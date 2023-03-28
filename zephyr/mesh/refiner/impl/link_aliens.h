@@ -1,0 +1,215 @@
+/// @file Файл содержит реализацию функции link_aliens, которая использутся
+/// для связывания соседей на различных процессов после выполнения функции
+/// адаптации сетки.
+/// Данный файл не устанавливается при установке zephyr, все изложенные описания
+/// алгоритмов и комментарии к функциям предназначены исключительно для разработчиков.
+
+#pragma once
+
+#include <zephyr/mesh/refiner/impl/common.h>
+
+namespace zephyr { namespace mesh { namespace impl {
+
+using namespace ::zephyr::data;
+using amrData;
+
+#ifdef ZEPHYR_ENABLE_MPI
+/// @brief Функция вызывается перед непосредственным связыванием соседей.
+/// У ячеек выставляются параметры element.rank и element.index, также
+/// если ячейка имеет сосдеда на другом процессе, то выставляется
+/// face.adjacent.ghost = base_id (соседа на другом процессе). После
+/// пересылки соседи находятся по base_id. Функция выполняется для части
+/// ячеек в хранилище.
+void before_exchange_partial(
+        Storage& locals,
+        Storage& aliens,
+        unsigned int rank,
+        size_t from, size_t to)
+{
+    for (size_t ic = from; ic < to; ++ic) {
+        auto cell = locals[ic];
+
+        // Ячейка неактуальна, пропускаем
+        if (cell[element].is_undefined()) continue;
+
+        cell[element].rank = rank;
+        cell[element].index = ic;
+
+        for (auto &face1: cell[faces].list) {
+            if (face1.is_undefined()) continue;
+
+            if (face1.adjacent.rank == rank) {
+                continue;
+            }
+
+            // Соседняя ячейка на другом процессе
+            scrutiny_check(face1.adjacent.ghost < aliens.size(), "face1.adjacent.ghost > aliens.size()")
+
+            auto neib = aliens[face1.adjacent.ghost];
+
+            face1.adjacent.ghost = neib[amrData].base_id;
+        }
+    }
+}
+
+void before_exchange(Storage& locals, Storage& aliens, unsigned int rank) {
+    before_exchange_partial(locals, aliens, rank, 0, locals.size());
+}
+
+#ifdef ZEPHYR_ENABLE_MULTITHREADING
+void before_exchange(Storage& locals, Storage& aliens, unsigned int rank, ThreadPool& threads) {
+    auto num_tasks = threads.size();
+    if (num_tasks < 2) {
+        before_exchange(locals, aliens, rank);
+        return;
+    }
+    std::vector<std::future<void>> results(num_tasks);
+
+    std::size_t bin = locals.size() / num_tasks + 1;
+    std::size_t pos = 0;
+    for (auto &res : results) {
+        res = threads.enqueue(before_exchange_partial,
+                              std::ref(locals), std::ref(aliens), rank,
+                              pos, std::min(pos + bin, locals.size())
+        );
+        pos += bin;
+    }
+
+    for (auto &result: results) result.get();
+}
+#endif
+
+/// @brief Функция для поиска и связывания ячеек между двумя процессами.
+/// Соседи ищутся по base_id, который указан в face.adjacent.ghost.
+template <unsigned int dim>
+void find_neighbors_partial(
+        Storage& locals,
+        Storage& aliens,
+        size_t from, size_t to)
+{
+    for (size_t ic = from; ic < to; ++ic) {
+        auto cell = locals[ic];
+
+        // Ячейка неактуальна, пропускаем
+        if (cell[element].is_undefined()) continue;
+
+        double search_radius = 2.0 * cell[size];
+
+        for (auto &face1: cell[faces].list) {
+            if (face1.is_undefined() or face1.is_boundary()) continue;
+
+            // Локальный сосед, пропускаем
+            if (face1.adjacent.ghost > std::numeric_limits<int>::max()) {
+                continue;
+            }
+
+            // Теперь попытаемся найти alien с таким base_id
+            auto base_id = face1.adjacent.ghost;
+
+            // Центр грани
+            auto fc1 = face_center<dim>(face1, cell[vertices]);
+
+            bool found = false;
+            for (size_t in = 0; in < aliens.size(); ++in) {
+                auto neib = aliens[in];
+                if (neib[amrData].base_id != base_id) continue;
+
+                // Если neib слишком далеко, пропускаем
+                if (distance(fc1, neib[coords]) > search_radius) {
+                    continue;
+                }
+
+                // Обходим грани предполагаемого соседа, ищем подходящую
+                for (auto &face2: neib[faces].list) {
+                    if (face2.is_undefined()) continue;
+                    auto fc2 = face_center<dim>(face2, neib[vertices]);
+
+                    if (distance(fc1, fc2) < 1.0e-5 * cell[size]) {
+                        face1.adjacent.rank = neib[element].rank;
+                        face1.adjacent.index = neib[element].index;
+                        face1.adjacent.ghost = in;
+
+                        found = true;
+                        break;
+                    }
+                }
+                if (found) {
+                    break;
+                }
+            }
+
+            if (!found) {
+                impl::print_cell_info(cell);
+                std::cout << "Can't find remote neighbor\n";
+                throw std::runtime_error("Can't find remote neighbor");
+            }
+        }
+    }
+}
+
+template <unsigned int dim>
+void find_neighbors(Storage& locals, Storage& aliens) {
+    find_neighbors_partial<dim>(locals, aliens, 0, locals.size());
+}
+
+#ifdef ZEPHYR_ENABLE_MULTITHREADING
+template <unsigned int dim>
+void find_neighbors(Storage& locals, Storage& aliens, ThreadPool& threads) {
+    auto num_tasks = threads.size();
+    if (num_tasks < 2) {
+        find_neighbors<dim>(locals, aliens);
+        return;
+    }
+    std::vector<std::future<void>> results(num_tasks);
+
+    std::size_t bin = locals.size() / num_tasks + 1;
+    std::size_t pos = 0;
+    for (auto &res : results) {
+        res = threads.enqueue(find_neighbors_partial<dim>,
+                              std::ref(locals), std::ref(aliens),
+                              pos, std::min(pos + bin, locals.size())
+        );
+        pos += bin;
+    }
+
+    for (auto &result: results) result.get();
+}
+#endif
+
+/// @brief Осуществляет связывание соседей на разных процессах в конце
+/// выполнения функции адаптации. Подробности алгоритма можно прочитать
+/// у функций before_exchange и find_neighbors
+template <unsigned int dim>
+void link_aliens(
+        Decomposition& decomposition
+        if_multithreading(, ThreadPool& threads = dummy_pool))
+{
+    Storage& locals = decomposition.inner_elements();
+    Storage& aliens = decomposition.outer_elements();
+    unsigned int rank = decomposition.network().rank();
+
+    // Подготовить ячейки и face.adjacent перед обменом
+    before_exchange(locals, aliens, rank if_multithreading(, threads));
+
+    // Получили alien ячейки, они содержат данные о своем ранге и номере
+    decomposition.prepare_aliens();
+    decomposition.exchange();
+
+    // Связать соседей на разных процессах
+    find_neighbors<dim>(locals, aliens if_multithreading(, threads));
+}
+
+/// @brief Специализация для пустых хранилищ
+template <>
+void link_aliens<0>(
+        Decomposition& decomposition
+        if_multithreading(, ThreadPool& threads))
+{
+    decomposition.prepare_aliens();
+    decomposition.exchange();
+}
+#endif
+
+} // namespace impl
+} // namespace mesh
+} // namespace zephyr
