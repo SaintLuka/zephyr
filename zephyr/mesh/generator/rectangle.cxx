@@ -86,8 +86,14 @@ void Rectangle::set_nx(int nx) {
     if (nx < 1) {
         throw std::runtime_error("Rectangle: Nx < 1");
     }
-    m_nx = nx;
-    m_ny = int(round(nx * (m_ymax - m_ymin) / (m_xmax - m_xmin)));
+    if (!m_voronoi) {
+        m_nx = nx;
+        m_ny = int(std::round(m_nx * (m_ymax - m_ymin) / (m_xmax - m_xmin)));
+    }
+    else {
+        m_nx = int(std::round(nx * std::pow(3.0, 0.25)) / std::sqrt(2.0));
+        m_ny = int(std::round(m_nx * (m_ymax - m_ymin) / (m_xmax - m_xmin) / std::sqrt(3.0)));
+    }
     compute_size();
 }
 
@@ -95,8 +101,14 @@ void Rectangle::set_ny(int ny) {
     if (ny < 1) {
         throw std::runtime_error("Rectangle: Ny < 1");
     }
-    m_ny = ny;
-    m_nx = int(round(ny * (m_xmax - m_xmin) / (m_ymax - m_ymin)));
+    if (!m_voronoi) {
+        m_ny = ny;
+        m_nx = int(std::round(ny * (m_xmax - m_xmin) / (m_ymax - m_ymin)));
+    }
+    else {
+        m_ny = int(std::round(ny / std::pow(3.0, 0.25)) / std::sqrt(2.0));
+        m_nx = int(std::round(m_ny * (m_xmax - m_xmin) / (m_ymax - m_ymin) * std::sqrt(3.0)));
+    }
     compute_size();
 }
 
@@ -104,8 +116,14 @@ void Rectangle::set_sizes(int nx, int ny) {
     if (nx < 1 || ny < 1) {
         throw std::runtime_error("Rectangle: Nx < 1 or Ny < 1");
     }
-    m_nx = nx;
-    m_ny = ny;
+    if (!m_voronoi) {
+        m_nx = nx;
+        m_ny = ny;
+    }
+    else {
+        m_nx = int(std::round(nx * std::pow(3.0, 0.25)) / std::sqrt(2.0));
+        m_ny = int(std::round(ny / std::pow(3.0, 0.25)) / std::sqrt(2.0));
+    }
     compute_size();
 
     double dx = (m_xmax - m_xmin) / m_nx;
@@ -122,10 +140,25 @@ void Rectangle::set_sizes(int nx, int ny) {
 }
 
 void Rectangle::set_size(int N) {
-    double d = std::sqrt((m_xmax - m_xmin) * (m_ymax - m_ymin) / N);
-    m_nx = int(round((m_xmax - m_xmin) / d));
-    m_ny = int(round((m_ymax - m_ymin) / d));
+    if (N < 1) {
+        std::cerr << "Rectangle Error: N < 1\n";
+        throw std::runtime_error("Rectangle Error: N < 1");
+    }
+
+    if (!m_voronoi) {
+        double d = std::sqrt((m_xmax - m_xmin) * (m_ymax - m_ymin) / N);
+        m_nx = int(std::round((m_xmax - m_xmin) / d));
+        m_ny = int(std::round((m_ymax - m_ymin) / d));
+    }
+    else {
+        double a = std::sqrt(2 * (m_xmax - m_xmin) * (m_ymax - m_ymin) / (std::sqrt(3.0) * N));
+        double h = std::sqrt(3.0) * a;
+
+        m_nx = int(std::round((m_xmax - m_xmin) / a));
+        m_ny = int(std::round((m_ymax - m_ymin) / h));
+    }
     compute_size();
+    std::cout << m_nx << " " << m_ny << " " << m_size << "\n";
 }
 
 void Rectangle::set_boundary_flags(FaceFlag left, FaceFlag right, FaceFlag bottom, FaceFlag top) {
@@ -185,19 +218,14 @@ void Rectangle::check_params() const {
 }
 
 void Rectangle::compute_size() {
-    if (m_voronoi) {
-        int Nb = m_nx * m_ny;
-        double DX = m_xmax - m_xmin;
-        double DY = m_ymax - m_ymin;
-        int Ny = int(std::floor(std::sqrt(std::sqrt(3.0) * DY * Nb / 2.0 / DX))) + 1;
-        double h = DY / 2.0 / Ny;
-        double D = h / std::sqrt(0.75);
-
-        int Nx = int(std::floor(DX / 1.5 / D));
-
-        m_size = (Nx + 1) * Ny + (Nx + 1) / 2;
-    } else {
+    if (!m_voronoi) {
         m_size = m_nx * m_ny;
+    } else {
+        m_size = 2 * m_nx * m_ny;
+    }
+    if (m_size > 1000000000) {
+        std::cerr << "Attempt to create mesh with more than 1 billion cells\n";
+        throw std::runtime_error("Attempt to create mesh with more than 1 billion cells");
     }
 }
 
@@ -283,189 +311,156 @@ void Rectangle::init_classic(Storage &cells, Part part) const {
     }
 }
 
+// Центр описаной окружности
+Vector3d circle_center(const Vector3d& A, const Vector3d& B, const Vector3d& C) {
+    double D = 2 * (A.x() * (B.y() - C.y()) + B.x() * (C.y() - A.y()) + C.x() * (A.y() - B.y()));
+    double Ux = (A.squaredNorm() * (B.y() - C.y()) +
+                 B.squaredNorm() * (C.y() - A.y()) +
+                 C.squaredNorm() * (A.y() - B.y())) / D;
+    double Uy = (A.squaredNorm() * (C.x() - B.x()) +
+                 B.squaredNorm() * (A.x() - C.x()) +
+                 C.squaredNorm() * (B.x() - A.x())) / D;
+    return Vector3d(Ux, Uy, 0.0);
+}
+
 void Rectangle::init_voronoi(Storage &cells, Part part) const {
-    int Nb = m_nx * m_ny;
-    double DX = m_xmax - m_xmin;
-    double DY = m_ymax - m_ymin;
-    int Ny = int(std::floor(std::sqrt(std::sqrt(3.0) * DY * Nb / 2.0 / DX))) + 1;
-    double h = DY / 2.0 / Ny;
-    double D = h / std::sqrt(0.75);
+    using zephyr::geom::Side;
+    using zephyr::geom::Cell;
+    using zephyr::geom::ShortList2D;
 
-    int Nx = int(std::floor(DX / 1.5 / D));
+    double Lx = m_xmax - m_xmin;
+    double Ly = m_ymax - m_ymin;
 
-    double x_shift = (DX - Nx * 1.5 * D) / 2.0;
+    double a = Lx / m_nx;
+    double h = Ly / m_ny;
 
-    int n = 0;
+    auto get_n = [this](int i, int j, int s) -> int {
+        return 2 * (((i + m_nx) % m_nx) * m_ny + (j + m_ny) % m_ny) + s;
+    };
+
+    auto get_i = [this](int n) -> int { return (n / 2) / m_ny; };
+    auto get_j = [this](int n) -> int { return (n / 2) % m_ny; };
+    auto get_s = [this](int n) -> int { return n % 2; };
+    auto inv = [](int s) -> int { return (s + 1) % 2; };
+
+    // Центры ячеек
+    auto center = [this, a, h](int i, int j, int s) -> Vector3d {
+        i = (i + m_nx) % m_nx;
+        j = (j + m_ny) % m_ny;
+        return {
+            m_xmin + (i + 0.5 * s + 0.25) * a,
+            m_ymin + (j + 0.5 * s + 0.25) * h,
+            0.0 };
+    };
+
     int counter = 0;
+    for (int n = part.from; n < part.to; ++n, ++counter) {
+        int i = get_i(n);
+        int j = get_j(n);
+        int s = get_s(n);
 
-    /*
-    std::vector<Vector3d> centers(cells.size());
+        // Центр ячейки
+        Vector3d c = center(i, j, s);
 
-    for (int i = 0; i < (Nx + 1) / 2; ++i) {
-        for (int j = 0; j < Ny; ++j) {
-            if (part.from <= n && n < part.to) {
-                centers[counter].x = 3 * D * i + x_shift;
-                centers[counter].y = (2.0 * j + 1.0) * h;
-                centers[counter].z = 0.0;
-                ++counter;
-            }
+        std::vector<int> neibs;
 
-            ++n;
-            if (n > m_size) {
-                break;
-            }
+        std::vector<int> neibs_n;
+        neibs_n.reserve(6);
+        std::vector<Vector3d> neibs_c;
+        neibs_c.reserve(6);
+
+        Vector3d nc;
+
+        // Сосед слева
+        neibs_n.push_back(get_n(i - 1, j, s));
+        nc = center(i - 1, j, s);
+        if (nc.x() > c.x()) {
+            nc.x() -= Lx;
         }
-        if (n > m_size) {
-            break;
+        neibs_c.push_back(nc);
+
+        // Сосед внизу слева
+        neibs_n.push_back(get_n(i - inv(s), j - inv(s), inv(s)));
+        nc = center(i - inv(s), j - inv(s), inv(s));
+        if (nc.x() > c.x()) { nc.x() -= Lx; }
+        if (nc.y() > c.y()) { nc.y() -= Ly; }
+        neibs_c.push_back(nc);
+
+        // Сосед внизу справа
+        neibs_n.push_back(get_n(i + s, j - inv(s), inv(s)));
+        nc = center(i + s, j - inv(s), inv(s));
+        if (nc.x() < c.x()) { nc.x() += Lx; }
+        if (nc.y() > c.y()) { nc.y() -= Ly; }
+        neibs_c.push_back(nc);
+
+        // Сосед справа
+        neibs_n.push_back(get_n(i + 1, j, s));
+        nc = center(i + 1, j, s);
+        if (nc.x() < c.x()) { nc.x() += Lx; }
+        neibs_c.push_back(nc);
+
+        // Сосед сверху справа
+        neibs_n.push_back(get_n(i + s, j + s, inv(s)));
+        nc = center(i + s, j + s, inv(s));
+        if (nc.x() < c.x()) { nc.x() += Lx; }
+        if (nc.y() < c.y()) { nc.y() += Ly; }
+        neibs_c.push_back(nc);
+
+        // Сосед сверху слева
+        neibs_n.push_back(get_n(i - inv(s), j + s, inv(s)));
+        nc = center(i - inv(s), j + s, inv(s));
+        if (nc.x() > c.x()) { nc.x() -= Lx; }
+        if (nc.y() < c.y()) { nc.y() += Ly; }
+        neibs_c.push_back(nc);
+
+        std::vector<Vector3d> verts(6);
+        for (int k1 = 0; k1 < 6; ++k1) {
+            int k2 = (k1 + 5) % 6;
+
+            verts[k1] = circle_center(c, neibs_c[k1], neibs_c[k2]);
         }
 
-        for (int j = 0; j <= Ny; ++j) {
-            if (part.from <= n && n < part.to) {
-                centers[counter].x = 3 * D * (i + 0.5) + x_shift;
-                centers[counter].y = 2.0 * j * h;
-                centers[counter].z = 0.0;
-                ++counter;
-            }
+        Cell cell(verts);
 
-            ++n;
-            if (n > m_size) {
-                break;
-            }
-        }
-        if (n > m_size) {
-            break;
-        }
+        // Данные AMR
+        cell.amr.base_id = n;
+        cell.amr.level   = 0;
+        cell.amr.flag    = 0;
+        cell.amr.z       = 0;
+
+        // Флаги граничных условий
+        auto ordinary = FaceFlag::ORDINARY;
+
+        cell.faces[Side::L].boundary = ordinary;
+        cell.faces[Side::R].boundary = ordinary;
+        cell.faces[Side::B].boundary = ordinary;
+        cell.faces[Side::T].boundary = ordinary;
+        cell.faces[Side::X].boundary = ordinary;
+        cell.faces[Side::F].boundary = ordinary;
+
+        cell.faces[Side::L].adjacent.rank = 0;
+        cell.faces[Side::R].adjacent.rank = 0;
+        cell.faces[Side::B].adjacent.rank = 0;
+        cell.faces[Side::T].adjacent.rank = 0;
+        cell.faces[Side::X].adjacent.rank = 0;
+        cell.faces[Side::F].adjacent.rank = 0;
+
+        cell.faces[Side::L].adjacent.ghost = 0;
+        cell.faces[Side::R].adjacent.ghost = 0;
+        cell.faces[Side::B].adjacent.ghost = 0;
+        cell.faces[Side::T].adjacent.ghost = 0;
+        cell.faces[Side::X].adjacent.ghost = 0;
+        cell.faces[Side::F].adjacent.ghost = 0;
+
+        cell.faces[Side::L].adjacent.index = neibs_n[0];
+        cell.faces[Side::R].adjacent.index = neibs_n[1];
+        cell.faces[Side::B].adjacent.index = neibs_n[2];
+        cell.faces[Side::T].adjacent.index = neibs_n[3];
+        cell.faces[Side::X].adjacent.index = neibs_n[4];
+        cell.faces[Side::F].adjacent.index = neibs_n[5];
+
+        cells[counter].geom() = cell;
     }
-    for (int j = 0; j < Ny; ++j) {
-        if (part.from <= n && n < part.to) {
-            centers[counter].x = 3 * D * ((Nx + 1) / 2) + x_shift;
-            centers[counter].y = (2.0 * j + 1.0) * h;
-            centers[counter].z = 0.0;
-            ++counter;
-        }
-
-        ++n;
-        if (n > m_size) {
-            break;
-        }
-    }
-
-    double d = 0.5 * D;
-
-    using zephyr::math::geom::Cell;
-    using zephyr::math::geom::VerticesList;
-
-    for (int ic = 0; ic < cells.size(); ++ic) {
-        using Vector3d;
-
-        Vector3d c = centers[ic];
-
-        VerticesList vlist;
-        if (c.x - D < m_xmin) {
-            /// LEFT
-            vlist = {
-                    Vector3d(c.x + D, c.y, 0.0),
-                    Vector3d(c.x + d, c.y + h, 0.0),
-                    Vector3d(m_xmin, c.y + h, 0.0),
-                    Vector3d(m_xmin, c.y - h, 0.0),
-                    Vector3d(c.x + d, c.y - h, 0.0)
-            };
-        } else if (c.x + D > m_xmax) {
-            /// RIGHT
-            if (c.y - 0.5 * h < m_ymin) {
-                /// RIGHT TOP
-                vlist = {
-                        Vector3d(m_xmax, m_ymax, 0.0),
-                        Vector3d(c.x - D, m_ymax, 0.0),
-                        Vector3d(c.x - d, m_ymax - h, 0.0),
-                        Vector3d(m_xmax, m_ymax - h, 0.0)
-                };
-            } else if (c.y + 0.5 * h > m_ymax) {
-                /// RIGHT BOTTOM
-                vlist = {
-                        Vector3d(m_xmax, m_ymin, 0.0),
-                        Vector3d(m_xmax, m_ymin + h, 0.0),
-                        Vector3d(c.x - d, m_ymin + h, 0.0),
-                        Vector3d(c.x - D, m_ymin, 0.0)
-                };
-            } else {
-                /// ORDINARY RIGHT
-                vlist = {
-                        Vector3d(m_xmax, c.y + h, 0.0),
-                        Vector3d(c.x - d, c.y + h, 0.0),
-                        Vector3d(c.x - D, c.y, 0.0),
-                        Vector3d(c.x - d, c.y - h, 0.0),
-                        Vector3d(m_xmax, c.y - h, 0.0)
-                };
-            }
-        } else if (c.y - 0.5 * h < m_ymin) {
-            /// BOTTOM
-            vlist = {
-                    Vector3d(c.x + D, c.y, 0.0),
-                    Vector3d(c.x + d, c.y + h, 0.0),
-                    Vector3d(c.x - d, c.y + h, 0.0),
-                    Vector3d(c.x - D, c.y, 0.0)
-            };
-        } else if (c.y + 0.5 * h > m_ymax) {
-            /// TOP
-            vlist = {
-                    Vector3d(c.x + D, c.y, 0.0),
-                    Vector3d(c.x - D, c.y, 0.0),
-                    Vector3d(c.x - d, c.y - h, 0.0),
-                    Vector3d(c.x + d, c.y - h, 0.0)
-            };
-        } else {
-            /// INNER CELL
-            vlist = {
-                    Vector3d(c.x + D, c.y, 0.0),
-                    Vector3d(c.x + d, c.y + h, 0.0),
-                    Vector3d(c.x - d, c.y + h, 0.0),
-                    Vector3d(c.x - D, c.y, 0.0),
-                    Vector3d(c.x - d, c.y - h, 0.0),
-                    Vector3d(c.x + d, c.y - h, 0.0)
-            };
-        }
-
-
-        Cell g_cell(vlist);
-
-        // Граничные условия
-        for (auto& face: g_cell.faces) {
-            if (face.is_undefined()) {
-                continue;
-            }
-
-            Vector3d v1 = (Vector3d &) g_cell.vertices.list[face.vertices[0]];
-            Vector3d v2 = (Vector3d &) g_cell.vertices.list[face.vertices[1]];
-
-            Vector3d fc = (v1 + v2) / 2.0;
-
-            FaceFlag flag = FaceFlag::ORDINARY;
-            if (fc.x + 1.0e-8 * DX > m_xmax) {
-                flag = m_right_flag;
-            } else if (fc.x - 1.0e-8 * DX < m_xmin) {
-                flag = m_left_flag;
-            } else if (fc.y + 1.0e-8 * DY > m_ymax) {
-                flag = m_top_flag;
-            } else if (fc.y - 1.0e-8 * DY < m_ymin) {
-                flag = m_bottom_flag;
-            }
-
-            face.boundary = flag;
-        }
-
-        auto cell = cells[ic];
-
-        cell[coords]   = g_cell.coords;
-        cell[size]     = g_cell.size;
-        cell[faces]    = g_cell.faces;
-        cell[vertices] = g_cell.vertices;
-
-        cell[element].dimension = 2;
-        cell[element].kind = kind::EULER;
-        cell[neibsSearchRadius].value = 3.0 * D;
-    }
-     */
 }
 
 } // generator
