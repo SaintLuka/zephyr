@@ -14,7 +14,7 @@
 namespace zephyr { namespace mesh { namespace generator {
 
 BlockStructured::BlockStructured(int n_blocks)
-    : Base("block_structured") {
+    : Generator("block_structured") {
 
     m_blocks.reserve(n_blocks);
     for (int index = 0; index < n_blocks; ++index) {
@@ -160,7 +160,6 @@ void BlockStructured::initialize(Storage& cells) {
     auto vlist = get_vertices();
     auto flist = get_boundary_flags();
 
-    /*
     cells.resize(vlist.size());
     for (int n = 0; n < cells.size(); ++n) {
         ShortList2D verts = vlist[n];
@@ -171,16 +170,8 @@ void BlockStructured::initialize(Storage& cells) {
             g_cell.faces[s].boundary = flist[n][s];
         }
 
-        auto cell = cells[n];
-
-        cell[coords]   = g_cell.coords;
-        cell[size]     = g_cell.size;
-        cell[faces]    = g_cell.faces;
-        cell[vertices] = g_cell.vertices;
-
-        cell[element].dimension = 2;
+        cells[n].geom() = g_cell;
     }
-     */
 }
 
 } // namespace generator

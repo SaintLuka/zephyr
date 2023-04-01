@@ -3,7 +3,7 @@
 #include <array>
 
 #include <zephyr/mesh/storage.h>
-#include <zephyr/mesh/generator/base.h>
+#include <zephyr/mesh/generator/generator.h>
 
 
 namespace zephyr { namespace mesh { namespace generator {
@@ -11,7 +11,7 @@ namespace zephyr { namespace mesh { namespace generator {
 
 /// @class Rectangle. Простой класс для создания Storage для хранения
 /// декартовой сетки или сетки из ячеек Воронного внутри прямоугольной области.
-class Rectangle : public Base {
+class Rectangle : public Generator {
 public:
 
 #ifdef ZEPHYR_ENABLE_YAML

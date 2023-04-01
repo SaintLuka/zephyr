@@ -15,7 +15,7 @@ using zephyr::network::mpi::Network;
 
 #ifdef ZEPHYR_ENABLE_YAML
 Rectangle::Rectangle(YAML::Node config)
-    : Base("rectangle"),
+    : Generator("rectangle"),
       m_xmin(0.0), m_xmax(1.0), m_ymin(0.0), m_ymax(1.0), m_nx(0), m_ny(0),
       m_left_flag(FaceFlag::WALL), m_right_flag(FaceFlag::WALL),
       m_bottom_flag(FaceFlag::WALL), m_top_flag(FaceFlag::WALL),
@@ -67,7 +67,7 @@ Rectangle::Rectangle(YAML::Node config)
 #endif
 
 Rectangle::Rectangle(double xmin, double xmax, double ymin, double ymax, bool voronoi) :
-        Base("rectangle"),
+        Generator("rectangle"),
         m_xmin(xmin), m_xmax(xmax), m_ymin(ymin), m_ymax(ymax), m_nx(0), m_ny(0),
         m_left_flag(FaceFlag::UNDEFINED), m_right_flag(FaceFlag::UNDEFINED),
         m_bottom_flag(FaceFlag::UNDEFINED), m_top_flag(FaceFlag::UNDEFINED),

@@ -5,7 +5,7 @@
 
 #include <zephyr/geom/vector.h>
 #include <zephyr/mesh/storage.h>
-#include <zephyr/mesh/generator/base.h>
+#include <zephyr/mesh/generator/generator.h>
 
 namespace zephyr { namespace mesh { namespace generator {
 
@@ -13,7 +13,7 @@ using VerticesList = std::vector<std::array<Vector3d, 4>>;
 
 /// @brief Генератор двумерной блочно-структурированной сетки из
 /// четырехугольных элементов.
-class BlockStructured : public Base {
+class BlockStructured : public Generator {
 private:
     using Curve_Ptr = std::shared_ptr<Curve>;
     using Curve_Ref = const std::shared_ptr<Curve> &;

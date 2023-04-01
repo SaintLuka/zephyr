@@ -18,7 +18,7 @@ namespace zephyr { namespace mesh { namespace generator { namespace collection {
 
 #ifdef ZEPHYR_ENABLE_YAML
 PlaneWithHole::PlaneWithHole(YAML::Node config) :
-        generator::Base("collection.plane-with-hole"),
+        Generator("collection.plane-with-hole"),
         blocks(12),
         m_xmin(0.0), m_xmax(0.0),
         m_ymin(0.0), m_ymax(0.0),
@@ -83,7 +83,7 @@ PlaneWithHole::PlaneWithHole(
         double ymin, double ymax,
         double xc, double yc,
         double r) :
-        generator::Base("collection.plane-with-hole"),
+        Generator("collection.plane-with-hole"),
         blocks(12),
         m_xmin(xmin), m_xmax(xmax),
         m_ymin(ymin), m_ymax(ymax),

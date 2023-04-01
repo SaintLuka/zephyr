@@ -1,6 +1,6 @@
 #pragma once
 
-#include <zephyr/mesh/generator/base.h>
+#include <zephyr/mesh/generator/generator.h>
 #include <zephyr/mesh/storage.h>
 
 #include <zephyr/mesh/range.h>
@@ -8,15 +8,14 @@
 
 namespace zephyr { namespace mesh {
 
+using namespace generator;
 
 class Mesh {
 public:
-    using Generator = generator::Base;
-
 
     template <class T>
     Mesh(const T& val, Generator* gen)
-        : m_locals(val), m_aliens(val) {
+            : m_locals(val), m_aliens(val) {
         initialize(gen);
     }
 
@@ -31,9 +30,10 @@ public:
 
     Storage& aliens() { return m_aliens; }
 
-    void initialize(Generator* gen);
 
 private:
+    void initialize(Generator* gen);
+
     Storage m_locals;
     Storage m_aliens;
 };

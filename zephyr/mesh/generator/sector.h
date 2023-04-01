@@ -5,7 +5,7 @@
 
 #include <zephyr/configuration.h>
 #include <zephyr/mesh/storage.h>
-#include <zephyr/mesh/generator/base.h>
+#include <zephyr/mesh/generator/generator.h>
 
 
 namespace zephyr { namespace mesh { namespace generator {
@@ -13,7 +13,7 @@ namespace zephyr { namespace mesh { namespace generator {
 
 /// @class Sector. Простой генератор для создания Storage для хранения
 /// блочно-структурированной сетки внутри сектора/круга
-class Sector : public Base {
+class Sector : public Generator {
 public:
 
 #ifdef ZEPHYR_ENABLE_YAML

@@ -10,7 +10,7 @@ namespace zephyr { namespace mesh { namespace generator {
 
 #ifdef ZEPHYR_ENABLE_YAML
 Cuboid::Cuboid(YAML::Node config)
-    : Base("cuboid"),
+    : Generator("cuboid"),
       m_xmin(0.0), m_xmax(1.0),
       m_ymin(0.0), m_ymax(1.0),
       m_zmin(0.0), m_zmax(1.0),
@@ -76,7 +76,7 @@ Cuboid::Cuboid(YAML::Node config)
 #endif
 
 Cuboid::Cuboid(double xmin, double xmax, double ymin, double ymax, double zmin, double zmax) :
-        Base("cuboid"),
+        Generator("cuboid"),
         m_xmin(xmin), m_xmax(xmax),
         m_ymin(ymin), m_ymax(ymax),
         m_zmin(zmin), m_zmax(zmax),
@@ -257,6 +257,7 @@ void Cuboid::compute_size() {
 }
 
 void Cuboid::initialize(Storage &cells) {
+    using zephyr::geom::Side;
     using zephyr::geom::Cell;
     using zephyr::geom::ShortList3D;
 
@@ -264,7 +265,8 @@ void Cuboid::initialize(Storage &cells) {
     double dy = (m_ymax - m_ymin) / m_ny;
     double dz = (m_zmax - m_zmin) / m_nz;
 
-    /*
+    cells.resize(m_size);
+
     for (int n = 0; n < cells.size(); ++n) {
         int i = (n / m_nz) / m_ny;
         int j = (n / m_nz) % m_ny;
@@ -298,18 +300,8 @@ void Cuboid::initialize(Storage &cells) {
         g_cell.faces[Side::X].boundary = k > 0 ? ordinary : m_back_flag;
         g_cell.faces[Side::F].boundary = k < m_nz - 1 ? ordinary : m_front_flag;
 
-        auto cell = cells[n];
-
-        cell[coords]   = g_cell.coords;
-        cell[size]     = g_cell.size;
-        cell[faces]    = g_cell.faces;
-        cell[vertices] = g_cell.vertices;
-
-        cell[element].dimension = 3;
-        cell[element].kind = kind::EULER;
-        cell[neibsSearchRadius].value = 1.6 * g_cell.size;
+        cells[n].geom() = g_cell;
     }
-     */
 }
 
 } // generator

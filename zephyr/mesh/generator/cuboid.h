@@ -8,7 +8,7 @@
 #include <zephyr/network/mpi/network.h>
 #endif
 
-#include <zephyr/mesh/generator/base.h>
+#include <zephyr/mesh/generator/generator.h>
 
 namespace zephyr { namespace mesh { namespace generator {
 
@@ -18,7 +18,7 @@ using ::zephyr::network::mpi::Network;
 
 /// @class Cuboid. Простой класс для создания Storage для хранения
 /// декартовой сетки или сетки из ячеек Воронного внутри прямоугольной области.
-class Cuboid : public Base {
+class Cuboid : public Generator {
 public:
 
 #ifdef ZEPHYR_ENABLE_YAML

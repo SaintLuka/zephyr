@@ -11,9 +11,10 @@ if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-option(ZEPHYR_ENABLE_MPI      "Use MPI functions"  OFF)
-option(ZEPHYR_ENABLE_YAML     "YAML support"       OFF)
-option(ZEPHYR_ENABLE_PROBLEMS "Build Problems"     ON)
+option(ZEPHYR_ENABLE_MPI      "Use MPI functions" ON)
+option(ZEPHYR_ENABLE_YAML     "YAML support"      OFF)
+option(ZEPHYR_ENABLE_TESTS    "Build tests"       ON)
+option(ZEPHYR_ENABLE_PROBLEMS "Build problems"    OFF)
 
 configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/configuration.h.in
@@ -42,15 +43,19 @@ target_include_directories(zephyr PUBLIC
     $<INSTALL_INTERFACE:${Boost_INCLUDE_DIR}>)
 
 if (ZEPHYR_ENABLE_MPI)
-    find_package(MPI REQUIRED COMPONENTS C)
-    target_link_libraries(zephyr PUBLIC MPI::MPI_C)
+    #find_package(MPI REQUIRED COMPONENTS C)
+    #target_link_libraries(zephyr PUBLIC MPI::MPI_C)
+
+    find_package(MPI REQUIRED)
+    target_include_directories(zephyr PUBLIC ${MPI_INCLUDE_PATH})
+    target_link_libraries(zephyr PUBLIC ${MPI_LIBRARIES})
 endif()
 if (ZEPHYR_ENABLE_YAML)
     target_link_libraries(zephyr PUBLIC yaml-cpp)
 endif()
 install(TARGETS zephyr DESTINATION lib EXPORT zephyr-targets)
 
-install(EXPORT zephyr-targets   DESTINATION share/cmake/zephyr)
+install(EXPORT zephyr-targets DESTINATION share/cmake/zephyr)
 install(DIRECTORY libs/Eigen DESTINATION include)
 
 include(CMakePackageConfigHelpers)
@@ -72,6 +77,10 @@ install(FILES
     ${CMAKE_CURRENT_BINARY_DIR}/zephyr/configuration.h
     DESTINATION include/${PROJECT_NAME}
     )
+
+if (ZEPHYR_ENABLE_TESTS)
+    add_subdirectory(tests)
+endif()
 
 if (ZEPHYR_ENABLE_PROBLEMS)
     add_subdirectory(problems)

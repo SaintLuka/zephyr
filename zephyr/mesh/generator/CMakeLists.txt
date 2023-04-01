@@ -2,7 +2,7 @@ set(ZEPHYR_GENERATOR_COLLECTION
 	${CMAKE_CURRENT_SOURCE_DIR}/collection/plane_with_hole.cxx)
 
 set(ZEPHYR_MESH_GENERATOR_SRC
-	${CMAKE_CURRENT_SOURCE_DIR}/base.cxx
+	${CMAKE_CURRENT_SOURCE_DIR}/generator.cxx
 	${CMAKE_CURRENT_SOURCE_DIR}/cuboid.cxx
 	${CMAKE_CURRENT_SOURCE_DIR}/sector.cxx
 	${CMAKE_CURRENT_SOURCE_DIR}/rectangle.cxx
@@ -29,7 +29,7 @@ install(FILES
 )
 
 install(FILES
-	${CMAKE_CURRENT_SOURCE_DIR}/base.h
+	${CMAKE_CURRENT_SOURCE_DIR}/generator.h
 	${CMAKE_CURRENT_SOURCE_DIR}/block.h
 	${CMAKE_CURRENT_SOURCE_DIR}/block_structured.h
 	${CMAKE_CURRENT_SOURCE_DIR}/cuboid.h

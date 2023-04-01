@@ -7,10 +7,10 @@
 #include <zephyr/mesh/storage.h>
 
 #ifdef ZEPHYR_ENABLE_MPI
-#include <zephyr/network/mpi.h>
+#include <zephyr/utils/mpi.h>
 #endif
 
-#include <zephyr/mesh/generator/base.h>
+#include <zephyr/mesh/generator/generator.h>
 #include <zephyr/mesh/generator/vertex.h>
 #include <zephyr/mesh/generator/curve/curve.h>
 #include <zephyr/mesh/generator/block_structured.h>
@@ -20,7 +20,7 @@ namespace zephyr { namespace mesh { namespace generator { namespace collection {
 using zephyr::geom::FaceFlag;
 
 /// @class PlaneWithHole. Генератор для создания сетки внутри прямоугольника с отверстием.
-class PlaneWithHole : public generator::Base {
+class PlaneWithHole : public Generator {
 public:
 
 #ifdef ZEPHYR_ENABLE_YAML

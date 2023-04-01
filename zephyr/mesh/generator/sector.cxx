@@ -46,7 +46,7 @@ using namespace sector_hidden;
 
 #ifdef ZEPHYR_ENABLE_YAML
 Sector::Sector(YAML::Node config)
-        : Base("sector"), m_r2(-1.0), m_r1(-1.0), m_angle(-1.0), m_hole(false),
+        : Generator("sector"), m_r2(-1.0), m_r1(-1.0), m_angle(-1.0), m_hole(false),
         m_left_flag(FaceFlag::UNDEFINED), m_right_flag(FaceFlag::UNDEFINED),
         m_inner_flag(FaceFlag::UNDEFINED), m_outer_flag(FaceFlag::UNDEFINED) {
 
@@ -101,7 +101,7 @@ Sector::Sector(YAML::Node config)
 #endif
 
 Sector::Sector(double r_max, double r_min, double angle, bool hole)
-        : Base("sector"), m_r2(r_max), m_r1(r_min), m_angle(angle), m_hole(hole),
+        : Generator("sector"), m_r2(r_max), m_r1(r_min), m_angle(angle), m_hole(hole),
         m_left_flag(FaceFlag::UNDEFINED), m_right_flag(FaceFlag::UNDEFINED),
         m_inner_flag(FaceFlag::UNDEFINED), m_outer_flag(FaceFlag::UNDEFINED) {
 
@@ -643,14 +643,10 @@ void Sector::initialize(Storage &cells) {
 
     create_vertices();
 
-    /*
-
-    if (cells.size() != m_vertices.size()) {
-        throw std::runtime_error("Sector strange error");
-    }
+    cells.resize(m_vertices.size());
 
     // Заполняем ячейки
-    for (int n = 0; n < m_vertices.size(); ++n) {
+    for (int n = 0; n < int(m_vertices.size()); ++n) {
         ShortList2D verts = {
                 m_vertices[n][0],
                 m_vertices[n][1],
@@ -661,29 +657,19 @@ void Sector::initialize(Storage &cells) {
         Cell g_cell(verts);
 
         for (int s = 0; s < 4; ++s) {
-            Vector3d v1 = (Vector3d &) g_cell.vertices.list[g_cell.faces[s].vertices[0]];
-            Vector3d v2 = (Vector3d &) g_cell.vertices.list[g_cell.faces[s].vertices[1]];
+            Vector3d v1 = g_cell.vertices[g_cell.faces[s].vertices[0]];
+            Vector3d v2 = g_cell.vertices[g_cell.faces[s].vertices[1]];
 
             Vector3d face_c = (v1 + v2) / 2.0;
 
             // Наружный слой
-            if (length(face_c) + 0.1 * g_cell.size > m_r2) {
+            if (face_c.norm() + 0.1 * g_cell.size > m_r2) {
                 g_cell.faces[s].boundary = m_outer_flag;
             }
         }
 
-        auto cell = cells[n];
-
-        cell[coords]   = g_cell.coords;
-        cell[size]     = g_cell.size;
-        cell[faces]    = g_cell.faces;
-        cell[vertices] = g_cell.vertices;
-
-        cell[element].dimension = 2;
-        cell[element].kind = kind::EULER;
-        cell[neibsSearchRadius].value = 2.0 * g_cell.size;
+        cells[n].geom() = g_cell;
     }
-     */
 }
 
 } // generator
