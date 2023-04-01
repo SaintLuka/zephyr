@@ -9,7 +9,12 @@ namespace zephyr { namespace mesh {
 IFace::IFace(const ICell &cell, int fid)
         : m_cell(cell), face_idx(fid) {
 
-    if (fid < geom::Faces::max_size) {
+    // Ищем первую определенную грань
+    while (face_idx < geom::Faces::max_size && geom().is_undefined()) {
+        ++face_idx;
+    }
+
+    if (face_idx < geom::Faces::max_size) {
         m_center = geom().center(m_cell.geom().vertices, m_cell.geom().dim);
     }
 }
