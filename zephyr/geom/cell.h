@@ -1,6 +1,5 @@
 #pragma once
 
-#include <zephyr/geom/vertices.h>
 #include <zephyr/geom/faces.h>
 #include <zephyr/geom/geom.h>
 
@@ -74,6 +73,22 @@ public:
     /// @brief Вывести информацию о ячейке в виде python скрипта
     /// для визуализации
     void visualize() const;
+
+    /// @brief Проверить базовую геометрию ячейки
+    /// @return -1 для плохой ячейки
+    int check_geometry() const;
+
+    /// @brief Проверить ориентацию граней
+    /// @return -1 для плохой ячейки
+    int check_base_face_orientation() const;
+
+    /// @brief Проверить порядок вершин
+    /// @return -1 для плохой ячейки
+    int check_base_vertices_order() const;
+
+    /// @brief Проверить сложные грани
+    /// @return -1 для плохой ячейки
+    int check_complex_faces() const;
 
 private:
 

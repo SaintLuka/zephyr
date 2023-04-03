@@ -1,354 +1,27 @@
 #include <zephyr/utils/mpi.h>
-#include <zephyr/mesh/amr/common.h>
+
+#include <zephyr/geom/base.h>
 #include <zephyr/mesh/mesh.h>
 
 namespace zephyr { namespace mesh {
 
 using utils::mpi;
-
-int check_geometry(const Cell& cell) {
-    /*
-    auto dim = cell.dim;
-
-    for (auto &face: cell.faces) {
-        if (face.is_undefined()) continue;
-
-        Vector3d fc(0.0, 0.0, 0.0);
-        for (int iv = 0; iv < amr::VpF(dim); ++iv) {
-            fc += cell.vertices[face.vertices[iv]];
-        }
-        fc /= amr::VpF(dim);
-
-        // Нормаль внешняя
-        if (face.normal.dot(fc - cell.coords) < 0.0) {
-            std::cout << "\tWrong normal direction (inside cell)\n";
-            cell.print_info();
-            return -1;
-        }
-
-        // Вершины грани перечислены в правильном порядке
-        if (dim > 2) {
-            Vector3d v0 = cell.vertices[face.vertices[0]];
-            Vector3d v1 = cell.vertices[face.vertices[1]];
-            Vector3d v2 = cell.vertices[face.vertices[2]];
-            Vector3d v3 = cell.vertices[face.vertices[3]];
-
-            Vector3d n1 = cross_product(v2 - v1, v0 - v1);
-            Vector3d n2 = cross_product(v1 - v2, v3 - v2);
-            if (scalar_product(n1, n2) < 0.0) {
-                std::cout << "Wrong order of vertices on face\n";
-                print_cell_info(cell);
-                return -1;
-            }
-        }
-    }
-    return 0;
-    */
-}
-
-int check_base_face_orientation(Storage::Item &cell) {
-    /*
-
-    if (cell[element].dimension == 2) {
-        Vector3d nx1 = (Vector3d &) cell.geom().faces[Side::LEFT].normal;
-        Vector3d nx2 = (Vector3d &) cell.geom().faces[Side::RIGHT].normal;
-        Vector3d ny1 = (Vector3d &) cell.geom().faces[Side::BOTTOM].normal;
-        Vector3d ny2 = (Vector3d &) cell.geom().faces[Side::TOP].normal;
-
-        if (scalar_product(nx1, nx2) > -0.8) {
-            std::cout << "\tOpposite outward normals (left-right) are co-directed\n";
-            print_cell_info(cell);
-            return -1;
-        }
-        if (scalar_product(ny1, ny2) > -0.8) {
-            std::cout << "\tOpposite outward normals (bottom-top) are co-directed\n";
-            print_cell_info(cell);
-            return -1;
-        }
-        if (nx1.x * ny1.y - nx1.y * ny1.x < 0.0) {
-            std::cout << "\tWrong face orientation (left-bottom)\n";
-            print_cell_info(cell);
-            return -1;
-        }
-        if (nx2.x * ny2.y - nx2.y * ny2.x < 0.0) {
-            std::cout << "\tWrong face orientation (right-top)\n";
-            print_cell_info(cell);
-            return -1;
-        }
-    } else {
-        Vector3d nx1 = (Vector3d &) cell.geom().faces[Side::LEFT].normal;
-        Vector3d nx2 = (Vector3d &) cell.geom().faces[Side::RIGHT].normal;
-        Vector3d ny1 = (Vector3d &) cell.geom().faces[Side::BOTTOM].normal;
-        Vector3d ny2 = (Vector3d &) cell.geom().faces[Side::TOP].normal;
-        Vector3d nz1 = (Vector3d &) cell.geom().faces[Side::BACK].normal;
-        Vector3d nz2 = (Vector3d &) cell.geom().faces[Side::FRONT].normal;
-
-        if (scalar_product(nx1, nx2) > -0.8) {
-            std::cout << "\tOpposite outward normals (left-right) are co-directed\n";
-            print_cell_info(cell);
-            return -1;
-        }
-        if (scalar_product(ny1, ny2) > -0.8) {
-            std::cout << "\tOpposite outward normals (bottom-top) are co-directed\n";
-            print_cell_info(cell);
-            return -1;
-        }
-        if (scalar_product(nz1, nz2) > -0.8) {
-            std::cout << "\tOpposite outward normals (back-front) are co-directed\n";
-            print_cell_info(cell);
-            return -1;
-        }
-        if (triple_product(nx1, ny1, nz1) > 0.0) {
-            std::cout << "\tWrong face orientation (left-bottom-back)\n";
-            print_cell_info(cell);
-            return -1;
-        }
-        if (triple_product(nx2, ny2, nz2) < 0.0) {
-            std::cout << "\tWrong face orientation (right-top-front)\n";
-            print_cell_info(cell);
-            return -1;
-        }
-    }
-     */
-    return 0;
-}
-
-int check_base_vertices_order(Storage::Item &cell) {
-    /*
-    using zephyr::math::geom::LargeList2D;
-    using zephyr::math::geom::LargeList3D;
-    using topology::iww;
-    using Vector3d;
-    using side;
-
-    auto dim = cell[element].dimension;
-
-    auto faces = cell[faces];
-
-    if (dim == 2) {
-        LargeList2D vertices;
-        for (int i = 0; i < 9; ++i) {
-            vertices[i] = (Vector3d &) cell.geom().vertices[i];
-        }
-
-        bool bad = false;
-
-        // Индекс пересечения двух граней
-        auto cross_face = [](Faces& faces, side side1, side side2) -> int {
-            auto& face1 = faces[side1];
-            auto& face2 = faces[side2];
-            if (face1.is_undefined()) {
-                return 100;
-            }
-            if (face2.is_undefined()) {
-                return 100;
-            }
-            for (int i: {0, 1}) {
-                for (int j: {0, 1}) {
-                    if (face1.vertices[i] == face2.vertices[j]) {
-                        return face1.vertices[i];
-                    }
-                }
-            }
-            return 100;
-        };
-
-        for (int i: {0, 1}) {
-            for (int j: {0, 1}) {
-                Vector3d a = vertices[iww(i + 1, j)] - vertices[iww(i, j)];
-                Vector3d b = vertices[iww(i, j + 1)] - vertices[iww(i, j)];
-
-                Vector3d c = vertices[iww(i, j + 1)] - vertices[iww(i + 1, j + 1)];
-                Vector3d d = vertices[iww(i + 1, j)] - vertices[iww(i + 1, j + 1)];
-
-                if (cross_product(a, b).z < 0.0 ||
-                    cross_product(c, d).z < 0.0) {
-                    bad = true;
-                    break;
-                }
-            }
-            if (bad) {
-                break;
-            }
-        }
-
-        // Пересечения граней по нужным вершинам
-        if (cross_face(faces, Side::::LEFT0, Side::BOTTOM0) != iww(0, 0)) {
-            bad = true;
-        }
-        if (cross_face(faces, Side::::LEFT0, Side::TOP) != iww(0, 2) &&
-                                                           cross_face(faces, Side::::LEFT1, Side::TOP) != iww(0, 2)) {
-            bad = true;
-        }
-        if (cross_face(faces, Side::::RIGHT, Side::BOTTOM0) != iww(2, 0) &&
-                                                               cross_face(faces, Side::::RIGHT, Side::BOTTOM1) != iww(2, 0)) {
-            bad = true;
-        }
-        if (cross_face(faces, Side::::RIGHT0, Side::TOP0) != iww(2, 2) &&
-                                                             cross_face(faces, Side::::RIGHT0, Side::TOP1) != iww(2, 2) &&
-                                                                                                              cross_face(faces, Side::::RIGHT1, Side::TOP0) != iww(2, 2) &&
-                                                                                                                                                               cross_face(faces, Side::::RIGHT1, Side::TOP1) != iww(2, 2)) {
-            bad = true;
-        }
-
-        if (bad) {
-            std::cout << "\tBad arrangement of vertices in cell\n";
-            print_cell_info(cell);
-            return -1;
-        }
-    } else {
-        LargeList3D vertices;
-        for (int i = 0; i < 27; ++i) {
-            vertices[i] = (Vector3d &) cell.geom().vertices[i];
-        }
-
-        bool bad = false;
-
-        // Индекс пересечения трех граней
-        auto cross_face = [](Faces& faces, side side1, side side2, side side3) -> int {
-            auto& face1 = faces[side1];
-            auto& face2 = faces[side2];
-            auto& face3 = faces[side3];
-
-            if (face1.is_undefined()) {
-                return 100;
-            }
-            if (face2.is_undefined()) {
-                return 100;
-            }
-            if (face3.is_undefined()) {
-                return 100;
-            }
-            for (int i: {0, 1, 2, 3}) {
-                for (int j: {0, 1, 2, 3}) {
-                    for (int k: {0, 1, 2, 3}) {
-                        if (face1.vertices[i] == face2.vertices[j] &&
-                            face2.vertices[j] == face3.vertices[k]) {
-                            return face1.vertices[i];
-                        }
-                    }
-                }
-            }
-            return 100;
-        };
-
-        for (int i: {0, 1}) {
-            for (int j: {0, 1}) {
-                for (int k: {0, 1}) {
-                    Vector3d a = vertices[iww(i + 1, j, k)] - vertices[iww(i, j, k)];
-                    Vector3d b = vertices[iww(i, j + 1, k)] - vertices[iww(i, j, k)];
-                    Vector3d c = vertices[iww(i, j, k + 1)] - vertices[iww(i, j, k)];
-
-                    Vector3d A = vertices[iww(i + 1, j + 1, k + 1)] - vertices[iww(i, j + 1, k + 1)];
-                    Vector3d B = vertices[iww(i + 1, j + 1, k + 1)] - vertices[iww(i + 1, j, k + 1)];
-                    Vector3d C = vertices[iww(i + 1, j + 1, k + 1)] - vertices[iww(i + 1, j + 1, k)];
-
-                    if (triple_product(a, b, c) < 0.0 ||
-                        triple_product(A, B, C) < 0.0) {
-                        bad = true;
-                        break;
-                    }
-                }
-                if (bad) {
-                    break;
-                }
-            }
-            if (bad) {
-                break;
-            }
-        }
-
-        // Пересечения граней по нужным вершинам ???
-
-        if (bad) {
-            std::cout << "\tBad arrangement of vertices in cell\n";
-            print_cell_info(cell);
-            return -1;
-        }
-    }
-     */
-
-    return 0;
-}
-
-int check_complex_faces(Storage::Item &cell) {
-    /*
-    using Vector3d;
-    using faces;
-    using vertices;
-    using side;
-
-    auto dim = cell[element].dimension;
-
-    if (dim == 2) {
-        for (int s = 0; s < 4; ++s) {
-            auto f1 = cell.geom().faces[s];
-            auto f2 = cell.geom().faces[s + 6];
-            if (f2.is_undefined()) continue;
-
-            if (fabs(scalar_product(f1.normal, f2.normal) - 1.0) > 1.0e-2) {
-                std::cout << "\tSubfaces are not co-directed (" + side_to_string(side(s)) + " side)\n";
-                print_cell_info(cell);
-                return -1;
-            }
-            int count = 0;
-            for (int i = 0; i < 2; ++i) {
-                for (int j = 0; j < 2; ++j) {
-                    if (f1.vertices[i] == f2.vertices[j]) {
-                        ++count;
-                    }
-                }
-            }
-            if (count != 1) {
-                std::cout << "\tStrange complex face\n";
-                print_cell_info(cell);
-                return -1;
-            }
-        }
-    } else {
-        for (int s = 0; s < 6; ++s) {
-            auto f1 = cell.geom().faces[s];
-            auto f2 = cell.geom().faces[s + 6];
-            if (f2.is_undefined()) continue;
-
-            auto f3 = cell.geom().faces[s + 12];
-            auto f4 = cell.geom().faces[s + 18];
-            if (f3.is_undefined() || f4.is_undefined()) {
-                std::cout
-                        << "\tComplex 3D face (" + side_to_string(side(s)) + " side) has less than 4 subfaces\n";
-                print_cell_info(cell);
-                return -1;
-            }
-
-            double d1 = fabs(scalar_product(f1.normal, f2.normal) - 1.0);
-            double d2 = fabs(scalar_product(f1.normal, f3.normal) - 1.0);
-            double d3 = fabs(scalar_product(f1.normal, f4.normal) - 1.0);
-            if (d1 + d2 + d3 > 1.0e-5) {
-                std::cout << "\tSubfaces are not co-directed (" + side_to_string(side(s)) + " side)\n";
-                print_cell_info(cell);
-                return -1;
-            }
-        }
-    }
-
-     */
-    return 0;
-}
+using namespace geom;
 
 int check_connectivity(Storage &locals, int ic, Storage& aliens) {
-    /*
-    using Vector3d;
-
-    auto cell = locals[ic];
-    if (cell[element].kind == kind::UNDEFINED)
+    auto cell = locals[ic].geom();
+    if (cell.is_undefined()) {
         return 0;
+    }
 
-    auto dim = cell[element].dimension;
+    auto dim = cell.dim;
 
     // Через обычные грани существуют соседи
     for (int iface = 0; iface < Faces::max_size; ++iface) {
-        auto &face = cell.geom().faces[iface];
-        if (face.is_undefined()) continue;
+        auto &face = cell.faces[iface];
+        if (face.is_undefined()) {
+            continue;
+        }
 
         if (face.boundary != FaceFlag::ORDINARY &&
             face.boundary != FaceFlag::PERIODIC) {
@@ -356,58 +29,58 @@ int check_connectivity(Storage &locals, int ic, Storage& aliens) {
             continue;
         }
 
-        auto neib = locals[0];
-        auto neib_rank = face.adjacent.rank;
-        auto neib_index = face.adjacent.index;
-        auto ghost = face.adjacent.ghost;
+        Cell neib;
+        auto& adj = face.adjacent;
 
-        if (neib_rank == rank) {
+        if (adj.rank == mpi::rank()) {
             // Локальная ячейка
-            if (ghost < std::numeric_limits<int>::max()) {
-                std::cout << "\tadjacent.ghost != infinity\n";
-                print_cell_info(cell);
+            if (adj.ghost >= 0) {
+                std::cout << "\tadjacent.ghost >= 0\n";
+                cell.print_info();
                 return -1;
             }
-            if (neib_index >= locals.size()) {
+            if (adj.index >= locals.size()) {
                 std::cout << "\tLocal neighbor out of range\n";
-                print_cell_info(cell);
+                cell.print_info();
                 return -1;
             }
-            if (neib_index == ic) {
+            if (adj.index == ic) {
                 std::cout << "\tSelf reference\n";
-                print_cell_info(cell);
+                cell.print_info();
                 return -1;
             }
-            neib = locals[neib_index];
+            neib = locals[adj.index].geom();
         }
         else {
             // Удаленная ячейка
-            if (ghost >= aliens.size()) {
+            if (adj.ghost < 0 || adj.ghost >= aliens.size()) {
                 std::cout << "\tRemote neighbor out of range\n";
-                print_cell_info(cell);
+                cell.print_info();
                 return -1;
             }
 
-            neib = aliens[ghost];
+            neib = aliens[adj.ghost].geom();
         }
 
-        if (neib[element].kind == kind::UNDEFINED) {
+        if (neib.is_undefined()) {
             std::cout << "\tUndefined neighbor\n";
-            print_cell_info(cell);
+            cell.print_info();
             return -1;
         }
 
         Vector3d fc(0.0, 0.0, 0.0);
         for (int i = 0; i < VpF(dim); ++i) {
-            fc += (Vector3d &) cell.geom().vertices[face.vertices[i]];
+            fc += cell.vertices[face.vertices[i]];
         }
         fc /= VpF(dim);
 
         // Сосед должен иметь точно такую же грань, но с противоположной нормалью,
         // и ссылаться на текущую ячейку
         int counter = 0;
-        for (auto &nface: neib.geom().faces) {
-            if (nface.is_undefined()) continue;
+        for (auto &nface: neib.faces) {
+            if (nface.is_undefined()) {
+                continue;
+            }
 
             if (nface.boundary != FaceFlag::ORDINARY &&
                 nface.boundary != FaceFlag::PERIODIC) {
@@ -417,11 +90,11 @@ int check_connectivity(Storage &locals, int ic, Storage& aliens) {
 
             Vector3d nfc(0.0, 0.0, 0.0);
             for (int i = 0; i < VpF(dim); ++i) {
-                nfc += (Vector3d &) neib.geom().vertices[nface.vertices[i]];
+                nfc += neib.vertices[nface.vertices[i]];
             }
             nfc /= VpF(dim);
 
-            if (distance(fc, nfc) > 1.0e-6 * cell[size].value) {
+            if ((fc - nfc).norm() > 1.0e-6 * cell.size) {
                 continue;
             }
 
@@ -429,50 +102,50 @@ int check_connectivity(Storage &locals, int ic, Storage& aliens) {
             ++counter;
 
             // нормали противоположны
-            if (fabs(scalar_product(face.normal, nface.normal) + 1.0) > 1.0e-6) {
+            if (std::abs(face.normal.dot(nface.normal) + 1.0) > 1.0e-6) {
                 std::cout << "\tOpposite faces have not opposite normals\n";
                 std::cout << "\tCurrent cell:\n";
-                print_cell_info(cell);
+                cell.print_info();
                 std::cout << "\tNeighbor:\n";
-                print_cell_info(neib);
+                neib.print_info();
                 return -1;
             }
             // площади совпадают
-            if (fabs(face.area - nface.area) > 1.0e-6 * cell[size].value) {
+            if (std::abs(face.area - nface.area) > 1.0e-6 * cell.size) {
                 std::cout << "\tOpposite faces have different area\n";
                 std::cout << "\tCurrent cell:\n";
-                print_cell_info(cell);
+                cell.print_info();
                 std::cout << "\tNeighbor:\n";
-                print_cell_info(neib);
+                neib.print_info();
                 return -1;
             }
-            if (nface.adjacent.rank != rank) {
+            if (nface.adjacent.rank != mpi::rank()) {
                 std::cout << "\tWrong adjacent (rank)\n";
                 std::cout << "\tCurrent cell:\n";
-                print_cell_info(cell);
+                cell.print_info();
                 std::cout << "\tNeighbor:\n";
-                print_cell_info(neib);
+                neib.print_info();
                 return -1;
             }
-            if (neib_rank == rank) {
+            if (adj.rank == mpi::rank()) {
                 // Локальный сосед
                 if (nface.adjacent.ghost < std::numeric_limits<int>::max()) {
                     std::cout << "\tWrong connection (ghost < infinity)\n";
                     std::cout << "\tCurrent cell:\n";
-                    print_cell_info(cell);
+                    cell.print_info();
                     std::cout << "\tNeighbor:\n";
-                    print_cell_info(neib);
+                    neib.print_info();
                     return -1;
                 }
             }
             else {
                 // Удаленный сосед
-                if (nface.adjacent.ghost > std::numeric_limits<int>::max()) {
-                    std::cout << "\tWrong connection (huge ghost)\n";
+                if (nface.adjacent.ghost < 0) {
+                    std::cout << "\tWrong connection\n";
                     std::cout << "\tCurrent cell:\n";
-                    print_cell_info(cell);
+                    cell.print_info();
                     std::cout << "\tNeighbor:\n";
-                    print_cell_info(neib);
+                    neib.print_info();
                     return -1;
                 }
 
@@ -480,18 +153,17 @@ int check_connectivity(Storage &locals, int ic, Storage& aliens) {
         }
         if (counter < 1) {
             std::cout << "\tHas no neighbor across ordinary face (" << side_to_string(iface/4) << ")\n";
-            print_cell_info(cell);
+            cell.print_info();
             std::cout << "\tNeighbor:\n";
-            print_cell_info(locals[cell.geom().faces[iface].adjacent.index]);
+            locals[cell.faces[iface].adjacent.index].print_info();
             return -1;
         }
         if (counter > 1) {
             std::cout << "\tMore than one neighbor across ordinary face\n";
-            print_cell_info(cell);
+            cell.print_info();
             return -1;
         }
     }
-     */
 
     return 0;
 }
@@ -524,14 +196,14 @@ int Mesh::check_base() {
         }
 
         // Число граней
-        for (int i = 0; i < amr::FpC(dim); ++i) {
+        for (int i = 0; i < FpC(dim); ++i) {
             if (cell.faces(i).is_undefined()) {
                 std::cout << "\tCell has no one of main faces\n";
                 cell.print_info();
                 return -1;
             }
         }
-        if (cell.faces().size() > amr::FpC(dim)) {
+        if (cell.faces().size() > FpC(dim)) {
             std::cout << "\tCell has too much faces\n";
             cell.print_info();
             return -1;
@@ -540,15 +212,15 @@ int Mesh::check_base() {
         // Число вершин ???
 
         // Правильное задание геометрии
-        res = check_geometry(cell.geom());
+        res = cell.geom().check_geometry();
         if (res < 0) return res;
 
         // Грани правльно ориентированы
-        res = check_base_face_orientation(cell);
+        res = cell.geom().check_base_face_orientation();
         if (res < 0) return res;
 
         // Порядок основных вершин
-        res = check_base_vertices_order(cell);
+        res = cell.geom().check_base_vertices_order();
         if (res < 0) return res;
 
         // Проверка смежности
@@ -593,7 +265,7 @@ int Mesh::check_refined() {
         }
 
         // Число граней
-        for (int i = 0; i < amr::FpC(dim); ++i) {
+        for (int i = 0; i < FpC(dim); ++i) {
             if (cell.faces(i).is_undefined()) {
                 std::cout << "\tCell has no one of main faces\n";
                 cell.print_info();
@@ -614,19 +286,19 @@ int Mesh::check_refined() {
         }
 
         // Правильное задание геометрии
-        res = check_geometry(cell.geom());
+        res = cell.geom().check_geometry();
         if (res < 0) return res;
 
         // Грани правльно ориентированы
-        res = check_base_face_orientation(cell);
+        res = cell.geom().check_base_face_orientation();
         if (res < 0) return res;
 
         // Порядок основных вершин
-        res = check_base_vertices_order(cell);
+        res = cell.geom().check_base_vertices_order();
         if (res < 0) return res;
 
         // Проверка сложных граней
-        res = check_complex_faces(cell);
+        res = cell.geom().check_complex_faces();
         if (res < 0) return res;
 
         // Проверка смежности

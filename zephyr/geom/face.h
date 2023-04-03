@@ -1,10 +1,8 @@
 #pragma once
 
 #include <string>
-#include <limits>
-#include <array>
-#include <algorithm>
 
+#include <zephyr/geom/base.h>
 #include <zephyr/geom/vertices.h>
 
 namespace zephyr { namespace geom {
@@ -78,7 +76,7 @@ inline FaceFlag boundary_from_string(std::string flag) {
 /// @details Короткое объяснение:
 ///               local neib           remote neib
 ///    rank  :    == this.rank    |    != this.rank
-///    index :    < locals.size  |    < decomposition(rank).locals.size
+///    index :    < locals.size   |    < decomposition(rank).locals.size
 ///    ghost :    < 0             |    < aliens.size
 struct Adjacent {
 
@@ -101,6 +99,14 @@ struct Adjacent {
         return adj.index != index || adj.ghost != ghost || adj.rank != rank;
     }
 };
+
+struct Face;
+
+/// @brief Найти центр простой грани.
+/// @param face Ссылка на грань.
+/// @param verts Соответствующий список вершин.
+template <int dim>
+static Vector3d face_center(const Face& face, const Vertices& verts);
 
 /// @brief Грань ячейки
 struct Face {
@@ -151,23 +157,16 @@ struct Face {
     template <int dim>
     inline Vector3d center(const Vertices& verts) const {
         if (dim < 3) {
-            return (verts[vertices[0]] + verts[vertices[1]]) / 2.0;
-        }
-        else {
-            return (verts[vertices[0]] + verts[vertices[1]] +
-                    verts[vertices[2]] + verts[vertices[3]]) / 4.0;
+            return 0.5 * (verts[vertices[0]] + verts[vertices[1]]);
+        } else {
+            return 0.25 * (verts[vertices[0]] + verts[vertices[1]] +
+                           verts[vertices[2]] + verts[vertices[3]]);
         }
     }
 
     /// @brief Центр грани
     inline Vector3d center(const Vertices& verts, int dim) const {
-        if (dim < 3) {
-            return (verts[vertices[0]] + verts[vertices[1]]) / 2.0;
-        }
-        else {
-            return (verts[vertices[0]] + verts[vertices[1]] +
-                    verts[vertices[2]] + verts[vertices[3]]) / 4.0;
-        }
+	    return dim < 3 ? center<2>(verts) : center<3>(verts);
     }
 };
 

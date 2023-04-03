@@ -101,8 +101,6 @@ std::array<geom::Cell, CpC(2)> create_children<2>(Storage::Item parent) {
 /// @return Массив с дочерними ячейками
 template <>
 std::array<Cell, CpC(3)> create_children<3>(Storage::Item parent) {
-    using topology::iww;
-    
     LargeList3D& vs = (LargeList3D&) parent.geom().vertices;
    
     ShortList3D vl1 = {vs[iww(0, 0, 0)], vs[iww(1, 0, 0)], vs[iww(0, 1, 0)], vs[iww(1, 1, 0)],
@@ -185,11 +183,11 @@ std::array<Cell, CpC(dim)> get_children(Storage::Item &cell, int ic, int rank) {
             for (int i: children_by_side[side]) {
                 Cell &child = children[i];
                 Face &child_face = child.faces[side];
-                auto child_fc = face_center<dim>(child_face, child.vertices);
+                auto child_fc = child_face.center<dim>(child.vertices);
 
                 for (auto s: subface_sides<dim>(side)) {
                     Face&cell_face = cell.geom().faces[s];
-                    auto cell_fc = face_center<dim>(cell_face, cell.geom().vertices);
+                    auto cell_fc = cell_face.center<dim>(cell.vertices());
 
                     if (distance(child_fc, cell_fc) < 1.0e-5 * cell.size()) {
                         child_face.adjacent = cell_face.adjacent;
@@ -251,7 +249,7 @@ void refine_cell(Storage &locals, Storage &aliens, int rank, int ic, const Distr
     for (int i = 0; i < CpC(dim); ++i) {
         auto j = locals[ic].geom().next + i;
 
-        copy_data(cell, locals[j]);
+        cell.copy_to(locals[j]);
 
         for (int s = 0; s < FpC(dim); ++s) {
             Face &f1 = locals[j].geom().faces[s];

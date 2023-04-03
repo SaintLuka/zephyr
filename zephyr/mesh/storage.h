@@ -88,6 +88,12 @@ public:
         /// @brief Ссылка на геометрию
         inline const Cell &geom() const { return *((Cell *) m_ptr); }
 
+        /// @brief Приведение к чистой геометрии
+        inline operator Cell&() { return *((Cell *) m_ptr); }
+
+        /// @brief Приведение к чистой геометрии
+        inline operator const Cell &() const { return *((Cell *) m_ptr); }
+
         /// @brief Вывести полную информацию о ячейке
         inline void print_info() const { geom().print_info(); }
 
@@ -157,6 +163,13 @@ public:
 
         /// @brief Ссылка на начало данных
         inline Byte* data_ptr() const { return m_ptr + sizeof(Cell); }
+
+        /// @brief Копирует данные из одной ячейки в другую.
+        /// @param src Указатель на источник данных.
+        /// @param dest Указатель на область, куда надо записать данные.
+        inline void copy_to(const Storage::Item& dest) const {
+            std::memcpy(m_ptr, dest.m_ptr, m_itemsize);
+        }
 
         /// @brief Ссылка на данные
         template<class T>

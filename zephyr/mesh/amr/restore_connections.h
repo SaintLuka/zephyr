@@ -71,7 +71,7 @@ void restore_connections_partial(Storage &locals, Storage &aliens, int rank,
             // Сосед через грань адаптировался
             bool found = false;
 
-            auto fc1 = face_center<dim>(face1, cell.geom().vertices);
+            auto fc1 = face1.center<dim>(cell.vertices());
 
             for (int j = 0; j < CpC(dim); ++j) {
                 auto jc = old_neib.geom().next + j;
@@ -83,7 +83,7 @@ void restore_connections_partial(Storage &locals, Storage &aliens, int rank,
                 auto neib = locals[jc];
                 for (auto &face2: neib.geom().faces.list()) {
                     if (face2.is_undefined()) continue;
-                    auto fc2 = face_center<dim>(face2, neib.geom().vertices);
+                    auto fc2 = face2.center<dim>(neib.vertices());
 
                     if (distance(fc1, fc2) < 1.0e-5 * cell.size()) {
                         face1.adjacent.index = jc;

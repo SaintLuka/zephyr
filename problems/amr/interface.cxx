@@ -51,7 +51,7 @@ int calc_idx(ICell& cell, double t) {
 
     int a1 = (int(std::floor(n_parts * f3)) + n_parts) % n_parts;
 
-    double g1 = std::round(sqr(std::sin(5.0 * r*r + 2*M_PI*t)));
+    double g1 = std::round(sqr(std::sin(5.0 * r*r - 2*M_PI*t)));
     int a2 = int(g1);
     return a1 + a2;
 }

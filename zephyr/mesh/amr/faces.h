@@ -30,8 +30,6 @@ void split_face_indices(Faces& faces);
 
 template <>
 void split_face_indices<2, Side::LEFT>(Faces& faces) {
-    using topology::iww;
-
     faces[Side::LEFT0].vertices[0] = iww(0, 0);
     faces[Side::LEFT0].vertices[1] = iww(0, 1);
     faces[Side::LEFT1].vertices[0] = iww(0, 1);
@@ -40,8 +38,6 @@ void split_face_indices<2, Side::LEFT>(Faces& faces) {
 
 template <>
 void split_face_indices<2, Side::RIGHT>(Faces& faces) {
-    using topology::iww;
-
     faces[Side::RIGHT0].vertices[0] = iww(2, 0);
     faces[Side::RIGHT0].vertices[1] = iww(2, 1);
     faces[Side::RIGHT1].vertices[0] = iww(2, 1);
@@ -50,8 +46,6 @@ void split_face_indices<2, Side::RIGHT>(Faces& faces) {
 
 template <>
 void split_face_indices<2, Side::BOTTOM>(Faces& faces) {
-    using topology::iww;
-
     faces[Side::BOTTOM0].vertices[0] = iww(0, 0);
     faces[Side::BOTTOM0].vertices[1] = iww(1, 0);
     faces[Side::BOTTOM1].vertices[0] = iww(1, 0);
@@ -60,8 +54,6 @@ void split_face_indices<2, Side::BOTTOM>(Faces& faces) {
 
 template <>
 void split_face_indices<2, Side::TOP>(Faces& faces) {
-    using topology::iww;
-
     faces[Side::TOP0].vertices[0] = iww(0, 2);
     faces[Side::TOP0].vertices[1] = iww(1, 2);
     faces[Side::TOP1].vertices[0] = iww(1, 2);
@@ -70,8 +62,6 @@ void split_face_indices<2, Side::TOP>(Faces& faces) {
 
 template <>
 void split_face_indices<3, Side::LEFT>(Faces& faces) {
-    using topology::iww;
-
     faces[Side::LEFT0].vertices = {iww(0, 0, 0), iww(0, 1, 0), iww(0, 0, 1), iww(0, 1, 1)};
     faces[Side::LEFT1].vertices = {iww(0, 1, 0), iww(0, 2, 0), iww(0, 1, 1), iww(0, 2, 1)};
     faces[Side::LEFT2].vertices = {iww(0, 0, 1), iww(0, 1, 1), iww(0, 0, 2), iww(0, 1, 2)};
@@ -80,8 +70,6 @@ void split_face_indices<3, Side::LEFT>(Faces& faces) {
 
 template <>
 void split_face_indices<3, Side::RIGHT>(Faces& faces) {
-    using topology::iww;
-
     faces[Side::RIGHT0].vertices = {iww(2, 0, 0), iww(2, 1, 0), iww(2, 0, 1), iww(2, 1, 1)};
     faces[Side::RIGHT1].vertices = {iww(2, 1, 0), iww(2, 2, 0), iww(2, 1, 1), iww(2, 2, 1)};
     faces[Side::RIGHT2].vertices = {iww(2, 0, 1), iww(2, 1, 1), iww(2, 0, 2), iww(2, 1, 2)};
@@ -90,8 +78,6 @@ void split_face_indices<3, Side::RIGHT>(Faces& faces) {
 
 template <>
 void split_face_indices<3, Side::BOTTOM>(Faces& faces) {
-    using topology::iww;
-
     faces[Side::BOTTOM0].vertices = {iww(0, 0, 0), iww(1, 0, 0), iww(0, 0, 1), iww(1, 0, 1)};
     faces[Side::BOTTOM1].vertices = {iww(1, 0, 0), iww(2, 0, 0), iww(1, 0, 1), iww(2, 0, 1)};
     faces[Side::BOTTOM2].vertices = {iww(0, 0, 1), iww(1, 0, 1), iww(0, 0, 2), iww(1, 0, 2)};
@@ -100,8 +86,6 @@ void split_face_indices<3, Side::BOTTOM>(Faces& faces) {
 
 template <>
 void split_face_indices<3, Side::TOP>(Faces& faces) {
-    using topology::iww;
-
     faces[Side::TOP0].vertices = {iww(0, 2, 0), iww(1, 2, 0), iww(0, 2, 1), iww(1, 2, 1)};
     faces[Side::TOP1].vertices = {iww(1, 2, 0), iww(2, 2, 0), iww(1, 2, 1), iww(2, 2, 1)};
     faces[Side::TOP2].vertices = {iww(0, 2, 1), iww(1, 2, 1), iww(0, 2, 2), iww(1, 2, 2)};
@@ -110,8 +94,6 @@ void split_face_indices<3, Side::TOP>(Faces& faces) {
 
 template <>
 void split_face_indices<3, Side::BACK>(Faces& faces) {
-    using topology::iww;
-
     faces[Side::BACK0].vertices = {iww(0, 0, 0), iww(1, 0, 0), iww(0, 1, 0), iww(1, 1, 0)};
     faces[Side::BACK1].vertices = {iww(1, 0, 0), iww(2, 0, 0), iww(1, 1, 0), iww(2, 1, 0)};
     faces[Side::BACK2].vertices = {iww(0, 1, 0), iww(1, 1, 0), iww(0, 2, 0), iww(1, 2, 0)};
@@ -120,8 +102,6 @@ void split_face_indices<3, Side::BACK>(Faces& faces) {
 
 template <>
 void split_face_indices<3, Side::FRONT>(Faces& faces) {
-    using topology::iww;
-
     faces[Side::FRONT0].vertices = {iww(0, 0, 2), iww(1, 0, 2), iww(0, 1, 2), iww(1, 1, 2)};
     faces[Side::FRONT1].vertices = {iww(1, 0, 2), iww(2, 0, 2), iww(1, 1, 2), iww(2, 1, 2)};
     faces[Side::FRONT2].vertices = {iww(0, 1, 2), iww(1, 1, 2), iww(0, 2, 2), iww(1, 2, 2)};
@@ -134,10 +114,8 @@ void setup_face_features(Face& face, Vertices& vertices);
 
 template <>
 void setup_face_features<2>(Face& face, Vertices& vertices) {
-    using topology::iww;
-
     // Точка внутри ячейки
-    Vector3d C = (Vector3d&) vertices[iww(1, 1)];
+    Vector3d C = vertices[iww(1, 1)];
 
     // Вершины грани
     ShortList1D vl = {
@@ -152,8 +130,6 @@ void setup_face_features<2>(Face& face, Vertices& vertices) {
 
 template <>
 void setup_face_features<3>(Face& face, Vertices& vertices) {
-    using topology::iww;
-
     // Точка внутри ячейки
     Vector3d C = (Vector3d&)vertices[iww(1, 1, 1)];
 
@@ -265,8 +241,6 @@ void split_face(Cell& cell, int side) {
 /// @brief Объединяет подграни в одну грань на стороне side
 template<int dim, Side side>
 void merge_faces(Storage::Item& cell) {
-    using topology::face_indices;
-
     auto &faces = cell.geom().faces;
     auto &vertices = cell.geom().vertices;
 

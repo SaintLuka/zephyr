@@ -1,7 +1,6 @@
 #include <fstream>
 
 #include <zephyr/geom/cell.h>
-
 #include <zephyr/io/vtu_file.h>
 
 
@@ -148,8 +147,6 @@ struct Handler {
         // заполнены и перед нами AMR ячейка
         if (dim < 3) {
             if (vertices[8].is_actual()) {
-                using topology::iww;
-
                 if (hex_only) {
                     // Сохраняем как простой четырехугольник (VTK_QUAD)
                     file.write((char *) vertices[iww(0, 0)].data(), 3 * sizeof(double));
@@ -183,8 +180,6 @@ struct Handler {
             }
         } else {
             if (vertices[26].is_actual()) {
-                using topology::iww;
-
                 // Сохраняем как простой шестигранник (VTK_HEXAHEDRON)
                 file.write((char *) vertices[iww(0, 0, 0)].data(), 3 * sizeof(double));
                 file.write((char *) vertices[iww(2, 0, 0)].data(), 3 * sizeof(double));

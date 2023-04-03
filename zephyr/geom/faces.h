@@ -1,14 +1,11 @@
 #pragma once
 
-#include <limits>
-
 #include <zephyr/geom/face.h>
-#include <zephyr/geom/vertices.h>
 
 namespace zephyr { namespace geom {
 
 /// @brief Именованные индексы граней ячейки
-enum Side : short {
+enum Side : int {
     LEFT    = 0,  L = 0,
     RIGHT   = 1,  R = 1,
     BOTTOM  = 2,  B = 2,
@@ -39,6 +36,71 @@ inline std::string side_to_string(Side s) {
 /// @brief Индекс грани в строку
 inline std::string side_to_string(int s) {
     return side_to_string(Side(s));
+}
+
+/// @brief Требуемый порядок граней
+static_assert(Side::LEFT   == 0, "Left   != 0");
+static_assert(Side::RIGHT  == 1, "Right  != 1");
+static_assert(Side::BOTTOM == 2, "Bottom != 2");
+static_assert(Side::TOP    == 3, "Top    != 3");
+static_assert(Side::BACK   == 4, "Back   != 4");
+static_assert(Side::FRONT  == 5, "Front  != 5");
+
+inline constexpr short undef_index() {
+    return -1;
+}
+
+template <int dim, Side side>
+inline std::array<short, 4> face_indices();
+
+template <>
+inline std::array<short, 4> face_indices<2, Side::LEFT>() {
+    return {iv(0, 0), iv(0, 1), undef_index(), undef_index()};
+}
+
+template <>
+inline std::array<short, 4> face_indices<2, Side::RIGHT>() {
+    return {iv(1, 0), iv(1, 1), undef_index(), undef_index()};
+}
+
+template <>
+inline std::array<short, 4> face_indices<2, Side::BOTTOM>() {
+    return  {iv(0, 0), iv(1, 0), undef_index(), undef_index()};
+}
+
+template <>
+inline std::array<short, 4> face_indices<2, Side::TOP>() {
+    return {iv(0, 1), iv(1, 1), undef_index(), undef_index()};
+}
+
+template <>
+inline std::array<short, 4> face_indices<3, Side::LEFT>() {
+    return {iv(0, 0, 0), iv(0, 1, 0), iv(0, 0, 1), iv(0, 1, 1)};
+}
+
+template <>
+inline std::array<short, 4> face_indices<3, Side::RIGHT>() {
+    return {iv(1, 0, 0), iv(1, 1, 0), iv(1, 0, 1), iv(1, 1, 1)};
+}
+
+template <>
+inline std::array<short, 4> face_indices<3, Side::BOTTOM>() {
+    return {iv(0, 0, 0), iv(1, 0, 0), iv(0, 0, 1), iv(1, 0, 1)};
+}
+
+template <>
+inline std::array<short, 4> face_indices<3, Side::TOP>() {
+    return {iv(0, 1, 0), iv(1, 1, 0), iv(0, 1, 1), iv(1, 1, 1)};
+}
+
+template <>
+inline std::array<short, 4> face_indices<3, Side::BACK>() {
+    return {iv(0, 0, 0), iv(1, 0, 0), iv(0, 1, 0), iv(1, 1, 0)};
+}
+
+template <>
+inline std::array<short, 4> face_indices<3, Side::FRONT>() {
+    return {iv(0, 0, 1), iv(1, 0, 1), iv(0, 1, 1), iv(1, 1, 1)};
 }
 
 /// @brief Список граней ячейки
@@ -104,71 +166,15 @@ struct Faces {
         return m_list[i];
     }
 
+    template <int dim, Side side>
+    inline static std::array<short, 4> indices() {
+        return face_indices<dim, side>();
+    }
+
 private:
     /// @brief Массив граней ячейки
     std::array<Face, max_size> m_list;
 };
-
-namespace topology {
-
-inline constexpr short undef_index() {
-    return -1;
-}
-
-template <int dim, Side side>
-inline std::array<short, 4> face_indices();
-
-template <>
-inline std::array<short, 4> face_indices<2, Side::LEFT>() {
-    return {iv(0, 0), iv(0, 1), undef_index(), undef_index()};
-}
-
-template <>
-inline std::array<short, 4> face_indices<2, Side::RIGHT>() {
-    return {iv(1, 0), iv(1, 1), undef_index(), undef_index()};
-}
-
-template <>
-inline std::array<short, 4> face_indices<2, Side::BOTTOM>() {
-    return  {iv(0, 0), iv(1, 0), undef_index(), undef_index()};
-}
-
-template <>
-inline std::array<short, 4> face_indices<2, Side::TOP>() {
-    return {iv(0, 1), iv(1, 1), undef_index(), undef_index()};
-}
-
-template <>
-inline std::array<short, 4> face_indices<3, Side::LEFT>() {
-    return {iv(0, 0, 0), iv(0, 1, 0), iv(0, 0, 1), iv(0, 1, 1)};
-}
-
-template <>
-inline std::array<short, 4> face_indices<3, Side::RIGHT>() {
-    return {iv(1, 0, 0), iv(1, 1, 0), iv(1, 0, 1), iv(1, 1, 1)};
-}
-
-template <>
-inline std::array<short, 4> face_indices<3, Side::BOTTOM>() {
-    return {iv(0, 0, 0), iv(1, 0, 0), iv(0, 0, 1), iv(1, 0, 1)};
-}
-
-template <>
-inline std::array<short, 4> face_indices<3, Side::TOP>() {
-    return {iv(0, 1, 0), iv(1, 1, 0), iv(0, 1, 1), iv(1, 1, 1)};
-}
-
-template <>
-inline std::array<short, 4> face_indices<3, Side::BACK>() {
-    return {iv(0, 0, 0), iv(1, 0, 0), iv(0, 1, 0), iv(1, 1, 0)};
-}
-
-template <>
-inline std::array<short, 4> face_indices<3, Side::FRONT>() {
-    return {iv(0, 0, 1), iv(1, 0, 1), iv(0, 1, 1), iv(1, 1, 1)};
-}
-
-} // topology
 
 } // geom
 } // zephyr

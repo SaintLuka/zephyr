@@ -187,7 +187,7 @@ Cell get_parent(Storage &locals, Storage &aliens, int rank,
         std::array<Vector3d, FpF(dim)> pfaces;
         for (int i = 0; i < FpF(dim); ++i) {
             Face& face = parent.faces[side + 6*i];
-            pfaces[i] = face_center<dim>(face, parent.vertices);
+            pfaces[i] = face.center<dim>(parent.vertices);
         }
 
         // Центры граней дочерних ячеек
@@ -196,7 +196,7 @@ Cell get_parent(Storage &locals, Storage &aliens, int rank,
             auto child = children[children_by_side[side][i]];
             if (child.geom().faces[side + 6].is_undefined()) {
                 // Простая грань
-                cfaces[i] = face_center<dim>(child.geom().faces[side], child.geom().vertices);
+                cfaces[i] = child.faces(side).center<dim>(child.vertices());
             } else {
                 // Сложная грань, считаем центр по основным вершинам
                 cfaces[i] = Vector3d(0.0, 0.0, 0.0);
@@ -298,7 +298,7 @@ void coarse_cell(Storage &locals, Storage &aliens, int rank, int ic, const Distr
 
     int ip = locals[ic].geom().next;
 
-    copy_data(locals[ic], locals[ip]);
+    locals[ic].copy_to(locals[ip]);
 
     locals[ip].geom() = parent;
 
