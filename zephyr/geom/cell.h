@@ -2,21 +2,37 @@
 
 #include <zephyr/geom/vertices.h>
 #include <zephyr/geom/faces.h>
-#include <zephyr/geom/amr_data.h>
-
 #include <zephyr/geom/geom.h>
 
 namespace zephyr { namespace geom {
 
-/// @struct Геометрические данные ячейки
+/// @struct Обязательные данные ячейки сетки
 class Cell {
 public:
-    short    dim;       ///< Размерность ячейки
-    AmrData  amr;       ///< Данные адаптации
+    // Данные о ячейке на сетке
+
+    int rank;   ///< Ранг процесса
+    int index;  ///< Индекс ячейки на сетке
+
+    // Данные AMR
+
+    int b_idx;  ///< Индекс среди базовых ячеек
+    int z_idx;  ///< Индекс ячейки на z-кривой
+    int next;   ///< Индекс новой ячейки (в алгоритмах)
+    int level;  ///< Уровень адаптации (0 для базовой)
+    int flag;   ///< Желаемый флаг адаптации
+
+    // Геометрия ячейки
+
+    int      dim;       ///< Размерность ячейки
     Vector3d coords;    ///< Барицентр ячейки
     double   size;      ///< Линейный размер ячейки
     Vertices vertices;  ///< Вершины ячейки
     Faces    faces;     ///< Список граней
+
+    /// @brief Конструктор по умолчанию, инициализирует
+    /// нулями не геометрические данные ячейки
+    Cell();
 
     /// @brief Двумерная простая
     explicit Cell(const ShortList2D &verts);
@@ -41,20 +57,33 @@ public:
      */
 
     /// @brief Площадь (в 2D) или объем (в 3D) ячейки
-    double volume() const {
-        return size * (dim < 3 ? size : size * size);
-    }
+    double volume() const;
 
+    /// @brief Устанавливает rank = -1 (ячейка вне сетки)
+    void set_undefined();
+
+    /// @brief Актуальная ячейка? (rank >= 0)
+    bool is_actual() const;
+
+    /// @brief Ячейка к удалению (rank < 0)
+    bool is_undefined() const;
+
+    /// @brief Вывести информацию о ячейке
+    void print_info() const;
+
+    /// @brief Вывести информацию о ячейке в виде python скрипта
+    /// для визуализации
+    void visualize() const;
 
 private:
 
-    /// Перенести вершины из списка в тип type::_vertices_
+    /// Перенести вершины из списка в тип Vertices
     void setup_vertices(const ShortList2D& vlist);
 
-    /// Перенести вершины из списка в тип type::_vertices_
+    /// Перенести вершины из списка в тип Vertices
     void setup_vertices(const LargeList2D& vlist);
 
-    /// Перенести вершины из списка в тип type::_vertices_
+    /// Перенести вершины из списка в тип Vertices
     void setup_vertices(const ShortList3D& vlist);
 
     void build2D(const ShortList2D &verts);

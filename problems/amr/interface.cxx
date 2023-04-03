@@ -21,11 +21,11 @@ struct _U_ {
 
 _U_ U;
 
-double get_idx(Storage::iterator cell) {
+double get_idx(Storage::Item cell) {
     return cell(U).idx;
 }
 
-double get_bit(Storage::iterator cell) {
+double get_bit(Storage::Item cell) {
     return cell(U).bit;
 }
 

@@ -31,15 +31,15 @@ void Storage::resize(int new_size) {
 }
 
 
-Storage::iterator Storage::operator[](int i) {
+Storage::Item Storage::operator[](int i) {
     return { m_data.data() + m_itemsize * i, m_itemsize };
 }
 
-Storage::iterator Storage::begin() {
+Storage::Item Storage::begin() {
     return { m_data.data(), m_itemsize };
 }
 
-Storage::iterator Storage::end() {
+Storage::Item Storage::end() {
     return { m_data.data() + m_itemsize * m_size, m_itemsize };
 }
 

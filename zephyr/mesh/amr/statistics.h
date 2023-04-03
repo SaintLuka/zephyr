@@ -5,9 +5,9 @@
 
 #pragma once
 
-#include <zephyr/mesh/refiner/impl/common.h>
+#include <zephyr/mesh/amr/common.h>
 
-namespace zephyr { namespace mesh { namespace impl {
+namespace zephyr { namespace mesh { namespace amr {
 
 /// @struct Содержит статистику о числе ячеек с флагами -1, 0 и 1 в некотором
 /// диапазоне индексов. Вспомогательная структура для реализации многопоточности.
@@ -26,10 +26,9 @@ struct StatisticsPartial {
     /// @param from, to Диапазон ячеек, для которых собирается статистика
     StatisticsPartial(Storage &cells, size_t from, size_t to)
         : n_coarse(0), n_retain(0), n_refine(0) {
-        using ::zephyr::data::amrData;
 
         for (size_t ic = from; ic < to; ++ic) {
-            switch (cells[ic][amrData].flag) {
+            switch (cells[ic].flag()) {
                 case 0:
                     ++n_retain;
                     break;
@@ -159,6 +158,6 @@ struct Statistics {
 #endif
 };
 
-} // namespace impl
+} // namespace amr
 } // namespace mesh
 } // namespace zephyr

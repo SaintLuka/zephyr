@@ -1,6 +1,8 @@
 #pragma once
 
+#include <iostream>
 #include <vector>
+#include <string>
 
 #include <zephyr/configuration.h>
 
@@ -11,11 +13,13 @@
 
 namespace zephyr { namespace utils {
 
+#ifdef ZEPHYR_ENABLE_MPI
 /// @brief Надо придумать, как это изящнее реализовать
 template <class T>
 MPI_Datatype mpi_type() {
     return MPI_INT;
 }
+#endif
 
 /// @brief Статический класс. Упрощенная обертка для mpi.
 /// @details При выключенном mpi все функции продолжают работать,

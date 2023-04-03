@@ -16,12 +16,12 @@ using zephyr::mesh::Storage;
 /// позволяет сократить размер выходного файла.
 /// @code
 /// WriteFunction<float> ev_energy =
-///     [](Storage::iterator cell, float* out) {
+///     [](Storage::Item cell, float* out) {
 ///         out[0] = static_cast<float>(cell.energy / 1.6e-19);
 ///     };
 /// @endcode
 template <typename T>
-using WriteFunction = std::function<void(Storage::iterator, T*)>;
+using WriteFunction = std::function<void(Storage::Item, T*)>;
 
 /// @class Класс для записи переменных в VTU файл, каждой переменной для
 /// записи должен соответствовать экземпляр Variable.
@@ -51,7 +51,7 @@ public:
     /// позволяет сократить размер выходного файла.
     /// @code
     /// Variable fd("momentum", 2,
-    ///     WriteFunction<float>([](Storage::iterator cell, float* out) {
+    ///     WriteFunction<float>([](Storage::Item cell, float* out) {
     ///         out[0] = static_cast<float>(cell.mass * cell.velocity.x);
     ///         out[1] = static_cast<float>(cell.mass * cell.velocity.y);
     ///     }));
@@ -64,7 +64,7 @@ public:
         m_name = name;
         m_type = VtkType::get<T>();
         m_n_components = n_components;
-        m_function = [func](Storage::iterator cell, void *out) {
+        m_function = [func](Storage::Item cell, void *out) {
             func(cell, (T *) out);
         };
     }
@@ -90,7 +90,7 @@ public:
     size_t size() const;
 
     /// @brief Основная функция класса. Запись переменной из ячейки в поток.
-    void write(Storage::iterator cell, void *out) const;
+    void write(Storage::Item cell, void *out) const;
 
 private:
     std::string m_name;

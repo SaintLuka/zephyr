@@ -6,12 +6,9 @@
 
 #pragma once
 
-#include <zephyr/mesh/refiner/impl/common.h>
+#include <zephyr/mesh/amr/common.h>
 
-namespace zephyr { namespace mesh { namespace impl {
-
-using namespace ::zephyr::data;
-using amrData;
+namespace zephyr { namespace mesh { namespace amr {
 
 #ifdef ZEPHYR_ENABLE_MPI
 /// @brief Функция вызывается перед непосредственным связыванием соседей.
@@ -35,7 +32,7 @@ void before_exchange_partial(
         cell[element].rank = rank;
         cell[element].index = ic;
 
-        for (auto &face1: cell[faces].list) {
+        for (auto &face1: cell.geom().faces) {
             if (face1.is_undefined()) continue;
 
             if (face1.adjacent.rank == rank) {
@@ -47,7 +44,7 @@ void before_exchange_partial(
 
             auto neib = aliens[face1.adjacent.ghost];
 
-            face1.adjacent.ghost = neib[amrData].base_id;
+            face1.adjacent.ghost = neib.b_idx();
         }
     }
 }
@@ -95,7 +92,7 @@ void find_neighbors_partial(
 
         double search_radius = 2.0 * cell[size];
 
-        for (auto &face1: cell[faces].list) {
+        for (auto &face1: cell.geom().faces) {
             if (face1.is_undefined() or face1.is_boundary()) continue;
 
             // Локальный сосед, пропускаем
@@ -112,7 +109,7 @@ void find_neighbors_partial(
             bool found = false;
             for (size_t in = 0; in < aliens.size(); ++in) {
                 auto neib = aliens[in];
-                if (neib[amrData].base_id != base_id) continue;
+                if (neib.b_idx() != base_id) continue;
 
                 // Если neib слишком далеко, пропускаем
                 if (distance(fc1, neib[coords]) > search_radius) {
@@ -120,7 +117,7 @@ void find_neighbors_partial(
                 }
 
                 // Обходим грани предполагаемого соседа, ищем подходящую
-                for (auto &face2: neib[faces].list) {
+                for (auto &face2: neib.geom().faces) {
                     if (face2.is_undefined()) continue;
                     auto fc2 = face_center<dim>(face2, neib[vertices]);
 
@@ -139,7 +136,7 @@ void find_neighbors_partial(
             }
 
             if (!found) {
-                impl::print_cell_info(cell);
+                amr::print_cell_info(cell);
                 std::cout << "Can't find remote neighbor\n";
                 throw std::runtime_error("Can't find remote neighbor");
             }
@@ -210,6 +207,6 @@ void link_aliens<0>(
 }
 #endif
 
-} // namespace impl
+} // namespace amr
 } // namespace mesh
 } // namespace zephyr

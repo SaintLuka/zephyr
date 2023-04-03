@@ -6,22 +6,18 @@
 
 #pragma once
 
-#include <zephyr/mesh/refiner/impl/common.h>
-#include <zephyr/mesh/refiner/impl/statistics.h>
-#include <zephyr/mesh/refiner/impl/setup_positions.h>
-#include <zephyr/mesh/refiner/impl/setup_geometry.h>
-#include <zephyr/mesh/refiner/impl/restore_connections.h>
-#include <zephyr/mesh/refiner/impl/remove_undefined.h>
-#include <zephyr/mesh/refiner/impl/sorting.h>
-#include <zephyr/mesh/refiner/impl/link_aliens.h>
+#include <zephyr/mesh/amr/common.h>
+#include <zephyr/mesh/amr/statistics.h>
+#include <zephyr/mesh/amr/setup_positions.h>
+#include <zephyr/mesh/amr/setup_geometry.h>
+#include <zephyr/mesh/amr/restore_connections.h>
+#include <zephyr/mesh/amr/remove_undefined.h>
+#include <zephyr/mesh/amr/sorting.h>
+#include <zephyr/mesh/amr/link_aliens.h>
 
-namespace zephyr { namespace mesh { namespace impl {
+namespace zephyr { namespace mesh { namespace amr {
 
-using namespace ::zephyr::data;
-using amrData;
-#ifdef ZEPHYR_ENABLE_MULTITHREADING
-using ::zephyr::multithreading::dummy_pool;
-#endif
+using utils::Stopwatch;
 
 /// @brief Функция выполняет непостредственную адаптацию ячеек в хранилище в
 /// соответствии с флагами адапатции. Предполагается, что флаги адаптации
@@ -42,13 +38,7 @@ using ::zephyr::multithreading::dummy_pool;
 /// часть старых ячеек (не листовых) являются неопределенными.
 /// Алгоритм осуществляет удаление данных ячеек.
 template<unsigned int dim = 0>
-void apply(
-        Storage &cells,
-        const DataDistributor& op
-        if_multithreading(, ThreadPool& threads = dummy_pool))
-{
-    using ::zephyr::performance::timer::Stopwatch;
-
+void apply(Storage &cells, const Distributor& op) {
     static Stopwatch count_timer;
     static Stopwatch positions_timer;
     static Stopwatch geometry_timer;
@@ -58,7 +48,7 @@ void apply(
 
     /// Этап 1. Сбор статистики
     count_timer.resume();
-    Statistics<dim> count(cells if_multithreading(, threads));
+    Statistics<dim> count(cells);
     count_timer.stop();
 
     // Нечего адаптировать
@@ -66,22 +56,23 @@ void apply(
 
     /// Этап 2. Распределяем места для новых ячеек
     positions_timer.resume();
-    setup_positions(cells, count if_multithreading(, threads));
+    setup_positions(cells, count);
     positions_timer.stop();
 
     /// Этап 3. Восстановление геометрии
     geometry_timer.resume();
-    setup_geometry(cells, count, op if_multithreading(, threads));
+    setup_geometry(cells, count, op);
     geometry_timer.stop();
 
     /// Этап 4. Восстановление соседства
     connections_timer.resume();
-    restore_connections(cells, count if_multithreading(, threads));
+    throw std::runtime_error("No restore");
+    //restore_connections(cells, count);
     connections_timer.stop();
 
     /// Этап 5. Удаление неопределенных ячеек
     clean_timer.resume();
-    remove_undefined(cells, count if_multithreading(, threads));
+    remove_undefined(cells, count);
     clean_timer.stop();
 
     /// Этап 6. Сортировка ячеек по уровням (не обязательно)
@@ -90,32 +81,28 @@ void apply(
     //sort_timer.stop();
 
 #if CHECK_PERFORMANCE
-    std::cout << "    Statistics elapsed: " << count_timer.times().wall() << "\n";
-    std::cout << "    Positions elapsed: " << positions_timer.times().wall() << "\n";
-    std::cout << "    Geometry elapsed: " << geometry_timer.times().wall() << "\n";
-    std::cout << "    Connections elapsed: " << connections_timer.times().wall() << "\n";
-    std::cout << "    Clean elapsed: " << clean_timer.times().wall() << "\n";
-    std::cout << "    Sorting elapsed: " << sort_timer.times().wall() << "\n";
+    std::cout << "    Statistics elapsed: " << count_timer.seconds() << " sec\n";
+    std::cout << "    Positions elapsed: " << positions_timer.seconds() << " sec\n";
+    std::cout << "    Geometry elapsed: " << geometry_timer.seconds() << " sec\n";
+    std::cout << "    Connections elapsed: " << connections_timer.seconds() << " sec\n";
+    std::cout << "    Clean elapsed: " << clean_timer.seconds() << " sec\n";
+    std::cout << "    Sorting elapsed: " << sort_timer.seconds() << " sec\n";
 #endif
 }
 
 /// @brief Специализация по умолчанию с автоматическим выбором размерности
 template<>
-void apply<0>(
-        Storage &cells,
-        const DataDistributor& op
-        if_multithreading(, ThreadPool& threads))
-{
+void apply<0>(Storage &cells, const Distributor& op) {
     if (cells.empty())
         return;
 
-    auto dim = cells[0][element].dimension;
+    auto dim = cells[0].dim();
 
     if (dim < 3) {
-        impl::apply<2>(cells, op if_multithreading(, threads));
+        amr::apply<2>(cells, op);
     }
     else {
-        impl::apply<3>(cells, op if_multithreading(, threads));
+        amr::apply<3>(cells, op);
     }
 }
 
@@ -221,21 +208,21 @@ void apply<1234>(
     Storage& cells = decomposition.inner_elements();
 
     if (cells.empty()) {
-        impl::apply<0>(decomposition, op if_multithreading(, threads));
+        amr::apply<0>(decomposition, op if_multithreading(, threads));
     }
     else {
         auto dim = cells[0][element].dimension;
 
         if (dim < 3) {
-            impl::apply<2>(decomposition, op if_multithreading(, threads));
+            amr::apply<2>(decomposition, op if_multithreading(, threads));
         } else {
-            impl::apply<3>(decomposition, op if_multithreading(, threads));
+            amr::apply<3>(decomposition, op if_multithreading(, threads));
         }
     }
 }
 
 #endif
 
-} // namespace impl
+} // namespace amr
 } // namespace mesh
 } // namespace zephyr

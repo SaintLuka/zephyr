@@ -101,7 +101,7 @@ struct Handler {
     }
 
     /// @brief Количество вершин элемента
-    int n_points(const geom::Cell& cell) {
+    int n_points(geom::Cell& cell) {
         auto& faces = cell.faces;
         auto& vertices = cell.vertices;
 
@@ -209,7 +209,7 @@ struct Handler {
     }
 
     /// @brief Записать порядок вершин элемента
-    void write_connectivity(std::ofstream &file, const geom::Cell& cell, size_t &counter) {
+    void write_connectivity(std::ofstream &file, geom::Cell& cell, size_t &counter) {
         auto n = n_points(cell);
         for (int i = 0; i < n; ++i) {
             size_t val = counter++;
@@ -345,7 +345,7 @@ void write_mesh_primitives(
 
     // Количество вершин
     size_t n_points = 0;
-    for (const auto& cell: cells) {
+    for (auto& cell: cells) {
         if (filter(cell)) {
             n_points += handler.n_points(cell.geom());
         }
@@ -359,7 +359,7 @@ void write_mesh_primitives(
     uint32_t data_size = static_cast<uint32_t>(3 * n_points * sizeof(double));
     file.write((char *) &data_size, sizeof(uint32_t));
 
-    for (const auto &cell: cells) {
+    for (auto &cell: cells) {
         if (filter(cell)) {
             handler.write_points(file, cell.geom());
         }
@@ -371,7 +371,7 @@ void write_mesh_primitives(
     file.write((char *) &data_size, sizeof(uint32_t));
 
     size_t counter = 0;
-    for (const auto &cell: cells) {
+    for (auto &cell: cells) {
         if (filter(cell)) {
             handler.write_connectivity(file, cell.geom(), counter);
         }
@@ -413,9 +413,9 @@ void write_particles_primitives(
     uint32_t data_size = static_cast<uint32_t>(3 * n_cells * sizeof(double));
     file.write((char *) &data_size, sizeof(uint32_t));
 
-    for (const auto &cell: cells) {
+    for (auto &cell: cells) {
         if (filter(cell)) {
-            file.write((char *) &cell.coords(), 3 * sizeof(double));
+            file.write((char *) &cell.center(), 3 * sizeof(double));
         }
     }
 

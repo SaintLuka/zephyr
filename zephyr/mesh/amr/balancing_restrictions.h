@@ -5,14 +5,14 @@
 
 #pragma once
 
-#include <zephyr/mesh/refiner/impl/common.h>
-#include <zephyr/mesh/refiner/impl/siblings.h>
+#include <zephyr/mesh/amr/common.h>
+#include <zephyr/mesh/amr/siblings.h>
 
 #ifdef ZEPHYR_ENABLE_MULTITHREADING
 #include <zephyr/multithreading/thread-pool.h>
 #endif
 
-namespace zephyr { namespace mesh { namespace impl {
+namespace zephyr { namespace mesh { namespace amr {
 
 /// @brief Функция осуществляет обход по части ячеек хранилища и накладывает
 /// базовые ограничения на флаги адаптации:
@@ -24,19 +24,19 @@ namespace zephyr { namespace mesh { namespace impl {
 /// @param cells Хранилище ячеек
 /// @param max_level Максимальный уровень адаптации
 /// @param from, to Диапазон ячеек для обхода
-template<unsigned int dim>
-void base_restrictions_partial(Storage &cells, unsigned int max_level, size_t from, size_t to) {
-    for (size_t ic = from; ic < to; ++ic) {
+template<int dim>
+void base_restrictions_partial(Storage &cells, int max_level, int from, int to) {
+    for (int ic = from; ic < to; ++ic) {
         scrutiny_check(ic < cells.size(), "base_restrictions: ic >= cells.size()")
         auto cell = cells[ic];
 
-        int flag = cell[amrData].flag;
+        short flag = cell.flag();
         // Приводим к одному из трех значений { -1, 0, 1 }
         if (flag != 0) {
             flag = flag > 0 ? 1 : -1;
         }
 
-        int lvl = cell[amrData].level;
+        int lvl = cell.level();
 
         if (lvl + flag < 0) {
             flag = 0;
@@ -52,7 +52,7 @@ void base_restrictions_partial(Storage &cells, unsigned int max_level, size_t fr
             }
         }
 
-        cell[amrData].flag = flag;
+        cell.geom().flag = flag;
     }
 }
 
@@ -60,8 +60,8 @@ void base_restrictions_partial(Storage &cells, unsigned int max_level, size_t fr
 /// в однопоточном режиме
 /// @param cells Хранилище ячеек
 /// @param max_level Максимальный уровень адаптации
-template <unsigned int dim>
-void base_restrictions(Storage &cells, unsigned int max_level) {
+template <int dim>
+void base_restrictions(Storage &cells, int max_level) {
     base_restrictions_partial<dim>(cells, max_level, 0, cells.size());
 }
 
@@ -71,8 +71,8 @@ void base_restrictions(Storage &cells, unsigned int max_level) {
 /// @param cells Хранилище ячеек
 /// @param max_level Максимальный уровень адаптации
 /// @param threads Ссылка ну пул тредов
-template <unsigned int dim>
-void base_restrictions(Storage &cells, unsigned int max_level, ThreadPool& threads) {
+template <int dim>
+void base_restrictions(Storage &cells, int max_level, ThreadPool& threads) {
     auto num_tasks = threads.size();
     if (num_tasks < 2) {
         // Вызов однопоточной версии
@@ -81,8 +81,8 @@ void base_restrictions(Storage &cells, unsigned int max_level, ThreadPool& threa
     }
     std::vector<std::future<void>> results(num_tasks);
 
-    std::size_t bin = cells.size() / num_tasks + 1;
-    std::size_t pos = 0;
+    std::int bin = cells.size() / num_tasks + 1;
+    std::int pos = 0;
     for (auto &res : results) {
         res = threads.enqueue(base_restrictions_partial<dim>,
                               std::ref(cells), max_level,
@@ -95,11 +95,9 @@ void base_restrictions(Storage &cells, unsigned int max_level, ThreadPool& threa
 }
 #endif
 
-Storage dummy_aliens;
-
-void check_flags(Storage& locals, unsigned int max_level, Storage& aliens = dummy_aliens) {
+void check_flags(Storage& locals, int max_level, Storage& aliens) {
     for(auto cell: locals) {
-        int cell_wanted_lvl = cell[amrData].level + cell[amrData].flag;
+        int cell_wanted_lvl = cell.level() + cell.flag();
 
         if (cell_wanted_lvl < 0 || cell_wanted_lvl > max_level) {
             std::string message = "Wanted level out of range [0, " + std::to_string(max_level) + "].";
@@ -107,17 +105,17 @@ void check_flags(Storage& locals, unsigned int max_level, Storage& aliens = dumm
             throw std::runtime_error(message);
         }
 
-        for (auto &face: cell[faces].list) {
+        for (auto &face: cell.geom().faces.list()) {
             if (face.is_undefined() or face.is_boundary()) {
                 continue;
             }
 
             auto &adj = face.adjacent;
 
-            auto neib = adj.rank == cell[element].rank ?
+            auto neib = adj.rank == cell.rank() ?
                         locals[adj.index] : aliens[adj.ghost];
 
-            int neib_wanted_lvl = neib[amrData].level + neib[amrData].flag;
+            int neib_wanted_lvl = neib.level() + neib.flag();
             if (std::abs(cell_wanted_lvl - neib_wanted_lvl) > 1) {
                 std::string message = "Adaptation flag balance is broken.";
                 std::cerr << message << "\n";
@@ -125,9 +123,9 @@ void check_flags(Storage& locals, unsigned int max_level, Storage& aliens = dumm
             }
         }
 
-        if (cell[amrData].flag < 0) {
+        if (cell.flag() < 0) {
             bool can = false;
-            if (cell[element].dimension < 3) {
+            if (cell.dim() < 3) {
                 can = can_coarse<2>(locals, cell - locals.begin());
             }
             else{
@@ -143,6 +141,6 @@ void check_flags(Storage& locals, unsigned int max_level, Storage& aliens = dumm
     }
 }
 
-} // namespace impl
+} // namespace amr
 } // namespace mesh
 } // namespace zephyr

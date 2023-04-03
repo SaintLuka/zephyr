@@ -185,7 +185,7 @@ void Base::exchange() {
 static std::mutex mutex1;
 #endif
 
-void Base::mark_tourists_out(Storage::iterator it, Storage::iterator begin) {
+void Base::mark_tourists_out(Storage::Item it, Storage::Item begin) {
     for (int neib_rank = 0; neib_rank < int(net.size()); ++neib_rank) {
         if (neib_rank == m_rank) {
             continue;
@@ -214,7 +214,7 @@ void Base::prepare_aliens() {
 
     auto b = m_locals.begin();
 
-    auto func = [&](Storage::iterator it) {
+    auto func = [&](Storage::Item it) {
         mark_tourists_out(it, b);
     };
 
@@ -264,7 +264,7 @@ void Base::prepare_migrants() {
     auto b = m_locals.begin();
 #ifdef ZEPHYR_ENABLE_MULTITHREADING
     if (m_pool.is_active()) {
-        auto func = [&](Storage::iterator it) {
+        auto func = [&](Storage::Item it) {
             auto s = rank((Vector3d&) it[coords]);
             if (s != m_rank) {
                 mutexb1.lock(); migrants_out[s].append(it[item]); mutexb1.unlock();
@@ -482,20 +482,20 @@ Storage Base::average(
 	return average(fields, {index.data(), index.size()});
 }
 
-void Base::remove_period(Storage::iterator element) {
+void Base::remove_period(Storage::Item element) {
     auto domain_center = center();
     auto& element_coords = (Vector3d&) element[coords];
     auto offset = m_domain.shortest(element_coords - domain_center);
     element_coords = domain_center + offset;
 }
 
-void Base::fit_in_period(Storage::iterator element) {
+void Base::fit_in_period(Storage::Item element) {
     auto& element_coords = (Vector3d&) element[coords];
     m_domain.fit_in_period(element_coords);
 }
 
 void Base::fit_in_period_for(Storage& s) {
-    auto func = [&](Storage::iterator it) {
+    auto func = [&](Storage::Item it) {
         fit_in_period(it);
     };
 #ifdef ZEPHYR_ENABLE_MULTITHREADING
@@ -512,7 +512,7 @@ void Base::fit_in_period_for(Storage& s) {
 }
 
 void Base::remove_period_for(Storage& s) {
-    auto func = [&](Storage::iterator it) {
+    auto func = [&](Storage::Item it) {
         remove_period(it);
     };
 #ifdef ZEPHYR_ENABLE_MULTITHREADING

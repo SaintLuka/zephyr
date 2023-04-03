@@ -44,16 +44,16 @@ public:
     double area() const;
 
     /// @brief Центр грани
-    const Vector3d &center() const;
+    Vector3d center() const;
 
     /// @brief Координата x центра грани
-    inline double x() const { return m_center.x(); }
+    inline double x() const { return center().x(); }
 
     /// @brief Координата y центра грани
-    inline double y() const { return m_center.y(); }
+    inline double y() const { return center().y(); }
 
     /// @brief Координата z центра грани
-    inline double z() const { return m_center.z(); }
+    inline double z() const { return center().z(); }
 
     IFace &operator++() {
         do {
@@ -73,9 +73,7 @@ public:
 public:
     const ICell &m_cell;  ///< Родительская ячейка
     int face_idx;         ///< Индекс грани в ячейке
-    Vector3d m_center;    ///< Центр грани
 };
-
 
 
 /// @brief Интерфейс для итерирования по граням ячейки

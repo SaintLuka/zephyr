@@ -36,14 +36,14 @@ struct _U_ {
 _U_ U;
 
 /// Переменные для сохранения
-double get_rho(Storage::iterator cell) { return cell(U).rho1; }
-double get_u(Storage::iterator cell)   { return cell(U).v1.x(); }
-double get_v(Storage::iterator cell)   { return cell(U).v1.y(); }
-double get_V(Storage::iterator cell)   { return cell(U).v1.norm(); }
-double get_p(Storage::iterator cell)   { return cell(U).p1 - 1.0_bar; }
+double get_rho(Storage::Item cell) { return cell(U).rho1; }
+double get_u(Storage::Item cell)   { return cell(U).v1.x(); }
+double get_v(Storage::Item cell)   { return cell(U).v1.y(); }
+double get_V(Storage::Item cell)   { return cell(U).v1.norm(); }
+double get_p(Storage::Item cell)   { return cell(U).p1 - 1.0_bar; }
 
 /// @brief Уровень звукового давления в дБ
-double get_spl(Storage::iterator cell) {
+double get_spl(Storage::Item cell) {
     return 20.0 * std::log(1.0 + std::abs(cell(U).p1 - 1.0_bar) / 20.0e-6_Pa) / std::log(10.0);
 }
 

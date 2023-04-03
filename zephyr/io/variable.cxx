@@ -11,20 +11,20 @@ Variable::Variable(const char* name)
         m_type = VtkType::UInt32;
         m_n_components = 1;
 
-        m_function = [](Storage::iterator cell, void *arg) {
+        m_function = [](Storage::Item cell, void *arg) {
             auto out = (uint32_t *) arg;
-            out[0] = cell.base_id();
+            out[0] = cell.b_idx();
         };
     }
     else if (!std::strcmp(name, "coords") || !std::strcmp(name, "center")) {
         m_type = VtkType::Float32;
         m_n_components = 3;
 
-        m_function = [](Storage::iterator cell, void *arg) {
+        m_function = [](Storage::Item cell, void *arg) {
             auto out = (float *) arg;
-            out[0] = float(cell.coords().x());
-            out[1] = float(cell.coords().y());
-            out[2] = float(cell.coords().z());
+            out[0] = float(cell.center().x());
+            out[1] = float(cell.center().y());
+            out[2] = float(cell.center().z());
         };
     }
     else {
@@ -37,7 +37,7 @@ Variable::Variable(const std::string& name)
 
 }
 
-void Variable::write(Storage::iterator elem, void* out) const {
+void Variable::write(Storage::Item elem, void* out) const {
     m_function(elem, out);
 }
 

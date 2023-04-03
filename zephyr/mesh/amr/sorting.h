@@ -4,9 +4,9 @@
 
 #pragma once
 
-#include <zephyr/mesh/refiner/impl/common.h>
+#include <zephyr/mesh/amr/common.h>
 
-namespace zephyr { namespace mesh { namespace impl {
+namespace zephyr { namespace mesh { namespace amr {
 
 /// @brief Функция сортировки ячеек с сохранением связности
 /// @details Не самый быстрый алгоритм, нужен для проверки гипотез
@@ -22,15 +22,15 @@ void sorting(Storage& cells) {
         auto cell_i = cells[i];
         auto cell_j = cells[j];
 
-        if (cell_i[amrData].level != cell_j[amrData].level) {
-            return cell_i[amrData].level < cell_j[amrData].level;
+        if (cell_i.level() != cell_j.level()) {
+            return cell_i.level() < cell_j.level();
         }
 
-        if (cell_i[amrData].base_id != cell_j[amrData].base_id) {
-            return cell_i[amrData].base_id < cell_j[amrData].base_id;
+        if (cell_i.b_idx() != cell_j.b_idx()) {
+            return cell_i.b_idx() < cell_j.b_idx();
         }
 
-        return cell_i[amrData].z < cell_j[amrData].z;
+        return cell_i.z_idx() < cell_j.z_idx();
     });
 
     std::vector<size_t> map(n_cells);
@@ -39,7 +39,7 @@ void sorting(Storage& cells) {
     }
 
     for (size_t ic = 0; ic < n_cells; ++ic) {
-        for (auto &face: cells[ic][faces].list) {
+        for (auto &face: cells[ic].geom().faces.list()) {
             if (face.is_undefined()) continue;
             if (face.adjacent.index > n_cells) continue;
 
@@ -51,6 +51,8 @@ void sorting(Storage& cells) {
     while(ic < n_cells) {
         size_t jc = map[ic];
         if (ic != jc) {
+            throw std::runtime_error("ZAZAZAZA");
+            /*
             _item_ item_i = cells[ic][item];
             _item_ item_j = cells[jc][item];
 
@@ -59,9 +61,11 @@ void sorting(Storage& cells) {
             memcpy(item_j.pos(), item_i.pos(), item_i.size());
             memcpy(item_i.pos(), temp.data(), item_i.size());
 
+
             //std::swap(map[ic], map[jc]);
             map[ic] = map[jc];
             map[jc] = jc;
+             */
         }
         else {
             ++ic;
@@ -69,6 +73,6 @@ void sorting(Storage& cells) {
     }
 }
 
-} // namespace impl
+} // namespace amr
 } // namespace mesh
 } // namespace zephyr

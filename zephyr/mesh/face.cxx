@@ -13,10 +13,6 @@ IFace::IFace(const ICell &cell, int fid)
     while (face_idx < geom::Faces::max_size && geom().is_undefined()) {
         ++face_idx;
     }
-
-    if (face_idx < geom::Faces::max_size) {
-        m_center = geom().center(m_cell.geom().vertices, m_cell.geom().dim);
-    }
 }
 
 //Face& IFace::face() {
@@ -51,8 +47,8 @@ double IFace::area() const {
     return geom().area;
 }
 
-const Vector3d& IFace::center() const {
-    return m_center;
+Vector3d IFace::center() const {
+    return geom().center(m_cell.geom().vertices, m_cell.geom().dim);
 }
 
 IFaces::IFaces(const ICell& cell)
@@ -61,12 +57,11 @@ IFaces::IFaces(const ICell& cell)
 }
 
 IFace IFaces::begin() const {
-    return IFace(m_cell, 0);
+    return { m_cell, 0 };
 }
 
 IFace IFaces::end() const {
-    return IFace(m_cell, geom::Faces::max_size);
-
+    return { m_cell, geom::Faces::max_size };
 }
 
 } // namespace mesh

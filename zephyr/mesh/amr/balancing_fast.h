@@ -5,11 +5,11 @@
 
 #pragma once
 
-#include <zephyr/mesh/refiner/impl/common.h>
-#include <zephyr/mesh/refiner/impl/siblings.h>
-#include <zephyr/mesh/refiner/impl/balancing_restrictions.h>
+#include <zephyr/mesh/amr/common.h>
+#include <zephyr/mesh/amr/siblings.h>
+#include <zephyr/mesh/amr/balancing_restrictions.h>
 
-namespace zephyr { namespace mesh { namespace impl {
+namespace zephyr { namespace mesh { namespace amr {
 
 /// @struct Ячейки из некоторого диапазона, распределенные по уровням и флагам адаптации
 /// @brief Структура содержит индексы ячеек из диапазона в хранилище, которые
@@ -48,8 +48,8 @@ struct CellsByLevelPartial {
         n_coarse.resize(max_level);
         n_retain.resize(max_level);
         for (size_t ic = from; ic < to; ++ic) {
-            auto lvl = cells[ic][amrData].level;
-            auto flag = cells[ic][amrData].flag;
+            auto lvl = cells[ic].level();
+            auto flag = cells[ic].flag();
 
             if (lvl < max_level && flag < 1) {
                 if (flag < 0) {
@@ -71,8 +71,8 @@ struct CellsByLevelPartial {
         }
 
         for (size_t ic = from; ic < to; ++ic) {
-            auto lvl = cells[ic][amrData].level;
-            auto flag = cells[ic][amrData].flag;
+            auto lvl = cells[ic].level();
+            auto flag = cells[ic].flag();
             if (lvl < max_level && flag < 1) {
                 if (flag < 0) {
                     coarse[lvl].push_back(ic);
@@ -161,10 +161,10 @@ private:
 
 /// @brief Обновляет флаг ячейки, которая имеет флаг 0.
 /// Повышает флаг адаптации, если один из соседей хочет уровень на два выше
-inline void retain_update_flag(Storage &cells, Storage::iterator cell) {
-    scrutiny_check(cell[amrData].flag == 0, "retain_update_flag: cell.flag != 0")
+inline void retain_update_flag(Storage &cells, Storage::Item cell) {
+    scrutiny_check(cell.flag() == 0, "retain_update_flag: cell.flag != 0")
 
-    for (const auto &face: cell[faces].list) {
+    for (const auto &face: cell.geom().faces.list()) {
         if (face.is_undefined() or face.is_boundary()) {
             continue;
         }
@@ -173,9 +173,9 @@ inline void retain_update_flag(Storage &cells, Storage::iterator cell) {
         scrutiny_check(neib_idx < cells.size(), "retain_update_flag: neib_idx >= cells.size()")
 
         auto neib = cells[neib_idx];
-        int neib_wanted = neib[amrData].level + neib[amrData].flag;
-        if (neib_wanted > cell[amrData].level + 1) {
-            cell[amrData].flag = 1;
+        int neib_wanted = neib.level() + neib.flag();
+        if (neib_wanted > cell.level() + 1) {
+            cell.geom().flag = 1;
             return;
         }
     }
@@ -185,10 +185,10 @@ inline void retain_update_flag(Storage &cells, Storage::iterator cell) {
 /// Ставит флаг адаптации 0, если сосед хочет уровень на 1 выше,
 /// ставит флаг адаптации 1, если сосед хочет уровень на 2 выше,
 /// флаги сиблингов не рассматриваются.
-inline void coarse_update_flag(Storage &cells, Storage::iterator cell) {
-    scrutiny_check(cell[amrData].flag < 0, "coarse_update_flag: cell.flag != -1")
+inline void coarse_update_flag(Storage &cells, Storage::Item cell) {
+    scrutiny_check(cell.flag() < 0, "coarse_update_flag: cell.flag != -1")
 
-    for (auto &face: cell[faces].list) {
+    for (auto &face: cell.geom().faces.list()) {
         if (face.is_undefined() or face.is_boundary()) {
             continue;
         }
@@ -197,14 +197,14 @@ inline void coarse_update_flag(Storage &cells, Storage::iterator cell) {
         scrutiny_check(neib_idx < cells.size(), "coarse_update_flag: neib_idx >= cells.size()")
 
         auto neib = cells[neib_idx];
-        int neib_wanted = neib[amrData].level + neib[amrData].flag;
+        int neib_wanted = neib.level() + neib.flag();
 
-        if (neib_wanted > cell[amrData].level) {
-            if (neib_wanted > cell[amrData].level + 1) {
-                cell[amrData].flag = 1;
+        if (neib_wanted > cell.level()) {
+            if (neib_wanted > cell.level() + 1) {
+                cell.geom().flag = 1;
                 return;
             } else {
-                cell[amrData].flag = 0;
+                cell.geom().flag = 0;
             }
         }
     }
@@ -222,7 +222,7 @@ void round_1(Storage &cells, const std::vector<size_t> &indices, size_t from, si
 
         auto cell = cells[indices[i]];
 
-        scrutiny_check(cell[amrData].flag == 0, "round_1: flag != 0")
+        scrutiny_check(cell.flag() == 0, "round_1: flag != 0")
 
         retain_update_flag(cells, cell);
     }
@@ -242,7 +242,7 @@ void round_2(Storage &cells, const std::vector<size_t> &indices, size_t from, si
 
         auto cell = cells[indices[i]];
 
-        scrutiny_check(cell[amrData].flag < 0, "round_2: flag != -1")
+        scrutiny_check(cell.flag() < 0, "round_2: flag != -1")
 
         coarse_update_flag(cells, cell);
     }
@@ -260,7 +260,7 @@ void round_3(Storage &cells, const std::vector<size_t> &indices, size_t from, si
         scrutiny_check(indices[i] < cells.size(), "round_3: indices[i] >= cells.size()")
 
         auto cell = cells[indices[i]];
-        if (cell[amrData].flag < 0) {
+        if (cell.flag() < 0) {
             coarse_update_flag(cells, cell);
         }
     }
@@ -282,7 +282,7 @@ void round_4(Storage &cells, const std::vector<size_t> &indices, size_t from, si
         size_t ic = indices[i];
         auto cell = cells[ic];
 
-        if (cell[amrData].flag >= 0) {
+        if (cell.flag() >= 0) {
             continue;
         }
 
@@ -291,8 +291,8 @@ void round_4(Storage &cells, const std::vector<size_t> &indices, size_t from, si
             scrutiny_check(is < cells.size(), "round_4: Sibling index out of range")
 
             auto sib = cells[is];
-            if (sib[amrData].flag >= 0) {
-                cell[amrData].flag = 0;
+            if (sib.flag() >= 0) {
+                cell.geom().flag = 0;
                 break;
             }
         }
@@ -321,7 +321,6 @@ void round_4(Storage &cells, const std::vector<size_t> &indices, size_t from, si
 /// огрубиться (@see round_4), флаги могут повыситься до 0.
 template <unsigned int dim = 1234>
 void balance_flags_fast(Storage& cells, unsigned int max_level) {
-    using zephyr::performance::timer::Stopwatch;
     static Stopwatch restriction_timer;
     static Stopwatch sorting_timer;
     static Stopwatch round_timer_1;
@@ -356,12 +355,12 @@ void balance_flags_fast(Storage& cells, unsigned int max_level) {
     }
 
 #if CHECK_PERFORMANCE
-    std::cout << "    Restriction elapsed: " << restriction_timer.times().wall() << "\n";
-    std::cout << "    Sorting elapsed: " << sorting_timer.times().wall() << "\n";
-    std::cout << "    Round 1 elapsed: " << round_timer_1.times().wall() << "\n";
-    std::cout << "    Round 2 elapsed: " << round_timer_2.times().wall() << "\n";
-    std::cout << "    Round 3 elapsed: " << round_timer_3.times().wall() << "\n";
-    std::cout << "    Round 4 elapsed: " << round_timer_4.times().wall() << "\n";
+    std::cout << "    Restriction elapsed: " << restriction_timer.seconds() << " sec\n";
+    std::cout << "    Sorting elapsed: " << sorting_timer.seconds() << " sec\n";
+    std::cout << "    Round 1 elapsed: " << round_timer_1.seconds() << " sec\n";
+    std::cout << "    Round 2 elapsed: " << round_timer_2.seconds() << " sec\n";
+    std::cout << "    Round 3 elapsed: " << round_timer_3.seconds() << " sec\n";
+    std::cout << "    Round 4 elapsed: " << round_timer_4.seconds() << " sec\n";
 #endif
 }
 
@@ -371,17 +370,18 @@ void balance_flags_fast<1234>(Storage& cells, unsigned int max_level) {
     if (cells.empty())
         return;
 
-    auto dim = cells[0][element].dimension;
+    auto dim = cells[0].dim();
 
     if (dim < 3) {
-        impl::balance_flags_fast<2>(cells, max_level);
+        amr::balance_flags_fast<2>(cells, max_level);
     }
     else {
-        impl::balance_flags_fast<3>(cells, max_level);
+        amr::balance_flags_fast<3>(cells, max_level);
     }
 
 #if SCRUTINY
-    impl::check_flags(cells, max_level);
+    throw std::runtime_error("add check #2");
+    // amr::check_flags(cells, max_level);
 #endif
 }
 
@@ -494,18 +494,18 @@ void balance_flags_fast<1234>(Storage& cells, unsigned int max_level, ThreadPool
     auto dim = cells[0][element].dimension;
 
     if (dim < 3) {
-        impl::balance_flags_fast<2>(cells, max_level, threads);
+        amr::balance_flags_fast<2>(cells, max_level, threads);
     }
     else {
-        impl::balance_flags_fast<3>(cells, max_level, threads);
+        amr::balance_flags_fast<3>(cells, max_level, threads);
     }
 
 #if SCRUTINY
-    impl::check_flags(cells, max_level);
+    amr::check_flags(cells, max_level);
 #endif
 }
 #endif
 
-} // namespace impl
+} // namespace amr
 } // namespace mesh
 } // namespace zephyr

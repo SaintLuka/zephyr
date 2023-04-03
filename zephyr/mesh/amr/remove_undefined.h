@@ -5,12 +5,11 @@
 
 #pragma once
 
-#include <zephyr/mesh/refiner/impl/common.h>
+#include <zephyr/mesh/amr/common.h>
 
-namespace zephyr { namespace mesh { namespace impl {
+namespace zephyr { namespace mesh { namespace amr {
 
-using namespace ::zephyr::data;
-using amrData;
+using zephyr::utils::Stopwatch;
 
 /// @brief Функция меняет индексы соседей через грань на новые, выполняется
 /// для части ячеек. Предполагается, что в поле element.index записан индекс,
@@ -20,7 +19,7 @@ using amrData;
 void change_adjacent_partial(Storage& cells, size_t from, size_t to) {
     size_t n_cells = cells.size();
     for (size_t ic = from; ic < to; ++ic) {
-        for (auto &face: cells[ic][faces].list) {
+        for (Face &face: cells[ic].geom().faces.list()) {
             if (face.is_undefined() or face.is_boundary()) continue;
             if (face.adjacent.ghost > std::numeric_limits<int>::max()) {
                 // Локальный сосед
@@ -29,7 +28,7 @@ void change_adjacent_partial(Storage& cells, size_t from, size_t to) {
                     throw std::runtime_error("change_adjacent_partial() error: adjacent.index out of range");
                 }
 #endif
-                face.adjacent.index = cells[face.adjacent.index][element].index;
+                face.adjacent.index = cells[face.adjacent.index].geom().index;
             }
 
         }
@@ -101,7 +100,7 @@ struct SwapLists {
     SwapLists(Storage& cells, size_t max_index, size_t max_swap_count) {
         undefined_cells.reserve(max_swap_count);
         for (size_t ic = 0; ic < max_index; ++ic) {
-            if (cells[ic][element].is_undefined()) {
+            if (cells[ic].is_undefined()) {
                 undefined_cells.push_back(ic);
                 if (undefined_cells.size() >= max_swap_count) {
                     break;
@@ -111,7 +110,7 @@ struct SwapLists {
 
         actual_cells.reserve(undefined_cells.size());
         for (size_t jc = cells.size() - 1; jc >= 0; --jc) {
-            if (cells[jc][element].is_actual()) {
+            if (cells[jc].is_actual()) {
                 actual_cells.push_back(jc);
                 if (actual_cells.size() >= undefined_cells.size()) {
                     break;
@@ -127,23 +126,23 @@ struct SwapLists {
     /// оказываться ближе к началу списка, чем неопределенный
     void check_mapping(Storage& cells) const {
         for (size_t i = 0; i < cells.size(); ++i) {
-            auto j = cells[i][element].index;
-            if (i != cells[j][element].index) {
+            auto j = cells[i].geom().index;
+            if (i != cells[j].geom().index) {
                 // Перестановка не является транспозицией
-                std::cout << i << " " << cells[i][element].index << "\n";
-                std::cout << j << " " << cells[j][element].index << "\n";
+                std::cout << i << " " << cells[i].geom().index << "\n";
+                std::cout << j << " " << cells[j].geom().index << "\n";
                 throw std::runtime_error("Only swaps are allowed");
             }
             if (i != j) {
-                if (cells[i][element].is_actual() && cells[j][element].is_actual()) {
+                if (cells[i].is_actual() && cells[j].is_actual()) {
                     // Попытка обменять две актуальные ячейки
                     throw std::runtime_error("Swap two actual cells");
                 }
-                if (i < j && cells[i][element].is_actual()) {
+                if (i < j && cells[i].is_actual()) {
                     // Актуальня ячейка переносится только в начало
                     throw std::runtime_error("Wrong swap #1");
                 }
-                if (i > j && cells[i][element].is_undefined()) {
+                if (i > j && cells[i].is_undefined()) {
                     // Неопределенная ячейка переносится только в конец
                     throw std::runtime_error("Wrong swap #2");
                 }
@@ -157,7 +156,7 @@ struct SwapLists {
     /// @param from, to Диапазон ячеек в хранилище
     void set_identical_mapping_partial(Storage& cells, size_t from, size_t to) const {
         for (size_t ic = from; ic < to; ++ic) {
-            cells[ic][element].index = ic;
+            cells[ic].geom().index = ic;
         }
     }
 
@@ -169,8 +168,8 @@ struct SwapLists {
             size_t ai = actual_cells[i];
             size_t ui = undefined_cells[i];
 
-            cells[ui][element].index = ai;
-            cells[ai][element].index = ui;
+            cells[ui].geom().index = ai;
+            cells[ai].geom().index = ui;
         }
     }
 
@@ -238,14 +237,18 @@ struct SwapLists {
     void move_elements_partial(Storage &cells, size_t from, size_t to) const {
         for (size_t i = from; i < to; ++i) {
             size_t ic = undefined_cells[i];
-            size_t jc = cells[ic][element].index;
+            size_t jc = cells[ic].geom().index;
 
-            cells[ic][item] = cells[jc][item];
-            cells[ic][element].index = ic;
-            cells[ic][amrData].next = ic;
-            cells[jc][element].set_undefined();
-            cells[jc][faces].set_undefined();
-            cells[jc][vertices].set_undefined();
+            std::memcpy(
+                    cells[ic].data_ptr(),
+                    cells[jc].data_ptr(),
+                    cells[ic].datasize());
+
+            cells[ic].geom().index = ic;
+            cells[ic].geom().next = ic;
+            cells[jc].set_undefined();
+            cells[jc].geom().faces.set_undefined();
+            cells[jc].geom().vertices.set_undefined();
         }
     }
 
@@ -311,13 +314,7 @@ struct SwapLists {
 /// 5. Хранилище меняет размер, все неопределенные ячейки остаются за пределами
 /// хранилища.
 template<unsigned int dim>
-void remove_undefined(
-        Storage &cells,
-        const Statistics<dim> &count
-        if_multithreading(, ThreadPool& threads = ::zephyr::multithreading::dummy_pool))
-{
-    using ::zephyr::performance::timer::Stopwatch;
-
+void remove_undefined(Storage &cells, const Statistics<dim> &count) {
     static Stopwatch create_swap_timer;
     static Stopwatch set_mapping_timer;
     static Stopwatch change_adjacent_timer;
@@ -333,27 +330,27 @@ void remove_undefined(
     create_swap_timer.stop();
 
     set_mapping_timer.resume();
-    swap_list.set_mapping(cells if_multithreading(, threads));
+    swap_list.set_mapping(cells);
     set_mapping_timer.stop();
 
     change_adjacent_timer.resume();
-    change_adjacent(cells if_multithreading(, threads));
+    change_adjacent(cells);
     change_adjacent_timer.stop();
 
     move_elements_timer.resume();
-    swap_list.move_elements(cells if_multithreading(, threads));
+    swap_list.move_elements(cells);
     move_elements_timer.stop();
 
     cells.resize(count.n_cells_short);
 
 #if CHECK_PERFORMANCE
-    std::cout << "      Create SwapList elapsed: " << create_swap_timer.times().wall() << "\n";
-    std::cout << "      Set mapping elapsed: " << set_mapping_timer.times().wall() << "\n";
-    std::cout << "      Change adjacent elapsed: " << change_adjacent_timer.times().wall() << "\n";
-    std::cout << "      Move elements elapsed: " << move_elements_timer.times().wall() << "\n";
+    std::cout << "      Create SwapList elapsed: " << create_swap_timer.seconds() << " sec\n";
+    std::cout << "      Set mapping elapsed: " << set_mapping_timer.seconds() << " sec\n";
+    std::cout << "      Change adjacent elapsed: " << change_adjacent_timer.seconds() << " sec\n";
+    std::cout << "      Move elements elapsed: " << move_elements_timer.seconds() << " sec\n";
 #endif
 }
 
-} // namespace impl
+} // namespace amr
 } // namespace mesh
 } // namespace zephyr

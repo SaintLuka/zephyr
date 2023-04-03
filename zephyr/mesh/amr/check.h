@@ -1,3 +1,5 @@
+/*
+
 /// @file Файл содержит объявления функций, которые используются дебаге, а также
 /// для проверки сетки.
 /// Данный файл не устанавливается при установке zephyr, все изложенные описания
@@ -5,20 +7,20 @@
 
 #pragma once
 
-#include <zephyr/mesh/refiner/impl/common.h>
+#include <zephyr/mesh/amr/common.h>
 
-namespace zephyr { namespace mesh { namespace impl {
+namespace zephyr { namespace mesh { namespace amr {
 
 /// @brief Выводит информацию о геометрии ячейки, списки вершин, граней,
 /// соседей и прочее
-void print_cell_info(Storage::iterator cell);
+void print_cell_info(Storage::Item cell);
 
 /// @brief Выводит полную информацию о ячейке, а также о её окружении
 void print_cell_info(Storage& locals, Storage& aliens, size_t ic);
 
 /// @brief Выводит информацию о геометрии ячейки и её соседях в формате
 /// скрипта для визуализации на python
-void visualize_cell(Storage::iterator cell);
+void visualize_cell(Storage::Item cell);
 
 /// @brief Проверяет наличие в Storage типов данных, необходимых для адаптации
 /// @throw runtime_error, если один из необходимых типов отсутствует
@@ -36,6 +38,7 @@ int check_base_mesh(Storage &locals, Storage &aliens, unsigned int rank = 0);
 /// @return -1, если сетка адаптирована неверно
 int check_refined_mesh(Storage &locals, Storage &aliens, unsigned int rank = 0);
 
-} // namespace impl
+} // namespace amr
 } // namespace mesh
 } // namespace zephyr
+*/

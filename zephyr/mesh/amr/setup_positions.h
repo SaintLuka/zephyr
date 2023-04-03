@@ -5,14 +5,11 @@
 
 #pragma once
 
-#include <zephyr/mesh/refiner/impl/common.h>
-#include <zephyr/mesh/refiner/impl/siblings.h>
-#include <zephyr/mesh/refiner/impl/statistics.h>
+#include <zephyr/mesh/amr/common.h>
+#include <zephyr/mesh/amr/siblings.h>
+#include <zephyr/mesh/amr/statistics.h>
 
-namespace zephyr { namespace mesh { namespace impl {
-
-using namespace ::zephyr::data;
-using amrData;
+namespace zephyr { namespace mesh { namespace amr {
 
 /// @brief Определяет положения новых ячеек (созданных при адаптации) в хранилище,
 /// устанавлевает параметр amrData.next.
@@ -26,8 +23,7 @@ using amrData;
 /// Алгоритм может выполняться как для всего хранилища, так и для части сетки
 /// в многопроцессорном режиме. Многопоточная реализация отсутствует.
 template<unsigned int dim>
-void setup_positions(Storage &cells, const Statistics<dim> &count
-    if_multithreading(, ThreadPool& threads = dummy_pool))
+void setup_positions(Storage &cells, const Statistics<dim> &count)
 {
     cells.resize(count.n_cells_large);
 
@@ -36,23 +32,23 @@ void setup_positions(Storage &cells, const Statistics<dim> &count
     for (size_t ic = 0; ic < count.n_cells; ++ic) {
         auto cell = cells[ic];
 
-        if (cell[amrData].flag == 0) {
-            cell[amrData].next = ic;
+        if (cell.flag() == 0) {
+            cell.geom().next = ic;
             continue;
         }
 
-        if (cell[amrData].flag > 0) {
-            cell[amrData].next = refine_counter;
+        if (cell.flag() > 0) {
+            cell.geom().next = refine_counter;
             refine_counter += CpC(dim);
             continue;
         }
 
         // Главный ребенок собирает своих сиблингов
-        if (cells[ic][amrData].z % CpC(dim) == 0) {
+        if (cells[ic].z_idx() % CpC(dim) == 0) {
             auto sibs = get_siblings<dim>(cells, ic);
-            cells[ic][amrData].next = coarse_counter;
+            cells[ic].geom().next = coarse_counter;
             for (size_t jc: sibs) {
-                cells[jc][amrData].next = coarse_counter;
+                cells[jc].geom().next = coarse_counter;
             }
             ++coarse_counter;
         }
@@ -66,6 +62,6 @@ void setup_positions(Storage &cells, const Statistics<dim> &count
     }
 }
 
-} // namespace impl
+} // namespace amr
 } // namespace mesh
 } // namespace zephyr

@@ -5,11 +5,11 @@
 
 #pragma once
 
-#include <zephyr/mesh/refiner/impl/common.h>
-#include <zephyr/mesh/refiner/impl/siblings.h>
-#include <zephyr/mesh/refiner/impl/balancing_restrictions.h>
+#include <zephyr/mesh/amr/common.h>
+#include <zephyr/mesh/amr/siblings.h>
+#include <zephyr/mesh/amr/balancing_restrictions.h>
 
-namespace zephyr { namespace mesh { namespace impl {
+namespace zephyr { namespace mesh { namespace amr {
 
 #ifdef ZEPHYR_ENABLE_MULTITHREADING
 using ::zephyr::multithreading::dummy_pool;
@@ -20,18 +20,18 @@ using ::zephyr::multithreading::dummy_pool;
 /// об обновлении соседей или сиблингов.
 /// Для ячеек с флагом = 1 данные не хранятся (нет необходимости), для
 /// ячеек с флагом = 0 не хранятся данные о сиблингах.
-template<unsigned int dim>
+template<int dim>
 struct CellsAround {
 private:
 
-    /// @brief Тип данных amrData.flag
-    using flag_type = decltype(amrData.flag);
+    /// @brief Тип данных amr.flag
+    using flag_type = short;
 
     /// @brief Максимальное число соседей
-    static const unsigned int max_neibs_size = FpC(dim) * FpF(dim);
+    static const int max_neibs_size = FpC(dim) * FpF(dim);
 
     /// @brief Максимальное число сиблингов
-    static const unsigned int max_sibs_size = CpC(dim) - 1;
+    static const int max_sibs_size = CpC(dim) - 1;
 
     int neib_count;                               ///< Действительное количество соседей
     int neib_levels[max_neibs_size];              ///< Уровни адаптации соседей
@@ -58,7 +58,7 @@ public:
         auto cell = locals[ic];
 
         // Эти ячейки не интересуют
-        if (cell[amrData].flag > 0) {
+        if (cell.flag() > 0) {
             neib_count = 0;
             sibs_count = 0;
             return;
@@ -66,14 +66,14 @@ public:
 
         // Поиск соседей
         neib_count = 0;
-        for (auto &face: cell[faces].list) {
-            if (face.is_undefined() or face.is_boundary()) {
+        for (auto &face: cell.geom().faces.list()) {
+            if (face.is_undefined() || face.is_boundary()) {
                 continue;
             }
 
             auto &adj = face.adjacent;
 #if SCRUTINY
-            if (adj.rank == cell[element].rank) {
+            if (adj.rank == cell.rank()) {
                 if (adj.index >= locals.size()) {
                     std::cerr << "rank: " << adj.rank << "\n";
                     std::cerr << "locals.size: " << locals.size() << "\n";
@@ -86,19 +86,19 @@ public:
                 }
             }
 #endif
-            auto neib = adj.rank == cell[element].rank ?
+            auto neib = adj.rank == cell.rank() ?
                         locals[adj.index] : aliens[adj.ghost];
 
-            neib_levels[neib_count] = neib[amrData].level;
-            neib_flags[neib_count] = &(neib[amrData].flag);
+            neib_levels[neib_count] = neib.level();
+            neib_flags[neib_count] = &(neib.geom().flag);
             ++neib_count;
         }
         scrutiny_check(neib_count <= max_neibs_size, "nei_count > max_neibs_size")
 
         // Поиск сиблингов для ячеек с флагом -1
-        if (cell[amrData].flag  < 0) {
+        if (cell.flag()  < 0) {
             sibs_count = 0;
-            if (cell[amrData].flag < 0) {
+            if (cell.flag() < 0) {
                 scrutiny_check(can_coarse<dim>(locals, ic), "Can't coarse")
 
                 // Код выполняется только если can_coarse было равно истинно,
@@ -108,7 +108,7 @@ public:
                     scrutiny_check(is < locals.size(), "CellsAround: Sibling index out of range")
 
                     auto sib = locals[is];
-                    sibs_flags[sibs_count] = &(sib[amrData].flag);
+                    sibs_flags[sibs_count] = &(sib.geom().flag);
                     ++sibs_count;
                 }
 
@@ -145,7 +145,7 @@ public:
 /// однопоточном, так и в параллельном режиме.
 /// Для ячеек с флагом = 1 данные не хранятся (нет необходимости), для
 /// ячеек с флагом = 0 не хранятся данные о сиблингах.
-template <unsigned int dim>
+template <int dim>
 struct CellsAroundList {
     std::vector<CellsAround<dim>> m_list;
 
@@ -250,7 +250,7 @@ private:
 /// @param around Ссылка на массив с окружением ячеек
 /// @param from, to Диапазон индексов ячеек для обхода
 /// @return true если хотя бы одна ячейка в диапазоне изменила свой флаг
-template <unsigned int dim>
+template <int dim>
 bool round_partial(Storage& locals, const CellsAroundList<dim>& around, size_t from, size_t to) {
     bool changed = false;
 
@@ -258,7 +258,7 @@ bool round_partial(Storage& locals, const CellsAroundList<dim>& around, size_t f
         scrutiny_check(ic < locals.size(), "round_partial: ic >= locals.size()")
 
         auto cell = locals[ic];
-        if (cell[amrData].flag > 0) {
+        if (cell.flag() > 0) {
             continue;
         }
 
@@ -266,34 +266,34 @@ bool round_partial(Storage& locals, const CellsAroundList<dim>& around, size_t f
         auto neibs_wanted_lvl = around[ic].max_neib_wanted_level;
 
         // Ячейка не хочет меняться
-        if (cell[amrData].flag == 0) {
+        if (cell.flag() == 0) {
             // Один из соседей хочет слишком высокий уровень
-            if (neibs_wanted_lvl > cell[amrData].level + 1) {
-                cell[amrData].flag = 1;
+            if (neibs_wanted_lvl > cell.level() + 1) {
+                cell.geom().flag = 1;
                 changed = true;
             }
         }
         else {
-            // Ячейка хочет огрубиться, cell[amrData].flag < 0
-            scrutiny_check(cell[amrData].flag < 0, "round_partial: wrong assumption")
+            // Ячейка хочет огрубиться, cell.flag() < 0
+            scrutiny_check(cell.flag() < 0, "round_partial: wrong assumption")
 
             // Один из соседей хочет слишком высокий уровень
-            if (neibs_wanted_lvl > cell[amrData].level + 1) {
-                cell[amrData].flag = 1;
+            if (neibs_wanted_lvl > cell.level() + 1) {
+                cell.geom().flag = 1;
                 changed = true;
                 continue;
             }
 
             // Один из соседей хочет достаточно высокий уровень
-            if (neibs_wanted_lvl > cell[amrData].level) {
-                cell[amrData].flag = 0;
+            if (neibs_wanted_lvl > cell.level()) {
+                cell.geom().flag = 0;
                 changed = true;
                 continue;
             }
 
             // Один из сиблингов не хочет огрубляться
             if (around[ic].max_sibs_flag > -1) {
-                cell[amrData].flag = 0;
+                cell.geom().flag = 0;
                 changed = true;
             }
         }
@@ -303,7 +303,7 @@ bool round_partial(Storage& locals, const CellsAroundList<dim>& around, size_t f
 }
 
 /// @brief Выполняет функцию round_partial для всех ячеек в однопоточном режиме
-template <unsigned int dim>
+template <int dim>
 bool round(Storage& locals, const CellsAroundList<dim>& around) {
     return round_partial<dim>(locals, around, 0, locals.size());
 }
@@ -311,7 +311,7 @@ bool round(Storage& locals, const CellsAroundList<dim>& around) {
 #ifdef ZEPHYR_ENABLE_MULTITHREADING
 /// @brief Выполняет функцию round_partial для всех ячеек в многопоточном режиме
 /// @param threads Ссылка на пул тредов
-template <unsigned int dim>
+template <int dim>
 bool round(Storage& locals, const CellsAroundList<dim>& around, ThreadPool& threads) {
     auto num_tasks = threads.size();
     if (num_tasks < 2) {
@@ -353,61 +353,57 @@ bool round(Storage& locals, const CellsAroundList<dim>& around, ThreadPool& thre
 /// количеству уровней. Алгоритм достаточно прост в реализации, для него легко
 /// (и достаточно эффективно) реализется многопоточность, также алгоритм легко
 /// обобщается на многопроцессорную систему.
-template<unsigned int dim>
-void balance_flags(
-        Storage &cells,
-        unsigned int max_level
-        if_multithreading(, ThreadPool& threads = dummy_pool))
-{
-    using zephyr::performance::timer::Stopwatch;
+template<int dim>
+void balance_flags(Storage &cells, int max_level) {
     static Stopwatch restrictions_timer;
     static Stopwatch setup_around_timer;
     static Stopwatch round_timer;
 
-    Storage aliens;
+    Storage aliens();
 
     restrictions_timer.resume();
-    base_restrictions<dim>(cells, max_level if_multithreading(, threads));
+    base_restrictions<dim>(cells, max_level);
     restrictions_timer.stop();
 
     setup_around_timer.resume();
-    CellsAroundList<dim> around(cells, aliens if_multithreading(, threads));
+    throw std::runtime_error("ALIENCS AROUND");
+    /*
+    //CellsAroundList<dim> around(cells, aliens);
     setup_around_timer.stop();
 
     round_timer.resume();
     bool changed = true;
     while (changed) {
-        around.collect(if_multithreading(threads));
-        changed = round(cells, around if_multithreading(, threads));
+        around.collect();
+        changed = round(cells, around);
     }
     round_timer.stop();
 
 #if CHECK_PERFORMANCE
-    std::cout << "    Restriction elapsed: " << restriction_timer.wall() << "\n";
-    std::cout << "    Setup around elapsed: " << setup_around_timer.times().wall() << "\n";
-    std::cout << "    Round elapsed: " << round_timer.times().wall() << "\n";
+    std::cout << "    Restriction elapsed: " << restrictions_timer.seconds() << " sec\n";
+    std::cout << "    Setup around elapsed: " << setup_around_timer.seconds() << " sec\n";
+    std::cout << "    Round elapsed: " << round_timer.seconds() << " sec\n";
 #endif
+     */
 }
 
 /// @brief Специализация по умолчанию с автоматическим выбором размерности
-void balance_flags_slow(
-        Storage &cells, unsigned int max_level
-        if_multithreading(, ThreadPool& threads))
-{
+void balance_flags_slow(Storage &cells, int max_level) {
     if (cells.empty())
         return;
 
-    auto dim = cells[0][element].dimension;
+    auto dim = cells[0].dim();
 
     if (dim < 3) {
-        impl::balance_flags<2>(cells, max_level if_multithreading(, threads));
+        amr::balance_flags<2>(cells, max_level);
     }
     else {
-        impl::balance_flags<3>(cells, max_level if_multithreading(, threads));
+        amr::balance_flags<3>(cells, max_level);
     }
 
 #if SCRUTINY
-    impl::check_flags(cells, max_level);
+    throw std::runtime_error("add check");
+    // amr::check_flags(cells, max_level);
 #endif
 }
 
@@ -415,10 +411,10 @@ void balance_flags_slow(
 
 /// @brief Простая версия функции балансировки флагов.
 /// @details Смотреть однопоточную версию.
-template<unsigned int dim>
+template<int dim>
 void balance_flags(
         Decomposition &decomposition,
-        unsigned int max_level
+        int max_level
         if_multithreading(, ThreadPool& threads = dummy_pool))
 {
     using zephyr::performance::timer::Stopwatch;
@@ -461,7 +457,7 @@ void balance_flags(
 template<>
 void balance_flags<0>(
         Decomposition &decomposition,
-        unsigned int max_level
+        int max_level
         if_multithreading(, ThreadPool& threads))
 {
     Network& network = decomposition.network();
@@ -477,33 +473,33 @@ void balance_flags<0>(
 /// @brief Специализация по умолчанию с автоматическим выбором размерности
 void balance_flags_slow(
         Decomposition &decomposition,
-        unsigned int max_level
+        int max_level
         if_multithreading(, ThreadPool& threads))
 {
     Storage& cells = decomposition.inner_elements();
 
     if (cells.empty()) {
-        impl::balance_flags<0>(decomposition, max_level if_multithreading(, threads));
+        amr::balance_flags<0>(decomposition, max_level if_multithreading(, threads));
     }
     else {
         auto dim = cells[0][element].dimension;
 
         if (dim < 3) {
-            impl::balance_flags<2>(decomposition, max_level if_multithreading(, threads));
+            amr::balance_flags<2>(decomposition, max_level if_multithreading(, threads));
         }
         else {
-            impl::balance_flags<3>(decomposition, max_level if_multithreading(, threads));
+            amr::balance_flags<3>(decomposition, max_level if_multithreading(, threads));
         }
     }
 
 #if SCRUTINY
     auto& aliens = decomposition.outer_elements();
-    impl::check_flags(cells, max_level, aliens);
+    amr::check_flags(cells, max_level, aliens);
 #endif
 }
 
 #endif
 
-} // namespace impl
+} // namespace amr
 } // namespace mesh
 } // namespace zephyr

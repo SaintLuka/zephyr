@@ -54,33 +54,59 @@ struct Faces {
     int size() const {
         int count = 0;
         for (int i = 0; i < max_size; ++i) {
-            if (list[i].is_actual()) {
+            if (m_list[i].is_actual()) {
                 ++count;
             }
         }
         return count;
     }
 
+    /// @brief Массив граней
+    /// @details Следует исключить
+    std::array<Face, max_size>& list() {
+        return m_list;
+    }
+
     /// @brief Установить неопределенные грани
     void set_undefined() {
-        for (Face &f: list) {
+        for (Face &f: m_list) {
             f.set_undefined();
         }
     }
 
+    /// @brief Начало списка
+    inline std::array<Face, max_size>::iterator begin() {
+        return m_list.begin();
+    }
+
+    /// @brief Начало списка
+    inline std::array<Face, max_size>::const_iterator begin() const {
+        return m_list.begin();
+    }
+
+    /// @brief Конец списка
+    inline std::array<Face, max_size>::iterator end() {
+        return m_list.end();
+    }
+
+    /// @brief Конец списка
+    inline std::array<Face, max_size>::const_iterator end() const {
+        return m_list.end();
+    }
+
     /// @brief Доступ к грани по индексу
     inline Face &operator[](int i) {
-        return list[i];
+        return m_list[i];
     }
 
     /// @brief Доступ к грани по индексу
     inline const Face &operator[](int i) const {
-        return list[i];
+        return m_list[i];
     }
 
 private:
     /// @brief Массив граней ячейки
-    std::array<Face, max_size> list;
+    std::array<Face, max_size> m_list;
 };
 
 namespace topology {

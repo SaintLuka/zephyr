@@ -19,12 +19,12 @@ struct _U_ {
 _U_ U;
 
 /// Переменные для сохранения
-double get_rho(Storage::iterator cell)  { return cell(U).rho1; }
-double get_u(Storage::iterator cell) { return cell(U).v1.x(); }
-double get_v(Storage::iterator cell) { return cell(U).v1.y(); }
-double get_w(Storage::iterator cell) { return cell(U).v1.z(); }
-double get_p(Storage::iterator cell)  { return cell(U).p1; }
-double get_e(Storage::iterator cell)  { return cell(U).e1; }
+double get_rho(Storage::Item cell) { return cell(U).rho1; }
+double get_u(Storage::Item cell) { return cell(U).v1.x(); }
+double get_v(Storage::Item cell) { return cell(U).v1.y(); }
+double get_w(Storage::Item cell) { return cell(U).v1.z(); }
+double get_p(Storage::Item cell) { return cell(U).p1; }
+double get_e(Storage::Item cell) { return cell(U).e1; }
 
 
 int main() {

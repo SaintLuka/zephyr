@@ -17,15 +17,15 @@ Vector3d velocity(const Vector3d& c) {
 }
 
 // Переменные для сохранения
-double get_u(Storage::iterator cell)  {
+double get_u(Storage::Item cell)  {
     return cell(U).u1;
 }
 
-double get_vx(Storage::iterator cell) {
+double get_vx(Storage::Item cell) {
     return velocity(cell.center()).x();
 }
 
-double get_vy(Storage::iterator cell) {
+double get_vy(Storage::Item cell) {
     return velocity(cell.center()).y();
 }
 

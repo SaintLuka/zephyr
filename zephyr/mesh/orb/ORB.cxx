@@ -142,7 +142,7 @@ bool ORB::is_near(const Vector3d& v, int neib_rank) const {
 void ORB::collect_local_info() {
     using data::neibsSearchRadius;
 
-    auto func = [](Storage::iterator elem) -> double {
+    auto func = [](Storage::Item elem) -> double {
         return elem[neibsSearchRadius].value;
     };
 

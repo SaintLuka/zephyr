@@ -14,7 +14,7 @@ class Filter {
 public:
     /// @brief Оператор фильтрации, возвращает true, если элемент хранилища,
     /// переданный в качетсве аргумента, необходимо сохранить.
-    virtual bool operator()(Storage::iterator) const = 0;
+    virtual bool operator()(Storage::Item) const = 0;
 
     /// @brief Является ли оператор фильтрации тривиальным.
     /// Тривиальным будем считать оператор фильтрации, который оставляет все
@@ -25,7 +25,7 @@ public:
 /// @class Тривиальный фильтр, сохраняет все элементы хранилища
 class TrivialFilter : public Filter {
 public:
-    bool operator()(Storage::iterator cell) const override {
+    bool operator()(Storage::Item cell) const override {
         return true;
     }
 
@@ -47,8 +47,8 @@ public:
           zmin(zmin), zmax(zmax) {
     }
 
-    bool operator()(Storage::iterator cell) const override {
-        auto& c = cell.coords();
+    bool operator()(Storage::Item cell) const override {
+        auto& c = cell.center();
         return xmin <= c.x() && c.x() <= xmax &&
                ymin <= c.y() && c.y() <= ymax &&
                zmin <= c.z() && c.z() <= zmax;
@@ -69,8 +69,8 @@ public:
         : r(r), x(x), y(y) {
     }
 
-    bool operator()(Storage::iterator cell) const override {
-        auto& c = cell.coords();
+    bool operator()(Storage::Item cell) const override {
+        auto& c = cell.center();
         return (c.x() - x) * (c.x() - x) + (c.y() - y) * (c.y() - y) <= r * r;
     }
 
@@ -92,7 +92,7 @@ private:
 /// @endcode
 class ComplexFilter : public Filter {
 public:
-    bool operator()(Storage::iterator cell) const override {
+    bool operator()(Storage::Item cell) const override {
         for (auto& filter: filters) {
             if (!(*filter)(cell)) {
                 return false;

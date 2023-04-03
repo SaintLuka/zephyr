@@ -4,16 +4,13 @@
 
 #pragma once
 
-#include <zephyr/mesh/refiner/impl/common.h>
-#include <zephyr/mesh/refiner/impl/refine.h>
-#include <zephyr/mesh/refiner/impl/retain.h>
-#include <zephyr/mesh/refiner/impl/coarse.h>
-#include <zephyr/mesh/refiner/impl/statistics.h>
+#include <zephyr/mesh/amr/common.h>
+#include <zephyr/mesh/amr/refine.h>
+#include <zephyr/mesh/amr/retain.h>
+#include <zephyr/mesh/amr/coarse.h>
+#include <zephyr/mesh/amr/statistics.h>
 
-namespace zephyr { namespace mesh { namespace impl {
-
-using namespace ::zephyr::data;
-using amrData;
+namespace zephyr { namespace mesh { namespace amr {
 
 /// @brief Осуществляет проход по диапазону ячеек и вызывает для них
 /// соответствующие методы адаптации
@@ -25,16 +22,16 @@ using amrData;
 /// @param from, to Диапазон ячеек
 template<unsigned int dim>
 void setup_geometry_partial(Storage &locals, Storage& aliens, unsigned int rank,
-        const Statistics<dim> &count, const DataDistributor& op,
+        const Statistics<dim> &count, const Distributor& op,
         size_t from, size_t to) {
 
     for (size_t ic = from; ic < to; ++ic) {
-        if (locals[ic][amrData].flag == 0) {
+        if (locals[ic].flag() == 0) {
             retain_cell<dim>(locals, aliens, rank, ic);
             continue;
         }
 
-        if (locals[ic][amrData].flag > 0) {
+        if (locals[ic].flag() > 0) {
             refine_cell<dim>(locals, aliens, rank, ic, op);
             continue;
         }
@@ -46,9 +43,11 @@ void setup_geometry_partial(Storage &locals, Storage& aliens, unsigned int rank,
 /// @brief Осуществляет проход по диапазону ячеек и вызывает для них
 /// соответствующие методы адаптации (без MPI и без тредов)
 template<unsigned int dim>
-void setup_geometry(Storage &cells, const Statistics<dim> &count, const DataDistributor& op) {
-    Storage aliens;
-    setup_geometry_partial<dim>(cells, aliens, 0, count, op, 0, count.n_cells);
+void setup_geometry(Storage &cells, const Statistics<dim> &count, const Distributor& op) {
+    throw std::runtime_error("setup geom");
+
+    //Storage aliens();
+    //setup_geometry_partial<dim>(cells, aliens, 0, count, op, 0, count.n_cells);
 }
 
 #ifdef ZEPHYR_ENABLE_MULTITHREADING
@@ -121,6 +120,6 @@ void setup_geometry(Storage &locals, Storage &aliens, unsigned int rank,
 #endif
 #endif
 
-} // namespace impl
+} // namespace amr
 } // namespace mesh
 } // namespace zephyr

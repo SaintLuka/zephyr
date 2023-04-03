@@ -1,8 +1,10 @@
+
+
 #include <zephyr/mesh/cell.h>
 
 namespace zephyr { namespace mesh {
 
-Storage::iterator safe_iterator(Storage &locals, Storage &aliens, int idx) {
+Storage::Item safe_iterator(Storage &locals, Storage &aliens, int idx) {
     if (idx < locals.size()) {
         return locals[idx];
     } else {
@@ -15,7 +17,7 @@ Storage::iterator safe_iterator(Storage &locals, Storage &aliens, int idx) {
     }
 }
 
-Storage::iterator safe_iterator(Storage &locals, Storage &aliens, const Adjacent &adj) {
+Storage::Item safe_iterator(Storage &locals, Storage &aliens, const Adjacent &adj) {
     if (adj.ghost < aliens.size()) {
         return aliens[adj.ghost];
     }
@@ -30,13 +32,13 @@ Storage::iterator safe_iterator(Storage &locals, Storage &aliens, const Adjacent
 }
 
 ICell::ICell(Storage &_locals, Storage &_aliens, int idx)
-    : iterator(safe_iterator(_locals, _aliens, idx)),
+    : Storage::Item(safe_iterator(_locals, _aliens, idx)),
       locals(_locals), aliens(_aliens) {
 
 }
 
 ICell::ICell(Storage &_locals, Storage &_aliens, const Adjacent &adj)
-    : iterator(safe_iterator(_locals, _aliens, adj)),
+    : Storage::Item(safe_iterator(_locals, _aliens, adj)),
       locals(_locals), aliens(_aliens) {
 
 }
@@ -67,6 +69,39 @@ ICell ICell::neighbor(int face_idx) const {
 
 IFaces ICell::faces() const {
     return { *this };
+}
+
+void ICell::print_neibs_info() const {
+    print_info();
+
+    std::cout << "\tAll neighbors of cell:\n";
+    for (int i = 0; i < geom::Faces::max_size; ++i) {
+        auto &face = geom().faces[i];
+        if (face.is_undefined() or face.is_boundary()) continue;
+
+        std::cout << "\tNeighbor through the " << side_to_string(geom::Side(i % 6)) << " face (" << i / 6 << "):\n";
+
+        if (face.adjacent.ghost > std::numeric_limits<int>::max()) {
+            // Локальная ячейка
+            if (face.adjacent.index >= locals.size()) {
+                std::cout << "print_cell_info: Wrong connection #1 (It's acceptable for some intermediate refinement stages)";
+            }
+            else {
+                auto neib = locals[face.adjacent.index];
+                neib.print_info();
+            }
+        }
+        else {
+            // Удаленная ячейка
+            if (face.adjacent.ghost >= aliens.size()) {
+                std::cout << "print_cell_info: Wrong connection #2 (It's acceptable for some intermediate refinement stages)";
+            }
+            else {
+                auto neib = aliens[face.adjacent.ghost];
+                neib.print_info();
+            }
+        }
+    }
 }
 
 

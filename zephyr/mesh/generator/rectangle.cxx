@@ -279,10 +279,10 @@ void Rectangle::init_classic(Storage &cells, Part part) const {
         Cell cell(verts);
 
         // Данные AMR
-        cell.amr.base_id = n;
-        cell.amr.level   = 0;
-        cell.amr.flag    = 0;
-        cell.amr.z       = 0;
+        cell.b_idx = n;
+        cell.level   = 0;
+        cell.flag    = 0;
+        cell.z_idx       = 0;
 
         // Флаги граничных условий
         auto ordinary = FaceFlag::ORDINARY;
@@ -423,10 +423,10 @@ void Rectangle::init_voronoi(Storage &cells, Part part) const {
         Cell cell(verts);
 
         // Данные AMR
-        cell.amr.base_id = n;
-        cell.amr.level   = 0;
-        cell.amr.flag    = 0;
-        cell.amr.z       = 0;
+        cell.b_idx = n;
+        cell.level   = 0;
+        cell.flag    = 0;
+        cell.z_idx       = 0;
 
         // Флаги граничных условий
         auto ordinary = FaceFlag::ORDINARY;

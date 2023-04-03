@@ -12,9 +12,9 @@ using zephyr::geom::Adjacent;
 using zephyr::geom::Vector3d;
 
 /// @brief Ячейка (итератор для доступа к элементам класса Mesh)
-/// @details Копирует функции Storage::iterator, а также добавляет
+/// @details Копирует функции Storage::Item, а также добавляет
 /// специфические функции для ячейки: volume, center, faces.
-class ICell : public Storage::iterator {
+class ICell : public Storage::Item {
 public:
     /// @brief Конструктор копирования
     ICell(const ICell &cell) = default;
@@ -37,12 +37,12 @@ public:
     ICell(Storage &locals, Storage &aliens, const Adjacent &adj);
 
     /// @brief Разыменование итератора (для цикла for)
-    const ICell &operator*() final {
+    ICell &operator*() final {
         return *this;
     }
 
     /// @brief Следующая ячейка
-    const ICell &operator++() final {
+    ICell &operator++() final {
         m_ptr += m_itemsize;
         return *this;
     }
@@ -68,9 +68,12 @@ public:
     /// @brief Получить смежную ячейку через грань
     ICell neighbor(int face_idx) const;
 
+    /// @brief Вывести полную информаци о ячейке и её соседях
+    void print_neibs_info() const;
+
 private:
-    Storage &locals;        ///< Ссылка на хранилище текущего процесса
-    Storage &aliens;        ///< Ссылка на хранилище соседей
+    Storage &locals;  ///< Ссылка на хранилище текущего процесса
+    Storage &aliens;  ///< Ссылка на хранилище соседей
 };
 
 } // namespace mesh

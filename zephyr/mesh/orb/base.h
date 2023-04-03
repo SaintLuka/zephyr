@@ -300,7 +300,7 @@ protected:
             \~
         \see tourists_labels_out.
     */
-    void mark_tourists_out(Storage::iterator it, Storage::iterator begin);
+    void mark_tourists_out(Storage::Item it, Storage::Item begin);
 
     /// Переслать aliens
     //void exchange_aliens();
@@ -412,7 +412,7 @@ protected:
             \~english an iterator to an element.
             \~
     */
-    void fit_in_period(Storage::iterator i);
+    void fit_in_period(Storage::Item i);
 
     /** \~russian Разместить элемент ближе к центру диаграммы,
             если позволяет периодичность области.
@@ -424,7 +424,7 @@ protected:
             \~english an iterator to an element.
             \~
     */
-    void remove_period(Storage::iterator element);
+    void remove_period(Storage::Item element);
 
 	Network& net;             ///< Сеть MPI-процессов
 	Storage& m_locals;       ///< Локальное хранилище данных
