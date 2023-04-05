@@ -35,7 +35,7 @@ namespace zephyr { namespace mesh { namespace amr {
 /// происходит на последнем этапе алгоритма адапатции.
 template<int dim>
 void restore_connections_partial(Storage &locals, Storage &aliens, int rank,
-        const Statistics<dim> &count, int from, int to) {
+        const Statistics &count, int from, int to) {
     for (int ic = from; ic < to; ++ic) {
         auto cell = locals[ic];
 
@@ -115,7 +115,7 @@ void set_undefined_next(Storage& cells, int from, int to) {
 /// @brief Восстанавливает связи (без MPI и без тредов)
 /// @details см. restore_connections_partial
 template<int dim>
-void restore_connections(Storage &cells, const Statistics<dim> &count) {
+void restore_connections(Storage &cells, const Statistics &count) {
     restore_connections_partial<dim>(cells, cells, 0, count, 0, count.n_cells_large);
     set_undefined_next(cells, 0, count.n_cells_large);
 }

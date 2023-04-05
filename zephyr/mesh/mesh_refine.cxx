@@ -9,6 +9,8 @@
 #include <zephyr/mesh/amr/balancing.h>
 #include <zephyr/mesh/amr/balancing_fast.h>
 
+#include <zephyr/io/vtu_file.h>
+
 namespace zephyr { namespace mesh {
 
 using zephyr::utils::mpi;

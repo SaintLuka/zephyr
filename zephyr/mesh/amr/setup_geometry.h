@@ -22,16 +22,18 @@ namespace zephyr { namespace mesh { namespace amr {
 /// @param from, to Диапазон ячеек
 template<int dim>
 void setup_geometry_partial(Storage &locals, Storage& aliens, int rank,
-        const Statistics<dim> &count, const Distributor& op,
-        size_t from, size_t to) {
+        const Statistics &count, const Distributor& op, int from, int to) {
 
-    for (size_t ic = from; ic < to; ++ic) {
-        if (locals[ic].flag() == 0) {
-            retain_cell<dim>(locals, aliens, rank, ic);
+
+    for (int ic = from; ic < to; ++ic) {
+        Cell& cell = locals[ic];
+
+        if (cell.flag == 0) {
+            retain_cell<dim>(cell, locals, aliens);
             continue;
         }
 
-        if (locals[ic].flag() > 0) {
+        if (cell.flag > 0) {
             refine_cell<dim>(locals, aliens, rank, ic, op);
             continue;
         }
@@ -43,7 +45,7 @@ void setup_geometry_partial(Storage &locals, Storage& aliens, int rank,
 /// @brief Осуществляет проход по диапазону ячеек и вызывает для них
 /// соответствующие методы адаптации (без MPI и без тредов)
 template<int dim>
-void setup_geometry(Storage &cells, const Statistics<dim> &count, const Distributor& op) {
+void setup_geometry(Storage &cells, const Statistics &count, const Distributor& op) {
     setup_geometry_partial<dim>(cells, cells, 0, count, op, 0, count.n_cells);
 }
 
@@ -61,8 +63,8 @@ void setup_geometry(Storage &cells, const Statistics<dim> &count,
     }
     std::vector<std::future<void>> results(num_tasks);
 
-    std::size_t bin = count.n_cells / num_tasks + 1;
-    std::size_t pos = 0;
+    std::int bin = count.n_cells / num_tasks + 1;
+    std::int pos = 0;
     for (auto &res : results) {
         res = threads.enqueue(setup_geometry_partial<dim>,
                               std::ref(cells), std::ref(aliens), 0, std::ref(count), std::ref(op),
@@ -81,7 +83,7 @@ void setup_geometry(Storage &cells, const Statistics<dim> &count,
 /// @brief Осуществляет проход по диапазону ячеек и вызывает для них
 /// соответствующие методы адаптации (с MPI и без тредов)
 template<int dim>
-void setup_geometry(Storage &locals, Storage &aliens, unsigned rank,
+void setup_geometry(Storage &locals, Storage &aliens, int rank,
                     const Statistics<dim> &count, const DataDistributor& op) {
     setup_geometry_partial<dim>(locals, aliens, rank, count, op, 0, count.n_cells);
 }
@@ -100,8 +102,8 @@ void setup_geometry(Storage &locals, Storage &aliens, int rank,
     }
     std::vector<std::future<void>> results(num_tasks);
 
-    std::size_t bin = count.n_cells / num_tasks + 1;
-    std::size_t pos = 0;
+    std::int bin = count.n_cells / num_tasks + 1;
+    std::int pos = 0;
     for (auto &res : results) {
         res = threads.enqueue(setup_geometry_partial<dim>,
                               std::ref(locals), std::ref(aliens), rank, std::ref(count), std::ref(op),

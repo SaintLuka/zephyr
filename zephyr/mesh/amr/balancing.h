@@ -86,13 +86,8 @@ public:
                 }
             }
 #endif
-            Cell& neib = adj.rank == cell.rank ?
-                        locals[adj.index].geom() : aliens[adj.ghost].geom();
+            Cell& neib = (adj.rank == cell.rank ? locals[adj.index] : aliens[adj.ghost]).geom();
 
-            if (std::abs(neib.flag) > 1 || neib.level != 0) {
-                std::cout << "hello mfk\n";
-                throw std::runtime_error("UUUU");
-            }
             neib_levels[neib_count] = neib.level;
             neib_flags[neib_count] = &neib.flag;
             ++neib_count;
@@ -366,8 +361,6 @@ void balance_flags(Storage &locals, Storage& aliens, int max_level) {
     restrictions_timer.resume();
     base_restrictions<dim>(locals, max_level);
     restrictions_timer.stop();
-
-    return;
 
     setup_around_timer.resume();
     

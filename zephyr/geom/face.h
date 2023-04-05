@@ -170,5 +170,16 @@ struct Face {
     }
 };
 
+/// @brief Центр грани
+template <int dim>
+inline Vector3d face_center(const Face& face, const Vertices& verts) {
+    if (dim < 3) {
+        return 0.5 * (verts[face.vertices[0]] + verts[face.vertices[1]]);
+    } else {
+        return 0.25 * (verts[face.vertices[0]] + verts[face.vertices[1]] +
+                       verts[face.vertices[2]] + verts[face.vertices[3]]);
+    }
+}
+
 } // geom
 } // zephyr

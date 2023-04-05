@@ -6,7 +6,7 @@ namespace zephyr { namespace utils {
 static int g_size = -1;
 static int g_rank = -1;
 #else
-static int g_size = 0;
+static int g_size = 1;
 static int g_rank = 0;
 #endif
 

@@ -227,22 +227,15 @@ void split_face<3>(Faces& faces, Vertices& vertices, int side) {
 /// @brief Разбивает грань на стороне side на подграни.
 /// Устанавливает площади и нормали новых граней.
 template <int dim>
-void split_face(Storage::Item cell, int side) {
-    split_face<dim>(cell.geom().faces, cell.geom().vertices, side);
-}
-
-/// @brief Разбивает грань на стороне side на подграни.
-/// Устанавливает площади и нормали новых граней.
-template <int dim>
 void split_face(Cell& cell, int side) {
     split_face<dim>(cell.faces, cell.vertices, side);
 }
 
 /// @brief Объединяет подграни в одну грань на стороне side
 template<int dim, Side side>
-void merge_faces(Storage::Item& cell) {
-    auto &faces = cell.geom().faces;
-    auto &vertices = cell.geom().vertices;
+void merge_faces(Cell& cell) {
+    auto &faces = cell.faces;
+    auto &vertices = cell.vertices;
 
     faces[side].vertices = face_indices<dim, side>();
 
@@ -258,10 +251,10 @@ void merge_faces(Storage::Item& cell) {
 
 /// @brief Объединяет подграни в одну грань на стороне side
 template<int dim>
-void merge_faces(Storage::Item& cell, Side side);
+void merge_faces(Cell& cell, Side side);
 
 template<>
-void merge_faces<2>(Storage::Item& cell, Side side) {
+void merge_faces<2>(Cell& cell, Side side) {
     switch (side) {
         case Side::LEFT:
             merge_faces<2, Side::L>(cell);
@@ -279,7 +272,7 @@ void merge_faces<2>(Storage::Item& cell, Side side) {
 }
 
 template<>
-void merge_faces<3>(Storage::Item& cell, Side side) {
+void merge_faces<3>(Cell& cell, Side side) {
     switch (side) {
         case Side::LEFT:
             merge_faces<3, Side::L>(cell);

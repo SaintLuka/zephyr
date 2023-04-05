@@ -1,3 +1,5 @@
+add_subdirectory(amr)
+
 set(MESHGEN   0)
 set(MPITEST   0)
 set(STOPWATCH 0)

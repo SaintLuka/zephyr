@@ -5,8 +5,8 @@
 
 #pragma once
 
-#define SCRUTINY 1          ///< Тщательная проверка вычислений
-#define CHECK_PERFORMANCE 1 ///< Выводить производительность частей алгоритма
+#define SCRUTINY 0          ///< Тщательная проверка вычислений
+#define CHECK_PERFORMANCE 0 ///< Выводить производительность частей алгоритма
 #define FAST_BALANCING 0    ///< Быстрая функция балансировки флагов
 
 #if SCRUTINY

@@ -41,6 +41,9 @@ Variables::Variables(const std::vector<std::string>& names) {
 void Variables::append(const char* name) {
     if (!std::strcmp(name, "faces")) {
         // Здесь добавляются сложные типы данных
+        m_list.emplace_back("face.rank");
+        m_list.emplace_back("face.index");
+        m_list.emplace_back("face.boundary");
     }
     else {
         m_list.emplace_back(name);

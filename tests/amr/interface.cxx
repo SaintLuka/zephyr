@@ -29,10 +29,6 @@ double get_bit(Storage::Item cell) {
     return cell(U).bit;
 }
 
-double get_flag(Storage::Item cell) {
-    return cell.flag();
-}
-
 inline double sqr(double x) {
     return x * x;
 }
@@ -75,18 +71,40 @@ int calc_bit(ICell& cell) {
     return 0;
 }
 
+int solution_step(Mesh& mesh, double t = 0.0) {
+    for (auto& cell: mesh.cells()) {
+        if (cell(U).bit > 0) {
+            cell.set_flag(1);
+        }
+        else {
+            cell.set_flag(-1);
+        }
+    }
+
+    mesh.refine();
+
+    for (auto cell: mesh.cells()) {
+        cell(U).idx = calc_idx(cell, t);
+    }
+    for (auto cell: mesh.cells()) {
+        cell(U).bit = calc_bit(cell);
+    }
+
+    return mesh.check_refined();
+}
+
 int main() {
     PvdFile pvd("mesh", "output");
+    pvd.variables = {"index", "level"};
     pvd.variables += { "idx", get_idx };
     pvd.variables += { "bit", get_bit };
-    pvd.variables += { "flag", get_flag };
 
     Rectangle rect(-1.0, 1.0, -1.0, 1.0);
-    rect.set_nx(200);
+    rect.set_nx(20);
 
     Mesh mesh(U, &rect);
 
-    mesh.set_max_level(3);
+    mesh.set_max_level(5);
 
     int res = mesh.check_base();
     if (res < 0) {
@@ -94,25 +112,21 @@ int main() {
         return 0;
     }
 
-    for (int step = 0; step < 2; ++step) {
-        std::cout << "Шаг " << step << "\n";
-        for (auto cell: mesh.cells()) {
-            cell(U).idx = calc_idx(cell, step / 100.0);
+    // Начальная адаптация
+    std::cout << "Начальная адапция\n";
+    for (int lvl = 0; lvl < mesh.max_level() + 2; ++lvl) {
+        std::cout << "  Уровень " << lvl << "\n";
+        solution_step(mesh);
+    }
+
+    std::cout << "\nРасчет\n";
+    for (int step = 0; step < 1000; ++step) {
+        if (step % 10 == 0) {
+            std::cout << "  Шаг " << step << " / 1000\n";
+            pvd.save(mesh, step);
         }
-        for (auto cell: mesh.cells()) {
-            cell(U).bit = calc_bit(cell);
-        }
-        for (auto& cell: mesh.cells()) {
-            if (cell(U).bit > 0) {
-                cell.set_flag(1);
-            }
-            else {
-                cell.set_flag(-1);
-            }
-        }
-        pvd.save(mesh, step);
-        mesh.refine();
-        pvd.save(mesh, step + 0.5);
+
+        solution_step(mesh, step / 1000.0);
     }
 
     return 0;

@@ -225,8 +225,7 @@ Cell get_parent(Storage &locals, Storage &aliens, int rank,
             auto child = children[children_by_side[side][i]];
             if (child.geom().faces[side + 6].is_undefined()) {
                 // Простая грань
-                throw std::runtime_error("olololshja");
-                //? cfaces[i] = child.geom().faces[side].center<dim>(child.geom().vertices);
+                cfaces[i] = face_center<dim>(child.geom().faces[side], child.geom().vertices);
             } else {
                 // Сложная грань, считаем центр по основным вершинам
                 cfaces[i] = Vector3d(0.0, 0.0, 0.0);

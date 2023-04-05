@@ -48,7 +48,7 @@ void apply(Storage &cells, const Distributor& op) {
 
     /// Этап 1. Сбор статистики
     count_timer.resume();
-    Statistics<dim> count(cells);
+    Statistics count(cells);
     count_timer.stop();
 
     // Нечего адаптировать
@@ -56,23 +56,28 @@ void apply(Storage &cells, const Distributor& op) {
 
     /// Этап 2. Распределяем места для новых ячеек
     positions_timer.resume();
-    setup_positions(cells, count);
+    setup_positions<dim>(cells, count);
     positions_timer.stop();
 
     /// Этап 3. Восстановление геометрии
     geometry_timer.resume();
-    setup_geometry(cells, count, op);
+    setup_geometry<dim>(cells, count, op);
     geometry_timer.stop();
 
     /// Этап 4. Восстановление соседства
     connections_timer.resume();
-    restore_connections(cells, count);
+    restore_connections<dim>(cells, count);
     connections_timer.stop();
+
 
     /// Этап 5. Удаление неопределенных ячеек
     clean_timer.resume();
-    remove_undefined(cells, count);
+    remove_undefined<dim>(cells, count);
     clean_timer.stop();
+
+    for (int idx = 0; idx <cells.size(); ++idx) {
+        cells[idx].geom().index = idx;
+    }
 
     /// Этап 6. Сортировка ячеек по уровням (не обязательно)
     //sort_timer.resume();

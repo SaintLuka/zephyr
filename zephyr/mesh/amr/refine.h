@@ -17,20 +17,20 @@ namespace zephyr { namespace mesh { namespace amr {
 /// @param parent Родительская ячейка
 /// @return Массив с дочерними ячейками
 template <int dim>
-std::array<geom::Cell, CpC(dim)> create_children(Storage::Item parent);
+std::array<geom::Cell, CpC(dim)> create_children(Cell& parent);
 
 /// @brief Создать геометрию дочерних ячеек по родительской ячейке
 /// @param parent Родительская ячейка
 /// @return Массив с дочерними ячейками
-std::array<geom::Cell, CpC(2)> create_children_simple(Storage::Item parent) {
+std::array<geom::Cell, CpC(2)> create_children_simple(Cell& parent) {
     using geom::ShortList2D;
     using geom::Cell;
 
     std::array<Vector3d, 9> vs;
-    vs[0] = parent.geom().vertices[0];
-    vs[1] = parent.geom().vertices[1];
-    vs[2] = parent.geom().vertices[2];
-    vs[3] = parent.geom().vertices[3];
+    vs[0] = parent.vertices[0];
+    vs[1] = parent.vertices[1];
+    vs[2] = parent.vertices[2];
+    vs[3] = parent.vertices[3];
 
     vs[4] = (vs[0] + vs[2]) / 2.0;
     vs[5] = (vs[1] + vs[3]) / 2.0;
@@ -51,12 +51,12 @@ std::array<geom::Cell, CpC(2)> create_children_simple(Storage::Item parent) {
 /// @param parent_vertices Вершины родительской ячейки
 /// @return Массив с дочерними ячейками
 template <>
-std::array<geom::Cell, CpC(2)> create_children<2>(Storage::Item parent) {
+std::array<geom::Cell, CpC(2)> create_children<2>(Cell& parent) {
     using geom::LargeList2D;
     using geom::Mapping2D;
     using geom::Cell;
 
-    const Vertices& vertices = parent.geom().vertices;
+    const Vertices& vertices = parent.vertices;
 
     // Собираем отображение ячейки
     LargeList2D vs = {
@@ -100,8 +100,8 @@ std::array<geom::Cell, CpC(2)> create_children<2>(Storage::Item parent) {
 /// @param parent_vertices Вершины родительской ячейки
 /// @return Массив с дочерними ячейками
 template <>
-std::array<Cell, CpC(3)> create_children<3>(Storage::Item parent) {
-    LargeList3D& vs = (LargeList3D&) parent.geom().vertices;
+std::array<Cell, CpC(3)> create_children<3>(Cell& parent) {
+    LargeList3D& vs = (LargeList3D&) parent.vertices;
    
     ShortList3D vl1 = {vs[iww(0, 0, 0)], vs[iww(1, 0, 0)], vs[iww(0, 1, 0)], vs[iww(1, 1, 0)],
                        vs[iww(0, 0, 1)], vs[iww(1, 0, 1)], vs[iww(0, 1, 1)], vs[iww(1, 1, 1)]};
@@ -135,31 +135,34 @@ std::array<Cell, CpC(3)> create_children<3>(Storage::Item parent) {
 /// @return Массив с дочерними ячейками, дочерние ячейки имеют законченный вид
 /// (необходимое число граней, правильную линковку (на старные ячейки))
 template<int dim>
-std::array<Cell, CpC(dim)> get_children(Storage::Item &cell, int ic, int rank) {
+std::array<Cell, CpC(dim)> get_children(Cell &cell) {
     auto children = create_children<dim>(cell);
 
     auto children_by_side = get_children_by_side<dim>();
 
     // По умолчанию дети ссылаются на родительскую ячейку
     for (auto &child: children) {
+        child.rank = cell.rank;
+        child.index = cell.index;
+
         for (int s = 0; s < FpC(dim); ++s) {
-            child.faces[s].adjacent.rank = rank;
-            child.faces[s].adjacent.index = ic;
+            child.faces[s].adjacent.rank = cell.rank;
+            child.faces[s].adjacent.index = cell.index;
             child.faces[s].adjacent.ghost = -1;
         }
     }
 
     for (int i = 0; i < CpC(dim); ++i) {
-        children[i].next = cell.geom().next + i;
+        children[i].next = cell.next + i;
         children[i].flag = 0;
-        children[i].b_idx = cell.geom().b_idx;
-        children[i].level = cell.geom().level + 1;
-        children[i].z_idx = CpC(dim) * cell.geom().z_idx + i;
+        children[i].b_idx = cell.b_idx;
+        children[i].level = cell.level + 1;
+        children[i].z_idx = CpC(dim) * cell.z_idx + i;
     }
 
     // Выставить граничный флаг
     for (int side = 0; side < FpC(dim); ++side) {
-        auto flag = cell.geom().faces[side].boundary;
+        auto flag = cell.faces[side].boundary;
         for (int i: children_by_side[side]) {
             children[i].faces[side].boundary = flag;
         }
@@ -167,14 +170,14 @@ std::array<Cell, CpC(dim)> get_children(Storage::Item &cell, int ic, int rank) {
 
     // Далее необходимо слинковать дочерние ячейки с соседями
     for (int side = 0; side < FpC(dim); ++side) {
-        auto flag = cell.geom().faces[side].boundary;
+        auto flag = cell.faces[side].boundary;
         for (int i: children_by_side[side]) {
             children[i].faces[side].boundary = flag;
         }
 
-        if (cell.geom().faces[side + 6].is_undefined()) {
+        if (cell.faces[side + 6].is_undefined()) {
             // Ячейка имела простую грань
-            auto adj = cell.geom().faces[side].adjacent;
+            auto adj = cell.faces[side].adjacent;
             for (int i: children_by_side[side]) {
                 children[i].faces[side].adjacent = adj;
             }
@@ -186,10 +189,10 @@ std::array<Cell, CpC(dim)> get_children(Storage::Item &cell, int ic, int rank) {
                 auto child_fc = child_face.center<dim>(child.vertices);
 
                 for (auto s: subface_sides<dim>(side)) {
-                    Face&cell_face = cell.geom().faces[s];
-                    auto cell_fc = cell_face.center<dim>(cell.vertices());
+                    Face& cell_face = cell.faces[s];
+                    auto cell_fc = cell_face.center<dim>(cell.vertices);
 
-                    if ((child_fc - cell_fc).norm() < 1.0e-5 * cell.size()) {
+                    if ((child_fc - cell_fc).norm() < 1.0e-5 * cell.size) {
                         child_face.adjacent = cell_face.adjacent;
                         break;
                     }
@@ -242,19 +245,20 @@ std::array<Storage::Item, CpC(3)> select_children<3>(
 /// adjacent указан на старые ячейки.
 template<int dim>
 void refine_cell(Storage &locals, Storage &aliens, int rank, int ic, const Distributor& op) {
-    auto cell = locals[ic];
+    auto item = locals[ic];
+    Cell& parent = item.geom();
 
-    cell.set_undefined();
-
-    auto children = get_children<dim>(cell, ic, rank);
+    auto children = get_children<dim>(parent);
 
     for (int i = 0; i < CpC(dim); ++i) {
-        auto j = locals[ic].geom().next + i;
+        Cell& child = locals[parent.next + i];
 
-        cell.copy_to(locals[j]);
+        // Возможна оптимизация (!), создавать дочерние ячейки сразу
+        // на нужном месте в хранилище
+        children[i].copy_to(child);
 
         for (int s = 0; s < FpC(dim); ++s) {
-            Face &f1 = locals[j].geom().faces[s];
+            Face &f1 = child.faces[s];
             if (f1.is_undefined() or f1.is_boundary()) {
                 continue;
             }
@@ -282,13 +286,15 @@ void refine_cell(Storage &locals, Storage &aliens, int rank, int ic, const Distr
                 nei_wanted_lvl = neib.level() + neib.flag();
             }
 
-            if (nei_wanted_lvl > locals[j].level()) {
-                split_face<dim>(locals[j], Side(s));
+            if (nei_wanted_lvl > child.level) {
+                split_face<dim>(child, Side(s));
             }
         }
     }
 
-    op.split<dim>(cell, select_children<dim>(locals, children));
+    op.split<dim>(item, select_children<dim>(locals, children));
+
+    parent.set_undefined();
 }
 
 } // namespace amr

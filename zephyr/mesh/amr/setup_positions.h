@@ -23,43 +23,45 @@ namespace zephyr { namespace mesh { namespace amr {
 /// Алгоритм может выполняться как для всего хранилища, так и для части сетки
 /// в многопроцессорном режиме. Многопоточная реализация отсутствует.
 template<int dim>
-void setup_positions(Storage &cells, const Statistics<dim> &count)
+void setup_positions(Storage &cells, const Statistics &count)
 {
     cells.resize(count.n_cells_large);
 
-    size_t coarse_counter = count.n_cells;
-    size_t refine_counter = count.n_cells + count.n_parents;
-    for (size_t ic = 0; ic < count.n_cells; ++ic) {
-        auto cell = cells[ic];
+    int coarse_counter = count.n_cells;
+    int refine_counter = count.n_cells + count.n_parents;
+    for (int ic = 0; ic < count.n_cells; ++ic) {
+        Cell& cell = cells[ic].geom();
 
-        if (cell.flag() == 0) {
-            cell.geom().next = ic;
+        if (cell.flag == 0) {
+            cell.next = ic;
             continue;
         }
 
-        if (cell.flag() > 0) {
-            cell.geom().next = refine_counter;
+        if (cell.flag > 0) {
+            cell.next = refine_counter;
             refine_counter += CpC(dim);
             continue;
         }
 
         // Главный ребенок собирает своих сиблингов
-        if (cells[ic].z_idx() % CpC(dim) == 0) {
+        if (cell.z_idx % CpC(dim) == 0) {
             auto sibs = get_siblings<dim>(cells, ic);
-            cells[ic].geom().next = coarse_counter;
-            for (size_t jc: sibs) {
+            cell.next = coarse_counter;
+            for (int jc: sibs) {
                 cells[jc].geom().next = coarse_counter;
             }
             ++coarse_counter;
         }
     }
 
+#if SCRUTINY
     if (coarse_counter != count.n_cells + count.n_parents || refine_counter != count.n_cells_large) {
         count.print();
         std::cout << "coarse_counter: " << coarse_counter << "\n";
         std::cout << "refine_counter: " << refine_counter << "\n";
         throw std::runtime_error("Something is wrong");
     }
+#endif
 }
 
 } // namespace amr

@@ -25,5 +25,3 @@ if (RIEMANN)
     target_link_libraries(riemann PUBLIC zephyr)
     install(TARGETS riemann DESTINATION problems)
 endif()
-
-add_subdirectory(amr)

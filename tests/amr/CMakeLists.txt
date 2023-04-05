@@ -1,0 +1,18 @@
+set(RANDOM 1)
+set(INTERFACE 1)
+
+if (RANDOM)
+    message(STATUS "Build AMR random test")
+    add_executable(random random.cxx)
+    target_include_directories(random PUBLIC zephyr)
+    target_link_libraries(random PUBLIC zephyr)
+    install(TARGETS random DESTINATION tests/amr)
+endif()
+
+if (INTERFACE)
+    message(STATUS "Build AMR interface test")
+    add_executable(interface interface.cxx)
+    target_include_directories(interface PUBLIC zephyr)
+    target_link_libraries(interface PUBLIC zephyr)
+    install(TARGETS interface DESTINATION tests/amr)
+endif()

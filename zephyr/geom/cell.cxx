@@ -245,20 +245,24 @@ Cell::Cell(const ShortList3D& verts) : Cell() {
     build3D(verts);
 }
 
+void Cell::copy_to(Cell& cell) const {
+    cell = *this;
+}
+
 double Cell::volume() const {
     return size * (dim < 3 ? size : size * size);
 }
 
 void Cell::set_undefined() {
-    rank = -1;
+    index = -1;
 }
 
 bool Cell::is_actual() const {
-    return rank >= 0;
+    return index >= 0;
 }
 
 bool Cell::is_undefined() const {
-    return rank < 0;
+    return index < 0;
 }
 
 /*

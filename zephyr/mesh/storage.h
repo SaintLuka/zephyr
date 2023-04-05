@@ -74,7 +74,7 @@ public:
 
         bool operator!=(const Item &it) const { return m_ptr != it.m_ptr; }
 
-        int operator-(const Item &it) const { return int(it.m_ptr - m_ptr) / m_itemsize; }
+        int operator-(const Item &it) const { return int(m_ptr - it.m_ptr) / m_itemsize; }
 
         /// @brief Ссылка на геометрию
         inline Byte* geom_ptr() { return m_ptr; }
@@ -120,6 +120,9 @@ public:
 
         /// @brief Ранг процесса, который обрабатывает ячейку
         inline const int& rank() const { return geom().rank; }
+
+        /// @brief Индекс ячеки в массиве Storage
+        inline const int& index() const { return geom().index; }
 
         /// @brief Пометить ячейку как неопределенную (вне сетки)
         inline void set_undefined() { geom().set_undefined(); }
@@ -168,7 +171,7 @@ public:
         /// @param src Указатель на источник данных.
         /// @param dest Указатель на область, куда надо записать данные.
         inline void copy_to(const Storage::Item& dest) const {
-            std::memcpy(m_ptr, dest.m_ptr, m_itemsize);
+            std::memcpy(dest.m_ptr, m_ptr, m_itemsize);
         }
 
         /// @brief Ссылка на данные
