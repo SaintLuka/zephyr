@@ -2,8 +2,13 @@
 
 namespace zephyr { namespace utils {
 
+#ifdef ZEPHYR_ENABLE_MPI
 static int g_size = -1;
 static int g_rank = -1;
+#else
+static int g_size = 0;
+static int g_rank = 0;
+#endif
 
 void mpi::init() {
 #ifdef ZEPHYR_ENABLE_MPI

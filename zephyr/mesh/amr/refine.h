@@ -189,7 +189,7 @@ std::array<Cell, CpC(dim)> get_children(Storage::Item &cell, int ic, int rank) {
                     Face&cell_face = cell.geom().faces[s];
                     auto cell_fc = cell_face.center<dim>(cell.vertices());
 
-                    if (distance(child_fc, cell_fc) < 1.0e-5 * cell.size()) {
+                    if ((child_fc - cell_fc).norm() < 1.0e-5 * cell.size()) {
                         child_face.adjacent = cell_face.adjacent;
                         break;
                     }
@@ -243,6 +243,8 @@ std::array<Storage::Item, CpC(3)> select_children<3>(
 template<int dim>
 void refine_cell(Storage &locals, Storage &aliens, int rank, int ic, const Distributor& op) {
     auto cell = locals[ic];
+
+    cell.set_undefined();
 
     auto children = get_children<dim>(cell, ic, rank);
 

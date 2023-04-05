@@ -335,7 +335,7 @@ int check_base_vertices_order(Storage::Item &cell) {
         bool bad = false;
 
         // Индекс пересечения двух граней
-        auto cross_face = [](Faces& faces, side side1, side side2) -> unsigned int {
+        auto cross_face = [](Faces& faces, side side1, side side2) -> int {
             auto& face1 = faces[side1];
             auto& face2 = faces[side2];
             if (face1.is_undefined()) {
@@ -406,7 +406,7 @@ int check_base_vertices_order(Storage::Item &cell) {
         bool bad = false;
 
         // Индекс пересечения трех граней
-        auto cross_face = [](Faces& faces, side side1, side side2, side side3) -> unsigned int {
+        auto cross_face = [](Faces& faces, side side1, side side2, side side3) -> int {
             auto& face1 = faces[side1];
             auto& face2 = faces[side2];
             auto& face3 = faces[side3];
@@ -531,7 +531,7 @@ int check_complex_faces(Storage::Item &cell) {
     return 0;
 }
 
-int check_connectivity(Storage &locals, size_t ic, Storage& aliens, unsigned int rank) {
+int check_connectivity(Storage &locals, size_t ic, Storage& aliens, int rank) {
     using Vector3d;
 
     auto cell = locals[ic];
@@ -690,7 +690,7 @@ int check_connectivity(Storage &locals, size_t ic, Storage& aliens, unsigned int
     return 0;
 }
 
-int check_base_mesh(Storage &locals, Storage &aliens, unsigned int rank) {
+int check_base_mesh(Storage &locals, Storage &aliens, int rank) {
     using Vector3d;
     using coords;
     using vertices;
@@ -775,7 +775,7 @@ int check_base_mesh(Storage &locals, Storage &aliens, unsigned int rank) {
     return 0;
 }
 
-int check_refined_mesh(zephyr::data::Storage &locals, Storage &aliens, unsigned int rank) {
+int check_refined_mesh(zephyr::data::Storage &locals, Storage &aliens, int rank) {
     using Vector3d;
     using coords;
     using vertices;

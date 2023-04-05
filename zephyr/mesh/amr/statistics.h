@@ -45,7 +45,7 @@ struct StatisticsPartial {
 
 /// @struct Содержит статистику о числе ячеек с флагами -1, 0 и 1, число новых
 /// дочерних и родительских ячеек и другие параметры
-template<unsigned int dim>
+template<int dim>
 struct Statistics {
     size_t n_cells;     ///< Исходное количество в Storage (перед адаптацией)
     size_t n_coarse;    ///< Число ячеек для огрубления (кратно числу дочерних ячеек CpC)

@@ -22,7 +22,7 @@ namespace zephyr { namespace mesh { namespace amr {
 /// индексы next+1, next+2, ...
 /// Алгоритм может выполняться как для всего хранилища, так и для части сетки
 /// в многопроцессорном режиме. Многопоточная реализация отсутствует.
-template<unsigned int dim>
+template<int dim>
 void setup_positions(Storage &cells, const Statistics<dim> &count)
 {
     cells.resize(count.n_cells_large);

@@ -129,8 +129,8 @@ int check_connectivity(Storage &locals, int ic, Storage& aliens) {
             }
             if (adj.rank == mpi::rank()) {
                 // Локальный сосед
-                if (nface.adjacent.ghost < std::numeric_limits<int>::max()) {
-                    std::cout << "\tWrong connection (ghost < infinity)\n";
+                if (nface.adjacent.ghost >= 0) {
+                    std::cout << "\tWrong connection (ghost >= 0)\n";
                     std::cout << "\tCurrent cell:\n";
                     cell.print_info();
                     std::cout << "\tNeighbor:\n";
@@ -140,7 +140,8 @@ int check_connectivity(Storage &locals, int ic, Storage& aliens) {
             }
             else {
                 // Удаленный сосед
-                if (nface.adjacent.ghost < 0) {
+                if (nface.adjacent.ghost < 0 ||
+                    nface.adjacent.ghost >= aliens.size()) {
                     std::cout << "\tWrong connection\n";
                     std::cout << "\tCurrent cell:\n";
                     cell.print_info();
@@ -148,7 +149,6 @@ int check_connectivity(Storage &locals, int ic, Storage& aliens) {
                     neib.print_info();
                     return -1;
                 }
-
             }
         }
         if (counter < 1) {
@@ -187,23 +187,33 @@ int Mesh::check_base() {
 
     int res = 0;
     for (int ic = 0; ic < m_locals.size(); ++ic) {
-        auto cell = m_locals[ic];
+        Cell& cell = m_locals[ic].geom();
+
+        if (cell.index != ic) {
+            std::cout << "\tWrong cell index\n";
+            return -1;
+        }
+
+        if (cell.rank != mpi::rank() || cell.rank < 0) {
+            std::cout << "\tWrong cell rank\n";
+            return -1;
+        }
 
         // Размерность постоянна
-        if (cell.dim() != dim) {
+        if (cell.dim != dim) {
             std::cout << "\tVarious dimensions of elements\n";
             return -1;
         }
 
         // Число граней
         for (int i = 0; i < FpC(dim); ++i) {
-            if (cell.faces(i).is_undefined()) {
+            if (cell.faces[i].is_undefined()) {
                 std::cout << "\tCell has no one of main faces\n";
                 cell.print_info();
                 return -1;
             }
         }
-        if (cell.faces().size() > FpC(dim)) {
+        if (cell.faces.size() > FpC(dim)) {
             std::cout << "\tCell has too much faces\n";
             cell.print_info();
             return -1;
@@ -212,15 +222,15 @@ int Mesh::check_base() {
         // Число вершин ???
 
         // Правильное задание геометрии
-        res = cell.geom().check_geometry();
+        res = cell.check_geometry();
         if (res < 0) return res;
 
         // Грани правльно ориентированы
-        res = cell.geom().check_base_face_orientation();
+        res = cell.check_base_face_orientation();
         if (res < 0) return res;
 
         // Порядок основных вершин
-        res = cell.geom().check_base_vertices_order();
+        res = cell.check_base_vertices_order();
         if (res < 0) return res;
 
         // Проверка смежности
@@ -250,23 +260,33 @@ int Mesh::check_refined() {
 
     int res = 0;
     for (int ic = 0; ic < m_locals.size(); ++ic) {
-        auto cell = m_locals[ic];
+        Cell& cell = m_locals[ic].geom();
 
         if (cell.is_undefined()) {
             continue;
         }
 
+        if (cell.index != ic) {
+            std::cout << "\tWrong cell index\n";
+            return -1;
+        }
+
+        if (cell.rank != mpi::rank()) {
+            std::cout << "\tWrong cell rank\n";
+            return -1;
+        }
+
         // Размерность постоянна
-        if (cell.dim() != dim) {
+        if (cell.dim != dim) {
             std::cout << "\tVarious dimensions of elements\n";
             std::cout << "\t\tdimension: " << dim << "\n";
-            std::cout << "\t\tcell.dimension: " << cell.dim() << "\n";
+            std::cout << "\t\tcell.dimension: " << cell.dim << "\n";
             return -1;
         }
 
         // Число граней
         for (int i = 0; i < FpC(dim); ++i) {
-            if (cell.faces(i).is_undefined()) {
+            if (cell.faces[i].is_undefined()) {
                 std::cout << "\tCell has no one of main faces\n";
                 cell.print_info();
                 return -1;
@@ -274,10 +294,10 @@ int Mesh::check_refined() {
         }
 
         // Вершины дублируются
-        for (int i = 0; i < cell.geom().vertices.size(); ++i) {
-            for (int j = i + 1; j < cell.geom().vertices.size(); ++j) {
-                double dist = (cell.vertices(i) - cell.vertices(j)).norm();
-                if (dist < 1.0e-5 * cell.size()) {
+        for (int i = 0; i < cell.vertices.size(); ++i) {
+            for (int j = i + 1; j < cell.vertices.size(); ++j) {
+                double dist = (cell.vertices[i] - cell.vertices[j]).norm();
+                if (dist < 1.0e-5 * cell.size) {
                     std::cout << "\tIdentical vertices\n";
                     cell.print_info();
                     return -1;
@@ -286,19 +306,19 @@ int Mesh::check_refined() {
         }
 
         // Правильное задание геометрии
-        res = cell.geom().check_geometry();
+        res = cell.check_geometry();
         if (res < 0) return res;
 
         // Грани правльно ориентированы
-        res = cell.geom().check_base_face_orientation();
+        res = cell.check_base_face_orientation();
         if (res < 0) return res;
 
         // Порядок основных вершин
-        res = cell.geom().check_base_vertices_order();
+        res = cell.check_base_vertices_order();
         if (res < 0) return res;
 
         // Проверка сложных граней
-        res = cell.geom().check_complex_faces();
+        res = cell.check_complex_faces();
         if (res < 0) return res;
 
         // Проверка смежности

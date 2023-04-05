@@ -40,6 +40,10 @@ public:
     /// @return -1, если сетка имеет неверную структуру.
     int check_refined();
 
+    int max_level() const;
+
+    void set_max_level(int max_level);
+
     /// @brief Основная функция адаптации, меняет хранилище в соответствии
     /// с флагами amr.flag ячеек.
     void refine();
@@ -51,7 +55,7 @@ private:
     /// функций адаптации, выполняется один раз после создания хранилища.
     void init_amr();
 
-    int max_level;
+    int m_max_level = 0;
     Distributor distributor;
 
     Storage m_locals;

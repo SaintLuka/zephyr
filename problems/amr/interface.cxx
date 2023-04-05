@@ -29,6 +29,10 @@ double get_bit(Storage::Item cell) {
     return cell(U).bit;
 }
 
+double get_flag(Storage::Item cell) {
+    return cell.flag();
+}
+
 inline double sqr(double x) {
     return x * x;
 }
@@ -75,13 +79,22 @@ int main() {
     PvdFile pvd("mesh", "output");
     pvd.variables += { "idx", get_idx };
     pvd.variables += { "bit", get_bit };
+    pvd.variables += { "flag", get_flag };
 
     Rectangle rect(-1.0, 1.0, -1.0, 1.0);
     rect.set_nx(200);
 
     Mesh mesh(U, &rect);
 
-    for (int step = 0; step < 100; ++step) {
+    mesh.set_max_level(3);
+
+    int res = mesh.check_base();
+    if (res < 0) {
+        std::cout << "bad init mesh\n";
+        return 0;
+    }
+
+    for (int step = 0; step < 2; ++step) {
         std::cout << "Шаг " << step << "\n";
         for (auto cell: mesh.cells()) {
             cell(U).idx = calc_idx(cell, step / 100.0);
@@ -89,7 +102,17 @@ int main() {
         for (auto cell: mesh.cells()) {
             cell(U).bit = calc_bit(cell);
         }
+        for (auto& cell: mesh.cells()) {
+            if (cell(U).bit > 0) {
+                cell.set_flag(1);
+            }
+            else {
+                cell.set_flag(-1);
+            }
+        }
         pvd.save(mesh, step);
+        mesh.refine();
+        pvd.save(mesh, step + 0.5);
     }
 
     return 0;

@@ -58,9 +58,6 @@ public:
 
         Item(Byte *ptr, int itemsize) : m_ptr(ptr), m_itemsize(itemsize) {}
 
-        /// @brief Присвоение таких странных операторов имеет неочевидное поведение
-        Item &operator=(const Item &) = delete;
-
         virtual Item &operator*() { return *this; }
 
         virtual Item &operator++() { m_ptr += m_itemsize; return *this; }
@@ -117,6 +114,9 @@ public:
 
         /// @brief Желаемый флаг адаптации
         inline const int& flag() const { return geom().flag; }
+
+        /// @brief Желаемый флаг адаптации
+        inline void set_flag(int flag) { geom().flag = flag; }
 
         /// @brief Ранг процесса, который обрабатывает ячейку
         inline const int& rank() const { return geom().rank; }

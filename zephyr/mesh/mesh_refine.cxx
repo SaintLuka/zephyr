@@ -16,7 +16,7 @@ using zephyr::utils::Stopwatch;
 
 
 void Mesh::init_amr() {
-    max_level = 0;
+    m_max_level = 0;
 
     if (m_locals.empty()) {
         return;
@@ -41,6 +41,14 @@ void Mesh::init_amr() {
     }
 }
 
+int Mesh::max_level() const {
+    return m_max_level;
+}
+
+void Mesh::set_max_level(int max_level) {
+    m_max_level = std::max(0, std::min(max_level, 15));
+}
+
 void Mesh::refine() {
     static Stopwatch balance;
     static Stopwatch apply;
@@ -58,7 +66,7 @@ void Mesh::refine() {
 #if FAST_BALANCING
         amr::balance_flags_fast(m_locals, max_level);
 #else
-        amr::balance_flags_slow(m_locals, max_level);
+        amr::balance_flags_slow(m_locals, m_aliens, m_max_level);
 #endif
     }
     else {

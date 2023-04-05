@@ -21,22 +21,22 @@ namespace zephyr { namespace mesh { namespace amr {
 /// 3. Ячейка может иметь флаг -1 (огрубление), только если все сиблинги
 /// находятся на том же процессе, имеют такой же уровень адаптации как и
 /// ячейка, а также флаг адаптации -1.
-/// @param cells Хранилище ячеек
+/// @param locals Хранилище ячеек
 /// @param max_level Максимальный уровень адаптации
 /// @param from, to Диапазон ячеек для обхода
 template<int dim>
-void base_restrictions_partial(Storage &cells, int max_level, int from, int to) {
+void base_restrictions_partial(Storage &locals, int max_level, int from, int to) {
     for (int ic = from; ic < to; ++ic) {
-        scrutiny_check(ic < cells.size(), "base_restrictions: ic >= cells.size()")
-        auto cell = cells[ic];
+        scrutiny_check(ic < locals.size(), "base_restrictions: ic >= cells.size()")
+        Cell& cell = locals[ic].geom();
 
-        short flag = cell.flag();
+        int flag = cell.flag;
         // Приводим к одному из трех значений { -1, 0, 1 }
         if (flag != 0) {
             flag = flag > 0 ? 1 : -1;
         }
 
-        int lvl = cell.level();
+        int lvl = cell.level;
 
         if (lvl + flag < 0) {
             flag = 0;
@@ -47,22 +47,22 @@ void base_restrictions_partial(Storage &cells, int max_level, int from, int to) 
         }
 
         if (flag < 0) {
-            if (!can_coarse<dim>(cells, ic)) {
+            if (!can_coarse<dim>(locals, ic)) {
                 flag = 0;
             }
         }
 
-        cell.geom().flag = flag;
+        cell.flag = flag;
     }
 }
 
 /// @brief Выполняет функцию base_restriction_partial для всех ячеек хранилища
 /// в однопоточном режиме
-/// @param cells Хранилище ячеек
+/// @param locals Хранилище ячеек
 /// @param max_level Максимальный уровень адаптации
 template <int dim>
-void base_restrictions(Storage &cells, int max_level) {
-    base_restrictions_partial<dim>(cells, max_level, 0, cells.size());
+void base_restrictions(Storage &locals, int max_level) {
+    base_restrictions_partial<dim>(locals, max_level, 0, locals.size());
 }
 
 #ifdef ZEPHYR_ENABLE_MULTITHREADING
@@ -95,12 +95,13 @@ void base_restrictions(Storage &cells, int max_level, ThreadPool& threads) {
 }
 #endif
 
-void check_flags(Storage& locals, int max_level, Storage& aliens) {
+void check_flags(Storage& locals, Storage& aliens, int max_level) {
     for(auto cell: locals) {
         int cell_wanted_lvl = cell.level() + cell.flag();
 
         if (cell_wanted_lvl < 0 || cell_wanted_lvl > max_level) {
-            std::string message = "Wanted level out of range [0, " + std::to_string(max_level) + "].";
+            std::string message = "Wanted level (" + std::to_string(cell_wanted_lvl) + ") "
+                                  + "out of range [0, " + std::to_string(max_level) + "].";
             std::cerr << message << "\n";
             throw std::runtime_error(message);
         }

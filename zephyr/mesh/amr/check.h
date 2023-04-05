@@ -31,12 +31,12 @@ void test_storage(Storage &cells);
 /// в 2D или шестигранники типа куба в 3D), а также правильное расположение вершин
 /// и граней в списках вершин и граней.
 /// @return -1, если базовая сетка не подходящая
-int check_base_mesh(Storage &locals, Storage &aliens, unsigned int rank = 0);
+int check_base_mesh(Storage &locals, Storage &aliens, int rank = 0);
 
 /// @brief Проверяет адаптированную сетку (связность ячеек, выполнение баланса и
 /// так далее), функция используется при дебаге
 /// @return -1, если сетка адаптирована неверно
-int check_refined_mesh(Storage &locals, Storage &aliens, unsigned int rank = 0);
+int check_refined_mesh(Storage &locals, Storage &aliens, int rank = 0);
 
 } // namespace amr
 } // namespace mesh

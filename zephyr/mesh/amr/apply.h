@@ -37,7 +37,7 @@ using utils::Stopwatch;
 /// Этап 5. На начале этапа все ячейки правильно связаны, но внутри хранилища
 /// часть старых ячеек (не листовых) являются неопределенными.
 /// Алгоритм осуществляет удаление данных ячеек.
-template<unsigned int dim = 0>
+template<int dim = 0>
 void apply(Storage &cells, const Distributor& op) {
     static Stopwatch count_timer;
     static Stopwatch positions_timer;
@@ -66,8 +66,7 @@ void apply(Storage &cells, const Distributor& op) {
 
     /// Этап 4. Восстановление соседства
     connections_timer.resume();
-    throw std::runtime_error("No restore");
-    //restore_connections(cells, count);
+    restore_connections(cells, count);
     connections_timer.stop();
 
     /// Этап 5. Удаление неопределенных ячеек
@@ -127,7 +126,7 @@ void apply<0>(Storage &cells, const Distributor& op) {
 /// хранилища часть старых ячеек (не листовых) являются неопределенными.
 /// Алгоритм осуществляет удаление данных ячеек.
 /// Этап 6. ???
-template<unsigned int dim = 1234>
+template<int dim = 1234>
 void apply(
         Decomposition &decomposition,
         const DataDistributor& op
@@ -145,7 +144,7 @@ void apply(
 
     Storage& locals = decomposition.inner_elements();
     Storage& aliens = decomposition.outer_elements();
-    unsigned int rank = decomposition.network().rank();
+    int rank = decomposition.network().rank();
 
     /// Этап 1. Сбор статистики
     count_timer.resume();

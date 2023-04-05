@@ -34,11 +34,11 @@ struct Distributor {
     static Distributor simple();
 
     /// @brief Шаблонная функция split
-    template <unsigned int dim>
+    template <int dim>
     inline void split(Storage::Item parent, const std::array<Storage::Item, 4*(dim-1)>& children) const;
 
     /// @brief Шаблонная функция merge
-    template <unsigned int dim>
+    template <int dim>
     inline void merge(const std::array<Storage::Item, 4*(dim-1)>& children, Storage::Item parent) const;
 
 };

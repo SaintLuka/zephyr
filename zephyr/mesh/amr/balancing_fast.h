@@ -32,19 +32,19 @@ struct CellsByLevelPartial {
     std::vector<std::vector<size_t>> retain;
 
     /// @brief Создание экземпляра класса
-    static CellsByLevelPartial create(Storage& cells, unsigned int max_level, size_t from, size_t to) {
+    static CellsByLevelPartial create(Storage& cells, int max_level, size_t from, size_t to) {
         return CellsByLevelPartial(cells, max_level, from, to);
     }
 
     /// @brief Конструктор класса
-    explicit CellsByLevelPartial(Storage& cells, unsigned int max_level, size_t from, size_t to)
+    explicit CellsByLevelPartial(Storage& cells, int max_level, size_t from, size_t to)
     : cells(cells), from(from), to(to) {
         set_count(max_level);
         sort_by_levels(max_level);
     }
 
     /// @brief Посчитать ячейки каждого типа в диапазоне
-    void set_count(unsigned int max_level) {
+    void set_count(int max_level) {
         n_coarse.resize(max_level);
         n_retain.resize(max_level);
         for (size_t ic = from; ic < to; ++ic) {
@@ -62,10 +62,10 @@ struct CellsByLevelPartial {
     }
 
     /// @brief Распределить индексы ячеек в списках по уровням
-    void sort_by_levels(unsigned int max_level) {
+    void sort_by_levels(int max_level) {
         retain.resize(max_level);
         coarse.resize(max_level);
-        for (unsigned int lvl = 0; lvl < max_level; ++lvl) {
+        for (int lvl = 0; lvl < max_level; ++lvl) {
             coarse[lvl].reserve(n_coarse[lvl]);
             retain[lvl].reserve(n_retain[lvl]);
         }
@@ -102,7 +102,7 @@ struct CellsByLevel {
     /// @brief Однопоточный конструктор класса
     /// @details Вызывается конструктор CellsByLevelPartial для всего диапазона
     /// ячеек хранилища, затем данные перемещаются
-    CellsByLevel(Storage &cells, unsigned int max_level)
+    CellsByLevel(Storage &cells, int max_level)
             : cells(cells) {
         serial_constructor(max_level);
     }
@@ -111,7 +111,7 @@ struct CellsByLevel {
     /// @brief Многопоточный конструктор класса
     /// @details Каждый поток вызывает конструктор CellsByLevelPartial для
     /// части ячеек, затем полученные данные складываются в один массив
-    CellsByLevel(Storage &cells, unsigned int max_level, ThreadPool& threads)
+    CellsByLevel(Storage &cells, int max_level, ThreadPool& threads)
             : cells(cells) {
         if (threads.size() < 2) {
             serial_constructor(max_level);
@@ -137,7 +137,7 @@ struct CellsByLevel {
 
         for (auto &result: parts) {
             auto part = result.get();
-            for (unsigned int lvl = 0; lvl < max_level; ++lvl) {
+            for (int lvl = 0; lvl < max_level; ++lvl) {
                 n_retain[lvl] += part.n_retain[lvl];
                 n_coarse[lvl] += part.n_coarse[lvl];
 
@@ -150,7 +150,7 @@ struct CellsByLevel {
 
 private:
     /// @brief Однопоточный конструктор класса
-    void serial_constructor(unsigned int max_level) {
+    void serial_constructor(int max_level) {
         CellsByLevelPartial part(cells, max_level, 0, cells.size());
         n_coarse = std::move(part.n_coarse);
         n_retain = std::move(part.n_retain);
@@ -274,7 +274,7 @@ void round_3(Storage &cells, const std::vector<size_t> &indices, size_t from, si
 /// @param cells Ссылка на хранилище
 /// @param indices Индексы ячеек с исходным флагом = -1 в хранилище
 /// @param from, to Диапазон индексов внутри массива indices
-template <unsigned int dim>
+template <int dim>
 void round_4(Storage &cells, const std::vector<size_t> &indices, size_t from, size_t to) {
     for (size_t i = from; i < to; ++i) {
         scrutiny_check(indices[i] < cells.size(), "round_4: indices[i] >= cells.size()")
@@ -319,8 +319,8 @@ void round_4(Storage &cells, const std::vector<size_t> &indices, size_t from, si
 /// в round_3 флаги могут повыситься только до 0.
 /// 4. На заключительном обходе координируются сиблинги, которые хотят
 /// огрубиться (@see round_4), флаги могут повыситься до 0.
-template <unsigned int dim = 1234>
-void balance_flags_fast(Storage& cells, unsigned int max_level) {
+template <int dim = 1234>
+void balance_flags_fast(Storage& cells, int max_level) {
     static Stopwatch restriction_timer;
     static Stopwatch sorting_timer;
     static Stopwatch round_timer_1;
@@ -366,7 +366,7 @@ void balance_flags_fast(Storage& cells, unsigned int max_level) {
 
 /// @brief Специализация по умолчанию с автоматическим выбором размерности
 template <>
-void balance_flags_fast<1234>(Storage& cells, unsigned int max_level) {
+void balance_flags_fast<1234>(Storage& cells, int max_level) {
     if (cells.empty())
         return;
 
@@ -398,8 +398,8 @@ void balance_flags_fast<1234>(Storage& cells, unsigned int max_level) {
 /// @details Детали алгоритма описаны у однопоточной весрии.
 /// Многопоточная фунция быстрой балансировки может уступать по
 /// производительности обычной итерационной функции балансировки.
-template <unsigned int dim = 1234>
-void balance_flags_fast(Storage& cells, unsigned int max_level, ThreadPool& threads) {
+template <int dim = 1234>
+void balance_flags_fast(Storage& cells, int max_level, ThreadPool& threads) {
     using zephyr::performance::timer::Stopwatch;
     static Stopwatch restriction_timer;
     static Stopwatch sorting_timer;
@@ -487,7 +487,7 @@ void balance_flags_fast(Storage& cells, unsigned int max_level, ThreadPool& thre
 
 /// @brief Специализация по умолчанию с автоматическим выбором размерности
 template <>
-void balance_flags_fast<1234>(Storage& cells, unsigned int max_level, ThreadPool& threads) {
+void balance_flags_fast<1234>(Storage& cells, int max_level, ThreadPool& threads) {
     if (cells.empty())
         return;
 

@@ -44,7 +44,7 @@ std::array<Storage::Item, CpC(dim)> select_children(Storage& cells, int ic) {
     for (auto sib: sibs) {
         scrutiny_check(sib < cells.size(), "CellsAround: Sibling index out of range")
 
-        auto z_loc = cells[sib].z() % CpC(dim);
+        auto z_loc = cells[sib].z_idx() % CpC(dim);
         children[z_loc] = cells[sib];
     }
 
@@ -60,7 +60,7 @@ std::array<Storage::Item, CpC(dim)> select_children(Storage& cells, int ic) {
         if (cells[sib].level() != main_lvl) {
             throw std::runtime_error("Different levels (siblings)");
         }
-        int loc_z = cells[sib].z() % CpC(dim);
+        int loc_z = cells[sib].z_idx() % CpC(dim);
         found.insert(loc_z);
     }
     int counter = 0;
@@ -75,6 +75,35 @@ std::array<Storage::Item, CpC(dim)> select_children(Storage& cells, int ic) {
     return children;
 }
 
+/// @brief Список вершин родительской ячейки
+LargeList2D parent_vs(const std::array<Storage::Item, 4>& children) {
+     return {
+            children[0].geom().vertices[iww(0, 0)],
+            children[0].geom().vertices[iww(2, 0)],
+            children[1].geom().vertices[iww(2, 0)],
+            children[0].geom().vertices[iww(0, 2)],
+            children[0].geom().vertices[iww(2, 2)],
+            children[1].geom().vertices[iww(2, 2)],
+            children[2].geom().vertices[iww(0, 2)],
+            children[2].geom().vertices[iww(2, 2)],
+            children[3].geom().vertices[iww(2, 2)]
+    };
+}
+
+/// @brief Список вершин родительской ячейки
+ShortList3D parent_vs(const std::array<Storage::Item, 8>& children) {
+    return {
+            children[iss(0, 0, 0)].geom().vertices[isw(0, 0, 0)],
+            children[iss(1, 0, 0)].geom().vertices[isw(1, 0, 0)],
+            children[iss(0, 1, 0)].geom().vertices[isw(0, 1, 0)],
+            children[iss(1, 1, 0)].geom().vertices[isw(1, 1, 0)],
+            children[iss(0, 0, 1)].geom().vertices[isw(0, 0, 1)],
+            children[iss(1, 0, 1)].geom().vertices[isw(1, 0, 1)],
+            children[iss(0, 1, 1)].geom().vertices[isw(0, 1, 1)],
+            children[iss(1, 1, 1)].geom().vertices[isw(1, 1, 1)]
+    };
+}
+
 /// @brief Создает родительскую ячейку с учетом окружения, то есть полученная
 /// ячейка будет иметь актуальные ссылки на (старых) соседей, также полученная
 /// ячейка может иметь более одной грани по каждой из сторон
@@ -85,12 +114,12 @@ std::array<Storage::Item, CpC(dim)> select_children(Storage& cells, int ic) {
 template<int dim>
 Cell get_parent(Storage &locals, Storage &aliens, int rank,
                      std::array<Storage::Item, CpC(dim)> children) {
-    Cell parent(children);
+    Cell parent(parent_vs(children));
 
     parent.b_idx = children[0].b_idx();
     parent.flag = 0;
     parent.level = children[0].level() - 1;
-    parent.z_idx = children[0].z() / CpC(dim);
+    parent.z_idx = children[0].z_idx() / CpC(dim);
 
     auto children_by_side = get_children_by_side<dim>();
 
@@ -129,13 +158,13 @@ Cell get_parent(Storage &locals, Storage &aliens, int rank,
         if (some_neib_rank == rank && some_neib_index >= locals.size()) {
             std::cout << "Child has no local neighbor through the " <<
                       side_to_string(side % 6) << " side #1\n";
-            print_cell_info(some_child);
+            some_child.print_info();
             throw std::runtime_error("Child has no local neighbor (coarse_cell) #1");
         }
         if (some_neib_rank != rank && some_neib_ghost >= aliens.size()) {
             std::cout << "Child has no remote neighbor through the " <<
                       side_to_string(side % 6) << " side #1\n";
-            print_cell_info(some_child);
+            some_child.print_info();
             throw std::runtime_error("Child has no remote neighbor (coarse_cell) #1");
         }
 #endif
@@ -151,13 +180,13 @@ Cell get_parent(Storage &locals, Storage &aliens, int rank,
             if (adj.rank == rank && adj.index >= locals.size()) {
                 std::cout << "Child has no local neighbor through the " <<
                           side_to_string(side % 6) << " side #2\n";
-                print_cell_info(child);
+                child.print_info();
                 throw std::runtime_error("Child has no local neighbor (coarse_cell) #2");
             }
             if (adj.rank != rank && adj.ghost >= aliens.size()) {
                 std::cout << "Child has no remote neighbor through the " <<
                           side_to_string(side % 6) << " side #2\n";
-                print_cell_info(child);
+                child.print_info();
                 throw std::runtime_error("Child has no remote neighbor (coarse_cell) #2");
             }
 
@@ -196,7 +225,8 @@ Cell get_parent(Storage &locals, Storage &aliens, int rank,
             auto child = children[children_by_side[side][i]];
             if (child.geom().faces[side + 6].is_undefined()) {
                 // Простая грань
-                cfaces[i] = child.faces(side).center<dim>(child.vertices());
+                throw std::runtime_error("olololshja");
+                //? cfaces[i] = child.geom().faces[side].center<dim>(child.geom().vertices);
             } else {
                 // Сложная грань, считаем центр по основным вершинам
                 cfaces[i] = Vector3d(0.0, 0.0, 0.0);
@@ -215,7 +245,7 @@ Cell get_parent(Storage &locals, Storage &aliens, int rank,
             auto child = children[children_by_side[side][i]];
             auto& child_face = child.geom().faces[side];
             for (int j = 0; j < FpF(dim); ++j) {
-                if (distance(pfaces[i], cfaces[j]) < eps) {
+                if ((pfaces[i] - cfaces[j]).norm() < eps) {
                     parent.faces[side + 6*j].adjacent.rank = child_face.adjacent.rank;
                     parent.faces[side + 6*j].adjacent.index = child_face.adjacent.index;
                     parent.faces[side + 6*j].adjacent.ghost = child_face.adjacent.ghost;
@@ -228,7 +258,7 @@ Cell get_parent(Storage &locals, Storage &aliens, int rank,
         std::set<int> found;
         for (int i = 0; i < FpF(dim); ++i) {
             for (int j = 0; j < FpF(dim); ++j) {
-                if (distance(pfaces[i], cfaces[j]) < eps) {
+                if ((pfaces[i] - cfaces[j]).norm() < eps) {
                     found.insert(j);
                     break;
                 }
@@ -287,6 +317,8 @@ std::array<int, CpC(dim)> sorted_siblings(Storage& cells,  int ic) {
 /// @param op Оператор огрубления данных
 template<int dim>
 void coarse_cell(Storage &locals, Storage &aliens, int rank, int ic, const Distributor& op) {
+    locals[ic].set_undefined();
+
     // главный ребенок всем заведует
     if (locals[ic].z_idx() % CpC(dim) != 0) {
         return;

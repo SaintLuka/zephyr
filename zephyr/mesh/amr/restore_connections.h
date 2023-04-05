@@ -85,7 +85,7 @@ void restore_connections_partial(Storage &locals, Storage &aliens, int rank,
                     if (face2.is_undefined()) continue;
                     auto fc2 = face2.center<dim>(neib.vertices());
 
-                    if (distance(fc1, fc2) < 1.0e-5 * cell.size()) {
+                    if ((fc1 - fc2).norm() < 1.0e-5 * cell.size()) {
                         face1.adjacent.index = jc;
                         found = true;
                         break;
@@ -116,8 +116,7 @@ void set_undefined_next(Storage& cells, int from, int to) {
 /// @details см. restore_connections_partial
 template<int dim>
 void restore_connections(Storage &cells, const Statistics<dim> &count) {
-    Storage aliens();
-    restore_connections_partial<dim>(cells, aliens, 0, count, 0, count.n_cells_large);
+    restore_connections_partial<dim>(cells, cells, 0, count, 0, count.n_cells_large);
     set_undefined_next(cells, 0, count.n_cells_large);
 }
 

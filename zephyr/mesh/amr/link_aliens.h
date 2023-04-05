@@ -20,7 +20,7 @@ namespace zephyr { namespace mesh { namespace amr {
 void before_exchange_partial(
         Storage& locals,
         Storage& aliens,
-        unsigned int rank,
+        int rank,
         size_t from, size_t to)
 {
     for (size_t ic = from; ic < to; ++ic) {
@@ -49,12 +49,12 @@ void before_exchange_partial(
     }
 }
 
-void before_exchange(Storage& locals, Storage& aliens, unsigned int rank) {
+void before_exchange(Storage& locals, Storage& aliens, int rank) {
     before_exchange_partial(locals, aliens, rank, 0, locals.size());
 }
 
 #ifdef ZEPHYR_ENABLE_MULTITHREADING
-void before_exchange(Storage& locals, Storage& aliens, unsigned int rank, ThreadPool& threads) {
+void before_exchange(Storage& locals, Storage& aliens, int rank, ThreadPool& threads) {
     auto num_tasks = threads.size();
     if (num_tasks < 2) {
         before_exchange(locals, aliens, rank);
@@ -78,7 +78,7 @@ void before_exchange(Storage& locals, Storage& aliens, unsigned int rank, Thread
 
 /// @brief Функция для поиска и связывания ячеек между двумя процессами.
 /// Соседи ищутся по base_id, который указан в face.adjacent.ghost.
-template <unsigned int dim>
+template <int dim>
 void find_neighbors_partial(
         Storage& locals,
         Storage& aliens,
@@ -144,13 +144,13 @@ void find_neighbors_partial(
     }
 }
 
-template <unsigned int dim>
+template <int dim>
 void find_neighbors(Storage& locals, Storage& aliens) {
     find_neighbors_partial<dim>(locals, aliens, 0, locals.size());
 }
 
 #ifdef ZEPHYR_ENABLE_MULTITHREADING
-template <unsigned int dim>
+template <int dim>
 void find_neighbors(Storage& locals, Storage& aliens, ThreadPool& threads) {
     auto num_tasks = threads.size();
     if (num_tasks < 2) {
@@ -176,14 +176,14 @@ void find_neighbors(Storage& locals, Storage& aliens, ThreadPool& threads) {
 /// @brief Осуществляет связывание соседей на разных процессах в конце
 /// выполнения функции адаптации. Подробности алгоритма можно прочитать
 /// у функций before_exchange и find_neighbors
-template <unsigned int dim>
+template <int dim>
 void link_aliens(
         Decomposition& decomposition
         if_multithreading(, ThreadPool& threads = dummy_pool))
 {
     Storage& locals = decomposition.inner_elements();
     Storage& aliens = decomposition.outer_elements();
-    unsigned int rank = decomposition.network().rank();
+    int rank = decomposition.network().rank();
 
     // Подготовить ячейки и face.adjacent перед обменом
     before_exchange(locals, aliens, rank if_multithreading(, threads));

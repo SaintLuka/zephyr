@@ -313,7 +313,7 @@ struct SwapLists {
 /// 4. Актуальные ячейки перемещаются на место неопределенных.
 /// 5. Хранилище меняет размер, все неопределенные ячейки остаются за пределами
 /// хранилища.
-template<unsigned int dim>
+template<int dim>
 void remove_undefined(Storage &cells, const Statistics<dim> &count) {
     static Stopwatch create_swap_timer;
     static Stopwatch set_mapping_timer;

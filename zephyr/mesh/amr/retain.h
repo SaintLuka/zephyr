@@ -19,8 +19,8 @@ namespace zephyr { namespace mesh { namespace amr {
 /// @details Если какая-то грань разбивается, то adjacent у подграней
 /// выставляется со старой грани. Если подграни склеиваются, то adjacent
 /// у объединенной грани будет такой, какой был у старой грани.
-template<unsigned int dim>
-void retain_cell(Storage &locals, Storage& aliens, unsigned int rank, size_t ic) {
+template<int dim>
+void retain_cell(Storage &locals, Storage& aliens, int rank, size_t ic) {
     // Ячейка не требует разбиения, необходимо пройти по граням,
     // возможно, необходимо разбить грань или собрать
     auto cell = locals[ic];

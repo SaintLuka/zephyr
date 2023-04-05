@@ -18,7 +18,7 @@ Storage::Item safe_iterator(Storage &locals, Storage &aliens, int idx) {
 }
 
 Storage::Item safe_iterator(Storage &locals, Storage &aliens, const Adjacent &adj) {
-    if (adj.ghost < aliens.size()) {
+    if (adj.ghost >= 0) {
         return aliens[adj.ghost];
     }
     else {

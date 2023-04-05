@@ -1,6 +1,7 @@
 #include <iostream>
 #include <algorithm>
 
+#include <zephyr/utils/mpi.h>
 #include <zephyr/geom/cell.h>
 
 #include <zephyr/geom/box.h>
@@ -9,9 +10,8 @@
 
 namespace zephyr { namespace mesh { namespace generator {
 
-#ifdef ZEPHYR_ENABLE_MPI
-using zephyr::network::mpi::Network;
-#endif
+using namespace zephyr::geom;
+using zephyr::utils::mpi;
 
 #ifdef ZEPHYR_ENABLE_YAML
 Rectangle::Rectangle(YAML::Node config)
@@ -69,8 +69,8 @@ Rectangle::Rectangle(YAML::Node config)
 Rectangle::Rectangle(double xmin, double xmax, double ymin, double ymax, bool voronoi) :
         Generator("rectangle"),
         m_xmin(xmin), m_xmax(xmax), m_ymin(ymin), m_ymax(ymax), m_nx(0), m_ny(0),
-        m_left_flag(FaceFlag::UNDEFINED), m_right_flag(FaceFlag::UNDEFINED),
-        m_bottom_flag(FaceFlag::UNDEFINED), m_top_flag(FaceFlag::UNDEFINED),
+        m_left_flag(FaceFlag::WALL), m_right_flag(FaceFlag::WALL),
+        m_bottom_flag(FaceFlag::WALL), m_top_flag(FaceFlag::WALL),
         m_voronoi(voronoi) {
     check_params();
 }
@@ -248,10 +248,6 @@ void Rectangle::initialize(Storage &cells, Part part) {
 }
 
 void Rectangle::init_classic(Storage &cells, Part part) const {
-    using zephyr::geom::Side;
-    using zephyr::geom::Cell;
-    using zephyr::geom::ShortList2D;
-
     double dx = (m_xmax - m_xmin) / m_nx;
     double dy = (m_ymax - m_ymin) / m_ny;
 
@@ -278,11 +274,16 @@ void Rectangle::init_classic(Storage &cells, Part part) const {
 
         Cell cell(verts);
 
+        // Базовая информация
+        cell.rank  = mpi::rank();
+        cell.index = counter;
+
         // Данные AMR
         cell.b_idx = n;
-        cell.level   = 0;
-        cell.flag    = 0;
-        cell.z_idx       = 0;
+        cell.z_idx = 0;
+        cell.next  = 0;
+        cell.level = 0;
+        cell.flag  = 0;
 
         // Флаги граничных условий
         auto ordinary = FaceFlag::ORDINARY;
@@ -297,10 +298,10 @@ void Rectangle::init_classic(Storage &cells, Part part) const {
         cell.faces[Side::B].adjacent.rank = 0;
         cell.faces[Side::T].adjacent.rank = 0;
 
-        cell.faces[Side::L].adjacent.ghost = 0;
-        cell.faces[Side::R].adjacent.ghost = 0;
-        cell.faces[Side::B].adjacent.ghost = 0;
-        cell.faces[Side::T].adjacent.ghost = 0;
+        cell.faces[Side::L].adjacent.ghost = -1;
+        cell.faces[Side::R].adjacent.ghost = -1;
+        cell.faces[Side::B].adjacent.ghost = -1;
+        cell.faces[Side::T].adjacent.ghost = -1;
 
         cell.faces[Side::L].adjacent.index = get_n(i - 1, j);
         cell.faces[Side::R].adjacent.index = get_n(i + 1, j);
@@ -320,7 +321,7 @@ Vector3d circle_center(const Vector3d& A, const Vector3d& B, const Vector3d& C) 
     double Uy = (A.squaredNorm() * (C.x() - B.x()) +
                  B.squaredNorm() * (A.x() - C.x()) +
                  C.squaredNorm() * (B.x() - A.x())) / D;
-    return Vector3d(Ux, Uy, 0.0);
+    return { Ux, Uy, 0.0 };
 }
 
 void Rectangle::init_voronoi(Storage &cells, Part part) const {

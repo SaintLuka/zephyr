@@ -263,8 +263,6 @@ bool Cell::is_undefined() const {
 
 /*
 Cell::Cell(const std::array<Storage::Item, 4>& children) : dim(2) {
-    using topology::iww;
-
     LargeList2D vs = {
             children[0].geom().vertices[iww(0, 0)],
             children[0].geom().vertices[iww(2, 0)],
@@ -280,9 +278,6 @@ Cell::Cell(const std::array<Storage::Item, 4>& children) : dim(2) {
 }
 
 Cell::Cell(const std::array<Storage::Item, 8>& children) : dim(3) {
-    using topology::iss;
-    using topology::isw;
-
     ShortList3D vs = {
             children[iss(0, 0, 0)].geom().vertices[isw(0, 0, 0)],
             children[iss(1, 0, 0)].geom().vertices[isw(1, 0, 0)],

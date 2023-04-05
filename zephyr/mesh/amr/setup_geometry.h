@@ -20,8 +20,8 @@ namespace zephyr { namespace mesh { namespace amr {
 /// @param count Статистика адапатции
 /// @param op Оператор распределения данных при огрублении и разбиении
 /// @param from, to Диапазон ячеек
-template<unsigned int dim>
-void setup_geometry_partial(Storage &locals, Storage& aliens, unsigned int rank,
+template<int dim>
+void setup_geometry_partial(Storage &locals, Storage& aliens, int rank,
         const Statistics<dim> &count, const Distributor& op,
         size_t from, size_t to) {
 
@@ -42,18 +42,15 @@ void setup_geometry_partial(Storage &locals, Storage& aliens, unsigned int rank,
 
 /// @brief Осуществляет проход по диапазону ячеек и вызывает для них
 /// соответствующие методы адаптации (без MPI и без тредов)
-template<unsigned int dim>
+template<int dim>
 void setup_geometry(Storage &cells, const Statistics<dim> &count, const Distributor& op) {
-    throw std::runtime_error("setup geom");
-
-    //Storage aliens();
-    //setup_geometry_partial<dim>(cells, aliens, 0, count, op, 0, count.n_cells);
+    setup_geometry_partial<dim>(cells, cells, 0, count, op, 0, count.n_cells);
 }
 
 #ifdef ZEPHYR_ENABLE_MULTITHREADING
 /// @brief Осуществляет проход по диапазону ячеек и вызывает для них
 /// соответствующие методы адаптации (без MPI и с тредами)
-template<unsigned int dim>
+template<int dim>
 void setup_geometry(Storage &cells, const Statistics<dim> &count,
                     const DataDistributor& op, ThreadPool& threads) {
     Storage aliens;
@@ -83,7 +80,7 @@ void setup_geometry(Storage &cells, const Statistics<dim> &count,
 #ifdef ZEPHYR_ENABLE_MPI
 /// @brief Осуществляет проход по диапазону ячеек и вызывает для них
 /// соответствующие методы адаптации (с MPI и без тредов)
-template<unsigned int dim>
+template<int dim>
 void setup_geometry(Storage &locals, Storage &aliens, unsigned rank,
                     const Statistics<dim> &count, const DataDistributor& op) {
     setup_geometry_partial<dim>(locals, aliens, rank, count, op, 0, count.n_cells);
@@ -92,8 +89,8 @@ void setup_geometry(Storage &locals, Storage &aliens, unsigned rank,
 #ifdef ZEPHYR_ENABLE_MULTITHREADING
 /// @brief Осуществляет проход по диапазону ячеек и вызывает для них
 /// соответствующие методы адаптации (с MPI и с тредами)
-template<unsigned int dim>
-void setup_geometry(Storage &locals, Storage &aliens, unsigned int rank,
+template<int dim>
+void setup_geometry(Storage &locals, Storage &aliens, int rank,
         const Statistics<dim> &count, const DataDistributor& op, ThreadPool& threads) {
 
     auto num_tasks = threads.size();

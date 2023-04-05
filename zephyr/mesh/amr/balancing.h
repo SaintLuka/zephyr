@@ -25,7 +25,7 @@ struct CellsAround {
 private:
 
     /// @brief Тип данных amr.flag
-    using flag_type = short;
+    using flag_type = int;
 
     /// @brief Максимальное число соседей
     static const int max_neibs_size = FpC(dim) * FpF(dim);
@@ -52,13 +52,13 @@ public:
     /// @brief Заполнение списков соседей для ячейки
     /// @param locals Ссылка на хранилище
     /// @param ic Индекс ячейки в хранилище
-    void setup(Storage &locals, Storage& aliens, size_t ic) {
+    void setup(Storage &locals, Storage& aliens, int ic) {
         scrutiny_check(ic < locals.size(), "setup: ic >= locals.size()")
 
-        auto cell = locals[ic];
+        Cell& cell = locals[ic].geom();
 
         // Эти ячейки не интересуют
-        if (cell.flag() > 0) {
+        if (cell.flag > 0) {
             neib_count = 0;
             sibs_count = 0;
             return;
@@ -66,14 +66,14 @@ public:
 
         // Поиск соседей
         neib_count = 0;
-        for (auto &face: cell.geom().faces.list()) {
+        for (auto &face: cell.faces) {
             if (face.is_undefined() || face.is_boundary()) {
                 continue;
             }
 
             auto &adj = face.adjacent;
 #if SCRUTINY
-            if (adj.rank == cell.rank()) {
+            if (adj.rank == cell.rank) {
                 if (adj.index >= locals.size()) {
                     std::cerr << "rank: " << adj.rank << "\n";
                     std::cerr << "locals.size: " << locals.size() << "\n";
@@ -86,19 +86,23 @@ public:
                 }
             }
 #endif
-            auto neib = adj.rank == cell.rank() ?
-                        locals[adj.index] : aliens[adj.ghost];
+            Cell& neib = adj.rank == cell.rank ?
+                        locals[adj.index].geom() : aliens[adj.ghost].geom();
 
-            neib_levels[neib_count] = neib.level();
-            neib_flags[neib_count] = &(neib.geom().flag);
+            if (std::abs(neib.flag) > 1 || neib.level != 0) {
+                std::cout << "hello mfk\n";
+                throw std::runtime_error("UUUU");
+            }
+            neib_levels[neib_count] = neib.level;
+            neib_flags[neib_count] = &neib.flag;
             ++neib_count;
         }
         scrutiny_check(neib_count <= max_neibs_size, "nei_count > max_neibs_size")
 
         // Поиск сиблингов для ячеек с флагом -1
-        if (cell.flag()  < 0) {
+        if (cell.flag  < 0) {
             sibs_count = 0;
-            if (cell.flag() < 0) {
+            if (cell.flag < 0) {
                 scrutiny_check(can_coarse<dim>(locals, ic), "Can't coarse")
 
                 // Код выполняется только если can_coarse было равно истинно,
@@ -107,8 +111,8 @@ public:
                 for (auto is: sibs) {
                     scrutiny_check(is < locals.size(), "CellsAround: Sibling index out of range")
 
-                    auto sib = locals[is];
-                    sibs_flags[sibs_count] = &(sib.geom().flag);
+                    Cell& sib = locals[is].geom();
+                    sibs_flags[sibs_count] = &sib.flag;
                     ++sibs_count;
                 }
 
@@ -167,12 +171,12 @@ struct CellsAroundList {
         auto num_tasks = threads.size();
         std::vector<std::future<void>> results(num_tasks);
 
-        std::size_t bin = locals.size() / num_tasks + 1;
-        std::size_t pos = 0;
+        std::int bin = locals.size() / num_tasks + 1;
+        std::int pos = 0;
         for (auto &res : results) {
             res = threads.enqueue(
-                    [this](Storage& locals, Storage& aliens, size_t from, size_t to) {
-                        for(size_t ic = from; ic < to; ++ic) {
+                    [this](Storage& locals, Storage& aliens, int from, int to) {
+                        for(int ic = from; ic < to; ++ic) {
                             m_list[ic].setup(locals, aliens, ic);
                         }
                     },
@@ -203,11 +207,11 @@ struct CellsAroundList {
         }
         std::vector<std::future<void>> results(num_tasks);
 
-        std::size_t bin = m_list.size() / num_tasks + 1;
-        std::size_t pos = 0;
+        std::int bin = m_list.size() / num_tasks + 1;
+        std::int pos = 0;
         for (auto &res : results) {
             res = threads.enqueue(
-                    [this](size_t from, size_t to) {
+                    [this](int from, int to) {
                         collect_partial(from, to);
                     },
                     pos, std::min(pos + bin, m_list.size())
@@ -220,7 +224,7 @@ struct CellsAroundList {
 #endif
 
     /// @brief Оператор доступа к элементу списка
-    const CellsAround<dim>& operator[](size_t ic) const {
+    const CellsAround<dim>& operator[](int ic) const {
         scrutiny_check(ic < m_list.size(), "ic >= CellsAround.m_list.size()")
         return m_list[ic];
     }
@@ -229,15 +233,15 @@ private:
     /// @brief Однопоточный конструктор
     void serial_constructor(Storage& locals, Storage& aliens) {
         m_list.resize(locals.size());
-        for (size_t ic = 0; ic < locals.size(); ++ic) {
+        for (int ic = 0; ic < locals.size(); ++ic) {
             m_list[ic].setup(locals, aliens, ic);
         }
     }
 
     /// @brief Собрать актуальные данные о соседях и сиблингах для части ячеек.
     /// Функция инициализирует переменные max_neib_wanted_level и max_sibs_flag.
-    void collect_partial(size_t from, size_t to) {
-        for (size_t i = from; i < to; ++i) {
+    void collect_partial(int from, int to) {
+        for (int i = from; i < to; ++i) {
             m_list[i].collect();
         }
     }
@@ -251,10 +255,10 @@ private:
 /// @param from, to Диапазон индексов ячеек для обхода
 /// @return true если хотя бы одна ячейка в диапазоне изменила свой флаг
 template <int dim>
-bool round_partial(Storage& locals, const CellsAroundList<dim>& around, size_t from, size_t to) {
+bool round_partial(Storage& locals, const CellsAroundList<dim>& around, int from, int to) {
     bool changed = false;
 
-    for (size_t ic = from; ic < to; ++ic) {
+    for (int ic = from; ic < to; ++ic) {
         scrutiny_check(ic < locals.size(), "round_partial: ic >= locals.size()")
 
         auto cell = locals[ic];
@@ -319,8 +323,8 @@ bool round(Storage& locals, const CellsAroundList<dim>& around, ThreadPool& thre
     }
     std::vector<std::future<bool>> results(num_tasks);
 
-    std::size_t bin = locals.size() / num_tasks + 1;
-    std::size_t pos = 0;
+    std::int bin = locals.size() / num_tasks + 1;
+    std::int pos = 0;
     for (auto &res : results) {
         res = threads.enqueue(round_partial<dim>,
                               std::ref(locals), std::ref(around),
@@ -354,28 +358,27 @@ bool round(Storage& locals, const CellsAroundList<dim>& around, ThreadPool& thre
 /// (и достаточно эффективно) реализется многопоточность, также алгоритм легко
 /// обобщается на многопроцессорную систему.
 template<int dim>
-void balance_flags(Storage &cells, int max_level) {
+void balance_flags(Storage &locals, Storage& aliens, int max_level) {
     static Stopwatch restrictions_timer;
     static Stopwatch setup_around_timer;
     static Stopwatch round_timer;
 
-    Storage aliens();
-
     restrictions_timer.resume();
-    base_restrictions<dim>(cells, max_level);
+    base_restrictions<dim>(locals, max_level);
     restrictions_timer.stop();
 
+    return;
+
     setup_around_timer.resume();
-    throw std::runtime_error("ALIENCS AROUND");
-    /*
-    //CellsAroundList<dim> around(cells, aliens);
+    
+    CellsAroundList<dim> around(locals, aliens);
     setup_around_timer.stop();
 
     round_timer.resume();
     bool changed = true;
     while (changed) {
         around.collect();
-        changed = round(cells, around);
+        changed = round(locals, around);
     }
     round_timer.stop();
 
@@ -384,26 +387,24 @@ void balance_flags(Storage &cells, int max_level) {
     std::cout << "    Setup around elapsed: " << setup_around_timer.seconds() << " sec\n";
     std::cout << "    Round elapsed: " << round_timer.seconds() << " sec\n";
 #endif
-     */
 }
 
 /// @brief Специализация по умолчанию с автоматическим выбором размерности
-void balance_flags_slow(Storage &cells, int max_level) {
-    if (cells.empty())
+void balance_flags_slow(Storage &locals, Storage& aliens, int max_level) {
+    if (locals.empty())
         return;
 
-    auto dim = cells[0].dim();
+    auto dim = locals[0].dim();
 
     if (dim < 3) {
-        amr::balance_flags<2>(cells, max_level);
+        amr::balance_flags<2>(locals, aliens, max_level);
     }
     else {
-        amr::balance_flags<3>(cells, max_level);
+        amr::balance_flags<3>(locals, aliens, max_level);
     }
 
 #if SCRUTINY
-    throw std::runtime_error("add check");
-    // amr::check_flags(cells, max_level);
+    amr::check_flags(locals, locals, max_level);
 #endif
 }
 

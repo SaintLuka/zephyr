@@ -7,7 +7,7 @@
 namespace zephyr { namespace geom {
 
 void Cell::print_info() const {
-    std::cout << "\t\tcenter: " << coords << "\n";
+    std::cout << "\t\tcenter: " << coords.transpose() << "\n";
     std::cout << "\t\trank:   " << rank << "\n";
     std::cout << "\t\tindex:  " << index << "\n";
     std::cout << "\t\tsize:   " << size << "\n";
@@ -21,7 +21,7 @@ void Cell::print_info() const {
     std::cout << "\t\tcell.vertices:\n";
     for (int i = 0; i < Vertices::max_size; ++i) {
         if (vertices[i].is_actual()) {
-            std::cout << "\t\t\t" << i << ": " << vertices[i] << "\n";
+            std::cout << "\t\t\t" << i << ": " << vertices[i].transpose() << "\n";
         }
     }
 
@@ -38,7 +38,7 @@ void Cell::print_info() const {
         std::cout << "\n";
         std::cout << "\t\t\t\tflag:       " << boundary_to_string(face.boundary) << "\n";
         std::cout << "\t\t\t\tarea:       " << face.area << "\n";
-        std::cout << "\t\t\t\tnormal:     " << face.normal << "\n";
+        std::cout << "\t\t\t\tnormal:     " << face.normal.transpose() << "\n";
         std::cout << "\t\t\t\tadj.rank:   " << face.adjacent.rank << "\n";
         std::cout << "\t\t\t\tadj.index:  " << face.adjacent.index << "\n";
         std::cout << "\t\t\t\tadj.ghost:  " << face.adjacent.ghost << "\n";
