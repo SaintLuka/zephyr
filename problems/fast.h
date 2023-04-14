@@ -14,6 +14,8 @@
 using zephyr::mesh::generator::Rectangle;
 using zephyr::mesh::Mesh;
 using zephyr::mesh::Storage;
+using zephyr::mesh::IFace;
+using zephyr::mesh::ICell;
 using zephyr::geom::FaceFlag;
 using zephyr::geom::Vector3d;
 using zephyr::geom::Matrix3d;

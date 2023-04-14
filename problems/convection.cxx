@@ -94,10 +94,9 @@ int main() {
                 auto neib = face.neib();
                 auto& zn = neib(U);
 
-                double ac = velocity(cell.center()).dot(face.normal());
-                double an = velocity(neib.center()).dot(face.normal());
-                double a_p = std::max(ac, 0.0);
-                double a_m = std::min(an, 0.0);
+                double af = velocity(face.center()).dot(face.normal());
+                double a_p = std::max(af, 0.0);
+                double a_m = std::min(af, 0.0);
 
                 fluxes += (a_p * zc.u1 + a_m * zn.u1) * face.area();
             }

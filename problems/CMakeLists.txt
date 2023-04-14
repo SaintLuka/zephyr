@@ -1,6 +1,15 @@
 set(CONVECTION 1)
-set(MEMBRANE   1)
-set(RIEMANN    1)
+set(ADVECTION  1)
+set(MEMBRANE   0)
+set(RIEMANN    0)
+
+if (ADVECTION)
+    message(STATUS "Build advection test")
+    add_executable(advection advection.cxx)
+    target_include_directories(advection PUBLIC zephyr)
+    target_link_libraries(advection PUBLIC zephyr)
+    install(TARGETS advection DESTINATION problems)
+endif()
 
 if (CONVECTION)
     message(STATUS "Build convection test")

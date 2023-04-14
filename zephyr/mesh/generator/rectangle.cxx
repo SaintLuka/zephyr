@@ -446,12 +446,12 @@ void Rectangle::init_voronoi(Storage &cells, Part part) const {
         cell.faces[Side::X].adjacent.rank = 0;
         cell.faces[Side::F].adjacent.rank = 0;
 
-        cell.faces[Side::L].adjacent.ghost = 0;
-        cell.faces[Side::R].adjacent.ghost = 0;
-        cell.faces[Side::B].adjacent.ghost = 0;
-        cell.faces[Side::T].adjacent.ghost = 0;
-        cell.faces[Side::X].adjacent.ghost = 0;
-        cell.faces[Side::F].adjacent.ghost = 0;
+        cell.faces[Side::L].adjacent.ghost = -1;
+        cell.faces[Side::R].adjacent.ghost = -1;
+        cell.faces[Side::B].adjacent.ghost = -1;
+        cell.faces[Side::T].adjacent.ghost = -1;
+        cell.faces[Side::X].adjacent.ghost = -1;
+        cell.faces[Side::F].adjacent.ghost = -1;
 
         cell.faces[Side::L].adjacent.index = neibs_n[0];
         cell.faces[Side::R].adjacent.index = neibs_n[1];
