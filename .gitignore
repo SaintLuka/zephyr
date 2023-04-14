@@ -1,2 +1,6 @@
 .idea
 .idea/*
+cmake-build-release
+cmake-build-debug
+/bin/
+/output/

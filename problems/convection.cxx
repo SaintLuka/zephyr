@@ -12,12 +12,12 @@ struct _U_ {
 _U_ U;
 
 // Векторное поле скорости
-Vector3d velocity(const Vector3d& c) {
-    return { 1.0, 0.3 + 0.3*std::sin(4 * M_PI * c.x()), 0.0 };
+Vector3d velocity(const Vector3d &c) {
+    return {1.0, 0.3 + 0.3 * std::sin(4 * M_PI * c.x()), 0.0};
 }
 
 // Переменные для сохранения
-double get_u(Storage::Item cell)  {
+double get_u(Storage::Item cell) {
     return cell(U).u1;
 }
 
@@ -34,7 +34,7 @@ int main() {
     PvdFile pvd("mesh", "output");
 
     // Переменные для сохранения
-    pvd.variables += {"u",  get_u};
+    pvd.variables += {"u", get_u};
     pvd.variables += {"vx", get_vx};
     pvd.variables += {"vy", get_vy};
 
@@ -65,7 +65,7 @@ int main() {
     double curr_time = 0.0;
     double next_write = 0.0;
 
-    while(curr_time <= 1.0) {
+    while (curr_time <= 1.0) {
         if (curr_time >= next_write) {
             std::cout << "\tШаг: " << std::setw(6) << n_step << ";"
                       << "\tВремя: " << std::setw(6) << std::setprecision(3) << curr_time << "\n";
@@ -75,7 +75,7 @@ int main() {
 
         // Определяем dt
         double dt = std::numeric_limits<double>::max();
-        for (auto& cell: mesh.cells()) {
+        for (auto &cell: mesh.cells()) {
             double max_area = 0.0;
             for (auto &face: cell.faces()) {
                 max_area = std::max(max_area, face.area());
@@ -87,12 +87,12 @@ int main() {
 
         // Расчет по схеме upwind
         for (auto cell: mesh.cells()) {
-            auto& zc = cell(U);
+            auto &zc = cell(U);
 
             double fluxes = 0.0;
-            for (auto& face: cell.faces()) {
+            for (auto &face: cell.faces()) {
                 auto neib = face.neib();
-                auto& zn = neib(U);
+                auto &zn = neib(U);
 
                 double ac = velocity(cell.center()).dot(face.normal());
                 double an = velocity(neib.center()).dot(face.normal());

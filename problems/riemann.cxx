@@ -15,10 +15,10 @@ struct _U_ {
     double e1, e2;
 };
 
-// Р”Р»СЏ Р±С‹СЃС‚СЂРѕРіРѕ РґРѕСЃС‚СѓРїР° РїРѕ С‚РёРїСѓ
+// Для быстрого доступа по типу
 _U_ U;
 
-/// РџРµСЂРµРјРµРЅРЅС‹Рµ РґР»СЏ СЃРѕС…СЂР°РЅРµРЅРёСЏ
+/// Переменные для сохранения
 double get_rho(Storage::Item cell) { return cell(U).rho1; }
 double get_u(Storage::Item cell) { return cell(U).v1.x(); }
 double get_v(Storage::Item cell) { return cell(U).v1.y(); }
@@ -28,10 +28,10 @@ double get_e(Storage::Item cell) { return cell(U).e1; }
 
 
 int main() {
-    // Р¤Р°Р№Р» РґР»СЏ Р·Р°РїРёСЃРё
+    // Файл для записи
     PvdFile pvd("mesh", "output");
 
-    // РџРµСЂРµРјРµРЅРЅС‹Рµ РґР»СЏ СЃРѕС…СЂР°РЅРµРЅРёСЏ
+    // Переменные для сохранения
     pvd.variables += {"density", get_rho};
     pvd.variables += {"velocity.x", get_u};
     pvd.variables += {"velocity.y", get_v};
@@ -39,13 +39,13 @@ int main() {
     pvd.variables += {"pressure", get_p};
     pvd.variables += {"energy", get_e};
 
-    // РўРµСЃС‚РѕРІР°СЏ Р·Р°РґР°С‡Р°
+    // Тестовая задача
     ShuOsherTest test;
 
-    // РЈСЂР°РІРЅРµРЅРёРµ СЃРѕСЃС‚РѕСЏРЅРёСЏ
+    // Уравнение состояния
     Eos& eos = test.eos();
 
-    // РЎРѕР·РґР°РµРј РѕРґРЅРѕРјРµСЂРЅСѓСЋ СЃРµС‚РєСѓ
+    // Создаем одномерную сетку
     double H = 0.05 * (test.xmax() - test.xmin());
     Rectangle rect(test.xmin(), test.xmax(), -H, +H);
     rect.set_sizes(1000, 1);
@@ -53,10 +53,10 @@ int main() {
             FaceFlag::WALL, FaceFlag::WALL,
             FaceFlag::WALL, FaceFlag::WALL);
 
-    // РЎРѕР·РґР°С‚СЊ СЃРµС‚РєСѓ
+    // Создать сетку
     Mesh mesh(U, &rect);
 
-    // Р—Р°РїРѕР»РЅСЏРµРј РЅР°С‡Р°Р»СЊРЅС‹Рµ РґР°РЅРЅС‹Рµ
+    // Заполняем начальные данные
     for (auto cell: mesh.cells()) {
         cell(U).rho1 = test.density(cell.center());
         cell(U).v1   = test.velocity(cell.center());
@@ -64,10 +64,10 @@ int main() {
         cell(U).e1   = test.energy(cell.center());
     }
 
-    // Р§РёСЃР»Рѕ РљСѓСЂР°РЅС‚Р°
+    // Число Куранта
     double CFL = 0.5;
 
-    // Р¤СѓРЅРєС†РёСЏ РІС‹С‡РёСЃР»РµРЅРёСЏ РїРѕС‚РѕРєР°
+    // Функция вычисления потока
     NumFlux::Ptr nf = CIR1::create();
 
     double time = 0.0;
@@ -76,45 +76,45 @@ int main() {
 
     while (time <= 1.01 * test.max_time()) {
         if (time >= next_write) {
-            std::cout << "\tРЁР°Рі: " << std::setw(6) << n_step << ";"
-                      << "\t\tР’СЂРµРјСЏ: " << std::setw(6) << std::setprecision(3) << time << "\n";
+            std::cout << "\tШаг: " << std::setw(6) << n_step << ";"
+                      << "\t\tВремя: " << std::setw(6) << std::setprecision(3) << time << "\n";
             pvd.save(mesh, time);
             next_write += test.max_time() / 100;
         }
 
-        // РћРїСЂРµРґРµР»СЏРµРј dt
+        // Определяем dt
         double dt = std::numeric_limits<double>::max();
         for (auto cell: mesh.cells()) {
-            // СЃРєРѕСЂРѕСЃС‚СЊ Р·РІСѓРєР°
+            // скорость звука
             double c = eos.sound_speed_rp(cell(U).rho1, cell(U).p1);
             for (auto &face: cell.faces()) {
-                // РќРѕСЂРјР°Р»СЊРЅР°СЏ СЃРѕСЃС‚Р°РІР»СЏСЋС‰Р°СЏ СЃРєРѕСЂРѕСЃС‚Рё
+                // Нормальная составляющая скорости
                 double vn = cell(U).v1.dot(face.normal());
 
-                // РњР°РєСЃРёРјР°Р»СЊРЅРѕРµ РїРѕ РјРѕРґСѓР»СЋ РЎР—
+                // Максимальное по модулю СЗ
                 double lambda = std::max(std::abs(vn + c), std::abs(vn - c));
 
-                // РЈСЃР»РѕРІРёРµ РљР¤Р›
+                // Условие КФЛ
                 dt = std::min(dt, cell.volume() / face.area() / lambda);
             }
         }
         dt *= CFL;
 
-        // Р Р°СЃС‡РµС‚ РїРѕ РЅРµРєРѕС‚РѕСЂРѕР№ СЃС…РµРјРµ
+        // Расчет по некоторой схеме
         for (auto cell: mesh.cells()) {
-            // РџСЂРёРјРёС‚РёРІРЅС‹Р№ РІРµРєС‚РѕСЂ РІ СЏС‡РµР№РєРµ
+            // Примитивный вектор в ячейке
             PState zc(cell(U).rho1, cell(U).v1, cell(U).p1, cell(U).e1);
 
-            // РљРѕРЅСЃРµСЂРІР°С‚РёРІРЅС‹Р№ РІРµРєС‚РѕСЂ РІ СЏС‡РµР№РєРµ
+            // Консервативный вектор в ячейке
             QState qc(zc);
 
-            // РџРµСЂРµРјРµРЅРЅР°СЏ РґР»СЏ РїРѕС‚РѕРєР°
+            // Переменная для потока
             Flux flux;
             for (auto &face: cell.faces()) {
-                // Р’РЅРµС€РЅСЏСЏ РЅРѕСЂРјР°Р»СЊ
+                // Внешняя нормаль
                 auto &normal = face.normal();
 
-                // РџСЂРёРјРёС‚РёРІРЅС‹Р№ РІРµРєС‚РѕСЂ СЃРѕСЃРµРґР°
+                // Примитивный вектор соседа
                 PState zn(zc);
 
                 if (!face.is_boundary()) {
@@ -125,26 +125,26 @@ int main() {
                     zn.energy   = neib(U).e1;
                 }
 
-                // Р—РЅР°С‡РµРЅРёРµ РЅР° РіСЂР°РЅРё СЃРѕ СЃС‚РѕСЂРѕРЅС‹ СЏС‡РµР№РєРё
+                // Значение на грани со стороны ячейки
                 PState zm(zc);
                 zm.to_local(normal);
 
-                // Р—РЅР°С‡РµРЅРёРµ РЅР° РіСЂР°РЅРё СЃРѕ СЃС‚РѕСЂРѕРЅС‹ СЃРѕСЃРµРґР°
+                // Значение на грани со стороны соседа
                 PState zp(zn);
                 zp.to_local(normal);
 
-                // Р§РёСЃР»РµРЅРЅС‹Р№ РїРѕС‚РѕРє РЅР° РіСЂР°РЅРё
+                // Численный поток на грани
                 auto loc_flux = nf->flux(zm, zp, eos);
                 loc_flux.to_global(normal);
 
-                // РЎСѓРјРјРёСЂСѓРµРј РїРѕС‚РѕРє
+                // Суммируем поток
                 flux.vec() += loc_flux.vec() * face.area();
             }
 
-            // РќРѕРІРѕРµ Р·РЅР°С‡РµРЅРёРµ РІ СЏС‡РµР№РєРµ (РєРѕРЅСЃРµСЂРІР°С‚РёРІРЅС‹Рµ РїРµСЂРµРјРµРЅРЅС‹Рµ)
+            // Новое значение в ячейке (консервативные переменные)
             QState Qc = qc.vec() - dt * flux.vec() / cell.volume();
 
-            // РќРѕРІРѕРµ Р·РЅР°С‡РµРЅРёРµ РїСЂРёРјРёС‚РёРІРЅС‹С… РїРµСЂРµРјРµРЅРЅС‹С…
+            // Новое значение примитивных переменных
             PState Zc(Qc, eos);
 
             cell(U).rho2 = Zc.density;
@@ -153,7 +153,7 @@ int main() {
             cell(U).e2   = Zc.energy;
         }
 
-        // РћР±РЅРѕРІР»СЏРµРј СЃР»РѕРё
+        // Обновляем слои
         for (auto cell: mesh.cells()) {
             std::swap(cell(U).rho1, cell(U).rho2);
             std::swap(cell(U).v1, cell(U).v2);

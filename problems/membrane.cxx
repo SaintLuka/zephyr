@@ -17,7 +17,7 @@ struct _U_ {
         return {rho1, v1, p1, e1};
     }
 
-    void set_state2(const PState& z) {
+    void set_state2(const PState &z) {
         rho2 = z.density;
         v2 = z.velocity;
         p2 = z.pressure;
@@ -37,17 +37,21 @@ _U_ U;
 
 /// Переменные для сохранения
 double get_rho(Storage::Item cell) { return cell(U).rho1; }
-double get_u(Storage::Item cell)   { return cell(U).v1.x(); }
-double get_v(Storage::Item cell)   { return cell(U).v1.y(); }
-double get_V(Storage::Item cell)   { return cell(U).v1.norm(); }
-double get_p(Storage::Item cell)   { return cell(U).p1 - 1.0_bar; }
+
+double get_u(Storage::Item cell) { return cell(U).v1.x(); }
+
+double get_v(Storage::Item cell) { return cell(U).v1.y(); }
+
+double get_V(Storage::Item cell) { return cell(U).v1.norm(); }
+
+double get_p(Storage::Item cell) { return cell(U).p1 - 1.0_bar; }
 
 /// @brief Уровень звукового давления в дБ
 double get_spl(Storage::Item cell) {
     return 20.0 * std::log(1.0 + std::abs(cell(U).p1 - 1.0_bar) / 20.0e-6_Pa) / std::log(10.0);
 }
 
-inline double sqr(double x) { return x*x; }
+inline double sqr(double x) { return x * x; }
 
 int main() {
     // Файл для записи
@@ -80,9 +84,9 @@ int main() {
     // Заполняем начальные данные
     for (auto cell: mesh.cells()) {
         cell(U).rho1 = R0;
-        cell(U).v1   = Vector3d(0.0, 0.0, 0.0);
-        cell(U).p1   = P0;
-        cell(U).e1   = eos.energy_rp(cell(U).rho1, cell(U).p1);
+        cell(U).v1 = Vector3d(0.0, 0.0, 0.0);
+        cell(U).p1 = P0;
+        cell(U).e1 = eos.energy_rp(cell(U).rho1, cell(U).p1);
     }
 
     // Число Куранта
@@ -131,7 +135,7 @@ int main() {
 
             // Переменная для потока
             Flux flux;
-            for (auto& face: cell.faces()) {
+            for (auto &face: cell.faces()) {
                 // Внешняя нормаль
                 auto &normal = face.normal();
 
@@ -161,8 +165,7 @@ int main() {
 
                         zn.velocity.x() += 1.0e-5 * R * T * A;
                     }
-                }
-                else {
+                } else {
                     zn = face.neib()(U).get_state1();
                 }
 

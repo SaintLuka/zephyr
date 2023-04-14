@@ -120,7 +120,7 @@ void PvdFile::open(const std::string& filename, const std::string& _directory) {
 
     ofs << "<?xml version=\"1.0\"?>\n";
     ofs << "<VTKFile type=\"Collection\" version=\"0.1\" byte_order=\"" + byteord + "\">\n";
-    ofs << "    <Collection>\n";
+    ofs << "    <Collection>" << std::endl;
 
     m_pos = ofs.tellp();
 
