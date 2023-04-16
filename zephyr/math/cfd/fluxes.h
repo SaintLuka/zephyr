@@ -11,7 +11,7 @@ public:
     using Ptr = std::unique_ptr<NumFlux>;
 
     /// @brief Численный поток для классической задачи
-    virtual Flux flux(const PState& zL, const PState& zR, const phys::Eos& eos) const {
+    virtual smf::Flux flux(const smf::PState& zL, const smf::PState& zR, const phys::Eos& eos) const {
         throw std::runtime_error("NumFlux::flux(PState...) is not implemented");
     }
 };

@@ -3,6 +3,7 @@
 namespace zephyr { namespace math {
 
 using namespace zephyr::phys;
+using namespace smf;
 
 ExactRiemannSolver::ExactRiemannSolver(
         const PState &zL, const PState &zR,

@@ -9,10 +9,10 @@ namespace zephyr { namespace io {
 /// Работает как класс перечисления.
 class VtkType {
 public:
-    enum ValueType : unsigned short {
+    enum ValueType : int {
         Undefined = 0,
-        Int8  = 1, Int16 = 2, Int32 = 3, Int64 = 4,
-        UInt8  = 5, UInt16 = 6, UInt32 = 7, UInt64 = 8,
+        Int8 = 1, Int16 = 2, Int32 = 3, Int64 = 4,
+        UInt8 = 5, UInt16 = 6, UInt32 = 7, UInt64 = 8,
         Float32 = 9, Float64 = 10
     };
 

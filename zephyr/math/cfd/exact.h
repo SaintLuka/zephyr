@@ -13,11 +13,11 @@ public:
     ExactRiemannSolver() = default;
 
     /// @brief Одноматериальный конструктор
-    ExactRiemannSolver(const PState &zL, const PState &zR,
+    ExactRiemannSolver(const smf::PState &zL, const smf::PState &zR,
                        const phys::StiffenedGas &gas);
 
     /// @brief Двухматериальный конструктор
-    ExactRiemannSolver(const PState &zL, const PState &zR,
+    ExactRiemannSolver(const smf::PState &zL, const smf::PState &zR,
                        const phys::StiffenedGas &gasL,
                        const phys::StiffenedGas &gasR);
 

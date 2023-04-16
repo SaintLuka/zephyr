@@ -6,6 +6,7 @@
 
 using namespace zephyr::phys;
 using namespace zephyr::math;
+using namespace zephyr::math::smf;
 
 struct _U_ {
     double rho1, rho2;

@@ -27,11 +27,11 @@ struct _U_ {
 
 _U_ U;
 
-double get_uid(Storage::iterator cell) {
+double get_uid(Storage::Item cell) {
     return cell(U).uid;
 }
 
-double get_val(Storage::iterator cell) {
+double get_val(Storage::Item cell) {
     return cell(U).val;
 }
 

@@ -18,9 +18,9 @@ public:
         return std::make_unique<CIR1>(std::forward<Args>(args)...);
     }
 
-    static Flux calc_flux(const PState& zL, const PState& zR, const phys::Eos& eos);
+    static smf::Flux calc_flux(const smf::PState& zL, const smf::PState& zR, const phys::Eos& eos);
 
-    Flux flux(const PState& zL, const PState& zR, const phys::Eos& eos) const final;
+    smf::Flux flux(const smf::PState& zL, const smf::PState& zR, const phys::Eos& eos) const final;
 
 };
 
@@ -36,9 +36,9 @@ public:
         return std::make_unique<CIR2>(std::forward<Args>(args)...);
     }
 
-    static Flux calc_flux(const PState& zL, const PState& zR, const phys::Eos& eos);
+    static smf::Flux calc_flux(const smf::PState& zL, const smf::PState& zR, const phys::Eos& eos);
 
-    Flux flux(const PState& zL, const PState& zR, const phys::Eos& eos) const final;
+    smf::Flux flux(const smf::PState& zL, const smf::PState& zR, const phys::Eos& eos) const final;
 
 };
 

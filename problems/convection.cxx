@@ -1,33 +1,30 @@
 /// @file Решение задачи переноса с неоднородной скоростью.
-/// Используется простейшая схема первого порядка (upwind)
+/// Используется схема высокого порядка (MUSCL) с адаптацией.
 
 #include "fast.h"
 
-// Вектор состояния
-struct _U_ {
-    double u1, u2;
+#include <zephyr/math/solver/convection.h>
+
+/// @brief Наследуем собственный решатель от Convection, теперь переопределив
+/// поле скорости можно решать произвольные задачи на перенос.
+class Solver : public zephyr::math::Convection {
+public:
+
+    /// @brief Задаем скорость переноса
+    Vector3d velocity(const Vector3d& c) const override {
+        return { 1.0, 0.3 + 0.3*std::sin(4 * M_PI * c.x()), 0.0 };
+    }
 };
 
-// Для быстрого доступа по типу
-_U_ U;
-
-// Векторное поле скорости
-Vector3d velocity(const Vector3d& c) {
-    return { 1.0, 0.3 + 0.3*std::sin(4 * M_PI * c.x()), 0.0 };
-}
+// Получим тип данных
+Solver::State U = Solver::datatype();
 
 // Переменные для сохранения
-double get_u(Storage::Item cell)  {
-    return cell(U).u1;
-}
+double get_u(Storage::Item cell)  { return cell(U).u1; }
 
-double get_vx(Storage::Item cell) {
-    return velocity(cell.center()).x();
-}
+double get_ux(Storage::Item cell)  { return cell(U).ux; }
 
-double get_vy(Storage::Item cell) {
-    return velocity(cell.center()).y();
-}
+double get_uy(Storage::Item cell)  { return cell(U).uy; }
 
 int main() {
     // Файл для записи
@@ -35,8 +32,8 @@ int main() {
 
     // Переменные для сохранения
     pvd.variables += {"u",  get_u};
-    pvd.variables += {"vx", get_vx};
-    pvd.variables += {"vy", get_vy};
+    pvd.variables += {"ux", get_ux};
+    pvd.variables += {"uy", get_uy};
 
     // Геометрия области
     Rectangle rect(0.0, 1.0, 0.0, 0.6, true);
@@ -47,6 +44,14 @@ int main() {
 
     // Создать сетку
     Mesh mesh(U, &rect);
+
+    // Создать решатель
+    Solver solver;
+
+    // Настроим решатель
+    solver.set_CFL(0.5);
+    solver.set_accuracy(3);
+    solver.set_limiter("van Leer");
 
     // Заполняем начальные данные
     Vector3d v1(rect.x_min(), rect.y_min(), 0.0);
@@ -59,13 +64,11 @@ int main() {
     }
 
     // Число Куранта
-    double CFL = 0.5;
-
     int n_step = 0;
     double curr_time = 0.0;
     double next_write = 0.0;
 
-    while(curr_time <= 1.0) {
+    while(curr_time < 1.0) {
         if (curr_time >= next_write) {
             std::cout << "\tШаг: " << std::setw(6) << n_step << ";"
                       << "\tВремя: " << std::setw(6) << std::setprecision(3) << curr_time << "\n";
@@ -73,45 +76,10 @@ int main() {
             next_write += 0.02;
         }
 
-        // Определяем dt
-        double dt = std::numeric_limits<double>::max();
-        for (auto& cell: mesh.cells()) {
-            double max_area = 0.0;
-            for (auto &face: cell.faces()) {
-                max_area = std::max(max_area, face.area());
-            }
-            double dx = cell.volume() / max_area;
-            dt = std::min(dt, dx / velocity(cell.center()).norm());
-        }
-        dt *= CFL;
-
-        // Расчет по схеме upwind
-        for (auto cell: mesh.cells()) {
-            auto& zc = cell(U);
-
-            double fluxes = 0.0;
-            for (auto& face: cell.faces()) {
-                auto neib = face.neib();
-                auto& zn = neib(U);
-
-                double af = velocity(face.center()).dot(face.normal());
-                double a_p = std::max(af, 0.0);
-                double a_m = std::min(af, 0.0);
-
-                fluxes += (a_p * zc.u1 + a_m * zn.u1) * face.area();
-            }
-
-            zc.u2 = zc.u1 - dt * fluxes / cell.volume();
-        }
-
-        // Обновляем слои
-        for (auto cell: mesh.cells()) {
-            cell(U).u1 = cell(U).u2;
-            cell(U).u2 = 0.0;
-        }
+        solver.update(mesh);
 
         n_step += 1;
-        curr_time += dt;
+        curr_time += solver.dt();
     }
 
     return 0;

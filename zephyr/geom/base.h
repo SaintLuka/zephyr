@@ -54,9 +54,9 @@ inline constexpr int iww(int i, int j, int k = 0) {
 }
 
 /// @brief Динамическое отображение. Отображает короткий индекс {0, 1}^3
-/// на одномерный индекс, соответствующий type::_vertices_::max_size
-inline constexpr int iv(int i, int j, int k = 0) {
-    return isw(i, j, k);
+/// на одномерный индекс, соответствующий Vertices::max_size
+inline constexpr short iv(int i, int j, int k = 0) {
+    return short(isw(i, j, k));
 }
 
 } // geom

@@ -9,6 +9,9 @@ namespace zephyr { namespace math {
 
 using namespace geom;
 
+/// @brief Одноматериальная модель Single Material Fluid
+namespace smf {
+
 struct QState;
 
 /// @brief Примитивный вектор состояния
@@ -90,5 +93,7 @@ struct Flux {
     VECTORIZE(Flux)
 };
 
-}
-}
+} // namespace smf
+
+} // namespace math
+} // namespace zephyr

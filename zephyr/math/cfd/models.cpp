@@ -2,6 +2,8 @@
 
 namespace zephyr { namespace math {
 
+namespace smf {
+
 PState::PState(const double &density, const Vector3d &velocity,
        const double &pressure, const double &energy)
         : density(density), velocity(velocity),
@@ -98,5 +100,7 @@ Flux Flux::in_global(const Vector3d& normal) const {
     return f;
 }
 
-}
-}
+} // namespace smf
+
+} // namespace math
+} // namespace zephyr

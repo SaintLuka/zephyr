@@ -13,11 +13,13 @@ inline double sqr(double x) {
     return x * x;
 }
 
-Flux CIR1::flux(const PState &zL, const PState &zR, const phys::Eos &eos) const {
+smf::Flux CIR1::flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) const {
     return calc_flux(zL, zR, eos);
 }
 
-Flux CIR1::calc_flux(const PState &zL, const PState &zR, const phys::Eos &eos) {
+smf::Flux CIR1::calc_flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) {
+    using namespace smf;
+
     // Состояние на грани
     PState zE = 0.5 * (zL.vec() + zR.vec());
 
@@ -120,11 +122,13 @@ Flux CIR1::calc_flux(const PState &zL, const PState &zR, const phys::Eos &eos) {
     return res;
 }
 
-Flux CIR2::flux(const PState &zL, const PState &zR, const phys::Eos &eos) const {
+smf::Flux CIR2::flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) const {
     return calc_flux(zL, zR, eos);
 }
 
-Flux CIR2::calc_flux(const PState &zL, const PState &zR, const phys::Eos &eos) {
+smf::Flux CIR2::calc_flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) {
+    using namespace smf;
+
     // Состояние на грани
     PState zE = 0.5 * (zL.vec() + zR.vec());
 
@@ -228,5 +232,5 @@ Flux CIR2::calc_flux(const PState &zL, const PState &zR, const phys::Eos &eos) {
     return res;
 }
 
-}
-}
+} // namespace math
+} // namespace zephyr
