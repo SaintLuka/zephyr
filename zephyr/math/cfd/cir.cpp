@@ -78,7 +78,7 @@ smf::Flux CIR1::calc_flux(const smf::PState &zL, const smf::PState &zR, const ph
            T - u * c         , -b * u + c  , -b * v      , -b * w      ,  b      ;
     OmL /= (2.0 * c2);
 
-#if 1
+#if 0
     // Диагональ с собственными значениями
     DiagMatrix5d L = vec_L.asDiagonal();
 

@@ -1,7 +1,7 @@
 #pragma once
 
-#include <geom/types/vector.h>
-#include <physics/eos/ideal_gas.h>
+#include <zephyr/geom/vector.h>
+#include <zephyr/phys/eos/ideal_gas.h>
 
 namespace zephyr {
 namespace phys {
@@ -21,19 +21,19 @@ public:
     double max_time() const { return 2.0; }
 
 
-    double density(const geom::Vector &r) const {
+    double density(const Vector3d &r) const {
         return r.x() < x_jump ? 3.857143 : 1.0 + 0.2 * std::sin(5.0 * r.x());
     }
 
-    double pressure(const geom::Vector &r) const {
+    double pressure(const Vector3d &r) const {
         return r.x() < x_jump ? 10.33333 : 1.0;
     }
 
-    geom::Vector velocity(const geom::Vector &r) const {
-        return r.x() < x_jump ? geom::Vector(2.629369, 0.0, 0.0) : geom::Vector::Zero();
+    Vector3d velocity(const Vector3d &r) const {
+        return r.x() < x_jump ? Vector3d(2.629369, 0.0, 0.0) : Vector3d::Zero();
     }
 
-    double energy(const geom::Vector &r) const {
+    double energy(const Vector3d &r) const {
         return m_eos.energy_rp(density(r), pressure(r));
     }
 

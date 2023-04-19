@@ -52,6 +52,15 @@ public:
     virtual double sound_speed_pt(double pressure, double temperature) const;
 
 
+    /// @brief Аппроксимация двучленным УрС
+
+    virtual double stiff_gamma(double density, double pressure) const;
+
+    virtual double stiff_p0(double density, double pressure) const;
+
+    virtual double stiff_e0(double density, double pressure) const;
+
+
     /// @brief Тест для уравнений состояния, проверяет, что все формулы
     /// согласованы.
     static void test();

@@ -1,8 +1,8 @@
-set(ADVECTION  1)
-set(CONVECTION 1)
-set(MEMBRANE   1)
+set(ADVECTION  0)
+set(CONVECTION 0)
+set(MEMBRANE   0)
 set(RIEMANN    1)
-set(WAVE2D     1)
+set(WAVE2D     0)
 
 if (ADVECTION)
     message(STATUS "Build advection test")

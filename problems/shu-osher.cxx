@@ -2,16 +2,11 @@
 
 #include <zephyr/math/cfd/cir.h>
 #include <zephyr/math/cfd/models.h>
-#include <zephyr/phys/tests/sod.h>
-#include <zephyr/phys/tests/toro.h>
-
-#include <zephyr/math/cfd/exact.h>
+#include <zephyr/phys/tests/shu-osher.h>
 
 using namespace zephyr::phys;
 using namespace zephyr::math;
 using namespace zephyr::math::smf;
-
-using zephyr::math::RiemannSolver;
 
 struct _U_ {
     double rho1, rho2;
@@ -33,64 +28,27 @@ double get_e(Storage::Item cell) { return cell(U).e1; }
 
 
 int main() {
-    // Тестовая задача
-    SodTest test;
-    //test.inverse();
-
-    // Уравнение состояния
-    Eos& eos = test.eos();
-
-    // Состояния слева и справа в тесте
-    Vector3d Ox = 100.0 * Vector3d::UnitX();
-    PState zL(test.density(-Ox), test.velocity(-Ox),
-              test.pressure(-Ox), test.energy(-Ox));
-
-    PState zR(test.density(Ox), test.velocity(Ox),
-              test.pressure(Ox), test.energy(Ox));
-
-    // Точное решение задачи Римана
-    RiemannSolver exact(zL, zR, eos);
-
     // Файл для записи
     PvdFile pvd("mesh", "output");
 
     // Переменные для сохранения
-    pvd.variables += {"rho", get_rho};
-    pvd.variables += {"u", get_u};
-    pvd.variables += {"p", get_p};
-    pvd.variables += {"e", get_e};
+    pvd.variables += {"density", get_rho};
+    pvd.variables += {"velocity.x", get_u};
+    pvd.variables += {"velocity.y", get_v};
+    pvd.variables += {"velocity.z", get_w};
+    pvd.variables += {"pressure", get_p};
+    pvd.variables += {"energy", get_e};
 
-    double time = 0.0;
+    // Тестовая задача
+    ShuOsherTest test;
 
-    pvd.variables += {"rho_exact",
-                      [&exact, &time](Storage::Item cell) -> double {
-                          return exact.density(cell.center().x() - 0.5, time);
-                      }};
-    pvd.variables += {"u_exact",
-                      [&exact, &time](Storage::Item cell) -> double {
-                          return exact.velocity(cell.center().x() - 0.5, time);
-                      }};
-    pvd.variables += {"p_exact",
-                      [&exact, &time](Storage::Item cell) -> double {
-                          return exact.pressure(cell.center().x() - 0.5, time);
-                      }};
-    pvd.variables += {"e_exact",
-                      [&exact, &time](Storage::Item cell) -> double {
-                          return exact.energy(cell.center().x() - 0.5, time);
-                      }};
-    pvd.variables += {"c",
-                      [&eos](Storage::Item cell) -> double {
-                          return eos.sound_speed_rp(cell(U).rho1, cell(U).p1);
-                      }};
-    pvd.variables += {"c_exact",
-                      [&exact, &time](Storage::Item cell) -> double {
-                          return exact.sound_speed(cell.center().x() - 0.5, time);
-                      }};
+    // Уравнение состояния
+    Eos& eos = test.eos();
 
     // Создаем одномерную сетку
     double H = 0.05 * (test.xmax() - test.xmin());
     Rectangle rect(test.xmin(), test.xmax(), -H, +H);
-    rect.set_sizes(5000, 1);
+    rect.set_sizes(1000, 1);
     rect.set_boundary_flags(
             FaceFlag::WALL, FaceFlag::WALL,
             FaceFlag::WALL, FaceFlag::WALL);
@@ -112,6 +70,7 @@ int main() {
     // Функция вычисления потока
     NumFlux::Ptr nf = CIR1::create();
 
+    double time = 0.0;
     double next_write = 0.0;
     size_t n_step = 0;
 

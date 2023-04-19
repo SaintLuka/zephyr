@@ -82,5 +82,17 @@ double IdealGas::sound_speed_pt(double pressure, double temperature) const {
     return std::sqrt(gamma * (gamma - 1.0) * Cv * temperature);
 }
 
+double IdealGas::stiff_gamma(double density, double pressure) const {
+    return gamma;
+}
+
+double IdealGas::stiff_p0(double density, double pressure) const {
+    return 0.0;
+}
+
+double IdealGas::stiff_e0(double density, double pressure) const {
+    return 0.0;
+}
+
 }
 }

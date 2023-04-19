@@ -55,6 +55,15 @@ public:
 
     double sound_speed_pt(double pressure, double temperature) const final;
 
+
+    /// @brief Аппроксимация двучленным УрС
+
+    double stiff_gamma(double density, double pressure) const final;
+
+    double stiff_p0(double density, double pressure) const final;
+
+    double stiff_e0(double density, double pressure) const final;
+
 };
 
 }

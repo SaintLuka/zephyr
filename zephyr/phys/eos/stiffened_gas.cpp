@@ -110,5 +110,17 @@ double StiffenedGas::sound_speed_pt(double pressure, double temperature) const {
     return std::sqrt(gamma * (gamma - 1.0) * Cv * temperature);
 }
 
+double StiffenedGas::stiff_gamma(double density, double pressure) const {
+    return gamma;
+}
+
+double StiffenedGas::stiff_p0(double density, double pressure) const {
+    return p_inf;
+}
+
+double StiffenedGas::stiff_e0(double density, double pressure) const {
+    return eps_0;
+}
+
 }
 }

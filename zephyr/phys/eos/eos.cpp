@@ -70,6 +70,18 @@ double Eos::sound_speed_pt(double pressure, double temperature) const {
     throw std::runtime_error("sound_speed_pt is not implemented");
 }
 
+double Eos::stiff_gamma(double density, double pressure) const {
+    throw std::runtime_error("stiff_gamma is not implemented");
+}
+
+double Eos::stiff_p0(double density, double pressure) const {
+    throw std::runtime_error("stiff_p0 is not implemented");
+}
+
+double Eos::stiff_e0(double density, double pressure) const {
+    throw std::runtime_error("stiff_e0 is not implemented");
+}
+
 void test_eos(Eos& eos, double temperature, double density) {
     double pressure = eos.pressure_rt(density, temperature);
     double energy = eos.energy_rt(density, temperature);
