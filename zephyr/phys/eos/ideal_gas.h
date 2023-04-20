@@ -9,10 +9,11 @@ public:
     double gamma;
     double Cv;
 
-    /// @brief Конструктор для известных материалов
-    IdealGas(const std::string &name);
+    /// @brief Конструктор с заданием параметров
+    explicit IdealGas(double gamma = 1.4, double Cv = 1.0);
 
-    explicit IdealGas(double gamma = 1.4, double Cv = 718.0_J_kgK);
+    /// @brief Конструктор для известных материалов
+    explicit IdealGas(const std::string &name);
 
 
     /// @brief Основные формулы для уравнений состояния, необходимые для

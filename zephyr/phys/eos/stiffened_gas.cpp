@@ -6,6 +6,9 @@
 
 namespace zephyr { namespace phys {
 
+StiffenedGas::StiffenedGas(double gamma, double p_inf, double eps_0, double Cv)
+    : gamma(gamma), p_inf(p_inf), eps_0(eps_0), Cv(Cv) { }
+
 StiffenedGas::StiffenedGas(const std::string &name) {
     // @formatter:off
 

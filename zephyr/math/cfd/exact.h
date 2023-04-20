@@ -19,20 +19,11 @@ public:
     /// @param rL, uL, pL Плотность, скорость, давление слева
     /// @param rR, uR, pR Плотность, скорость, давление справа
     /// @param cL, cR Скорость звука слева и справа
+    /// @param p0L, p0R Параметры УрС
     /// @return Оценка давления на контакте
     static double contact_p_init(
-            cref rL, cref uL, cref pL, cref cL,
-            cref rR, cref uR, cref pR, cref cR);
-
-    /// @brief Начальная оценка давления на контакте
-    /// @param rL, uL, pL Плотность, скорость, давление слева
-    /// @param rR, uR, pR Плотность, скорость, давление справа
-    /// @param gL, p0L Параметра материала слева (двучленный УрС)
-    /// @param gR, p0R Параметры материала справа (двучленный УрС)
-    /// @return Оценка давления на контакте
-    static double contact_p_init(
-            cref rL, cref uL, cref pL, cref gL, cref p0L,
-            cref rR, cref uR, cref pR, cref gR, cref p0R);
+            cref rL, cref uL, cref pL, cref cL, cref p0L,
+            cref rR, cref uR, cref pR, cref cR, cref p0R);
 
     /// @brief Вычислить давление на контакте, используется
     /// итерационная процедура Годунова или аналог.
@@ -73,7 +64,7 @@ public:
     /// @param zR Вектор состояния справа
     /// @param eos Уравнение состояния
     RiemannSolver(const smf::PState &zL, const smf::PState &zR,
-                  const phys::Eos &eos);
+                  const phys::Eos &eos, double x_jump = 0.0);
 
     /// @brief Двухматериальный конструктор
     /// @param zL Вектор состояния слева
@@ -81,7 +72,8 @@ public:
     /// @param eosL Уравнение состояния слева
     /// @param eosR Уравнение состояния справа
     RiemannSolver(const smf::PState &zL, const smf::PState &zR,
-                  const phys::Eos &eosL, const phys::Eos &eosR);
+                  const phys::Eos &eosL, const phys::Eos &eosR,
+                  double x_jump = 0.0);
     
     /// @brief Основной конструктор
     /// @param rhoL, uL, pL Плотность, скорость, давление слева
@@ -91,7 +83,8 @@ public:
     /// @return Давление на контакте
     RiemannSolver(
             double rhoL, double uL, double pL, double gL, double p0L, double e0L,
-            double rhoR, double uR, double pR, double gR, double p0R, double e0R);
+            double rhoR, double uR, double pR, double gR, double p0R, double e0R,
+            double x_jump = 0.0);
 
     /// @brief Скорость звука от координаты и времени
     double sound_speed(double x, double t) const;
@@ -113,7 +106,10 @@ private:
     /// инициализирует все поля класса
     void compute();
 
-    // Данные задаются в конструкторе
+    // Следующие данные задаются в конструкторе
+
+    // Положение начального разрыва
+    double x_jump;
 
     // Параметры двучленного УрС
     double gL, p0L, e0L;

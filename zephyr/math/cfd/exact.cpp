@@ -7,15 +7,13 @@ using namespace smf;
 
 RiemannSolver::RiemannSolver(
         const PState &zL, const PState &zR,
-        const Eos &eos) :
-        RiemannSolver(zL, zR, eos, eos) {
-
-    compute();
-}
+        const Eos &eos, double x_jump) :
+        RiemannSolver(zL, zR, eos, eos, x_jump) { }
 
 RiemannSolver::RiemannSolver(
         const PState &zL, const PState &zR,
-        const Eos &eosL, const Eos &eosR) :
+        const Eos &eosL, const Eos &eosR,
+        double x_jump) : x_jump(x_jump),
         rL(zL.density), uL(zL.velocity.x()), pL(zL.pressure),
         rR(zR.density), uR(zR.velocity.x()), pR(zR.pressure) {
 
@@ -32,7 +30,8 @@ RiemannSolver::RiemannSolver(
 
 RiemannSolver::RiemannSolver(
         double rhoL, double uL, double pL, double gL, double p0L, double e0L,
-        double rhoR, double uR, double pR, double gR, double p0R, double e0R) :
+        double rhoR, double uR, double pR, double gR, double p0R, double e0R,
+        double x_jump) : x_jump(x_jump),
         rL(rhoL), uL(uL), pL(pL), gL(gL), p0L(p0L), e0L(e0L),
         rR(rhoR), uR(uR), pR(pR), gR(gR), p0R(p0R), e0R(e0R) {
 
@@ -93,36 +92,46 @@ inline double a_any(cref P, cref rho, cref p, cref c, cref kappa,
     }
 }
 
-double RiemannSolver::contact_p_init(
-        cref rL, cref uL, cref pL, cref cL,
-        cref rR, cref uR, cref pR, cref cR) {
+bool is_vacuum(cref uL, cref cL, cref gL, cref uR, cref cR, cref gR) {
+    return uR - uL > 2.0 * (cL / (gL - 1.0) + cR / (gR - 1.0));
+}
+
+inline double p_init(
+        cref rL, cref uL, cref pL, cref cL, cref p0L,
+        cref rR, cref uR, cref pR, cref cR, cref p0R) {
 
     double rcL = rL * cL;
     double rcR = rR * cR;
 
-    return (pL * rcR + pR * rcL + (uL - uR) * rcL * rcR) / (rcL + rcR);
+    double P = (pL * rcR + pR * rcL + (uL - uR) * rcL * rcR) / (rcL + rcR);
+
+    double Pmin = -std::min(p0L, p0R) + 1.0e-2 * std::min(pL + p0L, pR + p0R);
+
+    return std::max(Pmin, P);
 }
 
 double RiemannSolver::contact_p_init(
-        cref rL, cref uL, cref pL, cref gL, cref p0L,
-        cref rR, cref uR, cref pR, cref gR, cref p0R) {
+        cref rL, cref uL, cref pL, cref cL, cref p0L,
+        cref rR, cref uR, cref pR, cref cR, cref p0R) {
 
-    double cL = eos_sound(rL, pL, gL, p0L);
-    double cR = eos_sound(rR, pR, gR, p0R);
-
-    return contact_p_init(rL, uL, pL, cL, rR, uR, pR, cR);
+    return p_init(rL, uL, pL, cL, p0L, rR, uR, pR, cR, p0R);
 }
 
-double RiemannSolver::contact_p(
+inline double contact_p_ver1(
         cref rL, cref uL, cref pL, cref cL, cref gL, cref p0L,
         cref rR, cref uR, cref pR, cref cR, cref gR, cref p0R) {
 
-    const double eps = 1.0e-8;
-    const int max_iterations = 30;
+    if (is_vacuum(uL, cL, gL, uR, cR, gR)) {
+        return std::max(-p0L, -p0R);
+    }
 
-    double DP = eps * std::abs(pL - pR);
+    const int max_iterations = 50;
 
-    double P = contact_p_init(rL, uL, pL, cL, rR, uR, pR, cR);
+    double DP1 = 1.0e-5  * std::abs(pL - pR);
+    double DP2 = 1.0e-12 * std::abs(std::max(pL + p0L, pR + p0R));
+    double DP = std::max(DP1, DP2);
+
+    double P = p_init(rL, uL, pL, cL, p0L, rR, uR, pR, cR, p0R);
 
     double aL, aR, dP, Pk;
 
@@ -149,6 +158,86 @@ double RiemannSolver::contact_p(
     }
 
     return P;
+}
+
+inline double contact_p_ver2(
+        cref rL, cref uL, cref pL, cref cL, cref gL, cref p0L,
+        cref rR, cref uR, cref pR, cref cR, cref gR, cref p0R) {
+
+    if (is_vacuum(uL, cL, gL, uR, cR, gR)) {
+        return std::max(-p0L, -p0R);
+    }
+
+    const int max_iterations = 50;
+
+    double DP1 = 1.0e-5  * std::abs(pL - pR);
+    double DP2 = 1.0e-12 * std::abs(std::max(pL + p0L, pR + p0R));
+    double DP = std::max(DP1, DP2);
+
+    double P = p_init(rL, uL, pL, cL, p0L, rR, uR, pR, cR, p0R);
+
+    //std::cout << "P init:" << P << "\n";
+
+    double aL, aR, dP, Pk, Pn, alpha, Z;
+
+    double g_avg = 0.5 * (gL + gR);
+    double kL = const_kappa(gL);
+    double gp1L = const_gamma_p_1(gL);
+    double gm1L = const_gamma_m_1(gL);
+
+    double kR = const_kappa(gR);
+    double gp1R = const_gamma_p_1(gR);
+    double gm1R = const_gamma_m_1(gR);
+
+    for (int counter = 0; counter < max_iterations; ++counter) {
+        Z = (P + 0.5*(p0L + p0R))/(pL + p0L + pR + p0R);    // Гипотетически
+        alpha = (g_avg - 1.0) / (3 * g_avg) * (1.0 - Z) /
+                (std::pow(Z, (g_avg + 1.0) / (2.0 * g_avg)) * (
+                1.0 - std::pow(Z, (g_avg - 1.0) / (2.0 * g_avg)))) - 1.0;
+
+        alpha = std::max(0.0, alpha);
+
+        aL = a_any(P, rL, pL, cL, kL, gp1L, gm1L, p0L);
+        aR = a_any(P, rR, pR, cR, kR, gp1R, gm1R, p0R);
+
+        Pk = (aR * pL + aL * pR + aL * aR * (uL - uR)) / (aL + aR);
+        Pn = (alpha * P + Pk) / (1.0 + alpha);
+
+        dP = std::abs(Pn - P);
+        P = Pn;
+
+        //std::cout << "Pn (" << counter << "): " << Pn << "\n";
+
+        if (dP < DP) {
+            break;
+        }
+    }
+
+    return P;
+}
+
+inline double contact_p_ver3(
+        cref rL, cref uL, cref pL, cref cL, cref gL, cref p0L,
+        cref rR, cref uR, cref pR, cref cR, cref gR, cref p0R) {
+
+    return 0.0 / 0.0;
+}
+
+double RiemannSolver::contact_p(
+        cref rL, cref uL, cref pL, cref cL, cref gL, cref p0L,
+        cref rR, cref uR, cref pR, cref cR, cref gR, cref p0R) {
+
+    //return contact_p_ver1(
+    //        rL, uL, pL, cL, gL, p0L,
+    //        rR, uR, pR, cR, gR, p0R);
+
+    return contact_p_ver2(
+            rL, uL, pL, cL, gL, p0L,
+            rR, uR, pR, cR, gR, p0R);
+
+    //return contact_p_ver3(
+    //        rL, uL, pL, cL, gL, p0L,
+    //        rR, uR, pR, cR, gR, p0R);
 }
 
 double RiemannSolver::contact_p(
@@ -183,9 +272,10 @@ void RiemannSolver::compute() {
     if (pL < P) {
         DL1 = DL2 = uL - aL / rL;
         rl = rL * aL / (aL - rL * (uL - U));
+        cl = eos_sound(rl, P, gL, p0L);
     } else {
         DL1 = uL - cL;
-        cl = cL + 0.5 * (gL - 1) * (uL - U);
+        cl = cL + 0.5 * (gL - 1.0) * (uL - U);
         DL2 = U - cl;
         rl = gL * (P + p0L) / (cl * cl);
     }
@@ -194,20 +284,21 @@ void RiemannSolver::compute() {
     if (pR < P) {
         DR1 = DR2 = uR + aR / rR;
         rr = rR * aR / (aR + rR * (uR - U));
+        cr = eos_sound(rr, P, gR, p0R);
     } else {
-        cr = cR - 0.5 * (gR - 1) * (uR - U);
+        cr = cR - 0.5 * (gR - 1.0) * (uR - U);
         DR1 = U + cr;
-        rr = gL * (P + p0R) / (cr * cr);
+        rr = gR * (P + p0R) / (cr * cr);
         DR2 = uR + cR;
     }
 }
 
 double RiemannSolver::sound_speed(double x, double t) const {
     if (t <= 0.0) {
-        return x < 0.0 ? cL : cR;
+        return x < x_jump ? cL : cR;
     }
 
-    double xi = x / t;
+    double xi = (x - x_jump) / t;
     if (xi < DL1) {
         return cL;
     }
@@ -228,10 +319,10 @@ double RiemannSolver::sound_speed(double x, double t) const {
 
 double RiemannSolver::density(double x, double t) const {
     if (t <= 0.0) {
-        return x < 0.0 ? rL : rR;
+        return x < x_jump ? rL : rR;
     }
 
-    double xi = x / t;
+    double xi = (x - x_jump) / t;
     if (xi < DL1) {
         return rL;
     }
@@ -256,10 +347,10 @@ double RiemannSolver::density(double x, double t) const {
 
 double RiemannSolver::velocity(double x, double t) const {
     if (t <= 0.0) {
-        return x < 0.0 ? uL : uR;
+        return x < x_jump ? uL : uR;
     }
 
-    double xi = x / t;
+    double xi = (x - x_jump) / t;
     if (xi < DL1) {
         return uL;
     }
@@ -277,31 +368,31 @@ double RiemannSolver::velocity(double x, double t) const {
 
 double RiemannSolver::pressure(double x, double t) const {
     if (t <= 0.0) {
-        return x < 0.0 ? pL : pR;
+        return x < x_jump ? pL : pR;
     }
 
-    double xi = x / t;
+    double xi = (x - x_jump) / t;
     if (xi < DL1) {
         return pL;
     }
     if (xi < DL2) {
         double rho = density(x, t);
-        return (pL + p0L) * std::pow(rho / rL, gL) + p0L;
+        return (pL + p0L) * std::pow(rho / rL, gL) - p0L;
     }
     if (xi < DR1) {
         return P;
     }
     if (xi < DR2) {
         double rho = density(x, t);
-        return (pR + p0R) * std::pow(rho / rR, gR) + p0R;
+        return (pR + p0R) * std::pow(rho / rR, gR) - p0R;
     }
     return pR;
 }
 
 double RiemannSolver::energy(double x, double t) const {
-    double g = x < U * t ? gL : gR;
-    double p0 = x < U * t ? p0L : p0R;
-    double e0 = x < U * t ? e0L : e0R;
+    double g = x < x_jump + U * t ? gL : gR;
+    double p0 = x < x_jump + U * t ? p0L : p0R;
+    double e0 = x < x_jump + U * t ? e0L : e0R;
 
     double p = pressure(x, t);
     double rho = density(x, t);

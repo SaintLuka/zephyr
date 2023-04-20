@@ -35,10 +35,11 @@ double get_e(Storage::Item cell) { return cell(U).e1; }
 int main() {
     // Тестовая задача
     SodTest test;
+    //ToroTest test(2);
     //test.inverse();
 
     // Уравнение состояния
-    Eos& eos = test.eos();
+    Eos& eos = test.eos;
 
     // Состояния слева и справа в тесте
     Vector3d Ox = 100.0 * Vector3d::UnitX();
@@ -49,7 +50,7 @@ int main() {
               test.pressure(Ox), test.energy(Ox));
 
     // Точное решение задачи Римана
-    RiemannSolver exact(zL, zR, eos);
+    RiemannSolver exact(zL, zR, eos, test.x_jump);
 
     // Файл для записи
     PvdFile pvd("mesh", "output");
@@ -64,19 +65,19 @@ int main() {
 
     pvd.variables += {"rho_exact",
                       [&exact, &time](Storage::Item cell) -> double {
-                          return exact.density(cell.center().x() - 0.5, time);
+                          return exact.density(cell.center().x(), time);
                       }};
     pvd.variables += {"u_exact",
                       [&exact, &time](Storage::Item cell) -> double {
-                          return exact.velocity(cell.center().x() - 0.5, time);
+                          return exact.velocity(cell.center().x(), time);
                       }};
     pvd.variables += {"p_exact",
                       [&exact, &time](Storage::Item cell) -> double {
-                          return exact.pressure(cell.center().x() - 0.5, time);
+                          return exact.pressure(cell.center().x(), time);
                       }};
     pvd.variables += {"e_exact",
                       [&exact, &time](Storage::Item cell) -> double {
-                          return exact.energy(cell.center().x() - 0.5, time);
+                          return exact.energy(cell.center().x(), time);
                       }};
     pvd.variables += {"c",
                       [&eos](Storage::Item cell) -> double {
@@ -84,7 +85,7 @@ int main() {
                       }};
     pvd.variables += {"c_exact",
                       [&exact, &time](Storage::Item cell) -> double {
-                          return exact.sound_speed(cell.center().x() - 0.5, time);
+                          return exact.sound_speed(cell.center().x(), time);
                       }};
 
     // Создаем одномерную сетку
@@ -167,12 +168,10 @@ int main() {
                 }
 
                 // Значение на грани со стороны ячейки
-                PState zm(zc);
-                zm.to_local(normal);
+                PState zm = zc.in_local(normal);
 
                 // Значение на грани со стороны соседа
-                PState zp(zn);
-                zp.to_local(normal);
+                PState zp = zn.in_local(normal);
 
                 // Численный поток на грани
                 auto loc_flux = nf->flux(zm, zp, eos);

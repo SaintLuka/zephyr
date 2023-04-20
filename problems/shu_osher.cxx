@@ -2,7 +2,7 @@
 
 #include <zephyr/math/cfd/cir.h>
 #include <zephyr/math/cfd/models.h>
-#include <zephyr/phys/tests/shu-osher.h>
+#include <zephyr/phys/tests/shu_osher.h>
 
 using namespace zephyr::phys;
 using namespace zephyr::math;
