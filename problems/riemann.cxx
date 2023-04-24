@@ -6,6 +6,7 @@
 #include <zephyr/phys/tests/toro.h>
 
 #include <zephyr/math/cfd/exact.h>
+#include <zephyr/phys/eos/stiffened_gas.h>
 
 using namespace zephyr::phys;
 using namespace zephyr::math;
@@ -40,6 +41,7 @@ int main() {
 
     // Уравнение состояния
     Eos& eos = test.eos;
+    //StiffenedGas eos(1.367, 0.113, 0.273);
 
     // Состояния слева и справа в тесте
     Vector3d Ox = 100.0 * Vector3d::UnitX();
@@ -104,14 +106,15 @@ int main() {
         cell(U).rho1 = test.density(cell.center());
         cell(U).v1   = test.velocity(cell.center());
         cell(U).p1   = test.pressure(cell.center());
-        cell(U).e1   = test.energy(cell.center());
+        cell(U).e1   = eos.energy_rp(cell(U).rho1, cell(U).p1);
     }
 
     // Число Куранта
-    double CFL = 0.5;
+    double CFL = 0.9;
 
     // Функция вычисления потока
-    NumFlux::Ptr nf = CIR1::create();
+    //NumFlux::Ptr nf = CIR1::create();
+    NumFlux::Ptr nf = GodunovFlux::create();
 
     double next_write = 0.0;
     size_t n_step = 0;

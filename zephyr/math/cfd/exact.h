@@ -12,57 +12,47 @@ namespace zephyr { namespace math {
 /// получить полное решение с зависимостью от времени.
 class RiemannSolver {
 public:
-    using ref  = double&;
     using cref = const double&;
 
-    /// @brief Начальная оценка давления на контакте
-    /// @param rL, uL, pL Плотность, скорость, давление слева
-    /// @param rR, uR, pR Плотность, скорость, давление справа
-    /// @param cL, cR Скорость звука слева и справа
-    /// @param p0L, p0R Параметры УрС
-    /// @return Оценка давления на контакте
-    static double contact_p_init(
-            cref rL, cref uL, cref pL, cref cL, cref p0L,
-            cref rR, cref uR, cref pR, cref cR, cref p0R);
+    /// @struct Минималистичная структура для хранения решения
+    /// задачи Римана о распаде разрыва на грани.
+    /// Структура содержит только те величины, которые необходимы для
+    /// вычисления потока в одноматериальной газодинамической задаче.
+    struct Solution {
+        double rho; ///< Плотность на грани
+        double U;   ///< Скорость на грани
+        double P;   ///< Давление на грани
 
-    /// @brief Вычислить давление на контакте, используется
-    /// итерационная процедура Годунова или аналог.
-    /// @param rL, uL, pL Плотность, скорость, давление слева
-    /// @param rR, uR, pR Плотность, скорость, давление справа
-    /// @param gL, p0L Параметра материала слева (двучленный УрС)
-    /// @param gR, p0R Параметры материала справа (двучленный УрС)
-    /// @return Давление на контакте
-    static double contact_p(
+        /// @brief Конструктор по умолчанию
+        Solution() : rho(0.0 / 0.0), U(0.0 / 0.0), P(0.0 / 0.0) {}
+
+        /// @brief Простейший конструктор
+        Solution(cref rho, cref U, cref P) : rho(rho), U(U), P(P) {}
+    };
+
+    /// @brief Решить задачу Римана о распаде разрыва
+    /// @param rhoL, uL, pL Плотность, скорость, давление слева
+    /// @param rhoR, uR, pR Плотность, скорость, давление справа
+    /// @param gL, p0L, e0L Параметра материала слева (двучленный УрС)
+    /// @param gR, p0R, e0R Параметры материала справа (двучленный УрС)
+    /// @return Решение на грани
+    static Solution solve(
             cref rL, cref uL, cref pL, cref gL, cref p0L,
             cref rR, cref uR, cref pR, cref gR, cref p0R);
 
-    /// @brief Вычислить давление на контакте, используется
-    /// итерационная процедура Годунова или аналог. Отличается от
-    /// предыдущей функции тем, что использует известные скорости
-    /// звука слева и справа.
-    /// @param cL, cR Скорость звука слева и справа, используются
-    /// для начального приближения давления
-    /// @param rL, uL, pL Плотность, скорость, давление слева
-    /// @param rR, uR, pR Плотность, скорость, давление справа
-    /// @param gL, p0L Параметра материала слева (двучленный УрС)
-    /// @param gR, p0R Параметры материала справа (двучленный УрС)
-    /// @return Давление на контакте
-    static double contact_p(
-            cref rL, cref uL, cref pL, cref cL, cref gL, cref p0L,
-            cref rR, cref uR, cref pR, cref cR, cref gR, cref p0R);
-
-    /// @brief Вычислить скорость на контакте
-    /// @param uL, pL, aL Скорость, давление, массовая скорость слева
-    /// @param rR, uR, pR Скорость, давление, массовая скорость справа
-    /// @return Скорость на контакте
-    static double contact_u(
-            cref uL, cref pL, cref aL,
-            cref uR, cref pR, cref aR);
+    /// @brief Решить задачу Римана о распаде разрыва
+    /// @param zL Вектор состояния слева
+    /// @param zR Вектор состояния справа
+    /// @param eos Уравнение состояния
+    /// @return Решение на грани
+    static Solution solve(const smf::PState &zL,
+            const smf::PState &zR, const phys::Eos &eos);
 
     /// @brief Одноматериальный конструктор
     /// @param zL Вектор состояния слева
     /// @param zR Вектор состояния справа
     /// @param eos Уравнение состояния
+    /// @param x_jump Положение разрыва
     RiemannSolver(const smf::PState &zL, const smf::PState &zR,
                   const phys::Eos &eos, double x_jump = 0.0);
 
@@ -71,19 +61,20 @@ public:
     /// @param zR Вектор состояния справа
     /// @param eosL Уравнение состояния слева
     /// @param eosR Уравнение состояния справа
+    /// @param x_jump Положение разрыва
     RiemannSolver(const smf::PState &zL, const smf::PState &zR,
                   const phys::Eos &eosL, const phys::Eos &eosR,
                   double x_jump = 0.0);
     
     /// @brief Основной конструктор
-    /// @param rhoL, uL, pL Плотность, скорость, давление слева
-    /// @param rhoR, uR, pR Плотность, скорость, давление справа
+    /// @param rL, uL, pL Плотность, скорость, давление слева
+    /// @param rR, uR, pR Плотность, скорость, давление справа
     /// @param gL, p0L, e0L Параметра материала слева (двучленный УрС)
     /// @param gR, p0R, e0R Параметры материала справа (двучленный УрС)
-    /// @return Давление на контакте
+    /// @param x_jump Положение разрыва
     RiemannSolver(
-            double rhoL, double uL, double pL, double gL, double p0L, double e0L,
-            double rhoR, double uR, double pR, double gR, double p0R, double e0R,
+            double rL, double uL, double pL, double gL, double p0L, double e0L,
+            double rR, double uR, double pR, double gR, double p0R, double e0R,
             double x_jump = 0.0);
 
     /// @brief Скорость звука от координаты и времени
@@ -102,7 +93,7 @@ public:
     double energy(double x, double t) const;
 
 private:
-    /// @brief Решение задачи Римана
+    /// @brief Решение задачи Римана,
     /// инициализирует все поля класса
     void compute();
 
@@ -127,10 +118,10 @@ private:
     // Скорость и давление на контакте
     double U, P;
 
-    // Параметры решения, значения вокруг контактного разрыва
-    double rl, rr, cl, cr;
+    // Параметры решения, плотность вокруг контактного разрыва
+    double rl, rr;
 
-    // Конфигурация решения (характеристики)
+    // Конфигурация решения (скорости УВ или ВР)
     double DL1, DL2, DR1, DR2;
 };
 

@@ -1,6 +1,7 @@
 set(ZEPHYR_MATH_CFD_SRC
         ${CMAKE_CURRENT_SOURCE_DIR}/cir.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/exact.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/fluxes.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/models.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/rotate.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/limiter.cxx
