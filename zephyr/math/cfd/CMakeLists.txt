@@ -1,5 +1,7 @@
 set(ZEPHYR_MATH_CFD_SRC
         ${CMAKE_CURRENT_SOURCE_DIR}/cir.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/rusanov.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/hllc.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/exact.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/fluxes.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/models.cpp
@@ -9,6 +11,8 @@ set(ZEPHYR_MATH_CFD_SRC
 
 install(FILES
         cir.h
+        rusanov.h
+        hllc.h
         exact.h
         fluxes.h
         hll.h

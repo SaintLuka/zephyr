@@ -4,6 +4,7 @@
 #include <zephyr/math/vectorization.h>
 #include <zephyr/math/cfd/rotate.h>
 #include <zephyr/phys/eos/eos.h>
+#include <ostream>
 
 namespace zephyr { namespace math {
 
@@ -38,10 +39,12 @@ struct PState {
     /// @brief Возвращает вектор состояния в глобальной системе координат
     PState in_global(const Vector3d& normal) const;
 
+    friend std::ostream &operator<<(std::ostream &os, const PState &state);
+
     VECTORIZE(PState)
 };
 
-/// @brief Консеравтивный вектор состояния
+/// @brief Консервативный вектор состояния
 struct QState {
     double mass;
     geom::Vector3d momentum;
@@ -66,17 +69,28 @@ struct QState {
     VECTORIZE(QState)
 };
 
-/// @brief Вектор потока
+/**
+ * @brief Вектор потока
+ * @code
+ *  mass = rho * u;
+ *  momentum.x() = rho * u^2 + p;
+ *  momentum.y() = rho * u * v;
+ *  momentum.z() = rho * u * w;
+ *  energy = u * (E + p);
+ * @endcode
+ */
 struct Flux {
-    double mass;
+    double mass; ///< rho * u
     Vector3d momentum;
-    double energy;
+    double energy; ///< u * (rho * (E + 0.5 * velocity^2) + p)
 
     /// @brief Нулевой поток
     Flux();
 
+    Flux(double mass, const Vector3d &momentum, double energy);
+
     /// @brief Дифференциальный поток по вектору примитивных переменных
-    Flux(const PState& z);
+    Flux(const PState& state);
 
     /// @brief Переводит вектор потока в локальную систему координат
     void to_local(const Vector3d& normal);
@@ -89,6 +103,8 @@ struct Flux {
 
     /// @brief Возвращает вектор потока в глобальной системе координат
     Flux in_global(const Vector3d& normal) const;
+
+    friend std::ostream &operator<<(std::ostream &os, const Flux &flux);
 
     VECTORIZE(Flux)
 };

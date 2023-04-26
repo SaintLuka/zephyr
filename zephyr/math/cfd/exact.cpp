@@ -441,7 +441,7 @@ void RiemannSolver::compute() {
     P = UP.P;
     U = UP.U;
 
-    // Скорсти и плотности слева
+    // Скорости и плотности слева
     if (pL < P) {
         DL1 = DL2 = shock_wave_speed(rL, uL, pL, U, P);
         rl = shock_wave_density(rL, uL, pL, U, P);

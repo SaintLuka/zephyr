@@ -3,7 +3,7 @@ set(CONVECTION 0)
 set(MEMBRANE   0)
 set(RIEMANN    1)
 set(SHU_OSHER  1)
-set(WAVE2D     0)
+set(WAVE2D     1)
 
 if (ADVECTION)
     message(STATUS "Build advection test")

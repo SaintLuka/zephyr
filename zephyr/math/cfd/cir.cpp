@@ -3,7 +3,8 @@
 #include <zephyr/geom/vector.h>
 #include <zephyr/math/cfd/cir.h>
 
-namespace zephyr { namespace math {
+namespace zephyr {
+namespace math {
 
 using geom::Vector5d;
 using geom::Vector6d;
@@ -29,24 +30,24 @@ smf::Flux CIR1::calc_flux(const smf::PState &zL, const smf::PState &zR, const ph
     auto P = eos.pressure_re(zE.density, zE.energy);
 
     double rho = zE.density;
-    double u   = zE.velocity.x();
-    double v   = zE.velocity.y();
-    double w   = zE.velocity.z();
-    double p   = zE.pressure;
+    double u = zE.velocity.x();
+    double v = zE.velocity.y();
+    double w = zE.velocity.z();
+    double p = zE.pressure;
     double eps = zE.energy;
 
     double u2 = sqr(u);
     double v2 = sqr(v);
     double w2 = sqr(w);
 
-    double q2 = u2 + v2 + w2;
+    double q2 = u2 + v2 + w2; // квадрат модуля скорости
 
     double E = rho * (eps + 0.5 * q2);
 
     double c = eos.sound_speed_rp(rho, p);
     double c2 = sqr(c);
 
-    double h = (E + p) / rho;
+    double h = (E + p) / rho; // энтальпия
     double b = P.dE / rho;
     double T = b * (q2 - h) + c2;
 
@@ -136,10 +137,10 @@ smf::Flux CIR2::calc_flux(const smf::PState &zL, const smf::PState &zR, const ph
     zE.energy = eos.energy_rp(zE.density, zE.pressure);
 
     double rho = zE.density;
-    double u   = zE.velocity.x();
-    double v   = zE.velocity.y();
-    double w   = zE.velocity.z();
-    double p   = zE.pressure;
+    double u = zE.velocity.x();
+    double v = zE.velocity.y();
+    double w = zE.velocity.z();
+    double p = zE.pressure;
     double eps = zE.energy;
 
     double u2 = sqr(u);

@@ -1,6 +1,8 @@
 #include "fast.h"
 
 #include <zephyr/math/cfd/cir.h>
+#include <zephyr/math/cfd/rusanov.h>
+#include <zephyr/math/cfd/hllc.h>
 #include <zephyr/math/cfd/models.h>
 #include <zephyr/phys/tests/sod.h>
 #include <zephyr/phys/tests/toro.h>
@@ -26,10 +28,15 @@ _U_ U;
 
 /// Переменные для сохранения
 double get_rho(Storage::Item cell) { return cell(U).rho1; }
+
 double get_u(Storage::Item cell) { return cell(U).v1.x(); }
+
 double get_v(Storage::Item cell) { return cell(U).v1.y(); }
+
 double get_w(Storage::Item cell) { return cell(U).v1.z(); }
+
 double get_p(Storage::Item cell) { return cell(U).p1; }
+
 double get_e(Storage::Item cell) { return cell(U).e1; }
 
 
@@ -93,7 +100,8 @@ int main() {
     // Создаем одномерную сетку
     double H = 0.05 * (test.xmax() - test.xmin());
     Rectangle rect(test.xmin(), test.xmax(), -H, +H);
-    rect.set_sizes(5000, 1);
+    int n_points = 5000;
+    rect.set_sizes(n_points, 1);
     rect.set_boundary_flags(
             FaceFlag::WALL, FaceFlag::WALL,
             FaceFlag::WALL, FaceFlag::WALL);
@@ -114,15 +122,16 @@ int main() {
 
     // Функция вычисления потока
     //NumFlux::Ptr nf = CIR1::create();
-    NumFlux::Ptr nf = GodunovFlux::create();
+    // NumFlux::Ptr nf = GodunovFlux::create();
+    NumFlux::Ptr nf = HLLC::create();
 
     double next_write = 0.0;
     size_t n_step = 0;
 
     while (time <= 1.01 * test.max_time()) {
         if (time >= next_write) {
-            std::cout << "\tШаг: " << std::setw(6) << n_step << ";"
-                      << "\t\tВремя: " << std::setw(6) << std::setprecision(3) << time << "\n";
+            std::cout << "\tStep: " << std::setw(6) << n_step << ";"
+                      << "\t\tTime: " << std::setw(6) << std::setprecision(3) << time << "\n";
             pvd.save(mesh, time);
             next_write += test.max_time() / 100;
         }
@@ -163,11 +172,11 @@ int main() {
                 PState zn(zc);
 
                 if (!face.is_boundary()) {
-                    auto neib  = face.neib();
-                    zn.density  = neib(U).rho1;
+                    auto neib = face.neib();
+                    zn.density = neib(U).rho1;
                     zn.velocity = neib(U).v1;
                     zn.pressure = neib(U).p1;
-                    zn.energy   = neib(U).e1;
+                    zn.energy = neib(U).e1;
                 }
 
                 // Значение на грани со стороны ячейки
@@ -208,5 +217,50 @@ int main() {
         time += dt;
     }
 
+    // расчёт ошибок
+    double rho_err = 0.0, u_err = 0.0, p_err = 0.0, e_err = 0.0, c_err = 0.0;
+    time = test.max_time();
+    for (auto cell: mesh.cells()) {
+        double x = cell.center().x();
+        rho_err += abs(cell(U).rho1 - exact.density(x, time));
+        u_err += abs(cell(U).v1.x() - exact.velocity(x, time));
+        p_err += abs(cell(U).p1 - exact.pressure(x, time));
+        e_err += abs(cell(U).e1 - exact.energy(x, time));
+        c_err += abs(eos.sound_speed_rp(cell(U).rho1, cell(U).p1) - exact.sound_speed(x, time));
+    }
+
+    auto fprint = [](const std::string &name, double value) {
+        std::cout << name << ": " << value << '\n';
+    };
+    std::cout << "Mean average errors:\n";
+    fprint("density error", rho_err / n_points);
+    fprint("u error", u_err / n_points);
+    fprint("pressure error", p_err / n_points);
+    fprint("energy error", e_err / n_points);
+    fprint("sound speed error", c_err / n_points);
+
     return 0;
 }
+
+/*
+HLLC:
+    density error: 0.002078
+    u error: 0.004508
+    pressure error: 0.001738
+    energy error: 0.009744
+    sound speed error: 0.2088
+
+CIR:
+    density error: 0.00211
+    u error: 0.00455
+    pressure error: 0.0018
+    energy error: 0.0098
+    sound speed error: 0.209
+
+Rusanov:
+    density error: 0.00306
+    u error: 0.0055
+    pressure error: 0.00237
+    energy error: 0.0135
+    sound speed error: 0.209
+ */
