@@ -1,13 +1,11 @@
 #include "fast.h"
 
-#include <zephyr/math/cfd/cir.h>
-#include <zephyr/math/cfd/rusanov.h>
-#include <zephyr/math/cfd/hllc.h>
+#include <zephyr/math/cfd/fluxes.h>
 #include <zephyr/math/cfd/models.h>
 #include <zephyr/phys/tests/sod.h>
 #include <zephyr/phys/tests/toro.h>
 
-#include <zephyr/math/cfd/exact.h>
+#include <zephyr/math/solver/riemann.h>
 #include <zephyr/phys/eos/stiffened_gas.h>
 
 using namespace zephyr::phys;
@@ -100,8 +98,8 @@ int main() {
     // Создаем одномерную сетку
     double H = 0.05 * (test.xmax() - test.xmin());
     Rectangle rect(test.xmin(), test.xmax(), -H, +H);
-    int n_points = 5000;
-    rect.set_sizes(n_points, 1);
+    int n_cells = 500;
+    rect.set_sizes(n_cells, 1);
     rect.set_boundary_flags(
             FaceFlag::WALL, FaceFlag::WALL,
             FaceFlag::WALL, FaceFlag::WALL);
@@ -122,8 +120,9 @@ int main() {
 
     // Функция вычисления потока
     //NumFlux::Ptr nf = CIR1::create();
-    // NumFlux::Ptr nf = GodunovFlux::create();
     NumFlux::Ptr nf = HLLC::create();
+    //NumFlux::Ptr nf = Rusanov::create();
+    //NumFlux::Ptr nf = Godunov::create();
 
     double next_write = 0.0;
     size_t n_step = 0;
@@ -233,11 +232,11 @@ int main() {
         std::cout << name << ": " << value << '\n';
     };
     std::cout << "Mean average errors:\n";
-    fprint("density error", rho_err / n_points);
-    fprint("u error", u_err / n_points);
-    fprint("pressure error", p_err / n_points);
-    fprint("energy error", e_err / n_points);
-    fprint("sound speed error", c_err / n_points);
+    fprint("\tdensity error     ", rho_err / n_cells);
+    fprint("\tu error           ", u_err / n_cells);
+    fprint("\tpressure error    ", p_err / n_cells);
+    fprint("\tenergy error      ", e_err / n_cells);
+    fprint("\tsound speed error ", c_err / n_cells);
 
     return 0;
 }

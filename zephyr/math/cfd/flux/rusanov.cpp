@@ -1,7 +1,7 @@
 #include <iostream>
 
 #include <zephyr/geom/vector.h>
-#include <zephyr/math/cfd/rusanov.h>
+#include <zephyr/math/cfd/flux/rusanov.h>
 
 namespace zephyr {
 namespace math {

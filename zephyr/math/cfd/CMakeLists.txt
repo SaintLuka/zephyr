@@ -1,21 +1,13 @@
+add_subdirectory(flux)
+
 set(ZEPHYR_MATH_CFD_SRC
-        ${CMAKE_CURRENT_SOURCE_DIR}/cir.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/rusanov.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/hllc.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/exact.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/fluxes.cpp
+        ${ZEPHYR_MATH_FLUX_SRC}
         ${CMAKE_CURRENT_SOURCE_DIR}/models.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/rotate.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/limiter.cxx
     PARENT_SCOPE)
 
 install(FILES
-        cir.h
-        rusanov.h
-        hllc.h
-        exact.h
-        fluxes.h
-        hll.h
         models.h
         rotate.h
         limiter.h

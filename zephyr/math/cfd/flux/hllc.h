@@ -1,8 +1,6 @@
 #pragma once
 
-#include <memory>
-
-#include <zephyr/math/cfd/fluxes.h>
+#include <zephyr/math/cfd/flux/num_flux.h>
 
 namespace zephyr {
 namespace math {

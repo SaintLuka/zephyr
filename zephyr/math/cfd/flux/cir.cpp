@@ -1,7 +1,7 @@
 #include <iostream>
 
 #include <zephyr/geom/vector.h>
-#include <zephyr/math/cfd/cir.h>
+#include <zephyr/math/cfd/flux/cir.h>
 
 namespace zephyr {
 namespace math {
