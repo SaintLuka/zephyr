@@ -51,6 +51,10 @@ void Mesh::set_max_level(int max_level) {
     m_max_level = std::max(0, std::min(max_level, 15));
 }
 
+void Mesh::set_distributor(Distributor distr) {
+    distributor = std::move(distr);
+}
+
 void Mesh::refine() {
     static Stopwatch balance;
     static Stopwatch apply;

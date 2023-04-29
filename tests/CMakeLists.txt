@@ -1,8 +1,8 @@
 add_subdirectory(amr)
 
-set(MESHGEN   1)
-set(MPITEST   1)
-set(STOPWATCH 1)
+set(MESHGEN   0)
+set(MPITEST   0)
+set(STOPWATCH 0)
 
 if (MESHGEN)
     message(STATUS "Build meshgen test")

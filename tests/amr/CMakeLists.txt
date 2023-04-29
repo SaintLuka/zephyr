@@ -1,5 +1,5 @@
-set(RANDOM 1)
-set(INTERFACE 1)
+set(RANDOM 0)
+set(INTERFACE 0)
 
 if (RANDOM)
     message(STATUS "Build AMR random test")

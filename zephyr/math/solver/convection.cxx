@@ -1,8 +1,12 @@
 #include <zephyr/math/solver/convection.h>
 
 #include <zephyr/math/cfd/face_extra.h>
+#include <zephyr/geom/face.h>
 
 namespace zephyr { namespace math {
+
+using mesh::Storage;
+using namespace geom;
 
 static const Convection::State U = Convection::datatype();
 
@@ -191,6 +195,42 @@ void Convection::update(Mesh &mesh) {
         cell(U).uh = 0.0;
         cell(U).u2 = 0.0;
     }
+}
+
+void Convection::set_flags(Mesh& mesh) {
+    for (auto cell: mesh.cells()) {
+        double min_val = cell(U).u1;
+        double max_val = cell(U).u1;
+
+        for (auto face: cell.faces()) {
+            if (face.is_boundary()) {
+                continue;
+            }
+            min_val = std::min(min_val, face.neib()(U).u1);
+            max_val = std::max(max_val, face.neib()(U).u1);
+        }
+
+        if (max_val - min_val > 0.1) {
+            cell.set_flag(1);
+        }
+        else {
+            cell.set_flag(-1);
+        }
+    }
+}
+
+Distributor Convection::distributor() const {
+    Distributor dist;
+
+    dist.split2D = [](Storage::Item parent, const std::array<Storage::Item, 4> & children) {
+
+    };
+
+    dist.merge2D = [](const std::array<Storage::Item, 4> & children, Storage::Item parent) {
+
+    };
+
+    return Distributor::simple();
 }
 
 }

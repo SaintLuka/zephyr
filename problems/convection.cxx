@@ -12,7 +12,7 @@ public:
 
     /// @brief Задаем скорость переноса
     Vector3d velocity(const Vector3d& c) const override {
-        return { 1.0, 0.3 + 0.3*std::sin(4 * M_PI * c.x()), 0.0 };
+        return { 0.8, 0.40 + 0.3*std::sin(4 * M_PI * c.x()), 0.0 };
     }
 };
 
@@ -26,6 +26,39 @@ double get_ux(Storage::Item cell)  { return cell(U).ux; }
 
 double get_uy(Storage::Item cell)  { return cell(U).uy; }
 
+double get_lvl(Storage::Item cell)  { return cell.level(); }
+
+const double margin = 0.0198;
+
+// Начальное условие в виде круга
+void setup_initial_1(Mesh& mesh, double D) {
+    double R = D / 2.0;
+    Vector3d vc = {R + margin, R + margin, 0.0};
+    for (auto cell: mesh.cells()) {
+        cell(U).u1 = (cell.center() - vc).norm() < R ? 1.0 : 0.0;
+        cell(U).u2 = 0.0;
+    }
+}
+
+// Начальное условие в виде квадрата
+void setup_initial_2(Mesh& mesh, double D) {
+    double x_min = margin;
+    double x_max = D + x_min;
+    double y_min = margin;
+    double y_max = D + y_min;
+
+    for (auto cell: mesh.cells()) {
+        Vector3d vc = cell.center();
+        if (x_min <= vc.x() && vc.x() <= x_max &&
+            y_min <= vc.y() && vc.y() <= y_max) {
+            cell(U).u1 = 1.0;
+        } else {
+            cell(U).u1 = 0.0;
+        }
+        cell(U).u2 = 0.0;
+    }
+}
+
 int main() {
     // Файл для записи
     PvdFile pvd("mesh", "output");
@@ -34,16 +67,14 @@ int main() {
     pvd.variables += {"u",  get_u};
     pvd.variables += {"ux", get_ux};
     pvd.variables += {"uy", get_uy};
+    pvd.variables += {"lvl", get_lvl};
 
     // Геометрия области
-    Rectangle rect(0.0, 1.0, 0.0, 0.6, true);
-    rect.set_nx(200);
+    Rectangle rect(0.0, 1.0, 0.0, 0.6, false);
+    rect.set_nx(50);
     rect.set_boundary_flags(
-            FaceFlag::PERIODIC, FaceFlag::PERIODIC,
-            FaceFlag::PERIODIC, FaceFlag::PERIODIC);
-
-    // Создать сетку
-    Mesh mesh(U, &rect);
+            FaceFlag::ZOE, FaceFlag::ZOE,
+            FaceFlag::ZOE, FaceFlag::ZOE);
 
     // Создать решатель
     Solver solver;
@@ -53,17 +84,25 @@ int main() {
     solver.set_accuracy(3);
     solver.set_limiter("van Leer");
 
+    // Создать сетку
+    Mesh mesh(U, &rect);
+
+    // Настраиваем адаптацию
+    mesh.set_max_level(5);
+    mesh.set_distributor(solver.distributor());
+
     // Заполняем начальные данные
-    Vector3d v1(rect.x_min(), rect.y_min(), 0.0);
-    Vector3d v2(rect.x_max(), rect.y_max(), 0.0);
-    Vector3d vc = 0.5 * (v1 + v2);
-    double D = 0.1 * (v2 - v1).norm();
-    for (auto cell: mesh.cells()) {
-        cell(U).u1 = (cell.center() - vc).norm() < D ? 1.0 : 0.0;
-        cell(U).u2 = 0.0;
+    Vector3d v_min(rect.x_min(), rect.y_min(), 0.0);
+    Vector3d v_max(rect.x_max(), rect.y_max(), 0.0);
+    double D = 0.1*(v_max - v_min).norm();
+
+    // Адаптация под начальные данные
+    for (int k = 0; k < mesh.max_level() + 3; ++k) {
+        setup_initial_1(mesh, D);
+        solver.set_flags(mesh);
+        mesh.refine();
     }
 
-    // Число Куранта
     int n_step = 0;
     double curr_time = 0.0;
     double next_write = 0.0;
@@ -76,7 +115,14 @@ int main() {
             next_write += 0.02;
         }
 
+        // Шаг решения
         solver.update(mesh);
+
+        // Установить флаги адаптации
+        solver.set_flags(mesh);
+
+        // Адаптировать сетку
+        mesh.refine();
 
         n_step += 1;
         curr_time += solver.dt();

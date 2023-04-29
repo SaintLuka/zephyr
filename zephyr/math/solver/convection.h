@@ -7,6 +7,7 @@ namespace zephyr { namespace math {
 
 using zephyr::mesh::ICell;
 using zephyr::mesh::Mesh;
+using zephyr::mesh::Distributor;
 using zephyr::geom::Vector3d;
 
 /// @brief Класс для моделирования уравнения переноса.
@@ -54,6 +55,12 @@ public:
 
     /// @brief Один шаг интегрирования по времени
     void update(Mesh& mesh);
+
+    /// @brief Установить флаги адаптации
+    void set_flags(Mesh& mesh);
+
+    /// @brief Распределитель данных при адаптации
+    Distributor distributor() const;
 
 protected:
 
