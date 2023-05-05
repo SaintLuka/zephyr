@@ -1,9 +1,11 @@
 #include "fast.h"
 
+#include <fstream>
 #include <zephyr/math/cfd/fluxes.h>
 #include <zephyr/math/cfd/models.h>
 #include <zephyr/phys/tests/sod.h>
 #include <zephyr/phys/tests/toro.h>
+#include <zephyr/phys/tests/classic_test.h>
 
 #include <zephyr/math/solver/riemann.h>
 #include <zephyr/phys/eos/stiffened_gas.h>
@@ -38,14 +40,9 @@ double get_p(Storage::Item cell) { return cell(U).p1; }
 double get_e(Storage::Item cell) { return cell(U).e1; }
 
 
-int main() {
-    // Тестовая задача
-    SodTest test;
-//    ToroTest test(2);
-    //test.inverse();
-
+std::vector<double> RiemannTester(const ClassicTest &test, const NumFlux::Ptr &nf, const std::string &filename = "output") {
     // Уравнение состояния
-    Eos& eos = test.eos;
+    const Eos *eos = test.get_eos();
     //StiffenedGas eos(1.367, 0.113, 0.273);
 
     // Состояния слева и справа в тесте
@@ -57,10 +54,10 @@ int main() {
               test.pressure(Ox), test.energy(Ox));
 
     // Точное решение задачи Римана
-    RiemannSolver exact(zL, zR, eos, test.x_jump);
+    RiemannSolver exact(zL, zR, *eos, test.get_x_jump());
 
     // Файл для записи
-    PvdFile pvd("mesh", "output");
+    PvdFile pvd("mesh", filename);
 
     // Переменные для сохранения
     pvd.variables += {"rho", get_rho};
@@ -88,7 +85,7 @@ int main() {
                       }};
     pvd.variables += {"c",
                       [&eos](Storage::Item cell) -> double {
-                          return eos.sound_speed_rp(cell(U).rho1, cell(U).p1);
+                          return eos->sound_speed_rp(cell(U).rho1, cell(U).p1);
                       }};
     pvd.variables += {"c_exact",
                       [&exact, &time](Storage::Item cell) -> double {
@@ -110,27 +107,21 @@ int main() {
     // Заполняем начальные данные
     for (auto cell: mesh.cells()) {
         cell(U).rho1 = test.density(cell.center());
-        cell(U).v1   = test.velocity(cell.center());
-        cell(U).p1   = test.pressure(cell.center());
-        cell(U).e1   = eos.energy_rp(cell(U).rho1, cell(U).p1);
+        cell(U).v1 = test.velocity(cell.center());
+        cell(U).p1 = test.pressure(cell.center());
+        cell(U).e1 = eos->energy_rp(cell(U).rho1, cell(U).p1);
     }
 
     // Число Куранта
     double CFL = 0.9;
-
-    // Функция вычисления потока
-//    NumFlux::Ptr nf = CIR1::create();
-//    NumFlux::Ptr nf = HLLC::create();
-    //NumFlux::Ptr nf = Rusanov::create();
-    NumFlux::Ptr nf = Godunov::create();
 
     double next_write = 0.0;
     size_t n_step = 0;
 
     while (time <= 1.01 * test.max_time()) {
         if (time >= next_write) {
-            std::cout << "\tStep: " << std::setw(6) << n_step << ";"
-                      << "\t\tTime: " << std::setw(6) << std::setprecision(3) << time << "\n";
+//            std::cout << "\tStep: " << std::setw(6) << n_step << ";"
+//                      << "\t\tTime: " << std::setw(6) << std::setprecision(3) << time << "\n";
             pvd.save(mesh, time);
             next_write += test.max_time() / 100;
         }
@@ -139,7 +130,7 @@ int main() {
         double dt = std::numeric_limits<double>::max();
         for (auto cell: mesh.cells()) {
             // скорость звука
-            double c = eos.sound_speed_rp(cell(U).rho1, cell(U).p1);
+            double c = eos->sound_speed_rp(cell(U).rho1, cell(U).p1);
             for (auto &face: cell.faces()) {
                 // Нормальная составляющая скорости
                 double vn = cell(U).v1.dot(face.normal());
@@ -185,7 +176,7 @@ int main() {
                 PState zp = zn.in_local(normal);
 
                 // Численный поток на грани
-                auto loc_flux = nf->flux(zm, zp, eos);
+                auto loc_flux = nf->flux(zm, zp, *eos);
                 loc_flux.to_global(normal);
 
                 // Суммируем поток
@@ -196,12 +187,12 @@ int main() {
             QState Qc = qc.vec() - dt * flux.vec() / cell.volume();
 
             // Новое значение примитивных переменных
-            PState Zc(Qc, eos);
+            PState Zc(Qc, *eos);
 
             cell(U).rho2 = Zc.density;
-            cell(U).v2   = Zc.velocity;
-            cell(U).p2   = Zc.pressure;
-            cell(U).e2   = Zc.energy;
+            cell(U).v2 = Zc.velocity;
+            cell(U).p2 = Zc.pressure;
+            cell(U).e2 = Zc.energy;
         }
 
         // Обновляем слои
@@ -225,18 +216,49 @@ int main() {
         u_err += abs(cell(U).v1.x() - exact.velocity(x, time));
         p_err += abs(cell(U).p1 - exact.pressure(x, time));
         e_err += abs(cell(U).e1 - exact.energy(x, time));
-        c_err += abs(eos.sound_speed_rp(cell(U).rho1, cell(U).p1) - exact.sound_speed(x, time));
+        c_err += abs(eos->sound_speed_rp(cell(U).rho1, cell(U).p1) - exact.sound_speed(x, time));
     }
+    rho_err /= n_cells;
+    u_err /= n_cells;
+    p_err /= n_cells;
+    e_err /= n_cells;
+    c_err /= n_cells;
 
     auto fprint = [](const std::string &name, double value) {
         std::cout << name << ": " << value << '\n';
     };
+
+    std::cout << "Test: " << test.get_name() << ", Flux: " << nf->get_name() << "\n";
     std::cout << "Mean average errors:\n";
-    fprint("\tdensity error     ", rho_err / n_cells);
-    fprint("\tu error           ", u_err / n_cells);
-    fprint("\tpressure error    ", p_err / n_cells);
-    fprint("\tenergy error      ", e_err / n_cells);
-    fprint("\tsound speed error ", c_err / n_cells);
+    fprint("\tdensity error     ", rho_err);
+    fprint("\tu error           ", u_err);
+    fprint("\tpressure error    ", p_err);
+    fprint("\tenergy error      ", e_err);
+    fprint("\tsound speed error ", c_err);
+    std::cout << '\n';
+
+    return {rho_err, u_err, p_err, e_err, c_err};
+}
+
+int main() {
+    // Тестовая задача
+    SodTest sod_test;
+    ToroTest toro_test(2);
+
+    std::vector<NumFlux::Ptr> nfs(3);
+    nfs[0] = HLLC::create();
+    nfs[1] = Godunov::create();
+    nfs[2] = CIR1::create();
+
+    std::vector<std::vector<double>> sod_errors(nfs.size(), std::vector<double>(5));
+    for (int i = 0; i < nfs.size(); ++i)
+        sod_errors[i] = RiemannTester(sod_test, nfs[i]);
+
+    std::cout << '\n';
+
+    std::vector<std::vector<double>> toro_errors(nfs.size(), std::vector<double>(5));
+    for (int i = 0; i < nfs.size(); ++i)
+        toro_errors[i] = RiemannTester(toro_test, nfs[i]);
 
     return 0;
 }

@@ -2,14 +2,16 @@
 
 #include <zephyr/geom/vector.h>
 #include <zephyr/phys/eos/ideal_gas.h>
+#include <zephyr/phys/tests/classic_test.h>
 
-namespace zephyr { namespace phys {
+namespace zephyr {
+namespace phys {
 
 using zephyr::geom::Vector3d;
 
 /// @class Набор тестов на распад разрыва из монографии Торо (глава 10)
 /// E.F. Toro. Riemann Solvers and Numerical Methods for Fluid Dynamics.
-class ToroTest {
+class ToroTest : public ClassicTest {
 public:
 
     IdealGas eos;   ///< Используемый УрС
@@ -28,6 +30,8 @@ public:
     /// @brief Симметрично отразить начальные условия
     void inverse();
 
+    std::string get_name() const { return "ToroTest";}
+
     /// @brief Левая граница области
     double xmin() const { return 0.0; }
 
@@ -37,6 +41,11 @@ public:
     /// @brief Конечный момент времени
     double max_time() const { return finish; }
 
+    ///@brief Получить используемый УрС
+    const Eos* get_eos() const { return &eos; }
+
+    ///@brief Получить положение разрыва
+    double get_x_jump() const { return x_jump; }
 
     /// @brief Начальная плотность
     double density(const double &x) const { return x < x_jump ? rL : rR; }
@@ -63,6 +72,7 @@ public:
     /// @brief Начальная внутренняя энергия
     double energy(const Vector3d &r) const { return energy(r.x()); }
 
+    ~ToroTest() = default;
 };
 
 }

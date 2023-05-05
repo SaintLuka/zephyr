@@ -16,6 +16,8 @@ public:
     virtual smf::Flux flux(const smf::PState& zL, const smf::PState& zR, const phys::Eos& eos) const {
         throw std::runtime_error("NumFlux::flux(PState...) is not implemented");
     }
+
+    virtual std::string get_name() const { return "Flux"; }
 };
 
 }

@@ -17,6 +17,8 @@ public:
         return std::make_unique<Rusanov>(std::forward<Args>(args)...);
     }
 
+    std::string get_name() const override {return "Rusanov"; }
+
     static smf::Flux calc_flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos);
 
     smf::Flux flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) const final;
@@ -33,6 +35,8 @@ public:
     inline static std::unique_ptr<Rusanov2> create(Args &&... args) {
         return std::make_unique<Rusanov2>(std::forward<Args>(args)...);
     }
+
+    std::string get_name() const override {return "Rusanov2"; }
 
     static smf::Flux calc_flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos);
 

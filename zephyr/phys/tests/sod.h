@@ -2,11 +2,15 @@
 
 #include <zephyr/geom/vector.h>
 #include <zephyr/phys/eos/ideal_gas.h>
+#include <zephyr/phys/tests/classic_test.h>
 
-namespace zephyr { namespace phys {
+namespace zephyr {
+namespace phys {
+
+using zephyr::geom::Vector3d;
 
 /// @class Классический одномерный тест Сода
-class SodTest {
+class SodTest : public ClassicTest {
 public:
     IdealGas eos;   ///< Используемый УрС
     double x_jump;  ///< Положение разрыва
@@ -18,6 +22,7 @@ public:
 
     /// @brief Конструктор
     SodTest() : eos(1.4) {
+        // @formatter:off
         rL = 1.0; rR = 0.125;
         pL = 1.0; pR = 0.1;
         uL = 0.0; uR = 0.0;
@@ -26,6 +31,7 @@ public:
 
         x_jump = 0.5;
         finish = 0.2;
+        // @formatter:on
     }
 
     /// @brief Симметрично отразить начальные условия
@@ -38,6 +44,7 @@ public:
         uR *= -1.0;
     }
 
+    std::string get_name() const { return "SodTest";}
 
     /// @brief Левая граница области
     double xmin() const { return 0.0; }
@@ -48,6 +55,11 @@ public:
     /// @brief Конечный момент времени
     double max_time() const { return finish; }
 
+    ///@brief Получить используемый УрС
+    const Eos* get_eos() const { return &eos; }
+
+    ///@brief Получить положение разрыва
+    double get_x_jump() const { return x_jump; }
 
     /// @brief Начальная плотность
     double density(const double &x) const { return x < x_jump ? rL : rR; }
@@ -73,6 +85,8 @@ public:
 
     /// @brief Начальная внутренняя энергия
     double energy(const Vector3d &r) const { return energy(r.x()); }
+
+    ~SodTest() override = default;
 
 };
 
