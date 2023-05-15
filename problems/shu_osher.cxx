@@ -1,6 +1,6 @@
 #include "fast.h"
 
-#include <zephyr/math/cfd/cir.h>
+#include <zephyr/math/cfd/fluxes.h>
 #include <zephyr/math/cfd/models.h>
 #include <zephyr/phys/tests/shu_osher.h>
 

@@ -220,17 +220,24 @@ void Convection::set_flags(Mesh& mesh) {
 }
 
 Distributor Convection::distributor() const {
-    Distributor dist;
+    Distributor distr;
 
-    dist.split2D = [](Storage::Item parent, const std::array<Storage::Item, 4> & children) {
-
+    distr.split2D = [](Storage::Item parent, const std::array<Storage::Item, 4> & children) {
+        for (auto child: children) {
+            Vector3d dr = parent.center() - child.center();
+            child(U).u1 = parent(U).u1 + parent(U).ux * dr.x() + parent(U).uy * dr.y();
+        }
     };
 
-    dist.merge2D = [](const std::array<Storage::Item, 4> & children, Storage::Item parent) {
-
+    distr.merge2D = [](const std::array<Storage::Item, 4> & children, Storage::Item parent) {
+        double sum = 0.0;
+        for (auto child: children) {
+            sum += child(U).u1 * child.volume();
+        }
+        parent(U).u1 = sum / parent.volume();
     };
 
-    return Distributor::simple();
+    return distr;
 }
 
 }

@@ -115,7 +115,7 @@ Variable::Variable(const char* name)
         };
     }
     else {
-        throw std::runtime_error("Unknown variable");
+        throw std::runtime_error("Unknown variable '" + std::string(name) + "'");
     }
 }
 
