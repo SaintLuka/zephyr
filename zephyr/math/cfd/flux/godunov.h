@@ -15,6 +15,8 @@ public:
         return std::make_unique<Godunov>(std::forward<Args>(args)...);
     }
 
+    std::string get_name() const override { return "Godunov"; }
+
     /// @brief Поток как решение задачи о распаде разрыва
     static smf::Flux calc_flux(const smf::PState& zL, const smf::PState& zR, const phys::Eos& eos);
 

@@ -6,5 +6,6 @@ install(FILES
         shu_osher.h
         sod.h
         toro.h
+        classic_test.h
         DESTINATION
         include/${PROJECT_NAME}/phys/tests)

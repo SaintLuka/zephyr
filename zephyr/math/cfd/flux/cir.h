@@ -17,6 +17,8 @@ public:
         return std::make_unique<CIR1>(std::forward<Args>(args)...);
     }
 
+    std::string get_name() const override {return "CIR1"; }
+
     static smf::Flux calc_flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos);
 
     smf::Flux flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) const final;
@@ -34,6 +36,8 @@ public:
     inline static std::unique_ptr<CIR2> create(Args &&... args) {
         return std::make_unique<CIR2>(std::forward<Args>(args)...);
     }
+
+    std::string get_name() const override {return "CIR2"; }
 
     static smf::Flux calc_flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos);
 
