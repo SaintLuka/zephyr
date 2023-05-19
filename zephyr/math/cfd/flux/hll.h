@@ -17,6 +17,8 @@ public:
         return std::make_unique<HLL>(std::forward<Args>(args)...);
     }
 
+    std::string get_name() const override {return "HLL"; }
+
     static smf::Flux calc_flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos);
 
     smf::Flux flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) const final;
