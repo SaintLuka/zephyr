@@ -24,14 +24,15 @@ smf::Flux HLL::calc_flux(const smf::PState &zL, const smf::PState &zR, const phy
     double w1 = zL.velocity.z(), w2 = zR.velocity.z();
     double p1 = zL.pressure, p2 = zR.pressure;
 
+    QState qL(zL); // U_L
+    QState qR(zR); // U_R
+
     double c1 = eos.sound_speed_rp(rho1, p1); // скорость звука слева std::sqrt(gamma * pressure / density);
     double c2 = eos.sound_speed_rp(rho2, p2); // скорость звука справа
 
     double s1 = std::min({u1 - c1, u2 - c2, 0.0}); // SL
     double s2 = std::max({u1 + c1, u2 + c2, 0.0}); // SR
 
-    QState qL(zL); // U_L
-    QState qR(zR); // U_R
 
     Flux fL(zL);   // Дифференциальный поток слева
     Flux fR(zR);   // Дифференциальный поток справа

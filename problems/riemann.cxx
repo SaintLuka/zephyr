@@ -119,9 +119,9 @@ int main() {
     double CFL = 0.9;
 
     // Функция вычисления потока
-//    NumFlux::Ptr nf = CIR1::create();
-//    NumFlux::Ptr nf = HLLC::create();
-    //NumFlux::Ptr nf = Rusanov::create();
+    // NumFlux::Ptr nf = CIR1::create();
+    // NumFlux::Ptr nf = HLLC::create();
+    // NumFlux::Ptr nf = Rusanov::create();
     NumFlux::Ptr nf = Godunov::create();
 
     double next_write = 0.0;

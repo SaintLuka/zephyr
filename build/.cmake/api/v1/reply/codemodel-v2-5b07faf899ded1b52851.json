@@ -13,7 +13,7 @@
 						16
 					],
 					"hasInstallRule" : true,
-					"jsonFile" : "directory-.-Release-d4ea3f3f661b284e2115.json",
+					"jsonFile" : "directory-.-MinSizeRel-d4ea3f3f661b284e2115.json",
 					"minimumCMakeVersion" : 
 					{
 						"string" : "3.5"
@@ -37,7 +37,7 @@
 						13
 					],
 					"hasInstallRule" : true,
-					"jsonFile" : "directory-zephyr-Release-0e6ca903eb7ca65f9f11.json",
+					"jsonFile" : "directory-zephyr-MinSizeRel-0e6ca903eb7ca65f9f11.json",
 					"minimumCMakeVersion" : 
 					{
 						"string" : "3.5"
@@ -49,7 +49,7 @@
 				{
 					"build" : "zephyr/geom",
 					"hasInstallRule" : true,
-					"jsonFile" : "directory-zephyr.geom-Release-ab79b9dbbda6d859b47e.json",
+					"jsonFile" : "directory-zephyr.geom-MinSizeRel-ab79b9dbbda6d859b47e.json",
 					"minimumCMakeVersion" : 
 					{
 						"string" : "3.5"
@@ -61,7 +61,7 @@
 				{
 					"build" : "zephyr/io",
 					"hasInstallRule" : true,
-					"jsonFile" : "directory-zephyr.io-Release-15794eb2ee1e96bcb499.json",
+					"jsonFile" : "directory-zephyr.io-MinSizeRel-15794eb2ee1e96bcb499.json",
 					"minimumCMakeVersion" : 
 					{
 						"string" : "3.5"
@@ -77,7 +77,7 @@
 						5
 					],
 					"hasInstallRule" : true,
-					"jsonFile" : "directory-zephyr.mesh-Release-f531b52f5a256cd9f256.json",
+					"jsonFile" : "directory-zephyr.mesh-MinSizeRel-f531b52f5a256cd9f256.json",
 					"minimumCMakeVersion" : 
 					{
 						"string" : "3.5"
@@ -89,7 +89,7 @@
 				{
 					"build" : "zephyr/mesh/generator",
 					"hasInstallRule" : true,
-					"jsonFile" : "directory-zephyr.mesh.generator-Release-322c978f03a9604f96c0.json",
+					"jsonFile" : "directory-zephyr.mesh.generator-MinSizeRel-322c978f03a9604f96c0.json",
 					"minimumCMakeVersion" : 
 					{
 						"string" : "3.5"
@@ -106,7 +106,7 @@
 						9
 					],
 					"hasInstallRule" : true,
-					"jsonFile" : "directory-zephyr.math-Release-141818fb8247db5a5598.json",
+					"jsonFile" : "directory-zephyr.math-MinSizeRel-141818fb8247db5a5598.json",
 					"minimumCMakeVersion" : 
 					{
 						"string" : "3.5"
@@ -122,7 +122,7 @@
 						8
 					],
 					"hasInstallRule" : true,
-					"jsonFile" : "directory-zephyr.math.cfd-Release-d9eaa6b018657eb577ea.json",
+					"jsonFile" : "directory-zephyr.math.cfd-MinSizeRel-d9eaa6b018657eb577ea.json",
 					"minimumCMakeVersion" : 
 					{
 						"string" : "3.5"
@@ -134,7 +134,7 @@
 				{
 					"build" : "zephyr/math/cfd/flux",
 					"hasInstallRule" : true,
-					"jsonFile" : "directory-zephyr.math.cfd.flux-Release-9c084b1a7df95448a8df.json",
+					"jsonFile" : "directory-zephyr.math.cfd.flux-MinSizeRel-9c084b1a7df95448a8df.json",
 					"minimumCMakeVersion" : 
 					{
 						"string" : "3.5"
@@ -146,7 +146,7 @@
 				{
 					"build" : "zephyr/math/solver",
 					"hasInstallRule" : true,
-					"jsonFile" : "directory-zephyr.math.solver-Release-481bdfe6cf6d36d78e2a.json",
+					"jsonFile" : "directory-zephyr.math.solver-MinSizeRel-481bdfe6cf6d36d78e2a.json",
 					"minimumCMakeVersion" : 
 					{
 						"string" : "3.5"
@@ -163,7 +163,7 @@
 						12
 					],
 					"hasInstallRule" : true,
-					"jsonFile" : "directory-zephyr.phys-Release-128ba0aff416f28b40b2.json",
+					"jsonFile" : "directory-zephyr.phys-MinSizeRel-128ba0aff416f28b40b2.json",
 					"minimumCMakeVersion" : 
 					{
 						"string" : "3.5"
@@ -175,7 +175,7 @@
 				{
 					"build" : "zephyr/phys/eos",
 					"hasInstallRule" : true,
-					"jsonFile" : "directory-zephyr.phys.eos-Release-6d4da7fc396fa501f91b.json",
+					"jsonFile" : "directory-zephyr.phys.eos-MinSizeRel-6d4da7fc396fa501f91b.json",
 					"minimumCMakeVersion" : 
 					{
 						"string" : "3.5"
@@ -187,7 +187,7 @@
 				{
 					"build" : "zephyr/phys/tests",
 					"hasInstallRule" : true,
-					"jsonFile" : "directory-zephyr.phys.tests-Release-0a7ed2e37aba888e7cc7.json",
+					"jsonFile" : "directory-zephyr.phys.tests-MinSizeRel-0a7ed2e37aba888e7cc7.json",
 					"minimumCMakeVersion" : 
 					{
 						"string" : "3.5"
@@ -199,7 +199,7 @@
 				{
 					"build" : "zephyr/utils",
 					"hasInstallRule" : true,
-					"jsonFile" : "directory-zephyr.utils-Release-7ade002a36c1c51905ac.json",
+					"jsonFile" : "directory-zephyr.utils-MinSizeRel-7ade002a36c1c51905ac.json",
 					"minimumCMakeVersion" : 
 					{
 						"string" : "3.5"
@@ -215,7 +215,7 @@
 						15
 					],
 					"hasInstallRule" : true,
-					"jsonFile" : "directory-tests-Release-b01f6abb0ab61427ef3b.json",
+					"jsonFile" : "directory-tests-MinSizeRel-b01f6abb0ab61427ef3b.json",
 					"minimumCMakeVersion" : 
 					{
 						"string" : "3.5"
@@ -227,7 +227,7 @@
 				{
 					"build" : "tests/amr",
 					"hasInstallRule" : true,
-					"jsonFile" : "directory-tests.amr-Release-cb80558313b17131144c.json",
+					"jsonFile" : "directory-tests.amr-MinSizeRel-cb80558313b17131144c.json",
 					"minimumCMakeVersion" : 
 					{
 						"string" : "3.5"
@@ -244,7 +244,7 @@
 				{
 					"build" : "problems",
 					"hasInstallRule" : true,
-					"jsonFile" : "directory-problems-Release-6d3e9687ba40e95a2006.json",
+					"jsonFile" : "directory-problems-MinSizeRel-6d3e9687ba40e95a2006.json",
 					"minimumCMakeVersion" : 
 					{
 						"string" : "3.5"
@@ -261,7 +261,7 @@
 					]
 				}
 			],
-			"name" : "Release",
+			"name" : "MinSizeRel",
 			"projects" : 
 			[
 				{
@@ -303,49 +303,49 @@
 				{
 					"directoryIndex" : 16,
 					"id" : "convection::@04f2f078ac7934f04213",
-					"jsonFile" : "target-convection-Release-47434f597438a694f2ae.json",
+					"jsonFile" : "target-convection-MinSizeRel-6eb85ba79c86fa04b785.json",
 					"name" : "convection",
 					"projectIndex" : 0
 				},
 				{
 					"directoryIndex" : 15,
 					"id" : "dense::@e0c9e5b294ee09a040e4",
-					"jsonFile" : "target-dense-Release-00a7fd1c7f2def5ff4a4.json",
+					"jsonFile" : "target-dense-MinSizeRel-59eb836bec9504ae9e0c.json",
 					"name" : "dense",
 					"projectIndex" : 0
 				},
 				{
 					"directoryIndex" : 15,
 					"id" : "gradient::@e0c9e5b294ee09a040e4",
-					"jsonFile" : "target-gradient-Release-5b1433e0f6e52e263c5c.json",
+					"jsonFile" : "target-gradient-MinSizeRel-bfa0d6453ba1a4fc9cbe.json",
 					"name" : "gradient",
 					"projectIndex" : 0
 				},
 				{
 					"directoryIndex" : 16,
 					"id" : "r_tester::@04f2f078ac7934f04213",
-					"jsonFile" : "target-r_tester-Release-09441171c404d9c4b059.json",
+					"jsonFile" : "target-r_tester-MinSizeRel-776ce120b79857a4742c.json",
 					"name" : "r_tester",
 					"projectIndex" : 0
 				},
 				{
 					"directoryIndex" : 16,
 					"id" : "riemann::@04f2f078ac7934f04213",
-					"jsonFile" : "target-riemann-Release-9ee2d6bf3c73de24502d.json",
+					"jsonFile" : "target-riemann-MinSizeRel-62ea9ab35d46fa7443de.json",
 					"name" : "riemann",
 					"projectIndex" : 0
 				},
 				{
 					"directoryIndex" : 16,
 					"id" : "shu-osher::@04f2f078ac7934f04213",
-					"jsonFile" : "target-shu-osher-Release-aa3491e853f6b18707b3.json",
+					"jsonFile" : "target-shu-osher-MinSizeRel-38c285119ab2fc2eeb82.json",
 					"name" : "shu-osher",
 					"projectIndex" : 0
 				},
 				{
 					"directoryIndex" : 0,
 					"id" : "zephyr::@6890427a1f51a3e7e1df",
-					"jsonFile" : "target-zephyr-Release-75e985e5ef88570f08d0.json",
+					"jsonFile" : "target-zephyr-MinSizeRel-c49915a85ec37ac78712.json",
 					"name" : "zephyr",
 					"projectIndex" : 0
 				}

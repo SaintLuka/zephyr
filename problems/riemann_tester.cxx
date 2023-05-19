@@ -245,7 +245,7 @@ int main() {
     SodTest sod_test;
     ToroTest toro_test(2);
 
-    std::vector<NumFlux::Ptr> nfs(3);
+    std::vector<NumFlux::Ptr> nfs(1);
     //nfs[0] = HLLC::create();
     //nfs[1] = Godunov::create();
     //nfs[2] = CIR1::create();

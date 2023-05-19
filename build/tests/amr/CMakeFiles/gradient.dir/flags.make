@@ -6,5 +6,5 @@ CXX_DEFINES = -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_
 
 CXX_INCLUDES = -I/home/user1/zephyr/tests/amr/zephyr -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build
 
-CXX_FLAGS = -Wno-attributes -Wno-unused-result -O3 -std=gnu++14
+CXX_FLAGS = -Os -DNDEBUG -std=gnu++14
 

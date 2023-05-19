@@ -56,7 +56,7 @@
 			"compileCommandFragments" : 
 			[
 				{
-					"fragment" : "-Wno-attributes -Wno-unused-result -O3 -fPIC"
+					"fragment" : "-Os -DNDEBUG -fPIC"
 				},
 				{
 					"fragment" : "-std=gnu++14"

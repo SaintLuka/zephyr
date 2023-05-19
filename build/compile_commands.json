@@ -1,267 +1,267 @@
 [
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/geom/cell.cxx.o -c /home/user1/zephyr/zephyr/geom/cell.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/geom/cell.cxx.o -c /home/user1/zephyr/zephyr/geom/cell.cxx",
   "file": "/home/user1/zephyr/zephyr/geom/cell.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/geom/cell_check.cxx.o -c /home/user1/zephyr/zephyr/geom/cell_check.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/geom/cell_check.cxx.o -c /home/user1/zephyr/zephyr/geom/cell_check.cxx",
   "file": "/home/user1/zephyr/zephyr/geom/cell_check.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/geom/box.cxx.o -c /home/user1/zephyr/zephyr/geom/box.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/geom/box.cxx.o -c /home/user1/zephyr/zephyr/geom/box.cxx",
   "file": "/home/user1/zephyr/zephyr/geom/box.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/geom/geom.cxx.o -c /home/user1/zephyr/zephyr/geom/geom.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/geom/geom.cxx.o -c /home/user1/zephyr/zephyr/geom/geom.cxx",
   "file": "/home/user1/zephyr/zephyr/geom/geom.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/geom/maps.cxx.o -c /home/user1/zephyr/zephyr/geom/maps.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/geom/maps.cxx.o -c /home/user1/zephyr/zephyr/geom/maps.cxx",
   "file": "/home/user1/zephyr/zephyr/geom/maps.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/io/vtk_type.cxx.o -c /home/user1/zephyr/zephyr/io/vtk_type.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/io/vtk_type.cxx.o -c /home/user1/zephyr/zephyr/io/vtk_type.cxx",
   "file": "/home/user1/zephyr/zephyr/io/vtk_type.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/io/variable.cxx.o -c /home/user1/zephyr/zephyr/io/variable.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/io/variable.cxx.o -c /home/user1/zephyr/zephyr/io/variable.cxx",
   "file": "/home/user1/zephyr/zephyr/io/variable.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/io/variables.cxx.o -c /home/user1/zephyr/zephyr/io/variables.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/io/variables.cxx.o -c /home/user1/zephyr/zephyr/io/variables.cxx",
   "file": "/home/user1/zephyr/zephyr/io/variables.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/io/vtu_file.cxx.o -c /home/user1/zephyr/zephyr/io/vtu_file.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/io/vtu_file.cxx.o -c /home/user1/zephyr/zephyr/io/vtu_file.cxx",
   "file": "/home/user1/zephyr/zephyr/io/vtu_file.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/io/pvd_file.cxx.o -c /home/user1/zephyr/zephyr/io/pvd_file.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/io/pvd_file.cxx.o -c /home/user1/zephyr/zephyr/io/pvd_file.cxx",
   "file": "/home/user1/zephyr/zephyr/io/pvd_file.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/generator/generator.cxx.o -c /home/user1/zephyr/zephyr/mesh/generator/generator.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/generator/generator.cxx.o -c /home/user1/zephyr/zephyr/mesh/generator/generator.cxx",
   "file": "/home/user1/zephyr/zephyr/mesh/generator/generator.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/generator/cuboid.cxx.o -c /home/user1/zephyr/zephyr/mesh/generator/cuboid.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/generator/cuboid.cxx.o -c /home/user1/zephyr/zephyr/mesh/generator/cuboid.cxx",
   "file": "/home/user1/zephyr/zephyr/mesh/generator/cuboid.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/generator/sector.cxx.o -c /home/user1/zephyr/zephyr/mesh/generator/sector.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/generator/sector.cxx.o -c /home/user1/zephyr/zephyr/mesh/generator/sector.cxx",
   "file": "/home/user1/zephyr/zephyr/mesh/generator/sector.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/generator/rectangle.cxx.o -c /home/user1/zephyr/zephyr/mesh/generator/rectangle.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/generator/rectangle.cxx.o -c /home/user1/zephyr/zephyr/mesh/generator/rectangle.cxx",
   "file": "/home/user1/zephyr/zephyr/mesh/generator/rectangle.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/generator/curve/curve.cxx.o -c /home/user1/zephyr/zephyr/mesh/generator/curve/curve.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/generator/curve/curve.cxx.o -c /home/user1/zephyr/zephyr/mesh/generator/curve/curve.cxx",
   "file": "/home/user1/zephyr/zephyr/mesh/generator/curve/curve.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/generator/curve/line.cxx.o -c /home/user1/zephyr/zephyr/mesh/generator/curve/line.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/generator/curve/line.cxx.o -c /home/user1/zephyr/zephyr/mesh/generator/curve/line.cxx",
   "file": "/home/user1/zephyr/zephyr/mesh/generator/curve/line.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/generator/curve/circle.cxx.o -c /home/user1/zephyr/zephyr/mesh/generator/curve/circle.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/generator/curve/circle.cxx.o -c /home/user1/zephyr/zephyr/mesh/generator/curve/circle.cxx",
   "file": "/home/user1/zephyr/zephyr/mesh/generator/curve/circle.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/generator/curve/cubic.cxx.o -c /home/user1/zephyr/zephyr/mesh/generator/curve/cubic.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/generator/curve/cubic.cxx.o -c /home/user1/zephyr/zephyr/mesh/generator/curve/cubic.cxx",
   "file": "/home/user1/zephyr/zephyr/mesh/generator/curve/cubic.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/generator/vertex.cxx.o -c /home/user1/zephyr/zephyr/mesh/generator/vertex.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/generator/vertex.cxx.o -c /home/user1/zephyr/zephyr/mesh/generator/vertex.cxx",
   "file": "/home/user1/zephyr/zephyr/mesh/generator/vertex.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/generator/block.cxx.o -c /home/user1/zephyr/zephyr/mesh/generator/block.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/generator/block.cxx.o -c /home/user1/zephyr/zephyr/mesh/generator/block.cxx",
   "file": "/home/user1/zephyr/zephyr/mesh/generator/block.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/generator/block_structured.cxx.o -c /home/user1/zephyr/zephyr/mesh/generator/block_structured.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/generator/block_structured.cxx.o -c /home/user1/zephyr/zephyr/mesh/generator/block_structured.cxx",
   "file": "/home/user1/zephyr/zephyr/mesh/generator/block_structured.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/generator/collection/plane_with_hole.cxx.o -c /home/user1/zephyr/zephyr/mesh/generator/collection/plane_with_hole.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/generator/collection/plane_with_hole.cxx.o -c /home/user1/zephyr/zephyr/mesh/generator/collection/plane_with_hole.cxx",
   "file": "/home/user1/zephyr/zephyr/mesh/generator/collection/plane_with_hole.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/mesh.cxx.o -c /home/user1/zephyr/zephyr/mesh/mesh.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/mesh.cxx.o -c /home/user1/zephyr/zephyr/mesh/mesh.cxx",
   "file": "/home/user1/zephyr/zephyr/mesh/mesh.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/mesh_check.cxx.o -c /home/user1/zephyr/zephyr/mesh/mesh_check.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/mesh_check.cxx.o -c /home/user1/zephyr/zephyr/mesh/mesh_check.cxx",
   "file": "/home/user1/zephyr/zephyr/mesh/mesh_check.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/mesh_refine.cxx.o -c /home/user1/zephyr/zephyr/mesh/mesh_refine.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/mesh_refine.cxx.o -c /home/user1/zephyr/zephyr/mesh/mesh_refine.cxx",
   "file": "/home/user1/zephyr/zephyr/mesh/mesh_refine.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/distributor.cxx.o -c /home/user1/zephyr/zephyr/mesh/distributor.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/distributor.cxx.o -c /home/user1/zephyr/zephyr/mesh/distributor.cxx",
   "file": "/home/user1/zephyr/zephyr/mesh/distributor.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/storage.cxx.o -c /home/user1/zephyr/zephyr/mesh/storage.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/storage.cxx.o -c /home/user1/zephyr/zephyr/mesh/storage.cxx",
   "file": "/home/user1/zephyr/zephyr/mesh/storage.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/face.cxx.o -c /home/user1/zephyr/zephyr/mesh/face.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/face.cxx.o -c /home/user1/zephyr/zephyr/mesh/face.cxx",
   "file": "/home/user1/zephyr/zephyr/mesh/face.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/cell.cxx.o -c /home/user1/zephyr/zephyr/mesh/cell.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/cell.cxx.o -c /home/user1/zephyr/zephyr/mesh/cell.cxx",
   "file": "/home/user1/zephyr/zephyr/mesh/cell.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/range.cxx.o -c /home/user1/zephyr/zephyr/mesh/range.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/mesh/range.cxx.o -c /home/user1/zephyr/zephyr/mesh/range.cxx",
   "file": "/home/user1/zephyr/zephyr/mesh/range.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/math/cfd/flux/cir.cpp.o -c /home/user1/zephyr/zephyr/math/cfd/flux/cir.cpp",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/math/cfd/flux/cir.cpp.o -c /home/user1/zephyr/zephyr/math/cfd/flux/cir.cpp",
   "file": "/home/user1/zephyr/zephyr/math/cfd/flux/cir.cpp"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/math/cfd/flux/rusanov.cpp.o -c /home/user1/zephyr/zephyr/math/cfd/flux/rusanov.cpp",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/math/cfd/flux/rusanov.cpp.o -c /home/user1/zephyr/zephyr/math/cfd/flux/rusanov.cpp",
   "file": "/home/user1/zephyr/zephyr/math/cfd/flux/rusanov.cpp"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/math/cfd/flux/godunov.cpp.o -c /home/user1/zephyr/zephyr/math/cfd/flux/godunov.cpp",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/math/cfd/flux/godunov.cpp.o -c /home/user1/zephyr/zephyr/math/cfd/flux/godunov.cpp",
   "file": "/home/user1/zephyr/zephyr/math/cfd/flux/godunov.cpp"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/math/cfd/flux/hllc.cpp.o -c /home/user1/zephyr/zephyr/math/cfd/flux/hllc.cpp",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/math/cfd/flux/hllc.cpp.o -c /home/user1/zephyr/zephyr/math/cfd/flux/hllc.cpp",
   "file": "/home/user1/zephyr/zephyr/math/cfd/flux/hllc.cpp"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/math/cfd/flux/hll.cpp.o -c /home/user1/zephyr/zephyr/math/cfd/flux/hll.cpp",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/math/cfd/flux/hll.cpp.o -c /home/user1/zephyr/zephyr/math/cfd/flux/hll.cpp",
   "file": "/home/user1/zephyr/zephyr/math/cfd/flux/hll.cpp"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/math/cfd/models.cpp.o -c /home/user1/zephyr/zephyr/math/cfd/models.cpp",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/math/cfd/models.cpp.o -c /home/user1/zephyr/zephyr/math/cfd/models.cpp",
   "file": "/home/user1/zephyr/zephyr/math/cfd/models.cpp"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/math/cfd/rotate.cpp.o -c /home/user1/zephyr/zephyr/math/cfd/rotate.cpp",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/math/cfd/rotate.cpp.o -c /home/user1/zephyr/zephyr/math/cfd/rotate.cpp",
   "file": "/home/user1/zephyr/zephyr/math/cfd/rotate.cpp"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/math/cfd/limiter.cxx.o -c /home/user1/zephyr/zephyr/math/cfd/limiter.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/math/cfd/limiter.cxx.o -c /home/user1/zephyr/zephyr/math/cfd/limiter.cxx",
   "file": "/home/user1/zephyr/zephyr/math/cfd/limiter.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/math/solver/convection.cxx.o -c /home/user1/zephyr/zephyr/math/solver/convection.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/math/solver/convection.cxx.o -c /home/user1/zephyr/zephyr/math/solver/convection.cxx",
   "file": "/home/user1/zephyr/zephyr/math/solver/convection.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/math/solver/riemann.cpp.o -c /home/user1/zephyr/zephyr/math/solver/riemann.cpp",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/math/solver/riemann.cpp.o -c /home/user1/zephyr/zephyr/math/solver/riemann.cpp",
   "file": "/home/user1/zephyr/zephyr/math/solver/riemann.cpp"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/phys/eos/eos.cpp.o -c /home/user1/zephyr/zephyr/phys/eos/eos.cpp",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/phys/eos/eos.cpp.o -c /home/user1/zephyr/zephyr/phys/eos/eos.cpp",
   "file": "/home/user1/zephyr/zephyr/phys/eos/eos.cpp"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/phys/eos/ideal_gas.cpp.o -c /home/user1/zephyr/zephyr/phys/eos/ideal_gas.cpp",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/phys/eos/ideal_gas.cpp.o -c /home/user1/zephyr/zephyr/phys/eos/ideal_gas.cpp",
   "file": "/home/user1/zephyr/zephyr/phys/eos/ideal_gas.cpp"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/phys/eos/stiffened_gas.cpp.o -c /home/user1/zephyr/zephyr/phys/eos/stiffened_gas.cpp",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/phys/eos/stiffened_gas.cpp.o -c /home/user1/zephyr/zephyr/phys/eos/stiffened_gas.cpp",
   "file": "/home/user1/zephyr/zephyr/phys/eos/stiffened_gas.cpp"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/phys/tests/toro.cxx.o -c /home/user1/zephyr/zephyr/phys/tests/toro.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/phys/tests/toro.cxx.o -c /home/user1/zephyr/zephyr/phys/tests/toro.cxx",
   "file": "/home/user1/zephyr/zephyr/phys/tests/toro.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/utils/mpi.cxx.o -c /home/user1/zephyr/zephyr/utils/mpi.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/utils/mpi.cxx.o -c /home/user1/zephyr/zephyr/utils/mpi.cxx",
   "file": "/home/user1/zephyr/zephyr/utils/mpi.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/utils/threads.cxx.o -c /home/user1/zephyr/zephyr/utils/threads.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/utils/threads.cxx.o -c /home/user1/zephyr/zephyr/utils/threads.cxx",
   "file": "/home/user1/zephyr/zephyr/utils/threads.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/utils/stopwatch.cxx.o -c /home/user1/zephyr/zephyr/utils/stopwatch.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -Dzephyr_EXPORTS -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -fPIC -std=gnu++14 -o CMakeFiles/zephyr.dir/zephyr/utils/stopwatch.cxx.o -c /home/user1/zephyr/zephyr/utils/stopwatch.cxx",
   "file": "/home/user1/zephyr/zephyr/utils/stopwatch.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build/tests/amr",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -I/home/user1/zephyr/tests/amr/zephyr -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -std=gnu++14 -o CMakeFiles/gradient.dir/gradient.cxx.o -c /home/user1/zephyr/tests/amr/gradient.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -I/home/user1/zephyr/tests/amr/zephyr -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -std=gnu++14 -o CMakeFiles/gradient.dir/gradient.cxx.o -c /home/user1/zephyr/tests/amr/gradient.cxx",
   "file": "/home/user1/zephyr/tests/amr/gradient.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build/tests/amr",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -I/home/user1/zephyr/tests/amr/zephyr -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -std=gnu++14 -o CMakeFiles/dense.dir/dense.cxx.o -c /home/user1/zephyr/tests/amr/dense.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -I/home/user1/zephyr/tests/amr/zephyr -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -std=gnu++14 -o CMakeFiles/dense.dir/dense.cxx.o -c /home/user1/zephyr/tests/amr/dense.cxx",
   "file": "/home/user1/zephyr/tests/amr/dense.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build/problems",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -I/home/user1/zephyr/problems/zephyr -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -std=gnu++14 -o CMakeFiles/convection.dir/convection.cxx.o -c /home/user1/zephyr/problems/convection.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -I/home/user1/zephyr/problems/zephyr -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -std=gnu++14 -o CMakeFiles/convection.dir/convection.cxx.o -c /home/user1/zephyr/problems/convection.cxx",
   "file": "/home/user1/zephyr/problems/convection.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build/problems",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -I/home/user1/zephyr/problems/zephyr -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -std=gnu++14 -o CMakeFiles/riemann.dir/riemann.cxx.o -c /home/user1/zephyr/problems/riemann.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -I/home/user1/zephyr/problems/zephyr -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -std=gnu++14 -o CMakeFiles/riemann.dir/riemann.cxx.o -c /home/user1/zephyr/problems/riemann.cxx",
   "file": "/home/user1/zephyr/problems/riemann.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build/problems",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -I/home/user1/zephyr/problems/zephyr -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -std=gnu++14 -o CMakeFiles/shu-osher.dir/shu_osher.cxx.o -c /home/user1/zephyr/problems/shu_osher.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -I/home/user1/zephyr/problems/zephyr -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -std=gnu++14 -o CMakeFiles/shu-osher.dir/shu_osher.cxx.o -c /home/user1/zephyr/problems/shu_osher.cxx",
   "file": "/home/user1/zephyr/problems/shu_osher.cxx"
 },
 {
   "directory": "/home/user1/zephyr/build/problems",
-  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -I/home/user1/zephyr/problems/zephyr -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Wno-attributes -Wno-unused-result -O3 -std=gnu++14 -o CMakeFiles/r_tester.dir/riemann_tester.cxx.o -c /home/user1/zephyr/problems/riemann_tester.cxx",
+  "command": "/usr/bin/g++ -DBOOST_ALL_NO_LIB -DBOOST_FILESYSTEM_DYN_LINK -DBOOST_SYSTEM_DYN_LINK -I/home/user1/zephyr/problems/zephyr -I/home/user1/zephyr -I/home/user1/zephyr/libs -I/home/user1/zephyr/build -Os -DNDEBUG -std=gnu++14 -o CMakeFiles/r_tester.dir/riemann_tester.cxx.o -c /home/user1/zephyr/problems/riemann_tester.cxx",
   "file": "/home/user1/zephyr/problems/riemann_tester.cxx"
 }
 ]
