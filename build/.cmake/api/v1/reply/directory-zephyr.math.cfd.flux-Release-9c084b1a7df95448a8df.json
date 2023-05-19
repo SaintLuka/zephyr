@@ -1,0 +1,48 @@
+{
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"install"
+		],
+		"files" : 
+		[
+			"zephyr/math/cfd/flux/CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 9,
+				"parent" : 0
+			}
+		]
+	},
+	"installers" : 
+	[
+		{
+			"backtrace" : 1,
+			"component" : "Unspecified",
+			"destination" : "include/zephyr/math/cfd/fluxes",
+			"paths" : 
+			[
+				"zephyr/math/cfd/flux/num_flux.h",
+				"zephyr/math/cfd/flux/cir.h",
+				"zephyr/math/cfd/flux/rusanov.h",
+				"zephyr/math/cfd/flux/godunov.h",
+				"zephyr/math/cfd/flux/hllc.h",
+				"zephyr/math/cfd/flux/hll.h"
+			],
+			"type" : "file"
+		}
+	],
+	"paths" : 
+	{
+		"build" : "zephyr/math/cfd/flux",
+		"source" : "zephyr/math/cfd/flux"
+	}
+}

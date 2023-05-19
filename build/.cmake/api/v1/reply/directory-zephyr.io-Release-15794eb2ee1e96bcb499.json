@@ -1,0 +1,48 @@
+{
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"install"
+		],
+		"files" : 
+		[
+			"zephyr/io/CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 10,
+				"parent" : 0
+			}
+		]
+	},
+	"installers" : 
+	[
+		{
+			"backtrace" : 1,
+			"component" : "Unspecified",
+			"destination" : "include/zephyr/io",
+			"paths" : 
+			[
+				"zephyr/io/vtk_type.h",
+				"zephyr/io/filter.h",
+				"zephyr/io/variable.h",
+				"zephyr/io/variables.h",
+				"zephyr/io/vtu_file.h",
+				"zephyr/io/pvd_file.h"
+			],
+			"type" : "file"
+		}
+	],
+	"paths" : 
+	{
+		"build" : "zephyr/io",
+		"source" : "zephyr/io"
+	}
+}

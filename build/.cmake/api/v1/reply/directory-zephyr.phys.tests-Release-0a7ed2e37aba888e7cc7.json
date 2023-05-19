@@ -1,0 +1,46 @@
+{
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"install"
+		],
+		"files" : 
+		[
+			"zephyr/phys/tests/CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 5,
+				"parent" : 0
+			}
+		]
+	},
+	"installers" : 
+	[
+		{
+			"backtrace" : 1,
+			"component" : "Unspecified",
+			"destination" : "include/zephyr/phys/tests",
+			"paths" : 
+			[
+				"zephyr/phys/tests/shu_osher.h",
+				"zephyr/phys/tests/sod.h",
+				"zephyr/phys/tests/toro.h",
+				"zephyr/phys/tests/classic_test.h"
+			],
+			"type" : "file"
+		}
+	],
+	"paths" : 
+	{
+		"build" : "zephyr/phys/tests",
+		"source" : "zephyr/phys/tests"
+	}
+}

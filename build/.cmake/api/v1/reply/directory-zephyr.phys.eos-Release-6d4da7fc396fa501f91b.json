@@ -1,0 +1,46 @@
+{
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"install"
+		],
+		"files" : 
+		[
+			"zephyr/phys/eos/CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 7,
+				"parent" : 0
+			}
+		]
+	},
+	"installers" : 
+	[
+		{
+			"backtrace" : 1,
+			"component" : "Unspecified",
+			"destination" : "include/zephyr/phys/eos",
+			"paths" : 
+			[
+				"zephyr/phys/eos/eos.h",
+				"zephyr/phys/eos/ideal_gas.h",
+				"zephyr/phys/eos/stiffened_gas.h",
+				"zephyr/phys/eos/types.h"
+			],
+			"type" : "file"
+		}
+	],
+	"paths" : 
+	{
+		"build" : "zephyr/phys/eos",
+		"source" : "zephyr/phys/eos"
+	}
+}

@@ -246,9 +246,10 @@ int main() {
     ToroTest toro_test(2);
 
     std::vector<NumFlux::Ptr> nfs(3);
-    nfs[0] = HLLC::create();
-    nfs[1] = Godunov::create();
-    nfs[2] = CIR1::create();
+    //nfs[0] = HLLC::create();
+    //nfs[1] = Godunov::create();
+    //nfs[2] = CIR1::create();
+    nfs[0] = HLL::create();
 
     std::vector<std::vector<double>> sod_errors(nfs.size(), std::vector<double>(5));
     for (int i = 0; i < nfs.size(); ++i)

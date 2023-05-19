@@ -1,0 +1,1 @@
+/usr/bin/g++ -Wno-attributes -Wno-unused-result -O3 CMakeFiles/shu-osher.dir/shu_osher.cxx.o -o shu-osher  -Wl,-rpath,/home/user1/zephyr/build: ../libzephyr.so /usr/lib/x86_64-linux-gnu/libboost_system.so.1.74.0 /usr/lib/x86_64-linux-gnu/libboost_filesystem.so.1.74.0 
