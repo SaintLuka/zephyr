@@ -21,7 +21,7 @@ inline bool is_big_endian() {
     return bint.c[0] == 1;
 }
 
-size_t count_cells(Storage &cells, const Filter &filter) {
+inline size_t count_cells(Storage &cells, const Filter &filter) {
     if (filter.is_trivial()) {
         return cells.size();
     }

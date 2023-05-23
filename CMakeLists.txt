@@ -86,4 +86,6 @@ if (ZEPHYR_ENABLE_PROBLEMS)
     add_subdirectory(problems)
 endif()
 
+add_subdirectory(python)
+
 #target_link_libraries(zephyr ${CMAKE_SOURCE_DIR}/cmake-build-debug/libzephyr.dll)

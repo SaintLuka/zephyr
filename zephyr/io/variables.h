@@ -121,6 +121,9 @@ public:
 
     /// @brief Доступ к переменной в списке по индексу
     const Variable &operator[](int i) const;
+    
+    /// @brief Количество переменных
+    size_t size() const;
 
     /// @brief Доступ ко всему списку переменных
     const std::vector<Variable> &list() const;
