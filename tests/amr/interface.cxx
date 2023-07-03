@@ -72,7 +72,7 @@ int calc_bit(ICell& cell) {
 }
 
 int solution_step(Mesh& mesh, double t = 0.0) {
-    for (auto& cell: mesh.cells()) {
+    for (auto& cell: mesh) {
         if (cell(U).bit > 0) {
             cell.set_flag(1);
         }
@@ -83,10 +83,10 @@ int solution_step(Mesh& mesh, double t = 0.0) {
 
     mesh.refine();
 
-    for (auto cell: mesh.cells()) {
+    for (auto cell: mesh) {
         cell(U).idx = calc_idx(cell, t);
     }
-    for (auto cell: mesh.cells()) {
+    for (auto cell: mesh) {
         cell(U).bit = calc_bit(cell);
     }
 

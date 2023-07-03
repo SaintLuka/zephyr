@@ -3,6 +3,9 @@
 #include <iostream>
 #include <iomanip>
 
+#include <zephyr/utils/threads.h>
+#include <zephyr/utils/stopwatch.h>
+
 #include <zephyr/geom/face.h>
 #include <zephyr/geom/vector.h>
 
@@ -22,5 +25,8 @@ using zephyr::mesh::ICell;
 using zephyr::geom::FaceFlag;
 using zephyr::geom::Vector3d;
 using zephyr::geom::Matrix3d;
+
+using zephyr::utils::threads;
+using zephyr::utils::Stopwatch;
 
 using namespace zephyr::io;

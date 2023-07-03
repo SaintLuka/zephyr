@@ -47,6 +47,19 @@ public:
         return *this;
     }
 
+    /// @brief Следующая ячейка
+    ICell &operator+=(int step) final {
+        m_ptr += step * m_itemsize;
+        return *this;
+    }
+
+    /// @brief Следующая ячейка
+    ICell operator+(int step) {
+        ICell res(*this);
+        res += step;
+        return res;
+    }
+
     /// @brief Массив граней
     IFaces faces() const;
 

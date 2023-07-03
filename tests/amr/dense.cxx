@@ -84,11 +84,11 @@ struct Star {
 };
 
 int solution_step(Mesh& mesh, Star& star) {
-    for (auto cell: mesh.cells()) {
+    for (auto cell: mesh) {
         cell(U).bit = star.is_inside(cell.center());
     }
 
-    for (auto& cell: mesh.cells()) {
+    for (auto& cell: mesh) {
         if (cell(U).bit > 0) {
             cell.set_flag(1);
         }

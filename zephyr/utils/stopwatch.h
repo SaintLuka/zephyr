@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <sstream>
 #include <chrono>
 
 namespace zephyr { namespace utils {

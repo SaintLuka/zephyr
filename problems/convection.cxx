@@ -34,7 +34,7 @@ const double margin = 0.0198;
 void setup_initial_1(Mesh& mesh, double D) {
     double R = D / 2.0;
     Vector3d vc = {R + margin, R + margin, 0.0};
-    for (auto cell: mesh.cells()) {
+    for (auto cell: mesh) {
         cell(U).u1 = (cell.center() - vc).norm() < R ? 1.0 : 0.0;
         cell(U).u2 = 0.0;
     }
@@ -47,7 +47,7 @@ void setup_initial_2(Mesh& mesh, double D) {
     double y_min = margin;
     double y_max = D + y_min;
 
-    for (auto cell: mesh.cells()) {
+    for (auto cell: mesh) {
         Vector3d vc = cell.center();
         if (x_min <= vc.x() && vc.x() <= x_max &&
             y_min <= vc.y() && vc.y() <= y_max) {
@@ -111,7 +111,7 @@ int main() {
         if (curr_time >= next_write) {
             std::cout << "\tШаг: " << std::setw(6) << n_step << ";"
                       << "\tВремя: " << std::setw(6) << std::setprecision(3) << curr_time << "\n";
-            pvd.save(mesh.cells(), curr_time);
+            pvd.save(mesh.locals(), curr_time);
             next_write += 0.02;
         }
 

@@ -12,7 +12,7 @@ public:
 
     template <class ...Args>
     inline static std::unique_ptr<Godunov> create(Args&&... args) {
-        return std::make_unique<Godunov>(std::forward<Args>(args)...);
+        return std::unique_ptr<Godunov>(new Godunov(std::forward<Args>(args)...));
     }
 
     std::string get_name() const override { return "Godunov"; }

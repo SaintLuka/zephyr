@@ -41,7 +41,7 @@ int solution_step(Mesh& mesh) {
     const double p_retain = 0.18;
     const double p_refine = 0.02;
 
-    for (auto& cell: mesh.cells()) {
+    for (auto& cell: mesh) {
         double p = rand() / double(RAND_MAX);
 
         if (p < p_coarse) {

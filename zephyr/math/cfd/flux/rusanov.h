@@ -14,7 +14,7 @@ public:
 
     template<class ...Args>
     inline static std::unique_ptr<Rusanov> create(Args &&... args) {
-        return std::make_unique<Rusanov>(std::forward<Args>(args)...);
+        return std::unique_ptr<Rusanov>(new Rusanov(std::forward<Args>(args)...));
     }
 
     std::string get_name() const override {return "Rusanov"; }
@@ -33,7 +33,7 @@ public:
 
     template<class ...Args>
     inline static std::unique_ptr<Rusanov2> create(Args &&... args) {
-        return std::make_unique<Rusanov2>(std::forward<Args>(args)...);
+        return std::unique_ptr<Rusanov2>(new Rusanov2(std::forward<Args>(args)...));
     }
 
     std::string get_name() const override {return "Rusanov2"; }

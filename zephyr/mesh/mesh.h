@@ -5,31 +5,35 @@
 #include <zephyr/mesh/distributor.h>
 
 #include <zephyr/mesh/range.h>
+#include <zephyr/utils/threads.h>
 
 
 namespace zephyr { namespace mesh {
 
+#define EXEC_RESULT typename std::result_of<F(ICell)>::type
+
 using namespace generator;
+using zephyr::utils::threads;
 
 class Mesh {
 public:
 
-    template <class T>
-    Mesh(const T& val, Generator* gen)
+    template<class T>
+    Mesh(const T &val, Generator *gen)
             : m_locals(val), m_aliens(val) {
         initialize(gen);
     }
 
 
-    Range cells() {
-        return { m_locals, m_aliens, 0, m_locals.size() };
-    }
+    ICell begin() { return {m_locals, m_aliens, 0}; }
 
-    operator Storage&() { return m_locals; }
+    ICell end() { return {m_locals, m_aliens, m_locals.size()}; }
 
-    Storage& locals() { return m_locals; }
+    operator Storage &() { return m_locals; }
 
-    Storage& aliens() { return m_aliens; }
+    Storage &locals() { return m_locals; }
+
+    Storage &aliens() { return m_aliens; }
 
 
     /// @brief Проверить базовую сетку после создания.
@@ -53,8 +57,27 @@ public:
     /// с флагами amr.flag ячеек.
     void refine();
 
+    template<int n_tasks_per_thread = 1, class Func>
+    void for_each(Func &&func) {
+        threads::for_each<n_tasks_per_thread>(begin(), end(), std::forward<Func>(func));
+    }
+
+    template<int n_tasks_per_thread = 1, class Func,
+            class Value = typename std::result_of<Func(ICell)>::type>
+    auto min(const Value &init, Func &&func)
+    -> typename std::enable_if<!std::is_void<Value>::value, Value>::type {
+        return threads::min<n_tasks_per_thread>(begin(), end(), init, std::forward<Func>(func));
+    }
+
+    template<int n_tasks_per_thread = 1, class Func,
+            class Value = typename std::result_of<Func(ICell)>::type>
+    auto min(Func &&func)
+    -> typename std::enable_if<std::is_arithmetic<Value>::value, Value>::type {
+        return threads::min<n_tasks_per_thread>(begin(), end(), std::forward<Func>(func));
+    }
+
 private:
-    void initialize(Generator* gen);
+    void initialize(Generator *gen);
 
     /// @brief Осуществляет инициализацию хранилища перед использованием
     /// функций адаптации, выполняется один раз после создания хранилища.

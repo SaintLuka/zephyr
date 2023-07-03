@@ -62,6 +62,11 @@ public:
 
         virtual Item &operator++() { m_ptr += m_itemsize; return *this; }
 
+        virtual Item &operator+=(int step) { m_ptr += step * m_itemsize; return *this; }
+
+        Item operator+(int step) { return Item(m_ptr += step * m_itemsize, m_itemsize); }
+
+
         bool operator<(const Item &it) const { return m_ptr < it.m_ptr; }
 
         bool operator>(const Item &it) const { return m_ptr > it.m_ptr; }

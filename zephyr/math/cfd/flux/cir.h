@@ -14,7 +14,7 @@ public:
 
     template<class ...Args>
     inline static std::unique_ptr<CIR1> create(Args &&... args) {
-        return std::make_unique<CIR1>(std::forward<Args>(args)...);
+        return std::unique_ptr<CIR1>(new CIR1(std::forward<Args>(args)...));
     }
 
     std::string get_name() const override {return "CIR1"; }
@@ -34,7 +34,7 @@ public:
 
     template<class ...Args>
     inline static std::unique_ptr<CIR2> create(Args &&... args) {
-        return std::make_unique<CIR2>(std::forward<Args>(args)...);
+        return std::unique_ptr<CIR2>(new CIR2(std::forward<Args>(args)...));
     }
 
     std::string get_name() const override {return "CIR2"; }

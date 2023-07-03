@@ -153,14 +153,14 @@ void Convection::fluxes(ICell &cell, int stage) {
 void Convection::update(Mesh &mesh) {
     // Определяем dt
     m_dt = std::numeric_limits<double>::max();
-    for (auto& cell: mesh.cells()) {
+    for (auto& cell: mesh) {
         m_dt = std::min(m_dt, compute_dt(cell));
     }
 
     if (m_accuracy < 2) {
         // Схема первого порядка, простой снос значений
         // на промежуточный слой
-        for (auto &cell: mesh.cells()) {
+        for (auto &cell: mesh) {
             cell(U).uh = cell(U).u1;
         }
     }
@@ -169,28 +169,28 @@ void Convection::update(Mesh &mesh) {
         // выполняем шаг предиктора
 
         // Считаем производные
-        for (auto &cell: mesh.cells()) {
+        for (auto &cell: mesh) {
             compute_grad(cell, 0);
         }
 
         // Шаг предиктора
-        for (auto cell: mesh.cells()) {
+        for (auto cell: mesh) {
             fluxes(cell, 0);
         }
 
         // Считаем производные
-        for (auto &cell: mesh.cells()) {
+        for (auto &cell: mesh) {
             compute_grad(cell, 1);
         }
     }
 
     // Шаг корректора
-    for (auto cell: mesh.cells()) {
+    for (auto cell: mesh) {
         fluxes(cell, 1);
     }
 
     // Обновляем слои
-    for (auto cell: mesh.cells()) {
+    for (auto cell: mesh) {
         cell(U).u1 = cell(U).u2;
         cell(U).uh = 0.0;
         cell(U).u2 = 0.0;
@@ -198,7 +198,7 @@ void Convection::update(Mesh &mesh) {
 }
 
 void Convection::set_flags(Mesh& mesh) {
-    for (auto cell: mesh.cells()) {
+    for (auto cell: mesh) {
         double min_val = cell(U).u1;
         double max_val = cell(U).u1;
 

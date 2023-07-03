@@ -1,6 +1,6 @@
 set(ZEPHYR_UTILS_SRC
         ${CMAKE_CURRENT_SOURCE_DIR}/mpi.cxx
-        ${CMAKE_CURRENT_SOURCE_DIR}/threads.cxx
+    ${CMAKE_CURRENT_SOURCE_DIR}/threads.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/stopwatch.cxx
         PARENT_SCOPE)
 

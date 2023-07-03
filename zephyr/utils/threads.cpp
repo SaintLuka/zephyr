@@ -3,9 +3,11 @@
 namespace zephyr { namespace utils {
 
 int threads::n_threads = 1;
+std::unique_ptr<ThreadPool> threads::pool = nullptr;
 
 void threads::on() {
     n_threads = int(std::thread::hardware_concurrency());
+    pool = std::unique_ptr<ThreadPool>(new ThreadPool(n_threads));
 }
 
 void threads::on(int count) {
@@ -14,12 +16,14 @@ void threads::on(int count) {
     }
     else {
         int HC = int(std::thread::hardware_concurrency());
-        n_threads = count < 2 * HC ? count : HC;
+        n_threads = count < HC ? count : HC;
     }
+    pool = std::unique_ptr<ThreadPool>(new ThreadPool(n_threads));
 }
 
 void threads::off() {
     n_threads = 1;
+    pool = nullptr;
 }
 
 bool threads::is_on() {
