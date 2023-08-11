@@ -36,6 +36,10 @@ public:
     /// @param adj Индекс смежности ячейки.
     ICell(Storage &locals, Storage &aliens, const Adjacent &adj);
 
+    /// @brief Для данной ячейки вернуть ячейку из local Storage
+    /// @param idx Индекс ячейки в локальном хранилище
+    ICell locals(int idx);
+
     /// @brief Разыменование итератора (для цикла for)
     ICell &operator*() final {
         return *this;
@@ -84,9 +88,11 @@ public:
     /// @brief Вывести полную информаци о ячейке и её соседях
     void print_neibs_info() const;
 
+
+
 private:
-    Storage &locals;  ///< Ссылка на хранилище текущего процесса
-    Storage &aliens;  ///< Ссылка на хранилище соседей
+    Storage &m_locals;  ///< Ссылка на хранилище текущего процесса
+    Storage &m_aliens;  ///< Ссылка на хранилище соседей
 };
 
 } // namespace mesh

@@ -33,38 +33,42 @@ Storage::Item safe_iterator(Storage &locals, Storage &aliens, const Adjacent &ad
 
 ICell::ICell(Storage &_locals, Storage &_aliens, int idx)
     : Storage::Item(safe_iterator(_locals, _aliens, idx)),
-      locals(_locals), aliens(_aliens) {
+      m_locals(_locals), m_aliens(_aliens) {
 
 }
 
 ICell::ICell(Storage &_locals, Storage &_aliens, const Adjacent &adj)
     : Storage::Item(safe_iterator(_locals, _aliens, adj)),
-      locals(_locals), aliens(_aliens) {
+      m_locals(_locals), m_aliens(_aliens) {
 
+}
+
+ICell ICell::locals(int idx) {
+    return { m_locals, m_aliens, idx };
 }
 
 ICell ICell::neib(const Face &face) const {
-    return { locals, aliens, face.adjacent };
+    return { m_locals, m_aliens, face.adjacent };
 }
 
 ICell ICell::neighbor(const Face &face) const {
-    return { locals, aliens, face.adjacent };
+    return { m_locals, m_aliens, face.adjacent };
 }
 
 ICell ICell::neib(const IFace &face) const {
-    return { locals, aliens, face.geom().adjacent };
+    return { m_locals, m_aliens, face.geom().adjacent };
 }
 
 ICell ICell::neighbor(const IFace &face) const {
-    return { locals, aliens, face.geom().adjacent };
+    return { m_locals, m_aliens, face.geom().adjacent };
 }
 
 ICell ICell::neib(int face_idx) const {
-    return { locals, aliens, geom().faces[face_idx].adjacent };
+    return { m_locals, m_aliens, geom().faces[face_idx].adjacent };
 }
 
 ICell ICell::neighbor(int face_idx) const {
-    return { locals, aliens, geom().faces[face_idx].adjacent };
+    return { m_locals, m_aliens, geom().faces[face_idx].adjacent };
 }
 
 IFaces ICell::faces() const {
@@ -83,21 +87,21 @@ void ICell::print_neibs_info() const {
 
         if (face.adjacent.ghost > std::numeric_limits<int>::max()) {
             // Локальная ячейка
-            if (face.adjacent.index >= locals.size()) {
+            if (face.adjacent.index >= m_locals.size()) {
                 std::cout << "print_cell_info: Wrong connection #1 (It's acceptable for some intermediate refinement stages)";
             }
             else {
-                auto neib = locals[face.adjacent.index];
+                auto neib = m_locals[face.adjacent.index];
                 neib.print_info();
             }
         }
         else {
             // Удаленная ячейка
-            if (face.adjacent.ghost >= aliens.size()) {
+            if (face.adjacent.ghost >= m_aliens.size()) {
                 std::cout << "print_cell_info: Wrong connection #2 (It's acceptable for some intermediate refinement stages)";
             }
             else {
-                auto neib = aliens[face.adjacent.ghost];
+                auto neib = m_aliens[face.adjacent.ghost];
                 neib.print_info();
             }
         }

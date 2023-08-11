@@ -154,7 +154,7 @@ public:
     static auto reduce(Iter begin, Iter end, const Value &init, Func &&func, Args &&... args)
     -> typename std::enable_if<!std::is_void<Value>::value, Value>::type;
 
-protected:
+public:
     /// @brief Число тредов
     static int n_threads;
 

@@ -42,7 +42,7 @@ std::array<Storage::Item, CpC(dim)> select_children(Storage& cells, int ic) {
     auto children = undefined_iterators<dim>(cells);
     children[0] = cells[ic];
     for (auto sib: sibs) {
-        scrutiny_check(sib < cells.size(), "CellsAround: Sibling index out of range")
+        scrutiny_check(sib < cells.size(), "Vicinity: Sibling index out of range")
 
         auto z_loc = cells[sib].z_idx() % CpC(dim);
         children[z_loc] = cells[sib];

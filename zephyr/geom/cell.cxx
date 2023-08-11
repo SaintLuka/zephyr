@@ -254,15 +254,15 @@ double Cell::volume() const {
 }
 
 void Cell::set_undefined() {
-    index = -1;
+    rank = -1;
 }
 
 bool Cell::is_actual() const {
-    return index >= 0;
+    return rank >= 0;
 }
 
 bool Cell::is_undefined() const {
-    return index < 0;
+    return rank < 0;
 }
 
 /*

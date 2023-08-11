@@ -57,9 +57,10 @@ public:
     /// с флагами amr.flag ячеек.
     void refine();
 
-    template<int n_tasks_per_thread = 1, class Func>
-    void for_each(Func &&func) {
-        threads::for_each<n_tasks_per_thread>(begin(), end(), std::forward<Func>(func));
+    template<int n_tasks_per_thread = 1, class Func, class... Args>
+    void for_each(Func &&func, Args&&... args) {
+        threads::for_each<n_tasks_per_thread>(begin(), end(),
+                std::forward<Func>(func), std::forward<Args>(args)...);
     }
 
     template<int n_tasks_per_thread = 1, class Func,

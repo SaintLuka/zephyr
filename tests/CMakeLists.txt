@@ -3,7 +3,7 @@ add_subdirectory(amr)
 set(MESHGEN   0)
 set(MPITEST   0)
 set(STOPWATCH 0)
-set(THREADS   1)
+set(THREADS   0)
 
 if (MESHGEN)
     message(STATUS "Build meshgen test")

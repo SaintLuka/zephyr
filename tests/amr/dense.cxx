@@ -103,6 +103,8 @@ int solution_step(Mesh& mesh, Star& star) {
 }
 
 int main() {
+    threads::on();
+
     PvdFile pvd("mesh", "output");
     pvd.variables = {"index", "level"};
     pvd.variables += { "bit", get_bit };

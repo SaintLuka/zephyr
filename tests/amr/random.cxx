@@ -61,6 +61,8 @@ int solution_step(Mesh& mesh) {
 }
 
 int main() {
+    threads::on();
+
     PvdFile pvd("mesh", "output");
     pvd.variables = {"index", "level"};
 
