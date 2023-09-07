@@ -3,6 +3,7 @@
 #include <vector>
 #include <algorithm>
 #include <cmath>
+#include <string>
 
 #include <zephyr/phys/eos/eos.h>
 #include <zephyr/phys/eos/ideal_gas.h>

@@ -1,6 +1,7 @@
 #include <iomanip>
 
 #include <zephyr/utils/stopwatch.h>
+#include <sstream>
 
 namespace zephyr { namespace utils {
 
