@@ -65,7 +65,7 @@ public:
     }
 
     /// @brief Массив граней
-    IFaces faces() const;
+    IFaces faces(Direction dir = Direction::ANY) const;
 
     /// @brief Получить смежную ячейку через грань
     ICell neib(const Face &face) const;

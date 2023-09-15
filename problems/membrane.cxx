@@ -73,7 +73,7 @@ int main() {
 
     // Создаем одномерную сетку
     Rectangle rect(0.0, 4.0, -2.0, 4.0);
-    rect.set_nx(400);
+    rect.set_nx(100);
     rect.set_boundary_flags(
             FaceFlag::WALL, FaceFlag::WALL,
             FaceFlag::WALL, FaceFlag::WALL);
@@ -92,13 +92,13 @@ int main() {
     // Число Куранта
     double CFL = 0.5;
 
-    NumFlux::Ptr nf = CIR1::create();
+    NumFlux::Ptr nf = HLLC::create();
 
     double time = 0.0;
     double next_write = 0.0;
     size_t n_step = 0;
     double max_time = 0.05;
-    double write_freq = 300 * max_time / 200;
+    double write_freq = max_time / 100;
 
     Stopwatch elapsed(true);
     Stopwatch write;

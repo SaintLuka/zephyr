@@ -19,11 +19,11 @@ public:
     // Запрещаем создание без типа
     Storage() = delete;
 
+    Storage(Storage &);
+
+    Storage(Storage &&);
+
     // Запрещаем любое копирование
-
-    Storage(Storage &) = delete;
-
-    Storage(Storage &&) = delete;
 
     Storage &operator=(Storage &) = delete;
 

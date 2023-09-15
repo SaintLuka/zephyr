@@ -71,8 +71,8 @@ ICell ICell::neighbor(int face_idx) const {
     return { m_locals, m_aliens, geom().faces[face_idx].adjacent };
 }
 
-IFaces ICell::faces() const {
-    return { *this };
+IFaces ICell::faces(Direction dir) const {
+    return { *this, dir };
 }
 
 void ICell::print_neibs_info() const {

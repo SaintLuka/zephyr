@@ -6,11 +6,11 @@
 
 namespace zephyr { namespace mesh {
 
-IFace::IFace(const ICell &cell, int fid)
-        : m_cell(cell), face_idx(fid) {
+IFace::IFace(const ICell &cell, int fid, Direction _dir)
+        : m_cell(cell), face_idx(fid), dir(_dir) {
 
     // Ищем первую определенную грань
-    while (face_idx < geom::Faces::max_size && geom().is_undefined()) {
+    while (face_idx < geom::Faces::max_size && geom().to_skip(dir)) {
         ++face_idx;
     }
 }
@@ -51,17 +51,17 @@ Vector3d IFace::center() const {
     return geom().center(m_cell.geom().vertices, m_cell.geom().dim);
 }
 
-IFaces::IFaces(const ICell& cell)
-    : m_cell(cell) {
+IFaces::IFaces(const ICell& cell, Direction _dir)
+    : m_cell(cell), dir(_dir) {
 
 }
 
 IFace IFaces::begin() const {
-    return { m_cell, 0 };
+    return { m_cell, 0, dir };
 }
 
 IFace IFaces::end() const {
-    return { m_cell, geom::Faces::max_size };
+    return { m_cell, geom::Faces::max_size, dir };
 }
 
 } // namespace mesh

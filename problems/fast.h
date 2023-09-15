@@ -11,12 +11,14 @@
 
 #include <zephyr/mesh/generator/rectangle.h>
 #include <zephyr/mesh/generator/sector.h>
+#include <zephyr/mesh/generator/strip.h>
 #include <zephyr/mesh/mesh.h>
 
 #include <zephyr/io/pvd_file.h>
 #include <zephyr/io/csv_file.h>
 
 using zephyr::mesh::generator::Rectangle;
+using zephyr::mesh::generator::Strip;
 using zephyr::mesh::generator::Sector;
 using zephyr::mesh::Mesh;
 using zephyr::mesh::Storage;
