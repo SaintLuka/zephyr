@@ -113,7 +113,7 @@ int main() {
     }
 
     // Начальная адаптация
-    std::cout << "Начальная адапция\n";
+    std::cout << "Начальная адаптация\n";
     for (int lvl = 0; lvl < mesh.max_level() + 2; ++lvl) {
         std::cout << "  Уровень " << lvl << "\n";
         solution_step(mesh);

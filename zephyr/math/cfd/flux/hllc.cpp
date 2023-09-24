@@ -133,7 +133,7 @@ smf::Flux HLLC::calc_flux(const smf::PState &zL, const smf::PState &zR, const ph
         std::cerr << "Zr: " << zR << "\n";
         std::cerr << "Sound speed left: " << c1 << " , Sound speed right: " << c2 << "\n";
         std::cerr << "SL: " << s1 << ", SR: " << s2 << ", S*: " << S << "\n";
-        std::cerr << "F_HLLLC: " << F_hllc << "\n";
+        std::cerr << "F_HLLC: " << F_hllc << "\n";
         throw std::runtime_error("HLLC::calc_flux Error, F_HLLC has the bad value");
     }
      */

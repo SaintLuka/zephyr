@@ -21,8 +21,6 @@ Convection::Convection() {
     m_limiter = "minmod";
 }
 
-
-
 double Convection::CFL() const {
     return m_CFL;
 }
@@ -55,12 +53,13 @@ Vector3d Convection::velocity(const Vector3d& c) const {
     return Vector3d::UnitX();
 }
 
-double Convection::compute_dt(ICell &cell) {
+double Convection::compute_dt(const ICell &cell) const {
     double max_area = 0.0;
     for (auto &face: cell.faces()) {
         max_area = std::max(max_area, face.area());
     }
     double dx = cell.volume() / max_area;
+
     return m_CFL * dx / velocity(cell.center()).norm();
 }
 

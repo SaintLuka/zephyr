@@ -26,7 +26,7 @@ double get_ux(Storage::Item cell)  { return cell(U).ux; }
 
 double get_uy(Storage::Item cell)  { return cell(U).uy; }
 
-double get_lvl(Storage::Item cell)  { return cell.level(); }
+double get_lvl(const Storage::Item &cell)  { return cell.level(); }
 
 const double margin = 0.0198;
 

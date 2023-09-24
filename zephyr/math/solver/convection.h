@@ -66,7 +66,7 @@ protected:
 
     /// @brief Посчитать шаг интегрирования по времени с учетом
     /// условия Куранта
-    double compute_dt(ICell& cell);
+    double compute_dt(const ICell& cell) const;
 
     /// @brief Посчитать граниент хранимой функции
     /// @param stage При stage = 0 производные считаются для предыдущего

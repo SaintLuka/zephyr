@@ -15,11 +15,11 @@
         return *this; \
     } \
     \
-    const auto& vec() const { \
+    const auto vec() const { \
         return *reinterpret_cast<const Eigen::Matrix<double, CustomVector::size(), 1> *>(this); \
     } \
     \
-    auto & vec() { \
+    auto vec() { \
         return *reinterpret_cast<Eigen::Matrix<double, CustomVector::size(), 1> *>(this); \
     } \
     \
