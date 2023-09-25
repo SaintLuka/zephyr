@@ -245,7 +245,7 @@ std::vector<double> RiemannTester(const ClassicTest &test, const NumFlux::Ptr &n
 std::vector<double> RiemannTesterWithSolver(const ClassicTest &test, Fluxes flux, const std::string &filename = "output") {
     // Уравнение состояния
     const Eos &eos = test.get_eos();
-    //StiffenedGas eos(1.367, 0.113, 0.273);
+    // StiffenedGas eos(1.367, 0.113, 0.273);
 
     // Состояния слева и справа в тесте
     Vector3d Ox = 100.0 * Vector3d::UnitX();
@@ -376,13 +376,12 @@ int main() {
     nfs[1] = HLLC::create();
     nfs[2] = CIR1::create();
 
-    std::vector<Fluxes> fluxes(2);
-//    fluxes[0] = Fluxes::HLLC;
-//    fluxes[1] = Fluxes::GODUNOV;
-//    fluxes[2] = Fluxes::HLLC2;
-    fluxes[0] = Fluxes::CIR2;
-    fluxes[1] = Fluxes::RUSANOV;
-
+    std::vector<Fluxes> fluxes(5);
+    fluxes[0] = Fluxes::HLLC;
+    fluxes[1] = Fluxes::GODUNOV;
+    fluxes[2] = Fluxes::HLLC2;
+    fluxes[3] = Fluxes::CIR2;
+    fluxes[4] = Fluxes::RUSANOV;
 
     std::vector<std::vector<double>> sod_errors(nfs.size(), std::vector<double>(5));
     for (int i = 0; i < fluxes.size(); ++i)

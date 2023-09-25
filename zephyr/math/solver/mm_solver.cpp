@@ -95,8 +95,6 @@ namespace zephyr {
                     // Значение на грани со стороны соседа
                     PState zp = zn.in_local(normal);
 
-                    PState f = zm.vec() - zp.vec();
-
                     // Численный поток на грани
                     auto loc_flux = m_nf->flux(zm, zp, m_eos);
                     loc_flux.to_global(normal);
