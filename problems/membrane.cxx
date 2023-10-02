@@ -89,7 +89,9 @@ int main() {
     // Число Куранта
     double CFL = 0.5;
 
-    NumFlux::Ptr nf = CIR1::create();
+    //!!!
+    //NumFlux::Ptr nf = CIR1::create();
+    NumFlux::Ptr nf = HLL::create();
 
     double time = 0.0;
     double next_write = 0.0;

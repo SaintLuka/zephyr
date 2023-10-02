@@ -43,6 +43,11 @@ bool IFace::is_boundary() const {
     return geom().is_boundary();
 }
 
+void IFace::set_boundary(FaceFlag flag) {
+    Face* face = (Face*)(&geom());
+    face->boundary = flag;
+}
+
 double IFace::area() const {
     return geom().area;
 }
@@ -63,6 +68,7 @@ IFace IFaces::begin() const {
 IFace IFaces::end() const {
     return { m_cell, geom::Faces::max_size };
 }
+
 
 } // namespace mesh
 } // namespace zephyr

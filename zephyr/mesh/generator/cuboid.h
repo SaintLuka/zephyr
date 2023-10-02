@@ -29,7 +29,7 @@ public:
     /// @brief Конструктор класса
     /// @param xmin, xmax Границы прямоугольника по оси x
     /// @param ymin, ymax Границы прямоугольника по оси y
-    /// @param zmin, zmax Границы прямоугольника по оси y
+    /// @param zmin, zmax Границы прямоугольника по оси z
     Cuboid(double xmin, double xmax, double ymin, double ymax, double zmin, double zmax);
 
     /// @brief Установить желаемое число ячеек сетки по оси Ox

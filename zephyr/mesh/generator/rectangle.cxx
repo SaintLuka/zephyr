@@ -425,9 +425,9 @@ void Rectangle::init_voronoi(Storage &cells, Part part) const {
 
         // Данные AMR
         cell.b_idx = n;
-        cell.level   = 0;
-        cell.flag    = 0;
-        cell.z_idx       = 0;
+        cell.level = 0;
+        cell.flag  = 0;
+        cell.z_idx = 0;
 
         // Флаги граничных условий
         auto ordinary = FaceFlag::ORDINARY;

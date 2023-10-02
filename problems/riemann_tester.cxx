@@ -242,8 +242,8 @@ std::vector<double> RiemannTester(const ClassicTest &test, const NumFlux::Ptr &n
 
 int main() {
     // Тестовая задача
-    SodTest sod_test;
-    ToroTest toro_test(2);
+    // SodTest sod_test;
+    ToroTest toro_test(3);
 
     std::vector<NumFlux::Ptr> nfs(3);
     nfs[0] = HLLC::create();
@@ -253,7 +253,7 @@ int main() {
 
     std::vector<std::vector<double>> sod_errors(nfs.size(), std::vector<double>(5));
     for (int i = 0; i < nfs.size(); ++i)
-        sod_errors[i] = RiemannTester(sod_test, nfs[i]);
+        sod_errors[i] = RiemannTester(toro_test, nfs[i]);
 
     std::cout << '\n';
 

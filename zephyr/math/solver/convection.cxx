@@ -21,8 +21,6 @@ Convection::Convection() {
     m_limiter = "minmod";
 }
 
-
-
 double Convection::CFL() const {
     return m_CFL;
 }

@@ -40,6 +40,9 @@ public:
     /// @brief Является ли грань граничной
     bool is_boundary() const;
 
+    /// @brief Установить флаг грани
+    void set_boundary(FaceFlag flag);
+
     /// @brief Площадь (в 3D) или длина (в 2D) грани
     double area() const;
 
