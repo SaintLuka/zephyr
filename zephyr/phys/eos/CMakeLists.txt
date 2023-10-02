@@ -5,7 +5,7 @@ set(ZEPHYR_PHYS_EOS_SRC
         PARENT_SCOPE)
 
 install(FILES
-        eos.h
+    eos.h
         ideal_gas.h
         stiffened_gas.h
         types.h

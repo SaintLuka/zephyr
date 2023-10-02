@@ -4,19 +4,16 @@
 
 namespace zephyr { namespace phys {
 
-class StiffenedGas : public Eos {
+class TaitEos : public Eos {
 public:
     double gamma;
     double Cv;
-    double p_inf;
-    double eps_0;
 
     /// @brief Конструктор с заданием параметров
-    explicit StiffenedGas(double gamma, double p_inf = 0.0,
-                          double eps_0 = 0.0, double Cv = 1.0);
+    explicit TaitEos(double gamma = 1.4, double Cv = 1.0);
 
     /// @brief Конструктор для известных материалов
-    explicit StiffenedGas(const std::string &name);
+    explicit TaitEos(const std::string &name);
 
 
     /// @brief Основные формулы для уравнений состояния, необходимые для

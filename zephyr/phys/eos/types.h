@@ -2,12 +2,14 @@
 
 namespace zephyr { namespace phys {
 
+/// @brief Термодинамическая величина +
+/// производные по плотности и энергии
 struct dRdE {
-    double value;
-    double dR;
-    double dE;
+    double value = NAN;
+    double dR = NAN;
+    double dE = NAN;
 
-    dRdE(double value, double dR = 0.0, double dE = 0.0)
+    dRdE(double value, double dR = NAN, double dE = NAN)
         : value(value), dR(dR), dE(dE) { }
 
     operator double() const {
@@ -15,13 +17,14 @@ struct dRdE {
     };
 };
 
-/*
+/// @brief Термодинамическая величина +
+/// производные по плотности и давлению
 struct dRdP {
-    double value;
-    double dR;
-    double dP;
+    double value = NAN;
+    double dR = NAN;
+    double dP = NAN;
 
-    dRdP(double value, double dR = 0.0, double dP = 0.0)
+    dRdP(double value, double dR = NAN, double dP = NAN)
             : value(value), dR(dR), dP(dP) { }
 
     operator double() const {
@@ -29,32 +32,26 @@ struct dRdP {
     };
 };
 
-struct dRdT {
-    double value;
-    double dR;
-    double dT;
-
-    dRdT(double value, double dR = 0.0, double dT = 0.0)
-            : value(value), dR(dR), dT(dT) { }
-
-    operator double() const {
-        return value;
-    };
-};
-
+/// @brief Термодинамическая величина +
+/// производные по давлению и температуре
 struct dPdT {
-    double value;
-    double dP;
-    double dT;
+    double value = NAN;
+    double dP = NAN;
+    double dT = NAN;
 
-    dPdT(double value, double dP = 0.0, double dT = 0.0)
+    dPdT(double value, double dP = NAN, double dT = NAN)
             : value(value), dP(dP), dT(dT) { }
 
     operator double() const {
         return value;
     };
 };
- */
+
+/// @brief Дополнительные аргументы УрС
+struct Options {
+    bool deriv  = false; ///< Вычислять производные
+    double rho0 = NAN;   ///< Начальное приближение плотности
+};
 
 }
 }
