@@ -3,6 +3,8 @@
 cmake-build-*
 /bin/
 /output/
+/build/
+/.vscode/
 *__pycache__*
 /build/
 /.vscode/

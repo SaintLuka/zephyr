@@ -129,7 +129,7 @@ int main () {
     // сек
     double time = 0.0;
     double max_time = 1.0;
-    double dt = 1.0;
+    double dt = 0.1;
 
     //шаг
     int n_step = 0;
