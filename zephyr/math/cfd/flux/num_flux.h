@@ -11,6 +11,7 @@ enum class Fluxes {
     CIR1,
     CIR2,
     GODUNOV,
+    HLL,
     HLLC,
     HLLC2,
     RUSANOV,

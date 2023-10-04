@@ -41,8 +41,8 @@ double get_e(Storage::Item cell) { return cell(U).e1; }
 int main() {
     // Тестовая задача
     SodTest test;
-//    ToroTest test(2);
-    //test.inverse();
+    // ToroTest test(2);
+    // test.inverse();
 
     // Уравнение состояния
     Eos& eos = test.eos;
@@ -120,10 +120,11 @@ int main() {
     double CFL = 0.9;
 
     // Функция вычисления потока
-//    NumFlux::Ptr nf = CIR1::create();
-//    NumFlux::Ptr nf = HLLC::create();
-    //NumFlux::Ptr nf = Rusanov::create();
-    NumFlux::Ptr nf = Godunov::create();
+    // NumFlux::Ptr nf = CIR1::create();
+       NumFlux::Ptr nf = HLLC::create();
+    // NumFlux::Ptr nf = Rusanov::create();
+    // NumFlux::Ptr nf = Godunov::create();
+    // NumFlux::Ptr nf = HLL::create();
 
     double next_write = 0.0;
     size_t n_step = 0;

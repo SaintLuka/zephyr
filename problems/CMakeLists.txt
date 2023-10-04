@@ -6,6 +6,16 @@ set(RIEMANN    1)
 set(SHU_OSHER  0)
 set(WAVE2D     0)
 set(R_TESTER   1)
+set(SHOCK_TUBE 1)
+
+
+if (SHOCK_TUBE)
+    message(STATUS "Build shock tube test")
+    add_executable(shock_tube shock-tube.cpp)
+    target_link_directories(shock_tube PUBLIC zephyr)
+    target_link_libraries(shock_tube PUBLIC zephyr)
+    install(TARGETS shock_tube DESTINATION problems)
+endif()
 
 if (ADVECTION)
     message(STATUS "Build advection test")

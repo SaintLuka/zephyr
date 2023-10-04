@@ -97,7 +97,7 @@ int main() {
 
         for (auto cell: mesh) {
             auto &zc = cell(U);
-            if (zc.is_bound) {
+            if (zc.is_bound) { 
                 zc.u_av = 0;
                 zc.v_av = 0;
                 continue;

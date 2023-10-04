@@ -371,19 +371,21 @@ std::vector<double> RiemannTesterWithSolver(const ClassicTest &test, Fluxes flux
 int main() {
     // Тестовая задача
     SodTest sod_test;
-    ToroTest toro_test(2);
+    //ToroTest toro_test(2);
 
-    std::vector<NumFlux::Ptr> nfs(3);
+    std::vector<NumFlux::Ptr> nfs(4);
     nfs[0] = Godunov::create();
-    nfs[1] = HLLC::create();
-    nfs[2] = CIR1::create();
+    nfs[1] = HLL::create();
+    nfs[2] = HLLC::create();
+    nfs[3] = CIR1::create();
 
-    std::vector<Fluxes> fluxes(5);
-    fluxes[0] = Fluxes::HLLC;
-    fluxes[1] = Fluxes::GODUNOV;
-    fluxes[2] = Fluxes::HLLC2;
-    fluxes[3] = Fluxes::CIR2;
-    fluxes[4] = Fluxes::RUSANOV;
+    std::vector<Fluxes> fluxes;
+    fluxes.push_back(Fluxes::HLL);
+    fluxes.push_back(Fluxes::HLLC);
+    fluxes.push_back(Fluxes::HLLC2);
+    fluxes.push_back(Fluxes::CIR2);
+    fluxes.push_back(Fluxes::RUSANOV);
+    fluxes.push_back(Fluxes::GODUNOV);
 
     std::vector<std::vector<double>> sod_errors(nfs.size(), std::vector<double>(5));
     for (int i = 0; i < fluxes.size(); ++i)

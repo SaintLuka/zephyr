@@ -1,5 +1,6 @@
 set(ZEPHYR_MATH_SOLVER_SRC
         ${CMAKE_CURRENT_SOURCE_DIR}/convection.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/sm_fluid.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/mm_solver.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/riemann.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/transfer.cpp
@@ -7,6 +8,7 @@ set(ZEPHYR_MATH_SOLVER_SRC
 
 install(FILES
         convection.h
+        sm_fluid.h
         mm_solver.h
         riemann.h
         transfer.h
