@@ -27,7 +27,7 @@ smf::Flux CIR1::calc_flux(const smf::PState &zL, const smf::PState &zR, const ph
     // Согласуем состояние на грани
     zE.energy = eos.energy_rp(zE.density, zE.pressure);
 
-    auto P = eos.pressure_re(zE.density, zE.energy);
+    auto P = eos.pressure_re(zE.density, zE.energy, {.deriv = true});
 
     double rho = zE.density;
     double u = zE.velocity.x();

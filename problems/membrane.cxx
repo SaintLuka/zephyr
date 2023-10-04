@@ -51,6 +51,9 @@ double get_spl(Storage::Item cell) {
 inline double sqr(double x) { return x*x; }
 
 int main() {
+    // Включаем многопоточность
+    threads::on();
+
     // Файл для записи
     PvdFile pvd("mesh", "output");
 
@@ -66,7 +69,7 @@ int main() {
     IdealGas eos("Air");
     double T0 = 20.0_C;
     double P0 = 1.0_bar;
-    double R0 = eos.density_pt(P0, T0);
+    double R0 = 1.0 / eos.volume_pt(P0, T0);
 
     // Создаем одномерную сетку
     Rectangle rect(0.0, 4.0, -2.0, 4.0);
@@ -79,16 +82,17 @@ int main() {
     Mesh mesh(U, &rect);
 
     // Заполняем начальные данные
-    for (auto cell: mesh.cells()) {
+    for (auto cell: mesh) {
         cell(U).rho1 = R0;
-        cell(U).v1   = Vector3d(0.0, 0.0, 0.0);
-        cell(U).p1   = P0;
-        cell(U).e1   = eos.energy_rp(cell(U).rho1, cell(U).p1);
+        cell(U).v1 = Vector3d(0.0, 0.0, 0.0);
+        cell(U).p1 = P0;
+        cell(U).e1 = eos.energy_rp(cell(U).rho1, cell(U).p1);
     }
 
     // Число Куранта
     double CFL = 0.5;
 
+    //NumFlux::Ptr nf = HLLC::create();
     //!!!
     //NumFlux::Ptr nf = CIR1::create();
     NumFlux::Ptr nf = HLL::create();
@@ -96,19 +100,30 @@ int main() {
     double time = 0.0;
     double next_write = 0.0;
     size_t n_step = 0;
-
     double max_time = 0.05;
+    double write_freq = max_time / 100;
+
+    Stopwatch elapsed(true);
+    Stopwatch write;
+    Stopwatch sw_dt;
+    Stopwatch sw_flux;
+    Stopwatch sw_update;
+
     while (time <= 1.01 * max_time) {
         if (time >= next_write) {
-            std::cout << "\tШаг: " << std::setw(6) << n_step << ";"
-                      << "\t\tВремя: " << std::setw(6) << std::setprecision(3) << time << "\n";
+            write.resume();
+            std::cout << "\tШаг: " << std::setw(8) << n_step << ";\t\t"
+                      << "Время: " << std::setw(11) << std::setprecision(3) << time << "\n";
             pvd.save(mesh, time);
-            next_write += max_time / 200;
+            next_write += write_freq;
+            write.stop();
         }
 
         // Определяем dt
-        double dt = std::numeric_limits<double>::max();
-        for (auto cell: mesh.cells()) {
+        sw_dt.resume();
+        double dt = mesh.min([&](ICell cell) -> double {
+            double dt = 1.0e300;
+
             // скорость звука
             double c = eos.sound_speed_rp(cell(U).rho1, cell(U).p1);
             for (auto &face: cell.faces()) {
@@ -121,11 +136,16 @@ int main() {
                 // Условие КФЛ
                 dt = std::min(dt, cell.volume() / face.area() / lambda);
             }
-        }
+
+            return dt;
+        });
         dt *= CFL;
+        sw_dt.stop();
 
         // Расчет по схеме CIR
-        for (auto cell: mesh.cells()) {
+        sw_flux.resume();
+        mesh.for_each([&](ICell cell) {
+
             // Примитивный вектор в ячейке
             PState zc = cell(U).get_state1();
 
@@ -134,7 +154,7 @@ int main() {
 
             // Переменная для потока
             Flux flux;
-            for (auto& face: cell.faces()) {
+            for (auto &face: cell.faces()) {
                 // Внешняя нормаль
                 auto &normal = face.normal();
 
@@ -164,8 +184,7 @@ int main() {
 
                         zn.velocity.x() += 1.0e-5 * R * T * A;
                     }
-                }
-                else {
+                } else {
                     zn = face.neib()(U).get_state1();
                 }
 
@@ -190,16 +209,35 @@ int main() {
             PState Zc(Qc, eos);
 
             cell(U).set_state2(Zc);
-        }
+        });
+        sw_flux.stop();
 
         // Обновляем слои
-        for (auto cell: mesh.cells()) {
+        sw_update.resume();
+        mesh.for_each([](ICell cell) {
             cell(U).swap();
-        }
+        });
+        sw_update.stop();
 
         n_step += 1;
         time += dt;
     }
+    elapsed.stop();
+
+    std::cout << "\nElapsed time: " << elapsed.extended_time()
+              << " ( " << elapsed.milliseconds() << " ms)\n";
+
+    std::cout << "  Write time:   " << write.extended_time()
+              << " ( " << write.milliseconds() << " ms)\n";
+
+    std::cout << "  dt time:      " << sw_dt.extended_time()
+              << " ( " << sw_dt.milliseconds() << " ms)\n";
+
+    std::cout << "  flux time:    " << sw_flux.extended_time()
+              << " ( " << sw_flux.milliseconds() << " ms)\n";
+
+    std::cout << "  update time:  " << sw_update.extended_time()
+              << " ( " << sw_update.milliseconds() << " ms)\n";
 
     return 0;
 }

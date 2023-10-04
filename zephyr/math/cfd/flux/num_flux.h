@@ -7,10 +7,24 @@
 
 namespace zephyr { namespace math {
 
+enum class Fluxes {
+    CIR1,
+    CIR2,
+    GODUNOV,
+    HLL,
+    HLLC,
+    HLLC2,
+    RUSANOV,
+    RUSANOV2
+};
+
 /// @brief Абстрактный класс для вычисления численного потока
 class NumFlux {
 public:
     using Ptr = std::unique_ptr<NumFlux>;
+
+    /// @brief Создать нужный класс по enum
+    static NumFlux::Ptr create(Fluxes flux);
 
     /// @brief Численный поток для классической задачи
     virtual smf::Flux flux(const smf::PState& zL, const smf::PState& zR, const phys::Eos& eos) const {

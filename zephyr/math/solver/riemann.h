@@ -1,9 +1,11 @@
 #pragma once
 
 #include <zephyr/math/cfd/models.h>
-#include <zephyr/phys/eos/eos.h>
+#include <zephyr/phys/eos/stiffened_gas.h>
 
 namespace zephyr { namespace math {
+
+using phys::StiffenedGas;
 
 /// @brief Класс с набором функций для получения точного решения 
 /// задачи Римана о распаде разрыва. 
@@ -46,7 +48,16 @@ public:
     /// @param eos Уравнение состояния
     /// @return Решение на грани
     static Solution solve(const smf::PState &zL,
-            const smf::PState &zR, const phys::Eos &eos);
+            const smf::PState &zR, const StiffenedGas &eos);
+
+    /// @brief Решить задачу Римана о распаде разрыва
+    /// @param zL Вектор состояния слева
+    /// @param zR Вектор состояния справа
+    /// @param eosL Уравнение состояния слева
+    /// @param eosR Уравнение состояния справа
+    /// @return Решение на грани
+    static Solution solve(const smf::PState &zL, const smf::PState &zR,
+            const StiffenedGas &eosL, const StiffenedGas &eosR);
 
     /// @brief Одноматериальный конструктор
     /// @param zL Вектор состояния слева
@@ -54,7 +65,7 @@ public:
     /// @param eos Уравнение состояния
     /// @param x_jump Положение разрыва
     RiemannSolver(const smf::PState &zL, const smf::PState &zR,
-                  const phys::Eos &eos, double x_jump = 0.0);
+                  const StiffenedGas &eos, double x_jump = 0.0);
 
     /// @brief Двухматериальный конструктор
     /// @param zL Вектор состояния слева
@@ -63,7 +74,7 @@ public:
     /// @param eosR Уравнение состояния справа
     /// @param x_jump Положение разрыва
     RiemannSolver(const smf::PState &zL, const smf::PState &zR,
-                  const phys::Eos &eosL, const phys::Eos &eosR,
+                  const StiffenedGas &eosL, const StiffenedGas &eosR,
                   double x_jump = 0.0);
     
     /// @brief Основной конструктор

@@ -2,7 +2,7 @@
 /// Используется схема SmFluid
 
 #include "fast.h"
-#include <zephyr/math/solver/SmFluid.h>
+#include <zephyr/math/solver/sm_fluid.h>
 #include <zephyr/phys/eos/ideal_gas.h>
 #include <zephyr/math/cfd/fluxes.h>
 
@@ -129,7 +129,7 @@ int main () {
     // сек
     double time = 0.0;
     double max_time = 1.0;
-    double dt = 0.1;
+    double dt = 1.0;
 
     //шаг
     int n_step = 0;

@@ -6,12 +6,14 @@
 #include <zephyr/mesh/generator/rectangle.h>
 #include <zephyr/io/pvd_file.h>
 #include <zephyr/io/variables.h>
+#include <zephyr/utils/stopwatch.h>
 
 using namespace zephyr;
 using namespace mesh;
 
 using generator::Rectangle;
 using zephyr::io::PvdFile;
+using zephyr::utils::Stopwatch;
 
 
 struct _U_ {
@@ -71,8 +73,17 @@ int calc_bit(ICell& cell) {
     return 0;
 }
 
+void set_index(ICell& cell, double t) {
+    cell(U).idx = calc_idx(cell, t);
+}
+
+void set_flag(ICell& cell) {
+    cell(U).bit = calc_bit(cell);
+    cell.set_flag(cell(U).bit > 0 ? 1 : -1);
+}
+
 int solution_step(Mesh& mesh, double t = 0.0) {
-    for (auto& cell: mesh.cells()) {
+    for (auto& cell: mesh) {
         if (cell(U).bit > 0) {
             cell.set_flag(1);
         }
@@ -83,10 +94,10 @@ int solution_step(Mesh& mesh, double t = 0.0) {
 
     mesh.refine();
 
-    for (auto cell: mesh.cells()) {
+    for (auto cell: mesh) {
         cell(U).idx = calc_idx(cell, t);
     }
-    for (auto cell: mesh.cells()) {
+    for (auto cell: mesh) {
         cell(U).bit = calc_bit(cell);
     }
 
@@ -94,6 +105,8 @@ int solution_step(Mesh& mesh, double t = 0.0) {
 }
 
 int main() {
+    threads::off();
+
     PvdFile pvd("mesh", "output");
     pvd.variables = {"index", "level"};
     pvd.variables += { "idx", get_idx };
@@ -113,21 +126,60 @@ int main() {
     }
 
     // Начальная адаптация
-    std::cout << "Начальная адапция\n";
+    std::cout << "Начальная адаптация\n";
     for (int lvl = 0; lvl < mesh.max_level() + 2; ++lvl) {
         std::cout << "  Уровень " << lvl << "\n";
         solution_step(mesh);
     }
 
+    Stopwatch elapsed;
+    Stopwatch sw_write;
+    Stopwatch sw_set_index;
+    Stopwatch sw_set_flags;
+    Stopwatch sw_refine;
+
     std::cout << "\nРасчет\n";
-    for (int step = 0; step < 1000; ++step) {
+    elapsed.resume();
+    for (int step = 0; step <= 1000; ++step) {
+        sw_write.resume();
         if (step % 10 == 0) {
             std::cout << "  Шаг " << step << " / 1000\n";
             pvd.save(mesh, step);
         }
+        sw_write.stop();
 
-        solution_step(mesh, step / 1000.0);
+        sw_set_index.resume();
+        mesh.for_each(set_index, step / 1000.0);
+        sw_set_index.stop();
+
+        sw_set_flags.resume();
+        mesh.for_each(set_flag);
+        sw_set_flags.stop();
+
+        sw_refine.resume();
+        mesh.refine();
+        sw_refine.stop();
+
+        //if (mesh.check_refined() < 0) {
+        //    throw std::runtime_error("Bad mesh");
+        //}
     }
+    elapsed.stop();
+
+    std::cout << "\nElapsed time:     " << elapsed.extended_time()
+              << " ( " << elapsed.milliseconds() << " ms)\n";
+
+    std::cout << "  Write time:     " << sw_write.extended_time()
+              << " ( " << sw_write.milliseconds() << " ms)\n";
+
+    std::cout << "  set index time: " << sw_set_index.extended_time()
+              << " ( " << sw_set_index.milliseconds() << " ms)\n";
+
+    std::cout << "  set flags time: " << sw_set_flags.extended_time()
+              << " ( " << sw_set_flags.milliseconds() << " ms)\n";
+
+    std::cout << "  Refine time:    " << sw_refine.extended_time()
+              << " ( " << sw_refine.milliseconds() << " ms)\n";
 
     return 0;
 }

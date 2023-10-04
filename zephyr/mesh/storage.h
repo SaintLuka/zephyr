@@ -19,11 +19,11 @@ public:
     // Запрещаем создание без типа
     Storage() = delete;
 
+    Storage(Storage &);
+
+    Storage(Storage &&);
+
     // Запрещаем любое копирование
-
-    Storage(Storage &) = delete;
-
-    Storage(Storage &&) = delete;
 
     Storage &operator=(Storage &) = delete;
 
@@ -42,7 +42,7 @@ public:
     /// @brief Количество элементов хранилища
     int size() const;
 
-    /// @brief Размер данных элемента хранилища в байтах
+    /// std::cout << "hello, bitch " << (void*)m_ptr << " " << m_itemsize << "\n"@brief Размер данных элемента хранилища в байтах
     int datasize() const;
 
     /// @brief Размер всего элемента хранилища в байтах
@@ -56,11 +56,16 @@ public:
     struct Item {
     public:
 
-        Item(Byte *ptr, int itemsize) : m_ptr(ptr), m_itemsize(itemsize) {}
+        Item(Byte *ptr, int itemsize) : m_ptr(ptr), m_itemsize(itemsize) { }
 
         virtual Item &operator*() { return *this; }
 
         virtual Item &operator++() { m_ptr += m_itemsize; return *this; }
+
+        virtual Item &operator+=(int step) { m_ptr += step * m_itemsize; return *this; }
+
+        Item operator+(int step) { return {m_ptr + step * m_itemsize, m_itemsize}; }
+
 
         bool operator<(const Item &it) const { return m_ptr < it.m_ptr; }
 

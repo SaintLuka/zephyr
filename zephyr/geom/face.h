@@ -100,6 +100,15 @@ struct Adjacent {
     }
 };
 
+/// @brief Перечисление используется для выбора граней с определенным
+/// направлением нормалей
+enum class Direction : int {
+    ANY = 0,  // Любое направление нормали
+    X   = 1,
+    Y   = 2,
+    Z   = 3
+};
+
 struct Face;
 
 /// @brief Найти центр простой грани.
@@ -152,6 +161,27 @@ struct Face {
         boundary = FaceFlag::UNDEFINED;
         vertices = { -1, -1, -1, -1 };
     }
+
+    /// @brief Пропустить грань?
+    /// @return 'true' если грань неопределена или
+    /// не совпадает по направлению
+    bool to_skip(Direction dir) const {
+	    if (boundary == FaceFlag::UNDEFINED) {
+            return true;
+	    }
+	    switch (dir) {
+	        case Direction::ANY:
+                return false;
+	        case Direction::X:
+                return std::abs(normal.x()) < 0.8;
+	        case Direction::Y:
+                return std::abs(normal.y()) < 0.8;
+	        case Direction::Z:
+                return std::abs(normal.z()) < 0.8;
+            default:
+                return false;
+	    }
+	}
 
     /// @brief Центр грани
     template <int dim>

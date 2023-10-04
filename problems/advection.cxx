@@ -53,7 +53,7 @@ int main() {
     Vector3d v2(rect.x_max(), rect.y_max(), 0.0);
     Vector3d vc = 0.5 * (v1 + v2);
     double D = 0.1 * (v2 - v1).norm();
-    for (auto cell: mesh.cells()) {
+    for (auto cell: mesh) {
         cell(U).u1 = (cell.center() - vc).norm() < D ? 1.0 : 0.0;
         cell(U).u2 = 0.0;
     }
@@ -69,13 +69,13 @@ int main() {
         if (curr_time >= next_write) {
             std::cout << "\tШаг: " << std::setw(6) << n_step << ";"
                       << "\tВремя: " << std::setw(6) << std::setprecision(3) << curr_time << "\n";
-            pvd.save(mesh.cells(), curr_time);
+            pvd.save(mesh.locals(), curr_time);
             next_write += 0.02;
         }
 
         // Определяем dt
         double dt = std::numeric_limits<double>::max();
-        for (auto& cell: mesh.cells()) {
+        for (auto& cell: mesh) {
             double max_area = 0.0;
             for (auto &face: cell.faces()) {
                 max_area = std::max(max_area, face.area());
@@ -86,7 +86,7 @@ int main() {
         dt *= CFL;
 
         // Расчет по схеме upwind
-        for (auto cell: mesh.cells()) {
+        for (auto cell: mesh) {
             auto& zc = cell(U);
 
             double fluxes = 0.0;
@@ -105,7 +105,7 @@ int main() {
         }
 
         // Обновляем слои
-        for (auto cell: mesh.cells()) {
+        for (auto cell: mesh) {
             cell(U).u1 = cell(U).u2;
             cell(U).u2 = 0.0;
         }

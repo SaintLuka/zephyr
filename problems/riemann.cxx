@@ -47,6 +47,7 @@ int main() {
     // Уравнение состояния
     Eos& eos = test.eos;
     //StiffenedGas eos(1.367, 0.113, 0.273);
+    StiffenedGas sg = eos.stiffened_gas(1.0, 1.0);
 
     // Состояния слева и справа в тесте
     Vector3d Ox = 100.0 * Vector3d::UnitX();
@@ -57,7 +58,7 @@ int main() {
               test.pressure(Ox), test.energy(Ox));
 
     // Точное решение задачи Римана
-    RiemannSolver exact(zL, zR, eos, test.x_jump);
+    RiemannSolver exact(zL, zR, sg, test.x_jump);
 
     // Файл для записи
     PvdFile pvd("mesh", "output");
@@ -71,19 +72,19 @@ int main() {
     double time = 0.0;
 
     pvd.variables += {"rho_exact",
-                      [&exact, &time](Storage::Item cell) -> double {
+                      [&exact, &time](const Storage::Item &cell) -> double {
                           return exact.density(cell.center().x(), time);
                       }};
     pvd.variables += {"u_exact",
-                      [&exact, &time](Storage::Item cell) -> double {
+                      [&exact, &time](const Storage::Item &cell) -> double {
                           return exact.velocity(cell.center().x(), time);
                       }};
     pvd.variables += {"p_exact",
-                      [&exact, &time](Storage::Item cell) -> double {
+                      [&exact, &time](const Storage::Item &cell) -> double {
                           return exact.pressure(cell.center().x(), time);
                       }};
     pvd.variables += {"e_exact",
-                      [&exact, &time](Storage::Item cell) -> double {
+                      [&exact, &time](const Storage::Item &cell) -> double {
                           return exact.energy(cell.center().x(), time);
                       }};
     pvd.variables += {"c",
@@ -91,7 +92,7 @@ int main() {
                           return eos.sound_speed_rp(cell(U).rho1, cell(U).p1);
                       }};
     pvd.variables += {"c_exact",
-                      [&exact, &time](Storage::Item cell) -> double {
+                      [&exact, &time](const Storage::Item &cell) -> double {
                           return exact.sound_speed(cell.center().x(), time);
                       }};
 
@@ -108,7 +109,7 @@ int main() {
     Mesh mesh(U, &rect);
 
     // Заполняем начальные данные
-    for (auto cell: mesh.cells()) {
+    for (auto cell: mesh) {
         cell(U).rho1 = test.density(cell.center());
         cell(U).v1   = test.velocity(cell.center());
         cell(U).p1   = test.pressure(cell.center());
@@ -138,7 +139,7 @@ int main() {
 
         // Определяем dt
         double dt = std::numeric_limits<double>::max();
-        for (auto cell: mesh.cells()) {
+        for (auto cell: mesh) {
             // скорость звука
             double c = eos.sound_speed_rp(cell(U).rho1, cell(U).p1);
             for (auto &face: cell.faces()) {
@@ -155,7 +156,7 @@ int main() {
         dt *= CFL;
 
         // Расчет по некоторой схеме
-        for (auto cell: mesh.cells()) {
+        for (auto cell: mesh) {
             // Примитивный вектор в ячейке
             PState zc(cell(U).rho1, cell(U).v1, cell(U).p1, cell(U).e1);
 
@@ -206,7 +207,7 @@ int main() {
         }
 
         // Обновляем слои
-        for (auto cell: mesh.cells()) {
+        for (auto cell: mesh) {
             std::swap(cell(U).rho1, cell(U).rho2);
             std::swap(cell(U).v1, cell(U).v2);
             std::swap(cell(U).p1, cell(U).p2);
@@ -222,7 +223,7 @@ int main() {
     // расчёт ошибок
     double rho_err = 0.0, u_err = 0.0, p_err = 0.0, e_err = 0.0, c_err = 0.0;
     time = test.max_time();
-    for (auto cell: mesh.cells()) {
+    for (auto cell: mesh) {
         double x = cell.center().x();
         rho_err += abs(cell(U).rho1 - exact.density(x, time));
         u_err += abs(cell(U).v1.x() - exact.velocity(x, time));

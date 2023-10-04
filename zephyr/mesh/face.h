@@ -9,6 +9,7 @@ class ICell;
 using zephyr::geom::Face;
 using zephyr::geom::FaceFlag;
 using zephyr::geom::Vector3d;
+using zephyr::geom::Direction;
 
 /// @brief Обертка для типа geom::Face, реализует интерфейс грани,
 /// необходимый для работы. Также содержит несколько новых функций.
@@ -17,7 +18,9 @@ public:
     /// @brief Создать грань по ячейке
     /// @param cell Ячейка сетки
     /// @param fid Индекс грани в ячейке
-    IFace(const ICell &cell, int fid);
+    /// @param dir Выбирать грани с определенным направлением
+    IFace(const ICell &cell, int fid,
+            Direction dir = Direction::ANY);
 
     //Face& face();
 
@@ -61,7 +64,7 @@ public:
     IFace &operator++() {
         do {
             ++face_idx;
-        } while (face_idx < geom::Faces::max_size && geom().is_undefined());
+        } while (face_idx < geom::Faces::max_size && geom().to_skip(dir));
         return *this;
     }
 
@@ -76,6 +79,7 @@ public:
 public:
     const ICell &m_cell;  ///< Родительская ячейка
     int face_idx;         ///< Индекс грани в ячейке
+    Direction dir;        ///< Направление
 };
 
 
@@ -83,7 +87,8 @@ public:
 class IFaces {
 public:
 
-    IFaces(const ICell& cell);
+    IFaces(const ICell& cell,
+            Direction dir = Direction::ANY);
 
     IFace begin() const;
 
@@ -91,6 +96,7 @@ public:
 
 private:
     const ICell &m_cell;  ///< Родительская ячейка
+    Direction dir;        ///< Направления граней
 };
 
 } // namespace mesh

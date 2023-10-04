@@ -8,7 +8,9 @@ using smf::Flux;
 using phys::Eos;
 
 Flux Godunov::calc_flux(const PState& zL, const PState& zR, const Eos& eos) {
-    auto sol = RiemannSolver::solve(zL, zR, eos);
+    auto sol = RiemannSolver::solve(zL, zR,
+            eos.stiffened_gas(zL.density, zL.pressure),
+            eos.stiffened_gas(zR.density, zR.pressure));
 
     Vector3d v = {
             sol.U,

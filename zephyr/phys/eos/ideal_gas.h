@@ -15,55 +15,42 @@ public:
     /// @brief Конструктор для известных материалов
     explicit IdealGas(const std::string &name);
 
+    template<typename... Args>
+    static Eos::Ptr create(Args &&... args) {
+        return std::make_shared<IdealGas>(std::forward<Args>(args)...);
+    };
+
 
     /// @brief Основные формулы для уравнений состояния, необходимые для
     /// решения уравнений Эйлера. Только связь внутренней энергии, плотности
     /// и давления
 
-    dRdE pressure_re(double density, double energy) const final;
+    dRdE pressure_re(double density, double energy, const Options& = {}) const final;
 
-    double energy_rp(double density, double pressure) const final;
+    double energy_rp(double density, double pressure, const Options& = {}) const final;
 
-    double sound_speed_rp(double density, double pressure) const final;
+    double sound_speed_re(double density, double energy, const Options& = {}) const final;
 
-
-    /// @brief Прочие бесполезные формулы
-
-    double density_pe(double pressure, double energy) const final;
-
-    double density_pt(double pressure, double temperature) const final;
-
-    double pressure_rt(double density, double temperature) const final;
-
-    double energy_rt(double density, double temperature) const final;
-
-    double energy_pt(double pressure, double temperature) const final;
-
-    double temperature_rp(double density, double pressure) const final;
-
-    double temperature_re(double density, double energy) const final;
-
-    double temperature_pe(double pressure, double energy) const final;
+    double sound_speed_rp(double density, double pressure, const Options& = {}) const final;
 
 
-    /// @brief Скорость звука от нетривиальных переменных
+    /// @brief Удобно для задания начальных условий
 
-    double sound_speed_re(double density, double pressure) const final;
+    double pressure_rt(double density, double temperature, const Options& = {}) const final;
 
-    double sound_speed_rt(double density, double temperature) const final;
+    double temperature_rp(double density, double pressure, const Options& = {}) const final;
 
-    double sound_speed_pe(double pressure, double energy) const final;
 
-    double sound_speed_pt(double pressure, double temperature) const final;
+    /// @brief Следующие функции используются для PT-замыкания
+
+    dPdT volume_pt(double pressure, double temperature, const Options& = {}) const final;
+
+    dPdT energy_pt(double pressure, double temperature, const Options& = {}) const final;
 
 
     /// @brief Аппроксимация двучленным УрС
 
-    double stiff_gamma(double density, double pressure) const final;
-
-    double stiff_p0(double density, double pressure) const final;
-
-    double stiff_e0(double density, double pressure) const final;
+    virtual StiffenedGas stiffened_gas(double density, double pressure, const Options& = {}) const;
 
 };
 

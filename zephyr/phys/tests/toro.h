@@ -42,7 +42,7 @@ public:
     double max_time() const { return finish; }
 
     ///@brief Получить используемый УрС
-    const Eos* get_eos() const { return &eos; }
+    const Eos& get_eos() const { return eos; }
 
     ///@brief Получить положение разрыва
     double get_x_jump() const { return x_jump; }

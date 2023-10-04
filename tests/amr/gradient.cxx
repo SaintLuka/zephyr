@@ -58,7 +58,7 @@ int calc_wanted(ICell& cell, int level, double t) {
 }
 
 int solution_step(Mesh& mesh, double t = 0.0) {
-    for (auto& cell: mesh.cells()) {
+    for (auto& cell: mesh) {
         int wanted = cell(U).wanted;
         if (cell.level() < wanted) {
             cell.set_flag(1);
@@ -73,7 +73,7 @@ int solution_step(Mesh& mesh, double t = 0.0) {
 
     mesh.refine();
 
-    for (auto cell: mesh.cells()) {
+    for (auto cell: mesh) {
         cell(U).wanted = calc_wanted(cell, mesh.max_level(), t);
     }
 
@@ -81,6 +81,8 @@ int solution_step(Mesh& mesh, double t = 0.0) {
 }
 
 int main() {
+    threads::on();
+
     PvdFile pvd("mesh", "output");
     pvd.variables = {"index", "level"};
     pvd.variables += { "wanted", get_wanted };

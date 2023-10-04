@@ -2,6 +2,21 @@
 
 namespace zephyr { namespace mesh {
 
+Storage::Storage(Storage& src)
+    : m_size(src.m_size),
+      m_itemsize(src.m_itemsize),
+      m_data(src.m_data.size()) {
+
+    std::memcpy(m_data.data(), src.m_data.data(),
+                m_data.size() * sizeof(Byte));
+}
+
+Storage::Storage(Storage&& src)
+        : m_size(src.m_size),
+          m_itemsize(src.m_itemsize),
+          m_data(std::move(src.m_data)) {
+}
+
 void Storage::init(int datasize, int size) {
     m_size = std::max(0, size);
     m_itemsize = int(sizeof(Cell)) + std::max(0, datasize);

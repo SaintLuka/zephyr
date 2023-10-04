@@ -14,7 +14,7 @@ public:
 
     template<class ...Args>
     inline static std::unique_ptr<HLLC> create(Args &&... args) {
-        return std::make_unique<HLLC>(std::forward<Args>(args)...);
+        return std::unique_ptr<HLLC>(new HLLC(std::forward<Args>(args)...));
     }
 
     std::string get_name() const override {return "HLLC"; }
@@ -32,7 +32,7 @@ public:
 
     template<class ...Args>
     inline static std::unique_ptr<HLLC2> create(Args &&... args) {
-        return std::make_unique<HLLC2>(std::forward<Args>(args)...);
+        return std::unique_ptr<HLLC2>(new HLLC2(std::forward<Args>(args)...));
     }
 
     std::string get_name() const override {return "HLLC2"; }

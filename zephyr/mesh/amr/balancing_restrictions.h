@@ -8,93 +8,61 @@
 #include <zephyr/mesh/amr/common.h>
 #include <zephyr/mesh/amr/siblings.h>
 
-#ifdef ZEPHYR_ENABLE_MULTITHREADING
-#include <zephyr/multithreading/thread-pool.h>
-#endif
-
 namespace zephyr { namespace mesh { namespace amr {
 
-/// @brief Функция осуществляет обход по части ячеек хранилища и накладывает
-/// базовые ограничения на флаги адаптации:
+/// @brief Функция накладывает базовые ограничения на флаг адаптации ячейки:
 /// 1. Ячейка нижнего уровня не огрубляется;
 /// 2. Ячейка верхнего -- не разбивается;
 /// 3. Ячейка может иметь флаг -1 (огрубление), только если все сиблинги
 /// находятся на том же процессе, имеют такой же уровень адаптации как и
 /// ячейка, а также флаг адаптации -1.
-/// @param locals Хранилище ячеек
+/// @param item Целевой элемент хранилища (из locals)
+/// @param locals Локальное хранилище ячеек
 /// @param max_level Максимальный уровень адаптации
-/// @param from, to Диапазон ячеек для обхода
 template<int dim>
-void base_restrictions_partial(Storage &locals, int max_level, int from, int to) {
-    for (int ic = from; ic < to; ++ic) {
-        scrutiny_check(ic < locals.size(), "base_restrictions: ic >= cells.size()")
-        Cell& cell = locals[ic].geom();
+void base_restriction(Storage::Item item, Storage &locals, int max_level) {
+    scrutiny_check(item.index() < locals.size(), "base_restrictions: ic >= cells.size()")
+    Cell &cell = item.geom();
 
-        int flag = cell.flag;
-        // Приводим к одному из трех значений { -1, 0, 1 }
-        if (flag != 0) {
-            flag = flag > 0 ? 1 : -1;
-        }
-
-        int lvl = cell.level;
-
-        if (lvl + flag < 0) {
-            flag = 0;
-        } else {
-            if (lvl + flag > max_level) {
-                flag = lvl > max_level ? -1 : 0;
-            }
-        }
-
-        if (flag < 0) {
-            if (!can_coarse<dim>(locals, ic)) {
-                flag = 0;
-            }
-        }
-
-        cell.flag = flag;
+    int flag = cell.flag;
+    // Приводим к одному из трех значений { -1, 0, 1 }
+    if (flag != 0) {
+        flag = flag > 0 ? 1 : -1;
     }
+
+    int lvl = cell.level;
+
+    if (lvl + flag < 0) {
+        flag = 0;
+    } else {
+        if (lvl + flag > max_level) {
+            flag = lvl > max_level ? -1 : 0;
+        }
+    }
+
+    if (flag < 0) {
+        if (!can_coarse<dim>(cell, locals)) {
+            flag = 0;
+        }
+    }
+
+    cell.flag = flag;
 }
 
-/// @brief Выполняет функцию base_restriction_partial для всех ячеек хранилища
-/// в однопоточном режиме
+/// @brief Выполняет функцию base_restriction для всех ячеек хранилища
 /// @param locals Хранилище ячеек
 /// @param max_level Максимальный уровень адаптации
 template <int dim>
 void base_restrictions(Storage &locals, int max_level) {
-    base_restrictions_partial<dim>(locals, max_level, 0, locals.size());
+    threads::for_each(
+            locals.begin(), locals.end(),
+            base_restriction<dim>, std::ref(locals), max_level);
 }
 
-#ifdef ZEPHYR_ENABLE_MULTITHREADING
-/// @brief Выполняет функцию base_restriction_partial для всех ячеек хранилища
-/// в многопоточном режиме
-/// @param cells Хранилище ячеек
-/// @param max_level Максимальный уровень адаптации
-/// @param threads Ссылка ну пул тредов
-template <int dim>
-void base_restrictions(Storage &cells, int max_level, ThreadPool& threads) {
-    auto num_tasks = threads.size();
-    if (num_tasks < 2) {
-        // Вызов однопоточной версии
-        base_restrictions_partial<dim>(cells, max_level, 0, cells.size());
-        return;
-    }
-    std::vector<std::future<void>> results(num_tasks);
-
-    std::int bin = cells.size() / num_tasks + 1;
-    std::int pos = 0;
-    for (auto &res : results) {
-        res = threads.enqueue(base_restrictions_partial<dim>,
-                              std::ref(cells), max_level,
-                              pos, std::min(pos + bin, cells.size())
-        );
-        pos += bin;
-    }
-    for (auto &result: results)
-        result.get();
-}
-#endif
-
+/// @brief Проверка соблюдения баланса флагов смежных ячеек.
+/// Уровни смежных ячеек после адаптации не должны отличаться не более,
+/// чем на один уровень.
+/// Функция вызывается только при включенной тщательной проверке.
 void check_flags(Storage& locals, Storage& aliens, int max_level) {
     for(auto cell: locals) {
         int cell_wanted_lvl = cell.level() + cell.flag();
@@ -107,7 +75,7 @@ void check_flags(Storage& locals, Storage& aliens, int max_level) {
         }
 
         for (auto &face: cell.geom().faces.list()) {
-            if (face.is_undefined() or face.is_boundary()) {
+            if (face.is_undefined() || face.is_boundary()) {
                 continue;
             }
 

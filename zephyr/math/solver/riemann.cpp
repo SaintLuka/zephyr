@@ -287,19 +287,39 @@ inline double pressure_rfan(cref uR, cref pR, cref cR, cref gR, cref p0R, cref x
 }
 
 RiemannSolver::Solution RiemannSolver::solve(
-        const PState &zL, const PState &zR, const Eos&eos) {
+        const PState &zL, const PState &zR, const StiffenedGas& eos) {
 
     cref rL = zL.density;
     cref uL = zL.velocity.x();
     cref pL = zL.pressure;
-    cref gL = eos.stiff_gamma(rL, pL);
-    cref p0L = eos.stiff_p0(rL, pL);
+    cref gL = eos.gamma;
+    cref p0L = eos.P0;
 
     cref rR = zR.density;
     cref uR = zR.velocity.x();
     cref pR = zR.pressure;
-    cref gR = eos.stiff_gamma(rR, pR);
-    cref p0R = eos.stiff_p0(rR, pR);
+    cref gR = eos.gamma;
+    cref p0R = eos.P0;
+
+    return RiemannSolver::solve(
+            rL, uL, pL, gL, p0L,
+            rR, uR, pR, gR, p0R);
+}
+
+RiemannSolver::Solution RiemannSolver::solve(
+        const PState &zL, const PState &zR, const StiffenedGas& eosL, const StiffenedGas& eosR) {
+
+    cref rL = zL.density;
+    cref uL = zL.velocity.x();
+    cref pL = zL.pressure;
+    cref gL = eosL.gamma;
+    cref p0L = eosL.P0;
+
+    cref rR = zR.density;
+    cref uR = zR.velocity.x();
+    cref pR = zR.pressure;
+    cref gR = eosR.gamma;
+    cref p0R = eosR.P0;
 
     return RiemannSolver::solve(
             rL, uL, pL, gL, p0L,
@@ -399,23 +419,23 @@ RiemannSolver::Solution RiemannSolver::solve(
 
 RiemannSolver::RiemannSolver(
         const PState &zL, const PState &zR,
-        const Eos &eos, double x_jump) :
+        const StiffenedGas &eos, double x_jump) :
         RiemannSolver(zL, zR, eos, eos, x_jump) { }
 
 RiemannSolver::RiemannSolver(
         const PState &zL, const PState &zR,
-        const Eos &eosL, const Eos &eosR,
+        const StiffenedGas &eosL, const StiffenedGas &eosR,
         double x_jump) : x_jump(x_jump),
                          rL(zL.density), uL(zL.velocity.x()), pL(zL.pressure),
                          rR(zR.density), uR(zR.velocity.x()), pR(zR.pressure) {
 
-    gL = eosL.stiff_gamma(rL, pL);
-    p0L = eosL.stiff_p0(rL, pL);
-    e0L = eosL.stiff_e0(rL, pL);
+    gL = eosL.gamma;
+    p0L = eosL.P0;
+    e0L = eosL.eps_0;
 
-    gR = eosL.stiff_gamma(rR, pR);
-    p0R = eosL.stiff_p0(rR, pR);
-    e0R = eosL.stiff_e0(rR, pR);
+    gR = eosL.gamma;
+    p0R = eosL.P0;
+    e0R = eosL.eps_0;
 
     compute();
 }

@@ -84,11 +84,11 @@ struct Star {
 };
 
 int solution_step(Mesh& mesh, Star& star) {
-    for (auto cell: mesh.cells()) {
+    for (auto cell: mesh) {
         cell(U).bit = star.is_inside(cell.center());
     }
 
-    for (auto& cell: mesh.cells()) {
+    for (auto& cell: mesh) {
         if (cell(U).bit > 0) {
             cell.set_flag(1);
         }
@@ -103,6 +103,8 @@ int solution_step(Mesh& mesh, Star& star) {
 }
 
 int main() {
+    threads::on();
+
     PvdFile pvd("mesh", "output");
     pvd.variables = {"index", "level"};
     pvd.variables += { "bit", get_bit };
