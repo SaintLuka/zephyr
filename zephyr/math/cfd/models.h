@@ -119,6 +119,35 @@ struct Flux {
 namespace mmf {
 
 using zephyr::phys::Fractions;
+
+/// @brief Примитивный вектор состояния
+struct PState {
+    double    density;
+    Vector3d  velocity;
+    double    pressure;
+    double    temperature;
+    double    energy;
+    Fractions mass_frac;
+
+
+    VECTORIZE(PState)
+};
+
+/// @brief Консервативный вектор состояния
+struct QState {
+    double    mass;
+    Vector3d  momentum;
+    double    energy;
+    Fractions mass_frac;
+
+};
+
+} // namespace mmf
+
+/// @brief Многоматериальная модель Multi Material Fluid
+namespace mmf {
+
+using zephyr::phys::Fractions;
 using zephyr::phys::FractionsFlux;
 
 struct Component {

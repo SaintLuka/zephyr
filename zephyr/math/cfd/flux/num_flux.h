@@ -19,6 +19,17 @@ enum class Fluxes {
     RUSANOV2
 };
 
+enum class Fluxes {
+    CIR1,
+    CIR2,
+    GODUNOV,
+    HLL,
+    HLLC,
+    HLLC2,
+    RUSANOV,
+    RUSANOV2
+};
+
 /// @brief Абстрактный класс для вычисления численного потока
 class NumFlux {
 public:
