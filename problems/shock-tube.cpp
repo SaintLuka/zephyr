@@ -2,13 +2,12 @@
 /// Используется схема SmFluid
 
 #include "fast.h"
-#include "zephyr/math/solver/SmFluid.h"
+#include <zephyr/math/solver/SmFluid.h>
 #include <zephyr/phys/eos/ideal_gas.h>
 #include <zephyr/math/cfd/fluxes.h>
 
 using zephyr::math::SmFluid;
-
-namespace zephyr { namespace math {
+using namespace zephyr::phys;
 
 struct _U_ : public SmFluid::State {
     bool inside;
@@ -25,7 +24,7 @@ double get_p(Storage::Item cell) { return cell(U).p1; }
 double get_e(Storage::Item cell) { return cell(U).e1; }
 double get_inside(Storage::Item cell) { return double(cell(U).inside); }
 
-Mesh* make_pipe(double xmin, double xmax, double ymin, double ymax, double H, double h, double L, double l, int nx_cells) {
+Mesh make_pipe(double xmin, double xmax, double ymin, double ymax, double H, double h, double L, double l, int nx_cells) {
     
     Rectangle rect(xmin, xmax, ymin, ymax);
     
@@ -34,12 +33,12 @@ Mesh* make_pipe(double xmin, double xmax, double ymin, double ymax, double H, do
             FaceFlag::WALL, FaceFlag::WALL,
             FaceFlag::WALL, FaceFlag::WALL);
 
-    Mesh *mesh = new Mesh(U, &rect);
+    Mesh mesh(U, &rect);
     
     double cell_size_x = (xmax - xmin) / nx_cells;
     double l1 = std::max(cell_size_x, l);
     
-    for (auto cell: mesh->cells()) {
+    for (auto cell: mesh) {
         if ((cell.center().y() < H-h) && (std::fmod(cell.center().x(), L) < l1)) {
             cell(U).inside = false;
         } 
@@ -48,7 +47,7 @@ Mesh* make_pipe(double xmin, double xmax, double ymin, double ymax, double H, do
         }
     }
     
-    for (auto cell: mesh->cells()) {
+    for (auto cell: mesh) {
         if (!cell(U).inside) {
             continue;
         }
@@ -70,25 +69,24 @@ Mesh* make_pipe(double xmin, double xmax, double ymin, double ymax, double H, do
 
 void setup_initial(Mesh &mesh, double u0, double u3, double P0, double P3, double rho0, double rho3, double cell_size_x, IdealGas &eos) {
 
-    for (auto cell : mesh.cells()) {
+    for (auto cell : mesh) {
         // Инициализация
         if (cell.center().x() > 0) {
             cell(U).v1.x() = u0;
             cell(U).v1.y() = 0;
-            cell(U).rho1 = eos.density_pt(P0, 20.0_C);
+            cell(U).rho1 = 1.0 / eos.volume_pt(P0, 20.0_C);
             cell(U).p1 = P0; 
             cell(U).e1 = eos.energy_rp(cell(U).rho1, cell(U).p1);
         }
         else {
             cell(U).v1.x() = u3;
             cell(U).v1.y() = 0;
-            cell(U).rho1 = eos.density_pt(P3, 20.0_C); 
+            cell(U).rho1 = 1.0 / eos.volume_pt(P3, 20.0_C);
             cell(U).p1 = P3; 
             cell(U).e1 = eos.energy_rp(cell(U).rho1, cell(U).p1);
         }
     }
 }
-
 
 
 int main () {
@@ -131,7 +129,7 @@ int main () {
     // сек
     double time = 0.0;
     double max_time = 1.0;
-    double dt = 1.0;
+    double dt = 0.1;
 
     //шаг
     int n_step = 0;
@@ -146,13 +144,13 @@ int main () {
     pvd.variables += {"inside", get_inside};
 
     // Создаем сетку
-    Mesh *mesh = make_pipe(xmin, xmax, ymin, ymax, H, h, L, l, nx_cells);
+    Mesh mesh = make_pipe(xmin, xmax, ymin, ymax, H, h, L, l, nx_cells);
 
     //EOS
     IdealGas eos("Air");
 
     // Инициализация начальных условий
-    setup_initial(*mesh, u0, u3, P0, P3, rho0, rho3, cell_size_x, eos);
+    setup_initial(mesh, u0, u3, P0, P3, rho0, rho3, cell_size_x, eos);
 
 
     // Создать решатель
@@ -162,10 +160,10 @@ int main () {
         std::cout << "\tStep: " << std::setw(6) << n_step << ";"
                   << "\tTime: " << std::setw(6) << std::setprecision(3) << time << "\n";
 
-        pvd.save(*mesh, time);
+        pvd.save(mesh, time);
 
         // Шаг решения
-        solver.update(*mesh, eos);
+        solver.update(mesh, eos);
 
         n_step += 1;
         time += dt;
@@ -173,6 +171,3 @@ int main () {
 
     return 0;
 }
-}
-}
-
