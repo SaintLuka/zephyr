@@ -14,7 +14,7 @@ using zephyr::mesh::Mesh;
 using zephyr::mesh::Distributor;
 using zephyr::geom::Vector3d;
 
-class MmSolver {
+class MmFluid {
 public:
 
     /// @brief Расширенный вектор состояния на котором решается задача
@@ -29,7 +29,7 @@ public:
     [[nodiscard]] static State datatype();
 
     /// @brief Конструктор класса
-    explicit MmSolver(const phys::Eos &eos, Fluxes flux);
+    explicit MmFluid(const phys::Eos &eos, Fluxes flux);
 
     /// @brief Число Куранта
     [[nodiscard]] double CFL() const;
@@ -62,7 +62,7 @@ public:
     /// @brief Обновление ячеек
     void update(Mesh &mesh);
 
-    ~MmSolver() = default;
+    ~MmFluid() = default;
 
 protected:
     const phys::Eos &m_eos;

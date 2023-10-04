@@ -1,6 +1,6 @@
-#include <zephyr/math/solver/mm_solver.h>
+#include <zephyr/math/solver/mm_fluid.h>
 #include <zephyr/math/cfd/face_extra.h>
-#include "zephyr/math/cfd/models.h"
+#include <zephyr/math/cfd/models.h>
 
 namespace zephyr { namespace math {
 
@@ -8,31 +8,31 @@ using mesh::Storage;
 using namespace geom;
 using namespace smf;
 
-static const MmSolver::State U = MmSolver::datatype();
+static const MmFluid::State U = MmFluid::datatype();
 
-[[nodiscard]] MmSolver::State MmSolver::datatype() {
+[[nodiscard]] MmFluid::State MmFluid::datatype() {
     return {};
 }
 
-MmSolver::MmSolver(const phys::Eos &eos, Fluxes flux = Fluxes::HLLC2) : m_eos(eos) {
+MmFluid::MmFluid(const phys::Eos &eos, Fluxes flux = Fluxes::HLLC2) : m_eos(eos) {
     m_nf = NumFlux::create(flux);
     m_CFL = 0.9;
     m_dt = std::numeric_limits<double>::max();
 }
 
-[[nodiscard]] double MmSolver::CFL() const {
+[[nodiscard]] double MmFluid::CFL() const {
     return m_CFL;
 }
 
-void MmSolver::set_CFL(double CFL) {
+void MmFluid::set_CFL(double CFL) {
     m_CFL = std::max(0.0, std::min(CFL, 1.0));
 }
 
-[[nodiscard]] double MmSolver::dt() const {
+[[nodiscard]] double MmFluid::dt() const {
     return m_dt;
 }
 
-void MmSolver::init_cells(Mesh &mesh, const phys::ClassicTest &test) {
+void MmFluid::init_cells(Mesh &mesh, const phys::ClassicTest &test) {
     // Заполняем начальные данные
     for (auto cell: mesh) {
         cell(U).rho1 = test.density(cell.center());
@@ -42,7 +42,7 @@ void MmSolver::init_cells(Mesh &mesh, const phys::ClassicTest &test) {
     }
 }
 
-double MmSolver::compute_dt(Mesh &mesh) {
+double MmFluid::compute_dt(Mesh &mesh) {
     m_dt = std::numeric_limits<double>::max();
     for (auto cell: mesh) {
         // скорость звука
@@ -63,7 +63,7 @@ double MmSolver::compute_dt(Mesh &mesh) {
     return m_dt;
 }
 
-void MmSolver::fluxes(Mesh &mesh) {
+void MmFluid::fluxes(Mesh &mesh) {
     // Расчет по некоторой схеме
     for (auto cell: mesh) {
         // Примитивный вектор в ячейке
@@ -116,7 +116,7 @@ void MmSolver::fluxes(Mesh &mesh) {
     }
 }
 
-void MmSolver::update(Mesh &mesh) {
+void MmFluid::update(Mesh &mesh) {
     for (auto cell: mesh) {
         std::swap(cell(U).rho1, cell(U).rho2);
         std::swap(cell(U).v1, cell(U).v2);
@@ -127,19 +127,19 @@ void MmSolver::update(Mesh &mesh) {
     m_step += 1;
 }
 
-void MmSolver::set_num_flux(Fluxes flux) {
+void MmFluid::set_num_flux(Fluxes flux) {
     m_nf = NumFlux::create(flux);
 }
 
-[[nodiscard]] double MmSolver::get_time() const {
+[[nodiscard]] double MmFluid::get_time() const {
     return m_time;
 }
 
-[[nodiscard]] size_t MmSolver::getStep() const {
+[[nodiscard]] size_t MmFluid::getStep() const {
     return m_step;
 }
 
-[[nodiscard]] std::string MmSolver::get_flux_name() const {
+[[nodiscard]] std::string MmFluid::get_flux_name() const {
     return m_nf->get_name();
 }
 

@@ -1,5 +1,5 @@
 #include "fast.h"
-#include "zephyr/math/solver/mm_solver.h"
+#include <zephyr/math/solver/mm_fluid.h>
 
 #include <fstream>
 #include <zephyr/math/cfd/fluxes.h>
@@ -308,7 +308,7 @@ std::vector<double> RiemannTesterWithSolver(const ClassicTest &test, Fluxes flux
     // Создать сетку
     Mesh mesh(U, &rect);
 
-    MmSolver solver(eos, flux);
+    MmFluid solver(eos, flux);
     solver.init_cells(mesh, test);
 
     // Число Куранта
