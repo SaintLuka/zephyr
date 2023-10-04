@@ -1,6 +1,5 @@
-/// @file Тестирование AMR на задачах с интерфейсами, под интерфейсами
-/// понимаются узкие области адаптации с шириной в одну ячейку, которые
-/// имеют меру размерности меньше, чем мера самой области.
+/// @file Тестирование AMR на задаче с медленно (по времени) и
+/// плавно (по координате) изменяющимися уровнями адаптации.
 
 #include <zephyr/mesh/mesh.h>
 #include <zephyr/mesh/generator/rectangle.h>
@@ -15,66 +14,57 @@ using zephyr::io::PvdFile;
 
 
 struct _U_ {
-    int idx;
-    int bit;
+    int wanted;
 };
 
 _U_ U;
 
-double get_idx(Storage::Item cell) {
-    return cell(U).idx;
-}
-
-double get_bit(Storage::Item cell) {
-    return cell(U).bit;
+double get_wanted(Storage::Item cell) {
+    return cell(U).wanted;
 }
 
 inline double sqr(double x) {
     return x * x;
 }
 
-// Периодическая функция времени, с периодом = 1
-int calc_idx(ICell& cell, double t) {
-    Vector3d c = cell.center();
-
-    double r = c.norm();
-    double phi = std::atan2(c.y(), c.x()) - 2 * M_PI * t;
-    if (phi < M_PI) {
-        phi += M_PI;
-    }
-
-    int n_parts = 12;
-    double f1 = 0.5 * phi / M_PI + 0.02 * std::sin(12 * r);
-    double f2 = 0.5 * phi / M_PI + 0.1 * r * r;
-    double sigma = sqr(std::sin(2 * M_PI * t));
-    double f3 = sigma * f1 + (1 - sigma) * f2;
-
-    int a1 = (int(std::floor(n_parts * f3)) + n_parts) % n_parts;
-
-    double g1 = std::round(sqr(std::sin(5.0 * r*r - 2*M_PI*t)));
-    int a2 = int(g1);
-    return a1 + a2;
+Vector3d epitrochoid(double t) {
+    double R = 0.6;
+    double m = 0.2;
+    double h = 0.3;
+    return {
+            R * (m + 1) * std::cos(m * t) - h * std::cos((m + 1) * t),
+            R * (m + 1) * std::sin(m * t) - h * std::sin((m + 1) * t),
+            0.0
+    };
 }
 
-int calc_bit(ICell& cell) {
-    int idx_c = cell(U).idx;
-    for (auto& face: cell.faces()) {
-        if (face.is_boundary()) {
-            continue;
-        }
+// Периодическая функция времени, с периодом = 1
+int calc_wanted(ICell& cell, int level, double t) {
+    double phi = 10 * M_PI * t;
+    Vector3d C = epitrochoid(phi);
+    Vector3d T = epitrochoid(phi + 1.0e-6) - epitrochoid(phi - 1.0e-6); // касательная
+    Vector3d N = {T.y(), -T.x(), 0.0}; // нормаль
+    N.normalize();
 
-        int idx_n = face.neib()(U).idx;
-        if (idx_c != idx_n) {
-            return 1;
-        }
-    }
-    return 0;
+    double H = 4.0;
+
+    double dist = std::abs((cell.center() - C).dot(N));
+
+    double xi = std::max(0.0, 1.0 - dist / H);
+
+    int wanted = int(std::floor((level + 0.99) * sqr(sqr(sqr(xi)))));
+
+    return std::max(0, std::min(wanted, level));
 }
 
 int solution_step(Mesh& mesh, double t = 0.0) {
     for (auto& cell: mesh.cells()) {
-        if (cell(U).bit > 0) {
+        int wanted = cell(U).wanted;
+        if (cell.level() < wanted) {
             cell.set_flag(1);
+        }
+        else if (cell.level() == wanted) {
+            cell.set_flag(0);
         }
         else {
             cell.set_flag(-1);
@@ -84,10 +74,7 @@ int solution_step(Mesh& mesh, double t = 0.0) {
     mesh.refine();
 
     for (auto cell: mesh.cells()) {
-        cell(U).idx = calc_idx(cell, t);
-    }
-    for (auto cell: mesh.cells()) {
-        cell(U).bit = calc_bit(cell);
+        cell(U).wanted = calc_wanted(cell, mesh.max_level(), t);
     }
 
     return mesh.check_refined();
@@ -96,8 +83,7 @@ int solution_step(Mesh& mesh, double t = 0.0) {
 int main() {
     PvdFile pvd("mesh", "output");
     pvd.variables = {"index", "level"};
-    pvd.variables += { "idx", get_idx };
-    pvd.variables += { "bit", get_bit };
+    pvd.variables += { "wanted", get_wanted };
 
     Rectangle rect(-1.0, 1.0, -1.0, 1.0);
     rect.set_nx(20);

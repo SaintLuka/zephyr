@@ -216,6 +216,8 @@ int main() {
         n_step += 1;
         time += dt;
     }
+    
+    CsvFile::save("results.csv", mesh, 5, pvd.variables);
 
     // расчёт ошибок
     double rho_err = 0.0, u_err = 0.0, p_err = 0.0, e_err = 0.0, c_err = 0.0;

@@ -92,6 +92,10 @@ const Variable& Variables::operator[](int i) const {
     return m_list[i];
 }
 
+size_t Variables::size() const {
+    return m_list.size();
+}
+
 const std::vector<Variable>& Variables::list() const {
     return m_list;
 }

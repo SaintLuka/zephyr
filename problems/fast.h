@@ -11,6 +11,7 @@
 #include <zephyr/mesh/mesh.h>
 
 #include <zephyr/io/pvd_file.h>
+#include <zephyr/io/csv_file.h>
 
 using zephyr::mesh::generator::Rectangle;
 using zephyr::mesh::generator::Sector;
