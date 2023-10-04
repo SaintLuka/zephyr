@@ -8,7 +8,7 @@ class StiffenedGas : public Eos {
 public:
     double gamma;
     double Cv;
-    double p_inf;
+    double P0;
     double eps_0;
 
     /// @brief Конструктор с заданием параметров
@@ -18,6 +18,10 @@ public:
     /// @brief Конструктор для известных материалов
     explicit StiffenedGas(const std::string &name);
 
+    template<typename... Args>
+    static Eos::Ptr create(Args &&... args) {
+        return std::make_shared<StiffenedGas>(std::forward<Args>(args)...);
+    };
 
     /// @brief Основные формулы для уравнений состояния, необходимые для
     /// решения уравнений Эйлера. Только связь внутренней энергии, плотности
@@ -25,7 +29,7 @@ public:
 
     dRdE pressure_re(double density, double energy, const Options& = {}) const final;
 
-    dRdP energy_rp(double density, double pressure, const Options& = {}) const final;
+    double energy_rp(double density, double pressure, const Options& = {}) const final;
 
     double sound_speed_re(double density, double energy, const Options& = {}) const final;
 
@@ -36,23 +40,19 @@ public:
 
     double pressure_rt(double density, double temperature, const Options& = {}) const final;
 
+    double temperature_rp(double density, double pressure, const Options& = {}) const final;
+
 
     /// @brief Следующие функции используются для PT-замыкания
 
-    dPdT density_pt(double pressure, double temperature, const Options& = {}) const final;
+    dPdT volume_pt(double pressure, double temperature, const Options& = {}) const final;
 
     dPdT energy_pt(double pressure, double temperature, const Options& = {}) const final;
-
-    double temperature_rp(double density, double pressure, const Options& = {}) const final;
 
 
     /// @brief Аппроксимация двучленным УрС
 
-    double stiff_gamma(double density, double pressure, const Options& = {}) const final;
-
-    double stiff_p0(double density, double pressure, const Options& = {}) const final;
-
-    double stiff_e0(double density, double pressure, const Options& = {}) const final;
+    virtual StiffenedGas stiffened_gas(double density, double pressure, const Options& = {}) const;
 
 };
 

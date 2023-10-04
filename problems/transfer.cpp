@@ -208,7 +208,7 @@ int main() {
         }
 
         // Шаг решения
-        solver.update(mesh, 2);
+        solver.update(mesh, 1);
 
         // Установить флаги адаптации
         solver.set_flags(mesh);

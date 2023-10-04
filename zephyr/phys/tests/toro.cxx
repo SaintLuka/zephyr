@@ -81,7 +81,7 @@ ToroTest::ToroTest(int num)
     }
 
     eL = eos.energy_rp(rL, pL);
-    eR = eos.energy_rp(rR, pR);
+    eR = ((Eos&)eos).energy_rp(rR, pR);
 }
 
 void ToroTest::inverse() {

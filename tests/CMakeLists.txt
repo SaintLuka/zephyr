@@ -4,7 +4,7 @@ set(MESHGEN   0)
 set(MPITEST   0)
 set(STOPWATCH 0)
 set(THREADS   0)
-set(MATERIALS 0)
+set(MATERIALS 1)
 
 if (MESHGEN)
     message(STATUS "Build meshgen test")

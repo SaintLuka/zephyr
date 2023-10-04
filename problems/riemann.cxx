@@ -47,6 +47,7 @@ int main() {
     // Уравнение состояния
     Eos& eos = test.eos;
     //StiffenedGas eos(1.367, 0.113, 0.273);
+    StiffenedGas sg = eos.stiffened_gas(1.0, 1.0);
 
     // Состояния слева и справа в тесте
     Vector3d Ox = 100.0 * Vector3d::UnitX();
@@ -57,7 +58,7 @@ int main() {
               test.pressure(Ox), test.energy(Ox));
 
     // Точное решение задачи Римана
-    RiemannSolver exact(zL, zR, eos, test.x_jump);
+    RiemannSolver exact(zL, zR, sg, test.x_jump);
 
     // Файл для записи
     PvdFile pvd("mesh", "output");

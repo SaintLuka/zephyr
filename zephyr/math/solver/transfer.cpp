@@ -260,7 +260,16 @@ double face_fraction(double a1, double a2) {
 
     a_sig = std::max(a_min, std::min(a_sig, a_max));
 
-    return a_sig;
+
+    if (a_min == 0.0) {
+        return 0.0;
+    }
+    if (a_max == 1.0) {
+        return 1.0;
+    }
+    return a_min;
+
+    //return a_sig;
 }
 
 void Transfer::fluxes_CRP(ICell &cell, Direction dir) {
@@ -440,12 +449,12 @@ void Transfer::update_ver1(Mesh& mesh) {
     // Считаем потоки
     static int counter = 0;
     for (auto cell: mesh) {
-        if (counter % 2 == 0) {
-            fluxes_CRP(cell, Direction::X);
-        }
-        else {
-            fluxes_CRP(cell, Direction::Y);
-        }
+        //if (counter % 2 == 0) {
+            fluxes_CRP(cell, Direction::ANY);
+        //}
+        //else {
+        //    fluxes_CRP(cell, Direction::Y);
+        //}
     }
     ++counter;
 
