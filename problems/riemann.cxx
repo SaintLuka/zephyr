@@ -72,19 +72,19 @@ int main() {
     double time = 0.0;
 
     pvd.variables += {"rho_exact",
-                      [&exact, &time](Storage::Item cell) -> double {
+                      [&exact, &time](const Storage::Item &cell) -> double {
                           return exact.density(cell.center().x(), time);
                       }};
     pvd.variables += {"u_exact",
-                      [&exact, &time](Storage::Item cell) -> double {
+                      [&exact, &time](const Storage::Item &cell) -> double {
                           return exact.velocity(cell.center().x(), time);
                       }};
     pvd.variables += {"p_exact",
-                      [&exact, &time](Storage::Item cell) -> double {
+                      [&exact, &time](const Storage::Item &cell) -> double {
                           return exact.pressure(cell.center().x(), time);
                       }};
     pvd.variables += {"e_exact",
-                      [&exact, &time](Storage::Item cell) -> double {
+                      [&exact, &time](const Storage::Item &cell) -> double {
                           return exact.energy(cell.center().x(), time);
                       }};
     pvd.variables += {"c",
@@ -92,7 +92,7 @@ int main() {
                           return eos.sound_speed_rp(cell(U).rho1, cell(U).p1);
                       }};
     pvd.variables += {"c_exact",
-                      [&exact, &time](Storage::Item cell) -> double {
+                      [&exact, &time](const Storage::Item &cell) -> double {
                           return exact.sound_speed(cell.center().x(), time);
                       }};
 

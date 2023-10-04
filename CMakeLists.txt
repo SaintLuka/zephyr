@@ -32,7 +32,7 @@ add_subdirectory(zephyr)
 
 message(STATUS "zephyr: build shared")
 
-add_library(zephyr SHARED ${ZEPHYR_SOURCES})
+add_library(zephyr SHARED ${ZEPHYR_SOURCES} zephyr/math/cfd/flux/num_flux.cpp)
 target_link_libraries(zephyr PUBLIC ${Boost_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
 target_include_directories(zephyr PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>

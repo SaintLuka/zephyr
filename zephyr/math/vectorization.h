@@ -6,7 +6,9 @@
     \
     template<typename OtherDerived> \
     CustomVector(const Eigen::MatrixBase<OtherDerived>& other) { \
-        *reinterpret_cast<Eigen::Matrix<double, CustomVector::size(), 1>*>(this) = other; \
+        for(int i = 0; i < CustomVector::size(); ++i){ \
+            ((double*)this)[i] = other(i); \
+        } \
     } \
     \
     template<typename OtherDerived> \
@@ -15,11 +17,11 @@
         return *this; \
     } \
     \
-    const auto& vec() const { \
+    const auto &vec() const { \
         return *reinterpret_cast<const Eigen::Matrix<double, CustomVector::size(), 1> *>(this); \
     } \
     \
-    auto & vec() { \
+    auto &vec() { \
         return *reinterpret_cast<Eigen::Matrix<double, CustomVector::size(), 1> *>(this); \
     } \
     \

@@ -35,7 +35,6 @@ int main() {
     pvd.variables += {"bound", get_bound};
 
     // Геометрия области
-    double h = 0.5;
     Rectangle rect(-1.0, 1.0, -1.0, 1.0, false);
     rect.set_nx(200);
     rect.set_boundary_flags(

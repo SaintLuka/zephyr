@@ -24,7 +24,7 @@ public:
     virtual double max_time() const = 0;
 
     ///@brief Получить используемый УрС
-    virtual const Eos* get_eos() const = 0;
+    virtual const Eos& get_eos() const = 0;
 
     ///@brief Получить положение разрыва
     virtual double get_x_jump() const = 0;

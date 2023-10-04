@@ -69,7 +69,7 @@ int main() {
     IdealGas eos("Air");
     double T0 = 20.0_C;
     double P0 = 1.0_bar;
-    double R0 = eos.density_pt(P0, T0);
+    double R0 = 1.0 / eos.volume_pt(P0, T0);
 
     // Создаем одномерную сетку
     Rectangle rect(0.0, 4.0, -2.0, 4.0);
