@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.5)
 
 set(CMAKE_LIB_NAME zephyr)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS_DEBUG   "-Wno-attributes -Wno-unused-result -O0 -g")
 set(CMAKE_CXX_FLAGS_RELEASE "-Wno-attributes -Wno-unused-result -O3")
 
@@ -32,7 +32,7 @@ add_subdirectory(zephyr)
 
 message(STATUS "zephyr: build shared")
 
-add_library(zephyr SHARED ${ZEPHYR_SOURCES})
+add_library(zephyr SHARED ${ZEPHYR_SOURCES} zephyr/math/cfd/flux/num_flux.cpp)
 target_link_libraries(zephyr PUBLIC ${Boost_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
 target_include_directories(zephyr PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>
