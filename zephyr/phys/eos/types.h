@@ -1,21 +1,22 @@
 #pragma once
 
 #include <cmath>
+#include <zephyr/phys/fractions.h>
 
 namespace zephyr { namespace phys {
 
 /// @brief Термодинамическая величина +
 /// производные по плотности и энергии
 struct dRdE {
-    double value = NAN;
+    double val = NAN;
     double dR = NAN;
     double dE = NAN;
 
     dRdE(double value, double dR = NAN, double dE = NAN)
-        : value(value), dR(dR), dE(dE) { }
+        : val(value), dR(dR), dE(dE) { }
 
     operator double() const {
-        return value;
+        return val;
     };
 };
 
@@ -34,12 +35,25 @@ struct dPdT {
     };
 };
 
+/// @brief Пара равновесных термодинамических величин
+struct PairPT {
+    double P;
+    double T;
+};
+
+/// @brief Массив для хранения удельных объемов
+using SpecVolumes = std::array<double, Fractions::max_size>;
+
 /// @brief Дополнительные аргументы УрС
+// TODO: Использовать начальные приближения для объемов
 struct Options {
     bool deriv  = false; ///< Вычислять производные
     double rho0 = NAN;   ///< Начальное приближение плотности
     double P0   = NAN;   ///< Начальное приближение давления
     double T0   = NAN;   ///< Начальное приближение температуры
+
+    /// @brief Начальные приближения для удельных объемов
+    double* vols = nullptr;
 };
 
 }

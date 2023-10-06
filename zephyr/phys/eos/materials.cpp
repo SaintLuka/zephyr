@@ -31,6 +31,11 @@ const Eos& Materials::operator[](int idx) const {
     return *m_materials[idx];
 }
 
+// Обратный якобиан D(x, y) / D(T, P)
+inline double inv_J(dPdT& x, dPdT& y) {
+    return 1.0 / (x.dT * y.dP - x.dP * y.dT);
+}
+
 dRdE Materials::pressure_re(double rho, double eps,
                             const Fractions& beta, const Options& options) const {
     // Случай одного материала
@@ -39,27 +44,16 @@ dRdE Materials::pressure_re(double rho, double eps,
         return m_materials[idx]->pressure_re(rho, eps, options);
     }
 
-    // Решаем v = sum_i beta_i v_i(P, T)
-    double vol = 1.0 / rho;
-    double P = std::isnan(options.T0) ? 1.0e5 : options.P0;
-    double T = std::isnan(options.T0) ? 300.0 : options.T0;
+    auto pair = find_PT(rho, eps, beta, options);
 
-    double err = 1.0;
-    int counter = 0;
-    while (err > 1.0e-10 && counter < 10) {
-        auto v = volume_pt(P, T, beta);
-        auto e = energy_pt(P, T, beta);
+    dRdE P{pair.P};
+    if (options.deriv) {
+        auto v = volume_pt(pair.P, pair.T, beta);
+        auto e = energy_pt(pair.P, pair.T, beta);
+        double inv_D = inv_J(v, e);
 
-        // 1.0 / Якобиан
-        double D = 1.0 / (v.dP * e.dT - v.dT * e.dP);
-
-        double dP = D * ((vol - v.val) * e.dT - (eps - e.val) * v.dT);
-        double dT = D * ((eps - e.val) * v.dP - (vol - v.val) * e.dP);
-
-        err = std::abs(dP / P) + std::abs(dT / T);
-        P += dP;
-        T += dT;
-        ++counter;
+        P.dE = inv_D * v.dT;
+        P.dR = inv_D * e.dT * sqr(v);
     }
     return P;
 }
@@ -78,12 +72,27 @@ double Materials::energy_rp(double rho, double P,
 
 double Materials::sound_speed_re(double rho, double eps,
         const Fractions& beta, const Options& options) const {
-    return NAN;
+
+    // Случай одного материала
+    int idx = beta.index();
+    if (idx >= 0) {
+        return m_materials[idx]->sound_speed_re(rho, eps, options);
+    }
+
+    auto pair = find_PT(rho, eps, beta, options);
+    return sound_speed_pt(pair.P, pair.T, beta);
 }
 
 double Materials::sound_speed_rp(double rho, double P,
         const Fractions& beta, const Options& options) const {
-    return NAN;
+    // Случай одного материала
+    int idx = beta.index();
+    if (idx >= 0) {
+        return m_materials[idx]->sound_speed_rp(rho, P, options);
+    }
+
+    double T = temperature_rp(rho, P, beta, options);
+    return sound_speed_pt(P, T, beta);
 }
 
 double Materials::pressure_rt(double rho, double T,
@@ -94,15 +103,15 @@ double Materials::pressure_rt(double rho, double T,
         return m_materials[idx]->pressure_rt(rho, T, options);
     }
 
-    // Решаем v = sum_i beta_i v_i(P, T)
+    // Решаем vol = sum_i beta_i vol_i(P, T)
     double vol = 1.0 / rho;
     double P = std::isnan(options.P0) ? 1.0e5 : options.P0;
 
     double err = 1.0;
     int counter = 0;
-    while (err > 1.0e-10 && counter < 10) {
+    while (err > 1.0e-10 && counter < 30) {
         auto v = volume_pt(P, T, beta);
-        double dP = (vol - v.val) / v.dP;
+        double dP = (vol - v) / v.dP;
         err = std::abs(dP / P);
         P += dP;
         ++counter;
@@ -118,15 +127,15 @@ double Materials::temperature_rp(double rho, double P,
         return m_materials[idx]->temperature_rp(rho, P, options);
     }
 
-    // Решаем v = sum_i beta_i v_i(P, T)
+    // Решаем vol = sum_i beta_i vol_i(P, T)
     double vol = 1.0 / rho;
     double T = std::isnan(options.T0) ? 300.0 : options.T0;
 
     double err = 1.0;
     int counter = 0;
-    while (err > 1.0e-10 && counter < 10) {
+    while (err > 1.0e-10 && counter < 30) {
         auto v = volume_pt(P, T, beta);
-        double dT = (vol - v.val) / v.dT;
+        double dT = (vol - v) / v.dT;
         err = std::abs(dT / P);
         T += dT;
         ++counter;
@@ -135,34 +144,88 @@ double Materials::temperature_rp(double rho, double P,
 }
 
 dPdT Materials::volume_pt(double P, double T, const Fractions& beta) const {
-    dPdT v = {0.0, 0.0, 0.0};
+    dPdT vol = {0.0, 0.0, 0.0};
     for (int i = 0; i < size(); ++i) {
         if (beta.has(i)) {
             auto v_i = m_materials[i]->volume_pt(P, T, {.deriv = true});
-            v.val += beta[i] * v_i.val;
-            v.dP  += beta[i] * v_i.dP;
-            v.dT  += beta[i] * v_i.dT;
+            vol.val += beta[i] * v_i.val;
+            vol.dP  += beta[i] * v_i.dP;
+            vol.dT  += beta[i] * v_i.dT;
         }
     }
-    return v;
+    return vol;
 }
 
 dPdT Materials::energy_pt(double P, double T, const Fractions& beta) const {
-    dPdT e = {0.0, 0.0, 0.0};
+    dPdT eps = {0.0, 0.0, 0.0};
     for (int i = 0; i < size(); ++i) {
         if (beta.has(i)) {
             auto e_i = m_materials[i]->energy_pt(P, T, {.deriv = true});
-            e.val += beta[i] * e_i.val;
-            e.dP  += beta[i] * e_i.dP;
-            e.dT  += beta[i] * e_i.dT;
+            eps.val += beta[i] * e_i.val;
+            eps.dP  += beta[i] * e_i.dP;
+            eps.dT  += beta[i] * e_i.dT;
         }
     }
-    return e;
+    return eps;
 }
 
 StiffenedGas Materials::stiffened_gas(double rho, double P,
-                   const Fractions& beta, const Options& options) const {
-    return StiffenedGas(NAN, NAN, NAN, NAN);
+        const Fractions& beta, const Options& options) const {
+    // Случай одного материала
+    int idx = beta.index();
+    if (idx >= 0) {
+        return m_materials[idx]->stiffened_gas(rho, P, options);
+    }
+
+    double T = temperature_rp(rho, P, beta, options);
+    auto vol = volume_pt(P, T, beta);
+    auto eps = energy_pt(P, T, beta);
+    double inv_D = inv_J(vol, eps);
+
+    double gamma = 1.0 + vol * vol.dT * inv_D;
+    double eps_0 = eps - vol * eps.dT / vol.dT;
+    double P0 = (vol * eps.dT * inv_D - P) / gamma;
+
+    return StiffenedGas(gamma, P0, eps_0, NAN);
+}
+
+PairPT Materials::find_PT(double rho, double eps,
+        const Fractions& beta, const Options& options) const {
+
+    // Решаем vol = sum_i beta_i vol_i(P, T)
+    //        eps = sum_i beta_i eps_i(P, T)
+
+    double vol = 1.0 / rho;
+    double P = std::isnan(options.P0) ? 1.0e5 : options.P0;
+    double T = std::isnan(options.T0) ? 300.0 : options.T0;
+
+    double err = 1.0;
+    int counter = 0;
+    while (err > 1.0e-12 && counter < 30) {
+
+        auto v = volume_pt(P, T, beta);
+        auto e = energy_pt(P, T, beta);
+
+        double inv_D = inv_J(v, e);
+        double dP = inv_D * ((eps - e) * v.dT - (vol - v) * e.dT);
+        double dT = inv_D * ((vol - v) * e.dP - (eps - e) * v.dP);
+
+        err = std::abs(dP / P) + std::abs(dT / T);
+        P += dP;
+        T += dT;
+        ++counter;
+    }
+
+    return {P, T};
+}
+
+double Materials::sound_speed_pt(double P, double T, const Fractions& beta) const {
+    auto v = volume_pt(P, T, beta);
+    auto e = energy_pt(P, T, beta);
+    double inv_D = inv_J(v, e);
+
+    double c2 = inv_D * sqr(v) * (e.dT + P * v.dT);
+    return std::sqrt(c2);
 }
 
 }}

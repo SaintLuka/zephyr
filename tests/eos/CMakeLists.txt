@@ -1,0 +1,18 @@
+set(MATTER  1)
+set(MIXTURE 1)
+
+if (MATTER)
+    message(STATUS "Build matter test")
+    add_executable(matter matter.cpp)
+    target_include_directories(matter PUBLIC zephyr)
+    target_link_libraries(matter PUBLIC zephyr)
+    install(TARGETS matter DESTINATION tests)
+endif()
+
+if (MIXTURE)
+    message(STATUS "Build mixture test")
+    add_executable(mixture mixture.cpp)
+    target_include_directories(mixture PUBLIC zephyr)
+    target_link_libraries(mixture PUBLIC zephyr)
+    install(TARGETS mixture DESTINATION tests)
+endif()

@@ -373,12 +373,6 @@ int main() {
     SodTest sod_test;
     //ToroTest toro_test(2);
 
-    std::vector<NumFlux::Ptr> nfs(4);
-    nfs[0] = Godunov::create();
-    nfs[1] = HLL::create();
-    nfs[2] = HLLC::create();
-    nfs[3] = CIR1::create();
-
     std::vector<Fluxes> fluxes;
     fluxes.push_back(Fluxes::HLL);
     fluxes.push_back(Fluxes::HLLC);
@@ -387,17 +381,17 @@ int main() {
     fluxes.push_back(Fluxes::RUSANOV);
     fluxes.push_back(Fluxes::GODUNOV);
 
-    std::vector<std::vector<double>> sod_errors(nfs.size(), std::vector<double>(5));
+    std::vector<std::vector<double>> sod_errors(fluxes.size(), std::vector<double>(5));
     for (int i = 0; i < fluxes.size(); ++i)
         sod_errors[i] = RiemannTesterWithSolver(sod_test, fluxes[i]);
 
-//    for (int i = 0; i < nfs.size(); ++i)
+//    for (int i = 0; i < fluxes.size(); ++i)
 //        sod_errors[i] = RiemannTester(sod_test, nfs[i]);
 
 //    std::cout << '\n';
 //
-//    std::vector<std::vector<double>> toro_errors(nfs.size(), std::vector<double>(5));
-//    for (int i = 0; i < nfs.size(); ++i)
+//    std::vector<std::vector<double>> toro_errors(fluxes.size(), std::vector<double>(5));
+//    for (int i = 0; i < fluxes.size(); ++i)
 //        toro_errors[i] = RiemannTesterWithSolver(toro_test, fluxes[i]);
 
     return 0;

@@ -66,7 +66,7 @@ dPdT IdealGas::energy_pt(double P, double T, const Options& options) const {
     return res;
 }
 
-StiffenedGas IdealGas::stiffened_gas(double rho, double p, const Options& options) const {
+StiffenedGas IdealGas::stiffened_gas(double rho, double P, const Options& options) const {
     return StiffenedGas(gamma, 0.0, 0.0, Cv);
 }
 
