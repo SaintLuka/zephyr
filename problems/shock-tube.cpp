@@ -121,7 +121,7 @@ int main () {
     double ymax = H;
 
     // кол-во ячеек по x
-    int nx_cells = 1000;
+    int nx_cells = 500;
 
     // размер ячейки
     double cell_size_x = (xmax - xmin) / nx_cells;
