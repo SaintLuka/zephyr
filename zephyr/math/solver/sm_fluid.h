@@ -4,6 +4,7 @@
 #include <zephyr/math/cfd/limiter.h>
 #include <zephyr/math/cfd/models.h>
 #include <zephyr/phys/eos/ideal_gas.h>
+#include <zephyr/math/cfd/fluxes.h>
 
 namespace zephyr { namespace math {
 
@@ -50,7 +51,10 @@ public:
     static State datatype();
 
     ///@brief Конструктор класса, параметры по умолчанию
-    SmFluid();
+    SmFluid(IdealGas &eos);
+
+    ///@brief 
+    double CFL() const;
 
     void compute_grad(EuCell &cell, int stage);
 
@@ -66,8 +70,6 @@ public:
     /// Convection и написать собственную функцию скорости
     virtual Vector3d velocity(const Vector3d& c) const;
 
-protected:
-
     /// @brief Шаг интегрирования на предыдущем вызове update()
     double dt() const;
 
@@ -79,8 +81,12 @@ protected:
 protected:
     
     double m_dt;        ///< Шаг интегрирования
+    double m_time;
+    int m_step=0;
     Limiter m_limiter;  ///< Ограничитель
     double m_CFL;
+    NumFlux::Ptr m_nf;
+    IdealGas m_eos;
 };
 }
 }

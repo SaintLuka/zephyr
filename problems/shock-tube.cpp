@@ -128,8 +128,7 @@ int main () {
 
     // сек
     double time = 0.0;
-    double max_time = 1.0;
-    double dt = 1.0;
+    double max_time = 0.05;
 
     //шаг
     int n_step = 0;
@@ -139,6 +138,8 @@ int main () {
     // Переменные для сохранения
     pvd.variables += {"rho", get_rho};
     pvd.variables += {"u", get_u};
+    pvd.variables += {"v", get_v};
+    pvd.variables += {"w", get_w};
     pvd.variables += {"p", get_p};
     pvd.variables += {"e", get_e};
     pvd.variables += {"inside", get_inside};
@@ -154,19 +155,21 @@ int main () {
 
 
     // Создать решатель
-    auto solver = zephyr::math::SmFluid();
+    auto solver = zephyr::math::SmFluid(eos);
 
-    while (time <= max_time) {
+    while (n_step < 1000) {
         std::cout << "\tStep: " << std::setw(6) << n_step << ";"
                   << "\tTime: " << std::setw(6) << std::setprecision(3) << time << "\n";
 
-        pvd.save(mesh, time);
+        if (std::fmod(n_step, 20) == 0) {
+            pvd.save(mesh, time);
+        }
 
         // Шаг решения
-        solver.update(mesh, eos);
+        solver.update(mesh);
 
         n_step += 1;
-        time += dt;
+        time = solver.get_time();
     }
 
     return 0;
