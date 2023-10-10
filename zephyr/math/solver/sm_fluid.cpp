@@ -112,7 +112,7 @@ void SmFluid::fluxes(Mesh &mesh) {
 };
 
 // Рунге-Кутта 2ого порядка
-void SmFluid::fluxes2(Mesh &mesh, int stage=1) {
+void SmFluid::fluxes2(Mesh &mesh, int stage) {
     for (auto cell: mesh) {
         // Примитивный вектор в ячейке
         PState zc = cell(U).get_state1();
@@ -180,7 +180,7 @@ void SmFluid::fluxes2(Mesh &mesh, int stage=1) {
 
 void SmFluid::update(Mesh& mesh) {
     m_dt = compute_dt(mesh);
-    fluxes2(mesh);
+    fluxes2(mesh, 1);
     // Обновляем слои
     for (auto cell: mesh) {
         cell(U).swap();
