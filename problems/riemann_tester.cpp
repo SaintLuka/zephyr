@@ -1,5 +1,6 @@
 #include "fast.h"
 #include <zephyr/math/solver/mm_fluid.h>
+#include <zephyr/math/solver/sm_fluid.h>
 
 #include <fstream>
 #include <zephyr/math/cfd/fluxes.h>
@@ -17,11 +18,8 @@ using namespace zephyr::math::smf;
 
 using zephyr::math::RiemannSolver;
 
-struct _U_ {
-    double rho1, rho2;
-    Vector3d v1, v2;
-    double p1, p2;
-    double e1, e2;
+struct _U_ : public SmFluid::State {
+    bool inside;
 };
 
 // Для быстрого доступа по типу
@@ -293,6 +291,7 @@ std::vector<double> RiemannTesterWithSolver(const ClassicTest &test, Fluxes flux
                           return exact.sound_speed(cell.center().x(), time);
                       }};
 
+
     // Создаем одномерную сетку
     double H = 0.05 * (test.xmax() - test.xmin());
     Rectangle rect(test.xmin(), test.xmax(), -H, +H);
@@ -305,7 +304,8 @@ std::vector<double> RiemannTesterWithSolver(const ClassicTest &test, Fluxes flux
     // Создать сетку
     Mesh mesh(U, &rect);
 
-    MmFluid solver(eos, flux);
+    //MmFluid solver(eos, flux);
+    SmFluid solver(eos, flux);
     solver.init_cells(mesh, test);
 
     // Число Куранта
@@ -324,7 +324,7 @@ std::vector<double> RiemannTesterWithSolver(const ClassicTest &test, Fluxes flux
         solver.compute_dt(mesh);
 
         // Расчет по некоторой схеме
-        solver.fluxes(mesh);
+        solver.fluxes2(mesh);
 
         // Обновляем слои
         solver.update(mesh);
@@ -376,7 +376,7 @@ int main() {
     fluxes.push_back(Fluxes::HLLC2);
     fluxes.push_back(Fluxes::CIR2);
     fluxes.push_back(Fluxes::RUSANOV);
-    fluxes.push_back(Fluxes::GODUNOV);
+    //fluxes.push_back(Fluxes::GODUNOV);
 
     std::vector<std::vector<double>> sod_errors(fluxes.size(), std::vector<double>(5));
 
