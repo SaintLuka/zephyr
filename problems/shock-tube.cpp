@@ -166,8 +166,8 @@ int main () {
         }
 
         solver.compute_dt(mesh);
-        solver.fluxes2(mesh);
-        solver.update(mesh);
+        solver.fluxes(mesh, 1);
+        solver.update(mesh, 1);
 
         n_step += 1;
         time = solver.get_time();

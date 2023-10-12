@@ -24,31 +24,52 @@ class SmFluid {
 public:
 
     struct State {
-        double rho1, rho2, rhoh;
-        Vector3d v1, v2, vh;
-        double p1, p2, ph;
-        double e1, e2, eh;
+        double rho1, rho2, rhoh, rhoh2;
+        Vector3d v1, v2, vh, vh2;
+        double p1, p2, ph, ph2;
+        double e1, e2, eh, eh2;
+        Flux P1, P2, P3, P4;
 
-        PState get_state1() const {
-            return {rho1, v1, p1, e1};
-        };
+        PState get_state(int stage) const {
+            if (stage == 0) {
+                return {rho1, v1, p1, e1};
+            }
+            if (stage == 1) {
+                return {rhoh, vh, ph, eh};
+            }
+            if (stage == 2) {
+                return {rho2, v2, p2, e2};
+            }
+            if (stage == 3) {
+                return {rhoh2, vh2, ph2, eh2};
+            }
+        }
 
-        PState get_state_h() const {
-            return {rhoh, vh, ph, eh};
-        };
-
-        void set_state2(const PState& z) {
-            rho2 = z.density;
-            v2 = z.velocity;
-            p2 = z.pressure;
-            e2 = z.energy;
-        };
-
-        void set_state_h(const PState &z) {
-            rhoh = z.density;
-            vh = z.velocity;
-            ph = z.pressure;
-            eh = z.energy;
+        void set_state(const PState& z, int stage) {
+            if (stage == 0) {
+                rho1 = z.density;
+                v1 = z.velocity;
+                p1 = z.pressure;
+                e1 = z.energy;
+            }
+            if (stage == 1) {
+                rhoh = z.density;
+                vh = z.velocity;
+                ph = z.pressure;
+                eh = z.energy;
+            }
+            if (stage == 2) {
+                rho2 = z.density;
+                v2 = z.velocity;
+                p2 = z.pressure;
+                e2 = z.energy;
+            }
+            if (stage == 3) {
+                rhoh2 = z.density;
+                vh2 = z.velocity;
+                ph2 = z.pressure;
+                eh2 = z.energy;
+            }
         }
 
         void swap() {
@@ -56,7 +77,8 @@ public:
             std::swap(v1, v2);
             std::swap(p1, p2);
             std::swap(e1, e2);
-        };
+        }
+        
     };
 
     /// @brief Получить экземпляр расширенного вектора состояния
@@ -98,11 +120,16 @@ public:
     ///@brief
     [[nodiscard]] double get_step() const;
 
+    Flux calc_flux(ICell &cell, int stage);
+
     ///@brief 
     void fluxes(Mesh &mesh);
 
     ///@brief
     void fluxes2(Mesh &mesh);
+
+    ///@brief
+    void fluxes4(Mesh &mesh);
 
 protected:
     const phys::Eos &m_eos;
