@@ -2,11 +2,11 @@
 #include <zephyr/math/cfd/face_extra.h>
 #include <zephyr/math/cfd/models.h>
 
-namespace zephyr { namespace math {
+namespace zephyr::math {
 
 using mesh::Storage;
 using namespace geom;
-using namespace smf;
+using namespace mmf;
 
 static const MmFluid::State U = MmFluid::datatype();
 
@@ -14,8 +14,8 @@ static const MmFluid::State U = MmFluid::datatype();
     return {};
 }
 
-MmFluid::MmFluid(const phys::Eos &eos, Fluxes flux = Fluxes::HLLC2) : m_eos(eos) {
-    m_nf = NumFlux::create(flux);
+MmFluid::MmFluid(const phys::Eos &eos, Fluxes flux = Fluxes::GODUNOV) : m_eos(eos) {
+    m_nf = MmNumFlux::create(flux);
     m_CFL = 0.9;
     m_dt = std::numeric_limits<double>::max();
 }
@@ -30,16 +30,6 @@ void MmFluid::set_CFL(double CFL) {
 
 [[nodiscard]] double MmFluid::dt() const {
     return m_dt;
-}
-
-void MmFluid::init_cells(Mesh &mesh, const phys::ClassicTest &test) {
-    // Заполняем начальные данные
-    for (auto cell: mesh) {
-        cell(U).rho1 = test.density(cell.center());
-        cell(U).v1 = test.velocity(cell.center());
-        cell(U).p1 = test.pressure(cell.center());
-        cell(U).e1 = m_eos.energy_rp(cell(U).rho1, cell(U).p1);
-    }
 }
 
 double MmFluid::compute_dt(Mesh &mesh) {
@@ -67,7 +57,7 @@ void MmFluid::fluxes(Mesh &mesh) {
     // Расчет по некоторой схеме
     for (auto cell: mesh) {
         // Примитивный вектор в ячейке
-        PState zc(cell(U).rho1, cell(U).v1, cell(U).p1, cell(U).e1);
+        PState zc(cell(U).rho1, cell(U).v1, cell(U).p1, cell(U).e1, cell(U).t1, cell(U).mass_frac1);
 
         // Консервативный вектор в ячейке
         QState qc(zc);
@@ -96,7 +86,7 @@ void MmFluid::fluxes(Mesh &mesh) {
             PState zp = zn.in_local(normal);
 
             // Численный поток на грани
-            auto loc_flux = m_nf->flux(zm, zp, m_eos);
+            auto loc_flux = m_nf->mm_flux(zm, zp, m_eos);
             loc_flux.to_global(normal);
 
             // Суммируем поток
@@ -128,7 +118,7 @@ void MmFluid::update(Mesh &mesh) {
 }
 
 void MmFluid::set_num_flux(Fluxes flux) {
-    m_nf = NumFlux::create(flux);
+    m_nf = MmNumFlux::create(flux);
 }
 
 [[nodiscard]] double MmFluid::get_time() const {
@@ -143,5 +133,4 @@ void MmFluid::set_num_flux(Fluxes flux) {
     return m_nf->get_name();
 }
 
-}
 }

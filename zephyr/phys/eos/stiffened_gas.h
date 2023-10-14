@@ -2,7 +2,7 @@
 
 #include <zephyr/phys/eos/eos.h>
 
-namespace zephyr { namespace phys {
+namespace zephyr::phys {
 
 /// @brief Двучленное уравнение состояния
 class StiffenedGas : public Eos {
@@ -72,5 +72,4 @@ public:
 
 };
 
-}
 }
