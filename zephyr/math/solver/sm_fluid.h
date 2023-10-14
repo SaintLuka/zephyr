@@ -128,6 +128,8 @@ public:
     ///@brief
     void fluxes2(Mesh &mesh);
 
+    void fluxes3(Mesh &mesh);
+
     ///@brief
     void fluxes4(Mesh &mesh);
 

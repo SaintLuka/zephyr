@@ -126,6 +126,38 @@ void SmFluid::fluxes2(Mesh &mesh) {
     }
 }
 
+//leapfrog
+void SmFluid::fluxes3(Mesh &mesh) {
+    for (auto cell : mesh) {
+        // Примитивный вектор в ячейке
+        PState zc0 = cell(U).get_state(0);
+        // Консервативный вектор в ячейке
+        QState qc0(zc0);
+        // Расчет потока P1
+        cell(U).P1 = calc_flux(cell, 0);
+        //
+        QState Qc1 = qc0.vec() - m_dt / cell.volume() * cell(U).P1.vec();
+        //
+        PState Zc1(Qc1, m_eos);
+        //
+        cell(U).set_state(Zc1, 1);
+    }
+    for (auto cell : mesh) {
+        // Примитивный вектор в ячейке
+        PState zc0 = cell(U).get_state(0);
+        // Консервативный вектор в ячейке
+        QState qc0(zc0);
+        // Расчет потока P1
+        cell(U).P2 = calc_flux(cell, 1);
+        //
+        QState Qc2 = qc0.vec() - 0.5 * m_dt / cell.volume() * cell(U).P1.vec() - m_dt / cell.volume() * cell(U).P2.vec();
+        //
+        PState Zc2(Qc2, m_eos);
+        //
+        cell(U).set_state(Zc2, 2);
+    }    
+}
+
 // Рунге-Кутта 4ого порядка
 void SmFluid::fluxes4(Mesh &mesh) {
     for (auto cell : mesh) {
@@ -172,8 +204,9 @@ void SmFluid::fluxes4(Mesh &mesh) {
         // Расчет потока P3
         cell(U).P3 = calc_flux(cell, 2);
         //
-        QState Qc3 = 2 * qc2.vec() - 2 * qc1.vec() + qc0.vec() - 2 * m_dt / cell.volume() * cell(U).P2.vec() + \
-                                                                0.5 * m_dt / cell.volume() * cell(U).P1.vec();
+        QState Qc3 = 2 * qc2.vec() - 2 * qc1.vec() + qc0.vec() - \
+                        2 * m_dt / cell.volume() * cell(U).P2.vec() + \
+                        0.5 * m_dt / cell.volume() * cell(U).P1.vec();
         //
         PState Zc3(Qc3, m_eos);
         //
