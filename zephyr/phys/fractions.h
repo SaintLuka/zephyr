@@ -2,9 +2,10 @@
 
 #include <array>
 
-namespace zephyr { namespace phys {
+namespace zephyr {
+namespace phys {
 
-/// @brief Вектор массовых или объемныых концентраций
+/// @brief Вектор массовых или объемных концентраций
 struct Fractions {
     /// @brief Максимальное число компонент
     static const int max_size = 5;
@@ -15,8 +16,11 @@ struct Fractions {
     /// @brief Конструктор со списком инициализации
     Fractions(std::initializer_list<double> list);
 
+    /// @brief Конструктор из вектора
+    Fractions(const std::vector<double> &list);
+
     /// @brief Содержит компоненту с индексом idx
-    bool has(int idx) const;
+    [[nodiscard]] bool has(int idx) const;
 
     /// @brief Оператор доступа по индексу
     double &operator[](int idx);
@@ -24,14 +28,20 @@ struct Fractions {
     /// @brief Оператор доступа по индексу
     const double &operator[](int idx) const;
 
+    /// @brief Оператор доступа по индексу
+    double &operator[](size_t idx);
+
+    /// @brief Оператор доступа по индексу
+    const double &operator[](size_t idx) const;
+
     /// @brief Возвращает true (чистое вещество), если массив содержит
     /// единственную концентрацию больше нуля, в остальных случаях false.
-    bool is_pure() const;
+    [[nodiscard]] bool is_pure() const;
 
     /// @brief Если массив содержит единственную концентрацию,
     /// отличную от нуля, тогда возвращается индекс ненулевого элемента.
     /// Иначе значение -1.
-    int index() const;
+    [[nodiscard]] int index() const;
 
     /// @brief Нормализовать концентрации (сумма равна единице)
     void normalize();
@@ -40,11 +50,14 @@ struct Fractions {
     /// концентрации, затем нормализовать концентрации
     void cutoff(double eps = 1.0e-6);
 
+    [[nodiscard]] size_t get_begin_size() const;
+
 private:
-    std::array<double, max_size> m_data;
+    size_t m_begin_size = max_size;
+    std::array<double, max_size> m_data{};
 };
 
-std::ostream& operator<<(std::ostream& os, const Fractions& frac);
+std::ostream &operator<<(std::ostream &os, const Fractions &frac);
 
 } // namespace phys
 } // namespace zephyr

@@ -1,6 +1,8 @@
 #include <zephyr/math/cfd/fluxes.h>
+#include "num_flux.h"
 
-namespace zephyr { namespace math {
+
+namespace zephyr::math {
 
 NumFlux::Ptr NumFlux::create(Fluxes flux) {
     switch (flux) {
@@ -25,5 +27,12 @@ NumFlux::Ptr NumFlux::create(Fluxes flux) {
     }
 }
 
+MmNumFlux::Ptr MmNumFlux::create(Fluxes flux) {
+    switch (flux) {
+        case Fluxes::GODUNOV:
+            return Godunov::create();
+        default:
+            throw std::runtime_error("Unknown multi material numerical flux");
+    }
 }
 }

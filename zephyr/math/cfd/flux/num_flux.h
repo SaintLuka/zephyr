@@ -5,7 +5,7 @@
 #include <zephyr/phys/eos/eos.h>
 #include <zephyr/math/cfd/models.h>
 
-namespace zephyr { namespace math {
+namespace zephyr::math {
 
 enum class Fluxes {
     CIR1,
@@ -32,7 +32,26 @@ public:
     }
 
     virtual std::string get_name() const { return "Flux"; }
+
+    virtual ~NumFlux() = default;
 };
 
-}
+/// @brief Абстрактный класс для вычисления численного потока
+class MmNumFlux {
+public:
+    using Ptr = std::unique_ptr<MmNumFlux>;
+
+    /// @brief Создать нужный класс по enum
+    static MmNumFlux::Ptr create(Fluxes flux);
+
+    /// @brief Численный поток для классической задачи
+    virtual mmf::Flux mm_flux(const mmf::PState& zL, const mmf::PState& zR, const phys::Eos& eos) const {
+        throw std::runtime_error("NumFlux::flux(PState...) is not implemented");
+    }
+
+    virtual std::string get_name() const { return "Mm_Flux"; }
+
+    virtual ~MmNumFlux() = default;
+};
+
 }
