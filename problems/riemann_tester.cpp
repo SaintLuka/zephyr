@@ -324,7 +324,7 @@ std::vector<double> RiemannTesterWithSolver(const ClassicTest &test, Fluxes flux
         solver.compute_dt(mesh);
 
         // Расчет по некоторой схеме
-        solver.fluxes2(mesh);
+        solver.fluxes3(mesh);
 
         // Обновляем слои
         solver.update(mesh);
