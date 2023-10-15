@@ -1,6 +1,6 @@
 #pragma once
 
-#include <zephyr/geom/face.h>
+#include <zephyr/geom/primitives/amr_face.h>
 
 #include <zephyr/mesh/storage.h>
 #include <zephyr/mesh/face.h>
@@ -68,10 +68,10 @@ public:
     IFaces faces(Direction dir = Direction::ANY) const;
 
     /// @brief Получить смежную ячейку через грань
-    ICell neib(const Face &face) const;
+    ICell neib(const AmrFace &face) const;
 
     /// @brief Получить смежную ячейку через грань
-    ICell neighbor(const Face &face) const;
+    ICell neighbor(const AmrFace &face) const;
 
     /// @brief Получить указатель на смежную ячейку через грань
     ICell neib(const IFace &face) const;

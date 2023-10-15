@@ -1,6 +1,6 @@
 #pragma once
 
-#include <zephyr/mesh/generator/generator.h>
+#include <zephyr/geom/generator/generator.h>
 #include <zephyr/mesh/storage.h>
 #include <zephyr/mesh/distributor.h>
 
@@ -8,12 +8,13 @@
 #include <zephyr/utils/threads.h>
 
 
+
 namespace zephyr { namespace mesh {
 
 #define EXEC_RESULT typename std::result_of<F(ICell)>::type
 
-using namespace generator;
 using zephyr::utils::threads;
+using namespace zephyr::geom;
 
 class Mesh {
 public:
@@ -21,7 +22,13 @@ public:
     template<class T>
     Mesh(const T &val, Generator *gen)
             : m_locals(val), m_aliens(val) {
-        initialize(gen);
+        initialize(gen->create());
+    }
+
+    template <class T>
+    Mesh(const T&val, const Grid& grid)
+            : m_locals(val), m_aliens(val) {
+        initialize(grid);
     }
 
 
@@ -78,7 +85,8 @@ public:
     }
 
 private:
-    void initialize(Generator *gen);
+
+    void initialize(const Grid& gen);
 
     /// @brief Осуществляет инициализацию хранилища перед использованием
     /// функций адаптации, выполняется один раз после создания хранилища.

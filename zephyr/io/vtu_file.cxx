@@ -1,6 +1,6 @@
 #include <fstream>
 
-#include <zephyr/geom/cell.h>
+#include <zephyr/geom/primitives/amr_cell.h>
 #include <zephyr/io/vtu_file.h>
 
 
@@ -43,7 +43,7 @@ struct Handler {
     }
 
     /// @brief VTK тип ячейки
-    int type(const geom::Cell& cell) {
+    int type(const geom::AmrCell& cell) {
         auto& faces = cell.faces;
         auto& vertices = cell.vertices;
 
@@ -100,7 +100,7 @@ struct Handler {
     }
 
     /// @brief Количество вершин элемента
-    int n_points(geom::Cell& cell) {
+    int n_points(geom::AmrCell& cell) {
         auto& faces = cell.faces;
         auto& vertices = cell.vertices;
 
@@ -139,7 +139,7 @@ struct Handler {
     }
 
     /// @brief Записать в файл координаты вершин элемента
-    void write_points(std::ofstream &file, const geom::Cell& cell) {
+    void write_points(std::ofstream &file, const geom::AmrCell& cell) {
         auto& faces = cell.faces;
         auto& vertices = cell.vertices;
 
@@ -204,7 +204,7 @@ struct Handler {
     }
 
     /// @brief Записать порядок вершин элемента
-    void write_connectivity(std::ofstream &file, geom::Cell& cell, size_t &counter) {
+    void write_connectivity(std::ofstream &file, geom::AmrCell& cell, size_t &counter) {
         auto n = n_points(cell);
         for (int i = 0; i < n; ++i) {
             size_t val = counter++;

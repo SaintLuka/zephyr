@@ -545,8 +545,8 @@ int check_connectivity(Storage &locals, size_t ic, Storage& aliens, int rank) {
         auto &face = cell.geom().faces[iface];
         if (face.is_undefined()) continue;
 
-        if (face.boundary != FaceFlag::ORDINARY &&
-            face.boundary != FaceFlag::PERIODIC) {
+        if (face.boundary != Boundary::ORDINARY &&
+            face.boundary != Boundary::PERIODIC) {
             // Простая граничная грань
             continue;
         }
@@ -604,8 +604,8 @@ int check_connectivity(Storage &locals, size_t ic, Storage& aliens, int rank) {
         for (auto &nface: neib.geom().faces) {
             if (nface.is_undefined()) continue;
 
-            if (nface.boundary != FaceFlag::ORDINARY &&
-                nface.boundary != FaceFlag::PERIODIC) {
+            if (nface.boundary != Boundary::ORDINARY &&
+                nface.boundary != Boundary::PERIODIC) {
                 // простая граничная грань
                 continue;
             }

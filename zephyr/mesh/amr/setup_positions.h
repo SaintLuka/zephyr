@@ -30,7 +30,7 @@ void setup_positions(Storage &cells, const Statistics &count)
     int coarse_counter = count.n_cells;
     int refine_counter = count.n_cells + count.n_parents;
     for (int ic = 0; ic < count.n_cells; ++ic) {
-        Cell& cell = cells[ic].geom();
+        AmrCell& cell = cells[ic].geom();
 
         if (cell.flag == 0) {
             cell.next = ic;

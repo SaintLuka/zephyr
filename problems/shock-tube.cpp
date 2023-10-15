@@ -30,8 +30,8 @@ Mesh make_pipe(double xmin, double xmax, double ymin, double ymax, double H, dou
     
     rect.set_nx(nx_cells);
     rect.set_boundary_flags(
-            FaceFlag::WALL, FaceFlag::WALL,
-            FaceFlag::WALL, FaceFlag::WALL);
+            Boundary::WALL, Boundary::WALL,
+            Boundary::WALL, Boundary::WALL);
 
     Mesh mesh(U, &rect);
     
@@ -57,7 +57,7 @@ Mesh make_pipe(double xmin, double xmax, double ymin, double ymax, double H, dou
             }
             auto neib = face.neib();
             if (!neib(U).inside) {
-                face.set_boundary(FaceFlag::WALL);
+                face.set_boundary(Boundary::WALL);
             }
         }
     }

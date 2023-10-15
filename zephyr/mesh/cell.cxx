@@ -47,11 +47,11 @@ ICell ICell::locals(int idx) {
     return { m_locals, m_aliens, idx };
 }
 
-ICell ICell::neib(const Face &face) const {
+ICell ICell::neib(const AmrFace &face) const {
     return { m_locals, m_aliens, face.adjacent };
 }
 
-ICell ICell::neighbor(const Face &face) const {
+ICell ICell::neighbor(const AmrFace &face) const {
     return { m_locals, m_aliens, face.adjacent };
 }
 
@@ -79,7 +79,7 @@ void ICell::print_neibs_info() const {
     print_info();
 
     std::cout << "\tAll neighbors of cell:\n";
-    for (int i = 0; i < geom::Faces::max_size; ++i) {
+    for (int i = 0; i < geom::AmrFaces::max_size; ++i) {
         auto &face = geom().faces[i];
         if (face.is_undefined() or face.is_boundary()) continue;
 

@@ -50,7 +50,7 @@ public:
     /// @param cell Целевая ячейка, для которой определяется окрестность
     /// @param locals Ссылка на локальное хранилище
     /// @param aliens Ссылка на хранилище ячеек с других процессов
-    void setup(const Cell& cell, Storage &locals, Storage& aliens) {
+    void setup(const AmrCell& cell, Storage &locals, Storage& aliens) {
         scrutiny_check(cell.index < locals.size(), "setup: ic >= locals.size()")
 
         // Эти ячейки не интересуют
@@ -82,7 +82,7 @@ public:
                 }
             }
 #endif
-            Cell& neib = (adj.rank == cell.rank ? locals[adj.index] : aliens[adj.ghost]).geom();
+            AmrCell& neib = (adj.rank == cell.rank ? locals[adj.index] : aliens[adj.ghost]).geom();
 
             neib_levels[neib_count] = neib.level;
             neib_flags[neib_count] = &neib.flag;
@@ -102,7 +102,7 @@ public:
                 for (auto is: sibs) {
                     scrutiny_check(is < locals.size(), "Vicinity: Sibling index out of range")
 
-                    Cell& sib = locals[is].geom();
+                    AmrCell& sib = locals[is].geom();
                     sibs_flags[sibs_count] = &sib.flag;
                     ++sibs_count;
                 }
@@ -180,7 +180,7 @@ struct VicinityList {
 /// @param vicinity_list Ссылка на массив с окружением ячеек
 /// @return true если ячейка изменила свой флаг
 template <int dim>
-bool update_flag(Cell& cell, Storage& locals, const VicinityList<dim>& vicinity_list) {
+bool update_flag(AmrCell& cell, Storage& locals, const VicinityList<dim>& vicinity_list) {
     int ic = cell.index;
     auto vicinity = vicinity_list[ic];
 

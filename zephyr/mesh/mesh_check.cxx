@@ -1,6 +1,6 @@
 #include <zephyr/utils/mpi.h>
 
-#include <zephyr/geom/base.h>
+#include <zephyr/geom/primitives/base.h>
 #include <zephyr/mesh/mesh.h>
 
 namespace zephyr { namespace mesh {
@@ -17,19 +17,19 @@ int check_connectivity(Storage &locals, int ic, Storage& aliens) {
     auto dim = cell.dim;
 
     // Через обычные грани существуют соседи
-    for (int iface = 0; iface < Faces::max_size; ++iface) {
+    for (int iface = 0; iface < AmrFaces::max_size; ++iface) {
         auto &face = cell.faces[iface];
         if (face.is_undefined()) {
             continue;
         }
 
-        if (face.boundary != FaceFlag::ORDINARY &&
-            face.boundary != FaceFlag::PERIODIC) {
+        if (face.boundary != Boundary::ORDINARY &&
+            face.boundary != Boundary::PERIODIC) {
             // Простая граничная грань
             continue;
         }
 
-        Cell neib;
+        AmrCell neib;
         auto& adj = face.adjacent;
 
         if (adj.rank == mpi::rank()) {
@@ -82,8 +82,8 @@ int check_connectivity(Storage &locals, int ic, Storage& aliens) {
                 continue;
             }
 
-            if (nface.boundary != FaceFlag::ORDINARY &&
-                nface.boundary != FaceFlag::PERIODIC) {
+            if (nface.boundary != Boundary::ORDINARY &&
+                nface.boundary != Boundary::PERIODIC) {
                 // простая граничная грань
                 continue;
             }
@@ -187,7 +187,7 @@ int Mesh::check_base() {
 
     int res = 0;
     for (int ic = 0; ic < m_locals.size(); ++ic) {
-        Cell& cell = m_locals[ic].geom();
+        AmrCell& cell = m_locals[ic].geom();
 
         if (cell.index != ic) {
             std::cout << "\tWrong cell index\n";
@@ -260,7 +260,7 @@ int Mesh::check_refined() {
 
     int res = 0;
     for (int ic = 0; ic < m_locals.size(); ++ic) {
-        Cell& cell = m_locals[ic].geom();
+        AmrCell& cell = m_locals[ic].geom();
 
         if (cell.is_undefined()) {
             continue;

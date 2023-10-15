@@ -21,7 +21,7 @@ namespace zephyr { namespace mesh { namespace amr {
 /// выставляется со старой грани. Если подграни склеиваются, то adjacent
 /// у объединенной грани будет такой, какой был у старой грани.
 template<int dim>
-void retain_cell(Cell& cell, Storage &locals, Storage& aliens) {
+void retain_cell(AmrCell& cell, Storage &locals, Storage& aliens) {
     // Ячейка не требует разбиения, необходимо пройти по граням,
     // возможно, необходимо разбить грань или собрать
     auto rank = cell.rank;
@@ -36,19 +36,19 @@ void retain_cell(Cell& cell, Storage &locals, Storage& aliens) {
         }
 #if SCRUTINY
         if (adj.rank == rank && adj.index >= locals.size()) {
-            std::cout << "Cell has no local neighbor through the " <<
+            std::cout << "AmrCell has no local neighbor through the " <<
                       side_to_string(side % 6) << " side\n";
             cell.print_info();
-            throw std::runtime_error("Cell has no local neighbor (retain_cell)");
+            throw std::runtime_error("AmrCell has no local neighbor (retain_cell)");
         }
         if (adj.rank != rank && adj.ghost >= aliens.size()) {
-            std::cout << "Cell has no remote neighbor through the " <<
+            std::cout << "AmrCell has no remote neighbor through the " <<
                 side_to_string(side % 6) << " side\n";
             cell.print_info();
-            throw std::runtime_error("Cell has no remote neighbor (retain_cell)");
+            throw std::runtime_error("AmrCell has no remote neighbor (retain_cell)");
         }
 #endif
-        Cell& neib = (adj.rank == rank ? locals[adj.index] : aliens[adj.ghost]).geom();
+        AmrCell& neib = (adj.rank == rank ? locals[adj.index] : aliens[adj.ghost]).geom();
         auto lvl_n = neib.level;
 
         if (lvl_c == lvl_n) {

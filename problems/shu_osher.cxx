@@ -3,6 +3,7 @@
 #include <zephyr/math/cfd/fluxes.h>
 #include <zephyr/math/cfd/models.h>
 #include <zephyr/phys/tests/shu_osher.h>
+#include <zephyr/geom/generator/collection/plane_with_hole.h>
 
 using namespace zephyr::phys;
 using namespace zephyr::math;
@@ -25,6 +26,10 @@ double get_v(Storage::Item cell) { return cell(U).v1.y(); }
 double get_w(Storage::Item cell) { return cell(U).v1.z(); }
 double get_p(Storage::Item cell) { return cell(U).p1; }
 double get_e(Storage::Item cell) { return cell(U).e1; }
+double get_faceL(Storage::Item cell) { return int(cell.geom().faces[0].boundary); }
+double get_faceR(Storage::Item cell) { return int(cell.geom().faces[1].boundary); }
+double get_faceB(Storage::Item cell) { return int(cell.geom().faces[2].boundary); }
+double get_faceT(Storage::Item cell) { return int(cell.geom().faces[3].boundary); }
 
 
 int main() {
@@ -38,6 +43,10 @@ int main() {
     pvd.variables += {"velocity.z", get_w};
     pvd.variables += {"pressure", get_p};
     pvd.variables += {"energy", get_e};
+    pvd.variables += {"faceL", get_faceL};
+    pvd.variables += {"faceR", get_faceR};
+    pvd.variables += {"faceB", get_faceB};
+    pvd.variables += {"faceT", get_faceT};
 
     // Тестовая задача
     ShuOsherTest test;
@@ -47,28 +56,33 @@ int main() {
 
     // Создаем одномерную сетку
     double H = 0.05 * (test.xmax() - test.xmin());
-    Rectangle rect(test.xmin(), test.xmax(), -H, +H);
-    rect.set_sizes(1000, 1);
-    rect.set_boundary_flags(
-            FaceFlag::WALL, FaceFlag::WALL,
-            FaceFlag::WALL, FaceFlag::WALL);
+    //Rectangle rect(test.xmin(), test.xmax(), -H, +H);
+    //rect.set_sizes(100, 2);
+    //Strip rect(test.xmin(), test.xmax(), Strip::Nodes::RANDOM);
+    //rect.set_size(1000);
+    //rect.set_boundary_flags(
+    //        Boundary::WALL, Boundary::WALL);
+
+    generator::collection::PlaneWithHole gen(-5.0, 5.0, -0.5, 0.5, 0.0, 0.0, 0.1);
+    gen.set_nx(200);
 
     // Создать сетку
-    Mesh mesh(U, &rect);
+    Mesh mesh(U, &gen);
 
     // Заполняем начальные данные
+    Vector3d shift = -2.0*Vector3d::UnitX();
     for (auto cell: mesh) {
-        cell(U).rho1 = test.density(cell.center());
-        cell(U).v1   = test.velocity(cell.center());
-        cell(U).p1   = test.pressure(cell.center());
-        cell(U).e1   = test.energy(cell.center());
+        cell(U).rho1 = test.density(cell.center()+shift);
+        cell(U).v1   = test.velocity(cell.center() + shift);
+        cell(U).p1   = test.pressure(cell.center() + shift);
+        cell(U).e1   = test.energy(cell.center() + shift);
     }
 
     // Число Куранта
     double CFL = 0.5;
 
     // Функция вычисления потока
-    NumFlux::Ptr nf = CIR1::create();
+    NumFlux::Ptr nf = HLLC::create();
 
     double time = 0.0;
     double next_write = 0.0;

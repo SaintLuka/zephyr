@@ -1,7 +1,7 @@
 #include <zephyr/math/solver/convection.h>
 
 #include <zephyr/math/cfd/face_extra.h>
-#include <zephyr/geom/face.h>
+#include <zephyr/geom/primitives/amr_face.h>
 
 namespace zephyr { namespace math {
 

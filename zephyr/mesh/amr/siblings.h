@@ -96,7 +96,7 @@ bool can_coarse(Storage& cells, int ic) {
 /// В фукнции используется сложная механика перехода от одного сиблинга
 /// к следующему, что позволяет прервать функцию, не обходя всех сиблингов
 template <int dim>
-bool can_coarse(const Cell& main_cell, Storage& cells) {
+bool can_coarse(const AmrCell& main_cell, Storage& cells) {
     const std::array<Side, CpC(dim)> sides = side_to_next_sibling<dim>();
 
     if (main_cell.flag >= 0) {
@@ -243,7 +243,7 @@ std::array<int, CpC(dim) - 1> get_siblings(Storage &cells, int ic) {
 /// @param main_cell Целевая ячейка (от которой запрос)
 /// @param locals Хранилище ячеек
 template<int dim>
-std::array<int, CpC(dim) - 1> get_siblings(const Cell& main_cell, Storage &locals) {
+std::array<int, CpC(dim) - 1> get_siblings(const AmrCell& main_cell, Storage &locals) {
     std::array<int, CpC(dim) - 1> siblings;
 
     std::array<Side, CpC(dim)> sides = side_to_next_sibling<dim>();

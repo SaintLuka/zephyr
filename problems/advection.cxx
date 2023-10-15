@@ -42,8 +42,8 @@ int main() {
     Rectangle rect(0.0, 1.0, 0.0, 0.6, true);
     rect.set_nx(200);
     rect.set_boundary_flags(
-            FaceFlag::PERIODIC, FaceFlag::PERIODIC,
-            FaceFlag::PERIODIC, FaceFlag::PERIODIC);
+            Boundary::PERIODIC, Boundary::PERIODIC,
+            Boundary::PERIODIC, Boundary::PERIODIC);
 
     // Создать сетку
     Mesh mesh(U, &rect);

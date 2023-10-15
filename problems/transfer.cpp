@@ -152,8 +152,8 @@ int main() {
     Rectangle rect(0.0, 1.0, 0.0, 1.0, false);
     rect.set_nx(200);
     rect.set_boundary_flags(
-            FaceFlag::ZOE, FaceFlag::ZOE,
-            FaceFlag::ZOE, FaceFlag::ZOE);
+            Boundary::ZOE, Boundary::ZOE,
+            Boundary::ZOE, Boundary::ZOE);
 
     // Создать решатель
     Solver solver;

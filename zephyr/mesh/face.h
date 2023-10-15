@@ -1,13 +1,13 @@
 #pragma once
 
-#include <zephyr/geom/face.h>
+#include <zephyr/geom/primitives/amr_face.h>
 
 
 namespace zephyr { namespace mesh {
 
 class ICell;
-using zephyr::geom::Face;
-using zephyr::geom::FaceFlag;
+using zephyr::geom::AmrFace;
+using zephyr::geom::Boundary;
 using zephyr::geom::Vector3d;
 using zephyr::geom::Direction;
 
@@ -22,9 +22,9 @@ public:
     IFace(const ICell &cell, int fid,
             Direction dir = Direction::ANY);
 
-    //Face& face();
+    //AmrFace& face();
 
-    const Face &geom() const;
+    const AmrFace &geom() const;
 
     /// @brief Внешняя нормаль
     const Vector3d &normal() const;
@@ -38,13 +38,13 @@ public:
     ICell neighbor() const;
 
     /// @brief Флаг граничных условий
-    FaceFlag flag() const;
+    Boundary flag() const;
 
     /// @brief Является ли грань граничной
     bool is_boundary() const;
 
     /// @brief Установить флаг грани
-    void set_boundary(FaceFlag flag);
+    void set_boundary(Boundary flag);
 
     /// @brief Площадь (в 3D) или длина (в 2D) грани
     double area() const;
@@ -64,7 +64,7 @@ public:
     IFace &operator++() {
         do {
             ++face_idx;
-        } while (face_idx < geom::Faces::max_size && geom().to_skip(dir));
+        } while (face_idx < geom::AmrFaces::max_size && geom().to_skip(dir));
         return *this;
     }
 

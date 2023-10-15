@@ -42,7 +42,7 @@ void restore_connections_partial(Storage &locals, Storage &aliens, int rank,
         // Ячейка неактуальна, пропускаем
         if (cell.is_undefined()) continue;
 
-        for (int i = 0; i < Faces::max_size; ++i) {
+        for (int i = 0; i < AmrFaces::max_size; ++i) {
             auto &face1 = cell.geom().faces[i];
             if (face1.is_undefined() or face1.is_boundary()) continue;
 

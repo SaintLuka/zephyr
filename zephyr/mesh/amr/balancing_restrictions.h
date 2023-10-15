@@ -22,7 +22,7 @@ namespace zephyr { namespace mesh { namespace amr {
 template<int dim>
 void base_restriction(Storage::Item item, Storage &locals, int max_level) {
     scrutiny_check(item.index() < locals.size(), "base_restrictions: ic >= cells.size()")
-    Cell &cell = item.geom();
+    AmrCell &cell = item.geom();
 
     int flag = cell.flag;
     // Приводим к одному из трех значений { -1, 0, 1 }

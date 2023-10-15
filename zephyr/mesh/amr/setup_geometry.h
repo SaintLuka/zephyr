@@ -26,7 +26,7 @@ void setup_geometry_partial(Storage &locals, Storage& aliens, int rank,
 
 
     for (int ic = from; ic < to; ++ic) {
-        Cell& cell = locals[ic];
+        AmrCell& cell = locals[ic];
 
         if (cell.flag == 0) {
             retain_cell<dim>(cell, locals, aliens);

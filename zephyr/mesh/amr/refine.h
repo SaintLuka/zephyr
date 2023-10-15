@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <zephyr/geom/cell.h>
+#include <zephyr/geom/primitives/amr_cell.h>
 #include <zephyr/geom/maps.h>
 
 #include <zephyr/mesh/amr/common.h>
@@ -17,14 +17,14 @@ namespace zephyr { namespace mesh { namespace amr {
 /// @param parent Родительская ячейка
 /// @return Массив с дочерними ячейками
 template <int dim>
-std::array<geom::Cell, CpC(dim)> create_children(Cell& parent);
+std::array<geom::AmrCell, CpC(dim)> create_children(AmrCell& parent);
 
 /// @brief Создать геометрию дочерних ячеек по родительской ячейке
 /// @param parent Родительская ячейка
 /// @return Массив с дочерними ячейками
-std::array<geom::Cell, CpC(2)> create_children_simple(Cell& parent) {
+std::array<geom::AmrCell, CpC(2)> create_children_simple(AmrCell& parent) {
     using geom::ShortList2D;
-    using geom::Cell;
+    using geom::AmrCell;
 
     std::array<Vector3d, 9> vs;
     vs[0] = parent.vertices[0];
@@ -44,19 +44,19 @@ std::array<geom::Cell, CpC(2)> create_children_simple(Cell& parent) {
     ShortList2D vl2 = {vs[4], vs[8], vs[2], vs[7]};
     ShortList2D vl3 = {vs[8], vs[5], vs[7], vs[3]};
 
-    return {Cell(vl0), Cell(vl1), Cell(vl2), Cell(vl3)};
+    return {AmrCell(vl0), AmrCell(vl1), AmrCell(vl2), AmrCell(vl3)};
 }
 
 /// @brief Создать геометрию дочерних ячеек по родительским вершинам (2D)
 /// @param parent_vertices Вершины родительской ячейки
 /// @return Массив с дочерними ячейками
 template <>
-std::array<geom::Cell, CpC(2)> create_children<2>(Cell& parent) {
+std::array<geom::AmrCell, CpC(2)> create_children<2>(AmrCell& parent) {
     using geom::LargeList2D;
     using geom::Mapping2D;
-    using geom::Cell;
+    using geom::AmrCell;
 
-    const Vertices& vertices = parent.vertices;
+    const AmrVertices& vertices = parent.vertices;
 
     // Собираем отображение ячейки
     LargeList2D vs = {
@@ -93,14 +93,14 @@ std::array<geom::Cell, CpC(2)> create_children<2>(Cell& parent) {
             vs[7], map(0.5, 1.0), vs[8]
     };
 
-    return {Cell(vl0), Cell(vl1), Cell(vl2), Cell(vl3)};
+    return {AmrCell(vl0), AmrCell(vl1), AmrCell(vl2), AmrCell(vl3)};
 }
 
 /// @brief Создать геометрию дочернх ячеек по родительским вершинам (3D)
 /// @param parent_vertices Вершины родительской ячейки
 /// @return Массив с дочерними ячейками
 template <>
-std::array<Cell, CpC(3)> create_children<3>(Cell& parent) {
+std::array<AmrCell, CpC(3)> create_children<3>(AmrCell& parent) {
     LargeList3D& vs = (LargeList3D&) parent.vertices;
    
     ShortList3D vl1 = {vs[iww(0, 0, 0)], vs[iww(1, 0, 0)], vs[iww(0, 1, 0)], vs[iww(1, 1, 0)],
@@ -124,8 +124,8 @@ std::array<Cell, CpC(3)> create_children<3>(Cell& parent) {
     ShortList3D vl0 = {zero, zero, zero, zero, zero, zero, zero, zero};
 
     return {
-            Cell(vl1), Cell(vl2), Cell(vl3), Cell(vl4),
-            Cell(vl5), Cell(vl6), Cell(vl7), Cell(vl8)
+            AmrCell(vl1), AmrCell(vl2), AmrCell(vl3), AmrCell(vl4),
+            AmrCell(vl5), AmrCell(vl6), AmrCell(vl7), AmrCell(vl8)
     };
 }
 
@@ -135,7 +135,7 @@ std::array<Cell, CpC(3)> create_children<3>(Cell& parent) {
 /// @return Массив с дочерними ячейками, дочерние ячейки имеют законченный вид
 /// (необходимое число граней, правильную линковку (на старные ячейки))
 template<int dim>
-std::array<Cell, CpC(dim)> get_children(Cell &cell) {
+std::array<AmrCell, CpC(dim)> get_children(AmrCell &cell) {
     auto children = create_children<dim>(cell);
 
     auto children_by_side = get_children_by_side<dim>();
@@ -184,12 +184,12 @@ std::array<Cell, CpC(dim)> get_children(Cell &cell) {
         } else {
             // Ячейка имела сложную грань
             for (int i: children_by_side[side]) {
-                Cell &child = children[i];
-                Face &child_face = child.faces[side];
+                AmrCell &child = children[i];
+                AmrFace &child_face = child.faces[side];
                 auto child_fc = child_face.center<dim>(child.vertices);
 
                 for (auto s: subface_sides<dim>(side)) {
-                    Face& cell_face = cell.faces[s];
+                    AmrFace& cell_face = cell.faces[s];
                     auto cell_fc = cell_face.center<dim>(cell.vertices);
 
                     if ((child_fc - cell_fc).norm() < 1.0e-5 * cell.size) {
@@ -207,12 +207,12 @@ std::array<Cell, CpC(dim)> get_children(Cell &cell) {
 /// @brief Возвращает итераторы дочерних ячеек
 template <int dim>
 std::array<Storage::Item, CpC(dim)> select_children(
-        Storage& cells, const std::array<Cell, CpC(dim)>& children);
+        Storage& cells, const std::array<AmrCell, CpC(dim)>& children);
 
 /// @brief Возвращает итераторы дочерних ячеек (2D)
 template <>
 std::array<Storage::Item, CpC(2)> select_children<2>(
-        Storage& cells, const std::array<Cell, CpC(2)>& children) {
+        Storage& cells, const std::array<AmrCell, CpC(2)>& children) {
     return {
             cells[children[0].next],
             cells[children[1].next],
@@ -224,7 +224,7 @@ std::array<Storage::Item, CpC(2)> select_children<2>(
 /// @brief Возвращает итераторы дочерних ячеек (3D)
 template <>
 std::array<Storage::Item, CpC(3)> select_children<3>(
-        Storage& cells, const std::array<Cell, CpC(3)>& children) {
+        Storage& cells, const std::array<AmrCell, CpC(3)>& children) {
     return {
             cells[children[0].next],
             cells[children[1].next],
@@ -246,19 +246,19 @@ std::array<Storage::Item, CpC(3)> select_children<3>(
 template<int dim>
 void refine_cell(Storage &locals, Storage &aliens, int rank, int ic, const Distributor& op) {
     auto item = locals[ic];
-    Cell& parent = item.geom();
+    AmrCell& parent = item.geom();
 
     auto children = get_children<dim>(parent);
 
     for (int i = 0; i < CpC(dim); ++i) {
-        Cell& child = locals[parent.next + i];
+        AmrCell& child = locals[parent.next + i];
 
         // Возможна оптимизация (!), создавать дочерние ячейки сразу
         // на нужном месте в хранилище
         children[i].copy_to(child);
 
         for (int s = 0; s < FpC(dim); ++s) {
-            Face &f1 = child.faces[s];
+            AmrFace &f1 = child.faces[s];
             if (f1.is_undefined() or f1.is_boundary()) {
                 continue;
             }

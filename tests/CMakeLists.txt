@@ -1,10 +1,10 @@
 add_subdirectory(amr)
 add_subdirectory(eos)
 
-set(MESHGEN   0)
+set(MESHGEN   1)
 set(MPITEST   0)
-set(STOPWATCH 0)
-set(THREADS   0)
+set(STOPWATCH 1)
+set(THREADS   1)
 
 if (MESHGEN)
     message(STATUS "Build meshgen test")

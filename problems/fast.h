@@ -6,12 +6,12 @@
 #include <zephyr/utils/threads.h>
 #include <zephyr/utils/stopwatch.h>
 
-#include <zephyr/geom/face.h>
+#include <zephyr/geom/primitives/amr_face.h>
 #include <zephyr/geom/vector.h>
 
-#include <zephyr/mesh/generator/rectangle.h>
-#include <zephyr/mesh/generator/sector.h>
-#include <zephyr/mesh/generator/strip.h>
+#include <zephyr/geom/generator/rectangle.h>
+#include <zephyr/geom/generator/sector.h>
+#include <zephyr/geom/generator/strip.h>
 #include <zephyr/mesh/mesh.h>
 
 #include <zephyr/io/pvd_file.h>
@@ -24,7 +24,7 @@ using zephyr::mesh::Mesh;
 using zephyr::mesh::Storage;
 using zephyr::mesh::IFace;
 using zephyr::mesh::ICell;
-using zephyr::geom::FaceFlag;
+using zephyr::geom::Boundary;
 using zephyr::geom::Vector3d;
 using zephyr::geom::Matrix3d;
 

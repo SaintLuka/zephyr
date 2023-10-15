@@ -3,7 +3,7 @@
 /// с некоторыми вероятностями.
 
 #include <zephyr/mesh/mesh.h>
-#include <zephyr/mesh/generator/rectangle.h>
+#include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/io/pvd_file.h>
 #include <zephyr/io/variables.h>
 

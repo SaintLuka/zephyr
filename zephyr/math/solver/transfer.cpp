@@ -1,7 +1,7 @@
 #include <zephyr/math/solver/transfer.h>
 
 #include <zephyr/math/cfd/face_extra.h>
-#include <zephyr/geom/face.h>
+#include <zephyr/geom/primitives/amr_face.h>
 
 namespace zephyr { namespace math {
 
@@ -21,7 +21,7 @@ Vector3d intersection(const Vector3d& v1, const Vector3d& v2,
 template <int N>
 struct Polygon {
 
-    Polygon(const Cell& cell) {
+    Polygon(const AmrCell& cell) {
 
         int idx_a = cell.faces[Side::L].vertices[0];
         int idx_b = cell.faces[Side::L].vertices[1];
@@ -301,7 +301,7 @@ void Transfer::fluxes_CRP(ICell &cell, Direction dir) {
 }
 
 // Предполагаем vs > 0.0
-double flux_VOF(double a, Vector3d& p, Vector3d& n, const Cell& cell, const Face& face, double vs, double dt) {
+double flux_VOF(double a, Vector3d& p, Vector3d& n, const AmrCell& cell, const AmrFace& face, double vs, double dt) {
     // Типа upwind
     Vector3d v1 = (Vector3d &) cell.vertices[face.vertices[0]];
     Vector3d v2 = (Vector3d &) cell.vertices[face.vertices[1]];
@@ -657,7 +657,7 @@ Storage Transfer::body(Mesh& mesh) {
 
         auto vlist = poly.cut(cell(U).p, cell(U).n);
         if (!vlist.empty()) {
-            cells[count].geom() = Cell(vlist);
+            cells[count].geom() = AmrCell(vlist);
             ++count;
         }
     }

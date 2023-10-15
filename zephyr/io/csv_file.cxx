@@ -1,7 +1,7 @@
 #include <fstream>
 #include <iomanip>
 
-#include <zephyr/geom/cell.h>
+#include <zephyr/geom/primitives/amr_cell.h>
 #include <zephyr/io/csv_file.h>
 
 

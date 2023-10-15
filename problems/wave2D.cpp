@@ -38,8 +38,8 @@ int main() {
     Rectangle rect(-1.0, 1.0, -1.0, 1.0, false);
     rect.set_nx(200);
     rect.set_boundary_flags(
-            FaceFlag::WALL, FaceFlag::WALL,
-            FaceFlag::WALL, FaceFlag::WALL);
+            Boundary::WALL, Boundary::WALL,
+            Boundary::WALL, Boundary::WALL);
 
     // Создать сетку
     Mesh mesh(U, &rect);

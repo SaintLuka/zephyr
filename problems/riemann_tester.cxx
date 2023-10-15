@@ -100,8 +100,8 @@ std::vector<double> RiemannTester(const ClassicTest &test, const NumFlux::Ptr &n
     int n_cells = 500;
     rect.set_sizes(n_cells, 1);
     rect.set_boundary_flags(
-            FaceFlag::WALL, FaceFlag::WALL,
-            FaceFlag::WALL, FaceFlag::WALL);
+            Boundary::WALL, Boundary::WALL,
+            Boundary::WALL, Boundary::WALL);
 
     // Создать сетку
     Mesh mesh(U, &rect);
@@ -302,8 +302,8 @@ std::vector<double> RiemannTesterWithSolver(const ClassicTest &test, Fluxes flux
     int n_cells = 500;
     rect.set_sizes(n_cells, 1);
     rect.set_boundary_flags(
-            FaceFlag::WALL, FaceFlag::WALL,
-            FaceFlag::WALL, FaceFlag::WALL);
+            Boundary::WALL, Boundary::WALL,
+            Boundary::WALL, Boundary::WALL);
 
     // Создать сетку
     Mesh mesh(U, &rect);

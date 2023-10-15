@@ -3,10 +3,14 @@
 
 namespace zephyr { namespace mesh {
 
-void Mesh::initialize(Generator* gen) {
-    gen->initialize(m_locals);
-}
 
+void Mesh::initialize(const Grid& grid) {
+    m_locals.resize(grid.n_cells());
+
+    for (int i = 0; i < grid.n_cells(); ++i) {
+        m_locals[i].geom() = grid.amr_cell(i);
+    }
+}
 
 } // mesh
 } // zephyr

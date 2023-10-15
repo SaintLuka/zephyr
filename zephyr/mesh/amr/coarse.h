@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include <zephyr/geom/cell.h>
+#include <zephyr/geom/primitives/amr_cell.h>
 #include <zephyr/mesh/amr/common.h>
 #include <zephyr/mesh/amr/faces.h>
 #include <zephyr/mesh/amr/siblings.h>
@@ -112,9 +112,9 @@ ShortList3D parent_vs(const std::array<Storage::Item, 8>& children) {
 /// @param children Массив дочерних ячеек
 /// @return Полностью готовая родительская ячейка
 template<int dim>
-Cell get_parent(Storage &locals, Storage &aliens, int rank,
-                     std::array<Storage::Item, CpC(dim)> children) {
-    Cell parent(parent_vs(children));
+AmrCell get_parent(Storage &locals, Storage &aliens, int rank,
+                   std::array<Storage::Item, CpC(dim)> children) {
+    AmrCell parent(parent_vs(children));
 
     parent.b_idx = children[0].b_idx();
     parent.flag = 0;
@@ -129,7 +129,7 @@ Cell get_parent(Storage &locals, Storage &aliens, int rank,
         auto &some_face = some_child.geom().faces[side];
 
 #if SCRUTINY
-        if (some_face.boundary == FaceFlag::UNDEFINED) {
+        if (some_face.boundary == Boundary::UNDEFINED) {
             throw std::runtime_error("Undefined boundary (coarse cell");
         }
         for (int i = 0; i < FpF(dim); ++i) {
@@ -144,8 +144,8 @@ Cell get_parent(Storage &locals, Storage &aliens, int rank,
         parent.faces[side].boundary = some_face.boundary;
 
         // Внешняя граница, не требуется линковать
-        if (some_face.boundary != FaceFlag::ORDINARY &&
-            some_face.boundary != FaceFlag::PERIODIC) {
+        if (some_face.boundary != Boundary::ORDINARY &&
+            some_face.boundary != Boundary::PERIODIC) {
             parent.faces[side].adjacent.rank = rank;
             parent.faces[side].adjacent.ghost = -1;
             continue;
@@ -215,7 +215,7 @@ Cell get_parent(Storage &locals, Storage &aliens, int rank,
         // Центры подграней родительской ячейки
         std::array<Vector3d, FpF(dim)> pfaces;
         for (int i = 0; i < FpF(dim); ++i) {
-            Face& face = parent.faces[side + 6*i];
+            AmrFace& face = parent.faces[side + 6 * i];
             pfaces[i] = face.center<dim>(parent.vertices);
         }
 

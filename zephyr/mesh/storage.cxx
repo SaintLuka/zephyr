@@ -19,7 +19,7 @@ Storage::Storage(Storage&& src)
 
 void Storage::init(int datasize, int size) {
     m_size = std::max(0, size);
-    m_itemsize = int(sizeof(Cell)) + std::max(0, datasize);
+    m_itemsize = int(sizeof(AmrCell)) + std::max(0, datasize);
     m_data.resize(m_size * m_itemsize);
 }
 
@@ -33,7 +33,7 @@ int Storage::size() const {
 }
 
 int Storage::datasize() const {
-    return m_itemsize - int(sizeof(Cell));
+    return m_itemsize - int(sizeof(AmrCell));
 }
 
 int Storage::itemsize() const {

@@ -4,15 +4,15 @@
 #include <zephyr/mesh/mesh.h>
 #include <zephyr/io/vtu_file.h>
 
-#include <zephyr/mesh/generator/rectangle.h>
-#include <zephyr/mesh/generator/cuboid.h>
-#include <zephyr/mesh/generator/sector.h>
-#include <zephyr/mesh/generator/vertex.h>
-#include <zephyr/mesh/generator/block.h>
-#include <zephyr/mesh/generator/curve/line.h>
-#include <zephyr/mesh/generator/curve/cubic.h>
-#include <zephyr/mesh/generator/curve/circle.h>
-#include <zephyr/mesh/generator/block_structured.h>
+#include <zephyr/geom/generator/rectangle.h>
+#include <zephyr/geom/generator/cuboid.h>
+#include <zephyr/geom/generator/sector.h>
+#include <zephyr/geom/generator/bs_vertex.h>
+#include <zephyr/geom/generator/block.h>
+#include <zephyr/geom/generator/curve/line.h>
+#include <zephyr/geom/generator/curve/cubic.h>
+#include <zephyr/geom/generator/curve/circle.h>
+#include <zephyr/geom/generator/block_structured.h>
 
 
 using namespace zephyr::io;

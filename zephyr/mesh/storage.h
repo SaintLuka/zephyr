@@ -4,11 +4,11 @@
 #include <array>
 #include <vector>
 
-#include <zephyr/geom/cell.h>
+#include <zephyr/geom/primitives/amr_cell.h>
 
 namespace zephyr { namespace mesh {
 
-using zephyr::geom::Cell;
+using zephyr::geom::AmrCell;
 using zephyr::geom::Vector3d;
 
 using Byte = unsigned char;
@@ -85,16 +85,16 @@ public:
         inline Byte* geom_ptr() { return m_ptr; }
 
         /// @brief Ссылка на геометрию
-        inline Cell &geom() { return *((Cell *) m_ptr); }
+        inline AmrCell &geom() { return *((AmrCell *) m_ptr); }
 
         /// @brief Ссылка на геометрию
-        inline const Cell &geom() const { return *((Cell *) m_ptr); }
+        inline const AmrCell &geom() const { return *((AmrCell *) m_ptr); }
 
         /// @brief Приведение к чистой геометрии
-        inline operator Cell&() { return *((Cell *) m_ptr); }
+        inline operator AmrCell&() { return *((AmrCell *) m_ptr); }
 
         /// @brief Приведение к чистой геометрии
-        inline operator const Cell &() const { return *((Cell *) m_ptr); }
+        inline operator const AmrCell &() const { return *((AmrCell *) m_ptr); }
 
         /// @brief Вывести полную информацию о ячейке
         inline void print_info() const { geom().print_info(); }
@@ -148,29 +148,29 @@ public:
         inline double volume() const { return geom().volume(); }
 
         /// @brief Список вершин
-        inline const geom::Vertices& vertices() const { return geom().vertices; };
+        inline const geom::AmrVertices& vertices() const { return geom().vertices; };
 
         /// @brief Конкретная вершина
-        inline geom::Vertex& vertices(int i) { return geom().vertices[i]; };
+        inline geom::OptVertex& vertices(int i) { return geom().vertices[i]; };
 
         /// @brief Конкретная вершина
-        inline const geom::Vertex& vertices(int i) const { return geom().vertices[i]; };
+        inline const geom::OptVertex& vertices(int i) const { return geom().vertices[i]; };
 
         /// @brief Список граней
-        inline const geom::Faces& faces() const { return geom().faces; };
+        inline const geom::AmrFaces& faces() const { return geom().faces; };
 
         /// @brief Конкретная грань
-        inline geom::Face& faces(int i) { return geom().faces[i]; };
+        inline geom::AmrFace& faces(int i) { return geom().faces[i]; };
 
         /// @brief Конкретная грань
-        inline const geom::Face& faces(int i) const { return geom().faces[i]; };
+        inline const geom::AmrFace& faces(int i) const { return geom().faces[i]; };
 
 
         /// @brief Размер данных в байтах
-        inline int datasize() const { return m_itemsize - int(sizeof(Cell)); }
+        inline int datasize() const { return m_itemsize - int(sizeof(AmrCell)); }
 
         /// @brief Ссылка на начало данных
-        inline Byte* data_ptr() const { return m_ptr + sizeof(Cell); }
+        inline Byte* data_ptr() const { return m_ptr + sizeof(AmrCell); }
 
         /// @brief Копирует данные из одной ячейки в другую.
         /// @param src Указатель на источник данных.
@@ -181,11 +181,11 @@ public:
 
         /// @brief Ссылка на данные
         template<class T>
-        inline T &data() { return *((T *) (m_ptr + sizeof(Cell))); }
+        inline T &data() { return *((T *) (m_ptr + sizeof(AmrCell))); }
 
         /// @brief Ссылка на данные
         template<class T>
-        inline T &operator()(const T&) { return *((T *) (m_ptr + sizeof(Cell))); }
+        inline T &operator()(const T&) { return *((T *) (m_ptr + sizeof(AmrCell))); }
 
     protected:
         Byte *m_ptr;      ///< Ссылка на начало данных
