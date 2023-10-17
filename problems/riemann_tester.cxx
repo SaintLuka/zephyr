@@ -312,7 +312,7 @@ std::vector<double> RiemannTesterWithSolver(const ClassicTest &test, Fluxes flux
     solver.init_cells(mesh, test);
 
     // Число Куранта
-    double CFL = 0.9;
+    double CFL = 0.5;
     solver.set_CFL(CFL);
 
     double next_write = 0.0;
@@ -327,7 +327,7 @@ std::vector<double> RiemannTesterWithSolver(const ClassicTest &test, Fluxes flux
         solver.compute_dt(mesh);
 
         // Расчет по некоторой схеме
-        solver.fluxes3(mesh);
+        solver.fluxes2(mesh);
 
         // Обновляем слои
         solver.update(mesh);

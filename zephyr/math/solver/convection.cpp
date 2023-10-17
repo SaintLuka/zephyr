@@ -120,13 +120,13 @@ void Convection::fluxes(ICell &cell, int stage) {
                     un, zn.ux, zn.uy, 0.0,
                     cell_c, neib_c, face_c);
 
-            u_m = fe.m(uc);
-            u_p = fe.p(un);
+            u_m = fe.m(uc); // -
+            u_p = fe.p(un); // + 
 
         }
         else if (m_accuracy > 2) {
             // Третий порядок
-            auto fe = FaceExtra::ATvL(
+            auto fe = FaceExtra::ATvL( // van Leer 
                     uc, zc.ux, zc.uy, 0.0,
                     un, zn.ux, zn.uy, 0.0,
                     cell_c, neib_c, face_c);

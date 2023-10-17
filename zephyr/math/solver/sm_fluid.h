@@ -30,6 +30,40 @@ public:
         double e1, e2, eh, eh2;
         Flux P1, P2, P3, P4;
 
+        // Производные
+        double rhox; Vector3d vx; double px; double ex;
+        double rhoy; Vector3d vy; double py; double ey;
+        double rhoz; Vector3d vz; double pz; double ez; 
+
+        PState zx() {
+            return {rhox, vx, px, ex};
+        }
+        PState zy() {
+            return {rhoy, vy, py, ey};
+        }
+        PState zz() {
+            return {rhoz, vz, pz, ez};
+        }
+
+        PState set_zx(PState &z) {
+            rhox = z.density;
+            vx = z.velocity;
+            px = z.pressure;
+            ex = z.energy;
+        }
+        PState set_zy(PState &z) {
+            rhoy = z.density;
+            vy = z.velocity;
+            py = z.pressure;
+            ey = z.energy;
+        }
+        PState set_zz(PState &z) {
+            rhoz = z.density;
+            vz = z.velocity;
+            pz = z.pressure;
+            ez = z.energy;
+        }
+
         PState get_state(int stage) const {
             if (stage == 0) {
                 return {rho1, v1, p1, e1};
@@ -122,6 +156,8 @@ public:
 
     Flux calc_flux(ICell &cell, int stage);
 
+    void compute_grad(ICell &cell, int stage);
+
     ///@brief 
     void fluxes(Mesh &mesh);
 
@@ -140,6 +176,7 @@ protected:
     size_t m_step = 0; ///< Количество шагов расчёта
     double m_CFL; ///< Число Куранта
     double m_dt; ///< Шаг интегрирования
+    Limiter m_limiter; ///< Лимитер
 };
 }
 }
