@@ -2,6 +2,8 @@
 #include <zephyr/math/cfd/models.h>
 #include <zephyr/phys/eos/ideal_gas.h>
 #include <zephyr/math/solver/sm_fluid.h>
+#include <zephyr/math/cfd/face_extra.h>
+#include <zephyr/geom/face.h>
 
 
 namespace zephyr { namespace math {
@@ -21,6 +23,7 @@ SmFluid::SmFluid(const phys::Eos &eos, Fluxes flux = Fluxes::HLLC2) : m_eos(eos)
     m_nf = NumFlux::create(flux);
     m_CFL = 0.5;
     m_dt = std::numeric_limits<double>::max();
+    m_limiter = Limiter("minmod");
 }
 
 [[nodiscard]] double SmFluid::CFL() const {
@@ -81,9 +84,9 @@ void SmFluid::update(EuMesh& mesh, IdealGas &eos) {
         // Консервативный вектор в ячейке
         QState qc(zc);
         // Расчет потока P1
-        Flux P1 = calc_flux(cell, 0);
+        cell(U).P1 = calc_flux(cell, 0);
         // Новое значение в ячейке (консервативные переменные)
-        QState Qc = qc.vec() - m_dt * P1.vec() / cell.volume();
+        QState Qc = qc.vec() - m_dt * cell(U).P1.vec() / cell.volume();
         // Новое значение примитивных переменных
         PState Zc(Qc, m_eos);
         //
@@ -99,23 +102,23 @@ void SmFluid::fluxes2(Mesh &mesh) {
         // Консервативный вектор в ячейке
         QState qc(zc);
         // Расчет потока P1
-        Flux P1 = calc_flux(cell, 0);
+        cell(U).P1 = calc_flux(cell, 0);
         //
-        QState Qch = qc.vec() - 0.5 * m_dt / cell.volume() * P1.vec();
+        QState Qc1 = qc.vec() - 0.5 * m_dt / cell.volume() * cell(U).P1.vec();
         //
-        PState Zch(Qch, m_eos);
+        PState Zc1(Qc1, m_eos);
         //
-        cell(U).set_state(Zch, 1);
+        cell(U).set_state(Zc1, 1);
     }
     for (auto cell : mesh) {
         // Примитивный вектор в ячейке
         PState zc = cell(U).get_state(0);
         // Консервативный вектор в ячейке
         QState qc(zc);
-        // Расчет потока P1
-        Flux P2 = calc_flux(cell, 1);
+        // Расчет потока P2
+        cell(U).P2 = calc_flux(cell, 1);
         //
-        QState Qc = qc.vec() - m_dt / cell.volume() * P2.vec();
+        QState Qc = qc.vec() - m_dt / cell.volume() * cell(U).P2.vec();
         //
         PState Zc(Qc, m_eos);
         //
@@ -147,7 +150,7 @@ void SmFluid::fluxes3(Mesh &mesh) {
         // Расчет потока P1
         cell(U).P2 = calc_flux(cell, 1);
         //
-        QState Qc2 = qc0.vec() - 0.5 * m_dt / cell.volume() * cell(U).P1.vec() - m_dt / cell.volume() * cell(U).P2.vec();
+        QState Qc2 = qc0.vec() - 0.5 * m_dt / cell.volume() * (cell(U).P1.vec() + cell(U).P2.vec());
         //
         PState Zc2(Qc2, m_eos);
         //
@@ -159,15 +162,18 @@ void SmFluid::fluxes3(Mesh &mesh) {
 void SmFluid::fluxes4(Mesh &mesh) {
     for (auto cell : mesh) {
         // Примитивный вектор в ячейке
-        PState zc0 = cell(U).get_state(0);
+        PState zc = cell(U).get_state(0);
         // Консервативный вектор в ячейке
-        QState qc0(zc0);
+        QState qc(zc);
         // Расчет потока P1
         cell(U).P1 = calc_flux(cell, 0);
         //
-        QState Qc1 = qc0.vec() - m_dt / cell.volume() * cell(U).P1.vec();
+        QState Qc1 = qc.vec() - m_dt / cell.volume() * cell(U).P1.vec();
         //
         PState Zc1(Qc1, m_eos);
+        //
+        Zc1.pressure = std::abs(Zc1.pressure);
+        Zc1.density = std::abs(Zc1.density);
         //
         cell(U).set_state(Zc1, 1);
     }
@@ -207,6 +213,9 @@ void SmFluid::fluxes4(Mesh &mesh) {
         //
         PState Zc3(Qc3, m_eos);
         //
+        Zc3.pressure = std::abs(Zc3.pressure);
+        Zc3.density = std::abs(Zc3.density);
+        //
         cell(U).set_state(Zc3, 3);
     }
     for (auto cell : mesh) {
@@ -226,12 +235,37 @@ void SmFluid::fluxes4(Mesh &mesh) {
     }   
 }
 
+void SmFluid::compute_grad(ICell &cell, int stage) {
+    PState zx;
+    PState zy;
+    PState zz;
+
+    PState zc = cell(U).get_state(stage);
+
+    for (auto &face: cell.faces()) {
+        auto neib = face.neib();
+
+        PState zn = neib(U).get_state(stage);
+
+        Vector3d S = 0.5 * face.normal() * face.area();  
+
+        zx.vec() += (zc.vec() + zn.vec()) * S.x();
+        zy.vec() += (zc.vec() + zn.vec()) * S.y();
+        zz.vec() += (zc.vec() + zn.vec()) * S.z(); 
+    }
+
+    zx.vec() /= cell.volume();
+    zy.vec() /= cell.volume();
+    zy.vec() /= cell.volume();
+
+    cell(U).set_zx(zx);
+    cell(U).set_zy(zy);
+    cell(U).set_zz(zz);
+}
+
 Flux SmFluid::calc_flux(ICell &cell, int stage) {
     // Примитивный вектор в ячейке
     PState zc = cell(U).get_state(stage);
-
-    // Консервативный вектор в ячейке
-    QState qc(zc);
     
     // Переменная для потока
     Flux flux;
@@ -242,7 +276,6 @@ Flux SmFluid::calc_flux(ICell &cell, int stage) {
         // Примитивный вектор соседа
         PState zn(zc);
 
-        //Единмтаенное различие
         if (face.is_boundary()) {
             // Граничные условия типа "стенка"
             double vn = zc.velocity.dot(face.normal());
@@ -258,16 +291,34 @@ Flux SmFluid::calc_flux(ICell &cell, int stage) {
         // Значение на грани со стороны соседа
         PState zp = zn.in_local(normal);
 
-        // Численный поток на грани
-        auto loc_flux = m_nf->flux(zm, zp, m_eos);
-        loc_flux.to_global(normal);
+        compute_grad(cell, stage);
+        compute_grad(*face.neib(), stage);
 
-        // Суммируем поток
-        flux.vec() += loc_flux.vec() * face.area();
+        Vector3d cell_c = cell.center();
+        Vector3d face_c = face.center();
+        // Пока проблемки с периодичностью
+        Vector3d neib_c = 2.0 * face_c - cell_c;
+
+        // Второй порядок
+        auto fe = FaceExtra::Simple(
+                    m_limiter,
+                    zm,        cell(U).zx(),        cell(U).zy(),        cell(U).zz(),
+                    zp, face.neib()(U).zx(), face.neib()(U).zy(), face.neib()(U).zz(),
+                    cell_c, neib_c, face_c);
+
+        auto u_m = fe.m(zm); // -
+        auto u_p = fe.p(zp); // + 
+
+        double af = velocity(face.center()).dot(face.normal());
+        double a_p = std::max(af, 0.0);
+        double a_m = std::min(af, 0.0);
+
+        flux.vec() += (a_p * u_m.vec() + a_m * u_p.vec()) * face.area();
     }
 
     return flux;
 };
+
 
 
 void SmFluid::update(Mesh& mesh) {
