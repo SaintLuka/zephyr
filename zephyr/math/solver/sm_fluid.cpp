@@ -322,8 +322,6 @@ Flux SmFluid::calc_flux(ICell &cell, int stage) {
     return flux;
 };
 
-
-
 void SmFluid::update(Mesh& mesh) {
     for (auto cell : mesh) {
         cell(U).swap();

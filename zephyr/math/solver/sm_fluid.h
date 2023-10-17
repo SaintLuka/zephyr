@@ -45,19 +45,19 @@ public:
             return {rhoz, vz, pz, ez};
         }
 
-        PState set_zx(PState &z) {
+        void set_zx(PState &z) {
             rhox = z.density;
             vx = z.velocity;
             px = z.pressure;
             ex = z.energy;
         }
-        PState set_zy(PState &z) {
+        void set_zy(PState &z) {
             rhoy = z.density;
             vy = z.velocity;
             py = z.pressure;
             ey = z.energy;
         }
-        PState set_zz(PState &z) {
+        void set_zz(PState &z) {
             rhoz = z.density;
             vz = z.velocity;
             pz = z.pressure;
