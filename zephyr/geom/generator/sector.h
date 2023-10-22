@@ -10,6 +10,7 @@ namespace zephyr::geom::generator {
 /// сетки внутри сектора или круга.
 class Sector : public Generator {
 public:
+    using Ptr = std::shared_ptr<Sector>;
 
     /// @brief Флаги граничных условий
     struct Boundaries {
@@ -31,17 +32,26 @@ public:
     /// @param hole Оставлять ли дырку в центре
     Sector(double r_max, double r_min, double angle, bool hole = false);
 
+    /// @brief Создать указатель на класс
+    template <class... Args>
+    static Sector::Ptr create(Args&&... args){
+        return std::make_shared<Sector>(std::forward<Args>(args)...);
+    }
+
     /// @brief Установить желаемое число ячеек по углу
     void set_n_phi(int N);
 
     /// @brief Установить флаги граничных условий
     void set_boundaries(Boundaries bounds);
 
+    /// @brief Количество ячеек сетки
+    int size() const final;
+
     /// @brief Ограничивающий объем
     Box bbox() const final;
 
     /// @brief Создать сетку общего вида
-    Grid create() final;
+    Grid make() final;
 
 private:
     /// @brief Подобрать параметры сетки исходя из геометрии

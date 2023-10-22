@@ -10,6 +10,7 @@ namespace zephyr::geom::generator {
 /// или сетки из ячеек Воронного внутри прямоугольной области.
 class Rectangle : public Generator {
 public:
+    using Ptr = std::shared_ptr<Rectangle>;
 
     /// @brief Флаги граничных условий
     struct Boundaries {
@@ -29,6 +30,12 @@ public:
     /// @param ymin, ymax Границы прямоугольника по оси y
     /// @param voronoi Использовать ячейки Вороного
     Rectangle(double xmin, double xmax, double ymin, double ymax, bool voronoi = false);
+
+    /// @brief Создать указатель на класс
+    template <class... Args>
+    static Rectangle::Ptr create(Args&&... args){
+        return std::make_shared<Rectangle>(std::forward<Args>(args)...);
+    }
 
     /// @brief Установить желаемое число ячеек сетки по оси Ox
     /// @details Число ячеек по оси Oy подбирается так, чтобы aspect ячеек
@@ -51,11 +58,14 @@ public:
     /// @brief Установить флаги граничных условий
     void set_boundaries(Boundaries bounds);
 
+    /// @brief Количество ячеек сетки
+    int size() const final;
+
     /// @brief Ограничивающий объем
     Box bbox() const final;
 
     /// @brief Создать сетку общего вида
-    Grid create() final;
+    Grid make() final;
 
 
     // Далее не самые полезные get-функции

@@ -238,8 +238,7 @@ void Block::link(Block* block) {
 void Block::create_vertices() {
     m_vertices.resize(m_size1 + 1, std::vector<BsVertex::Ptr>(m_size2 + 1, nullptr));
 
-    using zephyr::geom::Mapping2D;
-    using zephyr::geom::LargeList2D;
+    using zephyr::geom::SqQuad;
 
     Vector3d v0 = base_vertex(0)->v();
     Vector3d v1 = base_vertex(1)->v();
@@ -264,26 +263,24 @@ void Block::create_vertices() {
     }
 
     Vector3d vC = (vL + vR + vB + vT) / 4.0;
-    LargeList2D vl = {
+    SqQuad quad = {
             v0, vB, v1,
             vL, vC, vR,
             v2, vT, v3
     };
 
-    Mapping2D map2D(vl);
-
     for (int i = 0; i <= m_size1; ++i) {
-        double xi = (2.0 * i - m_size1) / m_size1;
+        double x = (2.0 * i - m_size1) / m_size1;
 
-        m_vertices[i][0]       = BsVertex::create(map2D(xi, -1.0));
-        m_vertices[i][m_size2] = BsVertex::create(map2D(xi, +1.0));
+        m_vertices[i][0]       = BsVertex::create(quad(x, -1.0));
+        m_vertices[i][m_size2] = BsVertex::create(quad(x, +1.0));
     }
 
     for (int j = 0; j <= m_size2; ++j) {
-        double eta = (2.0* j - m_size2) / m_size2;
+        double y = (2.0 * j - m_size2) / m_size2;
 
-        m_vertices[0][j]       = BsVertex::create(map2D(-1.0, eta));
-        m_vertices[m_size1][j] = BsVertex::create(map2D(+1.0, eta));
+        m_vertices[0][j]       = BsVertex::create(quad(-1.0, y));
+        m_vertices[m_size1][j] = BsVertex::create(quad(+1.0, y));
     }
 
     for (int k = 0; k < 0; ++k) {
@@ -314,10 +311,10 @@ void Block::create_vertices() {
 
     for (int i = 1; i < m_size1; ++i) {
         for (int j = 1; j < m_size2; ++j) {
-            double xi = (2.0 * i - m_size1) / m_size1;
-            double eta = (2.0 * j - m_size2) / m_size2;
+            double x = (2.0 * i - m_size1) / m_size1;
+            double y = (2.0 * j - m_size2) / m_size2;
 
-            m_vertices[i][j] = BsVertex::create(map2D(xi, eta));
+            m_vertices[i][j] = BsVertex::create(quad(x, y));
         }
     }
 

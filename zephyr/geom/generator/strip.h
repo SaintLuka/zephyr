@@ -10,6 +10,7 @@ namespace zephyr::geom::generator {
 /// квазиодномерной сетки (прямоугольная сетка толщиной в одну ячейку).
 class Strip : public Generator {
 public:
+    using Ptr = std::shared_ptr<Strip>;
 
     /// @brief Тип задания узлов
     enum class Type {
@@ -32,6 +33,12 @@ public:
     /// @param xmin, xmax Границы прямоугольника по оси x
     Strip(double xmin, double xmax, Type nodes = Type::UNIFORM);
 
+    /// @brief Создать указатель на класс
+    template <class... Args>
+    static Strip::Ptr create(Args&&... args){
+        return std::make_shared<Strip>(std::forward<Args>(args)...);
+    }
+
     /// @brief Установить желаемое число ячеек сетки по оси Ox
     void set_nx(int nx);
 
@@ -41,11 +48,14 @@ public:
     /// @brief Установить флаги граничных условий
     void set_boundaries(Boundaries bounds);
 
+    /// @brief Количество ячеек сетки
+    int size() const final;
+
     /// @brief Ограничивающий объем
     Box bbox() const final;
 
     /// @brief Создать сетку общего вида
-    Grid create() final;
+    Grid make() final;
 
 
     // Далее не самые полезные get-функции

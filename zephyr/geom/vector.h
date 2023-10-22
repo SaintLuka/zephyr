@@ -5,7 +5,7 @@
 
 #include <Eigen/Dense>
 
-namespace zephyr { namespace geom {
+namespace zephyr::geom {
 
 typedef Eigen::Matrix<double, 3, 1> Vector3d; ///< 3-ех мерный Eigen вектор-столбец
 typedef Eigen::Matrix<double, 4, 1> Vector4d; ///< 4-ех мерный Eigen вектор-столбец
@@ -25,6 +25,5 @@ typedef Eigen::DiagonalMatrix<double, 5, 5> DiagMatrix5d; ///< Диагонал�
 typedef Eigen::DiagonalMatrix<double, 6, 6> DiagMatrix6d; ///< Диагональная Eigen матрица 6 x 6
 typedef Eigen::DiagonalMatrix<double, 7, 7> DiagMatrix7d; ///< Диагональная Eigen матрица 7 x 7
 
-} // geom
-} // zephyr
+} // namespace zephyr::geom
 

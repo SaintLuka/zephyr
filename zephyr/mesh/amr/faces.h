@@ -118,14 +118,14 @@ void setup_face_features<2>(AmrFace& face, AmrVertices& vertices) {
     Vector3d C = vertices[iww(1, 1)];
 
     // Вершины грани
-    ShortList1D vl = {
+    Line vl = {
             (Vector3d &) vertices[face.vertices[0]],
             (Vector3d &) vertices[face.vertices[1]],
     };
 
     // Установить длину и нормаль
-    face.area = geom::length(vl);
-    face.normal = geom::normal(vl, C);
+    face.area   = vl.length();
+    face.normal = vl.normal(C);
 }
 
 template <>
@@ -134,7 +134,7 @@ void setup_face_features<3>(AmrFace& face, AmrVertices& vertices) {
     Vector3d C = (Vector3d&)vertices[iww(1, 1, 1)];
 
     // Вершины подграней
-    ShortList2D vl = {
+    Quad vl = {
             (Vector3d &) vertices[face.vertices[0]],
             (Vector3d &) vertices[face.vertices[1]],
             (Vector3d &) vertices[face.vertices[2]],
@@ -142,8 +142,8 @@ void setup_face_features<3>(AmrFace& face, AmrVertices& vertices) {
     };
 
     // Установить площадь и нормаль
-    face.area = geom::area(vl);
-    face.normal = geom::normal(vl, C);
+    face.area   = vl.area();
+    face.normal = vl.normal(C);
 }
 
 /// @brief Устанавливает нормали и площади новых подграней

@@ -2,7 +2,7 @@
 
 #include <zephyr/geom/vector.h>
 
-namespace zephyr { namespace geom {
+namespace zephyr::geom {
 
 // TODO: Написать нормально
 class Box {
@@ -13,6 +13,5 @@ public:
     Box(const Vector3d& _vmin, const Vector3d& _vmax);
 };
 
-} // geom
-} // zephyr
+} // namespace zephyr::geom
 

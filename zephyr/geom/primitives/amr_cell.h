@@ -1,5 +1,7 @@
 #pragma once
 
+#include <zephyr/geom/maps.h>
+#include <zephyr/geom/geom.h>
 #include <zephyr/geom/primitives/amr_faces.h>
 #include <zephyr/geom/primitives/element.h>
 
@@ -29,16 +31,16 @@ public:
     AmrCell();
 
     /// @brief Двумерная простая
-    explicit AmrCell(const ShortList2D &verts);
+    explicit AmrCell(const Quad &verts);
 
     /// @brief Двумерный полигон
     explicit AmrCell(const VerticesList &verts);
 
     /// @brief Двумерная криволинейная
-    explicit AmrCell(const LargeList2D &verts);
+    explicit AmrCell(const SqQuad &verts);
 
     /// @brief Трехмерная простая
-    explicit AmrCell(const ShortList3D &verts);
+    explicit AmrCell(const Cube &verts);
 
     /// @brief Скопировать геометрию ячейки в другую
     void copy_to(AmrCell& cell) const;
@@ -91,21 +93,21 @@ public:
 private:
 
     /// Перенести вершины из списка в тип Vertices
-    void setup_vertices(const ShortList2D& vlist);
+    void setup_vertices(const Quad& quad);
 
     /// Перенести вершины из списка в тип Vertices
-    void setup_vertices(const LargeList2D& vlist);
+    void setup_vertices(const SqQuad& vlist);
 
     /// Перенести вершины из списка в тип Vertices
-    void setup_vertices(const ShortList3D& vlist);
+    void setup_vertices(const Cube& cube);
 
-    void build2D(const ShortList2D &verts);
+    void build2D(const Quad &verts);
 
     void build2D(const VerticesList &verts);
 
-    void build2D(const LargeList2D &verts);
+    void build2D(const SqQuad &verts);
 
-    void build3D(const ShortList3D &verts);
+    void build3D(const Cube &verts);
 };
 
 } // namespace zephyr::geom

@@ -41,9 +41,9 @@ int main() {
     // Геометрия области
     Rectangle rect(0.0, 1.0, 0.0, 0.6, true);
     rect.set_nx(200);
-    rect.set_boundary_flags(
-            Boundary::PERIODIC, Boundary::PERIODIC,
-            Boundary::PERIODIC, Boundary::PERIODIC);
+    rect.set_boundaries({
+            .left   = Boundary::PERIODIC, .right = Boundary::PERIODIC,
+            .bottom = Boundary::PERIODIC, .top   = Boundary::PERIODIC});
 
     // Создать сетку
     Mesh mesh(U, &rect);

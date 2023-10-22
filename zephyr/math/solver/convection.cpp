@@ -66,6 +66,7 @@ double Convection::compute_dt(const ICell &cell) const {
 void Convection::compute_grad(ICell &cell, int stage) {
     double ux = 0.0;
     double uy = 0.0;
+    double uz = 0.0;
 
     double uc = stage < 1 ? cell(U).u1 : cell(U).uh;
 
@@ -77,10 +78,12 @@ void Convection::compute_grad(ICell &cell, int stage) {
         Vector3d S = 0.5 * face.normal() * face.area();
         ux += (uc + un) * S.x();
         uy += (uc + un) * S.y();
+        uz += (uc + un) * S.z();
     }
 
     cell(U).ux = ux / cell.volume();
     cell(U).uy = uy / cell.volume();
+    cell(U).uz = uz / cell.volume();
 }
 
 double lim(double t, double b) {
@@ -116,8 +119,8 @@ void Convection::fluxes(ICell &cell, int stage) {
             // Второй порядок
             auto fe = FaceExtra::Simple(
                     m_limiter,
-                    uc, zc.ux, zc.uy, 0.0,
-                    un, zn.ux, zn.uy, 0.0,
+                    uc, zc.ux, zc.uy, zc.uz,
+                    un, zn.ux, zn.uy, zc.uz,
                     cell_c, neib_c, face_c);
 
             u_m = fe.m(uc);
@@ -229,6 +232,24 @@ Distributor Convection::distributor() const {
     };
 
     distr.merge2D = [](const std::array<Storage::Item, 4> & children, Storage::Item parent) {
+        double sum = 0.0;
+        for (auto child: children) {
+            sum += child(U).u1 * child.volume();
+        }
+        parent(U).u1 = sum / parent.volume();
+    };
+
+    distr.split3D = [](Storage::Item parent, const std::array<Storage::Item, 8> & children) {
+        for (auto child: children) {
+            Vector3d dr = parent.center() - child.center();
+            child(U).u1 = parent(U).u1 +
+                    parent(U).ux * dr.x() +
+                    parent(U).uy * dr.y() +
+                    parent(U).uz * dr.z();
+        }
+    };
+
+    distr.merge3D = [](const std::array<Storage::Item, 8> & children, Storage::Item parent) {
         double sum = 0.0;
         for (auto child: children) {
             sum += child(U).u1 * child.volume();

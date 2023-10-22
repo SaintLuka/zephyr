@@ -1,7 +1,8 @@
 #include <zephyr/mesh/mesh.h>
+#include <zephyr/geom/grid.h>
 
 
-namespace zephyr { namespace mesh {
+namespace zephyr::mesh {
 
 
 void Mesh::initialize(const Grid& grid) {
@@ -12,5 +13,4 @@ void Mesh::initialize(const Grid& grid) {
     }
 }
 
-} // mesh
-} // zephyr
+} // namespace zephyr::mesh

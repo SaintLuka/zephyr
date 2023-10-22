@@ -110,14 +110,16 @@ GCell GCell::quad(const std::array<GNode::Ptr, 4>& nodes) {
     GCell cell(CellType::QUAD);
 
     // Проверка нумерации вершин в m_nodes
-    Vector3d a = nodes[0]->v - nodes[1]->v;
+    Vector3d a = nodes[1]->v - nodes[0]->v;
     Vector3d b = nodes[2]->v - nodes[1]->v;
-    Vector3d c = nodes[2]->v - nodes[3]->v;
+    Vector3d c = nodes[3]->v - nodes[2]->v;
     Vector3d d = nodes[0]->v - nodes[3]->v;
 
-    if (b.cross(a).dot(c.cross(d)) > 0.0) {
+    if (a.cross(b).dot(c.cross(d)) > 0.0) {
+        // Верный порядок по часовой
         cell.m_nodes = {nodes[0], nodes[1], nodes[2], nodes[3]};
     } else {
+        // Z-порядок обхода (меняем)
         cell.m_nodes = {nodes[0], nodes[1], nodes[3], nodes[2]};
     }
     cell.m_faces = {
@@ -146,8 +148,34 @@ GCell GCell::wedge(const std::array<GNode::Ptr, 6>& nodes) {
     throw std::runtime_error("WEDGE");
 }
 
-GCell GCell::hexagedron(const std::array<GNode::Ptr, 6>& nodes) {
-    throw std::runtime_error("HEX");
+GCell GCell::hexagedron(const std::array<GNode::Ptr, 8>& nodes) {
+    GCell cell(CellType::HEXAHEDRON);
+
+    // Проверка нумерации вершин в m_nodes
+    Vector3d a = nodes[1]->v - nodes[0]->v;
+    Vector3d b = nodes[2]->v - nodes[1]->v;
+    Vector3d c = nodes[3]->v - nodes[2]->v;
+    Vector3d d = nodes[0]->v - nodes[3]->v;
+
+    if (a.cross(b).dot(c.cross(d)) > 0.0) {
+        // Правильный порядок
+        cell.m_nodes = {nodes[0], nodes[1], nodes[2], nodes[3],
+                        nodes[4], nodes[5], nodes[6], nodes[7],};
+    } else {
+        // Z-порядок обхода (меняем)
+        cell.m_nodes = {nodes[0], nodes[1], nodes[3], nodes[2],
+                        nodes[4], nodes[5], nodes[7], nodes[6]};
+    }
+    cell.m_faces = {
+            {0, 4, 7, 3},
+            {1, 5, 6, 2},
+            {0, 1, 5, 4},
+            {3, 2, 6, 7},
+            {0, 1, 2, 3},
+            {4, 5, 6, 7}
+    };
+    cell.m_neibs = {-1, -1, -1, -1, -1, -1};
+    return cell;
 }
 
 CellType GCell::type() const {
@@ -323,14 +351,12 @@ AmrCell Grid::amr_cell(int idx) const {
     if (gcell.type() == CellType::QUAD) {
         auto v1 = m_nodes[gcell.node(0).index];
         auto v2 = m_nodes[gcell.node(1).index];
-        auto v3 = m_nodes[gcell.node(2).index];
-        auto v4 = m_nodes[gcell.node(3).index];
+        auto v3 = m_nodes[gcell.node(3).index];
+        auto v4 = m_nodes[gcell.node(2).index];
 
-        ShortList2D vlist = { v1->v, v2->v, v3->v, v4->v };
+        Quad vlist = {v1->v, v2->v, v3->v, v4->v };
 
         AmrCell cell(vlist);
-
-        cell.visualize();
 
         cell.rank  = mpi::rank();
         cell.index = idx;
@@ -361,6 +387,61 @@ AmrCell Grid::amr_cell(int idx) const {
         cell.faces[Side::R].adjacent.index = gcell.adjacent({v2, v4});
         cell.faces[Side::B].adjacent.index = gcell.adjacent({v1, v2});
         cell.faces[Side::T].adjacent.index = gcell.adjacent({v3, v4});
+
+        return cell;
+    }
+    else if (gcell.type() == CellType::HEXAHEDRON) {
+        auto v0 = m_nodes[gcell.node(0).index];
+        auto v1 = m_nodes[gcell.node(1).index];
+        auto v2 = m_nodes[gcell.node(3).index];
+        auto v3 = m_nodes[gcell.node(2).index];
+        auto v4 = m_nodes[gcell.node(4).index];
+        auto v5 = m_nodes[gcell.node(5).index];
+        auto v6 = m_nodes[gcell.node(7).index];
+        auto v7 = m_nodes[gcell.node(6).index];
+
+        Cube vlist = {v0->v, v1->v, v2->v, v3->v,
+                      v4->v, v5->v, v6->v, v7->v };
+
+        AmrCell cell(vlist);
+
+        cell.rank  = mpi::rank();
+        cell.index = idx;
+
+        // Данные AMR
+        cell.b_idx = idx;
+        cell.z_idx = 0;
+        cell.next  = 0;
+        cell.level = 0;
+        cell.flag  = 0;
+
+        cell.faces[Side::L].boundary = gcell.boundary({v0, v4, v2, v6});
+        cell.faces[Side::R].boundary = gcell.boundary({v5, v1, v3, v7});
+        cell.faces[Side::B].boundary = gcell.boundary({v0, v1, v4, v5});
+        cell.faces[Side::T].boundary = gcell.boundary({v6, v7, v2, v3});
+        cell.faces[Side::X].boundary = gcell.boundary({v0, v1, v2, v3});
+        cell.faces[Side::F].boundary = gcell.boundary({v4, v5, v6, v7});
+
+        cell.faces[Side::L].adjacent.rank = 0;
+        cell.faces[Side::R].adjacent.rank = 0;
+        cell.faces[Side::B].adjacent.rank = 0;
+        cell.faces[Side::T].adjacent.rank = 0;
+        cell.faces[Side::X].adjacent.rank = 0;
+        cell.faces[Side::F].adjacent.rank = 0;
+
+        cell.faces[Side::L].adjacent.ghost = -1;
+        cell.faces[Side::R].adjacent.ghost = -1;
+        cell.faces[Side::B].adjacent.ghost = -1;
+        cell.faces[Side::T].adjacent.ghost = -1;
+        cell.faces[Side::X].adjacent.ghost = -1;
+        cell.faces[Side::F].adjacent.ghost = -1;
+
+        cell.faces[Side::L].adjacent.index = gcell.adjacent({v0, v4, v2, v6});
+        cell.faces[Side::R].adjacent.index = gcell.adjacent({v5, v1, v3, v7});
+        cell.faces[Side::B].adjacent.index = gcell.adjacent({v0, v1, v4, v5});
+        cell.faces[Side::T].adjacent.index = gcell.adjacent({v6, v7, v2, v3});
+        cell.faces[Side::X].adjacent.index = gcell.adjacent({v0, v1, v2, v3});
+        cell.faces[Side::F].adjacent.index = gcell.adjacent({v4, v5, v6, v7});
 
         return cell;
     }

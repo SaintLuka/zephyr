@@ -1,99 +1,89 @@
 #include <zephyr/geom/primitives/amr_cell.h>
 
-namespace zephyr { namespace geom {
+namespace zephyr::geom {
 
-void AmrCell::setup_vertices(const ShortList2D& vlist) {
+void AmrCell::setup_vertices(const Quad& quad) {
     vertices.set_undefined();
 
     // Базовые вершины
-    vertices[iv(0, 0)] = vlist[iss(0, 0)];
-    vertices[iv(0, 1)] = vlist[iss(0, 1)];
-    vertices[iv(1, 0)] = vlist[iss(1, 0)];
-    vertices[iv(1, 1)] = vlist[iss(1, 1)];
+    vertices[iv(0, 0)] = quad.vs<-1, -1>();
+    vertices[iv(0, 1)] = quad.vs<-1, +1>();
+    vertices[iv(1, 0)] = quad.vs<+1, -1>();
+    vertices[iv(1, 1)] = quad.vs<+1, +1>();
 
     // Вершины на гранях
-    vertices[iww(0, 1)] = (vlist[iws(0, 0)] + vlist[iws(0, 2)]) / 2.0;
-    vertices[iww(2, 1)] = (vlist[iws(2, 0)] + vlist[iws(2, 2)]) / 2.0;
-    vertices[iww(1, 0)] = (vlist[iws(0, 0)] + vlist[iws(2, 0)]) / 2.0;
-    vertices[iww(1, 2)] = (vlist[iws(0, 2)] + vlist[iws(2, 2)]) / 2.0;
+    vertices[iww(0, 1)] = quad(-1.0, 0.0);
+    vertices[iww(2, 1)] = quad(+1.0, 0.0);
+    vertices[iww(1, 0)] = quad(0.0, -1.0);
+    vertices[iww(1, 2)] = quad(0.0, +1.0);
 
     // Вершина в центре
-    vertices[iww(1, 1)] = (vlist[iws(0, 0)] + vlist[iws(2, 0)] +
-                           vlist[iws(0, 2)] + vlist[iws(2, 2)]) / 4.0;
+    vertices[iww(1, 1)] = quad(0.0, 0.0);
 }
 
-void AmrCell::setup_vertices(const LargeList2D& vlist) {
+void AmrCell::setup_vertices(const SqQuad& vlist) {
     vertices.set_undefined();
 
     // Базовые вершины
-    vertices[iv(0, 0)] = vlist[isw(0, 0)];
-    vertices[iv(0, 1)] = vlist[isw(0, 1)];
-    vertices[iv(1, 0)] = vlist[isw(1, 0)];
-    vertices[iv(1, 1)] = vlist[isw(1, 1)];
+    vertices[iww(0, 0)] = vlist.vs<-1, -1>();
+    vertices[iww(0, 2)] = vlist.vs<-1, +1>();
+    vertices[iww(2, 0)] = vlist.vs<+1, -1>();
+    vertices[iww(2, 2)] = vlist.vs<+1, +1>();
 
     // Вершины на гранях
-    vertices[iww(0, 1)] = vlist[iww(0, 1)];
-    vertices[iww(2, 1)] = vlist[iww(2, 1)];
-    vertices[iww(1, 0)] = vlist[iww(1, 0)];
-    vertices[iww(1, 2)] = vlist[iww(1, 2)];
+    vertices[iww(0, 1)] = vlist.vs<-1, 0>();
+    vertices[iww(2, 1)] = vlist.vs<+1, 0>();
+    vertices[iww(1, 0)] = vlist.vs<0, -1>();
+    vertices[iww(1, 2)] = vlist.vs<0, +1>();
 
     // Вершина в центре
-    vertices[iww(1, 1)] = vlist[iww(1, 1)];
+    vertices[iww(1, 1)] = vlist.vs<0, 0>();
 }
 
-void AmrCell::setup_vertices(const ShortList3D& vlist) {
+void AmrCell::setup_vertices(const Cube& cube) {
     vertices.set_undefined();
 
     // Скопировать базовые вершины
-    vertices[iv(0, 0, 0)] = vlist[iss(0, 0, 0)];
-    vertices[iv(1, 0, 0)] = vlist[iss(1, 0, 0)];
-    vertices[iv(0, 1, 0)] = vlist[iss(0, 1, 0)];
-    vertices[iv(1, 1, 0)] = vlist[iss(1, 1, 0)];
-    vertices[iv(0, 0, 1)] = vlist[iss(0, 0, 1)];
-    vertices[iv(1, 0, 1)] = vlist[iss(1, 0, 1)];
-    vertices[iv(0, 1, 1)] = vlist[iss(0, 1, 1)];
-    vertices[iv(1, 1, 1)] = vlist[iss(1, 1, 1)];
+    vertices[iv(0, 0, 0)] = cube.vs<-1, -1, -1>();
+    vertices[iv(1, 0, 0)] = cube.vs<+1, -1, -1>();
+    vertices[iv(0, 1, 0)] = cube.vs<-1, +1, -1>();
+    vertices[iv(1, 1, 0)] = cube.vs<+1, +1, -1>();
+    vertices[iv(0, 0, 1)] = cube.vs<-1, -1, +1>();
+    vertices[iv(1, 0, 1)] = cube.vs<+1, -1, +1>();
+    vertices[iv(0, 1, 1)] = cube.vs<-1, +1, +1>();
+    vertices[iv(1, 1, 1)] = cube.vs<+1, +1, +1>();
 
     // Вершины на ребрах
-    vertices[iww(0, 1, 0)] = (vlist[iws(0, 0, 0)] + vlist[iws(0, 2, 0)]) / 2.0;
-    vertices[iww(2, 1, 0)] = (vlist[iws(2, 0, 0)] + vlist[iws(2, 2, 0)]) / 2.0;
-    vertices[iww(1, 0, 0)] = (vlist[iws(0, 0, 0)] + vlist[iws(2, 0, 0)]) / 2.0;
-    vertices[iww(1, 2, 0)] = (vlist[iws(0, 2, 0)] + vlist[iws(2, 2, 0)]) / 2.0;
-    vertices[iww(0, 0, 1)] = (vlist[iws(0, 0, 0)] + vlist[iws(0, 0, 2)]) / 2.0;
-    vertices[iww(2, 0, 1)] = (vlist[iws(2, 0, 0)] + vlist[iws(2, 0, 2)]) / 2.0;
-    vertices[iww(0, 2, 1)] = (vlist[iws(0, 2, 0)] + vlist[iws(0, 2, 2)]) / 2.0;
-    vertices[iww(2, 2, 1)] = (vlist[iws(2, 2, 0)] + vlist[iws(2, 2, 2)]) / 2.0;
-    vertices[iww(0, 1, 2)] = (vlist[iws(0, 0, 2)] + vlist[iws(0, 2, 2)]) / 2.0;
-    vertices[iww(2, 1, 2)] = (vlist[iws(2, 0, 2)] + vlist[iws(2, 2, 2)]) / 2.0;
-    vertices[iww(1, 0, 2)] = (vlist[iws(0, 0, 2)] + vlist[iws(2, 0, 2)]) / 2.0;
-    vertices[iww(1, 2, 2)] = (vlist[iws(0, 2, 2)] + vlist[iws(2, 2, 2)]) / 2.0;
+    vertices[iww(0, 1, 0)] = cube(-1.0,  0.0, -1.0);
+    vertices[iww(2, 1, 0)] = cube(+1.0,  0.0, -1.0);
+    vertices[iww(1, 0, 0)] = cube( 0.0, -1.0, -1.0);
+    vertices[iww(1, 2, 0)] = cube( 0.0, +1.0, -1.0);
+    vertices[iww(0, 0, 1)] = cube(-1.0, -1.0,  0.0);
+    vertices[iww(2, 0, 1)] = cube(+1.0, -1.0,  0.0);
+    vertices[iww(0, 2, 1)] = cube(-1.0, +1.0,  0.0);
+    vertices[iww(2, 2, 1)] = cube(+1.0, +1.0,  0.0);
+    vertices[iww(0, 1, 2)] = cube(-1.0,  0.0, +1.0);
+    vertices[iww(2, 1, 2)] = cube(+1.0,  0.0, +1.0);
+    vertices[iww(1, 0, 2)] = cube( 0.0, -1.0, +1.0);
+    vertices[iww(1, 2, 2)] = cube( 0.0, +1.0, +1.0);
 
     // Вершны на гранях
-    vertices[iww(0, 1, 1)] = (vlist[iws(0, 0, 0)] + vlist[iws(0, 2, 0)] +
-                                   vlist[iws(0, 0, 2)] + vlist[iws(0, 2, 2)]) / 4.0;
-    vertices[iww(2, 1, 1)] = (vlist[iws(2, 0, 0)] + vlist[iws(2, 2, 0)] +
-                                   vlist[iws(2, 0, 2)] + vlist[iws(2, 2, 2)]) / 4.0;
-    vertices[iww(1, 0, 1)] = (vlist[iws(0, 0, 0)] + vlist[iws(2, 0, 0)] +
-                                   vlist[iws(0, 0, 2)] + vlist[iws(2, 0, 2)]) / 4.0;
-    vertices[iww(1, 2, 1)] = (vlist[iws(0, 2, 0)] + vlist[iws(2, 2, 0)] +
-                                   vlist[iws(0, 2, 2)] + vlist[iws(2, 2, 2)]) / 4.0;
-    vertices[iww(1, 1, 0)] = (vlist[iws(0, 0, 0)] + vlist[iws(2, 0, 0)] +
-                                   vlist[iws(0, 2, 0)] + vlist[iws(2, 2, 0)]) / 4.0;
-    vertices[iww(1, 1, 2)] = (vlist[iws(0, 0, 2)] + vlist[iws(2, 0, 2)] +
-                                   vlist[iws(0, 2, 2)] + vlist[iws(2, 2, 2)]) / 4.0;
+    vertices[iww(0, 1, 1)] = cube(-1.0,  0.0,  0.0);
+    vertices[iww(2, 1, 1)] = cube(+1.0,  0.0,  0.0);
+    vertices[iww(1, 0, 1)] = cube( 0.0, -1.0,  0.0);
+    vertices[iww(1, 2, 1)] = cube( 0.0, +1.0,  0.0);
+    vertices[iww(1, 1, 0)] = cube( 0.0,  0.0, -1.0);
+    vertices[iww(1, 1, 2)] = cube( 0.0,  0.0, +1.0);
 
     // Вершина в центре
-    vertices[iww(1, 1, 1)] = (vlist[iws(0, 0, 0)] + vlist[iws(0, 2, 0)] +
-                                   vlist[iws(2, 0, 0)] + vlist[iws(2, 2, 0)] +
-                                   vlist[iws(0, 0, 2)] + vlist[iws(0, 2, 2)] +
-                                   vlist[iws(2, 0, 2)] + vlist[iws(2, 2, 2)]) / 8.0;
+    vertices[iww(1, 1, 1)] = cube( 0.0,  0.0,  0.0);
 }
 
-void AmrCell::build2D(const ShortList2D& verts) {
+void AmrCell::build2D(const Quad& verts) {
     dim = 2;
 
-    double area = geom::area(verts);
-    Vector3d centroid = geom::centroid(verts, area);
+    double area = verts.area();
+    Vector3d centroid = verts.centroid(area);
 
     coords = centroid;
     size = std::sqrt(area);
@@ -108,22 +98,22 @@ void AmrCell::build2D(const ShortList2D& verts) {
     faces[Side::T].vertices = face_indices<2, Side::T>();
 
     for (int i = 0; i < 4; ++i) {
-        ShortList1D vs = {
+        Line vs = {
                 vertices[faces[i].vertices[0]],
                 vertices[faces[i].vertices[1]]
         };
 
-        faces[i].area = geom::length(vs);
-        faces[i].normal = geom::normal(vs, centroid);
+        faces[i].area     = vs.length();
+        faces[i].normal   = vs.normal(centroid);
         faces[i].boundary = Boundary::ORDINARY;
     }
 }
 
-void AmrCell::build2D(const LargeList2D& verts) {
+void AmrCell::build2D(const SqQuad& verts) {
     dim = 2;
 
-    double area = geom::area(verts);
-    Vector3d centroid = geom::centroid(verts, area);
+    double area = verts.area();
+    Vector3d centroid = verts.centroid(area);
 
     coords = centroid;
     size = std::sqrt(area);
@@ -138,13 +128,13 @@ void AmrCell::build2D(const LargeList2D& verts) {
     faces[Side::T].vertices = face_indices<2, Side::T>();
 
     for (int i = 0; i < 4; ++i) {
-        ShortList1D vs = {
+        Line vs = {
                 vertices[faces[i].vertices[0]],
                 vertices[faces[i].vertices[1]]
         };
 
-        faces[i].area = geom::length(vs);
-        faces[i].normal = geom::normal(vs, centroid);
+        faces[i].area     = vs.length();
+        faces[i].normal   = vs.normal(centroid);
         faces[i].boundary = Boundary::ORDINARY;
     }
 }
@@ -174,21 +164,21 @@ void AmrCell::build2D(const VerticesList& verts) {
 
         faces[i].vertices = {short(i), short(j), undef, undef};
 
-        ShortList1D vs = {verts[i], verts[j]};
+        Line vs = {verts[i], verts[j]};
 
-        faces[i].area = geom::length(vs);
-        faces[i].normal = geom::normal(vs, centroid);
+        faces[i].area     = vs.length();
+        faces[i].normal   = vs.normal(centroid);
         faces[i].boundary = Boundary::ORDINARY;
     }
 }
 
-void AmrCell::build3D(const ShortList3D& verts) {
+void AmrCell::build3D(const Cube& verts) {
     dim = 3;
 
-    double volume = geom::volume(verts);
+    double volume = verts.volume();
     size = std::cbrt(volume);
 
-    Vector3d centroid = geom::centroid(verts, volume);
+    Vector3d centroid = verts.centroid(volume);
     coords = centroid;
 
     setup_vertices(verts);
@@ -203,15 +193,15 @@ void AmrCell::build3D(const ShortList3D& verts) {
     faces[Side::F].vertices = face_indices<3, Side::F>();
 
     for (int i = 0; i < 6; ++i) {
-        ShortList2D vs = {
+        Quad vs = {
                 vertices[faces[i].vertices[0]],
                 vertices[faces[i].vertices[1]],
                 vertices[faces[i].vertices[2]],
                 vertices[faces[i].vertices[3]]
         };
 
-        faces[i].area = geom::area(vs);
-        faces[i].normal = geom::normal(vs, centroid);
+        faces[i].area     = vs.area();
+        faces[i].normal   = vs.normal(centroid);
         faces[i].boundary = Boundary::ORDINARY;
     }
 }
@@ -228,7 +218,7 @@ AmrCell::AmrCell() :
 
 }
 
-AmrCell::AmrCell(const ShortList2D& verts) : AmrCell() {
+AmrCell::AmrCell(const Quad& verts) : AmrCell() {
     build2D(verts);
 }
 
@@ -236,11 +226,11 @@ AmrCell::AmrCell(const VerticesList& verts) : AmrCell() {
     build2D(verts);
 }
 
-AmrCell::AmrCell(const LargeList2D& verts) : AmrCell() {
+AmrCell::AmrCell(const SqQuad& verts) : AmrCell() {
     build2D(verts);
 }
 
-AmrCell::AmrCell(const ShortList3D& verts) : AmrCell() {
+AmrCell::AmrCell(const Cube& verts) : AmrCell() {
     build3D(verts);
 }
 
@@ -266,7 +256,7 @@ bool AmrCell::is_undefined() const {
 
 /*
 AmrCell::AmrCell(const std::array<Storage::Item, 4>& children) : dim(2) {
-    LargeList2D vs = {
+    SqQuad verts = {
             children[0].geom().vertices[iww(0, 0)],
             children[0].geom().vertices[iww(2, 0)],
             children[1].geom().vertices[iww(2, 0)],
@@ -277,11 +267,11 @@ AmrCell::AmrCell(const std::array<Storage::Item, 4>& children) : dim(2) {
             children[2].geom().vertices[iww(2, 2)],
             children[3].geom().vertices[iww(2, 2)]
     };
-    build2D(vs);
+    build2D(verts);
 }
 
 AmrCell::AmrCell(const std::array<Storage::Item, 8>& children) : dim(3) {
-    ShortList3D vs = {
+    Cube verts = {
             children[iss(0, 0, 0)].geom().vertices[isw(0, 0, 0)],
             children[iss(1, 0, 0)].geom().vertices[isw(1, 0, 0)],
             children[iss(0, 1, 0)].geom().vertices[isw(0, 1, 0)],
@@ -291,9 +281,8 @@ AmrCell::AmrCell(const std::array<Storage::Item, 8>& children) : dim(3) {
             children[iss(0, 1, 1)].geom().vertices[isw(0, 1, 1)],
             children[iss(1, 1, 1)].geom().vertices[isw(1, 1, 1)]
     };
-    build3D(vs);
+    build3D(verts);
 }
 */
 
-} // namespace geom
-} // namespace zephyr
+} // namespace zephyr::geom

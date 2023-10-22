@@ -4,6 +4,7 @@
 
 #include <zephyr/mesh/mesh.h>
 #include <zephyr/geom/generator/rectangle.h>
+#include <zephyr/geom/generator/cuboid.h>
 #include <zephyr/io/pvd_file.h>
 #include <zephyr/io/variables.h>
 
@@ -11,6 +12,7 @@ using namespace zephyr;
 using namespace mesh;
 
 using generator::Rectangle;
+using generator::Cuboid;
 using zephyr::io::PvdFile;
 
 
@@ -69,9 +71,12 @@ int main() {
     Rectangle rect(-1.0, 1.0, -1.0, 1.0);
     rect.set_nx(20);
 
-    Mesh mesh(U, &rect);
+    Cuboid cube(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
+    cube.set_nx(10);
 
-    mesh.set_max_level(5);
+    Mesh mesh(U, &cube);
+
+    mesh.set_max_level(3);
 
     int res = mesh.check_base();
     if (res < 0) {

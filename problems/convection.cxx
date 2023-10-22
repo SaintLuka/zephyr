@@ -12,7 +12,8 @@ public:
 
     /// @brief Задаем скорость переноса
     Vector3d velocity(const Vector3d& c) const override {
-        return { 0.8, 0.40 + 0.3*std::sin(4 * M_PI * c.x()), 0.0 };
+        return { 0.5, 0.4, 0.3 };
+        return { 0.8, 0.40 + 0.3*std::sin(4 * M_PI * c.x()), 0.2 };
     }
 };
 
@@ -32,8 +33,10 @@ const double margin = 0.0198;
 
 // Начальное условие в виде круга
 void setup_initial_1(Mesh& mesh, double D) {
-    double R = D / 2.0;
-    Vector3d vc = {R + margin, R + margin, 0.0};
+    //double R = D / 2.0;
+    //Vector3d vc = {R + margin, R + margin, 0.2};
+    double R = 0.1;
+    Vector3d vc = {0.15, 0.15, 0.15};
     for (auto cell: mesh) {
         cell(U).u1 = (cell.center() - vc).norm() < R ? 1.0 : 0.0;
         cell(U).u2 = 0.0;
@@ -72,9 +75,16 @@ int main() {
     // Геометрия области
     Rectangle rect(0.0, 1.0, 0.0, 0.6, false);
     rect.set_nx(50);
-    rect.set_boundary_flags(
-            Boundary::ZOE, Boundary::ZOE,
-            Boundary::ZOE, Boundary::ZOE);
+    rect.set_boundaries({
+        .left   = Boundary::ZOE, .right = Boundary::ZOE,
+        .bottom = Boundary::ZOE, .top   = Boundary::ZOE});
+
+    Cuboid cube(0.0, 1.0, 0.0, 0.8, 0.0, 0.6);
+    cube.set_nx(20);
+    cube.set_boundaries({
+        .left   = Boundary::ZOE, .right = Boundary::ZOE,
+        .bottom = Boundary::ZOE, .top   = Boundary::ZOE,
+        .back   = Boundary::ZOE, .front = Boundary::ZOE});
 
     // Создать решатель
     Solver solver;
@@ -85,10 +95,10 @@ int main() {
     solver.set_limiter("van Leer");
 
     // Создать сетку
-    Mesh mesh(U, &rect);
+    Mesh mesh(U, &cube);
 
     // Настраиваем адаптацию
-    mesh.set_max_level(5);
+    mesh.set_max_level(3);
     mesh.set_distributor(solver.distributor());
 
     // Заполняем начальные данные

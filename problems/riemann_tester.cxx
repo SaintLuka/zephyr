@@ -95,16 +95,13 @@ std::vector<double> RiemannTester(const ClassicTest &test, const NumFlux::Ptr &n
                       }};
 
     // Создаем одномерную сетку
-    double H = 0.05 * (test.xmax() - test.xmin());
-    Rectangle rect(test.xmin(), test.xmax(), -H, +H);
+    Strip gen(test.xmin(), test.xmax());
     int n_cells = 500;
-    rect.set_sizes(n_cells, 1);
-    rect.set_boundary_flags(
-            Boundary::WALL, Boundary::WALL,
-            Boundary::WALL, Boundary::WALL);
+    gen.set_nx(n_cells);
+    gen.set_boundaries({.left = Boundary::WALL, .right = Boundary::WALL});
 
     // Создать сетку
-    Mesh mesh(U, &rect);
+    Mesh mesh(U, &gen);
 
     // Заполняем начальные данные
     for (auto cell: mesh) {
@@ -297,16 +294,13 @@ std::vector<double> RiemannTesterWithSolver(const ClassicTest &test, Fluxes flux
                       }};
 
     // Создаем одномерную сетку
-    double H = 0.05 * (test.xmax() - test.xmin());
-    Rectangle rect(test.xmin(), test.xmax(), -H, +H);
+    Strip gen(test.xmin(), test.xmax());
     int n_cells = 500;
-    rect.set_sizes(n_cells, 1);
-    rect.set_boundary_flags(
-            Boundary::WALL, Boundary::WALL,
-            Boundary::WALL, Boundary::WALL);
+    gen.set_nx(n_cells);
+    gen.set_boundaries({.left = Boundary::WALL, .right = Boundary::WALL});
 
     // Создать сетку
-    Mesh mesh(U, &rect);
+    Mesh mesh(U, &gen);
 
     MmFluid solver(eos, flux);
     solver.init_cells(mesh, test);

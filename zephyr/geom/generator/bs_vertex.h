@@ -7,8 +7,6 @@
 
 namespace zephyr::geom::generator {
 
-using zephyr::geom::Vector3d;
-
 class Block;
 class Curve;
 

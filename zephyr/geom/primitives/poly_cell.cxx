@@ -3,7 +3,7 @@
 namespace zephyr::geom {
 
 /*
-void AmrCell::setup_vertices(const ShortList2D& vlist) {
+void AmrCell::setup_vertices(const Quad& vlist) {
     vertices.set_undefined();
 
     // Базовые вершины
@@ -23,7 +23,7 @@ void AmrCell::setup_vertices(const ShortList2D& vlist) {
                            vlist[iws(0, 2)] + vlist[iws(2, 2)]) / 4.0;
 }
 
-void AmrCell::setup_vertices(const LargeList2D& vlist) {
+void AmrCell::setup_vertices(const SqQuad& vlist) {
     vertices.set_undefined();
 
     // Базовые вершины
@@ -42,7 +42,7 @@ void AmrCell::setup_vertices(const LargeList2D& vlist) {
     vertices[iww(1, 1)] = vlist[iww(1, 1)];
 }
 
-void AmrCell::setup_vertices(const ShortList3D& vlist) {
+void AmrCell::setup_vertices(const Cube& vlist) {
     vertices.set_undefined();
 
     // Скопировать базовые вершины
@@ -90,7 +90,7 @@ void AmrCell::setup_vertices(const ShortList3D& vlist) {
                                    vlist[iws(2, 0, 2)] + vlist[iws(2, 2, 2)]) / 8.0;
 }
 
-void AmrCell::build2D(const ShortList2D& verts) {
+void AmrCell::build2D(const Quad& verts) {
     dim = 2;
 
     double area = geom::area(verts);
@@ -109,18 +109,18 @@ void AmrCell::build2D(const ShortList2D& verts) {
     faces[Side::T].vertices = face_indices<2, Side::T>();
 
     for (int i = 0; i < 4; ++i) {
-        ShortList1D vs = {
+        Line verts = {
                 vertices[faces[i].vertices[0]],
                 vertices[faces[i].vertices[1]]
         };
 
-        faces[i].area = geom::length(vs);
-        faces[i].normal = geom::normal(vs, centroid);
+        faces[i].area = geom::length(verts);
+        faces[i].normal = geom::normal(verts, centroid);
         faces[i].boundary = Boundary::ORDINARY;
     }
 }
 
-void AmrCell::build2D(const LargeList2D& verts) {
+void AmrCell::build2D(const SqQuad& verts) {
     dim = 2;
 
     double area = geom::area(verts);
@@ -139,13 +139,13 @@ void AmrCell::build2D(const LargeList2D& verts) {
     faces[Side::T].vertices = face_indices<2, Side::T>();
 
     for (int i = 0; i < 4; ++i) {
-        ShortList1D vs = {
+        Line verts = {
                 vertices[faces[i].vertices[0]],
                 vertices[faces[i].vertices[1]]
         };
 
-        faces[i].area = geom::length(vs);
-        faces[i].normal = geom::normal(vs, centroid);
+        faces[i].area = geom::length(verts);
+        faces[i].normal = geom::normal(verts, centroid);
         faces[i].boundary = Boundary::ORDINARY;
     }
 }
@@ -175,15 +175,15 @@ void AmrCell::build2D(const VerticesList& verts) {
 
         faces[i].vertices = {short(i), short(j), undef, undef};
 
-        ShortList1D vs = {verts[i], verts[j]};
+        Line verts = {verts[i], verts[j]};
 
-        faces[i].area = geom::length(vs);
-        faces[i].normal = geom::normal(vs, centroid);
+        faces[i].area = geom::length(verts);
+        faces[i].normal = geom::normal(verts, centroid);
         faces[i].boundary = Boundary::ORDINARY;
     }
 }
 
-void AmrCell::build3D(const ShortList3D& verts) {
+void AmrCell::build3D(const Cube& verts) {
     dim = 3;
 
     double volume = geom::volume(verts);
@@ -204,15 +204,15 @@ void AmrCell::build3D(const ShortList3D& verts) {
     faces[Side::F].vertices = face_indices<3, Side::F>();
 
     for (int i = 0; i < 6; ++i) {
-        ShortList2D vs = {
+        Quad verts = {
                 vertices[faces[i].vertices[0]],
                 vertices[faces[i].vertices[1]],
                 vertices[faces[i].vertices[2]],
                 vertices[faces[i].vertices[3]]
         };
 
-        faces[i].area = geom::area(vs);
-        faces[i].normal = geom::normal(vs, centroid);
+        faces[i].area = geom::area(verts);
+        faces[i].normal = geom::normal(verts, centroid);
         faces[i].boundary = Boundary::ORDINARY;
     }
 }
@@ -229,7 +229,7 @@ AmrCell::AmrCell() :
 
 }
 
-AmrCell::AmrCell(const ShortList2D& verts) : AmrCell() {
+AmrCell::AmrCell(const Quad& verts) : AmrCell() {
     build2D(verts);
 }
 
@@ -237,11 +237,11 @@ AmrCell::AmrCell(const VerticesList& verts) : AmrCell() {
     build2D(verts);
 }
 
-AmrCell::AmrCell(const LargeList2D& verts) : AmrCell() {
+AmrCell::AmrCell(const SqQuad& verts) : AmrCell() {
     build2D(verts);
 }
 
-AmrCell::AmrCell(const ShortList3D& verts) : AmrCell() {
+AmrCell::AmrCell(const Cube& verts) : AmrCell() {
     build3D(verts);
 }
 

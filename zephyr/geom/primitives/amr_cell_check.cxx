@@ -64,7 +64,7 @@ void AmrCell::visualize() const {
          << "            color=color)\n\n";
 
     // Основные точки
-    LargeList2D map;
+    SqQuad map;
     for (int i = 0; i < 9; ++i) {
         map[i] = vertices[i];
     }
@@ -93,14 +93,14 @@ void AmrCell::visualize() const {
 
     file << "unit = np.linspace(-1.0, 1.0, 101)\n\n";
 
-    Mapping1D L(LargeList1D({vertices[0], vertices[3], vertices[6]}));
-    Mapping1D R(LargeList1D({vertices[2], vertices[5], vertices[8]}));
-    Mapping1D B(LargeList1D({vertices[0], vertices[1], vertices[2]}));
-    Mapping1D T(LargeList1D({vertices[6], vertices[7], vertices[8]}));
+    SqLine L(SqLine({vertices[0], vertices[3], vertices[6]}));
+    SqLine R(SqLine({vertices[2], vertices[5], vertices[8]}));
+    SqLine B(SqLine({vertices[0], vertices[1], vertices[2]}));
+    SqLine T(SqLine({vertices[6], vertices[7], vertices[8]}));
 
     for (auto& sf: {L, R, B, T}) {
-        file << "curve_Lx = spline(" << sf.v1.x() << ", " << sf.vc.x() << ", " << sf.v2.x() << ", unit)\n";
-        file << "curve_Ly = spline(" << sf.v1.y() << ", " << sf.vc.y() << ", " << sf.v2.y() << ", unit)\n";
+        file << "curve_Lx = spline(" << sf(-1).x() << ", " << sf(0).x() << ", " << sf(+1).x() << ", unit)\n";
+        file << "curve_Ly = spline(" << sf(-1).y() << ", " << sf(0).y() << ", " << sf(+1).y() << ", unit)\n";
         file << "ax.plot(curve_Lx, curve_Ly, linestyle='dotted', color='green', linewidth=0.5)\n\n";
     }
 
@@ -242,7 +242,7 @@ int AmrCell::check_base_face_orientation() const {
 
 int AmrCell::check_base_vertices_order() const {
     if (dim == 2) {
-        LargeList2D verts;
+        SqQuad verts;
         for (int i = 0; i < 9; ++i) {
             verts[i] = vertices[i];
         }
@@ -313,7 +313,7 @@ int AmrCell::check_base_vertices_order() const {
             return -1;
         }
     } else {
-        LargeList3D verts;
+        SqCube verts;
         for (int i = 0; i < 27; ++i) {
             verts[i] = vertices[i];
         }

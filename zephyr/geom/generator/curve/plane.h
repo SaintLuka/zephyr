@@ -9,13 +9,13 @@ class BaseVertex;
 /// @brief Прямая линия с параметрическим заданием X(t), Y(t).
 /// Полная прямая получается при пробегании t от -1 до 1 (используется
 /// отображение в виде тангенса).
-class Line : public Curve {
+class Plane : public Curve {
 private:
     using BaseVertex_Ref = const std::shared_ptr<BaseVertex> &;
 
 public:
     /// @brief Конструктор по двум точкам
-    Line(const Vector3d &v1, const Vector3d &v2);
+    Plane(const Vector3d &v1, const Vector3d &v2);
 
     /// @brief Созадние указателя по двум точкам
     static Curve::Ptr create(const Vector3d &v1, const Vector3d &v2);

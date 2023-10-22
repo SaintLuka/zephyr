@@ -5,13 +5,9 @@
 #include <set>
 
 #include <zephyr/geom/vector.h>
-
-#include <zephyr/geom/primitives/base_face.h>
+#include <zephyr/geom/primitives/boundary.h>
 
 namespace zephyr::geom {
-
-class GCell;
-class AmrCell;
 
 /// @brief Поддерживаемые типы ячеек сетки
 /// Повторяют VTK типы с добавлением типов AMR2D и AMR3D
@@ -95,7 +91,7 @@ public:
 
     static GCell wedge(const std::array<GNode::Ptr, 6>& nodes);
 
-    static GCell hexagedron(const std::array<GNode::Ptr, 6>& nodes);
+    static GCell hexagedron(const std::array<GNode::Ptr, 8>& nodes);
 
 
     CellType type() const;
@@ -137,6 +133,8 @@ private:
     std::vector<GFace>      m_faces;
     std::vector<int>        m_neibs;
 };
+
+class AmrCell;
 
 /// @brief Сетка общего вида, которую выдают сеточные генераторы.
 /// Непосредственно в расчетах не используется, после создания преобразуется

@@ -3,14 +3,11 @@
 #include <cassert>
 #include <memory>
 
-#include <zephyr/mesh/storage.h>
-
-#include <zephyr/geom/box.h>
 #include <zephyr/geom/geom.h>
+#include <zephyr/geom/box.h>
+#include <zephyr/geom/grid.h>
 
-#include <zephyr/geom/generator/bs_vertex.h>
-#include <zephyr/geom/generator/block.h>
-#include <zephyr/geom/generator/curve/line.h>
+#include <zephyr/geom/generator/curve/plane.h>
 #include <zephyr/geom/generator/curve/circle.h>
 #include <zephyr/geom/generator/collection/plane_with_hole.h>
 
@@ -88,9 +85,7 @@ PlaneWithHole::PlaneWithHole(
         m_ymin(ymin), m_ymax(ymax),
         m_xc(xc), m_yc(yc),
         m_r(r), m_xi(2.0),
-        m_left_flag(Boundary::UNDEFINED), m_right_flag(Boundary::UNDEFINED),
-        m_bottom_flag(Boundary::UNDEFINED), m_top_flag(Boundary::UNDEFINED),
-        m_hole_flag(Boundary::UNDEFINED) {
+        m_bounds() {
 
     m_name = "collection.plane-with-hole";
 
@@ -163,9 +158,8 @@ void PlaneWithHole::set_nx(int Nx) {
 }
 
 
-void PlaneWithHole::set_boundaries(const Boundaries& flags) {
-    m_left_flag = flags.left;
-    m_right_flag = flags.right;
+void PlaneWithHole::set_boundaries(Boundaries bounds) {
+    m_bounds = bounds;
 }
 
 void PlaneWithHole::init_blocks() {
@@ -207,16 +201,16 @@ void PlaneWithHole::init_blocks() {
 
     // Ограничивающие прямые области
     circle = Circle::create(m_r, {m_xc, m_yc, 0.0});
-    left   = Line::create(v1, v17);
-    right  = Line::create(v4, v20);
-    bottom = Line::create(v1, v4);
-    top    = Line::create(v17, v20);
+    left   = Plane::create(v1, v17);
+    right  = Plane::create(v4, v20);
+    bottom = Plane::create(v1, v4);
+    top    = Plane::create(v17, v20);
 
-    left->set_boundary_flag(m_left_flag);
-    right->set_boundary_flag(m_right_flag);
-    bottom->set_boundary_flag(m_bottom_flag);
-    top->set_boundary_flag(m_top_flag);
-    circle->set_boundary_flag(m_hole_flag);
+    left->set_boundary(m_bounds.left);
+    right->set_boundary(m_bounds.right);
+    bottom->set_boundary(m_bounds.bottom);
+    top->set_boundary(m_bounds.top);
+    circle->set_boundary(m_bounds.hole);
 
     // Генератор сетки
     m_blocks[0] = {v1, v2, v5, v6};

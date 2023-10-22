@@ -9,7 +9,7 @@
 #include <zephyr/geom/generator/sector.h>
 #include <zephyr/geom/generator/bs_vertex.h>
 #include <zephyr/geom/generator/block.h>
-#include <zephyr/geom/generator/curve/line.h>
+#include <zephyr/geom/generator/curve/plane.h>
 #include <zephyr/geom/generator/curve/cubic.h>
 #include <zephyr/geom/generator/curve/circle.h>
 #include <zephyr/geom/generator/block_structured.h>
@@ -52,7 +52,6 @@ Generator::Ptr get_generator(Test test);
 void fill(Storage& cells);
 
 int main() {
-
     // Переменные для записи
     Variables vars;
     vars += { "uid", get_uid };
@@ -60,16 +59,16 @@ int main() {
 
     // Список тестов
     std::vector<Test> tests_list = {
-            Test::Rectangle,
-            Test::RectangleHex,
+            //Test::Rectangle,
+            //Test::RectangleHex,
             Test::Cuboid,
-            Test::Sector1,
-            Test::Sector2,
-            Test::Sector3,
-            Test::Disk,
-            Test::BlockStruct1,
-            Test::BlockStruct2,
-            Test::BlockStruct3
+            //Test::Sector1,
+            //Test::Sector2,
+            //Test::Sector3,
+            //Test::Disk,
+            //Test::BlockStruct1,
+            //Test::BlockStruct2,
+            //Test::BlockStruct3
     };
 
     for (auto test: tests_list) {
@@ -179,45 +178,45 @@ std::string filename(Test test) {
 }
 
 Generator::Ptr create_rectangle() {
-    auto rect = new Rectangle(0.0, 2.0, 0.0, 1.0, false);
+    auto rect = Rectangle::create(0.0, 2.0, 0.0, 1.0, false);
     rect->set_nx(100);
-    return std::unique_ptr<Generator>(rect);
+    return rect;
 }
 
 Generator::Ptr create_rectangle_hex() {
-    auto rect = new Rectangle(0.0, 2.0, 0.0, 1.0, true);
+    auto rect = Rectangle::create(0.0, 2.0, 0.0, 1.0, true);
     rect->set_nx(100);
-    return std::unique_ptr<Generator>(rect);
+    return rect;
 }
 
 Generator::Ptr create_cuboid() {
-    auto cuboid = new Cuboid(0.0, 2.0, 0.0, 1.0, 0.0, 0.5);
+    auto cuboid = Cuboid::create(0.0, 2.0, 0.0, 1.0, 0.0, 0.5);
     cuboid->set_nx(40);
-    return std::unique_ptr<Generator>(cuboid);
+    return cuboid;
 }
 
 Generator::Ptr create_sector1() {
-    auto sector = new Sector(1.0, 0.3, M_PI / 5.0, true);
+    auto sector = Sector::create(1.0, 0.3, M_PI / 5.0, true);
     sector->set_n_phi(17);
-    return std::unique_ptr<Generator>(sector);
+    return sector;
 }
 
 Generator::Ptr create_sector2() {
-    auto sector = new Sector(1.0, 0.3, 0.8 * M_PI, false);
+    auto sector = Sector::create(1.0, 0.3, 0.8 * M_PI, false);
     sector->set_n_phi(28);
-    return std::unique_ptr<Generator>(sector);
+    return sector;
 }
 
 Generator::Ptr create_sector3() {
-    auto sector = new Sector(1.0, 0.3, 1.4 * M_PI, false);
+    auto sector = Sector::create(1.0, 0.3, 1.4 * M_PI, false);
     sector->set_n_phi(36);
-    return std::unique_ptr<Generator>(sector);
+    return sector;
 }
 
 Generator::Ptr create_disk() {
-    auto sector = new Sector(1.0, 0.3, 2.0 * M_PI, false);
+    auto sector = Sector::create(1.0, 0.3, 2.0 * M_PI, false);
     sector->set_n_phi(80);
-    return std::unique_ptr<Generator>(sector);
+    return sector;
 }
 
 Generator::Ptr create_block_structured1() {
@@ -239,12 +238,12 @@ Generator::Ptr create_block_structured1() {
 
     // Ограничивающие кривые области
     Curve::Ptr circle = Circle::create(v3, v6, v7);           // Окружность
-    Curve::Ptr left = Line::create(v1, v7);                   // Прямая слева
+    Curve::Ptr left = Plane::create(v1, v7);                   // Прямая слева
     Curve::Ptr bottom = Cubic::create(*v1, v_s1, v_s2, *v3);  // Сплайн на нижней границе
 
     // Генератор сетки
-    auto blocks_ptr = new BlockStructured(3);
-    BlockStructured& blocks = *blocks_ptr;
+    auto gen = BlockStructured::create(3);
+    BlockStructured& blocks = *gen;
 
     blocks[0] = {v1, v2, v4, v5};
     blocks[0].set_boundary(v1, v4, left);
@@ -277,7 +276,7 @@ Generator::Ptr create_block_structured1() {
     blocks.set_accuracy(1.0e-5);
 
     // Возвращаем генератор
-    return std::unique_ptr<BlockStructured>(blocks_ptr);
+    return gen;
 }
 
 Generator::Ptr create_block_structured2() {
@@ -315,14 +314,14 @@ Generator::Ptr create_block_structured2() {
 
     // Ограничивающие кривые области
     Curve::Ptr circle = Circle::create(v9, v10, v11);
-    Curve::Ptr left   = Line::create(v1, v17);
-    Curve::Ptr right  = Line::create(v4, v20);
-    Curve::Ptr bottom = Line::create(v1, v4);
+    Curve::Ptr left   = Plane::create(v1, v17);
+    Curve::Ptr right  = Plane::create(v4, v20);
+    Curve::Ptr bottom = Plane::create(v1, v4);
     Curve::Ptr top    = Cubic::create(v17, v18, v19, v20);
 
     // Генератор сетки
-    auto blocks_ptr = new BlockStructured(12);
-    BlockStructured& blocks = *blocks_ptr;
+    auto gen = BlockStructured::create(12);
+    BlockStructured& blocks = *gen;
 
     blocks[0] = {v1, v2, v5, v6};
     blocks[0].set_boundary(v1, v5, left);
@@ -388,7 +387,7 @@ Generator::Ptr create_block_structured2() {
     blocks.set_accuracy(1.0e-5);
 
     // Возвращаем генератор
-    return std::unique_ptr<BlockStructured>(blocks_ptr);
+    return gen;
 }
 
 Generator::Ptr create_block_structured3() {
@@ -409,12 +408,12 @@ Generator::Ptr create_block_structured3() {
     // Ограничивающие кривые области
     Curve::Ptr circ = Circle::create(r, {h, 0.0, 0.0});
     Curve::Ptr CIRC = Circle::create(v7, v8, v4);
-    Curve::Ptr left = Line::create(v1, v7);
-    Curve::Ptr bottom = Line::create(v1, v4);
+    Curve::Ptr left = Plane::create(v1, v7);
+    Curve::Ptr bottom = Plane::create(v1, v4);
 
     // Генератор сетки
-    auto blocks_ptr = new BlockStructured(3);
-    BlockStructured& blocks = *blocks_ptr;
+    auto gen = BlockStructured::create(3);
+    BlockStructured& blocks = *gen;
 
     blocks[0] = {v1, v2, v6, v5};
     blocks[0].set_boundary(v1, v2, bottom);
@@ -448,7 +447,7 @@ Generator::Ptr create_block_structured3() {
     blocks.set_accuracy(1.0e-5);
 
     // Возвращаем генератор
-    return std::unique_ptr<BlockStructured>(blocks_ptr);
+    return gen;
 }
 
 Generator::Ptr get_generator(Test test) {

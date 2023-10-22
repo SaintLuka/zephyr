@@ -1,10 +1,19 @@
 add_subdirectory(amr)
 add_subdirectory(eos)
 
+set(GEOMETRY  1)
 set(MESHGEN   1)
 set(MPITEST   0)
 set(STOPWATCH 1)
 set(THREADS   1)
+
+if (GEOMETRY)
+    message(STATUS "Build geometry test")
+    add_executable(geometry geometry.cpp)
+    target_include_directories(geometry PUBLIC zephyr)
+    target_link_libraries(geometry PUBLIC zephyr)
+    install(TARGETS geometry DESTINATION tests)
+endif()
 
 if (MESHGEN)
     message(STATUS "Build meshgen test")

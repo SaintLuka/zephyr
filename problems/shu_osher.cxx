@@ -55,16 +55,9 @@ int main() {
     Eos& eos = test.eos();
 
     // Создаем одномерную сетку
-    double H = 0.05 * (test.xmax() - test.xmin());
-    //Rectangle rect(test.xmin(), test.xmax(), -H, +H);
-    //rect.set_sizes(100, 2);
-    //Strip rect(test.xmin(), test.xmax(), Strip::Nodes::RANDOM);
-    //rect.set_size(1000);
-    //rect.set_boundary_flags(
-    //        Boundary::WALL, Boundary::WALL);
-
-    generator::collection::PlaneWithHole gen(-5.0, 5.0, -0.5, 0.5, 0.0, 0.0, 0.1);
-    gen.set_nx(200);
+    Strip gen(test.xmin(), test.xmax());
+    gen.set_size(1000);
+    gen.set_boundaries({.left = Boundary::ZOE, .right = Boundary::ZOE});
 
     // Создать сетку
     Mesh mesh(U, &gen);
@@ -72,10 +65,10 @@ int main() {
     // Заполняем начальные данные
     Vector3d shift = -2.0*Vector3d::UnitX();
     for (auto cell: mesh) {
-        cell(U).rho1 = test.density(cell.center()+shift);
-        cell(U).v1   = test.velocity(cell.center() + shift);
-        cell(U).p1   = test.pressure(cell.center() + shift);
-        cell(U).e1   = test.energy(cell.center() + shift);
+        cell(U).rho1 = test.density(cell.center());
+        cell(U).v1   = test.velocity(cell.center());
+        cell(U).p1   = test.pressure(cell.center());
+        cell(U).e1   = test.energy(cell.center());
     }
 
     // Число Куранта

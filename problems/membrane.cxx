@@ -74,9 +74,9 @@ int main() {
     // Создаем одномерную сетку
     Rectangle rect(0.0, 4.0, -2.0, 4.0);
     rect.set_nx(100);
-    rect.set_boundary_flags(
-            Boundary::WALL, Boundary::WALL,
-            Boundary::WALL, Boundary::WALL);
+    rect.set_boundaries({
+        .left   = Boundary::WALL, .right = Boundary::WALL,
+        .bottom = Boundary::WALL, .top   = Boundary::WALL});
 
     // Создать сетку
     Mesh mesh(U, &rect);

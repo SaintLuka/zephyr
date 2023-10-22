@@ -101,9 +101,9 @@ int main() {
     Rectangle rect(test.xmin(), test.xmax(), -H, +H);
     int n_cells = 500;
     rect.set_sizes(n_cells, 1);
-    rect.set_boundary_flags(
-            Boundary::WALL, Boundary::WALL,
-            Boundary::WALL, Boundary::WALL);
+    rect.set_boundaries({
+        .left   = Boundary::WALL, .right = Boundary::WALL,
+        .bottom = Boundary::WALL, .top   = Boundary::WALL});
 
     // Создать сетку
     Mesh mesh(U, &rect);

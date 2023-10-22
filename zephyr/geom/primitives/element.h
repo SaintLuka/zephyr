@@ -1,7 +1,5 @@
 #pragma once
 
-#include <zephyr/geom/geom.h>
-
 namespace zephyr::geom {
 
 /// @class Базовый класс для геометрических данных хранилища Storage.

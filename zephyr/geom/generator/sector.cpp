@@ -76,6 +76,10 @@ Sector::Sector(double r_max, double r_min, double angle, bool hole) :
     init_params();
 }
 
+int Sector::size() const {
+    return m_size;
+}
+
 Box Sector::bbox() const {
     Vector3d vmin(0.0, 0.0, 0.0);
     Vector3d vmax(0.0, 0.0, 0.0);
@@ -218,7 +222,7 @@ Vector3d Sector::rotate(const Vector3d &v, int r) const {
     };
 }
 
-Grid Sector::create() {
+Grid Sector::make() {
     // Вершины центральной части
     std::vector<std::vector<GNode::Ptr>> CV;
     std::vector<std::vector<GNode::Ptr>> CV2;
@@ -488,7 +492,7 @@ Grid Sector::create() {
     }
 
     // Круг не замыкается
-    if (std::abs(m_angle - 2 * M_PI) > 1.0e-4) {
+    if (!m_hole && std::abs(m_angle - 2 * M_PI) > 1.0e-4) {
         for (size_t i = 0; i <= m_nx; ++i) {
             CV[i][0]->add_boundary(m_bounds.right);
         }

@@ -17,6 +17,10 @@ Strip::Strip(double xmin, double xmax, Type type) :
     check_params();
 }
 
+int Strip::size() const {
+    return m_nx;
+}
+
 Box Strip::bbox() const {
     Vector3d vmin(x_min(), y_min(), 0.0);
     Vector3d vmax(x_max(), y_max(), 0.0);
@@ -112,7 +116,7 @@ std::vector<double> get_nodes(Strip::Type type, double xmin, double xmax, int si
     }
 }
 
-Grid Strip::create() {
+Grid Strip::make() {
     check_size();
 
     auto nodes1D = get_nodes(m_type, m_xmin, m_xmax, m_nx);

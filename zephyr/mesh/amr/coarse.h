@@ -76,7 +76,7 @@ std::array<Storage::Item, CpC(dim)> select_children(Storage& cells, int ic) {
 }
 
 /// @brief Список вершин родительской ячейки
-LargeList2D parent_vs(const std::array<Storage::Item, 4>& children) {
+SqQuad parent_vs(const std::array<Storage::Item, 4>& children) {
      return {
             children[0].geom().vertices[iww(0, 0)],
             children[0].geom().vertices[iww(2, 0)],
@@ -91,7 +91,7 @@ LargeList2D parent_vs(const std::array<Storage::Item, 4>& children) {
 }
 
 /// @brief Список вершин родительской ячейки
-ShortList3D parent_vs(const std::array<Storage::Item, 8>& children) {
+Cube parent_vs(const std::array<Storage::Item, 8>& children) {
     return {
             children[iss(0, 0, 0)].geom().vertices[isw(0, 0, 0)],
             children[iss(1, 0, 0)].geom().vertices[isw(1, 0, 0)],

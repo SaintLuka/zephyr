@@ -4,33 +4,28 @@
 #include <vector>
 
 #include <zephyr/configuration.h>
-#include <zephyr/mesh/storage.h>
-
-#include <zephyr/geom/generator/generator.h>
-#include <zephyr/geom/generator/bs_vertex.h>
-#include <zephyr/geom/generator/curve/curve.h>
 #include <zephyr/geom/generator/block_structured.h>
 
 namespace zephyr::geom::generator::collection {
 
-using zephyr::geom::Boundary;
-
 /// @class PlaneWithHole. Генератор для создания сетки внутри прямоугольника с отверстием.
 class PlaneWithHole : public BlockStructured {
 public:
+    using Ptr = std::shared_ptr<PlaneWithHole>;
+
+    /// @brief Флаги граничных условий
+    struct Boundaries {
+        Boundary left   = Boundary::WALL;
+        Boundary right  = Boundary::WALL;
+        Boundary bottom = Boundary::WALL;
+        Boundary top    = Boundary::WALL;
+        Boundary hole   = Boundary::WALL;
+    };
 
 #ifdef ZEPHYR_ENABLE_YAML
     /// @brief Конструктор класса по кофигу
     explicit PlaneWithHole(YAML::Node config);
 #endif
-
-    struct Boundaries {
-        Boundary left;
-        Boundary right;
-        Boundary bottom;
-        Boundary top;
-        Boundary hole;
-    };
 
     /// @brief Конструктор класса
     /// @param xmin, xmax, ymin, ymax Границы прямоугольника
@@ -38,24 +33,29 @@ public:
     PlaneWithHole(double xmin, double xmax, double ymin, double ymax,
                   double xc, double yc, double r);
 
+    /// @brief Создать указатель на класс
+    template <class... Args>
+    static PlaneWithHole::Ptr create(Args&&... args){
+        return std::make_shared<PlaneWithHole>(std::forward<Args>(args)...);
+    }
 
     /// @brief Установить желаемое число ячеек сетки по оси Ox
     /// @details Число ячеек по оси Oy подбирается так, чтобы aspect ячеек
     /// был около единицы
     void set_nx(int nx);
 
-    void set_boundaries(const Boundaries& flags);
+    /// @brief Установить флаги граничных условий
+    void set_boundaries(Boundaries bounds);
 
-    /// @brief Создать указатель на соответствующий volumes::Box
+    /// @brief Ограничивающий объем
     Box bbox() const final;
 
 private:
-
     void check_params() const override;
 
     void init_blocks();
 
-
+    // Геометрия
     double m_xmin, m_xmax;
     double m_ymin, m_ymax;
     double m_xc, m_yc, m_r;
@@ -64,13 +64,11 @@ private:
     /// и внутренней (отверстия)
     double m_xi;
 
-    Boundary m_left_flag, m_right_flag;
-    Boundary m_bottom_flag, m_top_flag;
-    Boundary m_hole_flag;
-
+    // Флаги граничных условий
+    Boundaries m_bounds;
 
     // Куча параметров
-    // Задаем базисные вершины для струтурированных блоков
+    // Базисные вершины для струтурированных блоков
     BaseVertex::Ptr v1, v2, v3, v4;
     BaseVertex::Ptr v5, v6, v7, v8;
     BaseVertex::Ptr v9, v10, v11, v12;

@@ -101,7 +101,7 @@ void print_cell_info(Storage& locals, Storage& aliens, size_t ic) {
 }
 
 void visualize_cell(Storage::Item cell) {
-    using zephyr::math::geom::Mapping1D;
+    using zephyr::math::geom::SqLine;
     using zephyr::math::geom::Mapping2D;
     using zephyr::math::geom::LargeList1D;
     using zephyr::math::geom::LargeList2D;
@@ -154,10 +154,10 @@ void visualize_cell(Storage::Item cell) {
 
     file << "unit = np.linspace(-1.0, 1.0, 101)\n\n";
 
-    Mapping1D L(LargeList1D({vertices[0], vertices[3], vertices[6]}));
-    Mapping1D R(LargeList1D({vertices[2], vertices[5], vertices[8]}));
-    Mapping1D B(LargeList1D({vertices[0], vertices[1], vertices[2]}));
-    Mapping1D T(LargeList1D({vertices[6], vertices[7], vertices[8]}));
+    SqLine L(LargeList1D({vertices[0], vertices[3], vertices[6]}));
+    SqLine R(LargeList1D({vertices[2], vertices[5], vertices[8]}));
+    SqLine B(LargeList1D({vertices[0], vertices[1], vertices[2]}));
+    SqLine T(LargeList1D({vertices[6], vertices[7], vertices[8]}));
 
     for (auto& map: {L, R, B, T}) {
         file << "curve_Lx = spline(" << map.v1.x << ", " << map.vc.x << ", " << map.v2.x << ", unit)\n";

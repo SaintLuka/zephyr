@@ -37,9 +37,9 @@ int main() {
     // Геометрия области
     Rectangle rect(-1.0, 1.0, -1.0, 1.0, false);
     rect.set_nx(200);
-    rect.set_boundary_flags(
-            Boundary::WALL, Boundary::WALL,
-            Boundary::WALL, Boundary::WALL);
+    rect.set_boundaries({
+        .left   = Boundary::WALL, .right = Boundary::WALL,
+        .bottom = Boundary::WALL, .top   = Boundary::WALL});
 
     // Создать сетку
     Mesh mesh(U, &rect);

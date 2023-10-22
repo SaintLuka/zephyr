@@ -3,12 +3,9 @@
 #include <memory>
 
 #include <zephyr/geom/vector.h>
-#include <zephyr/geom/primitives/amr_face.h>
+#include <zephyr/geom/primitives/boundary.h>
 
 namespace zephyr::geom::generator {
-
-using zephyr::geom::Vector3d;
-using zephyr::geom::Boundary;
 
 /// @brief Абстрактный класс, представляющий параметрическую кривую
 /// X(t), Y(t) на плоскости. Параметр пробегает отрезок [-1, 1].
@@ -42,13 +39,13 @@ public:
     virtual Vector3d projection(const Vector3d &v) const = 0;
 
     /// @brief Установить флаг граничных условий
-    void set_boundary_flag(Boundary flag);
+    void set_boundary(Boundary flag);
 
     /// @brief Получить флаг граничных условий
-    Boundary boundary_flag() const;
+    Boundary boundary() const;
 
 protected:
-    Boundary m_flag;
+    Boundary m_boundary;
 };
 
 } // namespace zephyr::geom::generator

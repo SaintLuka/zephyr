@@ -9,7 +9,7 @@ set(ZEPHYR_GEOM_GENERATOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/cuboid.cpp
 
 	${CMAKE_CURRENT_SOURCE_DIR}/curve/curve.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/curve/line.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/curve/plane.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/curve/circle.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/curve/cubic.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/bs_vertex.cpp
@@ -24,7 +24,7 @@ install(FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/curve/circle.h
 	${CMAKE_CURRENT_SOURCE_DIR}/curve/cubic.h
 	${CMAKE_CURRENT_SOURCE_DIR}/curve/curve.h
-	${CMAKE_CURRENT_SOURCE_DIR}/curve/line.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/curve/plane.h
 	DESTINATION
 	include/${PROJECT_NAME}/geom/generator/curve
 )

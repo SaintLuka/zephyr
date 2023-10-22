@@ -3,7 +3,7 @@
 namespace zephyr::geom::generator {
 
 Curve::Curve()
-    : m_flag(Boundary::UNDEFINED) {
+    : m_boundary(Boundary::UNDEFINED) {
 }
 
 Vector3d Curve::get_V(double t) const {
@@ -32,12 +32,12 @@ Vector3d Curve::get_N(double t) const {
     return N;
 }
 
-void Curve::set_boundary_flag(Boundary flag) {
-    m_flag = flag;
+void Curve::set_boundary(Boundary flag) {
+    m_boundary = flag;
 }
 
-Boundary Curve::boundary_flag() const {
-    return m_flag;
+Boundary Curve::boundary() const {
+    return m_boundary;
 }
 
 } // namespace zephyr::geom::generator

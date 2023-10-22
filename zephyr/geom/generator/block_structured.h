@@ -1,26 +1,27 @@
 #pragma once
 
-#include <array>
-#include <map>
+#include <vector>
 
-#include <zephyr/geom/vector.h>
-#include <zephyr/mesh/storage.h>
-#include <zephyr/geom/generator/generator.h>
 #include <zephyr/geom/generator/block.h>
+#include <zephyr/geom/generator/generator.h>
 
 namespace zephyr::geom::generator {
 
 /// @brief Генератор двумерной блочно-структурированной сетки из
 /// четырехугольных элементов.
 class BlockStructured : public Generator {
-private:
-    using Curve_Ptr = std::shared_ptr<Curve>;
-    using Curve_Ref = const std::shared_ptr<Curve> &;
-
 public:
+    using Ptr = std::shared_ptr<BlockStructured>;
+
     /// @brief Конструктор
     /// @param n_blocks Число блоков, нельзя изменить в дальнейшем
     explicit BlockStructured(int n_blocks);
+
+    /// @brief Создать указатель на класс
+    template <class... Args>
+    static BlockStructured::Ptr create(Args&&... args){
+        return std::make_shared<BlockStructured>(std::forward<Args>(args)...);
+    }
 
     /// @brief Ссылка на структурированный блок по индексу
     Block &operator[](int idx);
@@ -40,10 +41,10 @@ public:
     void set_verbose(bool v = true);
 
     /// @brief Количество ячеек
-    int size() const override;
+    int size() const final;
 
     /// @brief Инициализировать хранилище
-    Grid create() override;
+    Grid make() override;
 
 protected:
     /// @brief Количество ячеек

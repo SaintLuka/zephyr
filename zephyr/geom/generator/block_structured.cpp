@@ -1,14 +1,11 @@
 #include <array>
 #include <iomanip>
 
-#include <zephyr/mesh/storage.h>
-
-#include <zephyr/geom/primitives/amr_cell.h>
-
-#include <zephyr/geom/generator/block.h>
-#include <zephyr/geom/generator/block_structured.h>
+#include <zephyr/geom/grid.h>
 #include <zephyr/geom/generator/bs_vertex.h>
 #include <zephyr/geom/generator/curve/curve.h>
+#include <zephyr/geom/generator/block.h>
+#include <zephyr/geom/generator/block_structured.h>
 
 
 namespace zephyr::geom::generator {
@@ -151,7 +148,7 @@ void BlockStructured::initialize() {
     }
 }
 
-Grid BlockStructured::create() {
+Grid BlockStructured::make() {
     initialize();
 
     Grid grid;
@@ -178,7 +175,7 @@ Grid BlockStructured::create() {
                     GNode::Ptr node = GNode::create(v->v1);
                     node->index = n_nodes;
                     if (v->boundary()) {
-                        node->add_boundary(v->boundary()->boundary_flag());
+                        node->add_boundary(v->boundary()->boundary());
                     }
                     grid += node;
 

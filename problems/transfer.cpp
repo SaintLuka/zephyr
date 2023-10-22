@@ -151,9 +151,9 @@ int main() {
     // Геометрия области
     Rectangle rect(0.0, 1.0, 0.0, 1.0, false);
     rect.set_nx(200);
-    rect.set_boundary_flags(
-            Boundary::ZOE, Boundary::ZOE,
-            Boundary::ZOE, Boundary::ZOE);
+    rect.set_boundaries({
+        .left   = Boundary::ZOE, .right = Boundary::ZOE,
+        .bottom = Boundary::ZOE, .top   = Boundary::ZOE});
 
     // Создать решатель
     Solver solver;
@@ -208,7 +208,7 @@ int main() {
         }
 
         // Шаг решения
-        solver.update(mesh, 1);
+        solver.update(mesh, 2);
 
         // Установить флаги адаптации
         solver.set_flags(mesh);

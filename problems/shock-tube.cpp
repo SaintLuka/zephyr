@@ -29,9 +29,9 @@ Mesh make_pipe(double xmin, double xmax, double ymin, double ymax, double H, dou
     Rectangle rect(xmin, xmax, ymin, ymax);
     
     rect.set_nx(nx_cells);
-    rect.set_boundary_flags(
-            Boundary::WALL, Boundary::WALL,
-            Boundary::WALL, Boundary::WALL);
+    rect.set_boundaries({
+        .left   = Boundary::WALL, .right = Boundary::WALL,
+        .bottom = Boundary::WALL, .top   = Boundary::WALL});
 
     Mesh mesh(U, &rect);
     

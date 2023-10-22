@@ -23,7 +23,7 @@ std::array<geom::AmrCell, CpC(dim)> create_children(AmrCell& parent);
 /// @param parent Родительская ячейка
 /// @return Массив с дочерними ячейками
 std::array<geom::AmrCell, CpC(2)> create_children_simple(AmrCell& parent) {
-    using geom::ShortList2D;
+    using geom::Quad;
     using geom::AmrCell;
 
     std::array<Vector3d, 9> vs;
@@ -39,10 +39,10 @@ std::array<geom::AmrCell, CpC(2)> create_children_simple(AmrCell& parent) {
 
     vs[8] = (vs[0] + vs[1] + vs[2] + vs[3]) / 4.0;
 
-    ShortList2D vl0 = {vs[0], vs[6], vs[4], vs[8]};
-    ShortList2D vl1 = {vs[6], vs[1], vs[8], vs[5]};
-    ShortList2D vl2 = {vs[4], vs[8], vs[2], vs[7]};
-    ShortList2D vl3 = {vs[8], vs[5], vs[7], vs[3]};
+    Quad vl0 = {vs[0], vs[6], vs[4], vs[8]};
+    Quad vl1 = {vs[6], vs[1], vs[8], vs[5]};
+    Quad vl2 = {vs[4], vs[8], vs[2], vs[7]};
+    Quad vl3 = {vs[8], vs[5], vs[7], vs[3]};
 
     return {AmrCell(vl0), AmrCell(vl1), AmrCell(vl2), AmrCell(vl3)};
 }
@@ -52,14 +52,13 @@ std::array<geom::AmrCell, CpC(2)> create_children_simple(AmrCell& parent) {
 /// @return Массив с дочерними ячейками
 template <>
 std::array<geom::AmrCell, CpC(2)> create_children<2>(AmrCell& parent) {
-    using geom::LargeList2D;
-    using geom::Mapping2D;
+    using geom::SqQuad;
     using geom::AmrCell;
 
-    const AmrVertices& vertices = parent.vertices;
+    const AmrVertices &vertices = parent.vertices;
 
     // Собираем отображение ячейки
-    LargeList2D vs = {
+    SqQuad quad = {
             (Vector3d &) vertices[0],
             (Vector3d &) vertices[1],
             (Vector3d &) vertices[2],
@@ -71,27 +70,28 @@ std::array<geom::AmrCell, CpC(2)> create_children<2>(AmrCell& parent) {
             (Vector3d &) vertices[8]
     };
 
-    Mapping2D map(vs);
-    LargeList2D vl0 = {
-            vs[0], map(-0.5, -1.0), vs[1],
-            map(-1.0, -0.5), map(-0.5, -0.5), map(0.0, -0.5),
-            vs[3], map(-0.5, 0.0), vs[4]
+    // @formatter:off
+    SqQuad vl0 = {
+            quad.vs<-1, -1>(), quad(-0.5, -1.0), quad.vs<0, -1>(),
+            quad(-1.0, -0.5),  quad(-0.5, -0.5), quad(0.0, -0.5),
+            quad.vs<-1,  0>(), quad(-0.5,  0.0), quad.vs<0,  0>()
     };
-    LargeList2D vl1 = {
-            vs[1], map(0.5, -1.0), vs[2],
-            map(0.0, -0.5), map(0.5, -0.5), map(1.0, -0.5),
-            vs[4], map(0.5, 0.0), vs[5]
+    SqQuad vl1 = {
+            quad.vs<0, -1>(), quad(0.5, -1.0), quad.vs<1, -1>(),
+            quad(0.0, -0.5),  quad(0.5, -0.5), quad(1.0, -0.5),
+            quad.vs<0,  0>(), quad(0.5,  0.0), quad.vs<1,  0>()
     };
-    LargeList2D vl2 = {
-            vs[3], map(-0.5, 0.0), vs[4],
-            map(-1.0, 0.5), map(-0.5, 0.5), map(0.0, 0.5),
-            vs[6], map(-0.5, 1.0), vs[7]
+    SqQuad vl2 = {
+            quad.vs<-1, 0>(), quad(-0.5, 0.0), quad.vs<0, 0>(),
+            quad(-1.0, 0.5),  quad(-0.5, 0.5), quad(0.0, 0.5),
+            quad.vs<-1, 1>(), quad(-0.5, 1.0), quad.vs<0, 1>()
     };
-    LargeList2D vl3 = {
-            vs[4], map(0.5, 0.0), vs[5],
-            map(0.0, 0.5), map(0.5, 0.5), map(1.0, 0.5),
-            vs[7], map(0.5, 1.0), vs[8]
+    SqQuad vl3 = {
+            quad.vs<0, 0>(), quad(0.5, 0.0), quad.vs<1, 0>(),
+            quad(0.0, 0.5),  quad(0.5, 0.5), quad(1.0, 0.5),
+            quad.vs<0, 1>(), quad(0.5, 1.0), quad.vs<1, 1>()
     };
+    // @formatter:on
 
     return {AmrCell(vl0), AmrCell(vl1), AmrCell(vl2), AmrCell(vl3)};
 }
@@ -101,27 +101,27 @@ std::array<geom::AmrCell, CpC(2)> create_children<2>(AmrCell& parent) {
 /// @return Массив с дочерними ячейками
 template <>
 std::array<AmrCell, CpC(3)> create_children<3>(AmrCell& parent) {
-    LargeList3D& vs = (LargeList3D&) parent.vertices;
+    SqCube& vs = (SqCube&) parent.vertices;
    
-    ShortList3D vl1 = {vs[iww(0, 0, 0)], vs[iww(1, 0, 0)], vs[iww(0, 1, 0)], vs[iww(1, 1, 0)],
-                       vs[iww(0, 0, 1)], vs[iww(1, 0, 1)], vs[iww(0, 1, 1)], vs[iww(1, 1, 1)]};
-    ShortList3D vl2 = {vs[iww(1, 0, 0)], vs[iww(2, 0, 0)], vs[iww(1, 1, 0)], vs[iww(2, 1, 0)],
-                       vs[iww(1, 0, 1)], vs[iww(2, 0, 1)], vs[iww(1, 1, 1)], vs[iww(2, 1, 1)]};
-    ShortList3D vl3 = {vs[iww(0, 1, 0)], vs[iww(1, 1, 0)], vs[iww(0, 2, 0)], vs[iww(1, 2, 0)],
-                       vs[iww(0, 1, 1)], vs[iww(1, 1, 1)], vs[iww(0, 2, 1)], vs[iww(1, 2, 1)]};
-    ShortList3D vl4 = {vs[iww(1, 1, 0)], vs[iww(2, 1, 0)], vs[iww(1, 2, 0)], vs[iww(2, 2, 0)],
-                       vs[iww(1, 1, 1)], vs[iww(2, 1, 1)], vs[iww(1, 2, 1)], vs[iww(2, 2, 1)]};
-    ShortList3D vl5 = {vs[iww(0, 0, 1)], vs[iww(1, 0, 1)], vs[iww(0, 1, 1)], vs[iww(1, 1, 1)],
-                       vs[iww(0, 0, 2)], vs[iww(1, 0, 2)], vs[iww(0, 1, 2)], vs[iww(1, 1, 2)]};
-    ShortList3D vl6 = {vs[iww(1, 0, 1)], vs[iww(2, 0, 1)], vs[iww(1, 1, 1)], vs[iww(2, 1, 1)],
-                       vs[iww(1, 0, 2)], vs[iww(2, 0, 2)], vs[iww(1, 1, 2)], vs[iww(2, 1, 2)]};
-    ShortList3D vl7 = {vs[iww(0, 1, 1)], vs[iww(1, 1, 1)], vs[iww(0, 2, 1)], vs[iww(1, 2, 1)],
-                       vs[iww(0, 1, 2)], vs[iww(1, 1, 2)], vs[iww(0, 2, 2)], vs[iww(1, 2, 2)]};
-    ShortList3D vl8 = {vs[iww(1, 1, 1)], vs[iww(2, 1, 1)], vs[iww(1, 2, 1)], vs[iww(2, 2, 1)],
-                       vs[iww(1, 1, 2)], vs[iww(2, 1, 2)], vs[iww(1, 2, 2)], vs[iww(2, 2, 2)]};
+    Cube vl1 = {vs[iww(0, 0, 0)], vs[iww(1, 0, 0)], vs[iww(0, 1, 0)], vs[iww(1, 1, 0)],
+                vs[iww(0, 0, 1)], vs[iww(1, 0, 1)], vs[iww(0, 1, 1)], vs[iww(1, 1, 1)]};
+    Cube vl2 = {vs[iww(1, 0, 0)], vs[iww(2, 0, 0)], vs[iww(1, 1, 0)], vs[iww(2, 1, 0)],
+                vs[iww(1, 0, 1)], vs[iww(2, 0, 1)], vs[iww(1, 1, 1)], vs[iww(2, 1, 1)]};
+    Cube vl3 = {vs[iww(0, 1, 0)], vs[iww(1, 1, 0)], vs[iww(0, 2, 0)], vs[iww(1, 2, 0)],
+                vs[iww(0, 1, 1)], vs[iww(1, 1, 1)], vs[iww(0, 2, 1)], vs[iww(1, 2, 1)]};
+    Cube vl4 = {vs[iww(1, 1, 0)], vs[iww(2, 1, 0)], vs[iww(1, 2, 0)], vs[iww(2, 2, 0)],
+                vs[iww(1, 1, 1)], vs[iww(2, 1, 1)], vs[iww(1, 2, 1)], vs[iww(2, 2, 1)]};
+    Cube vl5 = {vs[iww(0, 0, 1)], vs[iww(1, 0, 1)], vs[iww(0, 1, 1)], vs[iww(1, 1, 1)],
+                vs[iww(0, 0, 2)], vs[iww(1, 0, 2)], vs[iww(0, 1, 2)], vs[iww(1, 1, 2)]};
+    Cube vl6 = {vs[iww(1, 0, 1)], vs[iww(2, 0, 1)], vs[iww(1, 1, 1)], vs[iww(2, 1, 1)],
+                vs[iww(1, 0, 2)], vs[iww(2, 0, 2)], vs[iww(1, 1, 2)], vs[iww(2, 1, 2)]};
+    Cube vl7 = {vs[iww(0, 1, 1)], vs[iww(1, 1, 1)], vs[iww(0, 2, 1)], vs[iww(1, 2, 1)],
+                vs[iww(0, 1, 2)], vs[iww(1, 1, 2)], vs[iww(0, 2, 2)], vs[iww(1, 2, 2)]};
+    Cube vl8 = {vs[iww(1, 1, 1)], vs[iww(2, 1, 1)], vs[iww(1, 2, 1)], vs[iww(2, 2, 1)],
+                vs[iww(1, 1, 2)], vs[iww(2, 1, 2)], vs[iww(1, 2, 2)], vs[iww(2, 2, 2)]};
 
     Vector3d zero(0.0, 0.0, 0.0);
-    ShortList3D vl0 = {zero, zero, zero, zero, zero, zero, zero, zero};
+    Cube vl0 = {zero, zero, zero, zero, zero, zero, zero, zero};
 
     return {
             AmrCell(vl1), AmrCell(vl2), AmrCell(vl3), AmrCell(vl4),

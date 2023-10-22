@@ -74,6 +74,10 @@ Rectangle::Rectangle(double xmin, double xmax, double ymin, double ymax, bool vo
     check_params();
 }
 
+int Rectangle::size() const {
+    return m_size;
+}
+
 Box Rectangle::bbox() const {
     Vector3d vmin(m_xmin, m_ymin, 0.0);
     Vector3d vmax(m_xmax, m_ymax, 0.0);
@@ -225,7 +229,7 @@ void Rectangle::compute_size() {
     }
 }
 
-Grid Rectangle::create() {
+Grid Rectangle::make() {
     check_size();
 
     if (m_voronoi) {

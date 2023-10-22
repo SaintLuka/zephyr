@@ -204,13 +204,13 @@ double Transfer::compute_dt(Mesh& mesh) {
 }
 
 // Поток из пустой ячейки в ячейку с объемной долей a и шириной h
-// vs -- скорость потока, dt -- шаг интегрирования
+// verts -- скорость потока, dt -- шаг интегрирования
 double flux_1D_0(double a, double h, double vs, double dt) {
     return std::min(0.0, dt * vs + (1.0 - a) * h);
 }
 
 // Поток из ячейки с объемной долей a и шириной h в полную ячейку
-// vs -- скорость потока, dt -- шаг интегрирования
+// verts -- скорость потока, dt -- шаг интегрирования
 double flux_1D_1(double a, double h, double vs, double dt) {
     return std::min(a * h, dt * vs);
 }
@@ -219,17 +219,17 @@ double flux_1D_1(double a, double h, double vs, double dt) {
 // Предполагается, что a1 < a2.
 // h1, h2 -- длина ячеек вдоль нормали к грани
 // as -- объемная доля на грани
-// vs -- скорость вдоль нормали грани
+// verts -- скорость вдоль нормали грани
 // dt -- шаг интегрирования по времени
 double flux_2D_less(double a1, double a2, double h1, double h2, double as, double vs, double dt) {
 #if 0
     double F_in = 0.0;
     double F_ex = 0.0;
     if (as < 1.0) {
-        F_ex = flux_1D_0((a2 - as) / (1.0 - as), h2, vs, dt);
+        F_ex = flux_1D_0((a2 - as) / (1.0 - as), h2, verts, dt);
     }
     if (as > 0.0) {
-        F_in = flux_1D_1(a1 / as, h1, vs, dt);
+        F_in = flux_1D_1(a1 / as, h1, verts, dt);
     }
     return (1.0 - as) * F_ex + as * F_in;
 #else
@@ -255,21 +255,10 @@ double face_fraction(double a1, double a2) {
 
     if (std::isnan(a_sig)) {
         // Случай a_min = 0, a_max = 1
-        a_sig = 0.0; // ??
+        a_sig = 0.5; // ??
     }
 
-    a_sig = std::max(a_min, std::min(a_sig, a_max));
-
-
-    if (a_min == 0.0) {
-        return 0.0;
-    }
-    if (a_max == 1.0) {
-        return 1.0;
-    }
-    return a_min;
-
-    //return a_sig;
+    return std::max(a_min, std::min(a_sig, a_max));
 }
 
 void Transfer::fluxes_CRP(ICell &cell, Direction dir) {
@@ -300,13 +289,15 @@ void Transfer::fluxes_CRP(ICell &cell, Direction dir) {
     zc.u2 = zc.u1 - fluxes / cell.volume();
 }
 
-// Предполагаем vs > 0.0
+// Предполагаем verts > 0.0
 double flux_VOF(double a, Vector3d& p, Vector3d& n, const AmrCell& cell, const AmrFace& face, double vs, double dt) {
     // Типа upwind
     Vector3d v1 = (Vector3d &) cell.vertices[face.vertices[0]];
     Vector3d v2 = (Vector3d &) cell.vertices[face.vertices[1]];
     Vector3d v3 = v1 - dt * vs * face.normal;
     Vector3d v4 = v2 - dt * vs * face.normal;
+
+    // alpha - объемная доля, n - нормаль, face.area - площадь грани, xi = verts * dt.
 
     if (a < 1.0e-12) {
         return 0.0;
@@ -449,12 +440,12 @@ void Transfer::update_ver1(Mesh& mesh) {
     // Считаем потоки
     static int counter = 0;
     for (auto cell: mesh) {
-        //if (counter % 2 == 0) {
-            fluxes_CRP(cell, Direction::ANY);
-        //}
-        //else {
-        //    fluxes_CRP(cell, Direction::Y);
-        //}
+        if (counter % 2 == 0) {
+            fluxes_CRP(cell, Direction::X);
+        }
+        else {
+            fluxes_CRP(cell, Direction::Y);
+        }
     }
     ++counter;
 

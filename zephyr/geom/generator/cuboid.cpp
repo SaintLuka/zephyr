@@ -2,8 +2,7 @@
 #include <algorithm>
 
 #include <zephyr/geom/box.h>
-#include <zephyr/geom/primitives/amr_cell.h>
-
+#include <zephyr/geom/grid.h>
 #include <zephyr/geom/generator/cuboid.h>
 
 namespace zephyr::geom::generator {
@@ -15,9 +14,9 @@ Cuboid::Cuboid(YAML::Node config)
       m_ymin(0.0), m_ymax(1.0),
       m_zmin(0.0), m_zmax(1.0),
       m_nx(0), m_ny(0), m_nz(0),
-      m_left_flag(Boundary::UNDEFINED), m_right_flag(Boundary::UNDEFINED),
-      m_bottom_flag(Boundary::UNDEFINED), m_top_flag(Boundary::UNDEFINED),
-      m_back_flag(Boundary::UNDEFINED), m_front_flag(Boundary::UNDEFINED) {
+      m_bounds.left(Boundary::UNDEFINED), m_bounds.right(Boundary::UNDEFINED),
+      m_bounds.bottom(Boundary::UNDEFINED), m_bounds.top(Boundary::UNDEFINED),
+      m_bounds.back(Boundary::UNDEFINED), m_bounds.front(Boundary::UNDEFINED) {
 
     if (!config["geometry"]) {
         throw std::runtime_error("Mesh config doesn't contain 'geometry'");
@@ -33,12 +32,12 @@ Cuboid::Cuboid(YAML::Node config)
     if (!config["boundary"]) {
         throw std::runtime_error("Mesh config doesn't contain 'boundary'");
     }
-    m_left_flag = boundary_from_string(config["boundary"]["left"].as<std::string>());
-    m_right_flag = boundary_from_string(config["boundary"]["right"].as<std::string>());
-    m_bottom_flag = boundary_from_string(config["boundary"]["bottom"].as<std::string>());
-    m_top_flag = boundary_from_string(config["boundary"]["top"].as<std::string>());
-    m_back_flag = boundary_from_string(config["boundary"]["back"].as<std::string>());
-    m_front_flag = boundary_from_string(config["boundary"]["front"].as<std::string>());
+    m_bounds.left = boundary_from_string(config["boundary"]["left"].as<std::string>());
+    m_bounds.right = boundary_from_string(config["boundary"]["right"].as<std::string>());
+    m_bounds.bottom = boundary_from_string(config["boundary"]["bottom"].as<std::string>());
+    m_bounds.top = boundary_from_string(config["boundary"]["top"].as<std::string>());
+    m_bounds.back = boundary_from_string(config["boundary"]["back"].as<std::string>());
+    m_bounds.front = boundary_from_string(config["boundary"]["front"].as<std::string>());
 
     if (config["cells"]) {
         set_size(config["cells"].as<size_t>());
@@ -80,11 +79,13 @@ Cuboid::Cuboid(double xmin, double xmax, double ymin, double ymax, double zmin, 
         m_xmin(xmin), m_xmax(xmax),
         m_ymin(ymin), m_ymax(ymax),
         m_zmin(zmin), m_zmax(zmax),
-        m_nx(0), m_ny(0), m_nz(0),
-        m_left_flag(Boundary::UNDEFINED), m_right_flag(Boundary::UNDEFINED),
-        m_bottom_flag(Boundary::UNDEFINED), m_top_flag(Boundary::UNDEFINED),
-        m_back_flag(Boundary::UNDEFINED), m_front_flag(Boundary::UNDEFINED) {
+        m_nx(0), m_ny(0), m_nz(0), m_size(0),
+        m_bounds() {
     check_params();
+}
+
+int Cuboid::size() const {
+    return m_size;
 }
 
 Box Cuboid::bbox() const {
@@ -155,49 +156,41 @@ void Cuboid::set_size(int N) {
     compute_size();
 }
 
-void Cuboid::set_boundary_flags(
-        Boundary left, Boundary right,
-        Boundary bottom, Boundary top,
-        Boundary back, Boundary front) {
+void Cuboid::set_boundaries(Boundaries bounds) {
+    m_bounds = bounds;
 
-    m_left_flag = left;
-    m_right_flag = right;
-    m_bottom_flag = bottom;
-    m_top_flag = top;
-    m_back_flag = back;
-    m_front_flag = front;
     if (periodic_along_x()) {
-        m_left_flag = m_right_flag = Boundary::PERIODIC;
+        m_bounds.left = m_bounds.right = Boundary::PERIODIC;
     }
     if (periodic_along_y()) {
-        m_bottom_flag = m_top_flag = Boundary::PERIODIC;
+        m_bounds.bottom = m_bounds.top = Boundary::PERIODIC;
     }
     if (periodic_along_z()) {
-        m_back_flag = m_front_flag = Boundary::PERIODIC;
+        m_bounds.back = m_bounds.front = Boundary::PERIODIC;
     }
 }
 
-double Cuboid::xmin() const {
+double Cuboid::x_min() const {
     return m_xmin;
 }
 
-double Cuboid::xmax() const {
+double Cuboid::x_max() const {
     return m_xmax;
 }
 
-double Cuboid::ymin() const {
+double Cuboid::y_min() const {
     return m_ymin;
 }
 
-double Cuboid::ymax() const {
+double Cuboid::y_max() const {
     return m_ymax;
 }
 
-double Cuboid::zmin() const {
+double Cuboid::z_min() const {
     return m_ymin;
 }
 
-double Cuboid::zmax() const {
+double Cuboid::z_max() const {
     return m_ymax;
 }
 
@@ -214,15 +207,15 @@ int Cuboid::nz() const {
 }
 
 bool Cuboid::periodic_along_x() const {
-    return m_left_flag == Boundary::PERIODIC || m_right_flag == Boundary::PERIODIC;
+    return m_bounds.left == Boundary::PERIODIC || m_bounds.right == Boundary::PERIODIC;
 }
 
 bool Cuboid::periodic_along_y() const {
-    return m_bottom_flag == Boundary::PERIODIC || m_top_flag == Boundary::PERIODIC;
+    return m_bounds.bottom == Boundary::PERIODIC || m_bounds.top == Boundary::PERIODIC;
 }
 
 bool Cuboid::periodic_along_z() const {
-    return m_back_flag == Boundary::PERIODIC || m_front_flag == Boundary::PERIODIC;
+    return m_bounds.back == Boundary::PERIODIC || m_bounds.front == Boundary::PERIODIC;
 }
 
 void Cuboid::check_params() const {
@@ -256,11 +249,93 @@ void Cuboid::compute_size() {
     m_size = m_nx * m_ny * m_nz;
 }
 
-Grid Cuboid::create() {
+Grid Cuboid::make() {
+    double dx = (m_xmax - m_xmin) / m_nx;
+    double dy = (m_ymax - m_ymin) / m_ny;
+    double dz = (m_zmax - m_zmin) / m_nz;
+
+    std::vector<std::vector<std::vector<GNode::Ptr>>> nodes(
+            m_nx + 1, std::vector<std::vector<GNode::Ptr>>(
+                    m_ny + 1, std::vector<GNode::Ptr>(
+                            m_nz + 1, nullptr)));
+
+    int n_nodes = 0;
+    for (int i = 0; i <= m_nx; ++i) {
+        for (int j = 0; j <= m_ny; ++j) {
+            for (int k = 0; k <= m_nz; ++k) {
+                double x = m_xmin + i * dx;
+                double y = m_ymin + j * dy;
+                double z = m_zmin + k * dz;
+                nodes[i][j][k] = GNode::create(x, y, z);
+                nodes[i][j][k]->index = n_nodes;
+                ++n_nodes;
+            }
+        }
+    }
+
+    for (int j = 0; j <= m_ny; ++j) {
+        for (int k = 0; k <= m_nz; ++k) {
+            nodes[0][j][k]->add_boundary(m_bounds.left);
+            nodes[m_nx][j][k]->add_boundary(m_bounds.right);
+        }
+    }
+    for (int i = 0; i <= m_nx; ++i) {
+        for (int k = 0; k <= m_nz; ++k) {
+            nodes[i][0][k]->add_boundary(m_bounds.bottom);
+            nodes[i][m_ny][k]->add_boundary(m_bounds.top);
+        }
+    }
+    for (int i = 0; i <= m_nx; ++i) {
+        for (int j = 0; j <= m_ny; ++j) {
+            nodes[i][j][0]->add_boundary(m_bounds.back);
+            nodes[i][j][m_nz]->add_boundary(m_bounds.front);
+        }
+    }
+
+    Grid grid;
+
+    grid.reserve_nodes((m_nx + 1) * (m_ny + 1) * (m_nz + 1));
+    for (int i = 0; i <= m_nx; ++i) {
+        for (int j = 0; j <= m_ny; ++j) {
+            for (int k = 0; k <= m_nz; ++k) {
+                grid += nodes[i][j][k];
+            }
+        }
+    }
+
+    grid.reserve_cells(m_nx * m_ny);
+    int n_cells = 0;
+    for (int i = 0; i < m_nx; ++i) {
+        for (int j = 0; j < m_ny; ++j) {
+            for (int k = 0; k < m_nz; ++k) {
+                GCell cell = GCell::hexagedron(
+                        {
+                                nodes[i][j][k],
+                                nodes[i + 1][j][k],
+                                nodes[i + 1][j + 1][k],
+                                nodes[i][j + 1][k],
+                                nodes[i][j][k + 1],
+                                nodes[i + 1][j][k + 1],
+                                nodes[i + 1][j + 1][k + 1],
+                                nodes[i][j + 1][k + 1]
+                        });
+                cell.index = n_cells;
+                ++n_cells;
+
+                grid += cell;
+            }
+        }
+    }
+
+    grid.setup_adjacency();
+
+    return grid;
+
+
     /*
     using zephyr::geom::Side;
     using zephyr::geom::AmrCell;
-    using zephyr::geom::ShortList3D;
+    using zephyr::geom::Cube;
 
     double dx = (m_xmax - m_xmin) / m_nx;
     double dy = (m_ymax - m_ymin) / m_ny;
@@ -283,7 +358,7 @@ Grid Cuboid::create() {
         double z1 = m_zmin + k * dz;
         double z2 = m_zmin + (k + 1.0) * dz;
 
-        ShortList3D verts = {
+        Cube verts = {
                 Vector3d(x1, y1, z1), Vector3d(x2, y1, z1),
                 Vector3d(x1, y2, z1), Vector3d(x2, y2, z1),
                 Vector3d(x1, y1, z2), Vector3d(x2, y1, z2),
@@ -294,12 +369,12 @@ Grid Cuboid::create() {
 
         auto ordinary = Boundary::ORDINARY;
 
-        g_cell.faces[Side::L].boundary = i > 0 ? ordinary : m_left_flag;
-        g_cell.faces[Side::R].boundary = i < m_nx - 1 ? ordinary : m_right_flag;
-        g_cell.faces[Side::B].boundary = j > 0 ? ordinary : m_bottom_flag;
-        g_cell.faces[Side::T].boundary = j < m_ny - 1 ? ordinary : m_top_flag;
-        g_cell.faces[Side::X].boundary = k > 0 ? ordinary : m_back_flag;
-        g_cell.faces[Side::F].boundary = k < m_nz - 1 ? ordinary : m_front_flag;
+        g_cell.faces[Side::L].boundary = i > 0 ? ordinary : m_bounds.left;
+        g_cell.faces[Side::R].boundary = i < m_nx - 1 ? ordinary : m_bounds.right;
+        g_cell.faces[Side::B].boundary = j > 0 ? ordinary : m_bounds.bottom;
+        g_cell.faces[Side::T].boundary = j < m_ny - 1 ? ordinary : m_bounds.top;
+        g_cell.faces[Side::X].boundary = k > 0 ? ordinary : m_bounds.back;
+        g_cell.faces[Side::F].boundary = k < m_nz - 1 ? ordinary : m_bounds.front;
 
         cells[n].geom() = g_cell;
     }

@@ -1,6 +1,8 @@
 #pragma once
 
+#include <zephyr/geom/grid.h>
 #include <zephyr/geom/generator/generator.h>
+
 #include <zephyr/mesh/storage.h>
 #include <zephyr/mesh/distributor.h>
 
@@ -9,7 +11,7 @@
 
 
 
-namespace zephyr { namespace mesh {
+namespace zephyr::mesh {
 
 #define EXEC_RESULT typename std::result_of<F(ICell)>::type
 
@@ -22,7 +24,7 @@ public:
     template<class T>
     Mesh(const T &val, Generator *gen)
             : m_locals(val), m_aliens(val) {
-        initialize(gen->create());
+        initialize(gen->make());
     }
 
     template <class T>
@@ -100,5 +102,4 @@ private:
 };
 
 
-} // mesh
-} // zephyr
+} // namespace zephyr::mesh
