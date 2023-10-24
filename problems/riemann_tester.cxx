@@ -241,7 +241,7 @@ std::vector<double> RiemannTester(const ClassicTest &test, const NumFlux::Ptr &n
     return {rho_err, u_err, p_err, e_err, c_err};
 }
 
-std::vector<double> RiemannTesterWithSolver(const ClassicTest &test, Fluxes flux, const std::string &filename = "output") {
+std::vector<double> RiemannTesterWithSolver(const ClassicTest &test, Fluxes flux, const std::string &filename = "output3") {
     // Уравнение состояния
     const Eos &eos = test.get_eos();
     // StiffenedGas eos(1.367, 0.113, 0.273);
@@ -323,14 +323,8 @@ std::vector<double> RiemannTesterWithSolver(const ClassicTest &test, Fluxes flux
             next_write += test.max_time() / 100;
         }
 
-        // Определяем dt
-        solver.compute_dt(mesh);
-
-        // Расчет по некоторой схеме
-        solver.fluxes2(mesh);
-
         // Обновляем слои
-        solver.update(mesh);
+        solver.update(mesh, 3);
 
         time = solver.get_time();
     }
@@ -371,7 +365,7 @@ std::vector<double> RiemannTesterWithSolver(const ClassicTest &test, Fluxes flux
 int main() {
     // Тестовая задача
     SodTest sod_test;
-    //ToroTest toro_test(2);
+    // ToroTest toro_test(2);
 
     std::vector<NumFlux::Ptr> nfs(4);
     nfs[0] = Godunov::create();

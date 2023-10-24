@@ -135,10 +135,10 @@ public:
 
     /// @brief Посчитать шаг интегрирования по времени с учетом
     /// условия Куранта
-    double compute_dt(Mesh &mesh);
+    void compute_dt(Mesh &mesh);
 
     /// @brief Один шаг интегрирования по времени
-    void update(Mesh& mesh);
+    void update(Mesh& mesh, int flux_type);
 
     /// @brief Векторное поле скорости
     /// @details Виртуальная функция, следует унаследоваться от класса
@@ -154,20 +154,27 @@ public:
     ///@brief
     [[nodiscard]] double get_step() const;
 
+    // Обычная схема
     Flux calc_flux(ICell &cell, int stage);
 
+    // С экстраполяцией
+    Flux calc_flux_extra(ICell &cell, int stage); 
+
+    ///@brief вычисление градиента
     void compute_grad(ICell &cell, int stage);
 
-    ///@brief 
+    ///@brief
+    /// 1
     void fluxes(Mesh &mesh);
 
-    ///@brief
+    ///@brief 
+    /// 2
     void fluxes2(Mesh &mesh);
 
+    ///@brief “one-step” Predictor-Corrector scheme | Heun’s method
+    /// 3
     void fluxes3(Mesh &mesh);
 
-    ///@brief
-    void fluxes4(Mesh &mesh);
 
 protected:
     const phys::Eos &m_eos;
