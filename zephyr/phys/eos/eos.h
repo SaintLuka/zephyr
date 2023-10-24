@@ -71,6 +71,12 @@ public:
     virtual StiffenedGas stiffened_gas(double density, double pressure,
                                        const Options &options = {}) const;
 
+    /// @brief Минимальное давление, при котором УрС выдает приемлемые
+    /// значения. При более низких значениях образуется вакуум (плотность
+    /// принимает отрицательные значения, квадрат скорости звука становится
+    /// отрицательным). Может принимать отрицательные значения.
+    virtual double min_pressure() const;
+
 };
 
 }

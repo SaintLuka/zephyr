@@ -55,5 +55,9 @@ StiffenedGas Eos::stiffened_gas(double rho, double P, const Options& options) co
     return StiffenedGas(gamma, P0, eps_0, NAN);
 }
 
+double Eos::min_pressure() const {
+    throw std::runtime_error("min_pressure is not implemented");
+}
+
 }
 }

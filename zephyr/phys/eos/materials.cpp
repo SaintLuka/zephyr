@@ -106,6 +106,7 @@ double Materials::pressure_rt(double rho, double T,
     // Решаем vol = sum_i beta_i vol_i(P, T)
     double vol = 1.0 / rho;
     double P = std::isnan(options.P0) ? 1.0e5 : options.P0;
+    double P_min = min_pressure(beta);
 
     double err = 1.0;
     int counter = 0;
@@ -114,6 +115,11 @@ double Materials::pressure_rt(double rho, double T,
         double dP = (vol - v) / v.dP;
         err = std::abs(dP / P);
         P += dP;
+        if (P < P_min) {
+            // TODO: Долго сходится при больших P0, оптимизировать
+            // Среднее между P_min и предыдущим значением
+            P = 0.5 * (P_min + P - dP);
+        }
         ++counter;
     }
     return P;
@@ -189,6 +195,16 @@ StiffenedGas Materials::stiffened_gas(double rho, double P,
     return StiffenedGas(gamma, P0, eps_0, NAN);
 }
 
+double Materials::min_pressure(const Fractions &beta) const {
+    double P_min = -std::numeric_limits<double>::infinity();
+    for (int i = 0; i < Fractions::max_size; ++i) {
+        if (beta.has(i)) {
+            P_min = std::max(P_min, m_materials[i]->min_pressure());
+        }
+    }
+    return P_min;
+}
+
 PairPT Materials::find_PT(double rho, double eps,
         const Fractions& beta, const Options& options) const {
 
@@ -199,10 +215,11 @@ PairPT Materials::find_PT(double rho, double eps,
     double P = std::isnan(options.P0) ? 1.0e5 : options.P0;
     double T = std::isnan(options.T0) ? 300.0 : options.T0;
 
+    double P_min = min_pressure(beta);
+
     double err = 1.0;
     int counter = 0;
     while (err > 1.0e-12 && counter < 30) {
-
         auto v = volume_pt(P, T, beta);
         auto e = energy_pt(P, T, beta);
 
@@ -213,6 +230,11 @@ PairPT Materials::find_PT(double rho, double eps,
         err = std::abs(dP / P) + std::abs(dT / T);
         P += dP;
         T += dT;
+        if (P < P_min) {
+            // TODO: Долго сходится при больших P0, оптимизировать
+            // Среднее между P_min и предыдущим значением
+            P = 0.5 * (P_min + P - dP);
+        }
         ++counter;
     }
 

@@ -70,5 +70,9 @@ StiffenedGas IdealGas::stiffened_gas(double rho, double P, const Options& option
     return StiffenedGas(gamma, 0.0, 0.0, Cv);
 }
 
+double IdealGas::min_pressure() const {
+    return 0.0;
+}
+
 }
 }

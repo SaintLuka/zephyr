@@ -67,6 +67,9 @@ public:
     virtual StiffenedGas stiffened_gas(double density, double pressure,
                                        const Options& options = {}) const;
 
+    /// @brief Минимальное значение давления, при котором УрС работает.
+    virtual double min_pressure() const;
+
 };
 
 }

@@ -65,11 +65,6 @@ double MieGruneisen::temperature_rp(double rho, double P, const Options& options
 // При A > 0 существует единственное решение,
 // условие нарушается при P < p_min = - B/n
 double solve(double A, double C, double nu, double x0) {
-    if (A <= 0.0) {
-        std::cerr << "Warning Mie-Gruneisen\n";
-        A = 1.0e-3;
-    }
-
     double x = x0;
     double err = 1.0;
     int counter = 0;
@@ -84,6 +79,10 @@ double solve(double A, double C, double nu, double x0) {
 }
 
 dPdT MieGruneisen::volume_pt(double P, double T, const Options& options) const {
+    if (P < min_pressure()) {
+        return NAN;
+    }
+
     double A = 1.0 + n * P / B;
     double nu = n - 1.0;
     double C = n * Gr * Cv * (T - T0) / (B * v0);
@@ -102,6 +101,10 @@ dPdT MieGruneisen::volume_pt(double P, double T, const Options& options) const {
 }
 
 dPdT MieGruneisen::energy_pt(double P, double T, const Options& options) const {
+    if (P < min_pressure()) {
+        return NAN;
+    }
+
     dPdT vol = volume_pt(P, T, options);
     double rho = 1.0 / vol;
     dPdT res{energy_rp(rho, P, options)};
@@ -122,6 +125,10 @@ StiffenedGas MieGruneisen::stiffened_gas(double rho, double P, const Options& op
     double P0 = (B + (n - Gr - 1.0) * P_c) / gamma;
 
     return StiffenedGas(gamma, P0, eps_0, NAN);
+}
+
+double MieGruneisen::min_pressure() const {
+    return -B / n;
 }
 
 void MieGruneisen::table_params(std::string name) {

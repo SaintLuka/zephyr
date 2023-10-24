@@ -130,6 +130,11 @@ public:
     StiffenedGas stiffened_gas(double density, double pressure,
             const Fractions& beta, const Options& options = {}) const;
 
+    /// @brief Минимальное значение давления, при котором работают все
+    /// уравнения состояния с ненулевыми концентрациями
+    /// (максимальное из минимальных давлений)
+    double min_pressure(const Fractions& beta) const;
+
 protected:
     /// @brief Найти равновесные температуру и давление смеси
     /// @param options В качестве опций целесообразно передавать начальные
