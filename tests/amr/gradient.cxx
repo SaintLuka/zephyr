@@ -19,7 +19,7 @@ struct _U_ {
 
 _U_ U;
 
-double get_wanted(Storage::Item cell) {
+double get_wanted(AmrStorage::Item& cell) {
     return cell(U).wanted;
 }
 

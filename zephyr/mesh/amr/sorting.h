@@ -11,7 +11,7 @@ namespace zephyr { namespace mesh { namespace amr {
 /// @brief Функция сортировки ячеек с сохранением связности
 /// @details Не самый быстрый алгоритм, нужен для проверки гипотез
 /// по поводу производительности других алгоритмов
-void sorting(Storage& cells) {
+void sorting(AmrStorage& cells) {
     size_t n_cells = cells.size();
 
     std::vector<size_t> map1(n_cells);
@@ -19,18 +19,18 @@ void sorting(Storage& cells) {
         map1[ic] = ic;
     }
     std::sort(map1.begin(), map1.end(), [&cells](size_t i, size_t j) -> bool {
-        auto cell_i = cells[i];
-        auto cell_j = cells[j];
+        auto& cell_i = cells[i];
+        auto& cell_j = cells[j];
 
-        if (cell_i.level() != cell_j.level()) {
-            return cell_i.level() < cell_j.level();
+        if (cell_i.level != cell_j.level) {
+            return cell_i.level < cell_j.level;
         }
 
-        if (cell_i.b_idx() != cell_j.b_idx()) {
-            return cell_i.b_idx() < cell_j.b_idx();
+        if (cell_i.b_idx != cell_j.b_idx) {
+            return cell_i.b_idx < cell_j.b_idx;
         }
 
-        return cell_i.z_idx() < cell_j.z_idx();
+        return cell_i.z_idx < cell_j.z_idx;
     });
 
     std::vector<size_t> map(n_cells);
@@ -39,7 +39,7 @@ void sorting(Storage& cells) {
     }
 
     for (size_t ic = 0; ic < n_cells; ++ic) {
-        for (auto &face: cells[ic].geom().faces.list()) {
+        for (auto &face: cells[ic].faces) {
             if (face.is_undefined()) continue;
             if (face.adjacent.index > n_cells) continue;
 

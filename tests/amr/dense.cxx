@@ -20,7 +20,7 @@ struct _U_ {
 
 _U_ U;
 
-double get_bit(Storage::Item cell) {
+double get_bit(AmrStorage::Item& cell) {
     return cell(U).bit;
 }
 

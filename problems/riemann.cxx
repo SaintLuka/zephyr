@@ -25,17 +25,17 @@ struct _U_ {
 _U_ U;
 
 /// Переменные для сохранения
-double get_rho(Storage::Item cell) { return cell(U).rho1; }
+double get_rho(AmrStorage::Item& cell) { return cell(U).rho1; }
 
-double get_u(Storage::Item cell) { return cell(U).v1.x(); }
+double get_u(AmrStorage::Item& cell) { return cell(U).v1.x(); }
 
-double get_v(Storage::Item cell) { return cell(U).v1.y(); }
+double get_v(AmrStorage::Item& cell) { return cell(U).v1.y(); }
 
-double get_w(Storage::Item cell) { return cell(U).v1.z(); }
+double get_w(AmrStorage::Item& cell) { return cell(U).v1.z(); }
 
-double get_p(Storage::Item cell) { return cell(U).p1; }
+double get_p(AmrStorage::Item& cell) { return cell(U).p1; }
 
-double get_e(Storage::Item cell) { return cell(U).e1; }
+double get_e(AmrStorage::Item& cell) { return cell(U).e1; }
 
 
 int main() {
@@ -72,28 +72,28 @@ int main() {
     double time = 0.0;
 
     pvd.variables += {"rho_exact",
-                      [&exact, &time](const Storage::Item &cell) -> double {
-                          return exact.density(cell.center().x(), time);
+                      [&exact, &time](const AmrStorage::Item &cell) -> double {
+                          return exact.density(cell.center.x(), time);
                       }};
     pvd.variables += {"u_exact",
-                      [&exact, &time](const Storage::Item &cell) -> double {
-                          return exact.velocity(cell.center().x(), time);
+                      [&exact, &time](const AmrStorage::Item &cell) -> double {
+                          return exact.velocity(cell.center.x(), time);
                       }};
     pvd.variables += {"p_exact",
-                      [&exact, &time](const Storage::Item &cell) -> double {
-                          return exact.pressure(cell.center().x(), time);
+                      [&exact, &time](const AmrStorage::Item &cell) -> double {
+                          return exact.pressure(cell.center.x(), time);
                       }};
     pvd.variables += {"e_exact",
-                      [&exact, &time](const Storage::Item &cell) -> double {
-                          return exact.energy(cell.center().x(), time);
+                      [&exact, &time](const AmrStorage::Item &cell) -> double {
+                          return exact.energy(cell.center.x(), time);
                       }};
     pvd.variables += {"c",
-                      [&eos](Storage::Item cell) -> double {
+                      [&eos](AmrStorage::Item& cell) -> double {
                           return eos.sound_speed_rp(cell(U).rho1, cell(U).p1);
                       }};
     pvd.variables += {"c_exact",
-                      [&exact, &time](const Storage::Item &cell) -> double {
-                          return exact.sound_speed(cell.center().x(), time);
+                      [&exact, &time](const AmrStorage::Item &cell) -> double {
+                          return exact.sound_speed(cell.center.x(), time);
                       }};
 
     // Создаем одномерную сетку

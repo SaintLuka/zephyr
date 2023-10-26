@@ -20,16 +20,16 @@ struct _U_ {
 _U_ U;
 
 /// Переменные для сохранения
-double get_rho(Storage::Item cell) { return cell(U).rho1; }
-double get_u(Storage::Item cell) { return cell(U).v1.x(); }
-double get_v(Storage::Item cell) { return cell(U).v1.y(); }
-double get_w(Storage::Item cell) { return cell(U).v1.z(); }
-double get_p(Storage::Item cell) { return cell(U).p1; }
-double get_e(Storage::Item cell) { return cell(U).e1; }
-double get_faceL(Storage::Item cell) { return int(cell.geom().faces[0].boundary); }
-double get_faceR(Storage::Item cell) { return int(cell.geom().faces[1].boundary); }
-double get_faceB(Storage::Item cell) { return int(cell.geom().faces[2].boundary); }
-double get_faceT(Storage::Item cell) { return int(cell.geom().faces[3].boundary); }
+double get_rho(AmrStorage::Item& cell) { return cell(U).rho1; }
+double get_u(AmrStorage::Item& cell) { return cell(U).v1.x(); }
+double get_v(AmrStorage::Item& cell) { return cell(U).v1.y(); }
+double get_w(AmrStorage::Item& cell) { return cell(U).v1.z(); }
+double get_p(AmrStorage::Item& cell) { return cell(U).p1; }
+double get_e(AmrStorage::Item& cell) { return cell(U).e1; }
+double get_faceL(AmrStorage::Item& cell) { return int(cell.faces[0].boundary); }
+double get_faceR(AmrStorage::Item& cell) { return int(cell.faces[1].boundary); }
+double get_faceB(AmrStorage::Item& cell) { return int(cell.faces[2].boundary); }
+double get_faceT(AmrStorage::Item& cell) { return int(cell.faces[3].boundary); }
 
 
 int main() {

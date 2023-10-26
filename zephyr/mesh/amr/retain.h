@@ -21,7 +21,7 @@ namespace zephyr { namespace mesh { namespace amr {
 /// выставляется со старой грани. Если подграни склеиваются, то adjacent
 /// у объединенной грани будет такой, какой был у старой грани.
 template<int dim>
-void retain_cell(AmrCell& cell, Storage &locals, Storage& aliens) {
+void retain_cell(AmrCell& cell, AmrStorage &locals, AmrStorage& aliens) {
     // Ячейка не требует разбиения, необходимо пройти по граням,
     // возможно, необходимо разбить грань или собрать
     auto rank = cell.rank;
@@ -48,7 +48,7 @@ void retain_cell(AmrCell& cell, Storage &locals, Storage& aliens) {
             throw std::runtime_error("AmrCell has no remote neighbor (retain_cell)");
         }
 #endif
-        AmrCell& neib = (adj.rank == rank ? locals[adj.index] : aliens[adj.ghost]).geom();
+        AmrCell& neib = (adj.rank == rank ? locals[adj.index] : aliens[adj.ghost]);
         auto lvl_n = neib.level;
 
         if (lvl_c == lvl_n) {
@@ -104,7 +104,7 @@ void retain_cell(AmrCell& cell, Storage &locals, Storage& aliens) {
             }
 
             // Сосед ничего не делает - ничего не делаем
-            // if (cell[adj.index].flag() == 0) { }
+            // if (cell[adj.index].flag == 0) { }
 
         } else {
             // Сосед имеет уровень ниже

@@ -6,7 +6,7 @@ namespace zephyr { namespace math {
 
 using zephyr::mesh::ICell;
 using zephyr::mesh::Mesh;
-using zephyr::mesh::Storage;
+using zephyr::mesh::AmrStorage;
 using zephyr::mesh::Distributor;
 using zephyr::geom::Vector3d;
 using zephyr::geom::Direction;
@@ -55,7 +55,7 @@ public:
     /// @brief Распределитель данных при адаптации
     Distributor distributor() const;
 
-    Storage body(Mesh& mesh);
+    AmrStorage body(Mesh& mesh);
 
 protected:
 

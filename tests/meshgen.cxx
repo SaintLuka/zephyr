@@ -27,11 +27,11 @@ struct _U_ {
 
 _U_ U;
 
-double get_uid(Storage::Item cell) {
+double get_uid(AmrStorage::Item& cell) {
     return cell(U).uid;
 }
 
-double get_val(Storage::Item cell) {
+double get_val(AmrStorage::Item& cell) {
     return cell(U).val;
 }
 
@@ -49,7 +49,7 @@ std::string filename(Test test);
 
 Generator::Ptr get_generator(Test test);
 
-void fill(Storage& cells);
+void fill(AmrStorage& cells);
 
 int main() {
     // Переменные для записи
@@ -480,21 +480,21 @@ Generator::Ptr get_generator(Test test) {
     }
 }
 
-void fill(Storage& cells) {
+void fill(AmrStorage& cells) {
     double inf = std::numeric_limits<double>::infinity();
     Vector3d vmin = {+inf, +inf, +inf};
     Vector3d vmax = {-inf, -inf, -inf};
 
     for (auto& cell: cells) {
-        vmin = vmin.cwiseMin(cell.center());
-        vmax = vmax.cwiseMax(cell.center());
+        vmin = vmin.cwiseMin(cell.center);
+        vmax = vmax.cwiseMax(cell.center);
     }
 
     double L = (vmax - vmin).norm();
 
     for (size_t ic = 0; ic < cells.size(); ++ic) {
-        auto cell = cells[ic];
-        Vector3d r = cell.center();
+        auto& cell = cells[ic];
+        Vector3d r = cell.center;
 
         cell(U).uid = ic;
         cell(U).val = std::cos(1.0 / (r.squaredNorm() / (L * L) + 0.03));

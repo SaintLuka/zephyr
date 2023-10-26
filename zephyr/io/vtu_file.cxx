@@ -21,12 +21,12 @@ inline bool is_big_endian() {
     return bint.c[0] == 1;
 }
 
-inline size_t count_cells(Storage &cells, const Filter &filter) {
+inline size_t count_cells(AmrStorage &cells, const Filter &filter) {
     if (filter.is_trivial()) {
         return cells.size();
     }
     size_t count = 0;
-    for (auto cell: cells) {
+    for (auto& cell: cells) {
         if (filter(cell)) {
             ++count;
         }
@@ -50,29 +50,26 @@ struct Handler {
         // Если последняя вершина (8 или 26) определена, значит все вершины
         // заполнены и перед нами AMR ячейка
         if (dim < 3) {
-            if (vertices[8].is_actual()) {
-                if (hex_only) {
-                    return 9; // VTK_QUAD
+            if (hex_only) {
+                return 9; // VTK_QUAD
+            } else {
+                if (faces[Side::LEFT1].is_actual() ||
+                    faces[Side::RIGHT1].is_actual() ||
+                    faces[Side::BOTTOM1].is_actual() ||
+                    faces[Side::TOP1].is_actual()) {
+                    return 7; // VTK_POLYGON
                 } else {
-                    if (faces[Side::LEFT1].is_actual() ||
-                        faces[Side::RIGHT1].is_actual() ||
-                        faces[Side::BOTTOM1].is_actual() ||
-                        faces[Side::TOP1].is_actual()) {
-                        return 7; // VTK_POLYGON
-                    } else {
-                        return 9; // VTK_QUAD
-                    }
+                    return 9; // VTK_QUAD
                 }
             }
         } else {
-            if (vertices[26].is_actual()) {
-                return 12; // VTK_HEXAHEDRON
+            return 12; // VTK_HEXAHEDRON
 
-                // В будущем использовать TRIQUADRIC HEXAHEDRON
-                // return 29; // VTK_TRIQUADRIC_HEXAHEDRON
-            }
+            // В будущем использовать TRIQUADRIC HEXAHEDRON
+            // return 29; // VTK_TRIQUADRIC_HEXAHEDRON
         }
 
+        /*
         // В обратном случае это полигон или обычный трехмерный элемент
         int n = vertices.size();
 
@@ -97,6 +94,7 @@ struct Handler {
                     return 12; // VTK_HEXAHEDRON
             }
         }
+         */
     }
 
     /// @brief Количество вершин элемента
@@ -107,35 +105,33 @@ struct Handler {
         // Если последняя вершина (8 или 26) определена, значит все вершины
         // заполнены и перед нами AMR ячейка
         if (dim < 3) {
-            if (vertices[8].is_actual()) {
-                if (hex_only) {
-                    return 4;
-                } else {
-                    int n = 4;
-                    if (faces[Side::LEFT1].is_actual()) {
-                        n += 1;
-                    }
-                    if (faces[Side::RIGHT1].is_actual()) {
-                        n += 1;
-                    }
-                    if (faces[Side::BOTTOM1].is_actual()) {
-                        n += 1;
-                    }
-                    if (faces[Side::TOP1].is_actual()) {
-                        n += 1;
-                    }
-                    return n;
+            if (hex_only) {
+                return 4;
+            } else {
+                int n = 4;
+                if (faces[Side::LEFT1].is_actual()) {
+                    n += 1;
                 }
+                if (faces[Side::RIGHT1].is_actual()) {
+                    n += 1;
+                }
+                if (faces[Side::BOTTOM1].is_actual()) {
+                    n += 1;
+                }
+                if (faces[Side::TOP1].is_actual()) {
+                    n += 1;
+                }
+                return n;
             }
         } else {
-            if (vertices[26].is_actual()) {
-                return 8;
-                // return hex_only ? 8 : 27; // Для VTK_TRIQUADRIC_HEXAHEDRON
-            }
+            return 8;
+            // return hex_only ? 8 : 27; // Для VTK_TRIQUADRIC_HEXAHEDRON
         }
 
+        /*
         // В обратном случае это полигон или обычный трехмерный элемент
         return vertices.size();
+         */
     }
 
     /// @brief Записать в файл координаты вершин элемента
@@ -146,53 +142,50 @@ struct Handler {
         // Если последняя вершина (8 или 26) определена, значит все вершины
         // заполнены и перед нами AMR ячейка
         if (dim < 3) {
-            if (vertices[8].is_actual()) {
-                if (hex_only) {
-                    // Сохраняем как простой четырехугольник (VTK_QUAD)
-                    file.write((char *) vertices[iww(0, 0)].data(), 3 * sizeof(double));
-                    file.write((char *) vertices[iww(2, 0)].data(), 3 * sizeof(double));
-                    file.write((char *) vertices[iww(2, 2)].data(), 3 * sizeof(double));
-                    file.write((char *) vertices[iww(0, 2)].data(), 3 * sizeof(double));
-                    return;
-                } else {
-                    // Сохраняем как полигон
-                    file.write((char *) vertices[iww(0, 0)].data(), 3 * sizeof(double));
-                    if (faces[Side::BOTTOM1].is_actual()) {
-                        file.write((char *) vertices[iww(1, 0)].data(), 3 * sizeof(double));
-                    }
-
-                    file.write((char *) vertices[iww(2, 0)].data(), 3 * sizeof(double));
-                    if (faces[Side::RIGHT1].is_actual()) {
-                        file.write((char *) vertices[iww(2, 1)].data(), 3 * sizeof(double));
-                    }
-
-                    file.write((char *) vertices[iww(2, 2)].data(), 3 * sizeof(double));
-                    if (faces[Side::TOP1].is_actual()) {
-                        file.write((char *) vertices[iww(1, 2)].data(), 3 * sizeof(double));
-                    }
-
-                    file.write((char *) vertices[iww(0, 2)].data(), 3 * sizeof(double));
-                    if (faces[Side::LEFT1].is_actual()) {
-                        file.write((char *) vertices[iww(0, 1)].data(), 3 * sizeof(double));
-                    }
-                    return;
+            if (hex_only) {
+                // Сохраняем как простой четырехугольник (VTK_QUAD)
+                file.write((char *) vertices.vs<-1, -1>().data(), 3 * sizeof(double));
+                file.write((char *) vertices.vs<+1, -1>().data(), 3 * sizeof(double));
+                file.write((char *) vertices.vs<+1, +1>().data(), 3 * sizeof(double));
+                file.write((char *) vertices.vs<-1, +1>().data(), 3 * sizeof(double));
+                return;
+            } else {
+                // Сохраняем как полигон
+                file.write((char *) vertices.vs<-1, -1>().data(), 3 * sizeof(double));
+                if (faces[Side::BOTTOM1].is_actual()) {
+                    file.write((char *) vertices.vs<0, -1>().data(), 3 * sizeof(double));
                 }
-            }
-        } else {
-            if (vertices[26].is_actual()) {
-                // Сохраняем как простой шестигранник (VTK_HEXAHEDRON)
-                file.write((char *) vertices[iww(0, 0, 0)].data(), 3 * sizeof(double));
-                file.write((char *) vertices[iww(2, 0, 0)].data(), 3 * sizeof(double));
-                file.write((char *) vertices[iww(2, 2, 0)].data(), 3 * sizeof(double));
-                file.write((char *) vertices[iww(0, 2, 0)].data(), 3 * sizeof(double));
-                file.write((char *) vertices[iww(0, 0, 2)].data(), 3 * sizeof(double));
-                file.write((char *) vertices[iww(2, 0, 2)].data(), 3 * sizeof(double));
-                file.write((char *) vertices[iww(2, 2, 2)].data(), 3 * sizeof(double));
-                file.write((char *) vertices[iww(0, 2, 2)].data(), 3 * sizeof(double));
+
+                file.write((char *) vertices.vs<+1, -1>().data(), 3 * sizeof(double));
+                if (faces[Side::RIGHT1].is_actual()) {
+                    file.write((char *) vertices.vs<+1, 0>().data(), 3 * sizeof(double));
+                }
+
+                file.write((char *) vertices.vs<+1, +1>().data(), 3 * sizeof(double));
+                if (faces[Side::TOP1].is_actual()) {
+                    file.write((char *) vertices.vs<0, +1>().data(), 3 * sizeof(double));
+                }
+
+                file.write((char *) vertices.vs<-1, +1>().data(), 3 * sizeof(double));
+                if (faces[Side::LEFT1].is_actual()) {
+                    file.write((char *) vertices.vs<-1, 0>().data(), 3 * sizeof(double));
+                }
                 return;
             }
+        } else {
+            // Сохраняем как простой шестигранник (VTK_HEXAHEDRON)
+            file.write((char *) vertices.vs<-1, -1, -1>().data(), 3 * sizeof(double));
+            file.write((char *) vertices.vs<+1, -1, -1>().data(), 3 * sizeof(double));
+            file.write((char *) vertices.vs<+1, +1, -1>().data(), 3 * sizeof(double));
+            file.write((char *) vertices.vs<-1, +1, -1>().data(), 3 * sizeof(double));
+            file.write((char *) vertices.vs<-1, -1, +1>().data(), 3 * sizeof(double));
+            file.write((char *) vertices.vs<+1, -1, +1>().data(), 3 * sizeof(double));
+            file.write((char *) vertices.vs<+1, +1, +1>().data(), 3 * sizeof(double));
+            file.write((char *) vertices.vs<-1, +1, +1>().data(), 3 * sizeof(double));
+            return;
         }
 
+        /*
         // В обратном случае это полигон или обычный трехмерный элемент
 
         // В данном случае подразумеваем, что вершины пронумерованы
@@ -201,6 +194,7 @@ struct Handler {
         auto n_vertices = vertices.size();
 
         file.write((char *) vertices[0].data(), 3 * n_vertices * sizeof(double));
+         */
     }
 
     /// @brief Записать порядок вершин элемента
@@ -214,21 +208,21 @@ struct Handler {
 };
 
 void write_mesh_header(
-        std::ofstream &file, Storage &cells, size_t n_cells,
+        std::ofstream &file, AmrStorage &cells, size_t n_cells,
         const Variables &variables, bool hex_only, const Filter &filter
 ) {
     size_t dim = 2;
     if (!cells.empty()) {
-        dim = cells[0].dim();
+        dim = cells[0].dim;
     }
 
     Handler handler(dim, hex_only);
 
     // Количество вершин
     size_t n_points = 0;
-    for (auto cell: cells) {
+    for (auto& cell: cells) {
         if (filter(cell)) {
-            n_points += handler.n_points(cell.geom());
+            n_points += handler.n_points(cell);
         }
     }
 
@@ -280,7 +274,7 @@ void write_mesh_header(
 }
 
 void write_particles_header(
-        std::ofstream &file, Storage &cells, size_t n_cells,
+        std::ofstream &file, AmrStorage &cells, size_t n_cells,
         const Variables &variables, const Filter &filter
 ) {
     std::string byteord = is_big_endian() ? "BigEndian" : "LittleEndian";
@@ -331,10 +325,10 @@ void write_particles_header(
 }
 
 void write_mesh_primitives(
-        std::ofstream &file, Storage &cells, size_t n_cells,
+        std::ofstream &file, AmrStorage &cells, size_t n_cells,
         const Variables &variables, bool hex_only, const Filter &filter
 ) {
-    size_t dim = cells[0].dim();
+    size_t dim = cells[0].dim;
 
     Handler handler(dim, hex_only);
 
@@ -342,7 +336,7 @@ void write_mesh_primitives(
     size_t n_points = 0;
     for (auto& cell: cells) {
         if (filter(cell)) {
-            n_points += handler.n_points(cell.geom());
+            n_points += handler.n_points(cell);
         }
     }
 
@@ -356,7 +350,7 @@ void write_mesh_primitives(
 
     for (auto &cell: cells) {
         if (filter(cell)) {
-            handler.write_points(file, cell.geom());
+            handler.write_points(file, cell);
         }
     }
 
@@ -368,7 +362,7 @@ void write_mesh_primitives(
     size_t counter = 0;
     for (auto &cell: cells) {
         if (filter(cell)) {
-            handler.write_connectivity(file, cell.geom(), counter);
+            handler.write_connectivity(file, cell, counter);
         }
     }
 
@@ -377,9 +371,9 @@ void write_mesh_primitives(
     file.write((char *) &data_size, sizeof(uint32_t));
 
     uint64_t offset = 0;
-    for (auto cell: cells) {
+    for (auto& cell: cells) {
         if (filter(cell)) {
-            offset += handler.n_points(cell.geom());
+            offset += handler.n_points(cell);
             file.write((char *) &(offset), sizeof(uint64_t));
         }
     }
@@ -388,16 +382,16 @@ void write_mesh_primitives(
     data_size = static_cast<uint32_t>(n_cells * sizeof(uint8_t));
     file.write((char *) &data_size, sizeof(uint32_t));
 
-    for (auto cell: cells) {
+    for (auto& cell: cells) {
         if (filter(cell)) {
-            uint8_t type = handler.type(cell.geom());
+            uint8_t type = handler.type(cell);
             file.write((char *) &type, sizeof(uint8_t));
         }
     }
 }
 
 void write_particles_primitives(
-        std::ofstream &file, Storage &cells, size_t n_cells,
+        std::ofstream &file, AmrStorage &cells, size_t n_cells,
         const Variables &variables, const Filter &filter
 ) {
     // AppendedData
@@ -410,7 +404,7 @@ void write_particles_primitives(
 
     for (auto &cell: cells) {
         if (filter(cell)) {
-            file.write((char *) &cell.center(), 3 * sizeof(double));
+            file.write((char *) &cell.center, 3 * sizeof(double));
         }
     }
 
@@ -443,7 +437,7 @@ void write_particles_primitives(
 }
 
 void write_cells_data(
-        std::ofstream &file, Storage &cells, size_t n_cells,
+        std::ofstream &file, AmrStorage &cells, size_t n_cells,
         const Variables &variables, const Filter &filter
 ) {
     std::vector<char> temp;
@@ -457,7 +451,7 @@ void write_cells_data(
         temp.resize(data_size);
 
         size_t counter = 0;
-        for (auto cell: cells) {
+        for (auto& cell: cells) {
             if (filter(cell)) {
                 field.write(cell, temp.data() + counter * field_size);
                 ++counter;
@@ -480,13 +474,13 @@ VtuFile::VtuFile(
     filter(), hex_only(hex_only) {
 }
 
-void VtuFile::save(Storage &cells) {
+void VtuFile::save(AmrStorage &cells) {
     save(filename, cells, variables, hex_only, filter);
 }
 
 void VtuFile::save(
     const std::string &filename,
-    Storage &cells, const Variables &variables,
+    AmrStorage &cells, const Variables &variables,
     bool hex_only, const Filter &filter
 ) {
     size_t n_cells = count_cells(cells, filter);

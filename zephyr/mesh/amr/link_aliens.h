@@ -18,8 +18,8 @@ namespace zephyr { namespace mesh { namespace amr {
 /// пересылки соседи находятся по base_id. Функция выполняется для части
 /// ячеек в хранилище.
 void before_exchange_partial(
-        Storage& locals,
-        Storage& aliens,
+        AmrStorage& locals,
+        AmrStorage& aliens,
         int rank,
         size_t from, size_t to)
 {
@@ -32,7 +32,7 @@ void before_exchange_partial(
         cell[element].rank = rank;
         cell[element].index = ic;
 
-        for (auto &face1: cell.geom().faces) {
+        for (auto &face1: cell.faces) {
             if (face1.is_undefined()) continue;
 
             if (face1.adjacent.rank == rank) {
@@ -44,17 +44,17 @@ void before_exchange_partial(
 
             auto neib = aliens[face1.adjacent.ghost];
 
-            face1.adjacent.ghost = neib.b_idx();
+            face1.adjacent.ghost = neib.b_idx;
         }
     }
 }
 
-void before_exchange(Storage& locals, Storage& aliens, int rank) {
+void before_exchange(AmrStorage& locals, AmrStorage& aliens, int rank) {
     before_exchange_partial(locals, aliens, rank, 0, locals.size());
 }
 
 #ifdef ZEPHYR_ENABLE_MULTITHREADING
-void before_exchange(Storage& locals, Storage& aliens, int rank, ThreadPool& threads) {
+void before_exchange(AmrStorage& locals, AmrStorage& aliens, int rank, ThreadPool& threads) {
     auto num_tasks = threads.size();
     if (num_tasks < 2) {
         before_exchange(locals, aliens, rank);
@@ -80,8 +80,8 @@ void before_exchange(Storage& locals, Storage& aliens, int rank, ThreadPool& thr
 /// Соседи ищутся по base_id, который указан в face.adjacent.ghost.
 template <int dim>
 void find_neighbors_partial(
-        Storage& locals,
-        Storage& aliens,
+        AmrStorage& locals,
+        AmrStorage& aliens,
         size_t from, size_t to)
 {
     for (size_t ic = from; ic < to; ++ic) {
@@ -92,7 +92,7 @@ void find_neighbors_partial(
 
         double search_radius = 2.0 * cell[size];
 
-        for (auto &face1: cell.geom().faces) {
+        for (auto &face1: cell.faces) {
             if (face1.is_undefined() or face1.is_boundary()) continue;
 
             // Локальный сосед, пропускаем
@@ -109,7 +109,7 @@ void find_neighbors_partial(
             bool found = false;
             for (size_t in = 0; in < aliens.size(); ++in) {
                 auto neib = aliens[in];
-                if (neib.b_idx() != base_id) continue;
+                if (neib.b_idx != base_id) continue;
 
                 // Если neib слишком далеко, пропускаем
                 if (distance(fc1, neib[coords]) > search_radius) {
@@ -117,7 +117,7 @@ void find_neighbors_partial(
                 }
 
                 // Обходим грани предполагаемого соседа, ищем подходящую
-                for (auto &face2: neib.geom().faces) {
+                for (auto &face2: neib.faces) {
                     if (face2.is_undefined()) continue;
                     auto fc2 = face_center<dim>(face2, neib[vertices]);
 
@@ -145,13 +145,13 @@ void find_neighbors_partial(
 }
 
 template <int dim>
-void find_neighbors(Storage& locals, Storage& aliens) {
+void find_neighbors(AmrStorage& locals, AmrStorage& aliens) {
     find_neighbors_partial<dim>(locals, aliens, 0, locals.size());
 }
 
 #ifdef ZEPHYR_ENABLE_MULTITHREADING
 template <int dim>
-void find_neighbors(Storage& locals, Storage& aliens, ThreadPool& threads) {
+void find_neighbors(AmrStorage& locals, AmrStorage& aliens, ThreadPool& threads) {
     auto num_tasks = threads.size();
     if (num_tasks < 2) {
         find_neighbors<dim>(locals, aliens);
@@ -181,8 +181,8 @@ void link_aliens(
         Decomposition& decomposition
         if_multithreading(, ThreadPool& threads = dummy_pool))
 {
-    Storage& locals = decomposition.inner_elements();
-    Storage& aliens = decomposition.outer_elements();
+    AmrStorage& locals = decomposition.inner_elements();
+    AmrStorage& aliens = decomposition.outer_elements();
     int rank = decomposition.network().rank();
 
     // Подготовить ячейки и face.adjacent перед обменом

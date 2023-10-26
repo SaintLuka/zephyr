@@ -15,12 +15,12 @@
 
 namespace zephyr { namespace network { namespace decomposition {
 
-using ::zephyr::data::Storage;
+using ::zephyr::data::AmrStorage;
 using ::zephyr::data::Vector3d;
 using ::zephyr::geometry::Domain;
 using ::zephyr::data::item;
 using Measurer = ::zephyr::performance::load::Base;
-using ::zephyr::performance::load::StorageSize;
+using ::zephyr::performance::load::AmrStorageSize;
 using ::zephyr::network::mpi::Network;
 #ifdef ZEPHYR_ENABLE_MULTITHREADING
 using ::zephyr::multithreading::ThreadPool;
@@ -56,7 +56,7 @@ public:
 		\param[in] elements
 			\~russian хранилище с элементами, для которых
 				осуществляется декомпозиция.
-			\~english Storage with elements for which 
+			\~english AmrStorage with elements for which
 				decomposition is performed.
 			\~
 		\param[in] domain
@@ -72,7 +72,7 @@ public:
 	*/
 	Base(
 		Network&  net,
-		Storage&  elements,
+		AmrStorage&  elements,
 		Domain&   domain,
 		Measurer& measurer
         if_multithreading(, ThreadPool& pool)
@@ -90,7 +90,7 @@ public:
     */
 	static std::unique_ptr<Base> create(
             Network&  net,
-            Storage&  elements,
+            AmrStorage&  elements,
             Domain&   domain,
             Measurer& measurer,
             if_multithreading(ThreadPool& pool,)
@@ -107,7 +107,7 @@ public:
 	/** \brief
 		\~russian Обновить декомпозицию.
 		\~english Update decomposition according to 
-			input Storage changes.
+			input AmrStorage changes.
 		\~
 	*/
 	void update();
@@ -116,7 +116,7 @@ public:
 		\~russian Обменяться элементами у границ подобластей декомпозиции.
 			Элементы хранилища не меняются.
 		\~english Exchange elements near edges of decomposition 
-			subdomains, input Storage is not changed
+			subdomains, input AmrStorage is not changed
 		\~
 		\see elements.
 	*/
@@ -155,7 +155,7 @@ public:
 		\~english Reference to elements that are stored by the process.
 		\~
 	*/
-	Storage& inner_elements();
+	AmrStorage& inner_elements();
 	/** \brief
 		\~russian Ссылка на элементы, которые не хранятся 
 			в данном процессе, но используются им.
@@ -163,7 +163,7 @@ public:
 			by the process, but are used by it.
 		\~
 	*/
-	Storage& outer_elements();
+	AmrStorage& outer_elements();
 	
 	/** \brief
 		\~russian Функция запуска перестановки элементов.
@@ -174,7 +174,7 @@ public:
 
 	/** \brief
 		\~russian Собрать все элементы хранилища в одном MPI-процессе.
-		\~english Gather all Storage elements in a single MPI process.
+		\~english Gather all AmrStorage elements in a single MPI process.
 		\~
 		\param[in] rank
 		\~russian ранг MPI-процесса.
@@ -210,15 +210,15 @@ public:
 		\~english Evaulate average fields.
 		\~
 		\param[in] fields
-		\~russian список полей Storage в виде массива строк.
-		\~english Storage fields as strings.
+		\~russian список полей AmrStorage в виде массива строк.
+		\~english AmrStorage fields as strings.
 		\~
 		\param[in] index
 		\~russian индексы элементов для усреднения.
 		\~english element indices to account.
 		\~
 	*/
-	Storage average(
+	AmrStorage average(
 		std::vector<std::string> fields,
 		std::vector<long long int>& indices = dummy_index
 	);
@@ -227,8 +227,8 @@ public:
 		\~english Evaulate average fields.
 		\~
 		\param[in] fields
-		\~russian список полей Storage в виде массива строк.
-		\~english Storage fields as strings.
+		\~russian список полей AmrStorage в виде массива строк.
+		\~english AmrStorage fields as strings.
 		\~
 		\param[in] index
 		\~russian указатель на массив индексов элементов для усреднения.
@@ -239,7 +239,7 @@ public:
 		\~english number of elements in index array.
 		\~
 	*/
-	Storage average(
+	AmrStorage average(
 		std::vector<std::string> fields,
 		std::pair<long long int*, std::size_t> indices = {nullptr, 0}
 	);
@@ -296,11 +296,11 @@ protected:
             \~
         \param[in] begin
             \~russian начало хранилища элементов.
-            \~english elements Storage begin.
+            \~english elements AmrStorage begin.
             \~
         \see tourists_labels_out.
     */
-    void mark_tourists_out(Storage::Item it, Storage::Item begin);
+    void mark_tourists_out(AmrStorage::Iterator it, AmrStorage::Iterator begin);
 
     /// Переслать aliens
     //void exchange_aliens();
@@ -387,10 +387,10 @@ protected:
         \~
         \param[in] elements
         \~russian хранилище элементов.
-        \~english Storage with elements.
+        \~english AmrStorage with elements.
         \~
     */
-    void fit_in_period_for(Storage& elements);
+    void fit_in_period_for(AmrStorage& elements);
 
     /** \~russian Разместить элементы ближе вокруг центра диаграммы,
             если позволяет периодичность области.
@@ -399,10 +399,10 @@ protected:
         \~
         \param[in] elements
         \~russian хранилище элементов.
-        \~english Storage with elements.
+        \~english AmrStorage with elements.
         \~
     */
-    void remove_period_for(Storage& elements);
+    void remove_period_for(AmrStorage& elements);
 
     /** \~russian Поместить элемент в период.
         \~english Fit an element in period.
@@ -412,7 +412,7 @@ protected:
             \~english an iterator to an element.
             \~
     */
-    void fit_in_period(Storage::Item i);
+    void fit_in_period(AmrStorage::Iterator i);
 
     /** \~russian Разместить элемент ближе к центру диаграммы,
             если позволяет периодичность области.
@@ -424,10 +424,10 @@ protected:
             \~english an iterator to an element.
             \~
     */
-    void remove_period(Storage::Item element);
+    void remove_period(AmrStorage::Iterator element);
 
 	Network& net;             ///< Сеть MPI-процессов
-	Storage& m_locals;       ///< Локальное хранилище данных
+	AmrStorage& m_locals;       ///< Локальное хранилище данных
     Domain m_domain;          ///< Геометрия расчетной области
     Measurer* m_measurer;     ///< Измеритель нагрузки
 #ifdef ZEPHYR_ENABLE_MULTITHREADING
@@ -449,11 +449,11 @@ protected:
     std::vector<std::vector<size_t>> m_tourists_labels;
 
     /// @brief Хранище для элементов из обменного слоя данного процесса.
-	Storage m_tourists;
+	AmrStorage m_tourists;
 
     /// @brief Хранилище элементов из обменного слоя, которые переданы
     /// от других процессов.
-	Storage m_aliens;
+	AmrStorage m_aliens;
 
 	std::vector<size_t>      m_send_count;    ///< Число ячеек для отправки
     std::vector<MPI_Request> m_send_request;  ///< MPI-запрос на отправку
@@ -467,11 +467,11 @@ protected:
 
 
     /// @brief Хранище для элементов, переданных от других процессов
-    std::vector<Storage> migrants_in;
+    std::vector<AmrStorage> migrants_in;
 
     /// @brief Хранище для элементов, которые должны быть переданы другим
     /// процессам
-    std::vector<Storage> migrants_out;
+    std::vector<AmrStorage> migrants_out;
 
     /// @brief Список элементов, которые будут удалены.
     std::vector<std::size_t> to_remove;

@@ -16,13 +16,13 @@ struct _U_ : public SmFluid::State {
 _U_ U;
 
 /// Переменные для сохранения
-double get_rho(Storage::Item cell) { return cell(U).rho1; }
-double get_u(Storage::Item cell) { return cell(U).v1.x(); }
-double get_v(Storage::Item cell) { return cell(U).v1.y(); }
-double get_w(Storage::Item cell) { return cell(U).v1.z(); }
-double get_p(Storage::Item cell) { return cell(U).p1; }
-double get_e(Storage::Item cell) { return cell(U).e1; }
-double get_inside(Storage::Item cell) { return double(cell(U).inside); }
+double get_rho(AmrStorage::Item& cell) { return cell(U).rho1; }
+double get_u(AmrStorage::Item& cell) { return cell(U).v1.x(); }
+double get_v(AmrStorage::Item& cell) { return cell(U).v1.y(); }
+double get_w(AmrStorage::Item& cell) { return cell(U).v1.z(); }
+double get_p(AmrStorage::Item& cell) { return cell(U).p1; }
+double get_e(AmrStorage::Item& cell) { return cell(U).e1; }
+double get_inside(AmrStorage::Item& cell) { return double(cell(U).inside); }
 
 Mesh make_pipe(double xmin, double xmax, double ymin, double ymax, double H, double h, double L, double l, int nx_cells) {
     

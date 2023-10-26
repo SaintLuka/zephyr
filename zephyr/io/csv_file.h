@@ -7,7 +7,7 @@
 
 namespace zephyr { namespace io {
 
-using zephyr::mesh::Storage;
+using zephyr::mesh::AmrStorage;
 
 /// @class CsvFile для записи хранилища в файл .csv для неструктурированных
 /// сеток. Частицы также могут быть записаны.
@@ -31,12 +31,12 @@ public:
 
     /// @brief Базовая функция записи в файл. До вызова функции должен быть
     /// создан экземпляр класса и настроены опции записи.
-    void save(Storage &cells);
+    void save(AmrStorage &cells);
 
     /// @brief Статическая функция записи в файл. Полный аналог функции-члена
     /// класса write, но вызывается без экземпляра класса, все параметры записи
     /// передаются непосредственно как аргументы функции.
-    static void save(const std::string &filename, Storage &cells,
+    static void save(const std::string &filename, AmrStorage &cells,
                      int precision, const Variables &variables,
                      const Filter &filter = TrivialFilter());
 

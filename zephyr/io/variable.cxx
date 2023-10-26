@@ -2,104 +2,108 @@
 
 #include <zephyr/io/variable.h>
 
-namespace zephyr { namespace io {
+#include <zephyr/geom/primitives/amr_cell.h>
+
+namespace zephyr::io {
 
 Variable::Variable(const char* name)
     : m_name(name) {
+    
+    using geom::AmrFaces;
 
     if (!std::strcmp(name, "rank")) {
         m_type = VtkType::Int32;
         m_n_components = 1;
 
-        m_function = [](Storage::Item cell, void *arg) {
+        m_function = [](AmrStorage::Item& cell, void *arg) {
             auto out = (int32_t *) arg;
-            out[0] = cell.rank();
+            out[0] = cell.rank;
         };
     }
     else if (!std::strcmp(name, "index")) {
         m_type = VtkType::Int32;
         m_n_components = 1;
 
-        m_function = [](Storage::Item cell, void *arg) {
+        m_function = [](AmrStorage::Item& cell, void *arg) {
             auto out = (int32_t *) arg;
-            out[0] = cell.index();
+            out[0] = cell.index;
         };
     }
     else if (!std::strcmp(name, "level")) {
         m_type = VtkType::Int8;
         m_n_components = 1;
 
-        m_function = [](Storage::Item cell, void *arg) {
+        m_function = [](AmrStorage::Item& cell, void *arg) {
             auto out = (int8_t *) arg;
-            out[0] = cell.level();
+            out[0] = cell.level;
         };
     }
     else if (!std::strcmp(name, "next")) {
         m_type = VtkType::Int32;
         m_n_components = 1;
 
-        m_function = [](Storage::Item cell, void *arg) {
+        m_function = [](AmrStorage::Item& cell, void *arg) {
             auto out = (int32_t *) arg;
-            out[0] = cell.next();
+            out[0] = cell.next;
         };
     }
     else if (!std::strcmp(name, "flag")) {
         m_type = VtkType::Int8;
         m_n_components = 1;
 
-        m_function = [](Storage::Item cell, void *arg) {
+        m_function = [](AmrStorage::Item& cell, void *arg) {
             auto out = (int8_t *) arg;
-            out[0] = cell.flag();
+            out[0] = cell.flag;
         };
     }
     else if (!std::strcmp(name, "b_idx")) {
         m_type = VtkType::Int32;
         m_n_components = 1;
 
-        m_function = [](Storage::Item cell, void *arg) {
+        m_function = [](AmrStorage::Item& cell, void *arg) {
             auto out = (int32_t *) arg;
-            out[0] = cell.b_idx();
+            out[0] = cell.b_idx;
         };
     }
     else if (!std::strcmp(name, "z_idx")) {
         m_type = VtkType::Int32;
         m_n_components = 1;
 
-        m_function = [](Storage::Item cell, void *arg) {
+        m_function = [](AmrStorage::Item& cell, void *arg) {
             auto out = (int32_t *) arg;
-            out[0] = cell.z_idx();
+            out[0] = cell.z_idx;
         };
     }
     else if (!std::strcmp(name, "face.rank")) {
         m_type = VtkType::UInt8;
-        m_n_components = geom::AmrFaces::max_size;
+        m_n_components = AmrFaces::max_count;
 
-        m_function = [](Storage::Item cell, void *arg) {
+        m_function = [](AmrStorage::Item& cell, void *arg) {
             auto out = (int8_t *) arg;
-            for (int i = 0; i < geom::AmrFaces::max_size; ++i) {
-                out[i] = cell.geom().faces[i].adjacent.rank;
+            for (int i = 0; i < AmrFaces::max_count; ++i) {
+                out[i] = cell.faces[i].adjacent.rank;
             }
         };
     }
     else if (!std::strcmp(name, "face.index")) {
         m_type = VtkType::Int32;
-        m_n_components = geom::AmrFaces::max_size;
+        m_n_components = AmrFaces::max_count;
 
-        m_function = [](Storage::Item cell, void *arg) {
+        m_function = [](AmrStorage::Item& cell, void *arg) {
             auto out = (int32_t *) arg;
-            for (int i = 0; i < geom::AmrFaces::max_size; ++i) {
-                out[i] = cell.geom().faces[i].adjacent.index;
+            for (int i = 0; i < AmrFaces::max_count; ++i) {
+                out[i] = cell.faces[i].adjacent.index;
             }
         };
     }
     else if (!std::strcmp(name, "face.boundary")) {
         m_type = VtkType::Int8;
-        m_n_components = geom::AmrFaces::max_size;
+        m_n_components = AmrFaces::max_count;
 
-        m_function = [](Storage::Item cell, void *arg) {
+        m_function = [](AmrStorage::Item& cell, void *arg) {
             auto out = (int8_t *) arg;
-            for (int i = 0; i < geom::AmrFaces::max_size; ++i) {
-                out[i] = int(cell.geom().faces[i].boundary);
+            for (int i = 0; i < AmrFaces::max_count; ++i) {
+                out[i] = int(cell.faces[i].boundary);
             }
         };
     }
@@ -107,11 +111,11 @@ Variable::Variable(const char* name)
         m_type = VtkType::Float32;
         m_n_components = 3;
 
-        m_function = [](Storage::Item cell, void *arg) {
+        m_function = [](AmrStorage::Item& cell, void *arg) {
             auto out = (float *) arg;
-            out[0] = float(cell.center().x());
-            out[1] = float(cell.center().y());
-            out[2] = float(cell.center().z());
+            out[0] = float(cell.center.x());
+            out[1] = float(cell.center.y());
+            out[2] = float(cell.center.z());
         };
     }
     else {
@@ -124,7 +128,7 @@ Variable::Variable(const std::string& name)
 
 }
 
-void Variable::write(Storage::Item elem, void* out) const {
+void Variable::write(AmrStorage::Item& elem, void* out) const {
     m_function(elem, out);
 }
 
@@ -148,5 +152,4 @@ size_t Variable::size() const {
     return m_n_components * m_type.size();
 }
 
-} // namespace io
-} // namespace zephyr
+} // namespace zephyr::io

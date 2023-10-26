@@ -28,7 +28,7 @@ public:
     };
 
     ORB(Network&  network,
-        Storage&  elements,
+        AmrStorage&  elements,
         Domain&   domain,
         Measurer& measurer,
         if_multithreading(ThreadPool& pool = dummy_pool,)
@@ -38,7 +38,7 @@ public:
 
 #ifdef ZEPHYR_ENABLE_YAML
     ORB(Network&  network,
-        Storage&  elements,
+        AmrStorage&  elements,
         Domain&   domain,
         Measurer& measurer,
         const YAML::Node& config

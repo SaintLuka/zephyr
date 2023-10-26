@@ -11,7 +11,7 @@ namespace zephyr { namespace network { namespace decomposition {
 
 Base::Base(
 	Network&  net,
-	Storage&  elements,
+	AmrStorage&  elements,
 	Domain&   domain,
 	Measurer& measurer
 	if_multithreading(, ThreadPool& pool)
@@ -33,7 +33,7 @@ Base::Base(
 #ifdef ZEPHYR_ENABLE_YAML
 std::unique_ptr<Base> Base::create(
     Network&  net,
-    Storage&  elements,
+    AmrStorage&  elements,
     Domain&   domain,
     Measurer& measurer,
     if_multithreading(ThreadPool& pool,)
@@ -185,7 +185,7 @@ void Base::exchange() {
 static std::mutex mutex1;
 #endif
 
-void Base::mark_tourists_out(Storage::Item it, Storage::Item begin) {
+void Base::mark_tourists_out(AmrStorage::Iterator it, AmrStorage::Iterator begin) {
     for (int neib_rank = 0; neib_rank < int(net.size()); ++neib_rank) {
         if (neib_rank == m_rank) {
             continue;
@@ -214,7 +214,7 @@ void Base::prepare_aliens() {
 
     auto b = m_locals.begin();
 
-    auto func = [&](Storage::Item it) {
+    auto func = [&](AmrStorage::Iterator it) {
         mark_tourists_out(it, b);
     };
 
@@ -264,7 +264,7 @@ void Base::prepare_migrants() {
     auto b = m_locals.begin();
 #ifdef ZEPHYR_ENABLE_MULTITHREADING
     if (m_pool.is_active()) {
-        auto func = [&](Storage::Item it) {
+        auto func = [&](AmrStorage::Iterator it) {
             auto s = rank((Vector3d&) it[coords]);
             if (s != m_rank) {
                 mutexb1.lock(); migrants_out[s].append(it[item]); mutexb1.unlock();
@@ -396,8 +396,8 @@ void Base::collect_at(std::size_t rank) {
 	}
 }
 
-Storage& Base::inner_elements() { return m_locals; }
-Storage& Base::outer_elements() { return m_aliens; }
+AmrStorage& Base::inner_elements() { return m_locals; }
+AmrStorage& Base::outer_elements() { return m_aliens; }
 
 void Base::signal_to_permute(std::vector<std::size_t>& perm) {
     permute_tourists_labels_out(perm);
@@ -414,7 +414,7 @@ Measurer& Base::load_measurer() const {
 
 Network& Base::network() const { return net; }
 
-Storage Base::average(
+AmrStorage Base::average(
 	std::vector<std::string> fields,
 	std::pair<long long int*, std::size_t> indices
 ) {
@@ -429,9 +429,9 @@ Storage Base::average(
 	}
 	auto size = selected.size();
 
-	std::vector<Storage> averages(net.size());
+	std::vector<AmrStorage> averages(net.size());
 	fields.push_back("uid");
-	averages[m_rank] = Storage(fields, 1);
+	averages[m_rank] = AmrStorage(fields, 1);
 	auto& avg = averages[m_rank];
 	avg[0][uid].value = selected.size();
 	auto itemSize = selected.itemsize();
@@ -475,27 +475,27 @@ Storage Base::average(
 	return averages[m_rank][fields];
 }
 
-Storage Base::average(
+AmrStorage Base::average(
 	std::vector<std::string> fields,
 	std::vector<long long int>& index
 ) {
 	return average(fields, {index.data(), index.size()});
 }
 
-void Base::remove_period(Storage::Item element) {
+void Base::remove_period(AmrStorage::Iterator element) {
     auto domain_center = center();
     auto& element_coords = (Vector3d&) element[coords];
     auto offset = m_domain.shortest(element_coords - domain_center);
     element_coords = domain_center + offset;
 }
 
-void Base::fit_in_period(Storage::Item element) {
+void Base::fit_in_period(AmrStorage::Iterator element) {
     auto& element_coords = (Vector3d&) element[coords];
     m_domain.fit_in_period(element_coords);
 }
 
-void Base::fit_in_period_for(Storage& s) {
-    auto func = [&](Storage::Item it) {
+void Base::fit_in_period_for(AmrStorage& s) {
+    auto func = [&](AmrStorage::Iterator it) {
         fit_in_period(it);
     };
 #ifdef ZEPHYR_ENABLE_MULTITHREADING
@@ -511,8 +511,8 @@ void Base::fit_in_period_for(Storage& s) {
     }
 }
 
-void Base::remove_period_for(Storage& s) {
-    auto func = [&](Storage::Item it) {
+void Base::remove_period_for(AmrStorage& s) {
+    auto func = [&](AmrStorage::Iterator it) {
         remove_period(it);
     };
 #ifdef ZEPHYR_ENABLE_MULTITHREADING

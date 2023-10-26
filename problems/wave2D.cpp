@@ -15,11 +15,11 @@ struct _U_ {
 _U_ U;
 
 // Переменные для сохранения
-double get_u(Storage::Item cell) {
+double get_u(AmrStorage::Item& cell) {
     return cell(U).u1;
 }
 
-double get_bound(Storage::Item cell) {
+double get_bound(AmrStorage::Item& cell) {
     if (cell(U).is_bound)
         return 1.0;
     else

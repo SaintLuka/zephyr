@@ -383,6 +383,8 @@ public:
     /// Вершины должны располагаться в плоскости (x, y).
     /// @param area Площадь криволинейной ячейки
     Vector3d centroid(double area = 0.0) const;
+
+    std::array<SqQuad, 4> children() const;
 };
 
 /// @brief Представление шестигранника
@@ -499,8 +501,27 @@ public:
     /// @brief Конструктор по угловым точкам
     SqCube(const Cube &cube);
 
+    /// @brief Неполный конструктор. Инициализация только первого слоя
+    /// вершин для хранения представления двумерной ячейки.
+    SqCube(const Quad& quad);
+
+    /// @brief Неполный конструктор. Инициализация только первого слоя
+    /// вершин для хранения представления двумерной ячейки.
+    SqCube(const SqQuad& quad);
+
+    inline SqQuad& as2D() {
+        return *reinterpret_cast<SqQuad *>(verts.data());
+    };
+
+    inline const SqQuad& as2D() const {
+        return *reinterpret_cast<const SqQuad*>(verts.data());
+    };
+
     /// @brief Удалить промежуточные вершины и вернуть простой кубоид
     Cube reduce() const;
+
+    /// @brief Разбиение на 8 кубов
+    std::array<SqCube, 8> children() const;
 
     /// @brief Прямой доступ к данным по индексу
     /// @param idx in [0..27)
@@ -526,7 +547,7 @@ public:
     /// @tparam i in {-1, 0, +1}
     /// @tparam j in {-1, 0, +1}
     /// @tparam k in {-1, 0, +1}
-    template <int i, int j, int k>
+    template <int i, int j, int k = -1>
     inline Vector3d &vs() {
         return verts[iss<i, j, k>()];
     }
@@ -535,13 +556,17 @@ public:
     /// @tparam i in {-1, 0, +1}
     /// @tparam j in {-1, 0, +1}
     /// @tparam k in {-1, 0, +1}
-    template <int i, int j, int k>
+    template <int i, int j, int k = -1>
     inline const Vector3d &vs() const {
         return verts[iss<i, j, k>()];
     }
 
     /// @brief Непосредственно отображение
     Vector3d operator()(double x, double y, double z) const;
+
+    /// @brief Неполное отображение (для двумерных ячеек)
+    /// Эквивалентно заданию z = -1.
+    Vector3d operator()(double x, double y) const;
 
     /// @brief Непосредственно отображение
     Vector3d get(double x, double y, double z) const;

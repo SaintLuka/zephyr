@@ -21,13 +21,13 @@ public:
 Solver::State U = Solver::datatype();
 
 // Переменные для сохранения
-double get_u(Storage::Item cell)  { return cell(U).u1; }
+double get_u(AmrStorage::Item&cell)  { return cell(U).u1; }
 
-double get_ux(Storage::Item cell)  { return cell(U).ux; }
+double get_ux(AmrStorage::Item&cell)  { return cell(U).ux; }
 
-double get_uy(Storage::Item cell)  { return cell(U).uy; }
+double get_uy(AmrStorage::Item&cell)  { return cell(U).uy; }
 
-double get_lvl(const Storage::Item &cell)  { return cell.level(); }
+double get_lvl(const AmrStorage::Item &cell)  { return cell.level; }
 
 const double margin = 0.0198;
 
@@ -36,7 +36,7 @@ void setup_initial_1(Mesh& mesh, double D) {
     //double R = D / 2.0;
     //Vector3d vc = {R + margin, R + margin, 0.2};
     double R = 0.1;
-    Vector3d vc = {0.15, 0.15, 0.15};
+    Vector3d vc = {0.15, 0.15, 0.0};
     for (auto cell: mesh) {
         cell(U).u1 = (cell.center() - vc).norm() < R ? 1.0 : 0.0;
         cell(U).u2 = 0.0;
@@ -79,7 +79,7 @@ int main() {
         .left   = Boundary::ZOE, .right = Boundary::ZOE,
         .bottom = Boundary::ZOE, .top   = Boundary::ZOE});
 
-    Cuboid cube(0.0, 1.0, 0.0, 0.8, 0.0, 0.6);
+    Cuboid cube(0.0, 1.0, 0.0, 0.8, -0.3, 0.3);
     cube.set_nx(20);
     cube.set_boundaries({
         .left   = Boundary::ZOE, .right = Boundary::ZOE,

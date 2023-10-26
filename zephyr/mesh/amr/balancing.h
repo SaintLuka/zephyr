@@ -50,7 +50,7 @@ public:
     /// @param cell Целевая ячейка, для которой определяется окрестность
     /// @param locals Ссылка на локальное хранилище
     /// @param aliens Ссылка на хранилище ячеек с других процессов
-    void setup(const AmrCell& cell, Storage &locals, Storage& aliens) {
+    void setup(const AmrCell& cell, AmrStorage &locals, AmrStorage& aliens) {
         scrutiny_check(cell.index < locals.size(), "setup: ic >= locals.size()")
 
         // Эти ячейки не интересуют
@@ -82,7 +82,7 @@ public:
                 }
             }
 #endif
-            AmrCell& neib = (adj.rank == cell.rank ? locals[adj.index] : aliens[adj.ghost]).geom();
+            AmrCell& neib = adj.rank == cell.rank ? locals[adj.index] : aliens[adj.ghost];
 
             neib_levels[neib_count] = neib.level;
             neib_flags[neib_count] = &neib.flag;
@@ -102,7 +102,7 @@ public:
                 for (auto is: sibs) {
                     scrutiny_check(is < locals.size(), "Vicinity: Sibling index out of range")
 
-                    AmrCell& sib = locals[is].geom();
+                    AmrCell& sib = locals[is];
                     sibs_flags[sibs_count] = &sib.flag;
                     ++sibs_count;
                 }
@@ -146,12 +146,12 @@ struct VicinityList {
     /// @brief Конструктор построения окружения
     /// @param locals Ссылка на локальное хранилище
     /// @param aliens Ссылка на хранилище ячеек с других процессов
-    VicinityList(Storage& locals, Storage& aliens)
+    VicinityList(AmrStorage& locals, AmrStorage& aliens)
         : m_list(locals.size()) {
         threads::for_each(
                 locals.begin(), locals.end(),
-                [this, &locals, &aliens](const Storage::Item &item) {
-                    m_list[item.index()].setup(item, locals, aliens);
+                [this, &locals, &aliens](const AmrStorage::Item &item) {
+                    m_list[item.index].setup(item, locals, aliens);
                 });
     }
 
@@ -180,7 +180,7 @@ struct VicinityList {
 /// @param vicinity_list Ссылка на массив с окружением ячеек
 /// @return true если ячейка изменила свой флаг
 template <int dim>
-bool update_flag(AmrCell& cell, Storage& locals, const VicinityList<dim>& vicinity_list) {
+bool update_flag(AmrCell& cell, AmrStorage& locals, const VicinityList<dim>& vicinity_list) {
     int ic = cell.index;
     auto vicinity = vicinity_list[ic];
 
@@ -201,7 +201,7 @@ bool update_flag(AmrCell& cell, Storage& locals, const VicinityList<dim>& vicini
             return true;
         }
     } else {
-        // Ячейка хочет огрубиться, cell.flag() < 0
+        // Ячейка хочет огрубиться, cell.flag < 0
         scrutiny_check(cell.flag < 0, "update_flag: wrong assumption")
 
         // Один из соседей хочет слишком высокий уровень
@@ -229,7 +229,7 @@ bool update_flag(AmrCell& cell, Storage& locals, const VicinityList<dim>& vicini
 /// @brief Выполняет функцию update_flag для всех ячеек
 /// @return true если хотя бы одна ячейка изменила свой флаг
 template <int dim>
-bool flag_balancing_step(Storage& locals, const VicinityList<dim>& vicinity_list) {
+bool flag_balancing_step(AmrStorage& locals, const VicinityList<dim>& vicinity_list) {
     // Функция max в данном контексте заменяет логическое "И"
     return threads::max(
             locals.begin(), locals.end(),
@@ -256,7 +256,7 @@ bool flag_balancing_step(Storage& locals, const VicinityList<dim>& vicinity_list
 /// (и достаточно эффективно) реализуется многопоточность, также алгоритм легко
 /// обобщается на многопроцессорную систему.
 template<int dim>
-void balance_flags(Storage &locals, Storage& aliens, int max_level) {
+void balance_flags(AmrStorage &locals, AmrStorage& aliens, int max_level) {
     static Stopwatch base_restrictions_timer;
     static Stopwatch setup_vicinity_timer;
     static Stopwatch flag_balancing_timer;
@@ -288,11 +288,11 @@ void balance_flags(Storage &locals, Storage& aliens, int max_level) {
 /// @param locals Ссылка на локальное хранилище ячеек
 /// @param aliens Ссылка на хранилище ячеек с других процессов
 /// @param max_level Максимальный уровень ячеек
-void balance_flags_slow(Storage &locals, Storage& aliens, int max_level) {
+void balance_flags_slow(AmrStorage &locals, AmrStorage& aliens, int max_level) {
     if (locals.empty())
         return;
 
-    auto dim = locals[0].dim();
+    auto dim = locals[0].dim;
 
     if (dim < 3) {
         amr::balance_flags<2>(locals, aliens, max_level);
@@ -322,8 +322,8 @@ void balance_flags(
     static Stopwatch round_timer;
 
     Network& network = decomposition.network();
-    Storage& locals = decomposition.inner_elements();
-    Storage& aliens = decomposition.outer_elements();
+    AmrStorage& locals = decomposition.inner_elements();
+    AmrStorage& aliens = decomposition.outer_elements();
 
     restrictions_timer.resume();
     base_restrictions<dim>(locals, max_level if_multithreading(, threads));
@@ -375,7 +375,7 @@ void balance_flags_slow(
         int max_level
         if_multithreading(, ThreadPool& threads))
 {
-    Storage& cells = decomposition.inner_elements();
+    AmrStorage& cells = decomposition.inner_elements();
 
     if (cells.empty()) {
         amr::balance_flags<0>(decomposition, max_level if_multithreading(, threads));

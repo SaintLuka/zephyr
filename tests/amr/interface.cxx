@@ -23,11 +23,11 @@ struct _U_ {
 
 _U_ U;
 
-double get_idx(Storage::Item cell) {
+double get_idx(AmrStorage::Item& cell) {
     return cell(U).idx;
 }
 
-double get_bit(Storage::Item cell) {
+double get_bit(AmrStorage::Item& cell) {
     return cell(U).bit;
 }
 

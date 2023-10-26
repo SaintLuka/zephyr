@@ -12,17 +12,17 @@ struct Adjacent {
 
     /// @brief Ранг процесса, на котором находится смежная ячейка
     /// при распределенном расчете.
-    int rank;
+    int rank = -1;
 
     /// @brief Индекс смежной ячейки в массиве locals (в реальном локальном
     /// хранилище или в удаленном)
-    int index;
+    int index = -1;
 
     /// @brief Индекс смежной ячейки в массиве aliens.
-    int ghost;
+    int ghost = -1;
 
     /// @brief Конструктор по-умолчанию.
-    Adjacent() : rank(0), ghost(0), index(0) { }
+    Adjacent() = default;
 
     /// @brief Оператор сравнения
     bool operator!=(const Adjacent& adj) const {

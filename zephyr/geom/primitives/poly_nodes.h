@@ -1,7 +1,5 @@
 #pragma once
 
-#include <zephyr/geom/primitives/opt_vertex.h>
-
 namespace zephyr::geom {
 
 /// @brief Координаты вершин (узлов) ячейки.
@@ -28,7 +26,7 @@ public:
     int size() const {
         int count = 0;
         for (int i = 0; i < max_size; ++i) {
-            if (!list[i].is_undefined()) {
+            if (!list[i].hasNaN()) {
                 ++count;
             }
         }
@@ -38,23 +36,23 @@ public:
     /// @brief Установить неопределенный список
     void set_undefined() {
         for (auto &c: list) {
-            c.set_undefined();
+            setNaN(c);
         }
     }
 
     /// @brief Доступ к вершине по индексу
-    inline OptVertex &operator[](int i) {
+    inline Vector3d &operator[](int i) {
         return list[i];
     }
 
     /// @brief Доступ к вершине по индексу
-    inline const OptVertex &operator[](int i) const {
+    inline const Vector3d &operator[](int i) const {
         return list[i];
     }
 
 private:
     /// @brief Массив вершин ячейки (до max_size)
-    std::array<OptVertex, max_size> list;
+    std::array<Vector3d, max_size> list;
 };
 
 } // namespace zephyr::geom

@@ -2,6 +2,9 @@
 
 #include <zephyr/utils/mpi.h>
 #include <zephyr/utils/stopwatch.h>
+#include <zephyr/geom/primitives/amr_cell.h>
+
+#include <zephyr/mesh/cell.h>
 
 #include <zephyr/mesh/mesh.h>
 
@@ -34,12 +37,12 @@ void Mesh::init_amr() {
     }
 
     for (int ic = 0; ic < m_locals.size(); ++ic) {
-        auto cell = m_locals[ic];
+        auto& cell = m_locals[ic];
 
-        cell.geom().b_idx = offset[rank] + ic;
-        cell.geom().z_idx = 0;
-        cell.geom().level = 0;
-        cell.geom().flag = 0;
+        cell.b_idx = offset[rank] + ic;
+        cell.z_idx = 0;
+        cell.level = 0;
+        cell.flag = 0;
     }
 }
 

@@ -1,11 +1,8 @@
 #pragma once
 
-#include <string>
-#include <algorithm>
-
 #include <zephyr/geom/vector.h>
-#include <zephyr/geom/primitives/adjacent.h>
 #include <zephyr/geom/primitives/boundary.h>
+#include <zephyr/geom/primitives/adjacent.h>
 
 namespace zephyr::geom {
 
@@ -20,57 +17,58 @@ enum class Direction : int {
 
 /// @brief Базовый класс грани произвольной ячейки, хранит индексы
 /// вершин (узлов), которые хранятся в массиве в самой ячейке.
-template<int max_size>
-class BaseFace {
+template<int N>
+class BasicFace {
 public:
-
-    /// @brief Площадь грани
-    double area;
+    /// @brief Тип граничного условия
+    Boundary boundary = Boundary::UNDEFINED;
 
     /// @brief Список индексов вершин в массиве вершин ячейки,
     /// которой принадлежит грань
-    std::array<short, max_size> vertices;
-
-    /// @brief Внешняя нормаль грани
-    Vector3d normal;
-
-    /// @brief Тип граничного условия
-    Boundary boundary;
+    std::array<int, N> vertices;
 
     /// @brief Составной индекс смежной ячейки
     Adjacent adjacent;
 
+    /// @brief Площадь грани
+    double area;
+
+    /// @brief Внешняя нормаль грани
+    Vector3d normal;
+
+    /// @brief Центр грани
+    Vector3d center;
+
     /// @brief Конструктор по умолчанию
-    BaseFace() = default;
+    BasicFace() { vertices.fill(-1); }
 
 	/// @brief Является ли грань граничной?
-	bool is_boundary() const {
+	inline bool is_boundary() const {
         return boundary != Boundary::ORDINARY &&
                boundary != Boundary::PERIODIC &&
                boundary != Boundary::UNDEFINED;
     }
 
     /// @brief Является ли грань актуальной?
-    bool is_actual() const {
+    inline bool is_actual() const {
 	    return boundary != Boundary::UNDEFINED;
 	}
 
 	/// @return 'true', если грань не актуальна
-	bool is_undefined() const {
+	inline bool is_undefined() const {
 	    return boundary == Boundary::UNDEFINED;
 	}
 
 	/// @brief Установить неопределенную грань
-    void set_undefined() {
-        area = -1.0;
+    inline void set_undefined() {
         boundary = Boundary::UNDEFINED;
-        vertices.fill(-1);
+        vertices = {-1, -1, -1, -1};
     }
 
     /// @brief Пропустить грань?
     /// @return 'true' если грань неопределена или
     /// не совпадает с выбраным направлением
-    bool to_skip(Direction dir) const {
+    inline bool to_skip(Direction dir) const {
 	    if (boundary == Boundary::UNDEFINED) {
             return true;
 	    }

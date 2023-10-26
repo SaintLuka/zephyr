@@ -405,6 +405,28 @@ Vector3d SqQuad::centroid(double area) const {
     return C;
 }
 
+std::array<SqQuad, 4> SqQuad::children() const {
+    // @formatter:off
+    return {
+            SqQuad(vs<-1, -1>(),    get(-0.5, -1.0), vs<0, -1>(),
+                   get(-1.0, -0.5), get(-0.5, -0.5), get(0.0, -0.5),
+                   vs<-1, 0>(),     get(-0.5, 0.0), vs<0, 0>()),
+
+            SqQuad(vs<0, -1>(),     get(0.5, -1.0), vs<1, -1>(),
+                   get(0.0, -0.5),  get(0.5, -0.5), get(1.0, -0.5),
+                   vs<0, 0>(),      get(0.5, 0.0), vs<1, 0>()),
+
+            SqQuad(vs<-1, 0>(),     get(-0.5, 0.0), vs<0, 0>(),
+                   get(-1.0, 0.5),  get(-0.5, 0.5), get(0.0, 0.5),
+                   vs<-1, 1>(),     get(-0.5, 1.0), vs<0, 1>()),
+
+            SqQuad(vs<0, 0>(),      get(0.5, 0.0), vs<1, 0>(),
+                   get(0.0, 0.5),   get(0.5, 0.5), get(1.0, 0.5),
+                   vs<0, 1>(),      get(0.5, 1.0), vs<1, 1>())
+    };
+    // @formatter:on
+}
+
 // ============================================================================
 //                                    CUBE
 // ============================================================================
@@ -573,6 +595,16 @@ SqCube::SqCube(const Cube &cube)
         : SqCube(cube[0], cube[1], cube[2], cube[3],
                  cube[4], cube[5], cube[6], cube[7]) {}
 
+SqCube::SqCube(const Quad& quad)
+    : SqCube(SqQuad(quad)) { }
+
+SqCube::SqCube(const SqQuad& quad) {
+    std::memcpy((void *) verts.data(), (void *) &quad, 9 * sizeof(Vector3d));
+
+    const Vector3d nanvec = {NAN, NAN, NAN};
+    std::fill(verts.begin() + 9, verts.end(), nanvec);
+}
+
 Cube SqCube::reduce() const {
     return Cube(vs<-1, -1, -1>(), vs<+1, -1, -1>(),
                 vs<-1, +1, -1>(), vs<+1, +1, -1>(),
@@ -580,8 +612,60 @@ Cube SqCube::reduce() const {
                 vs<-1, +1, +1>(), vs<+1, +1, +1>());
 }
 
+using LargeGrid3D = std::array<std::array<std::array<Vector3d, 5>, 5>, 5>;
+
+template<int i, int j, int k>
+inline SqCube sq_cube_from_table(const LargeGrid3D& grid) {
+    static_assert(i == 0 || i == 2);
+    static_assert(j == 0 || j == 2);
+    static_assert(k == 0 || k == 2);
+
+    return {
+            grid[i + 0][j + 0][k + 0], grid[i + 1][j + 0][k + 0], grid[i + 2][j + 0][k + 0],
+            grid[i + 0][j + 1][k + 0], grid[i + 1][j + 1][k + 0], grid[i + 2][j + 1][k + 0],
+            grid[i + 0][j + 2][k + 0], grid[i + 1][j + 2][k + 0], grid[i + 2][j + 2][k + 0],
+
+            grid[i + 0][j + 0][k + 1], grid[i + 1][j + 0][k + 1], grid[i + 2][j + 0][k + 1],
+            grid[i + 0][j + 1][k + 1], grid[i + 1][j + 1][k + 1], grid[i + 2][j + 1][k + 1],
+            grid[i + 0][j + 2][k + 1], grid[i + 1][j + 2][k + 1], grid[i + 2][j + 2][k + 1],
+
+            grid[i + 0][j + 0][k + 2], grid[i + 1][j + 0][k + 2], grid[i + 2][j + 0][k + 2],
+            grid[i + 0][j + 1][k + 2], grid[i + 1][j + 1][k + 2], grid[i + 2][j + 1][k + 2],
+            grid[i + 0][j + 2][k + 2], grid[i + 1][j + 2][k + 2], grid[i + 2][j + 2][k + 2]
+    };
+}
+
+std::array<SqCube, 8> SqCube::children() const {
+    LargeGrid3D grid;
+    for (int i = 0; i < 5; ++i) {
+        double x = 0.5 * (i - 2);
+        for (int j = 0; j < 5; ++j) {
+            double y = 0.5 * (j - 2);
+            for (int k = 0; k < 5; ++k) {
+                double z = 0.5 * (k - 2);
+                grid[i][j][k] = get(x, y, z);
+            }
+        }
+    }
+
+    return {
+            sq_cube_from_table<0, 0, 0>(grid),
+            sq_cube_from_table<2, 0, 0>(grid),
+            sq_cube_from_table<0, 2, 0>(grid),
+            sq_cube_from_table<2, 2, 0>(grid),
+            sq_cube_from_table<0, 0, 2>(grid),
+            sq_cube_from_table<2, 0, 2>(grid),
+            sq_cube_from_table<0, 2, 2>(grid),
+            sq_cube_from_table<2, 2, 2>(grid),
+    };
+}
+
 Vector3d SqCube::operator()(double x, double y, double z) const {
     return SqCube::get(x, y, z);
+}
+
+Vector3d SqCube::operator()(double x, double y) const {
+    return as2D().get(x, y);
 }
 
 Vector3d SqCube::get(double x, double y, double z) const {

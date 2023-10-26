@@ -1,13 +1,14 @@
 #include <fstream>
 #include <iomanip>
 
+#include <zephyr/geom/primitives/base.h>
 #include <zephyr/geom/maps.h>
 #include <zephyr/geom/primitives/amr_cell.h>
 
-namespace zephyr { namespace geom {
+namespace zephyr::geom {
 
 void AmrCell::print_info() const {
-    std::cout << "\t\tcenter: " << coords.transpose() << "\n";
+    std::cout << "\t\tcenter: " << center.transpose() << "\n";
     std::cout << "\t\trank:   " << rank << "\n";
     std::cout << "\t\tindex:  " << index << "\n";
     std::cout << "\t\tsize:   " << size << "\n";
@@ -19,14 +20,14 @@ void AmrCell::print_info() const {
     std::cout << "\t\tz_idx:  " << z_idx << "\n";
 
     std::cout << "\t\tcell.vertices:\n";
-    for (int i = 0; i < AmrVertices::max_size; ++i) {
-        if (vertices[i].is_actual()) {
+    for (int i = 0; i < 27; ++i) {
+        if (!vertices[i].hasNaN()) {
             std::cout << "\t\t\t" << i << ": " << vertices[i].transpose() << "\n";
         }
     }
 
     std::cout << "\t\tcell.faces:\n";
-    for (int i = 0; i < AmrFaces::max_size; ++i) {
+    for (int i = 0; i < AmrFaces::max_count; ++i) {
         auto &face = faces[i];
         if (face.is_undefined()) continue;
 
@@ -45,8 +46,12 @@ void AmrCell::print_info() const {
     }
 }
 
-void AmrCell::visualize() const {
-    std::ofstream file("cell.py");
+void AmrCell::visualize(std::string filename) const {
+    if (filename.find(".py") == std::string::npos) {
+        filename += ".py";
+    }
+
+    std::ofstream file(filename);
 
     file << std::scientific << std::setprecision(6);
 
@@ -85,7 +90,7 @@ void AmrCell::visualize() const {
     file << map[8].y() << "],\n";
     file << "        linestyle='none', color='orange', marker='o')\n\n";
 
-    file << "ax.plot([" << coords.x() << "], [" << coords.y() << "], color='black', marker='x')\n\n";
+    file << "ax.plot([" << center.x() << "], [" << center.y() << "], color='black', marker='x')\n\n";
 
     for (int i = 0; i < 9; ++i) {
         file << "ax.text(" << vertices[i].x() << ", " << vertices[i].y() << ", " << i << ")\n";
@@ -104,7 +109,7 @@ void AmrCell::visualize() const {
         file << "ax.plot(curve_Lx, curve_Ly, linestyle='dotted', color='green', linewidth=0.5)\n\n";
     }
 
-    for (int i = 0; i < AmrFaces::max_size; ++i) {
+    for (int i = 0; i < AmrFaces::max_count; ++i) {
         auto &face = faces[i];
         if (face.is_undefined()) {
             continue;
@@ -151,7 +156,7 @@ int AmrCell::check_geometry() const {
         fc /= VpF(dim);
 
         // Нормаль внешняя
-        if (face.normal.dot(fc - coords) < 0.0) {
+        if (face.normal.dot(fc - center) < 0.0) {
             std::cout << "\tWrong normal direction (inside cell)\n";
             print_info();
             return -1;
@@ -269,13 +274,13 @@ int AmrCell::check_base_vertices_order() const {
             return 100;
         };
 
-        for (int i: {0, 1}) {
-            for (int j: {0, 1}) {
-                Vector3d a = vertices[iww(i + 1, j)] - vertices[iww(i, j)];
-                Vector3d b = vertices[iww(i, j + 1)] - vertices[iww(i, j)];
+        for (int i: {-1, 0}) {
+            for (int j: {-1, 0}) {
+                Vector3d a = vertices(i + 1, j) - vertices(i, j);
+                Vector3d b = vertices(i, j + 1) - vertices(i, j);
 
-                Vector3d c = vertices[iww(i, j + 1)] - vertices[iww(i + 1, j + 1)];
-                Vector3d d = vertices[iww(i + 1, j)] - vertices[iww(i + 1, j + 1)];
+                Vector3d c = vertices(i, j + 1) - vertices(i + 1, j + 1);
+                Vector3d d = vertices(i + 1, j) - vertices(i + 1, j + 1);
 
                 if (a.cross(b).z() < 0.0 ||
                     c.cross(d).z() < 0.0) {
@@ -289,21 +294,21 @@ int AmrCell::check_base_vertices_order() const {
         }
 
         // Пересечения граней по нужным вершинам
-        if (cross_face(faces, Side::LEFT0, Side::BOTTOM0) != iww(0, 0)) {
+        if (cross_face(faces, Side::LEFT0, Side::BOTTOM0) != SqQuad::iss<-1, -1>()) {
             bad = true;
         }
-        if (cross_face(faces, Side::LEFT0, Side::TOP) != iww(0, 2) &&
-            cross_face(faces, Side::LEFT1, Side::TOP) != iww(0, 2)) {
+        if (cross_face(faces, Side::LEFT0, Side::TOP) != SqQuad::iss<-1, +1>() &&
+            cross_face(faces, Side::LEFT1, Side::TOP) != SqQuad::iss<-1, +1>()) {
             bad = true;
         }
-        if (cross_face(faces, Side::RIGHT, Side::BOTTOM0) != iww(2, 0) &&
-            cross_face(faces, Side::RIGHT, Side::BOTTOM1) != iww(2, 0)) {
+        if (cross_face(faces, Side::RIGHT, Side::BOTTOM0) != SqQuad::iss<+1, -1>() &&
+            cross_face(faces, Side::RIGHT, Side::BOTTOM1) != SqQuad::iss<+1, -1>()) {
             bad = true;
         }
-        if (cross_face(faces, Side::RIGHT0, Side::TOP0) != iww(2, 2) &&
-            cross_face(faces, Side::RIGHT0, Side::TOP1) != iww(2, 2) &&
-            cross_face(faces, Side::RIGHT1, Side::TOP0) != iww(2, 2) &&
-            cross_face(faces, Side::RIGHT1, Side::TOP1) != iww(2, 2)) {
+        if (cross_face(faces, Side::RIGHT0, Side::TOP0) != SqQuad::iss<+1, +1>() &&
+            cross_face(faces, Side::RIGHT0, Side::TOP1) != SqQuad::iss<+1, +1>() &&
+            cross_face(faces, Side::RIGHT1, Side::TOP0) != SqQuad::iss<+1, +1>() &&
+            cross_face(faces, Side::RIGHT1, Side::TOP1) != SqQuad::iss<+1, +1>()) {
             bad = true;
         }
 
@@ -348,16 +353,16 @@ int AmrCell::check_base_vertices_order() const {
             return 100;
         };
 
-        for (int i: {0, 1}) {
-            for (int j: {0, 1}) {
-                for (int k: {0, 1}) {
-                    Vector3d a = vertices[iww(i + 1, j, k)] - vertices[iww(i, j, k)];
-                    Vector3d b = vertices[iww(i, j + 1, k)] - vertices[iww(i, j, k)];
-                    Vector3d c = vertices[iww(i, j, k + 1)] - vertices[iww(i, j, k)];
+        for (int i: {-1, 0}) {
+            for (int j: {-1, 0}) {
+                for (int k: {-1, 0}) {
+                    Vector3d a = vertices(i + 1, j, k) - vertices(i, j, k);
+                    Vector3d b = vertices(i, j + 1, k) - vertices(i, j, k);
+                    Vector3d c = vertices(i, j, k + 1) - vertices(i, j, k);
 
-                    Vector3d A = vertices[iww(i + 1, j + 1, k + 1)] - vertices[iww(i, j + 1, k + 1)];
-                    Vector3d B = vertices[iww(i + 1, j + 1, k + 1)] - vertices[iww(i + 1, j, k + 1)];
-                    Vector3d C = vertices[iww(i + 1, j + 1, k + 1)] - vertices[iww(i + 1, j + 1, k)];
+                    Vector3d A = vertices(i + 1, j + 1, k + 1) - vertices(i, j + 1, k + 1);
+                    Vector3d B = vertices(i + 1, j + 1, k + 1) - vertices(i + 1, j, k + 1);
+                    Vector3d C = vertices(i + 1, j + 1, k + 1) - vertices(i + 1, j + 1, k);
 
                     if (a.dot(b.cross(c)) < 0.0 || A.dot(B.cross(C)) < 0.0) {
                         bad = true;
@@ -443,5 +448,4 @@ int AmrCell::check_complex_faces() const {
     return 0;
 }
 
-} // namespace geom
-} // namespace zephyr
+} // namespace zephyr::geom

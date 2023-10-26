@@ -27,15 +27,15 @@ public:
 Solver::State U = Solver::datatype();
 
 // Переменные для сохранения
-double get_u(Storage::Item cell)  { return cell(U).u1; }
+double get_u(AmrStorage::Item& cell)  { return cell(U).u1; }
 
-double get_lvl(Storage::Item cell)  { return cell.level(); }
+double get_lvl(AmrStorage::Item& cell)  { return cell.level; }
 
-double normal_x(Storage::Item cell) { return cell(U).n.x(); }
+double normal_x(AmrStorage::Item& cell) { return cell(U).n.x(); }
 
-double normal_y(Storage::Item cell) { return cell(U).n.y(); }
+double normal_y(AmrStorage::Item& cell) { return cell(U).n.y(); }
 
-double get_over(Storage::Item cell) {
+double get_over(AmrStorage::Item& cell) {
     auto u = cell(U).u1;
     if (u < 0.0) {
         return u;
@@ -202,7 +202,7 @@ int main() {
 
             solver.compute_normals(mesh);
             solver.find_sections(mesh);
-            Storage body = solver.body(mesh);
+            AmrStorage body = solver.body(mesh);
             pvd_body.save(body, curr_time);
             next_write += 0.0;
         }

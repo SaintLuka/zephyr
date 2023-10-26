@@ -1,11 +1,11 @@
 #include <zephyr/math/solver/convection.h>
 
 #include <zephyr/math/cfd/face_extra.h>
-#include <zephyr/geom/primitives/amr_face.h>
+#include <zephyr/geom/primitives/basic_face.h>
 
 namespace zephyr { namespace math {
 
-using mesh::Storage;
+using mesh::AmrStorage;
 using namespace geom;
 
 static const Convection::State U = Convection::datatype();
@@ -222,36 +222,23 @@ void Convection::set_flags(Mesh& mesh) {
 }
 
 Distributor Convection::distributor() const {
+    using mesh::Children;
+
     Distributor distr;
 
-    distr.split2D = [](Storage::Item parent, const std::array<Storage::Item, 4> & children) {
-        for (auto child: children) {
-            Vector3d dr = parent.center() - child.center();
-            child(U).u1 = parent(U).u1 + parent(U).ux * dr.x() + parent(U).uy * dr.y();
-        }
-    };
-
-    distr.merge2D = [](const std::array<Storage::Item, 4> & children, Storage::Item parent) {
-        double sum = 0.0;
-        for (auto child: children) {
-            sum += child(U).u1 * child.volume();
-        }
-        parent(U).u1 = sum / parent.volume();
-    };
-
-    distr.split3D = [](Storage::Item parent, const std::array<Storage::Item, 8> & children) {
-        for (auto child: children) {
-            Vector3d dr = parent.center() - child.center();
+    distr.split = [](AmrStorage::Item &parent, Children &children) {
+        for (auto& child: children) {
+            Vector3d dr = parent.center - child.center;
             child(U).u1 = parent(U).u1 +
-                    parent(U).ux * dr.x() +
-                    parent(U).uy * dr.y() +
-                    parent(U).uz * dr.z();
+                          parent(U).ux * dr.x() +
+                          parent(U).uy * dr.y() +
+                          parent(U).uz * dr.z();
         }
     };
 
-    distr.merge3D = [](const std::array<Storage::Item, 8> & children, Storage::Item parent) {
+    distr.merge = [](Children &children, AmrStorage::Item &parent) {
         double sum = 0.0;
-        for (auto child: children) {
+        for (auto &child: children) {
             sum += child(U).u1 * child.volume();
         }
         parent(U).u1 = sum / parent.volume();

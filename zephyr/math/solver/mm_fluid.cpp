@@ -4,7 +4,7 @@
 
 namespace zephyr { namespace math {
 
-using mesh::Storage;
+using mesh::AmrStorage;
 using namespace geom;
 using namespace smf;
 

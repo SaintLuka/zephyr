@@ -1,5 +1,7 @@
 #include <zephyr/utils/mpi.h>
 
+#include <zephyr/geom/primitives/amr_cell.h>
+#include <zephyr/geom/primitives/amr_faces.h>
 #include <zephyr/geom/primitives/base.h>
 #include <zephyr/mesh/mesh.h>
 
@@ -8,8 +10,8 @@ namespace zephyr { namespace mesh {
 using utils::mpi;
 using namespace geom;
 
-int check_connectivity(Storage &locals, int ic, Storage& aliens) {
-    auto cell = locals[ic].geom();
+int check_connectivity(AmrStorage &locals, int ic, AmrStorage& aliens) {
+    auto& cell = locals[ic];
     if (cell.is_undefined()) {
         return 0;
     }
@@ -17,7 +19,7 @@ int check_connectivity(Storage &locals, int ic, Storage& aliens) {
     auto dim = cell.dim;
 
     // Через обычные грани существуют соседи
-    for (int iface = 0; iface < AmrFaces::max_size; ++iface) {
+    for (int iface = 0; iface < AmrFaces::max_count; ++iface) {
         auto &face = cell.faces[iface];
         if (face.is_undefined()) {
             continue;
@@ -29,7 +31,7 @@ int check_connectivity(Storage &locals, int ic, Storage& aliens) {
             continue;
         }
 
-        AmrCell neib;
+        AmrCell* neib_ptr = nullptr;
         auto& adj = face.adjacent;
 
         if (adj.rank == mpi::rank()) {
@@ -49,7 +51,7 @@ int check_connectivity(Storage &locals, int ic, Storage& aliens) {
                 cell.print_info();
                 return -1;
             }
-            neib = locals[adj.index].geom();
+            neib_ptr = &locals[adj.index];
         }
         else {
             // Удаленная ячейка
@@ -59,14 +61,16 @@ int check_connectivity(Storage &locals, int ic, Storage& aliens) {
                 return -1;
             }
 
-            neib = aliens[adj.ghost].geom();
+            neib_ptr = &aliens[adj.ghost];
         }
 
-        if (neib.is_undefined()) {
+        if (!neib_ptr || neib_ptr->is_undefined()) {
             std::cout << "\tUndefined neighbor\n";
             cell.print_info();
             return -1;
         }
+
+        AmrCell& neib = *neib_ptr;
 
         Vector3d fc(0.0, 0.0, 0.0);
         for (int i = 0; i < VpF(dim); ++i) {
@@ -178,7 +182,7 @@ int Mesh::check_base() {
         }
     }
 
-    auto dim = m_locals[0].dim();
+    auto dim = m_locals[0].dim;
 
     if (dim != 2 && dim != 3) {
         std::cout << "\tDimension is not 2 or 3\n";
@@ -187,7 +191,7 @@ int Mesh::check_base() {
 
     int res = 0;
     for (int ic = 0; ic < m_locals.size(); ++ic) {
-        AmrCell& cell = m_locals[ic].geom();
+        AmrCell& cell = m_locals[ic];
 
         if (cell.index != ic) {
             std::cout << "\tWrong cell index\n";
@@ -213,7 +217,7 @@ int Mesh::check_base() {
                 return -1;
             }
         }
-        if (cell.faces.size() > FpC(dim)) {
+        if (cell.faces.count() > FpC(dim)) {
             std::cout << "\tCell has too much faces\n";
             cell.print_info();
             return -1;
@@ -251,7 +255,7 @@ int Mesh::check_refined() {
         }
     }
 
-    auto dim = m_locals[0].dim();
+    auto dim = m_locals[0].dim;
 
     if (dim != 2 && dim != 3) {
         std::cout << "\tDimension is not 2 or 3\n";
@@ -260,7 +264,7 @@ int Mesh::check_refined() {
 
     int res = 0;
     for (int ic = 0; ic < m_locals.size(); ++ic) {
-        AmrCell& cell = m_locals[ic].geom();
+        AmrCell& cell = m_locals[ic];
 
         if (cell.is_undefined()) {
             continue;
@@ -294,8 +298,8 @@ int Mesh::check_refined() {
         }
 
         // Вершины дублируются
-        for (int i = 0; i < cell.vertices.size(); ++i) {
-            for (int j = i + 1; j < cell.vertices.size(); ++j) {
+        for (int i = 0; i < std::pow(3, dim); ++i) {
+            for (int j = i + 1; j < std::pow(3, dim); ++j) {
                 double dist = (cell.vertices[i] - cell.vertices[j]).norm();
                 if (dist < 1.0e-5 * cell.size) {
                     std::cout << "\tIdentical vertices\n";

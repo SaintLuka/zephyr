@@ -72,7 +72,7 @@ public:
     /// @code
     /// VariableList list;
     /// list.append("momentum", 2,
-    ///     WriteFunction<float>([](Storage::Item cell, float* out) {
+    ///     WriteFunction<float>([](AmrStorage::Item& cell, float* out) {
     ///         out[0] = static_cast<float>(cell.mass * cell.velocity.x);
     ///         out[1] = static_cast<float>(cell.mass * cell.velocity.y);
     ///     }));
@@ -101,9 +101,9 @@ public:
     }
 
     /// @brief Упрощенный вариант для добавления double полей
-    void append(const std::string& name, std::function<double(Storage::Item)> f) {
+    void append(const std::string& name, std::function<double(AmrStorage::Item&)> f) {
         m_list.emplace_back(name, 1, WriteFunction<double>(
-                [f](Storage::Item cell, double *out) {
+                [f](AmrStorage::Item& cell, double *out) {
                     out[0] = f(cell);
                 }));
     }
@@ -112,7 +112,7 @@ public:
     /// @param name Название переменной
     /// @param func Некоторая функция, которая для произвольной ячейки выдает
     /// значение переменной
-    void operator+=(std::pair<std::string, std::function<double(Storage::Item)>> p) {
+    void operator+=(std::pair<std::string, std::function<double(AmrStorage::Item&)>> p) {
         append(p.first, p.second);
     }
 

@@ -6,7 +6,7 @@
 
 namespace zephyr::geom::generator {
 
-/// @class Strip. Простой класс для создания Storage для хранения
+/// @class Strip. Простой класс для создания AmrStorage для хранения
 /// квазиодномерной сетки (прямоугольная сетка толщиной в одну ячейку).
 class Strip : public Generator {
 public:

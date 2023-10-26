@@ -1,16 +1,17 @@
-#include <zephyr/mesh/storage.h>
+#include <cstring>
 
+#include <zephyr/geom/primitives/amr_cell.h>
+#include <zephyr/geom/primitives/amr_faces.h>
 #include <zephyr/mesh/face.h>
-
 #include <zephyr/mesh/cell.h>
 
-namespace zephyr { namespace mesh {
+namespace zephyr::mesh {
 
 IFace::IFace(const ICell &cell, int fid, Direction _dir)
         : m_cell(cell), face_idx(fid), dir(_dir) {
 
     // Ищем первую определенную грань
-    while (face_idx < geom::AmrFaces::max_size && geom().to_skip(dir)) {
+    while (face_idx < geom::AmrFaces::max_count && geom().to_skip(dir)) {
         ++face_idx;
     }
 }
@@ -53,7 +54,7 @@ double IFace::area() const {
 }
 
 Vector3d IFace::center() const {
-    return geom().center(m_cell.geom().vertices, m_cell.geom().dim);
+    return geom().center;
 }
 
 IFaces::IFaces(const ICell& cell, Direction _dir)
@@ -66,9 +67,7 @@ IFace IFaces::begin() const {
 }
 
 IFace IFaces::end() const {
-    return {m_cell, geom::AmrFaces::max_size, dir };
+    return {m_cell, geom::AmrFaces::max_count, dir };
 }
 
-
-} // namespace mesh
-} // namespace zephyr
+} // namespace zephyr::mesh

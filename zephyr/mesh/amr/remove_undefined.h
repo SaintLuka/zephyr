@@ -16,10 +16,10 @@ using zephyr::utils::Stopwatch;
 /// куда ячейка будет перемещена в дальнейшем
 /// @param cells Хранилище ячеек
 /// @param from, to Диапазон ячеек, по которому осуществляется обход
-void change_adjacent_partial(Storage& cells, int from, int to) {
+void change_adjacent_partial(AmrStorage& cells, int from, int to) {
     int n_cells = cells.size();
     for (int ic = from; ic < to; ++ic) {
-        for (AmrFace &face: cells[ic].geom().faces) {
+        for (AmrFace &face: cells[ic].faces) {
             if (face.is_undefined() or face.is_boundary()) continue;
             if (face.adjacent.ghost < 0) {
                 // Локальный сосед
@@ -28,7 +28,7 @@ void change_adjacent_partial(Storage& cells, int from, int to) {
                     throw std::runtime_error("change_adjacent_partial() error: adjacent.index out of range");
                 }
 #endif
-                face.adjacent.index = cells[face.adjacent.index].geom().index;
+                face.adjacent.index = cells[face.adjacent.index].index;
             }
 
         }
@@ -39,7 +39,7 @@ void change_adjacent_partial(Storage& cells, int from, int to) {
 /// для всех ячеек в однопоточном режиме. Предполагается, что в поле
 /// element.index записан индекс, куда ячейка будет перемещена в дальнейшем
 /// @param cells Хранилище ячеек
-void change_adjacent(Storage& cells) {
+void change_adjacent(AmrStorage& cells) {
     change_adjacent_partial(cells, 0, cells.size());
 }
 
@@ -48,7 +48,7 @@ void change_adjacent(Storage& cells) {
 /// для всех ячеек в многопоточном режиме. Предполагается, что в поле
 /// element.index записан индекс, куда ячейка будет перемещена в дальнейшем
 /// @param cells Хранилище ячеек
-void change_adjacent(Storage& cells, ThreadPool& threads) {
+void change_adjacent(AmrStorage& cells, ThreadPool& threads) {
     auto num_tasks = threads.size();
     if (num_tasks < 2) {
         change_adjacent(cells);
@@ -97,7 +97,7 @@ struct SwapLists {
     /// @param max_swap_count Максимальное число элементов, для которых может
     /// потребоваться перестановка, размеры списков ограничены данным числом.
     /// TODO: Многопоточная версия конструктора
-    SwapLists(Storage& cells, int max_index, int max_swap_count) {
+    SwapLists(AmrStorage& cells, int max_index, int max_swap_count) {
         undefined_cells.reserve(max_swap_count);
         for (int ic = 0; ic < max_index; ++ic) {
             if (cells[ic].is_undefined()) {
@@ -124,13 +124,13 @@ struct SwapLists {
     /// транспозций пар элементов, при этом один элемент в паре должен быть актуальным,
     /// а один неопределенным, после перестановки актуальный элемент всегда должен
     /// оказываться ближе к началу списка, чем неопределенный
-    void check_mapping(Storage& cells) const {
+    void check_mapping(AmrStorage& cells) const {
         for (int i = 0; i < cells.size(); ++i) {
-            auto j = cells[i].geom().index;
-            if (i != cells[j].geom().index) {
+            auto j = cells[i].index;
+            if (i != cells[j].index) {
                 // Перестановка не является транспозицией
-                std::cout << i << " " << cells[i].geom().index << "\n";
-                std::cout << j << " " << cells[j].geom().index << "\n";
+                std::cout << i << " " << cells[i].index << "\n";
+                std::cout << j << " " << cells[j].index << "\n";
                 throw std::runtime_error("Only swaps are allowed");
             }
             if (i != j) {
@@ -154,29 +154,29 @@ struct SwapLists {
     /// @brief Устанавливает тождественную перестановку для части ячеек
     /// @param cells Хранилище ячеек
     /// @param from, to Диапазон ячеек в хранилище
-    void set_identical_mapping_partial(Storage& cells, int from, int to) const {
+    void set_identical_mapping_partial(AmrStorage& cells, int from, int to) const {
         for (int ic = from; ic < to; ++ic) {
-            cells[ic].geom().index = ic;
+            cells[ic].index = ic;
         }
     }
 
     /// @brief Устанавливает следующую позицию для части ячеек
     /// @param cells Ссылка на хранилище ячеек
     /// @param from, to Диапазон индексов в массивах actual_cells и undefined_cells
-    void set_swap_mapping_partial(Storage& cells, int from, int to) const {
+    void set_swap_mapping_partial(AmrStorage& cells, int from, int to) const {
         for (int i = from; i < to; ++i) {
             int ai = actual_cells[i];
             int ui = undefined_cells[i];
 
-            cells[ui].geom().index = ai;
-            cells[ai].geom().index = ui;
+            cells[ui].index = ai;
+            cells[ai].index = ui;
         }
     }
 
     /// @brief Устанавливает следующие позиции ячеек в однопоточном режиме
     /// @details После выполнения операции поле element.index у ячеек указывает
     /// на следующее положение ячейки в хранилище
-    void set_mapping(Storage& cells) const {
+    void set_mapping(AmrStorage& cells) const {
         set_identical_mapping_partial(cells, 0, cells.size());
         set_swap_mapping_partial(cells, 0, size());
 #if SCRUTINY
@@ -188,7 +188,7 @@ struct SwapLists {
     /// @brief Устанавливает следующие позиции ячеек в многопоточном режиме
     /// @details После выполнения операции поле element.index у ячеек указывает
     /// на следующее положение ячейки в хранилище
-    void set_mapping(Storage& cells, ThreadPool& threads) const {
+    void set_mapping(AmrStorage& cells, ThreadPool& threads) const {
         auto num_tasks = threads.size();
         if (num_tasks < 2) {
             set_mapping(cells);
@@ -234,18 +234,16 @@ struct SwapLists {
     /// заранее.
     /// @param cells Ссылка на хранилище ячеек
     /// @param from, to Диапазон индексов в массиве undefined_cells
-    void move_elements_partial(Storage &cells, int from, int to) const {
+    void move_elements_partial(AmrStorage &cells, int from, int to) const {
         for (int i = from; i < to; ++i) {
             int ic = undefined_cells[i];
-            int jc = cells[ic].geom().index;
+            int jc = cells[ic].index;
 
-            cells[jc].copy_to(cells[ic]);
+            cells.move_item(jc, ic);
 
-            cells[ic].geom().index = ic;
-            cells[ic].geom().next = ic;
+            cells[ic].index = ic;
+            cells[ic].next = ic;
             cells[jc].set_undefined();
-            cells[jc].geom().faces.set_undefined();
-            cells[jc].geom().vertices.set_undefined();
         }
     }
 
@@ -254,7 +252,7 @@ struct SwapLists {
     /// @details Данные актуальной ячейки перемещаются на место неактуальной
     /// ячейки, индексы смежности не изменяются, они должны быть выставлены
     /// заранее.
-    void move_elements(Storage &cells) const {
+    void move_elements(AmrStorage &cells) const {
         move_elements_partial(cells, 0, size());
     }
 
@@ -264,7 +262,7 @@ struct SwapLists {
     /// @details Данные актуальной ячейки перемещаются на место неактуальной
     /// ячейки, индексы смежности не изменяются, они должны быть выставлены
     /// заранее.
-    void move_elements(Storage &cells, ThreadPool& threads) const {
+    void move_elements(AmrStorage &cells, ThreadPool& threads) const {
         auto num_tasks = threads.size();
         if (num_tasks < 2) {
             move_elements(cells);
@@ -311,7 +309,7 @@ struct SwapLists {
 /// 5. Хранилище меняет размер, все неопределенные ячейки остаются за пределами
 /// хранилища.
 template<int dim>
-void remove_undefined(Storage &cells, const Statistics &count) {
+void remove_undefined(AmrStorage &cells, const Statistics &count) {
     static Stopwatch create_swap_timer;
     static Stopwatch set_mapping_timer;
     static Stopwatch change_adjacent_timer;

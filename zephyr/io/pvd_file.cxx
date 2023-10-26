@@ -1,21 +1,15 @@
 #include <iomanip>
 #include <fstream>
+#include <filesystem>
 
-#if __cplusplus >= 201703L
-#    include <filesystem>
-     namespace tmpfs = ::std::filesystem;
-#else
-#    include <boost/filesystem/path.hpp>
-#    include <boost/filesystem/operations.hpp>
-     namespace tmpfs = ::boost::filesystem;
-#endif
+#include <zephyr/geom/primitives/amr_cell.h>
 
 #include <zephyr/io/pvd_file.h>
 #include <zephyr/io/vtu_file.h>
 
-namespace zephyr { namespace io {
+namespace zephyr::io {
 
-namespace fs = ::tmpfs;
+namespace fs = std::filesystem;
 
 #ifdef ZEPHYR_ENABLE_DISTRIBUTED
 Network& dummy_net = ::zephyr::network::network::dummy;
@@ -132,7 +126,7 @@ void PvdFile::open(const std::string& filename, const std::string& _directory) {
     m_open = true;
 }
 
-void PvdFile::save(Storage& elements, double timestep) {
+void PvdFile::save(AmrStorage& elements, double timestep) {
     if (!m_open) {
         throw std::runtime_error("PvdFile::save() error: You need to open PvdFile");
     }
@@ -151,7 +145,7 @@ std::string PvdFile::get_filename() const {
     return filename;
 }
 
-void PvdFile::update_pvd(Storage& elements, double timestep) {
+void PvdFile::update_pvd(AmrStorage& elements, double timestep) {
     if (!m_open) {
         throw std::runtime_error("You need to open PvdFile");
     }
@@ -206,5 +200,4 @@ void PvdFile::update_pvd(Storage& elements, double timestep) {
     ++m_counter;
 }
 
-} // namespace io
-} // namespace zephyr
+} // namespace zephyr::io

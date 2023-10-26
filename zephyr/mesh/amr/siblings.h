@@ -39,42 +39,42 @@ inline std::array<Side, 8> side_to_next_sibling<3>() {
 ///  - Все сиблинги имеют один уровень.
 ///  - Все сиблинги хотят огрубиться.
 template <int dim>
-bool can_coarse(Storage& cells, int ic) {
+bool can_coarse(AmrStorage& cells, int ic) {
     std::array<Side, CpC(dim)> sides = side_to_next_sibling<dim>();
 
-    if (cells[ic].flag() >= 0) {
+    if (cells[ic].flag >= 0) {
         // Сама ячейка не хочет огрубляться
         return false;
     }
 
     for (int i = 0; i < CpC(dim) - 1; ++i) {
-        auto cell = cells[ic];
+        auto& cell = cells[ic];
 
         // локальный z-индекс
-        auto z = cell.z_idx() % CpC(dim);
-        auto adj = cell.geom().faces[sides[z]].adjacent;
+        auto z = cell.z_idx % CpC(dim);
+        auto adj = cell.faces[sides[z]].adjacent;
 
-        if (adj.rank != cell.rank()) {
+        if (adj.rank != cell.rank) {
             // Сосед на другом процессе
             return false;
         }
 
         ic = adj.index;
-        auto neib = cells[ic];
-        if (neib.level() != cell.level()) {
+        auto& neib = cells[ic];
+        if (neib.level != cell.level) {
             // Сосед другого уровня (точно не сиблинг)
             // Может быть потомком сиблинга более высокого уровня
             return false;
         }
 
-        if (neib.flag() >= 0) {
+        if (neib.flag >= 0) {
             // Сосед не хочет огрубляться
             return false;
         }
 
 #if SCRUTINY
-        auto zc = cell.z_idx() / CpC(dim);
-        auto zn = neib.z_idx() / CpC(dim);
+        auto zc = cell.z_idx / CpC(dim);
+        auto zn = neib.z_idx / CpC(dim);
         if (zc != zn) {
             throw std::runtime_error("siblings error #1");
         }
@@ -96,7 +96,7 @@ bool can_coarse(Storage& cells, int ic) {
 /// В фукнции используется сложная механика перехода от одного сиблинга
 /// к следующему, что позволяет прервать функцию, не обходя всех сиблингов
 template <int dim>
-bool can_coarse(const AmrCell& main_cell, Storage& cells) {
+bool can_coarse(const AmrCell& main_cell, AmrStorage& cells) {
     const std::array<Side, CpC(dim)> sides = side_to_next_sibling<dim>();
 
     if (main_cell.flag >= 0) {
@@ -106,33 +106,33 @@ bool can_coarse(const AmrCell& main_cell, Storage& cells) {
 
     int ic = main_cell.index;
     for (int i = 0; i < CpC(dim) - 1; ++i) {
-        auto cell = cells[ic];
+        auto& cell = cells[ic];
 
         // локальный z-индекс
-        auto z = cell.z_idx() % CpC(dim);
-        auto adj = cell.geom().faces[sides[z]].adjacent;
+        auto z = cell.z_idx % CpC(dim);
+        auto adj = cell.faces[sides[z]].adjacent;
 
-        if (adj.rank != cell.rank()) {
+        if (adj.rank != cell.rank) {
             // Сосед на другом процессе
             return false;
         }
 
         ic = adj.index;
-        auto neib = cells[ic];
-        if (neib.level() != cell.level()) {
+        auto& neib = cells[ic];
+        if (neib.level != cell.level) {
             // Сосед другого уровня (точно не сиблинг)
             // Может быть потомком сиблинга более высокого уровня
             return false;
         }
 
-        if (neib.flag() >= 0) {
+        if (neib.flag >= 0) {
             // Сосед не хочет огрубляться
             return false;
         }
 
 #if SCRUTINY
-        auto zc = cell.z_idx() / CpC(dim);
-        auto zn = neib.z_idx() / CpC(dim);
+        auto zc = cell.z_idx / CpC(dim);
+        auto zn = neib.z_idx / CpC(dim);
         if (zc != zn) {
             throw std::runtime_error("siblings error #1");
         }
@@ -148,18 +148,18 @@ bool can_coarse(const AmrCell& main_cell, Storage& cells) {
 /// @param cells Хранилище ячеек
 /// @param ic Целевая ячейка (от которой запрос)
 template<int dim>
-std::array<int, CpC(dim) - 1> get_siblings(Storage &cells, int ic) {
+std::array<int, CpC(dim) - 1> get_siblings(AmrStorage &cells, int ic) {
     std::array<int, CpC(dim) - 1> siblings;
 
     std::array<Side, CpC(dim)> sides = side_to_next_sibling<dim>();
 
     int jc = ic;
     for (int i = 0; i < CpC(dim) - 1; ++i) {
-        auto cell = cells[jc];
+        auto& cell = cells[jc];
 
         // локальный z-индекс
-        auto z = cell.z_idx() % CpC(dim);
-        auto adj = cell.geom().faces[sides[z]].adjacent;
+        auto z = cell.z_idx % CpC(dim);
+        auto adj = cell.faces[sides[z]].adjacent;
         jc = adj.index;
         siblings[i] = jc;
 
@@ -168,18 +168,18 @@ std::array<int, CpC(dim) - 1> get_siblings(Storage &cells, int ic) {
         // базовых ограничений при балансировке флагов
 
         // Сиблинг актуален и находится на другом процессе
-        if (cell.is_actual() && adj.rank != cell.rank()) {
+        if (cell.is_actual() && adj.rank != cell.rank) {
             throw std::runtime_error("get_siblings error: bad siblings #1");
         }
 
         // Сиблинг другого уровня
-        auto neib = cells[jc];
-        if (neib.level() != cell.level()) {
+        auto& neib = cells[jc];
+        if (neib.level != cell.level) {
             throw std::runtime_error("get_siblings error: bad siblings #2");
         }
 
-        auto zc = cell.z_idx() / CpC(dim);
-        auto zn = neib.z_idx() / CpC(dim);
+        auto zc = cell.z_idx / CpC(dim);
+        auto zn = neib.z_idx / CpC(dim);
         if (zc != zn) {
             throw std::runtime_error("get_siblings error: bad siblings #3");
         }
@@ -190,25 +190,25 @@ std::array<int, CpC(dim) - 1> get_siblings(Storage &cells, int ic) {
     /// Тестирование сиблингов
 
     std::set<int> ids;
-    auto lvl = cells[ic].level();
-    ids.insert(cells[ic].z_idx() % CpC(dim));
+    auto lvl = cells[ic].level;
+    ids.insert(cells[ic].z_idx % CpC(dim));
 
     for (int sib: siblings) {
-        if (cells[sib].level() == lvl) {
-            ids.insert(cells[sib].z_idx() % CpC(dim));
+        if (cells[sib].level == lvl) {
+            ids.insert(cells[sib].z_idx % CpC(dim));
         }
-        else if (cells[sib].level() == lvl + 1) {
+        else if (cells[sib].level == lvl + 1) {
             // Сиблинг через грань может уровень на единицу выше
-            ids.insert((cells[sib].z_idx() / CpC(dim)) % CpC(dim));
+            ids.insert((cells[sib].z_idx / CpC(dim)) % CpC(dim));
         }
-        else if (cells[sib].level() == lvl + 2) {
+        else if (cells[sib].level == lvl + 2) {
             // Сиблинг через ребро (в 3D) или через вершину (в 2D) может иметь
             // уровень на 2 выше
-            ids.insert((cells[sib].z_idx() / CpC(dim) / CpC(dim)) % CpC(dim));
+            ids.insert((cells[sib].z_idx / CpC(dim) / CpC(dim)) % CpC(dim));
         }
-        else if (dim > 2 && cells[sib].level() == lvl + 3) {
+        else if (dim > 2 && cells[sib].level == lvl + 3) {
             // Сиблинг через вершину (в 3D) может иметь уровень на три выше
-            ids.insert((cells[sib].z_idx() / CpC(dim) / CpC(dim) / CpC(dim)) % CpC(dim));
+            ids.insert((cells[sib].z_idx / CpC(dim) / CpC(dim) / CpC(dim)) % CpC(dim));
         }
         else {
             std::cout << "Current cell:\n";
@@ -243,18 +243,18 @@ std::array<int, CpC(dim) - 1> get_siblings(Storage &cells, int ic) {
 /// @param main_cell Целевая ячейка (от которой запрос)
 /// @param locals Хранилище ячеек
 template<int dim>
-std::array<int, CpC(dim) - 1> get_siblings(const AmrCell& main_cell, Storage &locals) {
+std::array<int, CpC(dim) - 1> get_siblings(const AmrCell& main_cell, AmrStorage &locals) {
     std::array<int, CpC(dim) - 1> siblings;
 
     std::array<Side, CpC(dim)> sides = side_to_next_sibling<dim>();
 
     int jc = main_cell.index;
     for (int i = 0; i < CpC(dim) - 1; ++i) {
-        auto cell = locals[jc];
+        auto& cell = locals[jc];
 
         // локальный z-индекс
-        auto z = cell.z_idx() % CpC(dim);
-        auto adj = cell.geom().faces[sides[z]].adjacent;
+        auto z = cell.z_idx % CpC(dim);
+        auto adj = cell.faces[sides[z]].adjacent;
         jc = adj.index;
         siblings[i] = jc;
 
@@ -263,18 +263,18 @@ std::array<int, CpC(dim) - 1> get_siblings(const AmrCell& main_cell, Storage &lo
         // базовых ограничений при балансировке флагов
 
         // Сиблинг актуален и находится на другом процессе
-        if (cell.is_actual() && adj.rank != cell.rank()) {
+        if (cell.is_actual() && adj.rank != cell.rank) {
             throw std::runtime_error("get_siblings error: bad siblings #1");
         }
 
         // Сиблинг другого уровня
-        auto neib = locals[jc];
-        if (neib.level() != cell.level()) {
+        auto& neib = locals[jc];
+        if (neib.level != cell.level) {
             throw std::runtime_error("get_siblings error: bad siblings #2");
         }
 
-        auto zc = cell.z_idx() / CpC(dim);
-        auto zn = neib.z_idx() / CpC(dim);
+        auto zc = cell.z_idx / CpC(dim);
+        auto zn = neib.z_idx / CpC(dim);
         if (zc != zn) {
             throw std::runtime_error("get_siblings error: bad siblings #3");
         }
@@ -289,21 +289,21 @@ std::array<int, CpC(dim) - 1> get_siblings(const AmrCell& main_cell, Storage &lo
     ids.insert(main_cell.z_idx % CpC(dim));
 
     for (int sib: siblings) {
-        if (locals[sib].level() == lvl) {
-            ids.insert(locals[sib].z_idx() % CpC(dim));
+        if (locals[sib].level == lvl) {
+            ids.insert(locals[sib].z_idx % CpC(dim));
         }
-        else if (locals[sib].level() == lvl + 1) {
+        else if (locals[sib].level == lvl + 1) {
             // Сиблинг через грань может уровень на единицу выше
-            ids.insert((locals[sib].z_idx() / CpC(dim)) % CpC(dim));
+            ids.insert((locals[sib].z_idx / CpC(dim)) % CpC(dim));
         }
-        else if (locals[sib].level() == lvl + 2) {
+        else if (locals[sib].level == lvl + 2) {
             // Сиблинг через ребро (в 3D) или через вершину (в 2D) может иметь
             // уровень на 2 выше
-            ids.insert((locals[sib].z_idx() / CpC(dim) / CpC(dim)) % CpC(dim));
+            ids.insert((locals[sib].z_idx / CpC(dim) / CpC(dim)) % CpC(dim));
         }
-        else if (dim > 2 && locals[sib].level() == lvl + 3) {
+        else if (dim > 2 && locals[sib].level == lvl + 3) {
             // Сиблинг через вершину (в 3D) может иметь уровень на три выше
-            ids.insert((locals[sib].z_idx() / CpC(dim) / CpC(dim) / CpC(dim)) % CpC(dim));
+            ids.insert((locals[sib].z_idx / CpC(dim) / CpC(dim) / CpC(dim)) % CpC(dim));
         }
         else {
             std::cout << "Current cell:\n";

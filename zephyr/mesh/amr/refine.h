@@ -14,118 +14,30 @@
 namespace zephyr { namespace mesh { namespace amr {
 
 /// @brief Создать геометрию дочернх ячеек по родительской ячейке
-/// @param parent Родительская ячейка
+/// @param cube Родительская ячейка
 /// @return Массив с дочерними ячейками
 template <int dim>
-std::array<geom::AmrCell, CpC(dim)> create_children(AmrCell& parent);
-
-/// @brief Создать геометрию дочерних ячеек по родительской ячейке
-/// @param parent Родительская ячейка
-/// @return Массив с дочерними ячейками
-std::array<geom::AmrCell, CpC(2)> create_children_simple(AmrCell& parent) {
-    using geom::Quad;
-    using geom::AmrCell;
-
-    std::array<Vector3d, 9> vs;
-    vs[0] = parent.vertices[0];
-    vs[1] = parent.vertices[1];
-    vs[2] = parent.vertices[2];
-    vs[3] = parent.vertices[3];
-
-    vs[4] = (vs[0] + vs[2]) / 2.0;
-    vs[5] = (vs[1] + vs[3]) / 2.0;
-    vs[6] = (vs[0] + vs[1]) / 2.0;
-    vs[7] = (vs[2] + vs[3]) / 2.0;
-
-    vs[8] = (vs[0] + vs[1] + vs[2] + vs[3]) / 4.0;
-
-    Quad vl0 = {vs[0], vs[6], vs[4], vs[8]};
-    Quad vl1 = {vs[6], vs[1], vs[8], vs[5]};
-    Quad vl2 = {vs[4], vs[8], vs[2], vs[7]};
-    Quad vl3 = {vs[8], vs[5], vs[7], vs[3]};
-
-    return {AmrCell(vl0), AmrCell(vl1), AmrCell(vl2), AmrCell(vl3)};
-}
+std::array<geom::AmrCell, CpC(dim)> create_children(const SqCube& cube);
 
 /// @brief Создать геометрию дочерних ячеек по родительским вершинам (2D)
-/// @param parent_vertices Вершины родительской ячейки
+/// @param cube Вершины родительской ячейки
 /// @return Массив с дочерними ячейками
 template <>
-std::array<geom::AmrCell, CpC(2)> create_children<2>(AmrCell& parent) {
-    using geom::SqQuad;
-    using geom::AmrCell;
-
-    const AmrVertices &vertices = parent.vertices;
-
-    // Собираем отображение ячейки
-    SqQuad quad = {
-            (Vector3d &) vertices[0],
-            (Vector3d &) vertices[1],
-            (Vector3d &) vertices[2],
-            (Vector3d &) vertices[3],
-            (Vector3d &) vertices[4],
-            (Vector3d &) vertices[5],
-            (Vector3d &) vertices[6],
-            (Vector3d &) vertices[7],
-            (Vector3d &) vertices[8]
-    };
-
-    // @formatter:off
-    SqQuad vl0 = {
-            quad.vs<-1, -1>(), quad(-0.5, -1.0), quad.vs<0, -1>(),
-            quad(-1.0, -0.5),  quad(-0.5, -0.5), quad(0.0, -0.5),
-            quad.vs<-1,  0>(), quad(-0.5,  0.0), quad.vs<0,  0>()
-    };
-    SqQuad vl1 = {
-            quad.vs<0, -1>(), quad(0.5, -1.0), quad.vs<1, -1>(),
-            quad(0.0, -0.5),  quad(0.5, -0.5), quad(1.0, -0.5),
-            quad.vs<0,  0>(), quad(0.5,  0.0), quad.vs<1,  0>()
-    };
-    SqQuad vl2 = {
-            quad.vs<-1, 0>(), quad(-0.5, 0.0), quad.vs<0, 0>(),
-            quad(-1.0, 0.5),  quad(-0.5, 0.5), quad(0.0, 0.5),
-            quad.vs<-1, 1>(), quad(-0.5, 1.0), quad.vs<0, 1>()
-    };
-    SqQuad vl3 = {
-            quad.vs<0, 0>(), quad(0.5, 0.0), quad.vs<1, 0>(),
-            quad(0.0, 0.5),  quad(0.5, 0.5), quad(1.0, 0.5),
-            quad.vs<0, 1>(), quad(0.5, 1.0), quad.vs<1, 1>()
-    };
-    // @formatter:on
-
-    return {AmrCell(vl0), AmrCell(vl1), AmrCell(vl2), AmrCell(vl3)};
+std::array<geom::AmrCell, CpC(2)> create_children<2>(const SqCube& cube) {
+    auto quads = cube.as2D().children();
+    return {AmrCell(quads[0]), AmrCell(quads[1]),
+            AmrCell(quads[2]), AmrCell(quads[3])};
 }
 
 /// @brief Создать геометрию дочернх ячеек по родительским вершинам (3D)
-/// @param parent_vertices Вершины родительской ячейки
+/// @param cube Вершины родительской ячейки
 /// @return Массив с дочерними ячейками
 template <>
-std::array<AmrCell, CpC(3)> create_children<3>(AmrCell& parent) {
-    SqCube& vs = (SqCube&) parent.vertices;
-   
-    Cube vl1 = {vs[iww(0, 0, 0)], vs[iww(1, 0, 0)], vs[iww(0, 1, 0)], vs[iww(1, 1, 0)],
-                vs[iww(0, 0, 1)], vs[iww(1, 0, 1)], vs[iww(0, 1, 1)], vs[iww(1, 1, 1)]};
-    Cube vl2 = {vs[iww(1, 0, 0)], vs[iww(2, 0, 0)], vs[iww(1, 1, 0)], vs[iww(2, 1, 0)],
-                vs[iww(1, 0, 1)], vs[iww(2, 0, 1)], vs[iww(1, 1, 1)], vs[iww(2, 1, 1)]};
-    Cube vl3 = {vs[iww(0, 1, 0)], vs[iww(1, 1, 0)], vs[iww(0, 2, 0)], vs[iww(1, 2, 0)],
-                vs[iww(0, 1, 1)], vs[iww(1, 1, 1)], vs[iww(0, 2, 1)], vs[iww(1, 2, 1)]};
-    Cube vl4 = {vs[iww(1, 1, 0)], vs[iww(2, 1, 0)], vs[iww(1, 2, 0)], vs[iww(2, 2, 0)],
-                vs[iww(1, 1, 1)], vs[iww(2, 1, 1)], vs[iww(1, 2, 1)], vs[iww(2, 2, 1)]};
-    Cube vl5 = {vs[iww(0, 0, 1)], vs[iww(1, 0, 1)], vs[iww(0, 1, 1)], vs[iww(1, 1, 1)],
-                vs[iww(0, 0, 2)], vs[iww(1, 0, 2)], vs[iww(0, 1, 2)], vs[iww(1, 1, 2)]};
-    Cube vl6 = {vs[iww(1, 0, 1)], vs[iww(2, 0, 1)], vs[iww(1, 1, 1)], vs[iww(2, 1, 1)],
-                vs[iww(1, 0, 2)], vs[iww(2, 0, 2)], vs[iww(1, 1, 2)], vs[iww(2, 1, 2)]};
-    Cube vl7 = {vs[iww(0, 1, 1)], vs[iww(1, 1, 1)], vs[iww(0, 2, 1)], vs[iww(1, 2, 1)],
-                vs[iww(0, 1, 2)], vs[iww(1, 1, 2)], vs[iww(0, 2, 2)], vs[iww(1, 2, 2)]};
-    Cube vl8 = {vs[iww(1, 1, 1)], vs[iww(2, 1, 1)], vs[iww(1, 2, 1)], vs[iww(2, 2, 1)],
-                vs[iww(1, 1, 2)], vs[iww(2, 1, 2)], vs[iww(1, 2, 2)], vs[iww(2, 2, 2)]};
-
-    Vector3d zero(0.0, 0.0, 0.0);
-    Cube vl0 = {zero, zero, zero, zero, zero, zero, zero, zero};
-
+std::array<AmrCell, CpC(3)> create_children<3>(const SqCube& cube) {
+    auto cubes = cube.children();
     return {
-            AmrCell(vl1), AmrCell(vl2), AmrCell(vl3), AmrCell(vl4),
-            AmrCell(vl5), AmrCell(vl6), AmrCell(vl7), AmrCell(vl8)
+            AmrCell(cubes[0]), AmrCell(cubes[1]), AmrCell(cubes[2]), AmrCell(cubes[3]),
+            AmrCell(cubes[4]), AmrCell(cubes[5]), AmrCell(cubes[6]), AmrCell(cubes[7])
     };
 }
 
@@ -136,7 +48,7 @@ std::array<AmrCell, CpC(3)> create_children<3>(AmrCell& parent) {
 /// (необходимое число граней, правильную линковку (на старные ячейки))
 template<int dim>
 std::array<AmrCell, CpC(dim)> get_children(AmrCell &cell) {
-    auto children = create_children<dim>(cell);
+    auto children = create_children<dim>(cell.vertices);
 
     auto children_by_side = get_children_by_side<dim>();
 
@@ -186,11 +98,11 @@ std::array<AmrCell, CpC(dim)> get_children(AmrCell &cell) {
             for (int i: children_by_side[side]) {
                 AmrCell &child = children[i];
                 AmrFace &child_face = child.faces[side];
-                auto child_fc = child_face.center<dim>(child.vertices);
+                auto child_fc = child_face.center;
 
                 for (auto s: subface_sides<dim>(side)) {
                     AmrFace& cell_face = cell.faces[s];
-                    auto cell_fc = cell_face.center<dim>(cell.vertices);
+                    auto cell_fc = cell_face.center;
 
                     if ((child_fc - cell_fc).norm() < 1.0e-5 * cell.size) {
                         child_face.adjacent = cell_face.adjacent;
@@ -206,47 +118,46 @@ std::array<AmrCell, CpC(dim)> get_children(AmrCell &cell) {
 
 /// @brief Возвращает итераторы дочерних ячеек
 template <int dim>
-std::array<Storage::Item, CpC(dim)> select_children(
-        Storage& cells, const std::array<AmrCell, CpC(dim)>& children);
+Children select_children(
+        AmrStorage& cells, const std::array<AmrCell, CpC(dim)>& children);
 
 /// @brief Возвращает итераторы дочерних ячеек (2D)
 template <>
-std::array<Storage::Item, CpC(2)> select_children<2>(
-        Storage& cells, const std::array<AmrCell, CpC(2)>& children) {
+Children select_children<2>(
+        AmrStorage& cells, const std::array<AmrCell, CpC(2)>& children) {
     return {
-            cells[children[0].next],
-            cells[children[1].next],
-            cells[children[2].next],
-            cells[children[3].next]
+            cells.iterator(children[0].next),
+            cells.iterator(children[1].next),
+            cells.iterator(children[2].next),
+            cells.iterator(children[3].next)
     };
 }
 
 /// @brief Возвращает итераторы дочерних ячеек (3D)
 template <>
-std::array<Storage::Item, CpC(3)> select_children<3>(
-        Storage& cells, const std::array<AmrCell, CpC(3)>& children) {
+Children select_children<3>(
+        AmrStorage& cells, const std::array<AmrCell, CpC(3)>& children) {
     return {
-            cells[children[0].next],
-            cells[children[1].next],
-            cells[children[2].next],
-            cells[children[3].next],
-            cells[children[4].next],
-            cells[children[5].next],
-            cells[children[6].next],
-            cells[children[7].next]
+            cells.iterator(children[0].next),
+            cells.iterator(children[1].next),
+            cells.iterator(children[2].next),
+            cells.iterator(children[3].next),
+            cells.iterator(children[4].next),
+            cells.iterator(children[5].next),
+            cells.iterator(children[6].next),
+            cells.iterator(children[7].next)
     };
 }
 
-/// @brief Производит разбиение ячейки, дочерние ячейки помещает в Storage
+/// @brief Производит разбиение ячейки, дочерние ячейки помещает в AmrStorage
 /// @param locals Хранилище ячеек
 /// @param ic Индекс родительской ячейки в хранилище
 /// @param op Оператор разделения данных
 /// @details Дочерние ячейки правильно ссылаются друг на друга, на гранях
 /// adjacent указан на старые ячейки.
 template<int dim>
-void refine_cell(Storage &locals, Storage &aliens, int rank, int ic, const Distributor& op) {
-    auto item = locals[ic];
-    AmrCell& parent = item.geom();
+void refine_cell(AmrStorage &locals, AmrStorage &aliens, int rank, int ic, const Distributor& op) {
+    auto& parent = locals[ic];
 
     auto children = get_children<dim>(parent);
 
@@ -255,7 +166,7 @@ void refine_cell(Storage &locals, Storage &aliens, int rank, int ic, const Distr
 
         // Возможна оптимизация (!), создавать дочерние ячейки сразу
         // на нужном месте в хранилище
-        children[i].copy_to(child);
+        locals[parent.next + i] = children[i];
 
         for (int s = 0; s < FpC(dim); ++s) {
             AmrFace &f1 = child.faces[s];
@@ -272,8 +183,8 @@ void refine_cell(Storage &locals, Storage &aliens, int rank, int ic, const Distr
                     throw std::runtime_error("adjacent.index out of range (refine_cell)");
                 }
 #endif
-                auto neib = locals[adj.index];
-                nei_wanted_lvl = neib.level() + neib.flag();
+                auto& neib = locals[adj.index];
+                nei_wanted_lvl = neib.level + neib.flag;
             }
             else {
                 // Удаленная ячейка
@@ -282,8 +193,8 @@ void refine_cell(Storage &locals, Storage &aliens, int rank, int ic, const Distr
                     throw std::runtime_error("adjacent.ghost out of range (refine_cell)");
                 }
 #endif
-                auto neib = aliens[adj.ghost];
-                nei_wanted_lvl = neib.level() + neib.flag();
+                auto& neib = aliens[adj.ghost];
+                nei_wanted_lvl = neib.level + neib.flag;
             }
 
             if (nei_wanted_lvl > child.level) {
@@ -292,7 +203,8 @@ void refine_cell(Storage &locals, Storage &aliens, int rank, int ic, const Distr
         }
     }
 
-    op.split<dim>(item, select_children<dim>(locals, children));
+    auto children2 = select_children<dim>(locals, children);
+    op.split(parent, children2);
 
     parent.set_undefined();
 }

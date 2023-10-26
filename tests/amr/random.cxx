@@ -22,16 +22,16 @@ struct _U_ {
 
 _U_ U;
 
-double get_flag(Storage::Item cell) {
-    return cell.flag();
+double get_flag(AmrStorage::Item& cell) {
+    return cell.flag;
 }
 
-double get_next(Storage::Item cell) {
-    return cell.next();
+double get_next(AmrStorage::Item& cell) {
+    return cell.next;
 }
 
-double get_some(Storage::Item cell) {
-    return cell.index();
+double get_some(AmrStorage::Item& cell) {
+    return cell.index;
 }
 
 inline double sqr(double x) {

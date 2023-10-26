@@ -1,29 +1,28 @@
-
-
+#include <zephyr/geom/primitives/amr_cell.h>
 #include <zephyr/mesh/cell.h>
 
-namespace zephyr { namespace mesh {
+namespace zephyr::mesh {
 
-Storage::Item safe_iterator(Storage &locals, Storage &aliens, int idx) {
+AmrStorage::Iterator safe_iterator(AmrStorage &locals, AmrStorage &aliens, int idx) {
     if (idx < locals.size()) {
-        return locals[idx];
+        return locals.iterator(idx);
     } else {
         idx -= locals.size();
         if (idx < aliens.size()) {
-            return aliens[idx];
+            return aliens.iterator(idx);
         } else {
             return locals.end();
         }
     }
 }
 
-Storage::Item safe_iterator(Storage &locals, Storage &aliens, const Adjacent &adj) {
+AmrStorage::Iterator safe_iterator(AmrStorage &locals, AmrStorage &aliens, const Adjacent &adj) {
     if (adj.ghost >= 0) {
-        return aliens[adj.ghost];
+        return aliens.iterator(adj.ghost);
     }
     else {
         if (adj.index < locals.size()) {
-            return locals[adj.index];
+            return locals.iterator(adj.index);
         }
         else {
             return locals.end();
@@ -31,14 +30,14 @@ Storage::Item safe_iterator(Storage &locals, Storage &aliens, const Adjacent &ad
     }
 }
 
-ICell::ICell(Storage &_locals, Storage &_aliens, int idx)
-    : Storage::Item(safe_iterator(_locals, _aliens, idx)),
+ICell::ICell(AmrStorage &_locals, AmrStorage &_aliens, int idx)
+    : m_it(safe_iterator(_locals, _aliens, idx)),
       m_locals(_locals), m_aliens(_aliens) {
 
 }
 
-ICell::ICell(Storage &_locals, Storage &_aliens, const Adjacent &adj)
-    : Storage::Item(safe_iterator(_locals, _aliens, adj)),
+ICell::ICell(AmrStorage &_locals, AmrStorage &_aliens, const Adjacent &adj)
+    : m_it(safe_iterator(_locals, _aliens, adj)),
       m_locals(_locals), m_aliens(_aliens) {
 
 }
@@ -56,19 +55,19 @@ ICell ICell::neighbor(const AmrFace &face) const {
 }
 
 ICell ICell::neib(const IFace &face) const {
-    return { m_locals, m_aliens, face.geom().adjacent };
+    return { m_locals, m_aliens, face.adjacent() };
 }
 
 ICell ICell::neighbor(const IFace &face) const {
-    return { m_locals, m_aliens, face.geom().adjacent };
+    return { m_locals, m_aliens, face.adjacent() };
 }
 
 ICell ICell::neib(int face_idx) const {
-    return { m_locals, m_aliens, geom().faces[face_idx].adjacent };
+    return { m_locals, m_aliens, m_it->faces[face_idx].adjacent };
 }
 
 ICell ICell::neighbor(int face_idx) const {
-    return { m_locals, m_aliens, geom().faces[face_idx].adjacent };
+    return { m_locals, m_aliens, m_it->faces[face_idx].adjacent };
 }
 
 IFaces ICell::faces(Direction dir) const {
@@ -76,11 +75,11 @@ IFaces ICell::faces(Direction dir) const {
 }
 
 void ICell::print_neibs_info() const {
-    print_info();
+    m_it->print_info();
 
     std::cout << "\tAll neighbors of cell:\n";
-    for (int i = 0; i < geom::AmrFaces::max_size; ++i) {
-        auto &face = geom().faces[i];
+    for (int i = 0; i < geom::AmrFaces::max_count; ++i) {
+        auto &face = m_it->faces[i];
         if (face.is_undefined() or face.is_boundary()) continue;
 
         std::cout << "\tNeighbor through the " << side_to_string(geom::Side(i % 6)) << " face (" << i / 6 << "):\n";
@@ -91,7 +90,7 @@ void ICell::print_neibs_info() const {
                 std::cout << "print_cell_info: Wrong connection #1 (It's acceptable for some intermediate refinement stages)";
             }
             else {
-                auto neib = m_locals[face.adjacent.index];
+                auto& neib = m_locals[face.adjacent.index];
                 neib.print_info();
             }
         }
@@ -101,7 +100,7 @@ void ICell::print_neibs_info() const {
                 std::cout << "print_cell_info: Wrong connection #2 (It's acceptable for some intermediate refinement stages)";
             }
             else {
-                auto neib = m_aliens[face.adjacent.ghost];
+                auto& neib = m_aliens[face.adjacent.ghost];
                 neib.print_info();
             }
         }
@@ -109,5 +108,4 @@ void ICell::print_neibs_info() const {
 }
 
 
-} // namespace mesh
-} // namespace zephyr
+} // namespace zephyr::mesh

@@ -13,7 +13,7 @@ using namespace zephyr::geom;
 ///             Реализация записи в виде набора статических функций
 /// ===========================================================================
 
-inline size_t count_cells(Storage &cells, const Filter &filter) {
+inline size_t count_cells(AmrStorage &cells, const Filter &filter) {
     if (filter.is_trivial()) {
         return cells.size();
     }
@@ -38,7 +38,7 @@ void write_name(const Variable& var, std::ofstream& file) {
     }
 }
 
-void write_variable(const Variable& var, Storage::Item& cell, std::ofstream& file) {
+void write_variable(const Variable& var, AmrStorage::Item& cell, std::ofstream& file) {
     if (!var.is_scalar()) {
         throw std::runtime_error("CsvFile doesn't support vector variables");
     }
@@ -69,12 +69,12 @@ CsvFile::CsvFile(
     variables(variables), filter() {
 }
 
-void CsvFile::save(Storage &cells) {
+void CsvFile::save(AmrStorage &cells) {
     save(filename, cells, precision, variables, filter);
 }
 
 void CsvFile::save(
-    const std::string &filename, Storage &cells, int precision,
+    const std::string &filename, AmrStorage &cells, int precision,
     const Variables &variables, const Filter &filter
 ) {
     size_t n_cells = count_cells(cells, filter);
@@ -104,7 +104,7 @@ void CsvFile::save(
 
     for (auto& cell: cells) {
         if (filter(cell)) {
-            file << cell.center().x() << ", " << cell.center().y() << ", ";
+            file << cell.center.x() << ", " << cell.center.y() << ", ";
             for(int i = 0; i < n_variables - 1; ++i) {
                 write_variable(variables[i], cell, file);
                 file << ", ";

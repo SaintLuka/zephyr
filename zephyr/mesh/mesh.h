@@ -1,19 +1,17 @@
 #pragma once
 
+#include <zephyr/utils/threads.h>
+
 #include <zephyr/geom/grid.h>
 #include <zephyr/geom/generator/generator.h>
 
+#include <zephyr/geom/primitives/amr_cell.h>
+#include <zephyr/mesh/cell.h>
 #include <zephyr/mesh/storage.h>
 #include <zephyr/mesh/distributor.h>
 
-#include <zephyr/mesh/range.h>
-#include <zephyr/utils/threads.h>
-
-
 
 namespace zephyr::mesh {
-
-#define EXEC_RESULT typename std::result_of<F(ICell)>::type
 
 using zephyr::utils::threads;
 using namespace zephyr::geom;
@@ -38,11 +36,11 @@ public:
 
     ICell end() { return {m_locals, m_aliens, m_locals.size()}; }
 
-    operator Storage &() { return m_locals; }
+    operator AmrStorage &() { return m_locals; }
 
-    Storage &locals() { return m_locals; }
+    AmrStorage &locals() { return m_locals; }
 
-    Storage &aliens() { return m_aliens; }
+    AmrStorage &aliens() { return m_aliens; }
 
 
     /// @brief Проверить базовую сетку после создания.
@@ -97,8 +95,8 @@ private:
     int m_max_level = 0;
     Distributor distributor;
 
-    Storage m_locals;
-    Storage m_aliens;
+    AmrStorage m_locals;
+    AmrStorage m_aliens;
 };
 
 

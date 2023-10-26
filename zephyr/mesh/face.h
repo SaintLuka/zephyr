@@ -1,6 +1,6 @@
 #pragma once
 
-#include <zephyr/geom/primitives/amr_face.h>
+#include <zephyr/geom/primitives/basic_face.h>
 
 
 namespace zephyr { namespace mesh {
@@ -61,10 +61,15 @@ public:
     /// @brief Координата z центра грани
     inline double z() const { return center().z(); }
 
+
+    inline const geom::Adjacent& adjacent() const {
+        return geom().adjacent;
+    }
+
     IFace &operator++() {
         do {
             ++face_idx;
-        } while (face_idx < geom::AmrFaces::max_size && geom().to_skip(dir));
+        } while (face_idx < geom::AmrFaces::max_count && geom().to_skip(dir));
         return *this;
     }
 

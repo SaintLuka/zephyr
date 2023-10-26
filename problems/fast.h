@@ -6,7 +6,7 @@
 #include <zephyr/utils/threads.h>
 #include <zephyr/utils/stopwatch.h>
 
-#include <zephyr/geom/primitives/amr_face.h>
+#include <zephyr/geom/primitives/basic_face.h>
 #include <zephyr/geom/vector.h>
 
 #include <zephyr/geom/generator/strip.h>
@@ -23,7 +23,7 @@ using zephyr::mesh::generator::Rectangle;
 using zephyr::mesh::generator::Cuboid;
 using zephyr::mesh::generator::Sector;
 using zephyr::mesh::Mesh;
-using zephyr::mesh::Storage;
+using zephyr::mesh::AmrStorage;
 using zephyr::mesh::IFace;
 using zephyr::mesh::ICell;
 using zephyr::geom::Boundary;

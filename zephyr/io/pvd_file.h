@@ -51,13 +51,13 @@ public:
     /// @brief Записать хранилище (или часть, при распределенном счете) в один
     /// файл VTU (или набор VTU), затем обновить PVD файл.
     /// Используется функция VtuFile::write
-    void save(Storage& elements, double timestep);
+    void save(AmrStorage& elements, double timestep);
 
 private:
 
     std::string get_filename() const;
 
-    void update_pvd(Storage& elements, double timestep);
+    void update_pvd(AmrStorage& elements, double timestep);
 
     bool           m_open;     ///< Открыт ли pvd файл
     std::string    m_filename; ///< Имя файла без расширения

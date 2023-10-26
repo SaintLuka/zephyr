@@ -1,11 +1,12 @@
 #include <zephyr/math/solver/transfer.h>
 
+#include <zephyr/geom/geom.h>
 #include <zephyr/math/cfd/face_extra.h>
-#include <zephyr/geom/primitives/amr_face.h>
+#include <zephyr/geom/primitives/basic_face.h>
 
 namespace zephyr { namespace math {
 
-using mesh::Storage;
+using mesh::AmrStorage;
 using namespace geom;
 Vector3d intersection(const Vector3d& v1, const Vector3d& v2,
                       const Vector3d& p, const Vector3d& n) {
@@ -606,18 +607,20 @@ void Transfer::set_flags(Mesh& mesh) {
 }
 
 Distributor Transfer::distributor() const {
+    using mesh::Children;
+
     Distributor distr;
 
-    distr.split2D = [](Storage::Item parent, const std::array<Storage::Item, 4> & children) {
-        for (auto child: children) {
-            Vector3d dr = parent.center() - child.center();
+    distr.split = [](AmrStorage::Item &parent, Children &children) {
+        for (auto &child: children) {
+            Vector3d dr = parent.center - child.center;
             child(U).u1 = parent(U).u1;
         }
     };
 
-    distr.merge2D = [](const std::array<Storage::Item, 4> & children, Storage::Item parent) {
+    distr.merge = [](Children &children, AmrStorage::Item& parent) {
         double sum = 0.0;
-        for (auto child: children) {
+        for (auto &child: children) {
             sum += child(U).u1 * child.volume();
         }
         parent(U).u1 = sum / parent.volume();
@@ -626,7 +629,7 @@ Distributor Transfer::distributor() const {
     return distr;
 }
 
-Storage Transfer::body(Mesh& mesh) {
+AmrStorage Transfer::body(Mesh& mesh) {
     double eps = 1.0e-5;
     int count = 0;
     for (auto cell: mesh) {
@@ -636,7 +639,7 @@ Storage Transfer::body(Mesh& mesh) {
         ++count;
     }
 
-    Storage cells(U, count);
+    AmrStorage cells(U, count);
 
     count = 0;
     for (auto cell: mesh) {
@@ -648,7 +651,11 @@ Storage Transfer::body(Mesh& mesh) {
 
         auto vlist = poly.cut(cell(U).p, cell(U).n);
         if (!vlist.empty()) {
-            cells[count].geom() = AmrCell(vlist);
+            Quad quad = vlist.size() < 4 ?
+                        Quad(vlist[0], vlist[1], vlist[2], vlist[2]) :
+                        Quad(vlist[0], vlist[1], vlist[2], vlist[3]);
+
+            cells[count] = AmrCell(quad);
             ++count;
         }
     }

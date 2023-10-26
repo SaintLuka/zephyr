@@ -25,5 +25,9 @@ typedef Eigen::DiagonalMatrix<double, 5, 5> DiagMatrix5d; ///< Диагонал�
 typedef Eigen::DiagonalMatrix<double, 6, 6> DiagMatrix6d; ///< Диагональная Eigen матрица 6 x 6
 typedef Eigen::DiagonalMatrix<double, 7, 7> DiagMatrix7d; ///< Диагональная Eigen матрица 7 x 7
 
+inline void setNaN(Vector3d& vec) {
+    vec.x() = vec.y() = vec.z() = NAN;
+}
+
 } // namespace zephyr::geom
 

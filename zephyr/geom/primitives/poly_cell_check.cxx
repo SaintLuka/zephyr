@@ -18,7 +18,7 @@ void PolyCell::print_info() const {
     std::cout << "\t\tz_idx:  " << z_idx << "\n";
 
     std::cout << "\t\tcell.vertices:\n";
-    for (int i = 0; i < AmrVertices::max_size; ++i) {
+    for (int i = 0; i < 27; ++i) {
         if (vertices[i].is_actual()) {
             std::cout << "\t\t\t" << i << ": " << vertices[i].transpose() << "\n";
         }

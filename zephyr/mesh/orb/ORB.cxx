@@ -8,7 +8,7 @@ inline double fit(double val, double min_val, double max_val) {
 
 ORB::ORB(
     Network&  network,
-    Storage&  elements,
+    AmrStorage&  elements,
     Domain&   domain,
     Measurer& measurer,
     if_multithreading(ThreadPool &pool,)
@@ -27,7 +27,7 @@ ORB::ORB(
 
 ORB::ORB(
     Network&  network,
-    Storage&  elements,
+    AmrStorage&  elements,
     Domain&   domain,
     Measurer& measurer,
     const YAML::Node &config
@@ -142,7 +142,7 @@ bool ORB::is_near(const Vector3d& v, int neib_rank) const {
 void ORB::collect_local_info() {
     using data::neibsSearchRadius;
 
-    auto func = [](Storage::Item elem) -> double {
+    auto func = [](AmrStorage::Iterator elem) -> double {
         return elem[neibsSearchRadius].value;
     };
 

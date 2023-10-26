@@ -8,8 +8,7 @@ set(ZEPHYR_MESH_SRC
         ${CMAKE_CURRENT_SOURCE_DIR}/storage.cxx
         ${CMAKE_CURRENT_SOURCE_DIR}/amr_face.cxx
         ${CMAKE_CURRENT_SOURCE_DIR}/cell.cxx
-        ${CMAKE_CURRENT_SOURCE_DIR}/range.cxx
-        PARENT_SCOPE)
+    PARENT_SCOPE)
 
 
 install(FILES
@@ -18,7 +17,6 @@ install(FILES
         storage.h
         face.h
         cell.h
-        range.h
         threads.h
         DESTINATION
         include/${PROJECT_NAME}/mesh)

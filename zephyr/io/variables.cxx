@@ -2,6 +2,8 @@
 
 #include <zephyr/io/variables.h>
 
+#include <zephyr/geom/primitives/amr_cell.h>
+
 
 namespace zephyr { namespace io {
 
