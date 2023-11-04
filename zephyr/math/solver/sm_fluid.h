@@ -18,101 +18,28 @@ using namespace zephyr::phys;
 using namespace zephyr::math;
 using namespace zephyr::math::smf;
 
-/// @brief GK_solver 2D???
 
 class SmFluid {
 public:
 
     struct State {
-        double rho1, rho2, rhoh, rhoh2;
-        Vector3d v1, v2, vh, vh2;
-        double p1, p2, ph, ph2;
-        double e1, e2, eh, eh2;
-        Flux P1, P2, P3, P4;
+        double rho1;
+        Vector3d v1;
+        double p1;
+        double e1;
+        PState half, d_dx, d_dy, d_dz, next;
+        Flux f1, f2;
 
-        // Производные
-        double rhox; Vector3d vx; double px; double ex;
-        double rhoy; Vector3d vy; double py; double ey;
-        double rhoz; Vector3d vz; double pz; double ez; 
-
-        PState zx() {
-            return {rhox, vx, px, ex};
-        }
-        PState zy() {
-            return {rhoy, vy, py, ey};
-        }
-        PState zz() {
-            return {rhoz, vz, pz, ez};
+        PState get_state() const {
+            return {rho1, v1, p1, e1};
         }
 
-        void set_zx(PState &z) {
-            rhox = z.density;
-            vx = z.velocity;
-            px = z.pressure;
-            ex = z.energy;
-        }
-        void set_zy(PState &z) {
-            rhoy = z.density;
-            vy = z.velocity;
-            py = z.pressure;
-            ey = z.energy;
-        }
-        void set_zz(PState &z) {
-            rhoz = z.density;
-            vz = z.velocity;
-            pz = z.pressure;
-            ez = z.energy;
-        }
-
-        PState get_state(int stage) const {
-            if (stage == 0) {
-                return {rho1, v1, p1, e1};
-            }
-            if (stage == 1) {
-                return {rhoh, vh, ph, eh};
-            }
-            if (stage == 2) {
-                return {rho2, v2, p2, e2};
-            }
-            if (stage == 3) {
-                return {rhoh2, vh2, ph2, eh2};
-            }
-        }
-
-        void set_state(const PState& z, int stage) {
-            if (stage == 0) {
-                rho1 = z.density;
-                v1 = z.velocity;
-                p1 = z.pressure;
-                e1 = z.energy;
-            }
-            if (stage == 1) {
-                rhoh = z.density;
-                vh = z.velocity;
-                ph = z.pressure;
-                eh = z.energy;
-            }
-            if (stage == 2) {
-                rho2 = z.density;
-                v2 = z.velocity;
-                p2 = z.pressure;
-                e2 = z.energy;
-            }
-            if (stage == 3) {
-                rhoh2 = z.density;
-                vh2 = z.velocity;
-                ph2 = z.pressure;
-                eh2 = z.energy;
-            }
-        }
-
-        void swap() {
-            std::swap(rho1, rho2);
-            std::swap(v1, v2);
-            std::swap(p1, p2);
-            std::swap(e1, e2);
-        }
-        
+        void set_state(const PState& z) {
+            rho1 = z.density;
+            v1 = z.velocity;
+            p1 = z.pressure;
+            e1 = z.energy;
+        }     
     };
 
     /// @brief Получить экземпляр расширенного вектора состояния
@@ -138,7 +65,7 @@ public:
     void compute_dt(Mesh &mesh);
 
     /// @brief Один шаг интегрирования по времени
-    void update(Mesh& mesh, int flux_type);
+    void update(Mesh& mesh);
 
     /// @brief Векторное поле скорости
     /// @details Виртуальная функция, следует унаследоваться от класса
@@ -154,27 +81,23 @@ public:
     ///@brief
     [[nodiscard]] double get_step() const;
 
-    // Обычная схема
-    Flux calc_flux(ICell &cell, int stage);
+    // Дифференциальный поток
+    Flux calc_flux(ICell &cell);
 
     // С экстраполяцией
-    Flux calc_flux_extra(ICell &cell, int stage); 
+    Flux calc_flux_extra(ICell &cell); 
 
     ///@brief вычисление градиента
-    void compute_grad(ICell &cell, int stage);
+    void compute_grad(Mesh& mesh);
 
-    ///@brief
-    /// 1
-    void fluxes(Mesh &mesh);
+    /// @brief установить порядок метода
+    void set_accuracy(int acc);
 
-    ///@brief 
-    /// 2
-    void fluxes2(Mesh &mesh);
+    ///@brief Стадия 1
+    void fluxes_stage1(Mesh &mesh);
 
-    ///@brief “one-step” Predictor-Corrector scheme | Heun’s method
-    /// 3
-    void fluxes3(Mesh &mesh);
-
+    ///@brief Стадия 2
+    void fluxes_stage2(Mesh &mesh);
 
 protected:
     const phys::Eos &m_eos;
@@ -183,7 +106,7 @@ protected:
     size_t m_step = 0; ///< Количество шагов расчёта
     double m_CFL; ///< Число Куранта
     double m_dt; ///< Шаг интегрирования
-    Limiter m_limiter; ///< Лимитер
+    int m_acc; ///< Порядок
 };
 }
 }

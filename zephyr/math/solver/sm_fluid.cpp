@@ -21,9 +21,8 @@ static const SmFluid::State U = SmFluid::datatype();
 
 SmFluid::SmFluid(const phys::Eos &eos, Fluxes flux = Fluxes::HLLC2) : m_eos(eos) {
     m_nf = NumFlux::create(flux);
-    m_CFL = 0.5;
+    m_CFL = 0.9;
     m_dt = std::numeric_limits<double>::max();
-    m_limiter = Limiter("minmod");
 }
 
 [[nodiscard]] double SmFluid::CFL() const {
@@ -45,6 +44,7 @@ void SmFluid::init_cells(Mesh &mesh, const phys::ClassicTest &test) {
         cell(U).v1 = test.velocity(cell.center());
         cell(U).p1 = test.pressure(cell.center());
         cell(U).e1 = m_eos.energy_rp(cell(U).rho1, cell(U).p1);
+        cell(U).half = cell(U).get_state();
     }
 }
 
@@ -75,119 +75,93 @@ void SmFluid::compute_dt(Mesh &mesh) {
     m_dt *= m_CFL;
 };
 
-// 1ый порядок
-void SmFluid::fluxes(Mesh &mesh) {
-    for (auto cell: mesh) {
-        // Примитивный вектор в ячейке
-        PState zc = cell(U).get_state(0);
-        // Консервативный вектор в ячейке
-        QState qc(zc);
-        // Расчет потока P1
-        cell(U).P1 = calc_flux(cell, 0);
-        // Новое значение в ячейке (консервативные переменные)
-        QState Qc = qc.vec() - m_dt * cell(U).P1.vec() / cell.volume();
-        // Новое значение примитивных переменных
-        PState Zc(Qc, m_eos);
-        //
-        cell(U).set_state(Zc,2);
-    }
+void SmFluid::set_accuracy(int acc) { // 1 или 2
+    m_acc = acc;
 };
 
-// Рунге-Кутта 2ого порядка
-void SmFluid::fluxes2(Mesh &mesh) {
+void SmFluid::fluxes_stage1(Mesh& mesh) {
     for (auto cell : mesh) {
         // Примитивный вектор в ячейке
-        PState zc = cell(U).get_state(0);
+        PState zc = cell(U).get_state();
         // Консервативный вектор в ячейке
         QState qc(zc);
-        // Расчет потока P1
-        cell(U).P1 = calc_flux_extra(cell, 0);
         //
-        QState Qc1 = qc.vec() - 0.5 * m_dt / cell.volume() * cell(U).P1.vec();
-        //
-        PState Zc1(Qc1, m_eos);
-        //
-        cell(U).set_state(Zc1, 1);
-    }
-    for (auto cell : mesh) {
-        // Примитивный вектор в ячейке
-        PState zc = cell(U).get_state(0);
-        // Консервативный вектор в ячейке
-        QState qc(zc);
-        // Расчет потока P2
-        cell(U).P2 = calc_flux_extra(cell, 1);
-        //
-        QState Qc = qc.vec() - m_dt / cell.volume() * cell(U).P2.vec();
-        //
-        PState Zc(Qc, m_eos);
-        //
-        cell(U).set_state(Zc, 2);
-    }
-}
-
-// leapfrog
-void SmFluid::fluxes3(Mesh &mesh) {
-    for (auto cell : mesh) {
-        // Примитивный вектор в ячейке
-        PState zc0 = cell(U).get_state(0);
-        // Консервативный вектор в ячейке
-        QState qc0(zc0);
-        // Расчет потока P1
-        cell(U).P1 = calc_flux_extra(cell, 0);
-        //
-        QState Qc1 = qc0.vec() - m_dt / cell.volume() * cell(U).P1.vec();
-        //
-        PState Zc1(Qc1, m_eos);
-        //
-        cell(U).set_state(Zc1, 1);
-    }
-    for (auto cell : mesh) {
-        // Примитивный вектор в ячейке
-        PState zc0 = cell(U).get_state(0);
-        // Консервативный вектор в ячейке
-        QState qc0(zc0);
-        // Расчет потока P1
-        cell(U).P2 = calc_flux_extra(cell, 1);
-        //
-        QState Qc2 = qc0.vec() - 0.5 * m_dt / cell.volume() * (cell(U).P1.vec() + cell(U).P2.vec());
-        //
-        PState Zc2(Qc2, m_eos);
-        //
-        cell(U).set_state(Zc2, 2);
+        cell(U).f1 = calc_flux(cell);
+        if (m_acc == 1) {
+            // cell(U).f1 = calc_flux(cell);
+            qc.vec() -= m_dt / cell.volume() * cell(U).f1.vec();
+        }
+        if (m_acc == 2) {
+            // cell(U).f1 = calc_flux_extra(cell);
+            qc.vec() -= 0.5 * m_dt / cell.volume() * cell(U).f1.vec();
+        }
+        PState Zc(qc, m_eos);
+        cell(U).half = Zc;
     }    
 }
 
-void SmFluid::compute_grad(ICell &cell, int stage) {
-    PState zx;
-    PState zy;
-    PState zz;
-
-    PState zc = cell(U).get_state(stage);
-
-    for (auto &face: cell.faces()) {
-        auto neib = face.neib();
-
-        PState zn = neib(U).get_state(stage);
-
-        Vector3d S = 0.5 * face.normal() * face.area();  
-
-        zx.vec() += (zc.vec() + zn.vec()) * S.x();
-        zy.vec() += (zc.vec() + zn.vec()) * S.y();
-        zz.vec() += (zc.vec() + zn.vec()) * S.z(); 
+void SmFluid::fluxes_stage2(Mesh& mesh) {
+    if (m_acc == 1) {
+        for (auto cell : mesh) {
+            cell(U).set_state(cell(U).half);
+        }
     }
-
-    zx.vec() /= cell.volume();
-    zy.vec() /= cell.volume();
-    zy.vec() /= cell.volume();
-
-    cell(U).set_zx(zx);
-    cell(U).set_zy(zy);
-    cell(U).set_zz(zz);
+    if (m_acc == 2) {
+        for (auto cell : mesh) {
+            // Примитивный вектор в ячейке
+            PState zc = cell(U).get_state();
+            // Консервативный вектор в ячейке
+            QState qc(zc);
+            // Расчет потока f2
+            cell(U).f2 = calc_flux_extra(cell);
+            //
+            QState Qc = qc.vec() - m_dt / cell.volume() * cell(U).f2.vec();
+            //
+            PState Zc(Qc, m_eos);
+            //
+            cell(U).next = Zc;  
+        }
+        for (auto cell : mesh) {
+            cell(U).set_state(cell(U).next);
+        }
+    }
 }
 
-Flux SmFluid::calc_flux(ICell &cell, int stage) {
+void SmFluid::compute_grad(Mesh& mesh) {
+    for (auto cell : mesh) { 
+        
+        PState zx;
+        PState zy;
+        PState zz;
+
+        PState zc = cell(U).half;
+
+        for (auto &face: cell.faces()) {
+            auto neib = face.neib();
+
+            PState zn = neib(U).half;
+
+            Vector3d S = 0.5 * face.normal() * face.area();  
+
+            zx.vec() += (zc.vec() + zn.vec()) * S.x();
+            zy.vec() += (zc.vec() + zn.vec()) * S.y();
+            zz.vec() += (zc.vec() + zn.vec()) * S.z(); 
+        }
+
+        zx.vec() /= cell.volume();
+        zy.vec() /= cell.volume();
+        zy.vec() /= cell.volume();
+
+        cell(U).d_dx = zx;
+        cell(U).d_dy = zy;
+        cell(U).d_dz = zz;
+    }
+}
+
+// для первого порядка точности
+Flux SmFluid::calc_flux(ICell &cell) {
     // Примитивный вектор в ячейке
-    PState zc = cell(U).get_state(stage);
+    PState zc = cell(U).get_state();
 
     // Консервативный вектор в ячейке
     QState qc(zc);
@@ -208,7 +182,7 @@ Flux SmFluid::calc_flux(ICell &cell, int stage) {
             zn.velocity -= 2.0 * vn * face.normal();
         } 
         else {
-            zn = face.neib()(U).get_state(stage);
+            zn = face.neib()(U).get_state();
         }
 
         // Значение на грани со стороны ячейки
@@ -228,9 +202,10 @@ Flux SmFluid::calc_flux(ICell &cell, int stage) {
     return flux;
 };
 
-Flux SmFluid::calc_flux_extra(ICell &cell, int stage) {
+/// берем только слой half
+Flux SmFluid::calc_flux_extra(ICell &cell) { 
     // Примитивный вектор в ячейке
-    PState zc = cell(U).get_state(stage);
+    PState zc = cell(U).half;
     
     // Переменная для потока
     Flux flux;
@@ -247,13 +222,8 @@ Flux SmFluid::calc_flux_extra(ICell &cell, int stage) {
             zn.velocity -= 2.0 * vn * face.normal();
         } 
         else {
-            zn = face.neib()(U).get_state(stage);
+            zn = face.neib()(U).half;
         }
-
-
-        // только для 0 stage - а
-        compute_grad(cell, stage);
-        compute_grad(*face.neib(), stage);
 
         Vector3d cell_c = cell.center();
         Vector3d face_c = face.center();
@@ -263,8 +233,8 @@ Flux SmFluid::calc_flux_extra(ICell &cell, int stage) {
 
         // Второй порядок
         auto fe = FaceExtra::ATvL(
-                    zc,        cell(U).zx(),        cell(U).zy(),        cell(U).zz(),
-                    zn, face.neib()(U).zx(), face.neib()(U).zy(), face.neib()(U).zz(),
+                    zc,        cell(U).d_dx,        cell(U).d_dy,        cell(U).d_dz,
+                    zn, face.neib()(U).d_dx, face.neib()(U).d_dy, face.neib()(U).d_dz,
                     cell_c, neib_c, face_c);
 
         PState zm = fe.m(zc).in_local(normal); // -
@@ -284,23 +254,19 @@ Flux SmFluid::calc_flux_extra(ICell &cell, int stage) {
     return flux;
 };
 
-void SmFluid::update(Mesh& mesh, int flux_type) {
+void SmFluid::update(Mesh& mesh) {
+    /// @brief Выбор шага интегрирования
     compute_dt(mesh);
-    
-    switch(flux_type) {
-        case 1:
-            fluxes(mesh);
-            break;
-        case 2:
-            fluxes2(mesh);
-            break;
-        case 3:
-            fluxes3(mesh);
-            break;
+
+    /// @brief Считает градиенты для переменных с основного слоя (только для 2ого порядка)
+    if (m_acc == 2) {
+        compute_grad(mesh);
     }
-    for (auto cell : mesh) {
-        cell(U).swap();
-    }
+    /// @brief первая итерация
+    fluxes_stage1(mesh);
+    /// @brief вторая итерация
+    fluxes_stage2(mesh);
+    /// 
     m_time += m_dt;
     m_step += 1;
 };

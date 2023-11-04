@@ -156,6 +156,7 @@ int main () {
 
     // Создать решатель
     auto solver = zephyr::math::SmFluid(eos, zephyr::math::Fluxes::HLL);
+    solver.set_accuracy(2);
 
     while (n_step < 1000) {
         std::cout << "\tStep: " << std::setw(6) << n_step << ";"
@@ -164,10 +165,8 @@ int main () {
         if (std::fmod(n_step, 20) == 0) {
             pvd.save(mesh, time);
         }
-
-        solver.compute_dt(mesh);
-        solver.fluxes(mesh, 1);
-        solver.update(mesh, 1);
+        
+        solver.update(mesh);
 
         n_step += 1;
         time = solver.get_time();
