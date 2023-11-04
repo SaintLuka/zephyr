@@ -366,7 +366,7 @@ std::vector<double> RiemannTesterWithSolver(const ClassicTest &test, Fluxes flux
 int main() {
     // Тестовая задача
     //SodTest test;
-    ShuOsherTest test;
+    ShuOsherTest test(3);
     // ToroTest test(2);
 
     std::vector<NumFlux::Ptr> nfs(4);
