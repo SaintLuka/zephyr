@@ -309,7 +309,7 @@ std::vector<double> RiemannTesterWithSolver(const ClassicTest &test, Fluxes flux
     Mesh mesh(U, &rect);
 
     SmFluid solver(eos, flux);
-    solver.set_accuracy(1);
+    solver.set_accuracy(2);
     solver.init_cells(mesh, test);
 
     // Число Куранта
