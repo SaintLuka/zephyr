@@ -65,7 +65,8 @@ public:
 
     /// @brief Начальная плотность
     double density(const double &x) const { 
-        return x < x_jump ? rL : rR + epsilon * std::sin(5.0 * x); 
+        // return x < x_jump ? rL : rR + epsilon * std::sin(5.0 * x); // ???
+        return x < x_jump ? rL : rR;
     }
 
     /// @brief Начальная скорость
@@ -80,12 +81,12 @@ public:
 
     /// @brief Начальная внутренняя энергия
     double energy(const double &x) const { 
-        return x < x_jump ? eL : eR; 
-    }
+        return x < x_jump ? eL : eR; }
 
     /// @brief Начальная плотность
     double density(const Vector3d &r) const {
-        return r.x() < x_jump ? rL : rR + epsilon * std::sin(5.0 * r.x());
+        // return r.x() < x_jump ? rL : rR + epsilon * std::sin(5.0 * r.x());
+        return r.x() < x_jump ? rL : rR;
     }
 
     /// @brief Начальная скорость

@@ -75,8 +75,8 @@ void SmFluid::compute_dt(Mesh &mesh) {
     m_dt *= m_CFL;
 };
 
-void SmFluid::set_accuracy(int acc) { // 1 или 2
-    m_acc = acc;
+void SmFluid::set_accuracy(int acc) { 
+    m_acc = acc;    // 1 или 2
 };
 
 void SmFluid::fluxes_stage1(Mesh& mesh) {
@@ -86,13 +86,12 @@ void SmFluid::fluxes_stage1(Mesh& mesh) {
         // Консервативный вектор в ячейке
         QState qc(zc);
         //
-        cell(U).f1 = calc_flux(cell);
         if (m_acc == 1) {
-            // cell(U).f1 = calc_flux(cell);
+            cell(U).f1 = calc_flux(cell);
             qc.vec() -= m_dt / cell.volume() * cell(U).f1.vec();
         }
         if (m_acc == 2) {
-            // cell(U).f1 = calc_flux_extra(cell);
+            cell(U).f1 = calc_flux_extra(cell);
             qc.vec() -= 0.5 * m_dt / cell.volume() * cell(U).f1.vec();
         }
         PState Zc(qc, m_eos);
@@ -115,9 +114,9 @@ void SmFluid::fluxes_stage2(Mesh& mesh) {
             // Расчет потока f2
             cell(U).f2 = calc_flux_extra(cell);
             //
-            QState Qc = qc.vec() - m_dt / cell.volume() * cell(U).f2.vec();
+            qc.vec() -= m_dt / cell.volume() * cell(U).f2.vec();
             //
-            PState Zc(Qc, m_eos);
+            PState Zc(qc, m_eos);
             //
             cell(U).next = Zc;  
         }
@@ -178,8 +177,8 @@ Flux SmFluid::calc_flux(ICell &cell) {
         //Единмтаенное различие
         if (face.is_boundary()) {
             // Граничные условия типа "стенка"
-            double vn = zc.velocity.dot(face.normal());
-            zn.velocity -= 2.0 * vn * face.normal();
+            // double vn = zc.velocity.dot(face.normal());
+            // zn.velocity -= 2.0 * vn * face.normal();
         } 
         else {
             zn = face.neib()(U).get_state();
