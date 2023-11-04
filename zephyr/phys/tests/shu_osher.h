@@ -17,23 +17,56 @@ public:
     IdealGas eos;   ///< Используемый УрС
     double x_jump;  ///< Положение разрыва
     double finish;  ///< Конечный момент времени
-    double rL, rR;  ///< Плотность
-    double uL, uR;  ///< Скорость
-    double pL, pR;  ///< Давление
+    double rL, rM, rR;  ///< Плотность
+    double uL, uM, uR;  ///< Скорость
+    double pL, pM, pR;  ///< Давление
     double eL, eR;  ///< Внутренняя энергия
     double epsilon; ///< Эпсилон
+    int test_type; ///< Тип теста
 
     /// @brief Начальные данные
-    ShuOsherTest() : eos(1.4) {
-        rL  = 27.0 / 7.0; rR  = 1.0;
-        pL = 31.0 / 3.0; pR = 1.0;
-        uL = 4.0 * std::sqrt(35.0) / 9.0; uR = 0.0;
-        eL = eos.energy_rp(rL, pL);
-        eR = eos.energy_rp(rR, pR);
+    ShuOsherTest(int n) : eos(1.4), test_type(n) {
+        if (n==1) {
+            rL  = 1.0; rR  = 0.125;
+            pL = 1.0; pR = 0.10;
+            uL = 0.0; uR = 0.0;
+            eL = eos.energy_rp(rL, pL);
+            eR = eos.energy_rp(rR, pR);
 
-        x_jump = -4.0;
-        finish = 2.0;
-        epsilon = 0.2;
+            x_jump = 0.0;
+            finish = 2.0;
+        }
+        if (n==2) {
+            rL  = 0.445; rR  = 0.5;
+            pL = 3.528; pR = 0.571;
+            uL = 0.698; uR = 0.0;
+            eL = eos.energy_rp(rL, pL);
+            eR = eos.energy_rp(rR, pR);
+
+            x_jump = 0.0;
+            finish = 2.0;
+        }
+        if (n==3) {
+            rL  = 1.0; rR  = 1.0, rM = 1.0;
+            pL = 10e-2; pR = 10e+2;
+            uL = 0.0; uR = 0.0, uM = 0.0;
+            eL = eos.energy_rp(rL, pL);
+            eR = eos.energy_rp(rR, pR);
+
+            x_jump = 0.0;
+            finish = 2.0;
+        }        
+        if (n==4) {
+            rL  = 27.0 / 7.0; rR  = 1.0;
+            pL = 31.0 / 3.0; pR = 1.0;
+            uL = 4.0 * std::sqrt(35.0) / 9.0; uR = 0.0;
+            eL = eos.energy_rp(rL, pL);
+            eR = eos.energy_rp(rR, pR);
+
+            x_jump = -4.0;
+            finish = 2.0;
+            epsilon = 0.2;
+        }
     }
 
     /// @brief Симметрично отразить начальные условия
@@ -65,8 +98,12 @@ public:
 
     /// @brief Начальная плотность
     double density(const double &x) const { 
-        // return x < x_jump ? rL : rR + epsilon * std::sin(5.0 * x); // ???
-        return x < x_jump ? rL : rR;
+        if (test_type == 4) {
+            return x < x_jump ? rL : rR + epsilon * std::sin(5.0 * x);
+        }
+        else {
+            return x < x_jump ? rL : rR;
+        }
     }
 
     /// @brief Начальная скорость
@@ -85,8 +122,12 @@ public:
 
     /// @brief Начальная плотность
     double density(const Vector3d &r) const {
-        // return r.x() < x_jump ? rL : rR + epsilon * std::sin(5.0 * r.x());
-        return r.x() < x_jump ? rL : rR;
+        if (test_type == 4) {
+            return r.x() < x_jump ? rL : rR + epsilon * std::sin(5.0 * r.x());
+        }
+        else {
+            return r.x() < x_jump ? rL : rR;
+        }
     }
 
     /// @brief Начальная скорость
