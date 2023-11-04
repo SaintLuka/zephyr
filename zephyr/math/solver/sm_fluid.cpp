@@ -120,7 +120,7 @@ void SmFluid::fluxes_stage2(Mesh& mesh) {
             //
             PState Zc(qc, m_eos);
             //
-            cell(U).next = Zc;  
+            cell(U).next = Zc;
         }
         for (auto cell : mesh) {
             cell(U).set_state(cell(U).next);
@@ -151,7 +151,7 @@ void SmFluid::compute_grad(Mesh& mesh) {
 
         zx.vec() /= cell.volume();
         zy.vec() /= cell.volume();
-        zy.vec() /= cell.volume();
+        zz.vec() /= cell.volume();
 
         cell(U).d_dx = zx;
         cell(U).d_dy = zy;
@@ -219,8 +219,8 @@ Flux SmFluid::calc_flux_extra(ICell &cell) {
 
         if (face.is_boundary()) {
             // Граничные условия типа "стенка"
-            double vn = zc.velocity.dot(face.normal());
-            zn.velocity -= 2.0 * vn * face.normal();
+            // double vn = zc.velocity.dot(face.normal());
+            // zn.velocity -= 2.0 * vn * face.normal();
         } 
         else {
             zn = face.neib()(U).half;
@@ -265,7 +265,6 @@ void SmFluid::update(Mesh& mesh) {
     }
     /// @brief первая итерация
     fluxes_stage1(mesh);
-    /// @brief вторая итерация
     fluxes_stage2(mesh);
     /// 
     m_time += m_dt;
