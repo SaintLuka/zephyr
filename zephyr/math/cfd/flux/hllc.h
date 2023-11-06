@@ -2,9 +2,7 @@
 
 #include <zephyr/math/cfd/flux/num_flux.h>
 
-namespace zephyr {
-namespace math {
-
+namespace zephyr::math {
 
 ///@brief Вычисление потока методом HLLC с использованием формул для каждой величины отдельно
 class HLLC : public NumFlux {
@@ -17,11 +15,14 @@ public:
         return std::unique_ptr<HLLC>(new HLLC(std::forward<Args>(args)...));
     }
 
-    std::string get_name() const override {return "HLLC"; }
+    [[nodiscard]] std::string get_name() const override { return "HLLC"; }
 
     static smf::Flux calc_flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos);
 
-    smf::Flux flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) const final;
+    [[nodiscard]] smf::Flux flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) const final;
+
+    [[nodiscard]] mmf::Flux
+    mm_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) const override;
 };
 
 /// @brief Оптимизированный расчёт потока по методу HLLC
@@ -35,12 +36,14 @@ public:
         return std::unique_ptr<HLLC2>(new HLLC2(std::forward<Args>(args)...));
     }
 
-    std::string get_name() const override {return "HLLC2"; }
+    [[nodiscard]] std::string get_name() const override { return "HLLC2"; }
 
     static smf::Flux calc_flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos);
 
-    smf::Flux flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) const final;
+    [[nodiscard]] smf::Flux flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) const final;
+
+    [[nodiscard]] mmf::Flux
+    mm_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) const override;
 };
 
-}
 }

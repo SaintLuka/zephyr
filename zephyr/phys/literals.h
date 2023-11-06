@@ -1,6 +1,6 @@
 #pragma once
 
-namespace zephyr { namespace phys {
+namespace zephyr::phys {
 
 /// ============================ Единицы длины ================================
 
@@ -77,5 +77,4 @@ constexpr double operator"" _W_mK(long double x) { return double(x); }
 // @brief Градусы Цельсия
 constexpr double operator"" _C(long double x) { return double(x + 273.15); }
 
-}
 }

@@ -75,6 +75,13 @@ QState QState::in_global(const Vector3d &normal) const {
     return q;
 }
 
+std::ostream &operator<<(std::ostream &os, const QState &state) {
+    os << "mass: " << state.mass <<
+       " momentum: {" << state.momentum.x() << ", " << state.momentum.y() << ", " << state.momentum.z() <<
+       "} energy: " << state.energy;
+    return os;
+}
+
 Flux::Flux() : mass(0.0), momentum(0.0, 0.0, 0.0), energy(0.0) {}
 
 Flux::Flux(const PState &state) {
@@ -148,13 +155,15 @@ PState::PState(const double &density, const Vector3d &velocity,
           pressure(pressure), energy(energy), temperature(temperature), mass_frac(mass_frac) {
 }
 
-PState::PState(const QState &q, const phys::Eos &eos) {
+PState::PState(const QState &q, const phys::Materials &mixture, double P0, double T0) {
     density = q.mass;
     velocity = q.momentum / density;
     energy = q.energy / density - 0.5 * velocity.squaredNorm();
-    pressure = eos.pressure_re(density, energy);
-    temperature = eos.temperature_rp(density, pressure);
-    mass_frac = q.mass_frac;
+
+    mass_frac = Fractions(q.mass_frac);
+
+    pressure = mixture.pressure_re(density, energy, mass_frac, {.P0=P0});
+    temperature = mixture.temperature_rp(density, pressure, mass_frac, {.T0=T0});
 }
 
 void PState::to_local(const Vector3d &normal) {
@@ -178,15 +187,16 @@ PState PState::in_global(const Vector3d &normal) const {
 }
 
 std::ostream &operator<<(std::ostream &os, const PState &state) {
-    os << boost::format("density: %, velocity: {%, %, %}, pressure: %, temperature: %, energy: %, mass_frac: %") %
+    os << boost::format(
+            "density: %1%, velocity: {%2%, %3%, %4%}, pressure: %5%, temperature: %6%, energy: %7%, mass_frac: %8%") %
           state.density % state.velocity.x() % state.velocity.y() % state.velocity.z() % state.pressure %
           state.temperature % state.energy % state.mass_frac;
     return os;
 }
 
 std::vector<double> PState::get_densities() const {
-    std::vector<double> densities(mass_frac.get_begin_size());
-    for (size_t i = 0; i < mass_frac.get_begin_size(); i++) {
+    std::vector<double> densities(mass_frac.get_size());
+    for (size_t i = 0; i < mass_frac.get_size(); i++) {
         densities[i] = density * mass_frac[i];
     }
 
@@ -194,8 +204,8 @@ std::vector<double> PState::get_densities() const {
 }
 
 std::vector<double> PState::get_energies() const {
-    std::vector<double> energies(mass_frac.get_begin_size());
-    for (size_t i = 0; i < mass_frac.get_begin_size(); i++) {
+    std::vector<double> energies(mass_frac.get_size());
+    for (size_t i = 0; i < mass_frac.get_size(); i++) {
         energies[i] = density * mass_frac[i];
     }
 
@@ -207,15 +217,16 @@ smf::PState PState::to_smf() const {
 }
 
 
-QState::QState(const double &mass, const Vector3d &momentum, const double &energy, const Fractions &mass_frac)
-        : mass(mass), momentum(momentum), energy(energy), mass_frac(mass_frac) {
-}
+QState::QState(const double &mass, const Vector3d &momentum, const double &energy, const FractionsFlux &mass_frac)
+        : mass(mass), momentum(momentum), energy(energy), mass_frac(mass_frac) {}
 
 QState::QState(const PState &state) {
+    mass_frac = FractionsFlux(state.mass_frac);
+    mass_frac *= state.density;
+
     mass = state.density;
     momentum = state.density * state.velocity;
     energy = state.density * (state.energy + 0.5 * state.velocity.squaredNorm());
-    mass_frac = state.mass_frac;
 }
 
 void QState::to_local(const Vector3d &normal) {
@@ -238,9 +249,21 @@ QState QState::in_global(const Vector3d &normal) const {
     return q;
 }
 
+std::ostream &operator<<(std::ostream &os, const QState &state) {
+    os << boost::format("mass: %1%, momentum: {%2%, %3%, %4%}, energy: %5%, mass_frac: %6%") %
+          state.mass %
+          state.momentum.x() % state.momentum.y() % state.momentum.z() %
+          state.energy %
+          state.mass_frac;
+    return os;
+}
+
 Flux::Flux() : mass(0.0), momentum(0.0, 0.0, 0.0), energy(0.0), mass_frac() {}
 
-Flux::Flux(const PState &state) : mass_frac(state.mass_frac) {
+Flux::Flux(const PState &state) {
+    mass_frac = FractionsFlux(state.mass_frac);
+    mass_frac *= state.density * state.velocity.x();
+
     mass = state.density * state.velocity.x();
     momentum.x() = state.density * state.velocity.x() * state.velocity.x() + state.pressure;
     momentum.y() = state.density * state.velocity.x() * state.velocity.y();
@@ -270,7 +293,7 @@ Flux Flux::in_global(const Vector3d &normal) const {
 }
 
 std::ostream &operator<<(std::ostream &os, const Flux &flux) {
-    os << boost::format("mass: %, momentum: {%, %, %}, energy: %, mass_frac: %") %
+    os << boost::format("mass: %1%, momentum: {%2%, %3%, %4%}, energy: %5%, mass_frac: %6%") %
           flux.mass %
           flux.momentum.x() % flux.momentum.y() % flux.momentum.z() %
           flux.energy %
@@ -278,10 +301,8 @@ std::ostream &operator<<(std::ostream &os, const Flux &flux) {
     return os;
 }
 
-Flux::Flux(double mass, const Vector3d &momentum, double energy, const Fractions &mass_frac) : mass(mass),
-                                                                                               momentum(momentum),
-                                                                                               energy(energy),
-                                                                                               mass_frac(mass_frac) {}
+Flux::Flux(double mass, const Vector3d &momentum, double energy,
+           const FractionsFlux &mass_frac) : mass(mass), momentum(momentum), energy(energy), mass_frac(mass_frac) {}
 
 
 } // namespace mmf

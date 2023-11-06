@@ -26,13 +26,4 @@ NumFlux::Ptr NumFlux::create(Fluxes flux) {
             throw std::runtime_error("Unknown numerical flux");
     }
 }
-
-MmNumFlux::Ptr MmNumFlux::create(Fluxes flux) {
-    switch (flux) {
-        case Fluxes::GODUNOV:
-            return Godunov::create();
-        default:
-            throw std::runtime_error("Unknown multi material numerical flux");
-    }
-}
 }

@@ -4,6 +4,7 @@
 #include <zephyr/math/vectorization.h>
 #include <zephyr/math/cfd/rotate.h>
 #include <zephyr/phys/eos/eos.h>
+#include <zephyr/phys/eos/materials.h>
 
 #include <zephyr/phys/fractions.h>
 
@@ -67,6 +68,8 @@ struct QState {
     /// @brief Возвращает вектор состояния в глобальной системе координат
     [[nodiscard]] QState in_global(const Vector3d &normal) const;
 
+    friend std::ostream &operator<<(std::ostream &os, const QState &state);
+
     VECTORIZE(QState)
 };
 
@@ -116,6 +119,7 @@ struct Flux {
 namespace mmf {
 
 using zephyr::phys::Fractions;
+using zephyr::phys::FractionsFlux;
 
 struct Component {
     double density;
@@ -140,7 +144,7 @@ struct PState {
     PState(const double &density, const Vector3d &velocity,
            const double &pressure, const double &energy, const double &temperature, const Fractions &mass_frac);
 
-    PState(const QState &q, const phys::Eos &eos);
+    PState(const QState &q, const phys::Materials &mixture, double P0 = 1e3, double T0 = 300.0);
 
     [[nodiscard]] std::vector<double> get_densities() const;
 
@@ -162,7 +166,6 @@ struct PState {
 
     friend std::ostream &operator<<(std::ostream &os, const PState &state);
 
-    VECTORIZE(PState)
 };
 
 /// @brief Консервативный многоматериальный вектор состояния
@@ -170,9 +173,9 @@ struct QState {
     double mass;
     Vector3d momentum;
     double energy;
-    Fractions mass_frac;
+    FractionsFlux mass_frac;
 
-    QState(const double &mass, const Vector3d &momentum, const double &energy, const Fractions &mass_frac);
+    QState(const double &mass, const Vector3d &momentum, const double &energy, const FractionsFlux &mass_frac);
 
     explicit QState(const PState &state);
 
@@ -187,6 +190,8 @@ struct QState {
 
     /// @brief Возвращает вектор состояния в глобальной системе координат
     [[nodiscard]] QState in_global(const Vector3d &normal) const;
+
+    friend std::ostream &operator<<(std::ostream &os, const QState &state);
 
     VECTORIZE(QState)
 };
@@ -205,12 +210,12 @@ struct Flux {
     double mass; ///< rho * u
     Vector3d momentum;
     double energy; ///< u * (rho * (E + 0.5 * velocity^2) + p)
-    Fractions mass_frac;
+    FractionsFlux mass_frac;
 
     /// @brief Нулевой поток
     Flux();
 
-    Flux(double mass, const Vector3d &momentum, double energy, const Fractions &mass_frac);
+    Flux(double mass, const Vector3d &momentum, double energy, const FractionsFlux &mass_frac);
 
     /// @brief Дифференциальный поток по вектору примитивных переменных
     explicit Flux(const PState &state);
