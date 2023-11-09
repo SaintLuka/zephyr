@@ -65,9 +65,8 @@ struct MmTest {
                                          x_max(x_max) {}
 };
 
-
 std::vector<double>
-RiemannTesterWithSolver(Fluxes flux, const MmTest &test, const std::string &filename = "output") {
+RiemannTesterWithSolver(Fluxes flux, const MmTest &test, int n_cells = 10, const std::string &filename = "output") {
     // Уравнение состояния
     Materials mixture;
 
@@ -138,7 +137,6 @@ RiemannTesterWithSolver(Fluxes flux, const MmTest &test, const std::string &file
     // Создаем одномерную сетку
     double H = 0.05 * (x_max - x_min);
     Rectangle rect(x_min, x_max, -H, +H);
-    int n_cells = 10;
     rect.set_sizes(n_cells, 1);
     rect.set_boundary_flags(
             FaceFlag::WALL, FaceFlag::WALL,
@@ -215,7 +213,7 @@ RiemannTesterWithSolver(Fluxes flux, const MmTest &test, const std::string &file
     };
 
     std::cout << "MultiMaterial test, " << "Flux: " << solver.get_flux_name() << "\n";
-    std::cout << "Mean percentage errors:\n";
+    std::cout << "Mean relative errors:\n";
     fprint("\tdensity error     ", rho_err);
     fprint("\tu error           ", u_err);
     fprint("\tpressure error    ", p_err);
@@ -229,9 +227,9 @@ RiemannTesterWithSolver(Fluxes flux, const MmTest &test, const std::string &file
 int main() {
     // Тестовая задача
     SodTest sod_test;
-    ToroTest toro_test(6);
+    ToroTest toro_test(3);
 
-    MmTest test1(IdealGas::create(1.3, 718.0_J_kgK), IdealGas::create(1.7, 718.0_J_kgK),
+    MmTest test1(IdealGas::create(1.4, 718.0_J_kgK), IdealGas::create(1.5, 718.0_J_kgK),
                  0.2, 0.1, // x_jump, max_time
                  10.0, 1.0, // rho
                  2e4, 1e4, // p
@@ -246,11 +244,11 @@ int main() {
                  10, -2,
                  0, 1.0);
 
-    MmTest test3(IdealGas::create(1.3, 718.0_J_kgK), IdealGas::create(1.7, 718.0_J_kgK),
-                 0.2, 0.1, // x_jump, max_time
-                 2.0, 1.0, // rho
+    MmTest test3(IdealGas::create(1.4, 718.0_J_kgK), IdealGas::create(1.5, 718.0_J_kgK),
+                 0.2, 0.01, // x_jump, max_time
+                 1.0, 1.0, // rho
                  2e4, 1e4, // p
-                 10, 10, // u
+                 0, 0, // u
                  0, 1.0 // x_min, x_max
     );
 
@@ -263,17 +261,25 @@ int main() {
                    x_min, x_max // x_min, x_max
     );
 
+    x_min = sod_test.xmin(), x_max = sod_test.xmax();
+    MmTest mm_sod(IdealGas::create(1.4, 718.0_J_kgK), IdealGas::create(1.5, 718.0_J_kgK),
+                  sod_test.x_jump, sod_test.max_time(), // x_jump, max_time
+                  sod_test.density(x_min), sod_test.density(x_max), // rho
+                  sod_test.pressure(x_min), sod_test.pressure(x_max), // p
+                  sod_test.velocity(x_min).x(), sod_test.velocity(x_max).x(), // u
+                  x_min, x_max // x_min, x_max
+    );
 
     std::vector<Fluxes> fluxes;
-    fluxes.push_back(Fluxes::HLL);
-    fluxes.push_back(Fluxes::HLLC);
+//    fluxes.push_back(Fluxes::HLL);
+//    fluxes.push_back(Fluxes::HLLC);
 //    fluxes.push_back(Fluxes::HLLC2);
-    fluxes.push_back(Fluxes::RUSANOV2);
+//    fluxes.push_back(Fluxes::RUSANOV2);
     fluxes.push_back(Fluxes::GODUNOV);
 
     std::vector<std::vector<double>> sod_errors(fluxes.size(), std::vector<double>(5));
     for (int i = 0; i < fluxes.size(); ++i)
-        sod_errors[i] = RiemannTesterWithSolver(fluxes[i], test3);
+        sod_errors[i] = RiemannTesterWithSolver(fluxes[i], test3, 10);
 
 //    for (int i = 0; i < fluxes.size(); ++i)
 //        sod_errors[i] = RiemannTester(sod_test, nfs[i]);

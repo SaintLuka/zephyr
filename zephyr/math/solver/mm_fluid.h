@@ -54,7 +54,7 @@ public:
         }
 
         [[nodiscard]] mmf::PState to_pstate() const {
-            return mmf::PState(p1, v1, p1, e1, t1, mass_frac1);
+            return mmf::PState(rho1, v1, p1, e1, t1, mass_frac1);
         }
     };
 
