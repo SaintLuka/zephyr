@@ -72,14 +72,14 @@ int main() {
     double R0 = 1.0 / eos.volume_pt(P0, T0);
 
     // Создаем одномерную сетку
-    Rectangle rect(0.0, 4.0, -2.0, 4.0);
-    rect.set_nx(100);
+    Rectangle rect(0.0, 4.0, -2.0, 4.0, true);
+    rect.set_nx(200);
     rect.set_boundaries({
         .left   = Boundary::WALL, .right = Boundary::WALL,
         .bottom = Boundary::WALL, .top   = Boundary::WALL});
 
     // Создать сетку
-    Mesh mesh(U, &rect);
+    EuMesh mesh(U, &rect);
 
     // Заполняем начальные данные
     for (auto cell: mesh) {
@@ -95,7 +95,7 @@ int main() {
     //NumFlux::Ptr nf = HLLC::create();
     //!!!
     //NumFlux::Ptr nf = CIR1::create();
-    NumFlux::Ptr nf = HLL::create();
+    NumFlux::Ptr nf = HLLC::create();
 
     double time = 0.0;
     double next_write = 0.0;
@@ -121,7 +121,7 @@ int main() {
 
         // Определяем dt
         sw_dt.resume();
-        double dt = mesh.min([&](ICell cell) -> double {
+        double dt = mesh.min([&](EuCell cell) -> double {
             double dt = 1.0e300;
 
             // скорость звука
@@ -144,7 +144,7 @@ int main() {
 
         // Расчет по схеме CIR
         sw_flux.resume();
-        mesh.for_each([&](ICell cell) {
+        mesh.for_each([&](EuCell cell) {
 
             // Примитивный вектор в ячейке
             PState zc = cell(U).get_state1();
@@ -214,7 +214,7 @@ int main() {
 
         // Обновляем слои
         sw_update.resume();
-        mesh.for_each([](ICell cell) {
+        mesh.for_each([](EuCell cell) {
             cell(U).swap();
         });
         sw_update.stop();

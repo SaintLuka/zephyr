@@ -1,22 +1,11 @@
+add_subdirectory(euler)
 
 set(ZEPHYR_MESH_SRC
-        ${ZEPHYR_MESH_REFINER_SRC}
-        ${CMAKE_CURRENT_SOURCE_DIR}/mesh.cxx
-        ${CMAKE_CURRENT_SOURCE_DIR}/mesh_check.cxx
-        ${CMAKE_CURRENT_SOURCE_DIR}/mesh_refine.cxx
-        ${CMAKE_CURRENT_SOURCE_DIR}/distributor.cxx
-        ${CMAKE_CURRENT_SOURCE_DIR}/storage.cxx
-        ${CMAKE_CURRENT_SOURCE_DIR}/amr_face.cxx
-        ${CMAKE_CURRENT_SOURCE_DIR}/cell.cxx
+    ${ZEPHYR_MESH_EULER_SRC}
     PARENT_SCOPE)
 
-
 install(FILES
-        mesh.h
-        distributor.h
-        storage.h
-        face.h
-        cell.h
-        threads.h
-        DESTINATION
-        include/${PROJECT_NAME}/mesh)
+    storage.h
+    threads.h
+    DESTINATION
+    include/${PROJECT_NAME}/mesh)

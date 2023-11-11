@@ -1,7 +1,7 @@
 #pragma once
 
-#include <zephyr/geom/maps.h>
 #include <zephyr/geom/primitives/element.h>
+#include <zephyr/geom/primitives/amr_vertices.h>
 #include <zephyr/geom/primitives/amr_faces.h>
 
 namespace zephyr::geom {
@@ -11,12 +11,13 @@ class AmrCell : public Element {
 public:
     // Геометрия ячейки
 
-    int      dim;       ///< Размерность ячейки
-    bool     linear;    ///< Линейная ячейка?
-    Vector3d center;    ///< Барицентр ячейки
-    double   size;      ///< Линейный размер ячейки
-    SqCube   vertices;  ///< Вершины ячейки
-    AmrFaces faces;     ///< Список граней
+    int         dim;       ///< Размерность ячейки
+    bool        adaptive;  ///< Адаптивная ячейка?
+    bool        linear;    ///< Линейная ячейка?
+    Vector3d    center;    ///< Барицентр ячейки
+    double      size;      ///< Линейный размер ячейки
+    AmrVertices vertices;  ///< Вершины ячейки
+    AmrFaces    faces;     ///< Список граней
 
     // Данные AMR
 
@@ -38,8 +39,16 @@ public:
     /// @brief Трехмерная криволинейная ячейка
     explicit AmrCell(const SqCube &cube);
 
+    /// @brief Двумерная полигональная ячейка. Не адаптивная ячейка, может
+    /// представлять четырехугольник, но вершины упорядочены иначе.
+    explicit AmrCell(const Polygon& poly);
+
     /// @brief Площадь (в 2D) или объем (в 3D) ячейки
     double volume() const;
+
+    /// @brief Скорпировать вершины в полигон (двумерные ячейки)
+    /// Для нелинейных AMR-ячеек возвращает до 8 граней.
+    PolygonS<8> polygon() const;
 
     /// @brief Вывести информацию о ячейке
     void print_info() const;

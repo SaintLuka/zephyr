@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <iostream>
 
 namespace zephyr::mesh {
 
@@ -274,16 +275,12 @@ namespace zephyr::geom {
 class AmrCell;   ///< AMR-ячейка
 //class PolyCell;  ///< Ячейка подвижной сетки
 //class PolyNode;  ///< Узел подвижной сетки
-
-// Interface: Cell, Faces, Face
-// AMR: EuCell, EuFaces, EuFace,
-// ALE: LaCell, LaFaces, LaFace, Node.
 }
 
 // Все возможные виды Storage
 namespace zephyr::mesh {
 
-/// @brief Хранилище с AMR-ячейками
+/// @brief Хранилище с эйлеровыми и AMR-ячейками
 using AmrStorage = Storage<zephyr::geom::AmrCell>;
 
 /// @brief Хранилище с подвижными ячейками

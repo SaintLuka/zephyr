@@ -101,7 +101,7 @@ std::vector<double> RiemannTester(const ClassicTest &test, const NumFlux::Ptr &n
     gen.set_boundaries({.left = Boundary::WALL, .right = Boundary::WALL});
 
     // Создать сетку
-    Mesh mesh(U, &gen);
+    EuMesh mesh(U, &gen);
 
     // Заполняем начальные данные
     for (auto cell: mesh) {
@@ -300,7 +300,7 @@ std::vector<double> RiemannTesterWithSolver(const ClassicTest &test, Fluxes flux
     gen.set_boundaries({.left = Boundary::WALL, .right = Boundary::WALL});
 
     // Создать сетку
-    Mesh mesh(U, &gen);
+    EuMesh mesh(U, &gen);
 
     MmFluid solver(eos, flux);
     solver.init_cells(mesh, test);

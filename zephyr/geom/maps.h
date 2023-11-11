@@ -11,7 +11,7 @@ namespace zephyr::geom {
 /// а также отвечает за отображение параметра x in [-1, 1] на отрезок
 /// и сопутствующие отображению функции.
 struct Line {
-private:
+protected:
     /// @brief Концы отрезка
     std::array<Vector3d, 2> verts;
 
@@ -87,7 +87,7 @@ public:
 /// а также отвечает за отображение параметра x in [-1, 1] на кривую
 /// и сопутствующие отображению функции.
 struct SqLine {
-private:
+protected:
     /// @brief Данные
     std::array<Vector3d, 3> verts;
 
@@ -188,7 +188,7 @@ protected:
 /// функций, а также отвечает за линейное отображение квадрата
 /// (x, y) in [-1, 1]^2 на заданый четырехугольник.
 struct Quad {
-private:
+protected:
     /// @brief Вершины в Z-порядке (таблица 2 x 2)
     std::array<Vector3d, 4> verts;
 
@@ -280,7 +280,7 @@ public:
 
 /// @brief Квадратичное отображение на четырехугольник
 struct SqQuad {
-private:
+protected:
     /// @brief Вершины (таблица 3 x 3)
     std::array<Vector3d, 9> verts;
 
@@ -389,7 +389,7 @@ public:
 
 /// @brief Представление шестигранника
 struct Cube {
-private:
+protected:
     /// @brief Вешины (таблица 2 x 2 x 2)
     std::array<Vector3d, 8> verts;
 
@@ -473,7 +473,7 @@ public:
 
 /// @brief Представление квадратичного шестигранника
 struct SqCube {
-private:
+protected:
     /// @brief Вешины (таблица 3 x 3 x 3)
     std::array<Vector3d, 27> verts;
 
@@ -509,10 +509,12 @@ public:
     /// вершин для хранения представления двумерной ячейки.
     SqCube(const SqQuad& quad);
 
+    /// @brief Интерпретировать первый слой как двумерное отображение
     inline SqQuad& as2D() {
         return *reinterpret_cast<SqQuad *>(verts.data());
     };
 
+    /// @brief Интерпретировать первый слой как двумерное отображение
     inline const SqQuad& as2D() const {
         return *reinterpret_cast<const SqQuad*>(verts.data());
     };

@@ -2,7 +2,7 @@
 /// В данном тесте флаги адаптации выбираются случайным образом
 /// с некоторыми вероятностями.
 
-#include <zephyr/mesh/mesh.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/geom/generator/cuboid.h>
 #include <zephyr/io/pvd_file.h>
@@ -38,7 +38,7 @@ inline double sqr(double x) {
     return x * x;
 }
 
-int solution_step(Mesh& mesh) {
+int solution_step(EuMesh& mesh) {
     const double p_coarse = 0.80;
     const double p_retain = 0.18;
     const double p_refine = 0.02;
@@ -74,7 +74,7 @@ int main() {
     Cuboid cube(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
     cube.set_nx(10);
 
-    Mesh mesh(U, &cube);
+    EuMesh mesh(U, &cube);
 
     mesh.set_max_level(3);
 

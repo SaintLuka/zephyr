@@ -1,7 +1,7 @@
 #include <iostream>
 #include <vector>
 
-#include <zephyr/mesh/mesh.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/io/vtu_file.h>
 
 #include <zephyr/geom/generator/rectangle.h>
@@ -35,21 +35,23 @@ double get_val(AmrStorage::Item& cell) {
     return cell(U).val;
 }
 
-enum class Test {
-    Rectangle, RectangleHex, Cuboid,
-    Sector1, Sector2, Sector3, Disk,
-    BlockStruct1, BlockStruct2, BlockStruct3
+struct Test {
+    enum TestType {
+        Rectangle, RectangleHex, Cuboid,
+        Sector1, Sector2, Sector3, Disk,
+        BlockStruct1, BlockStruct2, BlockStruct3
+    };
+    
+    std::string name;  ///< Название теста
+    std::string file;  ///< Имя выходного файла
+    std::string desc;  ///< Описание теста
+    
+    Generator::Ptr generator;  ///< Сеточный генератор
+    
+    Test(TestType test);
+
+    EuMesh generate() const;
 };
-
-std::string name(Test test);
-
-std::string description(Test test);
-
-std::string filename(Test test);
-
-Generator::Ptr get_generator(Test test);
-
-void fill(AmrStorage& cells);
 
 int main() {
     // Переменные для записи
@@ -60,8 +62,8 @@ int main() {
     // Список тестов
     std::vector<Test> tests_list = {
             //Test::Rectangle,
-            //Test::RectangleHex,
-            Test::Cuboid,
+            Test::RectangleHex,
+            //Test::Cuboid,
             //Test::Sector1,
             //Test::Sector2,
             //Test::Sector3,
@@ -71,109 +73,18 @@ int main() {
             //Test::BlockStruct3
     };
 
-    for (auto test: tests_list) {
-        std::cout << "Тест '" << name(test) << "'.\n";
-        std::cout << "\t" << description(test) << "\n";
-        std::cout << "\tВыходной файл: " << filename(test) << "\n\n";
+    for (auto& test: tests_list) {
+        std::cout << "Тест '" << test.name << "'.\n";
+        std::cout << "\t" << test.desc << "\n";
+        std::cout << "\tВыходной файл: " << test.file << "\n\n";
 
-        auto gen = get_generator(test);
+        EuMesh cells = test.generate();
 
-        Mesh cells(U, gen.get());
+        VtuFile file("output/" + test.file, vars);
 
-        fill(cells);
-
-        VtuFile file("output/" + filename(test), vars);
-
-        file.hex_only = test != Test::RectangleHex;
+        file.hex_only = false; // test != Test::RectangleHex;
 
         file.save(cells);
-    }
-}
-
-std::string name(Test test) {
-    switch (test) {
-        case Test::Rectangle:
-            return "Rectangle";
-        case Test::RectangleHex:
-            return "RectangleHex";
-        case Test::Cuboid:
-            return "Cuboid";
-
-        case Test::Sector1:
-            return "Sector 1";
-        case Test::Sector2:
-            return "Sector 2";
-        case Test::Sector3:
-            return "Sector 3";
-        case Test::Disk:
-            return "Disk";
-
-        case Test::BlockStruct1:
-            return "Block Structured 1";
-        case Test::BlockStruct2:
-            return "Block Structured 2";
-        case Test::BlockStruct3:
-            return "Block Structured 3";
-        default:
-            throw std::runtime_error("Unknown test");
-    }
-}
-
-std::string description(Test test) {
-    switch (test) {
-        case Test::Rectangle:
-            return "Декартова сетка в прямоуольнике.";
-        case Test::RectangleHex:
-            return "Сетка из шестиугольников в прямоугольнике.";
-        case Test::Cuboid:
-            return "Декартова сетка в прямоугольном параллелепипеде.";
-
-        case Test::Sector1:
-            return "Сетка в секторе с выколотым центром.";
-        case Test::Sector2:
-            return "Сетка в секторе (угол раствора < п)";
-        case Test::Sector3:
-            return "Сетка в секторе (угол раствора > п)";
-        case Test::Disk:
-            return "Блочно-структурированная сетка в круге.";
-
-        case Test::BlockStruct1:
-            return "Блочно-структурированная сетка №1.";
-        case Test::BlockStruct2:
-            return "Блочно-структурированная сетка №2.";
-        case Test::BlockStruct3:
-            return "Блочно-структурированная сетка №3.";
-        default:
-            throw std::runtime_error("Unknown test");
-    }
-}
-
-std::string filename(Test test) {
-    switch (test) {
-        case Test::Rectangle:
-            return "rectangle.vtu";
-        case Test::RectangleHex:
-            return "rectangle_hex.vtu";
-        case Test::Cuboid:
-            return "cuboid.vtu";
-
-        case Test::Sector1:
-            return "sector_1.vtu";
-        case Test::Sector2:
-            return "sector_2.vtu";
-        case Test::Sector3:
-            return "sector_3.vtu";
-        case Test::Disk:
-            return "disk.vtu";
-
-        case Test::BlockStruct1:
-            return "block_structured_1.vtu";
-        case Test::BlockStruct2:
-            return "block_structured_2.vtu";
-        case Test::BlockStruct3:
-            return "block_structured_3.vtu";
-        default:
-            throw std::runtime_error("Unknown test");
     }
 }
 
@@ -450,30 +361,77 @@ Generator::Ptr create_block_structured3() {
     return gen;
 }
 
-Generator::Ptr get_generator(Test test) {
+Test::Test(TestType test) {
     switch (test) {
         case Test::Rectangle:
-            return create_rectangle();
+            name = "Rectangle";
+            file = "rectangle.vtu";
+            desc = "Декартова сетка в прямоуольнике.";
+            generator = create_rectangle();
+            break;
+
         case Test::RectangleHex:
-            return create_rectangle_hex();
+            name = "RectangleHex";
+            file = "rectangle_hex.vtu";
+            desc = "Сетка из шестиугольников в прямоугольнике.";
+            generator = create_rectangle_hex();
+            break;
+
         case Test::Cuboid:
-            return create_cuboid();
+            name = "Cuboid";
+            file = "cuboid.vtu";
+            desc = "Декартова сетка в прямоугольном параллелепипеде.";
+            generator = create_cuboid();
+            break;
 
         case Test::Sector1:
-            return create_sector1();
+            name = "Sector 1";
+            file = "sector_1.vtu";
+            desc = "Сетка в секторе с выколотым центром.";
+            generator = create_sector1();
+            break;
+
         case Test::Sector2:
-            return create_sector2();
+            name = "Sector 2";
+            file = "sector_2.vtu";
+            desc = "Сетка в секторе (угол раствора < п)";
+            generator = create_sector2();
+            break;
+
         case Test::Sector3:
-            return create_sector3();
+            name = "Sector 3";
+            file = "sector_3.vtu";
+            desc = "Сетка в секторе (угол раствора > п)";
+            generator = create_sector3();
+            break;
+
         case Test::Disk:
-            return create_disk();
+            name = "Disk";
+            file = "disk.vtu";
+            desc = "Блочно-структурированная сетка в круге.";
+            generator = create_disk();
+            break;
 
         case Test::BlockStruct1:
-            return create_block_structured1();
+            name = "Block Structured 1";
+            file = "block_structured_1.vtu";
+            desc = "Блочно-структурированная сетка №1.";
+            generator = create_block_structured1();
+            break;
+
         case Test::BlockStruct2:
-            return create_block_structured2();
+            name = "Block Structured 2";
+            file = "block_structured_2.vtu";
+            desc = "Блочно-структурированная сетка №2.";
+            generator = create_block_structured2();
+            break;
+
         case Test::BlockStruct3:
-            return create_block_structured3();
+            name = "Block Structured 3";
+            file = "block_structured_3.vtu";
+            desc = "Блочно-структурированная сетка №3.";
+            generator = create_block_structured3();
+            break;
 
         default:
             throw std::runtime_error("Unknown test");
@@ -499,4 +457,10 @@ void fill(AmrStorage& cells) {
         cell(U).uid = ic;
         cell(U).val = std::cos(1.0 / (r.squaredNorm() / (L * L) + 0.03));
     }
+}
+
+EuMesh Test::generate() const {
+    EuMesh mesh(U, generator.get());
+    fill(mesh);
+    return mesh;
 }

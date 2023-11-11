@@ -83,7 +83,7 @@ public:
 
     static GCell quad(const std::array<GNode::Ptr, 4>& nodes);
 
-    static GCell polygon(const std::vector<GNode::Ptr>& nodes);
+    static GCell polygon(std::vector<GNode::Ptr> nodes);
 
     static GCell tetra(const std::array<GNode::Ptr, 4>& nodes);
 

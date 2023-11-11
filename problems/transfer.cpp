@@ -35,6 +35,10 @@ double normal_x(AmrStorage::Item& cell) { return cell(U).n.x(); }
 
 double normal_y(AmrStorage::Item& cell) { return cell(U).n.y(); }
 
+double point_x(AmrStorage::Item& cell) { return cell(U).p.x(); }
+
+double point_y(AmrStorage::Item& cell) { return cell(U).p.y(); }
+
 double get_over(AmrStorage::Item& cell) {
     auto u = cell(U).u1;
     if (u < 0.0) {
@@ -48,6 +52,11 @@ double get_over(AmrStorage::Item& cell) {
     }
 }
 
+double get_close(AmrStorage::Item& cell) {
+    auto u = cell(U).u1;
+    return std::abs(u < 0.5 ? u : 1.0 - u);
+}
+
 const double margin = 0.2198;
 
 inline double sqr(double x) {
@@ -55,7 +64,7 @@ inline double sqr(double x) {
 }
 
 // Начальное условие в виде полосы
-void setup_initial_0(Mesh& mesh, double D) {
+void setup_initial_0(EuMesh& mesh, double D) {
     // Обычной блок с резкими границами
     auto func1 = [](double x) -> double {
         return (0.1 < x && x < 0.2) ? 1.0 : 0.0;
@@ -99,7 +108,7 @@ void setup_initial_0(Mesh& mesh, double D) {
 }
 
 // Начальное условие в виде круга
-void setup_initial_1(Mesh& mesh, double D) {
+void setup_initial_1(EuMesh& mesh, double D) {
     double R = D / 2.0;
     Vector3d vc = {R + margin, R + margin, 0.0};
     for (auto cell: mesh) {
@@ -109,7 +118,7 @@ void setup_initial_1(Mesh& mesh, double D) {
 }
 
 // Начальное условие в виде квадрата
-void setup_initial_2(Mesh& mesh, double D) {
+void setup_initial_2(EuMesh& mesh, double D) {
     double x_min = margin;
     double x_max = D + x_min;
     double y_min = margin;
@@ -128,7 +137,7 @@ void setup_initial_2(Mesh& mesh, double D) {
 }
 
 // Объем тела
-double volume(Mesh& cells) {
+double volume(EuMesh& cells) {
     double sum = 0.0;
     for (auto cell: cells) {
         sum += cell.volume() * cell(U).u1;
@@ -146,10 +155,13 @@ int main() {
     pvd.variables += {"lvl", get_lvl};
     pvd.variables += {"n.x", normal_x};
     pvd.variables += {"n.y", normal_y};
+    pvd.variables += {"p.x", point_x};
+    pvd.variables += {"p.y", point_y};
     pvd.variables += {"over", get_over};
+    pvd.variables += {"close", get_close};
 
     // Геометрия области
-    Rectangle rect(0.0, 1.0, 0.0, 1.0, false);
+    Rectangle rect(0.0, 1.0, 0.0, 1.0, true);
     rect.set_nx(200);
     rect.set_boundaries({
         .left   = Boundary::ZOE, .right = Boundary::ZOE,
@@ -160,7 +172,7 @@ int main() {
     solver.set_CFL(0.5);
 
     // Создать сетку
-    Mesh mesh(U, &rect);
+    EuMesh mesh(U, &rect);
 
     // Настраиваем адаптацию
     mesh.set_max_level(0);
@@ -190,6 +202,9 @@ int main() {
 
     while(curr_time < 10.0 && n_step < 200) {
         if (curr_time >= next_write) {
+            solver.compute_normals(mesh);
+            solver.find_sections(mesh);
+
             std::cout << "\tШаг: " << std::setw(6) << n_step << ";"
                       << "\tВремя: " << std::setw(8) << std::setprecision(3) << std::fixed
                       << curr_time << ";";
@@ -200,8 +215,6 @@ int main() {
 
             pvd.save(mesh.locals(), curr_time);
 
-            solver.compute_normals(mesh);
-            solver.find_sections(mesh);
             AmrStorage body = solver.body(mesh);
             pvd_body.save(body, curr_time);
             next_write += 0.0;

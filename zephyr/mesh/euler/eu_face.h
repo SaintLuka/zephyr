@@ -3,9 +3,9 @@
 #include <zephyr/geom/primitives/basic_face.h>
 
 
-namespace zephyr { namespace mesh {
+namespace zephyr::mesh {
 
-class ICell;
+class EuCell;
 using zephyr::geom::AmrFace;
 using zephyr::geom::Boundary;
 using zephyr::geom::Vector3d;
@@ -13,13 +13,13 @@ using zephyr::geom::Direction;
 
 /// @brief Обертка для типа geom::Face, реализует интерфейс грани,
 /// необходимый для работы. Также содержит несколько новых функций.
-class IFace {
+class EuFace {
 public:
     /// @brief Создать грань по ячейке
     /// @param cell Ячейка сетки
     /// @param fid Индекс грани в ячейке
     /// @param dir Выбирать грани с определенным направлением
-    IFace(const ICell &cell, int fid,
+    EuFace(const EuCell &cell, int fid,
             Direction dir = Direction::ANY);
 
     //AmrFace& face();
@@ -31,11 +31,11 @@ public:
 
     /// @brief Ячейка по внешней нормали, на границе сетки возвращается
     /// сама ячейка
-    ICell neib() const;
+    EuCell neib() const;
 
     /// @brief Ячейка по внешней нормали, на границе сетки возвращается
     /// сама ячейка
-    ICell neighbor() const;
+    EuCell neighbor() const;
 
     /// @brief Флаг граничных условий
     Boundary flag() const;
@@ -66,43 +66,42 @@ public:
         return geom().adjacent;
     }
 
-    IFace &operator++() {
+    EuFace &operator++() {
         do {
             ++face_idx;
         } while (face_idx < geom::AmrFaces::max_count && geom().to_skip(dir));
         return *this;
     }
 
-    bool operator!=(const IFace &iface) {
+    bool operator!=(const EuFace &iface) {
         return face_idx != iface.face_idx;
     }
 
-    IFace &operator*() {
+    EuFace &operator*() {
         return *this;
     }
 
 public:
-    const ICell &m_cell;  ///< Родительская ячейка
+    const EuCell &m_cell;  ///< Родительская ячейка
     int face_idx;         ///< Индекс грани в ячейке
     Direction dir;        ///< Направление
 };
 
 
 /// @brief Интерфейс для итерирования по граням ячейки
-class IFaces {
+class EuFaces {
 public:
 
-    IFaces(const ICell& cell,
+    EuFaces(const EuCell& cell,
             Direction dir = Direction::ANY);
 
-    IFace begin() const;
+    EuFace begin() const;
 
-    IFace end() const;
+    EuFace end() const;
 
 private:
-    const ICell &m_cell;  ///< Родительская ячейка
+    const EuCell &m_cell; ///< Родительская ячейка
     Direction dir;        ///< Направления граней
 };
 
-} // namespace mesh
-} // namespace zephyr
+} // namespace zephyr::mesh

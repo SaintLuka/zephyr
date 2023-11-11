@@ -16,7 +16,7 @@ Rectangle::Rectangle(YAML::Node config)
       m_voronoi(false) {
 
     if (!config["geometry"]) {
-        throw std::runtime_error("Mesh config doesn't contain 'geometry'");
+        throw std::runtime_error("EuMesh config doesn't contain 'geometry'");
     }
 
     m_xmin = config["geometry"]["x_min"].as<double>();
@@ -25,7 +25,7 @@ Rectangle::Rectangle(YAML::Node config)
     m_ymax = config["geometry"]["y_max"].as<double>();
 
     if (!config["boundary"]) {
-        throw std::runtime_error("Mesh config doesn't contain 'boundary'");
+        throw std::runtime_error("EuMesh config doesn't contain 'boundary'");
     }
     m_left_flag = boundary_from_string(config["boundary"]["left"].as<std::string>());
     m_right_flag = boundary_from_string(config["boundary"]["right"].as<std::string>());
@@ -419,6 +419,9 @@ Grid Rectangle::create_voronoi() const {
             ++n_cells;
         }
     }
+
+    grid.setup_adjacency();
+
     return grid;
 }
 

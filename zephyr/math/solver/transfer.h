@@ -1,11 +1,11 @@
 #pragma once
 
-#include <zephyr/mesh/mesh.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
 
 namespace zephyr { namespace math {
 
-using zephyr::mesh::ICell;
-using zephyr::mesh::Mesh;
+using zephyr::mesh::EuCell;
+using zephyr::mesh::EuMesh;
 using zephyr::mesh::AmrStorage;
 using zephyr::mesh::Distributor;
 using zephyr::geom::Vector3d;
@@ -43,49 +43,49 @@ public:
     virtual Vector3d velocity(const Vector3d& c) const;
 
     /// @brief Один шаг интегрирования по времени
-    void update(Mesh& mesh, int ver = 1);
+    void update(EuMesh& mesh, int ver = 1);
 
-    void compute_normals(Mesh& mesh, int smoothing = 0);
+    void compute_normals(EuMesh& mesh, int smoothing = 0);
 
-    void find_sections(Mesh& mesh);
+    void find_sections(EuMesh& mesh);
 
     /// @brief Установить флаги адаптации
-    void set_flags(Mesh& mesh);
+    void set_flags(EuMesh& mesh);
 
     /// @brief Распределитель данных при адаптации
     Distributor distributor() const;
 
-    AmrStorage body(Mesh& mesh);
+    AmrStorage body(EuMesh& mesh);
 
 protected:
 
     /// @brief Посчитать шаг интегрирования по времени с учетом
     /// условия Куранта
-    double compute_dt(ICell& cell);
+    double compute_dt(EuCell& cell);
 
-    double compute_dt(Mesh& mesh);
+    double compute_dt(EuMesh& mesh);
 
-    void find_section(ICell& cell);
+    void find_section(EuCell& cell);
 
     /// @brief Посчитать нормали
-    void compute_normal(ICell& cell);
+    void compute_normal(EuCell& cell);
 
-    void smooth_normal(ICell& cell);
+    void smooth_normal(EuCell& cell);
 
-    void update_ver1(Mesh& mesh);
+    void update_ver1(EuMesh& mesh);
 
-    void update_ver2(Mesh& mesh);
+    void update_ver2(EuMesh& mesh);
 
-    void update_ver3(Mesh& mesh);
+    void update_ver3(EuMesh& mesh);
 
     /// @brief Потоки по схеме CRP
-    void fluxes_CRP(ICell& cell, Direction dir = Direction::ANY);
+    void fluxes_CRP(EuCell& cell, Direction dir = Direction::ANY);
 
     /// @brief Потоки по аналогу VOF
-    void fluxes_VOF(ICell& cell, Direction dir = Direction::ANY);
+    void fluxes_VOF(EuCell& cell, Direction dir = Direction::ANY);
 
     /// @brief Потоки по схеме CRP, но a_sig выбирается по аналогу VOF
-    void fluxes_MIX(ICell& cell, Direction dir = Direction::ANY);
+    void fluxes_MIX(EuCell& cell, Direction dir = Direction::ANY);
 
 protected:
     double m_CFL;       ///< Число Куранта

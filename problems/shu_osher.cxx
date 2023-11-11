@@ -60,7 +60,7 @@ int main() {
     gen.set_boundaries({.left = Boundary::ZOE, .right = Boundary::ZOE});
 
     // Создать сетку
-    Mesh mesh(U, &gen);
+    EuMesh mesh(U, &gen);
 
     // Заполняем начальные данные
     Vector3d shift = -2.0*Vector3d::UnitX();

@@ -22,7 +22,7 @@ Vector3d SmFluid::velocity(const Vector3d& c) const {
     return Vector3d::UnitX();
 }
 
-double SmFluid::compute_dt(ICell &cell) {
+double SmFluid::compute_dt(EuCell &cell) {
     double max_area = 0.0;
     for (auto &face: cell.faces()) {
         max_area = std::max(max_area, face.area());
@@ -31,15 +31,15 @@ double SmFluid::compute_dt(ICell &cell) {
     return m_CFL * dx / velocity(cell.center()).norm();
 }
 
-void SmFluid::compute_grad(ICell &cell, int stage) {
+void SmFluid::compute_grad(EuCell &cell, int stage) {
 
 }
 
-void SmFluid::fluxes(ICell &cell, int stage) {
+void SmFluid::fluxes(EuCell &cell, int stage) {
 
 };
 
-void SmFluid::update(Mesh& mesh, IdealGas &eos) {
+void SmFluid::update(EuMesh& mesh, IdealGas &eos) {
     NumFlux::Ptr nf = HLL::create(); // ?
 
     for (auto cell: mesh) {

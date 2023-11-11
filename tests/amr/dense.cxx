@@ -2,7 +2,7 @@
 /// уровнем адаптации. Под большими областями понимаются области, которые имеют
 /// ту же меру размерности, что и сама область.
 
-#include <zephyr/mesh/mesh.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/io/pvd_file.h>
 #include <zephyr/io/variables.h>
@@ -83,7 +83,7 @@ struct Star {
     }
 };
 
-int solution_step(Mesh& mesh, Star& star) {
+int solution_step(EuMesh& mesh, Star& star) {
     for (auto cell: mesh) {
         cell(U).bit = star.is_inside(cell.center());
     }
@@ -112,7 +112,7 @@ int main() {
     Rectangle rect(-2.0, 2.0, -1.0, 1.0);
     rect.set_nx(20);
 
-    Mesh mesh(U, &rect);
+    EuMesh mesh(U, &rect);
 
     mesh.set_max_level(5);
 

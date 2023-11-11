@@ -32,7 +32,7 @@ void MmFluid::set_CFL(double CFL) {
     return m_dt;
 }
 
-void MmFluid::init_cells(Mesh &mesh, const phys::ClassicTest &test) {
+void MmFluid::init_cells(EuMesh &mesh, const phys::ClassicTest &test) {
     // Заполняем начальные данные
     for (auto cell: mesh) {
         cell(U).rho1 = test.density(cell.center());
@@ -42,7 +42,7 @@ void MmFluid::init_cells(Mesh &mesh, const phys::ClassicTest &test) {
     }
 }
 
-double MmFluid::compute_dt(Mesh &mesh) {
+double MmFluid::compute_dt(EuMesh &mesh) {
     m_dt = std::numeric_limits<double>::max();
     for (auto cell: mesh) {
         // скорость звука
@@ -63,7 +63,7 @@ double MmFluid::compute_dt(Mesh &mesh) {
     return m_dt;
 }
 
-void MmFluid::fluxes(Mesh &mesh) {
+void MmFluid::fluxes(EuMesh &mesh) {
     // Расчет по некоторой схеме
     for (auto cell: mesh) {
         // Примитивный вектор в ячейке
@@ -116,7 +116,7 @@ void MmFluid::fluxes(Mesh &mesh) {
     }
 }
 
-void MmFluid::update(Mesh &mesh) {
+void MmFluid::update(EuMesh &mesh) {
     for (auto cell: mesh) {
         std::swap(cell(U).rho1, cell(U).rho2);
         std::swap(cell(U).v1, cell(U).v2);

@@ -7,6 +7,7 @@ set(ZEPHYR_GEOM_SRC
         ${CMAKE_CURRENT_SOURCE_DIR}/box.cxx
         ${CMAKE_CURRENT_SOURCE_DIR}/geom.cxx
         ${CMAKE_CURRENT_SOURCE_DIR}/maps.cxx
+        ${CMAKE_CURRENT_SOURCE_DIR}/polygon.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/grid.cpp
         PARENT_SCOPE
 )
@@ -16,6 +17,7 @@ install(FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/box.h
         ${CMAKE_CURRENT_SOURCE_DIR}/geom.h
         ${CMAKE_CURRENT_SOURCE_DIR}/maps.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/polygon.h
         ${CMAKE_CURRENT_SOURCE_DIR}/grid.h
         DESTINATION include/${PROJECT_NAME}/geom
 )

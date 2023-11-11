@@ -18,6 +18,14 @@ AmrFaces::AmrFaces(int dim) {
     }
 }
 
+AmrFaces::AmrFaces(bool polygon, int size) {
+    for (int i = 0; i < size; ++i) {
+        m_list[i].vertices = {i, (i + 1) % size,
+                              face_indices::undef(),
+                              face_indices::undef()};
+    }
+}
+
 int AmrFaces::count() const {
     int count = 0;
     for (auto& face: m_list) {

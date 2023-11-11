@@ -26,7 +26,7 @@ PlaneWithHole::PlaneWithHole(YAML::Node config) :
         m_hole_flag(Boundary::UNDEFINED) {
 
     if (!config["geometry"]) {
-        throw std::runtime_error("Mesh config doesn't contain 'geometry'");
+        throw std::runtime_error("EuMesh config doesn't contain 'geometry'");
     }
 
     m_xmin = config["geometry"]["x_min"].as<double>();
@@ -42,7 +42,7 @@ PlaneWithHole::PlaneWithHole(YAML::Node config) :
     }
 
     if (!config["boundary"]) {
-        throw std::runtime_error("Mesh config doesn't contain 'boundary'");
+        throw std::runtime_error("EuMesh config doesn't contain 'boundary'");
     }
     m_left_flag   = boundary_from_string(config["boundary"]["left"].as<std::string>());
     m_right_flag  = boundary_from_string(config["boundary"]["right"].as<std::string>());

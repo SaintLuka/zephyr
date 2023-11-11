@@ -1,6 +1,6 @@
 #pragma once
 
-#include <zephyr/mesh/mesh.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/math/cfd/limiter.h>
 #include "zephyr/phys/eos/eos.h"
 #include "zephyr/phys/tests/classic_test.h"
@@ -9,8 +9,8 @@
 
 namespace zephyr { namespace math {
 
-using zephyr::mesh::ICell;
-using zephyr::mesh::Mesh;
+using zephyr::mesh::EuCell;
+using zephyr::mesh::EuMesh;
 using zephyr::mesh::Distributor;
 using zephyr::geom::Vector3d;
 
@@ -50,17 +50,17 @@ public:
     [[nodiscard]] double dt() const;
 
     /// @brief Проинициализировать значения в ячейках согласно тесту
-    void init_cells(Mesh &mesh, const phys::ClassicTest &test);
+    void init_cells(EuMesh &mesh, const phys::ClassicTest &test);
 
     /// @brief Посчитать шаг интегрирования по времени с учетом
     /// условия Куранта
-    double compute_dt(Mesh &mesh);
+    double compute_dt(EuMesh &mesh);
 
     /// @brief Расчёт потоков
-    void fluxes(Mesh &mesh);
+    void fluxes(EuMesh &mesh);
 
     /// @brief Обновление ячеек
-    void update(Mesh &mesh);
+    void update(EuMesh &mesh);
 
     ~MmFluid() = default;
 

@@ -47,54 +47,56 @@ struct Handler {
         auto& faces = cell.faces;
         auto& vertices = cell.vertices;
 
-        // Если последняя вершина (8 или 26) определена, значит все вершины
-        // заполнены и перед нами AMR ячейка
-        if (dim < 3) {
-            if (hex_only) {
-                return 9; // VTK_QUAD
-            } else {
-                if (faces[Side::LEFT1].is_actual() ||
-                    faces[Side::RIGHT1].is_actual() ||
-                    faces[Side::BOTTOM1].is_actual() ||
-                    faces[Side::TOP1].is_actual()) {
-                    return 7; // VTK_POLYGON
-                } else {
+        if (cell.adaptive) {
+            // Адаптивная ячейка
+            if (dim < 3) {
+                if (hex_only) {
                     return 9; // VTK_QUAD
+                } else {
+                    if (faces[Side::LEFT1].is_actual() ||
+                        faces[Side::RIGHT1].is_actual() ||
+                        faces[Side::BOTTOM1].is_actual() ||
+                        faces[Side::TOP1].is_actual()) {
+                        return 7; // VTK_POLYGON
+                    } else {
+                        return 9; // VTK_QUAD
+                    }
+                }
+            } else {
+                return 12; // VTK_HEXAHEDRON
+
+                // В будущем использовать TRIQUADRIC HEXAHEDRON
+                // return 29; // VTK_TRIQUADRIC_HEXAHEDRON
+            }
+        }
+        else {
+            // Обычная эйлерова ячейка
+            int n = vertices.count();
+
+            if (dim < 3) {
+                // Двумерный полигон
+                switch (n) {
+                    case 3:
+                        return 5; // VTK_TRIANGLE
+                    case 4:
+                        return 9; // VTK_QUAD
+                    default:
+                        return 7; // VTK_POLYGON
+                }
+            } else {
+                // Один из доступных примитивов
+                switch (n) {
+                    case 4:
+                        return 10; // VTK_TETRA
+                    case 5:
+                        return 14; // VTK_PYRAMID
+                    case 6:
+                        return 13; // VTK_WEDGE
+                    default:
+                        return 12; // VTK_HEXAHEDRON
                 }
             }
-        } else {
-            return 12; // VTK_HEXAHEDRON
-
-            // В будущем использовать TRIQUADRIC HEXAHEDRON
-            // return 29; // VTK_TRIQUADRIC_HEXAHEDRON
         }
-
-        /*
-        // В обратном случае это полигон или обычный трехмерный элемент
-        int n = vertices.size();
-
-        if (dim < 3) {
-            switch (n) {
-                case 3:
-                    return 5; // VTK_TRIANGLE
-                case 4:
-                    return 9; // VTK_QUAD
-                default:
-                    return 7; // VTK_POLYGON
-            }
-        } else {
-            switch (n) {
-                case 4:
-                    return 10; // VTK_TETRA
-                case 5:
-                    return 14; // VTK_PYRAMID
-                case 6:
-                    return 13; // VTK_WEDGE
-                default:
-                    return 12; // VTK_HEXAHEDRON
-            }
-        }
-         */
     }
 
     /// @brief Количество вершин элемента
@@ -102,36 +104,37 @@ struct Handler {
         auto& faces = cell.faces;
         auto& vertices = cell.vertices;
 
-        // Если последняя вершина (8 или 26) определена, значит все вершины
-        // заполнены и перед нами AMR ячейка
-        if (dim < 3) {
-            if (hex_only) {
-                return 4;
+        if (cell.adaptive) {
+            // Адаптивная ячейка
+            if (dim < 3) {
+                if (hex_only) {
+                    return 4;
+                } else {
+                    int n = 4;
+                    if (faces[Side::LEFT1].is_actual()) {
+                        n += 1;
+                    }
+                    if (faces[Side::RIGHT1].is_actual()) {
+                        n += 1;
+                    }
+                    if (faces[Side::BOTTOM1].is_actual()) {
+                        n += 1;
+                    }
+                    if (faces[Side::TOP1].is_actual()) {
+                        n += 1;
+                    }
+                    return n;
+                }
             } else {
-                int n = 4;
-                if (faces[Side::LEFT1].is_actual()) {
-                    n += 1;
-                }
-                if (faces[Side::RIGHT1].is_actual()) {
-                    n += 1;
-                }
-                if (faces[Side::BOTTOM1].is_actual()) {
-                    n += 1;
-                }
-                if (faces[Side::TOP1].is_actual()) {
-                    n += 1;
-                }
-                return n;
+                return 8;
+                // return hex_only ? 8 : 27; // Для VTK_TRIQUADRIC_HEXAHEDRON
             }
-        } else {
-            return 8;
-            // return hex_only ? 8 : 27; // Для VTK_TRIQUADRIC_HEXAHEDRON
         }
+        else {
+            // В обратном случае это полигон или обычный трехмерный элемент
+            return vertices.count();
 
-        /*
-        // В обратном случае это полигон или обычный трехмерный элемент
-        return vertices.size();
-         */
+        }
     }
 
     /// @brief Записать в файл координаты вершин элемента
@@ -139,62 +142,62 @@ struct Handler {
         auto& faces = cell.faces;
         auto& vertices = cell.vertices;
 
-        // Если последняя вершина (8 или 26) определена, значит все вершины
-        // заполнены и перед нами AMR ячейка
-        if (dim < 3) {
-            if (hex_only) {
-                // Сохраняем как простой четырехугольник (VTK_QUAD)
-                file.write((char *) vertices.vs<-1, -1>().data(), 3 * sizeof(double));
-                file.write((char *) vertices.vs<+1, -1>().data(), 3 * sizeof(double));
-                file.write((char *) vertices.vs<+1, +1>().data(), 3 * sizeof(double));
-                file.write((char *) vertices.vs<-1, +1>().data(), 3 * sizeof(double));
-                return;
+        if (cell.adaptive) {
+            // Адаптивная ячейка
+            if (dim < 3) {
+                if (hex_only) {
+                    // Сохраняем как простой четырехугольник (VTK_QUAD)
+                    file.write((char *) vertices.vs<-1, -1>().data(), 3 * sizeof(double));
+                    file.write((char *) vertices.vs<+1, -1>().data(), 3 * sizeof(double));
+                    file.write((char *) vertices.vs<+1, +1>().data(), 3 * sizeof(double));
+                    file.write((char *) vertices.vs<-1, +1>().data(), 3 * sizeof(double));
+                    return;
+                } else {
+                    // Сохраняем как полигон
+                    file.write((char *) vertices.vs<-1, -1>().data(), 3 * sizeof(double));
+                    if (faces[Side::BOTTOM1].is_actual()) {
+                        file.write((char *) vertices.vs<0, -1>().data(), 3 * sizeof(double));
+                    }
+
+                    file.write((char *) vertices.vs<+1, -1>().data(), 3 * sizeof(double));
+                    if (faces[Side::RIGHT1].is_actual()) {
+                        file.write((char *) vertices.vs<+1, 0>().data(), 3 * sizeof(double));
+                    }
+
+                    file.write((char *) vertices.vs<+1, +1>().data(), 3 * sizeof(double));
+                    if (faces[Side::TOP1].is_actual()) {
+                        file.write((char *) vertices.vs<0, +1>().data(), 3 * sizeof(double));
+                    }
+
+                    file.write((char *) vertices.vs<-1, +1>().data(), 3 * sizeof(double));
+                    if (faces[Side::LEFT1].is_actual()) {
+                        file.write((char *) vertices.vs<-1, 0>().data(), 3 * sizeof(double));
+                    }
+                    return;
+                }
             } else {
-                // Сохраняем как полигон
-                file.write((char *) vertices.vs<-1, -1>().data(), 3 * sizeof(double));
-                if (faces[Side::BOTTOM1].is_actual()) {
-                    file.write((char *) vertices.vs<0, -1>().data(), 3 * sizeof(double));
-                }
-
-                file.write((char *) vertices.vs<+1, -1>().data(), 3 * sizeof(double));
-                if (faces[Side::RIGHT1].is_actual()) {
-                    file.write((char *) vertices.vs<+1, 0>().data(), 3 * sizeof(double));
-                }
-
-                file.write((char *) vertices.vs<+1, +1>().data(), 3 * sizeof(double));
-                if (faces[Side::TOP1].is_actual()) {
-                    file.write((char *) vertices.vs<0, +1>().data(), 3 * sizeof(double));
-                }
-
-                file.write((char *) vertices.vs<-1, +1>().data(), 3 * sizeof(double));
-                if (faces[Side::LEFT1].is_actual()) {
-                    file.write((char *) vertices.vs<-1, 0>().data(), 3 * sizeof(double));
-                }
+                // Сохраняем как простой шестигранник (VTK_HEXAHEDRON)
+                file.write((char *) vertices.vs<-1, -1, -1>().data(), 3 * sizeof(double));
+                file.write((char *) vertices.vs<+1, -1, -1>().data(), 3 * sizeof(double));
+                file.write((char *) vertices.vs<+1, +1, -1>().data(), 3 * sizeof(double));
+                file.write((char *) vertices.vs<-1, +1, -1>().data(), 3 * sizeof(double));
+                file.write((char *) vertices.vs<-1, -1, +1>().data(), 3 * sizeof(double));
+                file.write((char *) vertices.vs<+1, -1, +1>().data(), 3 * sizeof(double));
+                file.write((char *) vertices.vs<+1, +1, +1>().data(), 3 * sizeof(double));
+                file.write((char *) vertices.vs<-1, +1, +1>().data(), 3 * sizeof(double));
                 return;
             }
-        } else {
-            // Сохраняем как простой шестигранник (VTK_HEXAHEDRON)
-            file.write((char *) vertices.vs<-1, -1, -1>().data(), 3 * sizeof(double));
-            file.write((char *) vertices.vs<+1, -1, -1>().data(), 3 * sizeof(double));
-            file.write((char *) vertices.vs<+1, +1, -1>().data(), 3 * sizeof(double));
-            file.write((char *) vertices.vs<-1, +1, -1>().data(), 3 * sizeof(double));
-            file.write((char *) vertices.vs<-1, -1, +1>().data(), 3 * sizeof(double));
-            file.write((char *) vertices.vs<+1, -1, +1>().data(), 3 * sizeof(double));
-            file.write((char *) vertices.vs<+1, +1, +1>().data(), 3 * sizeof(double));
-            file.write((char *) vertices.vs<-1, +1, +1>().data(), 3 * sizeof(double));
-            return;
         }
+        else {
+            // В обратном случае это полигон или обычный трехмерный элемент
 
-        /*
-        // В обратном случае это полигон или обычный трехмерный элемент
+            // В данном случае подразумеваем, что вершины пронумерованы
+            // в соответствии с соглашениями, принятыми в формате VTK
 
-        // В данном случае подразумеваем, что вершины пронумерованы
-        // в соответствии с соглашениями, принятыми в формате VTK
+            auto n_vertices = vertices.count();
 
-        auto n_vertices = vertices.size();
-
-        file.write((char *) vertices[0].data(), 3 * n_vertices * sizeof(double));
-         */
+            file.write((char *) vertices[0].data(), 3 * n_vertices * sizeof(double));
+        }
     }
 
     /// @brief Записать порядок вершин элемента

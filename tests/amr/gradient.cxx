@@ -1,7 +1,7 @@
 /// @file Тестирование AMR на задаче с медленно (по времени) и
 /// плавно (по координате) изменяющимися уровнями адаптации.
 
-#include <zephyr/mesh/mesh.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/io/pvd_file.h>
 #include <zephyr/io/variables.h>
@@ -39,7 +39,7 @@ Vector3d epitrochoid(double t) {
 }
 
 // Периодическая функция времени, с периодом = 1
-int calc_wanted(ICell& cell, int level, double t) {
+int calc_wanted(EuCell& cell, int level, double t) {
     double phi = 10 * M_PI * t;
     Vector3d C = epitrochoid(phi);
     Vector3d T = epitrochoid(phi + 1.0e-6) - epitrochoid(phi - 1.0e-6); // касательная
@@ -57,7 +57,7 @@ int calc_wanted(ICell& cell, int level, double t) {
     return std::max(0, std::min(wanted, level));
 }
 
-int solution_step(Mesh& mesh, double t = 0.0) {
+int solution_step(EuMesh& mesh, double t = 0.0) {
     for (auto& cell: mesh) {
         int wanted = cell(U).wanted;
         if (cell.level() < wanted) {
@@ -90,7 +90,7 @@ int main() {
     Rectangle rect(-1.0, 1.0, -1.0, 1.0);
     rect.set_nx(20);
 
-    Mesh mesh(U, &rect);
+    EuMesh mesh(U, &rect);
 
     mesh.set_max_level(5);
 

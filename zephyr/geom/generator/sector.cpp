@@ -16,7 +16,7 @@ Sector::Sector(YAML::Node config)
         m_inner_flag(Boundary::UNDEFINED), m_outer_flag(Boundary::UNDEFINED) {
 
     if (!config["geometry"]) {
-        throw std::runtime_error("Mesh config doesn't contain 'geometry'");
+        throw std::runtime_error("EuMesh config doesn't contain 'geometry'");
     }
 
     m_r1 = config["geometry"]["r_min"].as<double>();
@@ -32,7 +32,7 @@ Sector::Sector(YAML::Node config)
     init_params();
 
     if (!config["boundary"]) {
-        throw std::runtime_error("Mesh config doesn't contain 'boundary'");
+        throw std::runtime_error("EuMesh config doesn't contain 'boundary'");
     }
 
     m_left_flag = Boundary::UNDEFINED;

@@ -6,9 +6,9 @@
 #include <zephyr/geom/generator/generator.h>
 
 #include <zephyr/geom/primitives/amr_cell.h>
-#include <zephyr/mesh/cell.h>
+#include <zephyr/mesh/euler/eu_cell.h>
 #include <zephyr/mesh/storage.h>
-#include <zephyr/mesh/distributor.h>
+#include <zephyr/mesh/euler/distributor.h>
 
 
 namespace zephyr::mesh {
@@ -16,25 +16,25 @@ namespace zephyr::mesh {
 using zephyr::utils::threads;
 using namespace zephyr::geom;
 
-class Mesh {
+class EuMesh {
 public:
 
     template<class T>
-    Mesh(const T &val, Generator *gen)
+    EuMesh(const T &val, Generator *gen)
             : m_locals(val), m_aliens(val) {
         initialize(gen->make());
     }
 
     template <class T>
-    Mesh(const T&val, const Grid& grid)
+    EuMesh(const T&val, const Grid& grid)
             : m_locals(val), m_aliens(val) {
         initialize(grid);
     }
 
 
-    ICell begin() { return {m_locals, m_aliens, 0}; }
+    EuCell begin() { return {m_locals, m_aliens, 0}; }
 
-    ICell end() { return {m_locals, m_aliens, m_locals.size()}; }
+    EuCell end() { return {m_locals, m_aliens, m_locals.size()}; }
 
     operator AmrStorage &() { return m_locals; }
 
@@ -71,14 +71,14 @@ public:
     }
 
     template<int n_tasks_per_thread = 1, class Func,
-            class Value = typename std::result_of<Func(ICell)>::type>
+            class Value = typename std::result_of<Func(EuCell)>::type>
     auto min(const Value &init, Func &&func)
     -> typename std::enable_if<!std::is_void<Value>::value, Value>::type {
         return threads::min<n_tasks_per_thread>(begin(), end(), init, std::forward<Func>(func));
     }
 
     template<int n_tasks_per_thread = 1, class Func,
-            class Value = typename std::result_of<Func(ICell)>::type>
+            class Value = typename std::result_of<Func(EuCell)>::type>
     auto min(Func &&func)
     -> typename std::enable_if<std::is_arithmetic<Value>::value, Value>::type {
         return threads::min<n_tasks_per_thread>(begin(), end(), std::forward<Func>(func));

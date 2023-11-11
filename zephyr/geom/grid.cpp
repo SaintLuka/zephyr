@@ -132,8 +132,33 @@ GCell GCell::quad(const std::array<GNode::Ptr, 4>& nodes) {
     return cell;
 }
 
-GCell GCell::polygon(const std::vector<GNode::Ptr>& nodes) {
-    throw std::runtime_error("POLY");
+GCell GCell::polygon(std::vector<GNode::Ptr> nodes) {
+    GCell cell(CellType::POLYGON);
+
+    int n_nodes = nodes.size();
+
+    Vector3d c = Vector3d::Zero();
+    for (auto& n: nodes) {
+        c += n->v;
+    }
+    c /= n_nodes;
+
+    std::sort(nodes.begin(), nodes.end(),
+              [&c](GNode::Ref a, GNode::Ref b) -> bool {
+                  double phi_a = std::atan2(a->v.y() - c.y(), a->v.x() - c.x());
+                  double phi_b = std::atan2(b->v.y() - c.y(), b->v.x() - c.x());
+                  return phi_a < phi_b;
+              });
+
+    cell.m_nodes = nodes;
+
+    cell.m_faces.resize(n_nodes);
+    for (int i = 0; i < n_nodes; ++i) {
+        cell.m_faces[i] = {i, (i + 1) % n_nodes};
+    }
+
+    cell.m_neibs.resize(n_nodes, -1);
+    return cell;
 }
 
 GCell GCell::tetra(const std::array<GNode::Ptr, 4>& nodes) {
@@ -354,7 +379,7 @@ AmrCell Grid::amr_cell(int idx) const {
         auto v3 = m_nodes[gcell.node(3).index];
         auto v4 = m_nodes[gcell.node(2).index];
 
-        Quad vlist = {v1->v, v2->v, v3->v, v4->v };
+        Quad vlist = {v1->v, v2->v, v3->v, v4->v};
 
         AmrCell cell(vlist);
 
@@ -442,6 +467,42 @@ AmrCell Grid::amr_cell(int idx) const {
         cell.faces[Side::T].adjacent.index = gcell.adjacent({v6, v7, v2, v3});
         cell.faces[Side::X].adjacent.index = gcell.adjacent({v0, v1, v2, v3});
         cell.faces[Side::F].adjacent.index = gcell.adjacent({v4, v5, v6, v7});
+
+        return cell;
+    }
+    else if (gcell.type() == CellType::POLYGON) {
+        int n_nodes = gcell.n_nodes();
+
+        std::vector<GNode::Ptr> nodes(n_nodes, nullptr);
+
+        geom::PolygonD poly(n_nodes);
+
+        for (int i = 0; i < n_nodes; ++i) {
+            nodes[i] = m_nodes[gcell.node(i).index];
+            poly[i]  = nodes[i]->v;
+        }
+
+        AmrCell cell(poly);
+
+        cell.rank  = mpi::rank();
+        cell.index = idx;
+
+        // Данные AMR
+        cell.b_idx = idx;
+        cell.z_idx = 0;
+        cell.next  = 0;
+        cell.level = 0;
+        cell.flag  = 0;
+
+        for (int i = 0; i < n_nodes; ++i) {
+            GNode::Ref v1 = nodes[cell.faces[i].vertices[0]];
+            GNode::Ref v2 = nodes[cell.faces[i].vertices[1]];
+
+            cell.faces[i].boundary = gcell.boundary({v1, v2});
+            cell.faces[i].adjacent.rank = 0;
+            cell.faces[i].adjacent.ghost = -1;
+            cell.faces[i].adjacent.index = gcell.adjacent({v1, v2});
+        }
 
         return cell;
     }

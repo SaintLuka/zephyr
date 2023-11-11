@@ -4,9 +4,9 @@
 #include <zephyr/utils/stopwatch.h>
 #include <zephyr/geom/primitives/amr_cell.h>
 
-#include <zephyr/mesh/cell.h>
+#include <zephyr/mesh/euler/eu_cell.h>
 
-#include <zephyr/mesh/mesh.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
 
 #include <zephyr/mesh/amr/apply.h>
 #include <zephyr/mesh/amr/balancing.h>
@@ -20,7 +20,7 @@ using zephyr::utils::mpi;
 using zephyr::utils::Stopwatch;
 
 
-void Mesh::init_amr() {
+void EuMesh::init_amr() {
     m_max_level = 0;
 
     if (m_locals.empty()) {
@@ -46,26 +46,26 @@ void Mesh::init_amr() {
     }
 }
 
-int Mesh::max_level() const {
+int EuMesh::max_level() const {
     return m_max_level;
 }
 
-void Mesh::set_max_level(int max_level) {
+void EuMesh::set_max_level(int max_level) {
     m_max_level = std::max(0, std::min(max_level, 15));
 }
 
-void Mesh::set_distributor(Distributor distr) {
+void EuMesh::set_distributor(Distributor distr) {
     distributor = std::move(distr);
 }
 
-void Mesh::refine() {
+void EuMesh::refine() {
     static Stopwatch balance;
     static Stopwatch apply;
     static Stopwatch full;
 
     // Для однопроцессорной версии при пустой сетке сразу выход
     if (mpi::is_single() && m_locals.empty()) {
-        throw std::runtime_error("Mesh::refine() error: Empty mesh");
+        throw std::runtime_error("EuMesh::refine() error: Empty mesh");
     }
 
     full.resume();

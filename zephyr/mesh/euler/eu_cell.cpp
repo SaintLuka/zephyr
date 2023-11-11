@@ -1,5 +1,5 @@
 #include <zephyr/geom/primitives/amr_cell.h>
-#include <zephyr/mesh/cell.h>
+#include <zephyr/mesh/euler/eu_cell.h>
 
 namespace zephyr::mesh {
 
@@ -30,51 +30,51 @@ AmrStorage::Iterator safe_iterator(AmrStorage &locals, AmrStorage &aliens, const
     }
 }
 
-ICell::ICell(AmrStorage &_locals, AmrStorage &_aliens, int idx)
+EuCell::EuCell(AmrStorage &_locals, AmrStorage &_aliens, int idx)
     : m_it(safe_iterator(_locals, _aliens, idx)),
       m_locals(_locals), m_aliens(_aliens) {
 
 }
 
-ICell::ICell(AmrStorage &_locals, AmrStorage &_aliens, const Adjacent &adj)
+EuCell::EuCell(AmrStorage &_locals, AmrStorage &_aliens, const Adjacent &adj)
     : m_it(safe_iterator(_locals, _aliens, adj)),
       m_locals(_locals), m_aliens(_aliens) {
 
 }
 
-ICell ICell::locals(int idx) {
+EuCell EuCell::locals(int idx) {
     return { m_locals, m_aliens, idx };
 }
 
-ICell ICell::neib(const AmrFace &face) const {
+EuCell EuCell::neib(const AmrFace &face) const {
     return { m_locals, m_aliens, face.adjacent };
 }
 
-ICell ICell::neighbor(const AmrFace &face) const {
+EuCell EuCell::neighbor(const AmrFace &face) const {
     return { m_locals, m_aliens, face.adjacent };
 }
 
-ICell ICell::neib(const IFace &face) const {
+EuCell EuCell::neib(const EuFace &face) const {
     return { m_locals, m_aliens, face.adjacent() };
 }
 
-ICell ICell::neighbor(const IFace &face) const {
+EuCell EuCell::neighbor(const EuFace &face) const {
     return { m_locals, m_aliens, face.adjacent() };
 }
 
-ICell ICell::neib(int face_idx) const {
+EuCell EuCell::neib(int face_idx) const {
     return { m_locals, m_aliens, m_it->faces[face_idx].adjacent };
 }
 
-ICell ICell::neighbor(int face_idx) const {
+EuCell EuCell::neighbor(int face_idx) const {
     return { m_locals, m_aliens, m_it->faces[face_idx].adjacent };
 }
 
-IFaces ICell::faces(Direction dir) const {
+EuFaces EuCell::faces(Direction dir) const {
     return { *this, dir };
 }
 
-void ICell::print_neibs_info() const {
+void EuCell::print_neibs_info() const {
     m_it->print_info();
 
     std::cout << "\tAll neighbors of cell:\n";

@@ -1,164 +1,14 @@
 #include <zephyr/math/solver/transfer.h>
 
 #include <zephyr/geom/geom.h>
+#include <zephyr/geom/polygon.h>
 #include <zephyr/math/cfd/face_extra.h>
 #include <zephyr/geom/primitives/basic_face.h>
 
-namespace zephyr { namespace math {
+namespace zephyr::math {
 
 using mesh::AmrStorage;
 using namespace geom;
-Vector3d intersection(const Vector3d& v1, const Vector3d& v2,
-                      const Vector3d& p, const Vector3d& n) {
-    //return 0.5*(v1 + v2);
-    double xi = (v1 - p).dot(n) / ((v1 - v2).dot(n));
-    if (std::isnan(xi)) {
-        xi = 0.0;
-    }
-    xi = std::max(0.0, std::min(xi, 1.0));
-    return (1.0 - xi) * v1 + xi * v2;
-}
-
-template <int N>
-struct Polygon {
-
-    Polygon(const AmrCell& cell) {
-
-        int idx_a = cell.faces[Side::L].vertices[0];
-        int idx_b = cell.faces[Side::L].vertices[1];
-        int idx_c = cell.faces[Side::R].vertices[0];
-        int idx_d = cell.faces[Side::R].vertices[1];
-
-        //std::cout << idx_a << " " << idx_b << " " << idx_c << " " << idx_d << "\n";
-        //throw std::runtime_error("kek");
-
-        vertices[0] = (Vector3d &) cell.vertices[0];
-        vertices[1] = (Vector3d &) cell.vertices[6];
-        vertices[2] = (Vector3d &) cell.vertices[2];
-        vertices[3] = (Vector3d &) cell.vertices[8];
-
-        init();
-    }
-
-    Polygon(const std::array<Vector3d, N>& vlist)
-            : vertices(vlist) {
-        init();
-    }
-
-    void init() {
-        center = {0.0, 0.0, 0.0};
-        for(auto& v: vertices) {
-            center += v;
-        }
-        center /= N;
-
-        std::sort(vertices.begin(), vertices.end(),
-                  [this](Vector3d& a, Vector3d& b) -> bool {
-                      double phi_a = std::atan2(a.y() - center.y(), a.x() - center.x());
-                      double phi_b = std::atan2(b.y() - center.y(), b.x() - center.x());
-                      return phi_a < phi_b;
-                  });
-
-        area = geom::area(std::vector<Vector3d>({vertices[0], vertices[1], vertices[2], vertices[3]}));
-    }
-
-    // Отсечь от полигона часть плоскостью с внешней нормалью n,
-    // проходящую через точку p.
-    VerticesList cut(Vector3d p, Vector3d n) {
-        std::array<bool, N> inside;
-        for (int i = 0; i < N; ++i) {
-            inside[i] = (vertices[i] - p).dot(n) <= 0.0;
-        }
-
-        int i2o = -1;
-        int o2i = -1;
-        for (int i = 0; i < N; ++i) {
-            int j = (i + 1) % N;
-
-            if (inside[i] && !inside[j]) {
-                i2o = i;
-            }
-            if (!inside[i] && inside[j]) {
-                o2i = i;
-            }
-        }
-
-        // нет пересечений
-        if (i2o < 0 || o2i < 0) {
-            if (inside[0]) {
-                return {
-                        vertices[0],
-                        vertices[1],
-                        vertices[2],
-                        vertices[3]
-                };
-            }
-            else {
-                return {};
-            }
-        }
-
-        VerticesList vlist;
-        vlist.reserve(6);
-
-        for (int i = 0; i < N; ++i) {
-            if (inside[i]) {
-                vlist.push_back(vertices[i]);
-            }
-            if (i == i2o || i == o2i) {
-                int j = (i + 1) % N;
-                vlist.push_back(intersection(vertices[i], vertices[j], p, n));
-            }
-        }
-
-        return vlist;
-    }
-
-    double cut_volume(Vector3d& p, Vector3d& n) {
-        auto vlist = cut(p, n);
-        return vlist.empty() ? 0.0 : geom::area(vlist);
-    }
-
-    Vector3d find_section(Vector3d& n, double alpha) {
-        auto comp = [&n](Vector3d &a, Vector3d &b) -> bool {
-            return a.dot(n) < b.dot(n);
-        };
-        Vector3d v_min = *std::min_element(vertices.begin(), vertices.end(), comp);
-        Vector3d v_max = *std::max_element(vertices.begin(), vertices.end(), comp);
-
-        if (alpha < 1.0e-7) {
-            return v_min;
-        } else if (alpha > 1.0 - 1.0e-7) {
-            return v_max;
-        }
-
-        Vector3d v_avg = 0.5 * (v_min + v_max);
-
-        double f_min = cut_volume(v_min, n) - alpha * area;
-        double f_avg = cut_volume(v_avg, n) - alpha * area;
-        double f_max = cut_volume(v_max, n) - alpha * area;
-
-        while (f_max - f_min > 1.0e-3 * area) {
-            if (f_avg < 0.0) {
-                v_min = v_avg;
-                f_min = f_avg;
-            } else {
-                v_max = v_avg;
-                f_max = f_avg;
-            }
-
-            v_avg = 0.5 * (v_min + v_max);
-            f_avg = cut_volume(v_avg, n) - alpha * area;
-        }
-
-        v_avg = v_min - f_min * (v_max - v_min) / (f_max - f_min);
-        return v_avg;
-    }
-
-    Vector3d center;
-    double area;
-    std::array<Vector3d, N> vertices;
-};
 
 static const Transfer::State U = Transfer::datatype();
 
@@ -187,7 +37,7 @@ Vector3d Transfer::velocity(const Vector3d& c) const {
     return Vector3d::UnitX();
 }
 
-double Transfer::compute_dt(ICell &cell) {
+double Transfer::compute_dt(EuCell &cell) {
     double max_area = 0.0;
     for (auto &face: cell.faces()) {
         max_area = std::max(max_area, face.area());
@@ -196,7 +46,7 @@ double Transfer::compute_dt(ICell &cell) {
     return m_CFL * dx / velocity(cell.center()).norm();
 }
 
-double Transfer::compute_dt(Mesh& mesh) {
+double Transfer::compute_dt(EuMesh& mesh) {
     double dt = std::numeric_limits<double>::max();
     for (auto &cell: mesh) {
         dt = std::min(dt, compute_dt(cell));
@@ -262,7 +112,7 @@ double face_fraction(double a1, double a2) {
     return std::max(a_min, std::min(a_sig, a_max));
 }
 
-void Transfer::fluxes_CRP(ICell &cell, Direction dir) {
+void Transfer::fluxes_CRP(EuCell &cell, Direction dir) {
     auto &zc = cell(U);
     double a1 = zc.u1;
 
@@ -293,8 +143,8 @@ void Transfer::fluxes_CRP(ICell &cell, Direction dir) {
 // Предполагаем verts > 0.0
 double flux_VOF(double a, Vector3d& p, Vector3d& n, const AmrCell& cell, const AmrFace& face, double vs, double dt) {
     // Типа upwind
-    Vector3d v1 = (Vector3d &) cell.vertices[face.vertices[0]];
-    Vector3d v2 = (Vector3d &) cell.vertices[face.vertices[1]];
+    Vector3d v1 = cell.vertices[face.vertices[0]];
+    Vector3d v2 = cell.vertices[face.vertices[1]];
     Vector3d v3 = v1 - dt * vs * face.normal;
     Vector3d v4 = v2 - dt * vs * face.normal;
 
@@ -303,12 +153,12 @@ double flux_VOF(double a, Vector3d& p, Vector3d& n, const AmrCell& cell, const A
     if (a < 1.0e-12) {
         return 0.0;
     } else {
-        Polygon<4> poly({v1, v2, v3, v4});
-        return poly.cut_volume(p, n);
+        PolyQuad poly(v1, v2, v4, v3);
+        return poly.clip_area(p, n);
     }
 }
 
-void Transfer::fluxes_VOF(ICell &cell, Direction dir) {
+void Transfer::fluxes_VOF(EuCell &cell, Direction dir) {
     auto &zc = cell(U);
 
     double fluxes = 0.0;
@@ -378,7 +228,7 @@ double best_face_fraction(double a1, double a2, double h1, double h2, double vs,
     return a_sig;
 }
 
-void Transfer::fluxes_MIX(ICell &cell, Direction dir) {
+void Transfer::fluxes_MIX(EuCell &cell, Direction dir) {
     auto &zc = cell(U);
 
     double fluxes = 0.0;
@@ -419,7 +269,7 @@ void Transfer::fluxes_MIX(ICell &cell, Direction dir) {
     zc.u2 = zc.u1 - fluxes / cell.volume();
 }
 
-void Transfer::update(Mesh &mesh, int ver) {
+void Transfer::update(EuMesh &mesh, int ver) {
     switch (ver) {
         case 1:
             update_ver1(mesh);
@@ -435,17 +285,17 @@ void Transfer::update(Mesh &mesh, int ver) {
     }
 }
 
-void Transfer::update_ver1(Mesh& mesh) {
+void Transfer::update_ver1(EuMesh& mesh) {
     m_dt = compute_dt(mesh);
 
     // Считаем потоки
     static int counter = 0;
     for (auto cell: mesh) {
         if (counter % 2 == 0) {
-            fluxes_CRP(cell, Direction::X);
+            fluxes_CRP(cell, Direction::ANY);
         }
         else {
-            fluxes_CRP(cell, Direction::Y);
+            fluxes_CRP(cell, Direction::ANY);
         }
     }
     ++counter;
@@ -457,7 +307,7 @@ void Transfer::update_ver1(Mesh& mesh) {
     }
 }
 
-void Transfer::update_ver2(Mesh& mesh) {
+void Transfer::update_ver2(EuMesh& mesh) {
     // Определяем dt
     m_dt = compute_dt(mesh);
 
@@ -468,10 +318,10 @@ void Transfer::update_ver2(Mesh& mesh) {
     static int counter = 0;
     for (auto cell: mesh) {
         if (counter % 2 == 0) {
-            fluxes_VOF(cell, Direction::X);
+            fluxes_VOF(cell, Direction::ANY);
         }
         else {
-            fluxes_VOF(cell, Direction::Y);
+            fluxes_VOF(cell, Direction::ANY);
         }
     }
     ++counter;
@@ -486,7 +336,7 @@ void Transfer::update_ver2(Mesh& mesh) {
     find_sections(mesh);
 }
 
-void Transfer::update_ver3(Mesh& mesh) {
+void Transfer::update_ver3(EuMesh& mesh) {
     // Определяем dt
     m_dt = compute_dt(mesh);
 
@@ -507,7 +357,7 @@ void Transfer::update_ver3(Mesh& mesh) {
 
     // Обновляем слои
     for (auto cell: mesh) {
-        cell(U).u1 = std::max(-0.0, std::min(cell(U).u2, 1.0));
+        cell(U).u1 = std::max(0.0, std::min(cell(U).u2, 1.0));
         cell(U).u2 = 0.0;
     }
 
@@ -515,7 +365,7 @@ void Transfer::update_ver3(Mesh& mesh) {
     find_sections(mesh);
 }
 
-void Transfer::compute_normal(ICell& cell) {
+void Transfer::compute_normal(EuCell& cell) {
     double uc = cell(U).u1;
 
     double n_x = 0.0;
@@ -541,7 +391,7 @@ void Transfer::compute_normal(ICell& cell) {
     cell(U).n.normalize();
 }
 
-void Transfer::smooth_normal(ICell& cell) {
+void Transfer::smooth_normal(EuCell& cell) {
     double n_x = 4 * cell(U).n.x();
     double n_y = 4 * cell(U).n.y();
 
@@ -561,12 +411,12 @@ void Transfer::smooth_normal(ICell& cell) {
     cell(U).n.normalize();
 }
 
-void Transfer::find_section(ICell &cell) {
-    Polygon<4> poly(cell.geom());
+void Transfer::find_section(EuCell &cell) {
+    auto poly = cell.geom().polygon();
     cell(U).p = poly.find_section(cell(U).n, cell(U).u1);
 }
 
-void Transfer::compute_normals(Mesh& mesh, int smoothing) {
+void Transfer::compute_normals(EuMesh& mesh, int smoothing) {
     for (auto cell: mesh) {
         compute_normal(cell);
     }
@@ -578,13 +428,13 @@ void Transfer::compute_normals(Mesh& mesh, int smoothing) {
     }
 }
 
-void Transfer::find_sections(Mesh& mesh) {
+void Transfer::find_sections(EuMesh& mesh) {
     for (auto cell: mesh) {
         find_section(cell);
     }
 }
 
-void Transfer::set_flags(Mesh& mesh) {
+void Transfer::set_flags(EuMesh& mesh) {
     for (auto cell: mesh) {
         double min_val = cell(U).u1;
         double max_val = cell(U).u1;
@@ -629,7 +479,7 @@ Distributor Transfer::distributor() const {
     return distr;
 }
 
-AmrStorage Transfer::body(Mesh& mesh) {
+AmrStorage Transfer::body(EuMesh& mesh) {
     double eps = 1.0e-5;
     int count = 0;
     for (auto cell: mesh) {
@@ -647,21 +497,13 @@ AmrStorage Transfer::body(Mesh& mesh) {
             continue;
         }
 
-        Polygon<4> poly(cell.geom());
-
-        auto vlist = poly.cut(cell(U).p, cell(U).n);
-        if (!vlist.empty()) {
-            Quad quad = vlist.size() < 4 ?
-                        Quad(vlist[0], vlist[1], vlist[2], vlist[2]) :
-                        Quad(vlist[0], vlist[1], vlist[2], vlist[3]);
-
-            cells[count] = AmrCell(quad);
-            ++count;
-        }
+        auto poly = cell.geom().polygon();
+        auto part = poly.clip(cell(U).p, cell(U).n);
+        cells[count] = AmrCell(part);
+        ++count;
     }
 
     return cells;
 }
 
-}
-}
+} // namespace zephyr::math

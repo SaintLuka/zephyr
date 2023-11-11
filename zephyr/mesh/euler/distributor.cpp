@@ -1,6 +1,6 @@
 #include <cstring>
 
-#include <zephyr/mesh/distributor.h>
+#include <zephyr/mesh/euler/distributor.h>
 #include <zephyr/geom/primitives/amr_cell.h>
 
 namespace zephyr::mesh {

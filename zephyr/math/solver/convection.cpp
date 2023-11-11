@@ -53,7 +53,7 @@ Vector3d Convection::velocity(const Vector3d& c) const {
     return Vector3d::UnitX();
 }
 
-double Convection::compute_dt(const ICell &cell) const {
+double Convection::compute_dt(const EuCell &cell) const {
     double max_area = 0.0;
     for (auto &face: cell.faces()) {
         max_area = std::max(max_area, face.area());
@@ -63,7 +63,7 @@ double Convection::compute_dt(const ICell &cell) const {
     return m_CFL * dx / velocity(cell.center()).norm();
 }
 
-void Convection::compute_grad(ICell &cell, int stage) {
+void Convection::compute_grad(EuCell &cell, int stage) {
     double ux = 0.0;
     double uy = 0.0;
     double uz = 0.0;
@@ -94,7 +94,7 @@ double lim(double t, double b) {
     return std::max(0.0, std::min(r, 1.0));
 }
 
-void Convection::fluxes(ICell &cell, int stage) {
+void Convection::fluxes(EuCell &cell, int stage) {
     auto &zc = cell(U);
 
     double fluxes = 0.0;
@@ -152,7 +152,7 @@ void Convection::fluxes(ICell &cell, int stage) {
     }
 }
 
-void Convection::update(Mesh &mesh) {
+void Convection::update(EuMesh &mesh) {
     // Определяем dt
     m_dt = std::numeric_limits<double>::max();
     for (auto& cell: mesh) {
@@ -199,7 +199,7 @@ void Convection::update(Mesh &mesh) {
     }
 }
 
-void Convection::set_flags(Mesh& mesh) {
+void Convection::set_flags(EuMesh& mesh) {
     for (auto cell: mesh) {
         double min_val = cell(U).u1;
         double max_val = cell(U).u1;

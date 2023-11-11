@@ -42,7 +42,7 @@ int main() {
         .bottom = Boundary::WALL, .top   = Boundary::WALL});
 
     // Создать сетку
-    Mesh mesh(U, &rect);
+    EuMesh mesh(U, &rect);
 
     // Заполняем начальные данные
     Vector3d v1(rect.x_min(), rect.y_min(), 0.0);

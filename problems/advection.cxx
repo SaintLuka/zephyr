@@ -46,7 +46,7 @@ int main() {
             .bottom = Boundary::PERIODIC, .top   = Boundary::PERIODIC});
 
     // Создать сетку
-    Mesh mesh(U, &rect);
+    EuMesh mesh(U, &rect);
 
     // Заполняем начальные данные
     Vector3d v1(rect.x_min(), rect.y_min(), 0.0);

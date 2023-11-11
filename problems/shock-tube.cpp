@@ -24,7 +24,7 @@ double get_p(AmrStorage::Item& cell) { return cell(U).p1; }
 double get_e(AmrStorage::Item& cell) { return cell(U).e1; }
 double get_inside(AmrStorage::Item& cell) { return double(cell(U).inside); }
 
-Mesh make_pipe(double xmin, double xmax, double ymin, double ymax, double H, double h, double L, double l, int nx_cells) {
+EuMesh make_pipe(double xmin, double xmax, double ymin, double ymax, double H, double h, double L, double l, int nx_cells) {
     
     Rectangle rect(xmin, xmax, ymin, ymax);
     
@@ -33,7 +33,7 @@ Mesh make_pipe(double xmin, double xmax, double ymin, double ymax, double H, dou
         .left   = Boundary::WALL, .right = Boundary::WALL,
         .bottom = Boundary::WALL, .top   = Boundary::WALL});
 
-    Mesh mesh(U, &rect);
+    EuMesh mesh(U, &rect);
     
     double cell_size_x = (xmax - xmin) / nx_cells;
     double l1 = std::max(cell_size_x, l);
@@ -67,7 +67,7 @@ Mesh make_pipe(double xmin, double xmax, double ymin, double ymax, double H, dou
 }
 
 
-void setup_initial(Mesh &mesh, double u0, double u3, double P0, double P3, double rho0, double rho3, double cell_size_x, IdealGas &eos) {
+void setup_initial(EuMesh &mesh, double u0, double u3, double P0, double P3, double rho0, double rho3, double cell_size_x, IdealGas &eos) {
 
     for (auto cell : mesh) {
         // Инициализация
@@ -144,7 +144,7 @@ int main () {
     pvd.variables += {"inside", get_inside};
 
     // Создаем сетку
-    Mesh mesh = make_pipe(xmin, xmax, ymin, ymax, H, h, L, l, nx_cells);
+    EuMesh mesh = make_pipe(xmin, xmax, ymin, ymax, H, h, L, l, nx_cells);
 
     //EOS
     IdealGas eos("Air");

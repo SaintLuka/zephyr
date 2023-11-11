@@ -3,7 +3,7 @@
 #include <zephyr/geom/primitives/amr_cell.h>
 #include <zephyr/geom/primitives/amr_faces.h>
 #include <zephyr/geom/primitives/base.h>
-#include <zephyr/mesh/mesh.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
 
 namespace zephyr { namespace mesh {
 
@@ -172,7 +172,7 @@ int check_connectivity(AmrStorage &locals, int ic, AmrStorage& aliens) {
     return 0;
 }
 
-int Mesh::check_base() {
+int EuMesh::check_base() {
     if (m_locals.empty()) {
         if (mpi::is_single()) {
             std::cout << "\tEmpty storage\n";
@@ -245,7 +245,7 @@ int Mesh::check_base() {
     return 0;
 }
 
-int Mesh::check_refined() {
+int EuMesh::check_refined() {
     if (m_locals.empty()) {
         if (mpi::is_single()) {
             std::cout << "\tEmpty storage\n";

@@ -1,14 +1,14 @@
 #pragma once
 
-#include <zephyr/mesh/mesh.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/math/cfd/limiter.h>
 #include <zephyr/math/cfd/models.h>
 #include <zephyr/phys/eos/ideal_gas.h>
 
 namespace zephyr { namespace math {
 
-using zephyr::mesh::ICell;
-using zephyr::mesh::Mesh;
+using zephyr::mesh::EuCell;
+using zephyr::mesh::EuMesh;
 using zephyr::mesh::Distributor;
 using zephyr::geom::Vector3d;
 
@@ -52,14 +52,14 @@ public:
     ///@brief Конструктор класса, параметры по умолчанию
     SmFluid();
 
-    void compute_grad(ICell &cell, int stage);
+    void compute_grad(EuCell &cell, int stage);
 
     /// @brief Посчитать шаг интегрирования по времени с учетом
     /// условия Куранта
-    double compute_dt(ICell& cell);
+    double compute_dt(EuCell& cell);
 
     /// @brief Один шаг интегрирования по времени
-    void update(Mesh& mesh, IdealGas &eos);
+    void update(EuMesh& mesh, IdealGas &eos);
 
     /// @brief Векторное поле скорости
     /// @details Виртуальная функция, следует унаследоваться от класса
@@ -72,7 +72,7 @@ protected:
     double dt() const;
 
     /// @brief 
-    void fluxes(ICell& cell, int stage);
+    void fluxes(EuCell& cell, int stage);
 
     void solution_step();
 

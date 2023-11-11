@@ -32,7 +32,7 @@ double get_lvl(const AmrStorage::Item &cell)  { return cell.level; }
 const double margin = 0.0198;
 
 // Начальное условие в виде круга
-void setup_initial_1(Mesh& mesh, double D) {
+void setup_initial_1(EuMesh& mesh, double D) {
     //double R = D / 2.0;
     //Vector3d vc = {R + margin, R + margin, 0.2};
     double R = 0.1;
@@ -44,7 +44,7 @@ void setup_initial_1(Mesh& mesh, double D) {
 }
 
 // Начальное условие в виде квадрата
-void setup_initial_2(Mesh& mesh, double D) {
+void setup_initial_2(EuMesh& mesh, double D) {
     double x_min = margin;
     double x_max = D + x_min;
     double y_min = margin;
@@ -73,18 +73,33 @@ int main() {
     pvd.variables += {"lvl", get_lvl};
 
     // Геометрия области
-    Rectangle rect(0.0, 1.0, 0.0, 0.6, false);
-    rect.set_nx(50);
-    rect.set_boundaries({
+#define GENTYPE 1
+
+#if GENTYPE == 1
+    // Прямоугольник
+    Rectangle gen(0.0, 1.0, 0.0, 0.6, false);
+    gen.set_nx(50);
+    gen.set_boundaries({
         .left   = Boundary::ZOE, .right = Boundary::ZOE,
         .bottom = Boundary::ZOE, .top   = Boundary::ZOE});
 
-    Cuboid cube(0.0, 1.0, 0.0, 0.8, -0.3, 0.3);
-    cube.set_nx(20);
-    cube.set_boundaries({
+#elif GENTYPE == 2
+    // Прямоугольник из сот
+    Rectangle gen(0.0, 1.0, 0.0, 0.6, true);
+    gen.set_nx(300);
+    gen.set_boundaries({
+        .left   = Boundary::ZOE, .right = Boundary::ZOE,
+        .bottom = Boundary::ZOE, .top   = Boundary::ZOE});
+
+#elif GENTYPE == 3
+    // Кубоид
+    Cuboid gen(0.0, 1.0, 0.0, 0.8, -0.3, 0.3);
+    gen.set_nx(20);
+    gen.set_boundaries({
         .left   = Boundary::ZOE, .right = Boundary::ZOE,
         .bottom = Boundary::ZOE, .top   = Boundary::ZOE,
         .back   = Boundary::ZOE, .front = Boundary::ZOE});
+#endif
 
     // Создать решатель
     Solver solver;
@@ -95,15 +110,15 @@ int main() {
     solver.set_limiter("van Leer");
 
     // Создать сетку
-    Mesh mesh(U, &cube);
+    EuMesh mesh(U, &gen);
 
     // Настраиваем адаптацию
     mesh.set_max_level(3);
     mesh.set_distributor(solver.distributor());
 
     // Заполняем начальные данные
-    Vector3d v_min(rect.x_min(), rect.y_min(), 0.0);
-    Vector3d v_max(rect.x_max(), rect.y_max(), 0.0);
+    Vector3d v_min(gen.x_min(), gen.y_min(), 0.0);
+    Vector3d v_max(gen.x_max(), gen.y_max(), 0.0);
     double D = 0.1*(v_max - v_min).norm();
 
     // Адаптация под начальные данные

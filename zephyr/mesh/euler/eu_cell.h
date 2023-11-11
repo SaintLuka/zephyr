@@ -3,7 +3,7 @@
 #include <zephyr/geom/primitives/basic_face.h>
 
 #include <zephyr/mesh/storage.h>
-#include <zephyr/mesh/face.h>
+#include <zephyr/mesh/euler/eu_face.h>
 
 
 namespace zephyr::mesh {
@@ -11,16 +11,16 @@ namespace zephyr::mesh {
 using zephyr::geom::Adjacent;
 using zephyr::geom::Vector3d;
 
-/// @brief Ячейка (итератор для доступа к элементам класса Mesh)
+/// @brief Ячейка (итератор для доступа к элементам класса EuMesh)
 /// @details Копирует функции AmrStorage::Iterator, а также добавляет
 /// специфические функции для ячейки: volume, center, faces.
-class ICell {
+class EuCell {
 public:
     /// @brief Конструктор копирования
-    ICell(const ICell &cell) = default;
+    EuCell(const EuCell &cell) = default;
 
     /// @brief Конструктор перемещения
-    ICell(ICell &&cell) = default;
+    EuCell(EuCell &&cell) = default;
 
     /// @brief Основной конструктор. Взять ячейку из хранилища по индексу.
     /// Ячейка может быть из locals или из aliens. Если индекс меньше
@@ -29,50 +29,50 @@ public:
     /// большой (больше locals.size + aliens.size), тогда возвращается
     /// итератор на конец хранилища locals.
     /// @param idx Индекс ячейки.
-    ICell(AmrStorage &locals, AmrStorage &aliens, int idx);
+    EuCell(AmrStorage &locals, AmrStorage &aliens, int idx);
 
     /// @brief Вспомогательный конструктор. Взять смежную ячейку из locals
     /// или aliens хранилища по индексу смежности с грани.
     /// @param adj Индекс смежности ячейки.
-    ICell(AmrStorage &locals, AmrStorage &aliens, const Adjacent &adj);
+    EuCell(AmrStorage &locals, AmrStorage &aliens, const Adjacent &adj);
 
     /// @brief Для данной ячейки вернуть ячейку из local AmrStorage
     /// @param idx Индекс ячейки в локальном хранилище
-    ICell locals(int idx);
+    EuCell locals(int idx);
 
     /// @brief Разыменование итератора (для цикла for)
-    ICell &operator*() {
+    EuCell &operator*() {
         return *this;
     }
 
     /// @brief Следующая ячейка
-    ICell &operator++() {
+    EuCell &operator++() {
         ++m_it;
         return *this;
     }
 
     /// @brief Следующая ячейка
-    ICell &operator+=(int step) {
+    EuCell &operator+=(int step) {
         m_it += step;
         return *this;
     }
 
     /// @brief Следующая ячейка
-    ICell operator+(int step) {
-        ICell res(*this);
+    EuCell operator+(int step) {
+        EuCell res(*this);
         res += step;
         return res;
     }
 
-    int operator-(const ICell& cell) const {
-        return cell.m_it - m_it;
+    int operator-(const EuCell& cell) const {
+        return m_it - cell.m_it;
     }
 
-    bool operator<(const ICell& cell) {
+    bool operator<(const EuCell& cell) {
         return m_it < cell.m_it;
     }
 
-    bool operator!=(const ICell& cell) {
+    bool operator!=(const EuCell& cell) {
         return m_it != cell.m_it;
     }
 
@@ -95,25 +95,25 @@ public:
     }
 
     /// @brief Массив граней
-    IFaces faces(Direction dir = Direction::ANY) const;
+    EuFaces faces(Direction dir = Direction::ANY) const;
 
     /// @brief Получить смежную ячейку через грань
-    ICell neib(const AmrFace &face) const;
+    EuCell neib(const AmrFace &face) const;
 
     /// @brief Получить смежную ячейку через грань
-    ICell neighbor(const AmrFace &face) const;
+    EuCell neighbor(const AmrFace &face) const;
 
     /// @brief Получить указатель на смежную ячейку через грань
-    ICell neib(const IFace &face) const;
+    EuCell neib(const EuFace &face) const;
 
     /// @brief Получить смежную ячейку через грань
-    ICell neighbor(const IFace &face) const;
+    EuCell neighbor(const EuFace &face) const;
 
     /// @brief Получить указатель на смежную ячейку через грань
-    ICell neib(int face_idx) const;
+    EuCell neib(int face_idx) const;
 
     /// @brief Получить смежную ячейку через грань
-    ICell neighbor(int face_idx) const;
+    EuCell neighbor(int face_idx) const;
 
     /// @brief Вывести полную информаци о ячейке и её соседях
     void print_neibs_info() const;

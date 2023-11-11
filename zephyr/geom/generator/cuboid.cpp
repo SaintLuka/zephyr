@@ -19,7 +19,7 @@ Cuboid::Cuboid(YAML::Node config)
       m_bounds.back(Boundary::UNDEFINED), m_bounds.front(Boundary::UNDEFINED) {
 
     if (!config["geometry"]) {
-        throw std::runtime_error("Mesh config doesn't contain 'geometry'");
+        throw std::runtime_error("EuMesh config doesn't contain 'geometry'");
     }
 
     m_xmin = config["geometry"]["x_min"].as<double>();
@@ -30,7 +30,7 @@ Cuboid::Cuboid(YAML::Node config)
     m_zmax = config["geometry"]["z_max"].as<double>();
 
     if (!config["boundary"]) {
-        throw std::runtime_error("Mesh config doesn't contain 'boundary'");
+        throw std::runtime_error("EuMesh config doesn't contain 'boundary'");
     }
     m_bounds.left = boundary_from_string(config["boundary"]["left"].as<std::string>());
     m_bounds.right = boundary_from_string(config["boundary"]["right"].as<std::string>());

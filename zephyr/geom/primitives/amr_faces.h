@@ -1,7 +1,7 @@
 #pragma once
 
 #include <zephyr/geom/primitives/side.h>
-#include <zephyr/geom/primitives/amr_face.h>
+#include <zephyr/geom/primitives/eu_face.h>
 
 namespace zephyr::geom {
 
@@ -16,6 +16,11 @@ public:
 
     /// @brief Конструктор инициализирует индексы граней
     AmrFaces(int dim);
+
+    /// @brief Конструктор инициализирует индексы граней
+    /// @param polygon Формальный параметр (любое значение)
+    /// @param size Число вершин полигона
+    AmrFaces(bool polygon, int size);
 
     /// @brief Число актуальных граней в списке
     int count() const;
