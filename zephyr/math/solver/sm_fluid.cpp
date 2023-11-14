@@ -228,7 +228,7 @@ Flux SmFluid::calc_flux_extra(ICell &cell) {
         Vector3d face_c = face.center();
         
         // Пока проблемки с периодичностью
-        Vector3d neib_c = 2.0 * face_c - cell_c;
+        Vector3d neib_c = face.neib().center();
 
         // Второй порядок
         auto fe = FaceExtra::ATvL(
