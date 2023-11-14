@@ -4,6 +4,7 @@
 
 namespace zephyr { namespace phys {
 
+/// @brief Двучленное уравнение состояния
 class StiffenedGas : public Eos {
 public:
     double gamma;
@@ -18,41 +19,56 @@ public:
     /// @brief Конструктор для известных материалов
     explicit StiffenedGas(const std::string &name);
 
+    /// @brief Создание указателя на базовый класс Eos
     template<typename... Args>
     static Eos::Ptr create(Args &&... args) {
         return std::make_shared<StiffenedGas>(std::forward<Args>(args)...);
     };
 
-    /// @brief Основные формулы для уравнений состояния, необходимые для
-    /// решения уравнений Эйлера. Только связь внутренней энергии, плотности
-    /// и давления
+    /// @brief Основная формула. Давление от плотности и энергии
+    /// @param options Передать {.deriv = true}, если необходимы производные
+    dRdE pressure_re(double density, double energy,
+                     const Options& options = {}) const final;
 
-    dRdE pressure_re(double density, double energy, const Options& = {}) const final;
+    /// @brief Основная формула. Энергия от плотности и давления
+    double energy_rp(double density, double pressure,
+                     const Options& options = {}) const final;
 
-    double energy_rp(double density, double pressure, const Options& = {}) const final;
+    /// @brief Скорость звука от плотности и энергии
+    double sound_speed_re(double density, double energy,
+                          const Options& options = {}) const final;
 
-    double sound_speed_re(double density, double energy, const Options& = {}) const final;
+    /// @details Скорость звука от плотности и давления
+    double sound_speed_rp(double density, double pressure,
+                          const Options& options = {}) const final;
 
-    double sound_speed_rp(double density, double pressure, const Options& = {}) const final;
+    /// @brief Вспомогательная функция, удобна для задания начальных условий.
+    double pressure_rt(double density, double temperature,
+                       const Options& options = {}) const final;
 
+    /// @brief Вспомогательная функция, удобна для задания начальных условий
+    double temperature_rp(double density, double pressure,
+                          const Options& options = {}) const final;
 
-    /// @brief Удобно для задания начальных условий
+    /// @brief Удельный объем по давлению и температуре. Функция используется
+    /// в формулах для PT-замыкания.
+    /// @param options Передать {.deriv = true}, если необходимы производные
+    dPdT volume_pt(double pressure, double temperature,
+                   const Options& options = {}) const final;
 
-    double pressure_rt(double density, double temperature, const Options& = {}) const final;
+    /// @brief Внутренняя энергия по давлению и температуре. Функция
+    /// используется в формулах для PT-замыкания.
+    /// @param options Передать {.deriv = true}, если необходимы производные
+    dPdT energy_pt(double pressure, double temperature,
+                   const Options& options = {}) const final;
 
-    double temperature_rp(double density, double pressure, const Options& = {}) const final;
+    /// @brief Аппроксимация уравнения состояния двучленным уравнением
+    /// состояния в окрестности заданой плотности и давления.
+    virtual StiffenedGas stiffened_gas(double density, double pressure,
+                                       const Options& options = {}) const;
 
-
-    /// @brief Следующие функции используются для PT-замыкания
-
-    dPdT volume_pt(double pressure, double temperature, const Options& = {}) const final;
-
-    dPdT energy_pt(double pressure, double temperature, const Options& = {}) const final;
-
-
-    /// @brief Аппроксимация двучленным УрС
-
-    virtual StiffenedGas stiffened_gas(double density, double pressure, const Options& = {}) const;
+    /// @brief Минимальное значение давления, при котором УрС работает.
+    virtual double min_pressure() const;
 
 };
 

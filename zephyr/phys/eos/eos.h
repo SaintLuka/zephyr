@@ -18,43 +18,64 @@ public:
     /// @brief Конструктор по умолчанию
     Eos() = default;
 
-    /// @brief Основные формулы для уравнений состояния, необходимые для
-    /// решения уравнений Эйлера. Только связь внутренней энергии, плотности
-    /// и давления
+    /// @brief Основная формула, производные требуются для некоторых численных
+    /// методов, также через первые производные можно определить скорость
+    /// звука и аппроксимацию двучленным уравнением состояния.
+    /// @param options Передать {.deriv = true}, если необходимы производные
+    virtual dRdE pressure_re(double density, double energy,
+                             const Options &options = {}) const;
 
-    virtual dRdE pressure_re(double density, double energy, const Options& = {}) const;
+    /// @brief Формула необходима, если в качестве примитивной переменной
+    /// используется давление. Тогда формула позволяет вычислить энергию.
+    virtual double energy_rp(double density, double pressure,
+                             const Options &options = {}) const;
 
-    virtual double energy_rp(double density, double pressure, const Options& = {}) const;
+    /// @brief Скорость звука от плотности и энергии
+    virtual double sound_speed_re(double density, double energy,
+                                  const Options &options = {}) const;
 
-    virtual double sound_speed_re(double density, double energy, const Options& = {}) const;
+    /// @details Скорость звука от плотности и давления. При известном значении
+    /// энергии целесообразно использовать функцию Eos::sound_speed_re.
+    virtual double sound_speed_rp(double density, double pressure,
+                                  const Options &options = {}) const;
 
-    /// @details При известной энергии целесообразно использовать функцию
-    /// sound_speed_re.
-    virtual double sound_speed_rp(double density, double pressure, const Options& = {}) const;
+    /// @brief Вспомогательная функция, удобна для задания начальных условий.
+    /// Кроме того, используется в моделях с учетом теплопроводности.
+    virtual double pressure_rt(double density, double temperature,
+                               const Options &options = {}) const;
 
+    /// @brief Вспомогательная функция, удобна для задания начальных условий.
+    virtual double temperature_rp(double density, double pressure,
+                                  const Options &options = {}) const;
 
-    /// @brief Удобно для задания начальных условий
+    /// @brief Удельный объем по давлению и температуре. Функция используется
+    /// в формулах для PT-замыкания.
+    /// @param options Для вычисления производных указать {.deriv = true},
+    /// также некоторые УрС вычисляют плотность неявно, поэтому целесообразно
+    /// передавать начальное приближение для плотности {.rho0 = }
+    virtual dPdT volume_pt(double pressure, double temperature,
+                           const Options &options = {}) const;
 
-    virtual double pressure_rt(double density, double temperature, const Options& = {}) const;
+    /// @brief Внутрення энергия по давлению и температуре. Функция
+    /// используется в формулах для PT-замыкания.
+    /// @param options Для вычисления производных указать {.deriv = true},
+    /// также некоторые УрС внутри функции вычисляют плотность неявно, поэтому
+    /// целесообразно передавать начальное приближение для плотности {.rho0 = }
+    virtual dPdT energy_pt(double pressure, double temperature,
+                           const Options &options = {}) const;
 
-    virtual double temperature_rp(double density, double pressure, const Options& = {}) const;
+    /// @brief Аппроксимация уравнения состояния двучленным уравнением
+    /// состояния в окрестности заданой плотности и давления.
+    /// В частности, функция требуется для построения численных методов
+    /// на основе точного решения задачи Римана о распаде разрыва.
+    virtual StiffenedGas stiffened_gas(double density, double pressure,
+                                       const Options &options = {}) const;
 
-
-    /// @brief Следующие функции используются для PT-замыкания
-
-    virtual dPdT volume_pt(double pressure, double temperature, const Options& = {}) const;
-
-    virtual dPdT energy_pt(double pressure, double temperature, const Options& = {}) const;
-
-
-    /// @brief Аппроксимация двучленным УрС
-
-    virtual StiffenedGas stiffened_gas(double density, double pressure, const Options& = {}) const;
-
-
-    /// @brief Тест для уравнений состояния, проверяет, что все формулы
-    /// согласованы.
-    static void test();
+    /// @brief Минимальное давление, при котором УрС выдает приемлемые
+    /// значения. При более низких значениях образуется вакуум (плотность
+    /// принимает отрицательные значения, квадрат скорости звука становится
+    /// отрицательным). Может принимать отрицательные значения.
+    virtual double min_pressure() const;
 
 };
 

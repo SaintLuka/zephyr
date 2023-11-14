@@ -101,5 +101,9 @@ StiffenedGas StiffenedGas::stiffened_gas(double rho, double P, const Options& op
     return StiffenedGas(gamma, P0, eps_0, Cv);
 }
 
+double StiffenedGas::min_pressure() const {
+    return -P0;
+}
+
 }
 }

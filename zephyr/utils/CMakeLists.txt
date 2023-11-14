@@ -1,12 +1,13 @@
 set(ZEPHYR_UTILS_SRC
-        ${CMAKE_CURRENT_SOURCE_DIR}/mpi.cxx
+    ${CMAKE_CURRENT_SOURCE_DIR}/mpi.cxx
     ${CMAKE_CURRENT_SOURCE_DIR}/threads.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/stopwatch.cxx
-        PARENT_SCOPE)
+    ${CMAKE_CURRENT_SOURCE_DIR}/stopwatch.cxx
+    PARENT_SCOPE)
 
 install(FILES
-        mpi.h
-        threads.h
-        stopwatch.h
-        DESTINATION
-        include/${PROJECT_NAME}/utils)
+    error_list.h
+    mpi.h
+    threads.h
+    stopwatch.h
+    DESTINATION
+    include/${PROJECT_NAME}/utils)

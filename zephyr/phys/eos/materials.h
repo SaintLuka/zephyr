@@ -37,18 +37,39 @@ public:
     /// @param idx Индекс материала
     const Eos& operator[](int idx) const;
 
-
     /// @brief Найти равновесное давление смеси
     /// @param density Смесевая плотность
     /// @param energy Внутренняя энергия смеси
     /// @param beta Массовые концентрации компонент
-    /// @param options В качестве опции целесообразно передавать начальные
-    /// приближения для температуры и давления.
+    /// @param options В качестве опций целесообразно передавать начальные
+    /// приближения для температуры и давления. Также указать {.deriv = true},
+    /// если требуется получить производные.
     /// @details Решается метом итераций Ньютона по паре уравнений.
-    dRdE pressure_re(double density, double energy,
-                     const Fractions& beta, const Options& = {}) const;
+    dRdE pressure_re(double density, double energy, const Fractions& beta,
+                     const Options& options = {}) const;
 
     /// @brief Найти внутреннюю энергию смеси
+    /// @param density Смесевая плотность
+    /// @param pressure Равновесное давление
+    /// @param beta Массовые концентрации компонент
+    /// @param options В качестве опции целесообразно передавать начальное
+    /// приближение для температуры.
+    /// @details Решается метом итераций Ньютона по одному уравнению.
+    /// Для смеси StiffenedGas точное решение получается за одну итерацию.
+    double energy_rp(double density, double pressure, const Fractions& beta,
+                     const Options& options = {}) const;
+
+    /// @brief Смесевая скорость звука
+    /// @param density Смесевая плотность
+    /// @param energy Внутренняя энергия смеси
+    /// @param beta Массовые концентрации компонент
+    /// @param options В качестве опций целесообразно передавать начальные
+    /// приближения для температуры и давления.
+    /// @details Решается метом итераций Ньютона по паре уравнений.
+    double sound_speed_re(double density, double energy, const Fractions& beta,
+                          const Options& options = {}) const;
+
+    /// @brief Смесевая скорость звука
     /// @param density Смесевая плотность
     /// @param pressure Равновесное давление
     /// @param beta Массовые концентрации компонент
@@ -56,15 +77,8 @@ public:
     /// для температуры.
     /// @details Решается метом итераций Ньютона по одному уравнению.
     /// Для смеси StiffenedGas точное решение получается за одну итерацию.
-    double energy_rp(double density, double pressure,
-                   const Fractions& beta, const Options& = {}) const;
-
-    double sound_speed_re(double density, double energy,
-                          const Fractions& beta, const Options& = {}) const;
-
-    double sound_speed_rp(double density, double pressure,
-                          const Fractions& beta, const Options& = {}) const;
-
+    double sound_speed_rp(double density, double pressure, const Fractions& beta,
+                          const Options& options = {}) const;
 
     /// @brief Найти равновесное давление смеси
     /// @param density Смесевая плотность
@@ -87,13 +101,12 @@ public:
     double temperature_rp(double density, double pressure,
                           const Fractions& beta, const Options& options = {}) const;
 
-
     /// @brief Удельный объем смеси
     /// @param pressure Равновесная плотность смеси
     /// @param temperature Равновесная температура смеси
     /// @param beta Массовые концентрации компонент
     /// @details Быстрая функция, т.к. удельный объем выражается в явном виде
-    /// Очевидно, вычислительная сложность добавляется, если в одном из
+    /// Очевидно, вычислительная сложность увеличивается, если в одном из
     /// уравнений состояния плотность считается неявно (частая ситуация).
     dPdT volume_pt(double pressure, double temperature, const Fractions& beta) const;
 
@@ -102,15 +115,37 @@ public:
     /// @param temperature Равновесная температура смеси
     /// @param beta Массовые концентрации компонент
     /// @details Быстрая функция, т.к. смесевая энергия выражается в явном виде.
+    /// Очевидно, вычислительная сложность увеличиывется, если в одном из
+    /// уравнений состояния энергия считается неявно (частая ситуация).
     dPdT energy_pt(double pressure, double temperature, const Fractions& beta) const;
 
-
-    /// @brief Аппроксимация двучленным УрС
-
+    /// @brief Аппроксимация смеси двучленным уравнением состояния
+    /// @param density Смесевая плотность
+    /// @param pressure Равновесное давление
+    /// @param beta Массовые концентрации компонент
+    /// @param options В качестве опции целесообразно передавать начальное
+    /// приближение для температуры.
+    /// @details Решается метом итераций Ньютона по одному уравнению.
+    /// Для смеси StiffenedGas точное решение получается за одну итерацию.
     StiffenedGas stiffened_gas(double density, double pressure,
-            const Fractions& beta, const Options& = {}) const;
+            const Fractions& beta, const Options& options = {}) const;
+
+    /// @brief Минимальное значение давления, при котором работают все
+    /// уравнения состояния с ненулевыми концентрациями
+    /// (максимальное из минимальных давлений)
+    double min_pressure(const Fractions& beta) const;
 
 protected:
+    /// @brief Найти равновесные температуру и давление смеси
+    /// @param options В качестве опций целесообразно передавать начальные
+    /// приближения для температуры и давления.
+    /// @details Решается метом итераций Ньютона по паре уравнений.
+    PairPT find_PT(double density, double energy, const Fractions& beta,
+                   const Options& options = {}) const;
+
+    /// @brief Скорость звука от равновесных температуры и давления
+    double sound_speed_pt(double pressure, double temperature,
+                          const Fractions& beta) const;
 
     /// @brief Массив материалов
     std::vector<Eos::Ptr> m_materials;
