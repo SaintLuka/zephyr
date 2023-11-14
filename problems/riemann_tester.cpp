@@ -419,8 +419,8 @@ int main() {
 
 //    std::cout << '\n';
 //
-//    std::vector<std::vector<double>> toro_errors(fluxes.size(), std::vector<double>(5));
-//    for (int i = 0; i < fluxes.size(); ++i)
+//    std::vector<std::vector<double>> toro_errors(nfs.size(), std::vector<double>(5));
+//    for (int i = 0; i < nfs.size(); ++i)
 //        toro_errors[i] = RiemannTesterWithSolver(toro_test, fluxes[i]);
 
     return 0;
