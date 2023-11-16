@@ -3,7 +3,7 @@
 #include <zephyr/geom/vector.h>
 #include <zephyr/math/cfd/limiter.h>
 
-namespace zephyr { namespace math {
+namespace zephyr::math {
 
 template<class T>
 class FaceExtraSimple;
@@ -234,4 +234,4 @@ private:
 };
 
 } // math
-} // zephyr
+// zephyr

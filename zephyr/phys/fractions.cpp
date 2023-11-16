@@ -107,16 +107,23 @@ int Fractions::index() const {
 }
 
 void Fractions::normalize() {
+    double abs_sum = 0;
+    for (auto &v: m_data)
+        abs_sum += abs(v);
+
     double sum = 0.0;
     for (auto &v: m_data) {
-        if (-1e-2 < v && v < 0)
-            v = 0.0;
-        if (v < -1e-2) {
-            std::cerr << *this;
-            throw std::runtime_error("mass_frac[i] < 0");
-        }
-        sum += v;
+        if (v < 0) {
+            if (-3e-2 * abs_sum < v)
+                v = 0;
+            else {
+                std::cerr << *this;
+                throw std::runtime_error("mass_frac[i] < 0");
+            }
+        } else
+            sum += v;
     }
+
     for (int i = 0; i < max_size; ++i) {
         m_data[i] /= sum;
     }
@@ -150,11 +157,11 @@ size_t Fractions::get_size() const {
 }
 
 std::ostream &operator<<(std::ostream &os, const Fractions &frac) {
-    os << "[ ";
+    os << "[";
     for (int i = 0; i < frac.get_size() - 1; ++i) {
         os << frac[i] << ", ";
     }
-    os << frac[frac.get_size() - 1] << " ]";
+    os << frac[frac.get_size() - 1] << "]";
     return os;
 }
 
@@ -185,11 +192,11 @@ bool FractionsFlux::has(int idx) const {
 }
 
 std::ostream &operator<<(std::ostream &os, const FractionsFlux &frac) {
-    os << "[ ";
+    os << "[";
     for (int i = 0; i < frac.get_size() - 1; ++i) {
         os << frac.m_data[i] << ", ";
     }
-    os << frac.m_data[frac.get_size() - 1] << " ]";
+    os << frac.m_data[frac.get_size() - 1] << "]";
     return os;
 }
 

@@ -138,6 +138,8 @@ struct PState {
     double energy;
     Fractions mass_frac;
 
+    PState();
+
     PState(const double &pressure, const double &temperature, const Vector3d &velocity,
            const std::vector<Component> &components);
 
@@ -166,6 +168,9 @@ struct PState {
 
     friend std::ostream &operator<<(std::ostream &os, const PState &state);
 
+    [[nodiscard]] bool is_bad() const;
+
+    VECTORIZE(PState)
 };
 
 /// @brief Консервативный многоматериальный вектор состояния

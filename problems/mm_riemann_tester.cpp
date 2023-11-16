@@ -66,7 +66,7 @@ struct MmTest {
 };
 
 std::vector<double>
-RiemannTesterWithSolver(Fluxes flux, const MmTest &test, int n_cells = 10, const std::string &filename = "output") {
+RiemannTesterWithSolver(Fluxes flux, const MmTest &test, int n_cells = 10, int acc = 1, const std::string &filename = "output") {
     // Уравнение состояния
     Materials mixture;
 
@@ -146,6 +146,7 @@ RiemannTesterWithSolver(Fluxes flux, const MmTest &test, int n_cells = 10, const
     Mesh mesh(U, &rect);
 
     MmFluid solver(mixture, flux);
+    solver.set_acc(acc);
 
     for (auto cell: mesh) {
         if (cell.center().x() < x_jump) {
@@ -177,14 +178,6 @@ RiemannTesterWithSolver(Fluxes flux, const MmTest &test, int n_cells = 10, const
             pvd.save(mesh, time);
             next_write += max_time / n_writes;
         }
-
-        // Определяем dt
-        solver.compute_dt(mesh);
-
-        // Расчет по некоторой схеме
-        solver.fluxes(mesh);
-
-        // Обновляем слои
         solver.update(mesh);
 
         time = solver.get_time();
@@ -200,7 +193,7 @@ RiemannTesterWithSolver(Fluxes flux, const MmTest &test, int n_cells = 10, const
         e_err += abs(cell(U).e1 - exact.energy(x, max_time)) / exact.energy(x, max_time);
         c_err += abs(mixture.sound_speed_rp(cell(U).rho1, cell(U).p1, cell(U).mass_frac1) -
                      exact.sound_speed(x, max_time)) / exact.sound_speed(x, max_time);
-        std::cout << "idx: " << cell.b_idx() << ", " << cell(U).to_pstate() << "\n";
+//        std::cout << "idx: " << cell.b_idx() << ", " << cell(U).to_pstate() << "\n";
     }
     rho_err /= n_cells;
     u_err /= n_cells;
@@ -224,10 +217,174 @@ RiemannTesterWithSolver(Fluxes flux, const MmTest &test, int n_cells = 10, const
     return {rho_err, u_err, p_err, e_err, c_err};
 }
 
+std::vector<double>
+RiemannTesterWithSolver2D(Fluxes flux, int n_cells = 10, int acc = 1, const std::string &filename = "output") {
+    // Уравнение состояния
+    auto matL = IdealGas::create(1.4, 718.0_J_kgK);
+    auto matR = IdealGas::create(1.5, 718.0_J_kgK);
+
+    Materials mixture;
+    mixture += matL;
+    mixture += matR;
+
+    double max_time = 0.01;
+    double rho_in = 10, rho_out = 1;
+    double p_in = 1e5, p_out = 1e4;
+    double u_in = 0, u_out = 0;
+    double e_in = matL->energy_rp(rho_in, p_in), e_out = matR->energy_rp(rho_out, p_out);
+    double t_in = matL->temperature_rp(rho_in, p_in), t_out = matR->temperature_rp(rho_out, p_out);
+    double x_min = 0.0, x_max = 1.0;
+
+    Fractions mass_frac_in({1, 0});
+    Fractions mass_frac_out({0, 1});
+    // Состояния слева и справа в тесте
+    PState zL(rho_in, Vector3d(u_in, 0, 0), p_in, e_in, t_in, mass_frac_in);
+    PState zR(rho_out, Vector3d(u_out, 0, 0), p_out, e_in, t_out, mass_frac_out);
+
+    std::cout << "ZL: " << zL << "\n" << "zR: " << zR << "\n";
+
+    // Создаем одномерную сетку
+    double H = x_max - x_min;
+    double r = 0.05 * H;
+    Rectangle rect(x_min, x_max, -H / 2, +H / 2);
+    rect.set_sizes(n_cells, n_cells);
+    rect.set_boundary_flags(
+            FaceFlag::WALL, FaceFlag::WALL,
+            FaceFlag::WALL, FaceFlag::WALL);
+
+    // Точное решение задачи Римана
+    RiemannSolver exact(zL.to_smf(), zR.to_smf(),
+                        mixture.stiffened_gas(rho_in, p_in, mass_frac_in),
+                        mixture.stiffened_gas(rho_out, p_out, mass_frac_out),
+                        r);
+
+    // Файл для записи
+    PvdFile pvd("mesh", filename);
+
+    // Переменные для сохранения
+    pvd.variables += {"rho", get_rho};
+    pvd.variables += {"u", get_u};
+    pvd.variables += {"p", get_p};
+    pvd.variables += {"e", get_e};
+    pvd.variables += {"frac1", get_frac1};
+    pvd.variables += {"frac2", get_frac2};
+
+    double time = 0.0;
+
+    pvd.variables += {"rho_exact",
+                      [&exact, &time](const Storage::Item &cell) -> double {
+                          return exact.density(cell.center().x(), time);
+                      }};
+    pvd.variables += {"u_exact",
+                      [&exact, &time](const Storage::Item &cell) -> double {
+                          return exact.velocity(cell.center().x(), time);
+                      }};
+    pvd.variables += {"p_exact",
+                      [&exact, &time](const Storage::Item &cell) -> double {
+                          return exact.pressure(cell.center().x(), time);
+                      }};
+    pvd.variables += {"e_exact",
+                      [&exact, &time](const Storage::Item &cell) -> double {
+                          return exact.energy(cell.center().x(), time);
+                      }};
+    pvd.variables += {"c",
+                      [&mixture](Storage::Item cell) -> double {
+                          return mixture.sound_speed_rp(cell(U).rho1, cell(U).p1, cell(U).mass_frac1);
+                      }};
+    pvd.variables += {"c_exact",
+                      [&exact, &time](const Storage::Item &cell) -> double {
+                          return exact.sound_speed(cell.center().x(), time);
+                      }};
+
+    // Создать сетку
+    Mesh mesh(U, &rect);
+
+    MmFluid solver(mixture, flux);
+    solver.set_acc(acc);
+
+    Vector3d center = {(x_min + x_max) / 2, 0, 0};
+    for (auto cell: mesh) {
+        if ((cell.center() - center).norm() < r) {
+            cell(U).rho1 = rho_in;
+            cell(U).v1 = Vector3d(u_in, 0, 0);
+            cell(U).p1 = p_in;
+            cell(U).e1 = e_in;
+            cell(U).t1 = t_in;
+            cell(U).mass_frac1 = mass_frac_in;
+        } else {
+            cell(U).rho1 = rho_out;
+            cell(U).v1 = Vector3d(u_out, 0, 0);
+            cell(U).p1 = p_out;
+            cell(U).e1 = e_out;
+            cell(U).t1 = t_out;
+            cell(U).mass_frac1 = mass_frac_out;
+        }
+    }
+
+    // Число Куранта
+    double CFL = 0.2;
+    solver.set_CFL(CFL);
+
+    double next_write = 0.0;
+    int n_writes = 100;
+    while (time <= 1.01 * max_time) {
+        if (time >= next_write) {
+            std::cout << "progress: " << round(100 * time / max_time) << "%\n";
+            pvd.save(mesh, time);
+            next_write += max_time / n_writes;
+        }
+        solver.update(mesh);
+
+        time = solver.get_time();
+    }
+
+    // расчёт ошибок
+    double rho_err = 0.0, u_err = 0.0, p_err = 0.0, e_err = 0.0, c_err = 0.0;
+    for (auto cell: mesh) {
+        double x = cell.center().x();
+        rho_err += abs(cell(U).rho1 - exact.density(x, max_time)) / exact.density(x, max_time);
+        u_err += abs(cell(U).v1.x() - exact.velocity(x, max_time)) / exact.velocity(x, max_time);
+        p_err += abs(cell(U).p1 - exact.pressure(x, max_time)) / exact.pressure(x, max_time);
+        e_err += abs(cell(U).e1 - exact.energy(x, max_time)) / exact.energy(x, max_time);
+        c_err += abs(mixture.sound_speed_rp(cell(U).rho1, cell(U).p1, cell(U).mass_frac1) -
+                     exact.sound_speed(x, max_time)) / exact.sound_speed(x, max_time);
+//        std::cout << "idx: " << cell.b_idx() << ", " << cell(U).to_pstate() << "\n";
+    }
+    rho_err /= n_cells;
+    u_err /= n_cells;
+    p_err /= n_cells;
+    e_err /= n_cells;
+    c_err /= n_cells;
+
+    auto fprint = [](const std::string &name, double value) {
+        std::cout << name << ": " << value << '\n';
+    };
+
+    std::cout << "MultiMaterial test, " << "Flux: " << solver.get_flux_name() << "\n";
+    std::cout << "Mean relative errors:\n";
+    fprint("\tdensity error     ", rho_err);
+    fprint("\tu error           ", u_err);
+    fprint("\tpressure error    ", p_err);
+    fprint("\tenergy error      ", e_err);
+    fprint("\tsound speed error ", c_err);
+    std::cout << '\n';
+
+    return {rho_err, u_err, p_err, e_err, c_err};
+}
+
+
 int main() {
     // Тестовая задача
     SodTest sod_test;
     ToroTest toro_test(3);
+
+    MmTest transfer(IdealGas::create(1.4, 718.0_J_kgK), IdealGas::create(1.5, 718.0_J_kgK),
+                    0.2, 0.1, // x_jump, max_time
+                    1.0, 1.0, // rho
+                    1e4, 1e4, // p
+                    10, 10, // u
+                    0, 1.0 // x_min, x_max
+    );
 
     MmTest test1(IdealGas::create(1.4, 718.0_J_kgK), IdealGas::create(1.5, 718.0_J_kgK),
                  0.2, 0.1, // x_jump, max_time
@@ -242,13 +399,30 @@ int main() {
                  10.0, 800.0,
                  1e5, 1e4,
                  10, -2,
-                 0, 1.0);
+                 0, 1.0
+    );
 
     MmTest test3(IdealGas::create(1.4, 718.0_J_kgK), IdealGas::create(1.5, 718.0_J_kgK),
                  0.2, 0.01, // x_jump, max_time
                  1.0, 1.0, // rho
                  2e4, 1e4, // p
                  0, 0, // u
+                 0, 1.0 // x_min, x_max
+    );
+
+    MmTest test4(IdealGas::create(1.4, 718.0_J_kgK), IdealGas::create(1.5, 718.0_J_kgK),
+                 0.4, 0.004, // x_jump, max_time
+                 3.0, 1.0, // rho
+                 1e4, 2e4, // p
+                 100, 0, // u
+                 0, 1.0 // x_min, x_max
+    );
+
+    MmTest test5(StiffenedGas::create(1.4, 1000, 100, 718.0_J_kgK), StiffenedGas::create(1.5, 1000, 1000, 718.0_J_kgK),
+                 0.4, 0.004, // x_jump, max_time
+                 3.0, 1.0, // rho
+                 1e4, 2e4, // p
+                 100, 0, // u
                  0, 1.0 // x_min, x_max
     );
 
@@ -277,9 +451,9 @@ int main() {
 //    fluxes.push_back(Fluxes::RUSANOV2);
     fluxes.push_back(Fluxes::GODUNOV);
 
-    std::vector<std::vector<double>> sod_errors(fluxes.size(), std::vector<double>(5));
-    for (int i = 0; i < fluxes.size(); ++i)
-        sod_errors[i] = RiemannTesterWithSolver(fluxes[i], test3, 10);
+//    std::vector<std::vector<double>> sod_errors(fluxes.size(), std::vector<double>(5));
+//    for (int i = 1; i < 2; i++)
+    RiemannTesterWithSolver2D(Fluxes::GODUNOV, 250, 1);
 
 //    for (int i = 0; i < fluxes.size(); ++i)
 //        sod_errors[i] = RiemannTester(sod_test, nfs[i]);

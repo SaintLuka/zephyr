@@ -1,5 +1,5 @@
 set(ADVECTION   0)
-set(CONVECTION  0)
+set(CONVECTION  1)
 set(TRANSFER    1)
 set(MEMBRANE    1)
 set(RIEMANN     1)

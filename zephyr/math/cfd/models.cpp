@@ -127,6 +127,8 @@ Flux::Flux(double mass, const Vector3d &momentum, double energy) : mass(mass), m
 
 namespace mmf {
 
+PState::PState() : density(0), velocity(0, 0, 0), pressure(0), temperature(0), energy(0), mass_frac() {}
+
 PState::PState(const double &pressure, const double &temperature,
                const Vector3d &velocity, const std::vector<Component> &components) :
         pressure(pressure), temperature(temperature), velocity(velocity) {
@@ -212,6 +214,17 @@ std::vector<double> PState::get_energies() const {
 
 smf::PState PState::to_smf() const {
     return {density, velocity, pressure, energy};
+}
+
+bool PState::is_bad() const {
+    return std::isinf(density) || std::isnan(density) ||
+           std::isinf(velocity.x()) || std::isnan(velocity.x()) ||
+           std::isinf(velocity.y()) || std::isnan(velocity.y()) ||
+           std::isinf(velocity.z()) || std::isnan(velocity.z()) ||
+           std::isinf(pressure) || std::isnan(pressure) ||
+           std::isinf(energy) || std::isnan(energy) ||
+           std::isinf(temperature) || std::isnan(temperature) ||
+           mass_frac.empty();
 }
 
 
