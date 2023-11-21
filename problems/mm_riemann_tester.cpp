@@ -1,4 +1,5 @@
 #include "fast.h"
+#include <zephyr/math/cfd/face_extra.h>
 #include <zephyr/math/solver/mm_fluid.h>
 
 #include <fstream>
@@ -21,21 +22,21 @@ using zephyr::math::RiemannSolver;
 MmFluid::State U;
 
 /// Переменные для сохранения
-double get_rho(Storage::Item cell) { return cell(U).rho1; }
+double get_rho(Storage::Item cell) { return cell(U).rho; }
 
-double get_u(Storage::Item cell) { return cell(U).v1.x(); }
+double get_u(Storage::Item cell) { return cell(U).v.x(); }
 
-double get_v(Storage::Item cell) { return cell(U).v1.y(); }
+double get_v(Storage::Item cell) { return cell(U).v.y(); }
 
-double get_w(Storage::Item cell) { return cell(U).v1.z(); }
+double get_w(Storage::Item cell) { return cell(U).v.z(); }
 
-double get_p(Storage::Item cell) { return cell(U).p1; }
+double get_p(Storage::Item cell) { return cell(U).p; }
 
-double get_e(Storage::Item cell) { return cell(U).e1; }
+double get_e(Storage::Item cell) { return cell(U).e; }
 
-double get_frac1(Storage::Item cell) { return cell(U).mass_frac1[0]; }
+double get_frac1(Storage::Item cell) { return cell(U).mass_frac[0]; }
 
-double get_frac2(Storage::Item cell) { return cell(U).mass_frac1[1]; }
+double get_frac2(Storage::Item cell) { return cell(U).mass_frac[1]; }
 
 struct MmTest {
     std::shared_ptr<Eos> matL, matR;
@@ -86,7 +87,7 @@ RiemannTesterWithSolver(Fluxes flux, const MmTest &test, int n_cells = 10, int a
     Fractions mass_fracR({0, 1});
     // Состояния слева и справа в тесте
     PState zL(rhoL, Vector3d(uL, 0, 0), pL, eL, tL, mass_fracL);
-    PState zR(rhoR, Vector3d(uR, 0, 0), pR, eL, tR, mass_fracR);
+    PState zR(rhoR, Vector3d(uR, 0, 0), pR, eR, tR, mass_fracR);
 
     std::cout << "ZL: " << zL << "\n" << "zR: " << zR << "\n";
 
@@ -127,7 +128,7 @@ RiemannTesterWithSolver(Fluxes flux, const MmTest &test, int n_cells = 10, int a
                       }};
     pvd.variables += {"c",
                       [&mixture](Storage::Item cell) -> double {
-                          return mixture.sound_speed_rp(cell(U).rho1, cell(U).p1, cell(U).mass_frac1);
+                          return mixture.sound_speed_rp(cell(U).rho, cell(U).p, cell(U).mass_frac);
                       }};
     pvd.variables += {"c_exact",
                       [&exact, &time](const Storage::Item &cell) -> double {
@@ -150,19 +151,19 @@ RiemannTesterWithSolver(Fluxes flux, const MmTest &test, int n_cells = 10, int a
 
     for (auto cell: mesh) {
         if (cell.center().x() < x_jump) {
-            cell(U).rho1 = rhoL;
-            cell(U).v1 = Vector3d(uL, 0, 0);
-            cell(U).p1 = pL;
-            cell(U).e1 = eL;
-            cell(U).t1 = tL;
-            cell(U).mass_frac1 = mass_fracL;
+            cell(U).rho = rhoL;
+            cell(U).v = Vector3d(uL, 0, 0);
+            cell(U).p = pL;
+            cell(U).e = eL;
+            cell(U).t = tL;
+            cell(U).mass_frac = mass_fracL;
         } else {
-            cell(U).rho1 = rhoR;
-            cell(U).v1 = Vector3d(uR, 0, 0);
-            cell(U).p1 = pR;
-            cell(U).e1 = eR;
-            cell(U).t1 = tR;
-            cell(U).mass_frac1 = mass_fracR;
+            cell(U).rho = rhoR;
+            cell(U).v = Vector3d(uR, 0, 0);
+            cell(U).p = pR;
+            cell(U).e = eR;
+            cell(U).t = tR;
+            cell(U).mass_frac = mass_fracR;
         }
     }
 
@@ -187,13 +188,13 @@ RiemannTesterWithSolver(Fluxes flux, const MmTest &test, int n_cells = 10, int a
     double rho_err = 0.0, u_err = 0.0, p_err = 0.0, e_err = 0.0, c_err = 0.0;
     for (auto cell: mesh) {
         double x = cell.center().x();
-        rho_err += abs(cell(U).rho1 - exact.density(x, max_time)) / exact.density(x, max_time);
-        u_err += abs(cell(U).v1.x() - exact.velocity(x, max_time)) / exact.velocity(x, max_time);
-        p_err += abs(cell(U).p1 - exact.pressure(x, max_time)) / exact.pressure(x, max_time);
-        e_err += abs(cell(U).e1 - exact.energy(x, max_time)) / exact.energy(x, max_time);
-        c_err += abs(mixture.sound_speed_rp(cell(U).rho1, cell(U).p1, cell(U).mass_frac1) -
+        rho_err += abs(cell(U).rho - exact.density(x, max_time)) / exact.density(x, max_time);
+        u_err += abs(cell(U).v.x() - exact.velocity(x, max_time)) / exact.velocity(x, max_time);
+        p_err += abs(cell(U).p - exact.pressure(x, max_time)) / exact.pressure(x, max_time);
+        e_err += abs(cell(U).e - exact.energy(x, max_time)) / exact.energy(x, max_time);
+        c_err += abs(mixture.sound_speed_rp(cell(U).rho, cell(U).p, cell(U).mass_frac) -
                      exact.sound_speed(x, max_time)) / exact.sound_speed(x, max_time);
-//        std::cout << "idx: " << cell.b_idx() << ", " << cell(U).to_pstate() << "\n";
+//        std::cout << "idx: " << cell.b_idx() << ", " << cell(U).get_pstate() << "\n";
     }
     rho_err /= n_cells;
     u_err /= n_cells;
@@ -217,8 +218,7 @@ RiemannTesterWithSolver(Fluxes flux, const MmTest &test, int n_cells = 10, int a
     return {rho_err, u_err, p_err, e_err, c_err};
 }
 
-std::vector<double>
-RiemannTesterWithSolver2D(Fluxes flux, int n_cells = 10, int acc = 1, const std::string &filename = "output") {
+void RiemannTesterWithSolver2D(Fluxes flux, int n_cells = 10, int acc = 1, const std::string &filename = "output") {
     // Уравнение состояния
     auto matL = IdealGas::create(1.4, 718.0_J_kgK);
     auto matR = IdealGas::create(1.5, 718.0_J_kgK);
@@ -239,7 +239,7 @@ RiemannTesterWithSolver2D(Fluxes flux, int n_cells = 10, int acc = 1, const std:
     Fractions mass_frac_out({0, 1});
     // Состояния слева и справа в тесте
     PState zL(rho_in, Vector3d(u_in, 0, 0), p_in, e_in, t_in, mass_frac_in);
-    PState zR(rho_out, Vector3d(u_out, 0, 0), p_out, e_in, t_out, mass_frac_out);
+    PState zR(rho_out, Vector3d(u_out, 0, 0), p_out, e_out, t_out, mass_frac_out);
 
     std::cout << "ZL: " << zL << "\n" << "zR: " << zR << "\n";
 
@@ -251,12 +251,6 @@ RiemannTesterWithSolver2D(Fluxes flux, int n_cells = 10, int acc = 1, const std:
     rect.set_boundary_flags(
             FaceFlag::WALL, FaceFlag::WALL,
             FaceFlag::WALL, FaceFlag::WALL);
-
-    // Точное решение задачи Римана
-    RiemannSolver exact(zL.to_smf(), zR.to_smf(),
-                        mixture.stiffened_gas(rho_in, p_in, mass_frac_in),
-                        mixture.stiffened_gas(rho_out, p_out, mass_frac_out),
-                        r);
 
     // Файл для записи
     PvdFile pvd("mesh", filename);
@@ -271,31 +265,6 @@ RiemannTesterWithSolver2D(Fluxes flux, int n_cells = 10, int acc = 1, const std:
 
     double time = 0.0;
 
-    pvd.variables += {"rho_exact",
-                      [&exact, &time](const Storage::Item &cell) -> double {
-                          return exact.density(cell.center().x(), time);
-                      }};
-    pvd.variables += {"u_exact",
-                      [&exact, &time](const Storage::Item &cell) -> double {
-                          return exact.velocity(cell.center().x(), time);
-                      }};
-    pvd.variables += {"p_exact",
-                      [&exact, &time](const Storage::Item &cell) -> double {
-                          return exact.pressure(cell.center().x(), time);
-                      }};
-    pvd.variables += {"e_exact",
-                      [&exact, &time](const Storage::Item &cell) -> double {
-                          return exact.energy(cell.center().x(), time);
-                      }};
-    pvd.variables += {"c",
-                      [&mixture](Storage::Item cell) -> double {
-                          return mixture.sound_speed_rp(cell(U).rho1, cell(U).p1, cell(U).mass_frac1);
-                      }};
-    pvd.variables += {"c_exact",
-                      [&exact, &time](const Storage::Item &cell) -> double {
-                          return exact.sound_speed(cell.center().x(), time);
-                      }};
-
     // Создать сетку
     Mesh mesh(U, &rect);
 
@@ -305,19 +274,19 @@ RiemannTesterWithSolver2D(Fluxes flux, int n_cells = 10, int acc = 1, const std:
     Vector3d center = {(x_min + x_max) / 2, 0, 0};
     for (auto cell: mesh) {
         if ((cell.center() - center).norm() < r) {
-            cell(U).rho1 = rho_in;
-            cell(U).v1 = Vector3d(u_in, 0, 0);
-            cell(U).p1 = p_in;
-            cell(U).e1 = e_in;
-            cell(U).t1 = t_in;
-            cell(U).mass_frac1 = mass_frac_in;
+            cell(U).rho = rho_in;
+            cell(U).v = Vector3d(u_in, 0, 0);
+            cell(U).p = p_in;
+            cell(U).e = e_in;
+            cell(U).t = t_in;
+            cell(U).mass_frac = mass_frac_in;
         } else {
-            cell(U).rho1 = rho_out;
-            cell(U).v1 = Vector3d(u_out, 0, 0);
-            cell(U).p1 = p_out;
-            cell(U).e1 = e_out;
-            cell(U).t1 = t_out;
-            cell(U).mass_frac1 = mass_frac_out;
+            cell(U).rho = rho_out;
+            cell(U).v = Vector3d(u_out, 0, 0);
+            cell(U).p = p_out;
+            cell(U).e = e_out;
+            cell(U).t = t_out;
+            cell(U).mass_frac = mass_frac_out;
         }
     }
 
@@ -337,41 +306,68 @@ RiemannTesterWithSolver2D(Fluxes flux, int n_cells = 10, int acc = 1, const std:
 
         time = solver.get_time();
     }
-
-    // расчёт ошибок
-    double rho_err = 0.0, u_err = 0.0, p_err = 0.0, e_err = 0.0, c_err = 0.0;
-    for (auto cell: mesh) {
-        double x = cell.center().x();
-        rho_err += abs(cell(U).rho1 - exact.density(x, max_time)) / exact.density(x, max_time);
-        u_err += abs(cell(U).v1.x() - exact.velocity(x, max_time)) / exact.velocity(x, max_time);
-        p_err += abs(cell(U).p1 - exact.pressure(x, max_time)) / exact.pressure(x, max_time);
-        e_err += abs(cell(U).e1 - exact.energy(x, max_time)) / exact.energy(x, max_time);
-        c_err += abs(mixture.sound_speed_rp(cell(U).rho1, cell(U).p1, cell(U).mass_frac1) -
-                     exact.sound_speed(x, max_time)) / exact.sound_speed(x, max_time);
-//        std::cout << "idx: " << cell.b_idx() << ", " << cell(U).to_pstate() << "\n";
-    }
-    rho_err /= n_cells;
-    u_err /= n_cells;
-    p_err /= n_cells;
-    e_err /= n_cells;
-    c_err /= n_cells;
-
-    auto fprint = [](const std::string &name, double value) {
-        std::cout << name << ": " << value << '\n';
-    };
-
-    std::cout << "MultiMaterial test, " << "Flux: " << solver.get_flux_name() << "\n";
-    std::cout << "Mean relative errors:\n";
-    fprint("\tdensity error     ", rho_err);
-    fprint("\tu error           ", u_err);
-    fprint("\tpressure error    ", p_err);
-    fprint("\tenergy error      ", e_err);
-    fprint("\tsound speed error ", c_err);
-    std::cout << '\n';
-
-    return {rho_err, u_err, p_err, e_err, c_err};
 }
 
+void test_two_cells() {
+    auto matL = IdealGas::create(1.4, 718.0_J_kgK);
+    auto matR = IdealGas::create(1.4, 718.0_J_kgK);
+
+    Materials mixture;
+    mixture += matL;
+    mixture += matR;
+
+    double rhoL = 1, rhoR = 1;
+    double pL = 1.1e4, pR = 1e4;
+    double uL = 0.1, uR = -10;
+    double eL = matL->energy_rp(rhoL, pL), eR = matR->energy_rp(rhoR, pR);
+    double tL = matL->temperature_rp(rhoL, pL), tR = matR->temperature_rp(rhoR, pR);
+    double x_min = 0.0, x_max = 1.0;
+
+    Fractions mass_fracL({1, 0});
+    Fractions mass_fracR({0, 1});
+    // Состояния слева и справа в тесте
+    PState zL(rhoL, Vector3d(uL, 0, 0), pL, eL, tL, mass_fracL);
+    PState zR(rhoR, Vector3d(uR, 0, 0), pR, eR, tR, mass_fracR);
+
+    Rectangle rect(x_min, x_max, -0.05 / 2, 0.05 / 2);
+    rect.set_sizes(2, 1);
+    rect.set_boundary_flags(
+            FaceFlag::WALL, FaceFlag::WALL,
+            FaceFlag::WALL, FaceFlag::WALL);
+
+    // Создать сетку
+    Mesh mesh(U, &rect);
+
+    for (auto cell: mesh) {
+        if (cell.b_idx() < 1) {
+            cell(U).rho = rhoL;
+            cell(U).v = Vector3d(uL, 0, 0);
+            cell(U).p = pL;
+            cell(U).e = eL;
+            cell(U).t = tL;
+            cell(U).mass_frac = mass_fracL;
+        } else {
+            cell(U).rho = rhoR;
+            cell(U).v = Vector3d(uR, 0, 0);
+            cell(U).p = pR;
+            cell(U).e = eR;
+            cell(U).t = tR;
+            cell(U).mass_frac = mass_fracR;
+        }
+    }
+
+    MmFluid solver(mixture, Fluxes::GODUNOV);
+    solver.set_CFL(0.2);
+    solver.set_acc(2);
+
+    while (solver.get_step() < 50) {
+        solver.update(mesh);
+    }
+
+    for (auto cell: mesh) {
+        std::cout << "idx: " << cell.b_idx() << ", " << cell(U).get_pstate() << "\n";
+    }
+}
 
 int main() {
     // Тестовая задача
@@ -451,9 +447,15 @@ int main() {
 //    fluxes.push_back(Fluxes::RUSANOV2);
     fluxes.push_back(Fluxes::GODUNOV);
 
-//    std::vector<std::vector<double>> sod_errors(fluxes.size(), std::vector<double>(5));
-//    for (int i = 1; i < 2; i++)
-    RiemannTesterWithSolver2D(Fluxes::GODUNOV, 250, 1);
+//    RiemannTesterWithSolver(Fluxes::GODUNOV, test1, 100, 2);
+//    RiemannTesterWithSolver(Fluxes::GODUNOV, test3, 100, 2);
+//    RiemannTesterWithSolver(Fluxes::GODUNOV, test4, 100, 2);
+//    RiemannTesterWithSolver(Fluxes::GODUNOV, test5, 100, 2);
+//    RiemannTesterWithSolver(Fluxes::GODUNOV, mm_toro, 100, 2);
+//    RiemannTesterWithSolver(Fluxes::GODUNOV, mm_sod, 100, 2);
+
+    RiemannTesterWithSolver2D(Fluxes::GODUNOV, 100, 2, "output_2D_2");
+//    RiemannTesterWithSolver2D(Fluxes::GODUNOV, 100, 1, "output_2D_1");
 
 //    for (int i = 0; i < fluxes.size(); ++i)
 //        sod_errors[i] = RiemannTester(sod_test, nfs[i]);

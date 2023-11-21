@@ -21,12 +21,12 @@ public:
 
     /// @brief Расширенный вектор состояния на котором решается задача
     struct State {
-        double rho1; ///< плотность
-        Vector3d v1; ///< скорость
-        double p1; ///< давление
-        double e1; ///< энергия
-        double t1; ///< температура
-        mmf::Fractions mass_frac1; ///< доли веществ
+        double rho; ///< плотность
+        Vector3d v; ///< скорость
+        double p; ///< давление
+        double e; ///< энергия
+        double t; ///< температура
+        mmf::Fractions mass_frac; ///< доли веществ
         mmf::PState half, next;
         mmf::PState d_dx, d_dy, d_dz;
 
@@ -43,24 +43,28 @@ public:
         }
 
         [[nodiscard]] mmf::PState get_pstate() const {
-            return mmf::PState(rho1, v1, p1, e1, t1, mass_frac1);
+            return mmf::PState(rho, v, p, e, t, mass_frac);
         }
 
         void set_state(const mmf::PState &pstate) {
-            rho1 = pstate.density;
-            v1 = pstate.velocity;
-            p1 = pstate.pressure;
-            e1 = pstate.energy;
-            t1 = pstate.temperature;
-            mass_frac1 = pstate.mass_frac;
+            rho = pstate.density;
+            v = pstate.velocity;
+            p = pstate.pressure;
+            e = pstate.energy;
+            t = pstate.temperature;
+            mass_frac = pstate.mass_frac;
         }
     };
 
     friend std::ostream &operator<<(std::ostream &os, const State &state) {
         os << boost::format(
-                "State: density: %1%, velocity: {%2%, %3%, %4%}, pressure: %5%, temperature: %6%, energy: %7%, mass_frac: %8%\n") %
-              state.rho1 % state.v1.x() % state.v1.y() % state.v1.z() % state.p1 %
-              state.t1 % state.e1 % state.mass_frac1;
+                "State1: density: %1%, velocity: {%2%, %3%, %4%}, pressure: %5%, temperature: %6%, energy: %7%, mass_frac: %8%\n") %
+              state.rho % state.v.x() % state.v.y() % state.v.z() % state.p %
+              state.t % state.e % state.mass_frac;
+        os << boost::format(
+                "State2: density: %1%, velocity: {%2%, %3%, %4%}, pressure: %5%, temperature: %6%, energy: %7%, mass_frac: %8%\n") %
+              state.next.density % state.next.velocity.x() % state.next.velocity.y() % state.next.velocity.z() %
+              state.next.pressure % state.next.temperature % state.next.energy % state.next.mass_frac;
         return os;
     }
 
@@ -95,18 +99,18 @@ private:
     double compute_dt(Mesh &mesh);
 
     /// @brief Расчёт потоков
-    void fluxes(Mesh &mesh);
+    void fluxes(Mesh &mesh) const;
 
     /// @brief Обновление ячеек
     void swap(Mesh &mesh);
 
-    void compute_grad(Mesh &mesh);
+    void compute_grad(Mesh &mesh) const;
 
-    void fluxes_stage1(Mesh &mesh);
+    void fluxes_stage1(Mesh &mesh) const;
 
-    void fluxes_stage2(Mesh &mesh);
+    void fluxes_stage2(Mesh &mesh) const;
 
-    mmf::Flux calc_flux_extra(ICell &cell);
+    mmf::Flux calc_flux_extra(ICell &cell) const;
 
 public:
 

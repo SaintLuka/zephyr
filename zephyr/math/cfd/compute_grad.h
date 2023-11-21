@@ -18,9 +18,10 @@ std::array<T, 3> compute_grad(ICell &cell, const std::function<T(zephyr::mesh::I
 
         Eigen::Vector3d S = 0.5 * face.normal() * face.area();
 
-        z_xyz[0].vec() += (zc.vec() + zn.vec()) * S.x();
-        z_xyz[1].vec() += (zc.vec() + zn.vec()) * S.y();
-        z_xyz[2].vec() += (zc.vec() + zn.vec()) * S.z();
+        T state = zc.vec() + zn.vec();
+        z_xyz[0].vec() += state.vec() * S.x();
+        z_xyz[1].vec() += state.vec() * S.y();
+        z_xyz[2].vec() += state.vec() * S.z();
     }
 
     for (auto &z: z_xyz)

@@ -224,7 +224,8 @@ bool PState::is_bad() const {
            std::isinf(pressure) || std::isnan(pressure) ||
            std::isinf(energy) || std::isnan(energy) ||
            std::isinf(temperature) || std::isnan(temperature) ||
-           mass_frac.empty();
+           mass_frac.empty() ||
+           density < 0 || pressure < 0 || energy < 0 || temperature < 0;
 }
 
 

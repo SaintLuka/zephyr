@@ -31,18 +31,15 @@ MmFluid::MmFluid(const phys::Materials &mixture, Fluxes flux = Fluxes::GODUNOV) 
 }
 
 void MmFluid::update(Mesh &mesh) {
-    for (auto cell: mesh)
-        cell(U).half = cell(U).get_pstate();
-
     // Определяем dt
     compute_dt(mesh);
 
     if (m_acc == 1) {
-        // Расчет по некоторой схеме
         fluxes(mesh);
     } else {
         compute_grad(mesh);
         fluxes_stage1(mesh);
+        compute_grad(mesh);
         fluxes_stage2(mesh);
     }
 
@@ -54,10 +51,10 @@ double MmFluid::compute_dt(Mesh &mesh) {
     m_dt = std::numeric_limits<double>::max();
     for (auto cell: mesh) {
         // скорость звука
-        double c = mixture.sound_speed_rp(cell(U).rho1, cell(U).p1, cell(U).mass_frac1);
+        double c = mixture.sound_speed_rp(cell(U).rho, cell(U).p, cell(U).mass_frac);
         for (auto &face: cell.faces()) {
             // Нормальная составляющая скорости
-            double vn = cell(U).v1.dot(face.normal());
+            double vn = cell(U).v.dot(face.normal());
 
             // Максимальное по модулю СЗ
             double lambda = std::max(std::abs(vn + c), std::abs(vn - c));
@@ -71,7 +68,7 @@ double MmFluid::compute_dt(Mesh &mesh) {
     return m_dt;
 }
 
-void MmFluid::fluxes(Mesh &mesh) {
+void MmFluid::fluxes(Mesh &mesh) const {
     // Расчет по некоторой схеме
     for (auto cell: mesh) {
         // Примитивный вектор в ячейке
@@ -131,7 +128,7 @@ void MmFluid::fluxes(Mesh &mesh) {
     }
 }
 
-void MmFluid::compute_grad(Mesh &mesh) {
+void MmFluid::compute_grad(Mesh &mesh) const {
     for (auto cell: mesh) {
         auto grad = math::compute_grad<PState>(cell, get_half);
         cell(U).d_dx = grad[0];
@@ -140,7 +137,10 @@ void MmFluid::compute_grad(Mesh &mesh) {
     }
 }
 
-void MmFluid::fluxes_stage1(Mesh &mesh) {
+void MmFluid::fluxes_stage1(Mesh &mesh) const {
+    for (auto cell: mesh)
+        cell(U).half = cell(U).get_pstate();
+
     for (auto cell: mesh) {
         QState qc(cell(U).get_pstate());
         qc.vec() -= 0.5 * m_dt / cell.volume() * calc_flux_extra(cell).vec();
@@ -148,7 +148,7 @@ void MmFluid::fluxes_stage1(Mesh &mesh) {
     }
 }
 
-void MmFluid::fluxes_stage2(Mesh &mesh) {
+void MmFluid::fluxes_stage2(Mesh &mesh) const {
     for (auto cell: mesh) {
         QState qc(cell(U).get_pstate());
         qc.vec() -= m_dt / cell.volume() * calc_flux_extra(cell).vec();
@@ -156,17 +156,13 @@ void MmFluid::fluxes_stage2(Mesh &mesh) {
     }
 }
 
-mmf::Flux MmFluid::calc_flux_extra(ICell &cell) {
+mmf::Flux MmFluid::calc_flux_extra(ICell &cell) const {
     // Примитивный вектор в ячейке
     PState p_self = cell(U).half;
 
     // Переменная для потока
     Flux flux;
     for (auto &face: cell.faces()) {
-//        if (face.is_boundary()) {
-//            continue;
-//        }
-
         // Внешняя нормаль
         auto &normal = face.normal();
 
@@ -190,14 +186,14 @@ mmf::Flux MmFluid::calc_flux_extra(ICell &cell) {
         for (auto &v: p_minus.mass_frac.m_data)
             if (v < 0)
                 v = 0;
-            else if(v > 1)
+            else if (v > 1)
                 v = 1;
         p_minus.mass_frac.normalize();
 
         for (auto &v: p_plus.mass_frac.m_data)
             if (v < 0)
                 v = 0;
-            else if(v > 1)
+            else if (v > 1)
                 v = 1;
         p_plus.mass_frac.normalize();
 
