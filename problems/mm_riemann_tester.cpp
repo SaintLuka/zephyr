@@ -140,8 +140,8 @@ RiemannTesterWithSolver(Fluxes flux, const MmTest &test, int n_cells = 10, int a
     Rectangle rect(x_min, x_max, -H, +H);
     rect.set_sizes(n_cells, 1);
     rect.set_boundary_flags(
-            FaceFlag::WALL, FaceFlag::WALL,
-            FaceFlag::WALL, FaceFlag::WALL);
+            FaceFlag::ZOE, FaceFlag::ZOE,
+            FaceFlag::ZOE, FaceFlag::ZOE);
 
     // Создать сетку
     Mesh mesh(U, &rect);
@@ -185,29 +185,37 @@ RiemannTesterWithSolver(Fluxes flux, const MmTest &test, int n_cells = 10, int a
     }
 
     // расчёт ошибок
-    double rho_err = 0.0, u_err = 0.0, p_err = 0.0, e_err = 0.0, c_err = 0.0;
+    std::pair<double, double> rho_err = {0, 0}, u_err = {0, 0}, p_err = {0, 0}, e_err = {0, 0}, c_err = {0, 0}; // {mean_err, relative_err}
+    auto sum_err = [](std::pair<double, double> &err, double pred, double real) -> void {
+        err.first += abs(pred - real);
+        if (real != 0.0)
+            err.second += abs(pred - real) / abs(real);
+    };
     for (auto cell: mesh) {
         double x = cell.center().x();
-        rho_err += abs(cell(U).rho - exact.density(x, max_time)) / exact.density(x, max_time);
-        u_err += abs(cell(U).v.x() - exact.velocity(x, max_time)) / exact.velocity(x, max_time);
-        p_err += abs(cell(U).p - exact.pressure(x, max_time)) / exact.pressure(x, max_time);
-        e_err += abs(cell(U).e - exact.energy(x, max_time)) / exact.energy(x, max_time);
-        c_err += abs(mixture.sound_speed_rp(cell(U).rho, cell(U).p, cell(U).mass_frac) -
-                     exact.sound_speed(x, max_time)) / exact.sound_speed(x, max_time);
-//        std::cout << "idx: " << cell.b_idx() << ", " << cell(U).get_pstate() << "\n";
+        sum_err(rho_err, cell(U).rho, exact.density(x, max_time));
+        sum_err(u_err, cell(U).v.x(), exact.velocity(x, max_time));
+        sum_err(p_err, cell(U).p, exact.pressure(x, max_time));
+        sum_err(e_err, cell(U).e, exact.energy(x, max_time));
+        sum_err(c_err, mixture.sound_speed_rp(cell(U).rho, cell(U).p, cell(U).mass_frac), exact.sound_speed(x, max_time));
     }
-    rho_err /= n_cells;
-    u_err /= n_cells;
-    p_err /= n_cells;
-    e_err /= n_cells;
-    c_err /= n_cells;
+    rho_err.first /= n_cells;
+    rho_err.second /= n_cells;
+    u_err.first /= n_cells;
+    u_err.second /= n_cells;
+    p_err.first /= n_cells;
+    p_err.second /= n_cells;
+    e_err.first /= n_cells;
+    e_err.second /= n_cells;
+    c_err.first /= n_cells;
+    c_err.second /= n_cells;
 
-    auto fprint = [](const std::string &name, double value) {
-        std::cout << name << ": " << value << '\n';
+    auto fprint = [](const std::string &name, const std::pair<double, double> &value) {
+        std::cout << std::fixed << std::setprecision(3) <<  name << ": " << value.first << " | " << value.second << '\n';
     };
 
     std::cout << "MultiMaterial test, " << "Flux: " << solver.get_flux_name() << "\n";
-    std::cout << "Mean relative errors:\n";
+    std::cout << "Mean average errors | relative errors:\n";
     fprint("\tdensity error     ", rho_err);
     fprint("\tu error           ", u_err);
     fprint("\tpressure error    ", p_err);
@@ -215,7 +223,7 @@ RiemannTesterWithSolver(Fluxes flux, const MmTest &test, int n_cells = 10, int a
     fprint("\tsound speed error ", c_err);
     std::cout << '\n';
 
-    return {rho_err, u_err, p_err, e_err, c_err};
+    return {rho_err.first, u_err.first, p_err.first, e_err.first, c_err.first};
 }
 
 void RiemannTesterWithSolver2D(Fluxes flux, int n_cells = 10, int acc = 1, const std::string &filename = "output") {
@@ -249,8 +257,8 @@ void RiemannTesterWithSolver2D(Fluxes flux, int n_cells = 10, int acc = 1, const
     Rectangle rect(x_min, x_max, -H / 2, +H / 2);
     rect.set_sizes(n_cells, n_cells);
     rect.set_boundary_flags(
-            FaceFlag::WALL, FaceFlag::WALL,
-            FaceFlag::WALL, FaceFlag::WALL);
+            FaceFlag::ZOE, FaceFlag::ZOE,
+            FaceFlag::ZOE, FaceFlag::ZOE);
 
     // Файл для записи
     PvdFile pvd("mesh", filename);
@@ -332,8 +340,8 @@ void test_two_cells() {
     Rectangle rect(x_min, x_max, -0.05 / 2, 0.05 / 2);
     rect.set_sizes(2, 1);
     rect.set_boundary_flags(
-            FaceFlag::WALL, FaceFlag::WALL,
-            FaceFlag::WALL, FaceFlag::WALL);
+            FaceFlag::ZOE, FaceFlag::ZOE,
+            FaceFlag::ZOE, FaceFlag::ZOE);
 
     // Создать сетку
     Mesh mesh(U, &rect);
@@ -447,14 +455,14 @@ int main() {
 //    fluxes.push_back(Fluxes::RUSANOV2);
     fluxes.push_back(Fluxes::GODUNOV);
 
-//    RiemannTesterWithSolver(Fluxes::GODUNOV, test1, 100, 2);
-//    RiemannTesterWithSolver(Fluxes::GODUNOV, test3, 100, 2);
-//    RiemannTesterWithSolver(Fluxes::GODUNOV, test4, 100, 2);
-//    RiemannTesterWithSolver(Fluxes::GODUNOV, test5, 100, 2);
-//    RiemannTesterWithSolver(Fluxes::GODUNOV, mm_toro, 100, 2);
-//    RiemannTesterWithSolver(Fluxes::GODUNOV, mm_sod, 100, 2);
+    RiemannTesterWithSolver(Fluxes::GODUNOV, test1, 100, 2);
+    RiemannTesterWithSolver(Fluxes::GODUNOV, test3, 100, 2);
+    RiemannTesterWithSolver(Fluxes::GODUNOV, test4, 100, 2);
+    RiemannTesterWithSolver(Fluxes::GODUNOV, test5, 100, 2);
+    RiemannTesterWithSolver(Fluxes::GODUNOV, mm_toro, 100, 2);
+    RiemannTesterWithSolver(Fluxes::GODUNOV, mm_sod, 100, 2);
 
-    RiemannTesterWithSolver2D(Fluxes::GODUNOV, 100, 2, "output_2D_2");
+//    RiemannTesterWithSolver2D(Fluxes::GODUNOV, 100, 2, "output_2D_2");
 //    RiemannTesterWithSolver2D(Fluxes::GODUNOV, 100, 1, "output_2D_1");
 
 //    for (int i = 0; i < fluxes.size(); ++i)

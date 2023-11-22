@@ -167,7 +167,13 @@ mmf::Flux MmFluid::calc_flux_extra(ICell &cell) const {
         auto &normal = face.normal();
 
         // Примитивный вектор соседа
-        PState p_neib = face.neib()(U).half;
+        PState p_neib = p_self;
+        if (!face.is_boundary()) {
+            p_neib = face.neib()(U).half;
+        } else if (face.flag() == FaceFlag::WALL) {
+            Vector3d Vn = normal * p_self.velocity.dot(normal);
+            p_neib.velocity = p_self.velocity - 2 * Vn; // Vt - Vn = p_self.velocity - Vn - Vn
+        }
 
         Vector3d cell_c = cell.center();
         Vector3d face_c = face.center();
