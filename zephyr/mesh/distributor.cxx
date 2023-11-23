@@ -37,7 +37,7 @@ Distributor Distributor::simple() {
     };
 
     return ds;
-};
+}
 
 } // namespace mesh
 } // namespace zephyr

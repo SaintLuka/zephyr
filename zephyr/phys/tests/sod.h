@@ -4,8 +4,7 @@
 #include <zephyr/phys/eos/ideal_gas.h>
 #include <zephyr/phys/tests/classic_test.h>
 
-namespace zephyr {
-namespace phys {
+namespace zephyr::phys {
 
 using zephyr::geom::Vector3d;
 
@@ -91,4 +90,4 @@ public:
 };
 
 }
-}
+

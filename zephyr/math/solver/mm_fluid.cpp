@@ -1,12 +1,13 @@
 #include <zephyr/math/solver/mm_fluid.h>
 #include <zephyr/math/cfd/face_extra.h>
+#include <zephyr/math/cfd/compute_grad.h>
 #include <zephyr/math/cfd/models.h>
 
-namespace zephyr { namespace math {
+namespace zephyr::math {
 
 using mesh::Storage;
 using namespace geom;
-using namespace smf;
+using namespace mmf;
 
 static const MmFluid::State U = MmFluid::datatype();
 
@@ -14,42 +15,46 @@ static const MmFluid::State U = MmFluid::datatype();
     return {};
 }
 
-MmFluid::MmFluid(const phys::Eos &eos, Fluxes flux = Fluxes::HLLC2) : m_eos(eos) {
+/// Используется при дебаге (в калькуляторе можно набрать to_state(cell) и посмотреть что лежит внутри
+MmFluid::State to_state(ICell &cell) {
+    return cell(U);
+}
+
+mmf::PState get_half(ICell &cell) {
+    return cell(U).half;
+}
+
+MmFluid::MmFluid(const phys::Materials &mixture, Fluxes flux = Fluxes::GODUNOV) : mixture(mixture) {
     m_nf = NumFlux::create(flux);
-    m_CFL = 0.9;
+    m_CFL = 0.5;
     m_dt = std::numeric_limits<double>::max();
 }
 
-[[nodiscard]] double MmFluid::CFL() const {
-    return m_CFL;
-}
+void MmFluid::update(Mesh &mesh) {
+    // Определяем dt
+    compute_dt(mesh);
 
-void MmFluid::set_CFL(double CFL) {
-    m_CFL = std::max(0.0, std::min(CFL, 1.0));
-}
-
-[[nodiscard]] double MmFluid::dt() const {
-    return m_dt;
-}
-
-void MmFluid::init_cells(Mesh &mesh, const phys::ClassicTest &test) {
-    // Заполняем начальные данные
-    for (auto cell: mesh) {
-        cell(U).rho1 = test.density(cell.center());
-        cell(U).v1 = test.velocity(cell.center());
-        cell(U).p1 = test.pressure(cell.center());
-        cell(U).e1 = m_eos.energy_rp(cell(U).rho1, cell(U).p1);
+    if (m_acc == 1) {
+        fluxes(mesh);
+    } else {
+        compute_grad(mesh);
+        fluxes_stage1(mesh);
+        compute_grad(mesh);
+        fluxes_stage2(mesh);
     }
+
+    // Обновляем слои
+    swap(mesh);
 }
 
 double MmFluid::compute_dt(Mesh &mesh) {
     m_dt = std::numeric_limits<double>::max();
     for (auto cell: mesh) {
         // скорость звука
-        double c = m_eos.sound_speed_rp(cell(U).rho1, cell(U).p1);
+        double c = mixture.sound_speed_rp(cell(U).rho, cell(U).p, cell(U).mass_frac);
         for (auto &face: cell.faces()) {
             // Нормальная составляющая скорости
-            double vn = cell(U).v1.dot(face.normal());
+            double vn = cell(U).v.dot(face.normal());
 
             // Максимальное по модулю СЗ
             double lambda = std::max(std::abs(vn + c), std::abs(vn - c));
@@ -63,14 +68,14 @@ double MmFluid::compute_dt(Mesh &mesh) {
     return m_dt;
 }
 
-void MmFluid::fluxes(Mesh &mesh) {
+void MmFluid::fluxes(Mesh &mesh) const {
     // Расчет по некоторой схеме
     for (auto cell: mesh) {
         // Примитивный вектор в ячейке
-        PState zc(cell(U).rho1, cell(U).v1, cell(U).p1, cell(U).e1);
+        PState p_self = cell(U).get_pstate();
 
         // Консервативный вектор в ячейке
-        QState qc(zc);
+        QState q_self(p_self);
 
         // Переменная для потока
         Flux flux;
@@ -79,24 +84,20 @@ void MmFluid::fluxes(Mesh &mesh) {
             auto &normal = face.normal();
 
             // Примитивный вектор соседа
-            PState zn(zc);
+            PState p_neib(p_self);
 
             if (!face.is_boundary()) {
-                auto neib = face.neib();
-                zn.density = neib(U).rho1;
-                zn.velocity = neib(U).v1;
-                zn.pressure = neib(U).p1;
-                zn.energy = neib(U).e1;
+                p_neib = face.neib()(U).get_pstate();
             }
 
             // Значение на грани со стороны ячейки
-            PState zm = zc.in_local(normal);
+            PState zm = p_self.in_local(normal);
 
             // Значение на грани со стороны соседа
-            PState zp = zn.in_local(normal);
+            PState zp = p_neib.in_local(normal);
 
             // Численный поток на грани
-            auto loc_flux = m_nf->flux(zm, zp, m_eos);
+            auto loc_flux = m_nf->mm_flux(zm, zp, mixture);
             loc_flux.to_global(normal);
 
             // Суммируем поток
@@ -104,38 +105,153 @@ void MmFluid::fluxes(Mesh &mesh) {
         }
 
         // Новое значение в ячейке (консервативные переменные)
-        QState Qc = qc.vec() - m_dt * flux.vec() / cell.volume();
+        QState q_self2 = q_self.vec() - m_dt * flux.vec() / cell.volume();
 
         // Новое значение примитивных переменных
-        PState Zc(Qc, m_eos);
+        PState p_self2(q_self2, mixture, p_self.pressure, p_self.energy);
 
-        cell(U).rho2 = Zc.density;
-        cell(U).v2 = Zc.velocity;
-        cell(U).p2 = Zc.pressure;
-        cell(U).e2 = Zc.energy;
+//        std::cout << "step: " << m_step << '\n';
+//        std::cout << "cell_idx: " << cell.b_idx() << '\n';
+//        std::cout << "p_self: " << p_self.mass_frac << '\n';
+//        std::cout << "flux: " << flux.mass_frac << '\n';
+//        std::cout << "q_self2: " << q_self2.mass_frac << '\n';
+//        std::cout << "p_self2: " << p_self2.mass_frac << "\n\n";
+
+        cell(U).next = p_self2;
+
+        if (cell(U).is_bad()) {
+            std::cerr << "calc new cell " << cell.b_idx() << " state from step " << m_step << " to " << m_step + 1
+                      << "\n";
+            std::cerr << cell(U);
+            throw std::runtime_error("bad cell");
+        }
     }
 }
 
-void MmFluid::update(Mesh &mesh) {
+void MmFluid::compute_grad(Mesh &mesh) const {
     for (auto cell: mesh) {
-        std::swap(cell(U).rho1, cell(U).rho2);
-        std::swap(cell(U).v1, cell(U).v2);
-        std::swap(cell(U).p1, cell(U).p2);
-        std::swap(cell(U).e1, cell(U).e2);
+        auto grad = math::compute_grad<PState>(cell, get_half);
+        cell(U).d_dx = grad[0];
+        cell(U).d_dy = grad[1];
+        cell(U).d_dz = grad[2];
+    }
+}
+
+void MmFluid::fluxes_stage1(Mesh &mesh) const {
+    for (auto cell: mesh)
+        cell(U).half = cell(U).get_pstate();
+
+    for (auto cell: mesh) {
+        QState qc(cell(U).get_pstate());
+        qc.vec() -= 0.5 * m_dt / cell.volume() * calc_flux_extra(cell).vec();
+        cell(U).half = PState(qc, mixture);
+    }
+}
+
+void MmFluid::fluxes_stage2(Mesh &mesh) const {
+    for (auto cell: mesh) {
+        QState qc(cell(U).get_pstate());
+        qc.vec() -= m_dt / cell.volume() * calc_flux_extra(cell).vec();
+        cell(U).next = PState(qc, mixture);
+    }
+}
+
+mmf::Flux MmFluid::calc_flux_extra(ICell &cell) const {
+    // Примитивный вектор в ячейке
+    PState p_self = cell(U).half;
+
+    // Переменная для потока
+    Flux flux;
+    for (auto &face: cell.faces()) {
+        // Внешняя нормаль
+        auto &normal = face.normal();
+
+        // Примитивный вектор соседа
+        PState p_neib = p_self;
+        if (!face.is_boundary()) {
+            p_neib = face.neib()(U).half;
+        } else if (face.flag() == FaceFlag::WALL) {
+            Vector3d Vn = normal * p_self.velocity.dot(normal);
+            p_neib.velocity = p_self.velocity - 2 * Vn; // Vt - Vn = p_self.velocity - Vn - Vn
+        }
+
+        Vector3d cell_c = cell.center();
+        Vector3d face_c = face.center();
+        Vector3d neib_c = 2 * face_c - cell_c;
+
+        auto face_extra = FaceExtra::ATvL(
+                p_self, cell(U).d_dx, cell(U).d_dy, cell(U).d_dz,
+                p_neib, face.neib()(U).d_dx, face.neib()(U).d_dy, face.neib()(U).d_dz,
+                cell_c, neib_c, face_c);
+
+        // рассчитываем расстояние на грани слева и справа
+        PState p_minus = face_extra.m(p_self).in_local(normal);
+        PState p_plus = face_extra.p(p_neib).in_local(normal);
+
+        // исправляем возможные нефизичные значения массовых долей
+        for (auto &v: p_minus.mass_frac.m_data)
+            if (v < 0)
+                v = 0;
+            else if (v > 1)
+                v = 1;
+        p_minus.mass_frac.normalize();
+
+        for (auto &v: p_plus.mass_frac.m_data)
+            if (v < 0)
+                v = 0;
+            else if (v > 1)
+                v = 1;
+        p_plus.mass_frac.normalize();
+
+        // пересчитываем энергию и температуру
+        p_minus.energy = mixture.energy_rp(p_minus.density, p_minus.pressure, p_minus.mass_frac);
+        p_plus.energy = mixture.energy_rp(p_plus.density, p_plus.pressure, p_plus.mass_frac);
+
+        p_minus.temperature = mixture.temperature_rp(p_minus.density, p_minus.pressure, p_minus.mass_frac);
+        p_plus.temperature = mixture.temperature_rp(p_plus.density, p_plus.pressure, p_plus.mass_frac);
+
+        // Численный поток на грани
+        auto loc_flux = m_nf->mm_flux(p_minus, p_plus, mixture);
+        loc_flux.to_global(normal);
+
+        // Суммируем поток
+        flux.vec() += loc_flux.vec() * face.area();
+    }
+
+    return flux;
+}
+
+void MmFluid::swap(Mesh &mesh) {
+    for (auto cell: mesh) {
+        if (cell(U).is_bad()) {
+            std::cerr << "update cell " << cell.b_idx() << " from step " << m_step << " to " << m_step + 1 << "\n";
+            std::cerr << cell(U);
+            throw std::runtime_error("bad cell");
+        }
+        cell(U).set_state(cell(U).next);
+        cell(U).half = cell(U).next;
     }
     m_time += m_dt;
     m_step += 1;
 }
 
-void MmFluid::set_num_flux(Fluxes flux) {
-    m_nf = NumFlux::create(flux);
+void MmFluid::set_CFL(double CFL) {
+    m_CFL = std::max(0.0, std::min(CFL, 1.0));
+}
+
+[[nodiscard]] double MmFluid::dt() const {
+    return m_dt;
+}
+
+[[nodiscard]] double MmFluid::CFL() const {
+    return m_CFL;
 }
 
 [[nodiscard]] double MmFluid::get_time() const {
     return m_time;
 }
 
-[[nodiscard]] size_t MmFluid::getStep() const {
+[[nodiscard]] size_t MmFluid::get_step() const {
     return m_step;
 }
 
@@ -143,5 +259,8 @@ void MmFluid::set_num_flux(Fluxes flux) {
     return m_nf->get_name();
 }
 
+void MmFluid::set_acc(int acc) {
+    m_acc = acc;
 }
+
 }

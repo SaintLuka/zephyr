@@ -1,10 +1,15 @@
 #pragma once
 
 #include <array>
+#include <vector>
+#include <zephyr/math/vectorization.h>
+#include <zephyr/geom/vector.h>
 
-namespace zephyr { namespace phys {
+namespace zephyr::phys {
 
-/// @brief Вектор массовых или объемныых концентраций
+struct FractionsFlux;
+
+/// @brief Вектор массовых или объемных концентраций
 struct Fractions {
     /// @brief Максимальное число компонент
     static const int max_size = 5;
@@ -15,8 +20,15 @@ struct Fractions {
     /// @brief Конструктор со списком инициализации
     Fractions(std::initializer_list<double> list);
 
+    /// @brief Конструктор из вектора
+    explicit Fractions(const std::vector<double> &vec);
+
+    explicit Fractions(const std::array<double, max_size> &arr);
+
+    explicit Fractions(const FractionsFlux &frac_flux);
+
     /// @brief Содержит компоненту с индексом idx
-    bool has(int idx) const;
+    [[nodiscard]] bool has(int idx) const;
 
     /// @brief Оператор доступа по индексу
     double &operator[](int idx);
@@ -24,14 +36,24 @@ struct Fractions {
     /// @brief Оператор доступа по индексу
     const double &operator[](int idx) const;
 
+    /// @brief Оператор доступа по индексу
+    double &operator[](size_t idx);
+
+    /// @brief Оператор доступа по индексу
+    const double &operator[](size_t idx) const;
+
     /// @brief Возвращает true (чистое вещество), если массив содержит
     /// единственную концентрацию больше нуля, в остальных случаях false.
-    bool is_pure() const;
+    [[nodiscard]] bool is_pure() const;
+
+    [[nodiscard]] std::array<double, Fractions::max_size> get_data() const {
+        return m_data;
+    }
 
     /// @brief Если массив содержит единственную концентрацию,
     /// отличную от нуля, тогда возвращается индекс ненулевого элемента.
     /// Иначе значение -1.
-    int index() const;
+    [[nodiscard]] int index() const;
 
     /// @brief Нормализовать концентрации (сумма равна единице)
     void normalize();
@@ -40,11 +62,61 @@ struct Fractions {
     /// концентрации, затем нормализовать концентрации
     void cutoff(double eps = 1.0e-6);
 
-private:
-    std::array<double, max_size> m_data;
+    [[nodiscard]] bool empty() const;
+
+    [[nodiscard]] size_t get_size() const;
+
+    std::array<double, max_size> m_data{};
+
+    VECTORIZE(Fractions)
 };
 
-std::ostream& operator<<(std::ostream& os, const Fractions& frac);
+std::ostream &operator<<(std::ostream &os, const Fractions &frac);
 
-} // namespace phys
+
+/// @brief Вектор потока величины нескольких веществ
+struct FractionsFlux {
+    /// @brief Конструктор по умолчанию
+    FractionsFlux();
+
+    /// @brief Конструктор из Fractions
+    explicit FractionsFlux(const Fractions &frac);
+
+    /// @brief Конструктор из вектора
+    explicit FractionsFlux(const std::vector<double> &vec);
+
+    /// @brief Содержит компоненту с индексом idx
+    [[nodiscard]] bool has(int idx) const;
+
+    template<typename T>
+    FractionsFlux &operator*=(const T &c) {
+        for (double &v: m_data)
+            v *= c;
+
+        return *this;
+    }
+
+    template<typename T>
+    FractionsFlux &operator/=(const T &c) {
+        for (double &v: m_data)
+            v /= c;
+
+        return *this;
+    }
+
+    [[nodiscard]] size_t get_size() const {
+        return m_data.size();
+    }
+
+    [[nodiscard]] const std::array<double, Fractions::max_size> &get_data() const {
+        return m_data;
+    }
+
+    std::array<double, Fractions::max_size> m_data{};
+
+    VECTORIZE(FractionsFlux)
+};
+
+std::ostream &operator<<(std::ostream &os, const FractionsFlux &frac);
+
 } // namespace zephyr

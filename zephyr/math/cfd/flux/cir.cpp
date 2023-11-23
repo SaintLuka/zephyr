@@ -3,8 +3,7 @@
 #include <zephyr/geom/vector.h>
 #include <zephyr/math/cfd/flux/cir.h>
 
-namespace zephyr {
-namespace math {
+namespace zephyr::math {
 
 using geom::Vector5d;
 using geom::Vector6d;
@@ -233,5 +232,4 @@ smf::Flux CIR2::calc_flux(const smf::PState &zL, const smf::PState &zR, const ph
     return res;
 }
 
-} // namespace math
 } // namespace zephyr
