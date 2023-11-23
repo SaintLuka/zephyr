@@ -18,6 +18,10 @@ static const SmFluid::State U = SmFluid::datatype();
     return {};
 }
 
+smf::PState get_smf_pstate(ICell &cell) {
+    return cell(U).get_state();
+}
+
 smf::PState get_smf_half(ICell &cell) {
     return cell(U).half;
 }
@@ -84,9 +88,6 @@ void SmFluid::set_accuracy(int acc) {
 };
 
 void SmFluid::fluxes_stage1(Mesh &mesh) {
-    for (auto cell: mesh)
-        cell(U).half = cell(U).get_state();
-
     for (auto cell: mesh) {
         // Консервативный вектор в ячейке
         QState qc(cell(U).get_state());
@@ -94,7 +95,7 @@ void SmFluid::fluxes_stage1(Mesh &mesh) {
             qc.vec() -= m_dt / cell.volume() * calc_flux(cell).vec();
         }
         if (m_acc == 2) {
-            qc.vec() -= 0.5 * m_dt / cell.volume() * calc_flux_extra(cell).vec();
+            qc.vec() -= 0.5 * m_dt / cell.volume() * calc_flux_extra(cell, false).vec();
         }
         cell(U).half = PState(qc, m_eos);
     }
@@ -102,27 +103,25 @@ void SmFluid::fluxes_stage1(Mesh &mesh) {
 
 void SmFluid::fluxes_stage2(Mesh &mesh) {
     if (m_acc == 1) {
-        for (auto cell: mesh) {
+        for (auto cell: mesh) 
             cell(U).set_state(cell(U).half);
-        }
     }
     if (m_acc == 2) {
         for (auto cell: mesh) {
             // Консервативный вектор в ячейке
             QState qc(cell(U).get_state());
             // Расчет потока f2
-            qc.vec() -= m_dt / cell.volume() * calc_flux_extra(cell).vec();
+            qc.vec() -= m_dt / cell.volume() * calc_flux_extra(cell, true).vec();
             cell(U).next = PState(qc, m_eos);
         }
-        for (auto cell: mesh) {
+        for (auto cell: mesh) 
             cell(U).set_state(cell(U).next);
-        }
     }
 }
 
-void SmFluid::compute_grad(Mesh &mesh) {
+void SmFluid::compute_grad(Mesh &mesh,const std::function<smf::PState(zephyr::mesh::ICell &)> &to_state) const {
     for (auto cell: mesh) {
-        auto grad = math::compute_grad<smf::PState>(cell, get_smf_half);
+        auto grad = math::compute_grad<smf::PState>(cell, to_state);
         cell(U).d_dx = grad[0];
         cell(U).d_dy = grad[1];
         cell(U).d_dz = grad[2];
@@ -172,8 +171,8 @@ Flux SmFluid::calc_flux(ICell &cell) {
     return flux;
 };
 
-/// берем только слой half
-Flux SmFluid::calc_flux_extra(ICell &cell) {
+/// берем только слой half]
+Flux SmFluid::calc_flux_extra(ICell &cell, bool from_begin) {
     // Примитивный вектор в ячейке
     PState zc = cell(U).half;
 
@@ -191,7 +190,10 @@ Flux SmFluid::calc_flux_extra(ICell &cell) {
             // double vn = zc.velocity.dot(face.normal());
             // zn.velocity -= 2.0 * vn * face.normal();
         } else {
-            zn = face.neib()(U).half;
+            if(from_begin)
+                zn = face.neib()(U).get_state();
+            else
+                zn = face.neib()(U).half;
         }
 
         Vector3d cell_c = cell.center();
@@ -227,11 +229,11 @@ void SmFluid::update(Mesh &mesh) {
 
     /// @brief Считает градиенты для переменных с основного слоя (только для 2ого порядка)
     if (m_acc == 2) {
-        compute_grad(mesh);
+        compute_grad(mesh, get_smf_pstate);
     }
     fluxes_stage1(mesh);
     if (m_acc == 2) {
-        compute_grad(mesh);
+        compute_grad(mesh, get_smf_half);
     }
     fluxes_stage2(mesh);
     /// 
