@@ -107,14 +107,10 @@ int Fractions::index() const {
 }
 
 void Fractions::normalize() {
-    double abs_sum = 0;
-    for (auto &v: m_data)
-        abs_sum += abs(v);
-
     double sum = 0.0;
     for (auto &v: m_data) {
         if (v < 0) {
-            if (-3e-2 * abs_sum < v)
+            if (-1e-2 < v)
                 v = 0;
             else {
                 std::cerr << *this;

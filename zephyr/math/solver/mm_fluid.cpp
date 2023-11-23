@@ -20,6 +20,10 @@ MmFluid::State to_state(ICell &cell) {
     return cell(U);
 }
 
+mmf::PState get_current(ICell &cell) {
+    return cell(U).get_pstate();
+}
+
 mmf::PState get_half(ICell &cell) {
     return cell(U).half;
 }
@@ -37,9 +41,9 @@ void MmFluid::update(Mesh &mesh) {
     if (m_acc == 1) {
         fluxes(mesh);
     } else {
-        compute_grad(mesh);
+        compute_grad(mesh, get_current);
         fluxes_stage1(mesh);
-        compute_grad(mesh);
+        compute_grad(mesh, get_half);
         fluxes_stage2(mesh);
     }
 
@@ -128,9 +132,9 @@ void MmFluid::fluxes(Mesh &mesh) const {
     }
 }
 
-void MmFluid::compute_grad(Mesh &mesh) const {
+void MmFluid::compute_grad(Mesh &mesh,const std::function<mmf::PState(zephyr::mesh::ICell &)> &to_state) const {
     for (auto cell: mesh) {
-        auto grad = math::compute_grad<PState>(cell, get_half);
+        auto grad = math::compute_grad<mmf::PState>(cell, to_state);
         cell(U).d_dx = grad[0];
         cell(U).d_dy = grad[1];
         cell(U).d_dz = grad[2];
@@ -138,12 +142,9 @@ void MmFluid::compute_grad(Mesh &mesh) const {
 }
 
 void MmFluid::fluxes_stage1(Mesh &mesh) const {
-    for (auto cell: mesh)
-        cell(U).half = cell(U).get_pstate();
-
     for (auto cell: mesh) {
         QState qc(cell(U).get_pstate());
-        qc.vec() -= 0.5 * m_dt / cell.volume() * calc_flux_extra(cell).vec();
+        qc.vec() -= 0.5 * m_dt / cell.volume() * calc_flux_extra(cell, true).vec();
         cell(U).half = PState(qc, mixture);
     }
 }
@@ -151,14 +152,16 @@ void MmFluid::fluxes_stage1(Mesh &mesh) const {
 void MmFluid::fluxes_stage2(Mesh &mesh) const {
     for (auto cell: mesh) {
         QState qc(cell(U).get_pstate());
-        qc.vec() -= m_dt / cell.volume() * calc_flux_extra(cell).vec();
+        qc.vec() -= m_dt / cell.volume() * calc_flux_extra(cell, false).vec();
         cell(U).next = PState(qc, mixture);
     }
 }
 
-mmf::Flux MmFluid::calc_flux_extra(ICell &cell) const {
+mmf::Flux MmFluid::calc_flux_extra(ICell &cell, bool from_begin) const {
     // Примитивный вектор в ячейке
     PState p_self = cell(U).half;
+    if(from_begin)
+        p_self = cell(U).get_pstate();
 
     // Переменная для потока
     Flux flux;
@@ -170,6 +173,8 @@ mmf::Flux MmFluid::calc_flux_extra(ICell &cell) const {
         PState p_neib = p_self;
         if (!face.is_boundary()) {
             p_neib = face.neib()(U).half;
+            if(from_begin)
+                p_neib = face.neib()(U).get_pstate();
         } else if (face.flag() == FaceFlag::WALL) {
             Vector3d Vn = normal * p_self.velocity.dot(normal);
             p_neib.velocity = p_self.velocity - 2 * Vn; // Vt - Vn = p_self.velocity - Vn - Vn

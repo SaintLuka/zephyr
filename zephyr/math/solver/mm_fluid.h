@@ -104,13 +104,13 @@ private:
     /// @brief Обновление ячеек
     void swap(Mesh &mesh);
 
-    void compute_grad(Mesh &mesh) const;
+    void compute_grad(Mesh &mesh,  const std::function<mmf::PState(zephyr::mesh::ICell &)> &to_state) const;
 
     void fluxes_stage1(Mesh &mesh) const;
 
     void fluxes_stage2(Mesh &mesh) const;
 
-    mmf::Flux calc_flux_extra(ICell &cell) const;
+    mmf::Flux calc_flux_extra(ICell &cell, bool from_begin) const;
 
 public:
 
