@@ -6,3 +6,5 @@ cmake-build-*
 *__pycache__*
 /build/
 /.vscode/
+/python/SodTest/
+/python/ToroTest*/

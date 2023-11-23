@@ -4,7 +4,7 @@
 
 #include <zephyr/phys/eos/stiffened_gas.h>
 
-namespace zephyr { namespace phys {
+namespace zephyr::phys {
 
 StiffenedGas::StiffenedGas(double gamma, double p_inf, double eps_0, double Cv)
     : gamma(gamma), P0(p_inf), eps_0(eps_0), Cv(Cv) { }
@@ -105,5 +105,4 @@ double StiffenedGas::min_pressure() const {
     return -P0;
 }
 
-}
 }

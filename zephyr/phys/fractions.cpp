@@ -1,26 +1,53 @@
 #include <iostream>
 #include <zephyr/phys/fractions.h>
 
-namespace zephyr { namespace phys {
+namespace zephyr::phys {
 
 Fractions::Fractions() {
     m_data.fill(0.0);
 }
 
 Fractions::Fractions(std::initializer_list<double> list) {
+    if (list.size() > Fractions::max_size) {
+        throw std::runtime_error("When construct Fractions got list.size() > Fractions::max_size (" +
+                                 std::to_string(list.size()) + " > " + std::to_string(Fractions::max_size));
+    }
+
     int counter = 0;
-    for (auto elem: list) {
-        if (counter < max_size) {
-            m_data[counter] = elem;
-        }
-        else {
-            break;
-        }
-        ++counter;
+    for (auto &elem: list) {
+        m_data[counter++] = elem;
     }
     for (int i = counter; i < max_size; ++i) {
         m_data[i] = 0.0;
     }
+
+    normalize();
+}
+
+Fractions::Fractions(const std::vector<double> &vec) {
+    if (vec.size() > Fractions::max_size) {
+        throw std::runtime_error("When construct Fractions got vec.size() > Fractions::max_size (" +
+                                 std::to_string(vec.size()) + " > " + std::to_string(Fractions::max_size));
+    }
+
+    for (size_t i = 0; i < vec.size(); ++i) {
+        m_data[i] = vec[i];
+    }
+    for (int i = vec.size(); i < max_size; ++i) {
+        m_data[i] = 0.0;
+    }
+
+    normalize();
+}
+
+Fractions::Fractions(const std::array<double, max_size> &arr) : m_data(arr) {
+    normalize();
+}
+
+Fractions::Fractions(const FractionsFlux &frac_flux) {
+    std::copy(frac_flux.m_data.begin(), frac_flux.m_data.end(), m_data.begin());
+
+    normalize();
 }
 
 bool Fractions::has(int idx) const {
@@ -35,6 +62,14 @@ const double &Fractions::operator[](int idx) const {
     return m_data[idx];
 }
 
+double &Fractions::operator[](size_t idx) {
+    return m_data[idx];
+}
+
+const double &Fractions::operator[](size_t idx) const {
+    return m_data[idx];
+}
+
 bool Fractions::is_pure() const {
     bool pure = false;
     for (int i = 0; i < max_size; ++i) {
@@ -42,8 +77,7 @@ bool Fractions::is_pure() const {
             if (!pure) {
                 // Нашли первое вещество
                 pure = true;
-            }
-            else {
+            } else {
                 // Нашли второе вещество
                 return false;
             }
@@ -61,8 +95,7 @@ int Fractions::index() const {
             if (idx < 0) {
                 // Нашли первое вещество
                 idx = i;
-            }
-            else {
+            } else {
                 // Нашли второе вещество
                 return -1;
             }
@@ -74,10 +107,23 @@ int Fractions::index() const {
 }
 
 void Fractions::normalize() {
+    double abs_sum = 0;
+    for (auto &v: m_data)
+        abs_sum += abs(v);
+
     double sum = 0.0;
-    for (int i = 0; i < max_size; ++i) {
-        sum += m_data[i];
+    for (auto &v: m_data) {
+        if (v < 0) {
+            if (-3e-2 * abs_sum < v)
+                v = 0;
+            else {
+                std::cerr << *this;
+                throw std::runtime_error("mass_frac[i] < 0");
+            }
+        } else
+            sum += v;
     }
+
     for (int i = 0; i < max_size; ++i) {
         m_data[i] /= sum;
     }
@@ -88,8 +134,7 @@ void Fractions::cutoff(double eps) {
     for (int i = 0; i < max_size; ++i) {
         if (m_data[i] < eps) {
             m_data[i] = 0.0;
-        }
-        else if (m_data[i] > 1.0 - eps) {
+        } else if (m_data[i] > 1.0 - eps) {
             m_data[i] = 1.0;
         }
         sum += m_data[i];
@@ -99,14 +144,60 @@ void Fractions::cutoff(double eps) {
     }
 }
 
-std::ostream& operator<<(std::ostream& os, const Fractions& frac) {
-    os << "[ ";
-    for (int i = 0; i < Fractions::max_size - 1; ++i) {
+bool Fractions::empty() const {
+    for (auto &v: m_data)
+        if (v > 1e-5)
+            return false;
+
+    return true;
+}
+
+size_t Fractions::get_size() const {
+    return max_size;
+}
+
+std::ostream &operator<<(std::ostream &os, const Fractions &frac) {
+    os << "[";
+    for (int i = 0; i < frac.get_size() - 1; ++i) {
         os << frac[i] << ", ";
     }
-    os << frac[Fractions::max_size - 1] << " ]";
+    os << frac[frac.get_size() - 1] << "]";
     return os;
 }
 
-} // namespace phys
+FractionsFlux::FractionsFlux() {
+    m_data.fill(0);
+}
+
+FractionsFlux::FractionsFlux(const Fractions &frac) : m_data(frac.get_data()) {}
+
+FractionsFlux::FractionsFlux(const std::vector<double> &vec) {
+    if (vec.size() > Fractions::max_size) {
+        throw std::runtime_error("When construct FractionsFlux got vec.size() > Fractions::max_size (" +
+                                 std::to_string(vec.size()) + " > " + std::to_string(Fractions::max_size));
+    }
+
+    for (size_t i = 0; i < vec.size(); ++i) {
+        m_data[i] = vec[i];
+    }
+    for (int i = vec.size(); i < Fractions::max_size; ++i) {
+        m_data[i] = 0.0;
+    }
+}
+
+bool FractionsFlux::has(int idx) const {
+    if (idx > m_data.size())
+        return false;
+    return m_data[idx] > 0.0;
+}
+
+std::ostream &operator<<(std::ostream &os, const FractionsFlux &frac) {
+    os << "[";
+    for (int i = 0; i < frac.get_size() - 1; ++i) {
+        os << frac.m_data[i] << ", ";
+    }
+    os << frac.m_data[frac.get_size() - 1] << "]";
+    return os;
+}
+
 } // namespace zephyr

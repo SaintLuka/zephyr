@@ -3,13 +3,7 @@
 #include <zephyr/geom/vector.h>
 #include <zephyr/math/cfd/flux/hllc.h>
 
-namespace zephyr {
-namespace math {
-
-using geom::Vector5d;
-using geom::Vector6d;
-using geom::Matrix5d;
-
+namespace zephyr::math {
 
 smf::Flux HLLC2::flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) const {
     return calc_flux(zL, zR, eos);
@@ -32,7 +26,7 @@ smf::Flux HLLC2::calc_flux(const smf::PState &zL, const smf::PState &zR, const p
     Flux fR(zR);   // Дифференциальный поток справа
     if (0 < s1)
         return fL;
-    if(s2 < 0)
+    if (s2 < 0)
         return fR;
 
     double S = (p2 - p1 + rho1 * u1 * (s1 - u1) - rho2 * u2 * (s2 - u2)) / (rho1 * (s1 - u1) - rho2 * (s2 - u2)); // S*
@@ -43,21 +37,19 @@ smf::Flux HLLC2::calc_flux(const smf::PState &zL, const smf::PState &zR, const p
     double P = p1 + rho1 * (s1 - u1) * (S - u1); // P*
 
     Flux F_hllc;
-    if (s1 <= 0 && 0 <= S){
+    if (s1 <= 0 && 0 <= S) {
         QState qL(zL); // U_L
         double EL = ((s1 - u1) * qL.energy + S * P - u1 * p1) / (s1 - S);
         QState QL(rhoL, rhoL * Vector3d(S, zL.velocity.y(), zL.velocity.z()), EL); // U*_L
 
         F_hllc = fL.vec() + s1 * (QL.vec() - qL.vec());
-    }
-    else if (S <= 0 && 0 <= s2) {
+    } else if (S <= 0 && 0 <= s2) {
         QState qR(zR); // U_R
         double ER = ((s2 - u2) * qR.energy + S * P - u2 * p2) / (s2 - S);
         QState QR(rhoR, rhoR * Vector3d(S, zR.velocity.y(), zR.velocity.z()), ER); // U*_R
 
         F_hllc = fR.vec() + s2 * (QR.vec() - qR.vec());
-    }
-    else {
+    } else {
         std::cerr << "zL: " << zL << "\n"; // сюда попадает только если где-то none или другие кривые значения
         std::cerr << "Zr: " << zR << "\n";
         std::cerr << "Sound speed left: " << c1 << " , Sound speed right: " << c2 << "\n";
@@ -68,6 +60,58 @@ smf::Flux HLLC2::calc_flux(const smf::PState &zL, const smf::PState &zR, const p
     return F_hllc;
 }
 
+mmf::Flux HLLC2::mm_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) const {
+    using namespace mmf;
+
+    double rho1 = zL.density, rho2 = zR.density;
+    double u1 = zL.velocity.x(), u2 = zR.velocity.x();
+    double p1 = zL.pressure, p2 = zR.pressure;
+
+    double c1 = mixture.sound_speed_rp(rho1, p1, zL.mass_frac); // скорость звука слева
+    double c2 = mixture.sound_speed_rp(rho2, p2, zR.mass_frac); // скорость звука справа
+
+    double s1 = std::min(u1 - c1, u2 - c2); // SL
+    double s2 = std::max(u1 + c1, u2 + c2); // SR
+
+    Flux fL(zL);   // Дифференциальный поток слева
+    Flux fR(zR);   // Дифференциальный поток справа
+    if (0 < s1)
+        return fL;
+    if (s2 < 0)
+        return fR;
+
+    double S = (p2 - p1 + rho1 * u1 * (s1 - u1) - rho2 * u2 * (s2 - u2)) / (rho1 * (s1 - u1) - rho2 * (s2 - u2)); // S*
+
+    double rhoL = rho1 * (s1 - u1) / (s1 - S); // rho*_L
+    double rhoR = rho2 * (s2 - u2) / (s2 - S); // rho*_R
+
+    double P = p1 + rho1 * (s1 - u1) * (S - u1); // P*
+
+    Flux F_hllc;
+    if (s1 <= 0 && 0 <= S) {
+        QState qL(zL); // U_L
+        double EL = ((s1 - u1) * qL.energy + S * P - u1 * p1) / (s1 - S);
+        // TODO: здесь надо как-то рассчитать mass_frac
+        QState QL(rhoL, rhoL * Vector3d(S, zL.velocity.y(), zL.velocity.z()), EL, FractionsFlux(zL.mass_frac)); // U*_L
+
+        F_hllc = fL.vec() + s1 * (QL.vec() - qL.vec());
+    } else if (S <= 0 && 0 <= s2) {
+        QState qR(zR); // U_R
+        double ER = ((s2 - u2) * qR.energy + S * P - u2 * p2) / (s2 - S);
+        // TODO: здесь надо как-то рассчитать mass_frac
+        QState QR(rhoR, rhoR * Vector3d(S, zR.velocity.y(), zR.velocity.z()), ER, FractionsFlux(zR.mass_frac)); // U*_R
+
+        F_hllc = fR.vec() + s2 * (QR.vec() - qR.vec());
+    } else {
+        std::cerr << "zL: " << zL << "\n"; // сюда попадает только если где-то none или другие кривые значения
+        std::cerr << "Zr: " << zR << "\n";
+        std::cerr << "Sound speed left: " << c1 << " , Sound speed right: " << c2 << "\n";
+        std::cerr << "SL: " << s1 << ", SR: " << s2 << ", S*: " << S << "\n";
+        throw std::runtime_error("HLLC2::calc_flux Error, strange case in switch");
+    }
+
+    return F_hllc;
+}
 
 smf::Flux HLLC::flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) const {
     return calc_flux(zL, zR, eos);
@@ -141,5 +185,59 @@ smf::Flux HLLC::calc_flux(const smf::PState &zL, const smf::PState &zR, const ph
     return F_hllc;
 }
 
+mmf::Flux HLLC::mm_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) const {
+    using namespace mmf;
+
+    double rho1 = zL.density, rho2 = zR.density;
+    double u1 = zL.velocity.x(), u2 = zR.velocity.x();
+    double v1 = zL.velocity.y(), v2 = zR.velocity.y();
+    double w1 = zL.velocity.z(), w2 = zR.velocity.z();
+    double p1 = zL.pressure, p2 = zR.pressure;
+
+    QState qL(zL); // U_L
+    QState qR(zR); // U_R
+    double E1 = qL.energy, E2 = qR.energy;
+
+    double c1 = mixture.sound_speed_rp(rho1, p1, zL.mass_frac); // скорость звука слева
+    double c2 = mixture.sound_speed_rp(rho2, p2, zR.mass_frac); // скорость звука справа
+
+    double s1 = std::min(u1 - c1, u2 - c2); // SL
+    double s2 = std::max(u1 + c1, u2 + c2); // SR
+    double S = (p2 - p1 + rho1 * u1 * (s1 - u1) - rho2 * u2 * (s2 - u2)) / (rho1 * (s1 - u1) - rho2 * (s2 - u2)); // S*
+
+    double rhoL = rho1 * (s1 - u1) / (s1 - S); // rho*_L
+    double rhoR = rho2 * (s2 - u2) / (s2 - S); // rho*_R
+
+    double P = p1 + rho1 * (s1 - u1) * (S - u1); // P*
+
+    double EL = ((s1 - u1) * E1 + S * P - u1 * p1) / (s1 - S);
+    double ER = ((s2 - u2) * E2 + S * P - u2 * p2) / (s2 - S);
+
+    // TODO: здесь надо как-то рассчитать mass_frac
+    QState QL(rhoL, rhoL * Vector3d(S, v1, w1), EL, FractionsFlux(zL.mass_frac)); // U*_L
+    QState QR(rhoR, rhoR * Vector3d(S, v2, w2), ER, FractionsFlux(zR.mass_frac)); // U*_R
+
+    Flux fL(zL);   // Дифференциальный поток слева
+    Flux fR(zR);   // Дифференциальный поток справа
+
+    Flux F_hllc;
+    if (0 < s1)
+        F_hllc = fL;
+    else if (s1 <= 0 && 0 <= S)
+        F_hllc = fL.vec() + s1 * (QL.vec() - qL.vec());
+    else if (S <= 0 && 0 <= s2)
+        F_hllc = fR.vec() + s2 * (QR.vec() - qR.vec());
+    else if (s2 < 0)
+        F_hllc = fR;
+    else {
+        std::cerr << "zL: " << zL << "\n"; // сюда попадает только если где-то none или другие кривые значения
+        std::cerr << "Zr: " << zR << "\n";
+        std::cerr << "Sound speed left: " << c1 << " , Sound speed right: " << c2 << "\n";
+        std::cerr << "SL: " << s1 << ", SR: " << s2 << ", S*: " << S << "\n";
+        throw std::runtime_error("HLLC::calc_flux Error, strange case in switch");
+    }
+
+    return F_hllc;
 }
+
 }

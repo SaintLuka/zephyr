@@ -2,8 +2,7 @@
 
 #include <zephyr/math/cfd/flux/num_flux.h>
 
-namespace zephyr {
-namespace math {
+namespace zephyr::math {
 
 /// @brief Расчёт потока по методу Русанова
 /// @details Максимальное собственное значение считается из вектора состояния на грани
@@ -17,11 +16,11 @@ public:
         return std::unique_ptr<Rusanov>(new Rusanov(std::forward<Args>(args)...));
     }
 
-    std::string get_name() const override {return "Rusanov"; }
+    [[nodiscard]] std::string get_name() const override {return "Rusanov"; }
 
     static smf::Flux calc_flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos);
 
-    smf::Flux flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) const final;
+    [[nodiscard]] smf::Flux flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) const final;
 };
 
 /// @brief Расчёт потока по методу русанова
@@ -36,12 +35,13 @@ public:
         return std::unique_ptr<Rusanov2>(new Rusanov2(std::forward<Args>(args)...));
     }
 
-    std::string get_name() const override {return "Rusanov2"; }
+    [[nodiscard]] std::string get_name() const override {return "Rusanov2"; }
 
     static smf::Flux calc_flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos);
 
-    smf::Flux flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) const final;
+    [[nodiscard]] smf::Flux flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) const final;
+
+    mmf::Flux mm_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) const override;
 };
 
-}
 }

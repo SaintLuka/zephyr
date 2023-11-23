@@ -7,10 +7,10 @@
 #include <zephyr/phys/eos/stiffened_gas.h>
 
 
-namespace zephyr { namespace phys {
+namespace zephyr::phys {
 
 /// @brief Набор материалов.
-/// Можно использовать в качетсве смесевого УрС (PT-замыкание).
+/// Можно использовать в качестве смесевого УрС (PT-замыкание).
 class Materials {
 public:
 
@@ -151,4 +151,4 @@ protected:
     std::vector<Eos::Ptr> m_materials;
 };
 
-}}
+}

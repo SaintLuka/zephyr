@@ -202,7 +202,7 @@ Vertex::Ptr &Block::preboundary_vertex(int f_idx, int idx) {
         default:
             return m_vertices[1][m_size2 - idx];
     }
-};
+}
 
 int Block::neib_face(int f_idx) const {
     return (f_idx - m_rotations[f_idx] + 4) % 4;

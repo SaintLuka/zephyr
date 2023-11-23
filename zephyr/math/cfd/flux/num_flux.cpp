@@ -1,6 +1,8 @@
 #include <zephyr/math/cfd/fluxes.h>
+#include "num_flux.h"
 
-namespace zephyr { namespace math {
+
+namespace zephyr::math {
 
 NumFlux::Ptr NumFlux::create(Fluxes flux) {
     switch (flux) {
@@ -23,7 +25,5 @@ NumFlux::Ptr NumFlux::create(Fluxes flux) {
         default:
             throw std::runtime_error("Unknown numerical flux");
     }
-}
-
 }
 }
