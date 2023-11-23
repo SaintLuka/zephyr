@@ -23,22 +23,22 @@ class SmFluid {
 public:
 
     struct State {
-        double rho1;
-        Vector3d v1;
-        double p1;
-        double e1;
-        PState half, d_dx, d_dy, d_dz, next;
-        Flux f1, f2;
+        double rho;
+        Vector3d v;
+        double p;
+        double e;
+        PState half, next;
+        PState d_dx, d_dy, d_dz;
 
         PState get_state() const {
-            return {rho1, v1, p1, e1};
+            return {rho, v, p, e};
         }
 
         void set_state(const PState& z) {
-            rho1 = z.density;
-            v1 = z.velocity;
-            p1 = z.pressure;
-            e1 = z.energy;
+            rho = z.density;
+            v = z.velocity;
+            p = z.pressure;
+            e = z.energy;
         }     
     };
 

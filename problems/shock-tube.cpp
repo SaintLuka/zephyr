@@ -72,18 +72,18 @@ void setup_initial(EuMesh &mesh, double u0, double u3, double P0, double P3, dou
     for (auto cell : mesh) {
         // Инициализация
         if (cell.center().x() > 0) {
-            cell(U).v1.x() = u0;
-            cell(U).v1.y() = 0;
-            cell(U).rho1 = 1.0 / eos.volume_pt(P0, 20.0_C);
-            cell(U).p1 = P0; 
-            cell(U).e1 = eos.energy_rp(cell(U).rho1, cell(U).p1);
+            cell(U).v.x() = u0;
+            cell(U).v.y() = 0;
+            cell(U).rho = 1.0 / eos.volume_pt(P0, 20.0_C);
+            cell(U).p = P0;
+            cell(U).e = eos.energy_rp(cell(U).rho, cell(U).p);
         }
         else {
-            cell(U).v1.x() = u3;
-            cell(U).v1.y() = 0;
-            cell(U).rho1 = 1.0 / eos.volume_pt(P3, 20.0_C);
-            cell(U).p1 = P3; 
-            cell(U).e1 = eos.energy_rp(cell(U).rho1, cell(U).p1);
+            cell(U).v.x() = u3;
+            cell(U).v.y() = 0;
+            cell(U).rho = 1.0 / eos.volume_pt(P3, 20.0_C);
+            cell(U).p = P3;
+            cell(U).e = eos.energy_rp(cell(U).rho, cell(U).p);
         }
     }
 }
