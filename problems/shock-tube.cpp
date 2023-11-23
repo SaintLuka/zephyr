@@ -16,12 +16,12 @@ struct _U_ : public SmFluid::State {
 _U_ U;
 
 /// Переменные для сохранения
-double get_rho(Storage::Item cell) { return cell(U).rho1; }
-double get_u(Storage::Item cell) { return cell(U).v1.x(); }
-double get_v(Storage::Item cell) { return cell(U).v1.y(); }
-double get_w(Storage::Item cell) { return cell(U).v1.z(); }
-double get_p(Storage::Item cell) { return cell(U).p1; }
-double get_e(Storage::Item cell) { return cell(U).e1; }
+double get_rho(Storage::Item cell) { return cell(U).rho; }
+double get_u(Storage::Item cell) { return cell(U).v.x(); }
+double get_v(Storage::Item cell) { return cell(U).v.y(); }
+double get_w(Storage::Item cell) { return cell(U).v.z(); }
+double get_p(Storage::Item cell) { return cell(U).p; }
+double get_e(Storage::Item cell) { return cell(U).e; }
 double get_inside(Storage::Item cell) { return double(cell(U).inside); }
 
 Mesh make_pipe(double xmin, double xmax, double ymin, double ymax, double H, double h, double L, double l, int nx_cells) {
@@ -72,18 +72,18 @@ void setup_initial(Mesh &mesh, double u0, double u3, double P0, double P3, doubl
     for (auto cell : mesh) {
         // Инициализация
         if (cell.center().x() > 0) {
-            cell(U).v1.x() = u0;
-            cell(U).v1.y() = 0;
-            cell(U).rho1 = 1.0 / eos.volume_pt(P0, 20.0_C);
-            cell(U).p1 = P0; 
-            cell(U).e1 = eos.energy_rp(cell(U).rho1, cell(U).p1);
+            cell(U).v.x() = u0;
+            cell(U).v.y() = 0;
+            cell(U).rho = 1.0 / eos.volume_pt(P0, 20.0_C);
+            cell(U).p = P0;
+            cell(U).e = eos.energy_rp(cell(U).rho, cell(U).p);
         }
         else {
-            cell(U).v1.x() = u3;
-            cell(U).v1.y() = 0;
-            cell(U).rho1 = 1.0 / eos.volume_pt(P3, 20.0_C);
-            cell(U).p1 = P3; 
-            cell(U).e1 = eos.energy_rp(cell(U).rho1, cell(U).p1);
+            cell(U).v.x() = u3;
+            cell(U).v.y() = 0;
+            cell(U).rho = 1.0 / eos.volume_pt(P3, 20.0_C);
+            cell(U).p = P3;
+            cell(U).e = eos.energy_rp(cell(U).rho, cell(U).p);
         }
     }
 }
