@@ -110,7 +110,7 @@ void Fractions::normalize() {
     double sum = 0.0;
     for (auto &v: m_data) {
         if (v < 0) {
-            if (-1e-2 < v)
+            if (-1e-11 < v)
                 v = 0;
             else {
                 std::cerr << *this;
@@ -142,7 +142,7 @@ void Fractions::cutoff(double eps) {
 
 bool Fractions::empty() const {
     for (auto &v: m_data)
-        if (v > 1e-5)
+        if (v > 1e-8)
             return false;
 
     return true;

@@ -8,3 +8,5 @@ cmake-build-*
 /.vscode/
 /python/SodTest/
 /python/ToroTest*/
+diplom
+/diplom/*

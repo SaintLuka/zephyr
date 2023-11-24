@@ -211,7 +211,7 @@ RiemannTesterWithSolver(Fluxes flux, const MmTest &test, int n_cells = 10, int a
     c_err.second /= n_cells;
 
     auto fprint = [](const std::string &name, const std::pair<double, double> &value) {
-        std::cout << std::fixed << std::setprecision(3) <<  name << ": " << value.first << " | " << value.second << '\n';
+        std::cout << std::fixed << std::setprecision(3) << name << ": " << value.first << " | " << value.second << '\n';
     };
 
     std::cout << "MultiMaterial test, " << "Flux: " << solver.get_flux_name() << "\n";
@@ -378,6 +378,7 @@ void test_two_cells() {
 }
 
 int main() {
+    threads::on();
     // Тестовая задача
     SodTest sod_test;
     ToroTest toro_test(3);
@@ -399,7 +400,7 @@ int main() {
     );
 
     MmTest test2(IdealGas::create(1.4, 718.0_J_kgK), StiffenedGas::create("Water"),
-                 0.5, 0.4,
+                 0.5, 0.1,
                  10.0, 800.0,
                  1e5, 1e4,
                  10, -2,
@@ -456,14 +457,19 @@ int main() {
     fluxes.push_back(Fluxes::GODUNOV);
 
     RiemannTesterWithSolver(Fluxes::GODUNOV, test1, 100, 2);
+//    RiemannTesterWithSolver(Fluxes::GODUNOV, test2, 100, 2);
     RiemannTesterWithSolver(Fluxes::GODUNOV, test3, 100, 2);
     RiemannTesterWithSolver(Fluxes::GODUNOV, test4, 100, 2);
     RiemannTesterWithSolver(Fluxes::GODUNOV, test5, 100, 2);
     RiemannTesterWithSolver(Fluxes::GODUNOV, mm_toro, 100, 2);
     RiemannTesterWithSolver(Fluxes::GODUNOV, mm_sod, 100, 2);
 
-//    RiemannTesterWithSolver2D(Fluxes::GODUNOV, 100, 2, "output_2D_2");
-//    RiemannTesterWithSolver2D(Fluxes::GODUNOV, 100, 1, "output_2D_1");
+//    Stopwatch solve;
+//    solve.start();
+//    RiemannTesterWithSolver2D(Fluxes::GODUNOV, 300, 2, "output_2D_2");
+//    solve.stop();
+//    std::cout << "Time: " << solve.milliseconds();
+//    RiemannTesterWithSolver2D(Fluxes::GODUNOV, 250, 1, "output_2D_1");
 
 //    for (int i = 0; i < fluxes.size(); ++i)
 //        sod_errors[i] = RiemannTester(sod_test, nfs[i]);

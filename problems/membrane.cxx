@@ -112,8 +112,8 @@ int main() {
     while (time <= 1.01 * max_time) {
         if (time >= next_write) {
             write.resume();
-            std::cout << "\tШаг: " << std::setw(8) << n_step << ";\t\t"
-                      << "Время: " << std::setw(11) << std::setprecision(3) << time << "\n";
+            std::cout << "\tStep: " << std::setw(8) << n_step << ";\t\t"
+                      << "Time: " << std::setw(11) << std::setprecision(3) << time << "\n";
             pvd.save(mesh, time);
             next_write += write_freq;
             write.stop();
