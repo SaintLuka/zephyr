@@ -15,11 +15,11 @@ struct _U_ {
 _U_ U;
 
 // Переменные для сохранения
-double get_u(Storage::Item cell) {
+double get_u(AmrStorage::Item& cell) {
     return cell(U).u1;
 }
 
-double get_bound(Storage::Item cell) {
+double get_bound(AmrStorage::Item& cell) {
     if (cell(U).is_bound)
         return 1.0;
     else
@@ -37,18 +37,17 @@ int main() {
     // Геометрия области
     Rectangle rect(-1.0, 1.0, -1.0, 1.0, false);
     rect.set_nx(200);
-    rect.set_boundary_flags(
-            FaceFlag::WALL, FaceFlag::WALL,
-            FaceFlag::WALL, FaceFlag::WALL);
+    rect.set_boundaries({
+        .left   = Boundary::WALL, .right = Boundary::WALL,
+        .bottom = Boundary::WALL, .top   = Boundary::WALL});
 
     // Создать сетку
-    Mesh mesh(U, &rect);
+    EuMesh mesh(U, &rect);
 
     // Заполняем начальные данные
-    Vector3d v1(rect.x_min(), rect.y_min(), 0.0);
-    Vector3d v2(rect.x_max(), rect.y_max(), 0.0);
-    Vector3d vc = 0.5 * (v1 + v2);
-    double D = 0.1 * (v2 - v1).norm();
+    Box box = mesh.bbox();
+    Vector3d vc = box.center();
+    double D = 0.1 * box.diameter();
     for (auto cell: mesh) {
         auto center = cell.center();
         double r = (center - vc).norm() / D;
@@ -95,7 +94,7 @@ int main() {
             next_write += period;
         }
 
-        for (auto cell: mesh) {
+        for (auto& cell: mesh) {
             auto &zc = cell(U);
             if (zc.is_bound) { 
                 zc.u_av = 0;
@@ -114,7 +113,7 @@ int main() {
             zc.v_av = zc.v1 + 0.5 * dt * a * a * fluxes / cell.volume(); // v(n + 1/2)
         }
 
-        for (auto cell: mesh) {
+        for (auto& cell: mesh) {
             auto &zc = cell(U);
             if (zc.is_bound) {
                 zc.u2 = 0;

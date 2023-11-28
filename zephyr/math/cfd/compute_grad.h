@@ -7,7 +7,7 @@
 namespace zephyr::math {
 
 template<class T>
-std::array<T, 3> compute_grad(ICell &cell, const std::function<T(zephyr::mesh::ICell &)> &to_state) {
+std::array<T, 3> compute_grad(Cell &cell, const std::function<T(Cell &)> &to_state) {
     std::array<T, 3> z_xyz;
 
     T zc = to_state(cell);

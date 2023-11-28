@@ -10,3 +10,8 @@ cmake-build-*
 /python/ToroTest*/
 diplom
 /diplom/*
+*.aux
+*.log
+*.pdf
+*.gz
+*.toc

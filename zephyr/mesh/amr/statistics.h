@@ -28,13 +28,13 @@ struct PartialStatistics {
 };
 
 /// @brief Собрать частичную статистику с части хранилища
-static PartialStatistics partial_statistics(Storage& cells, int from, int to) {
+static PartialStatistics partial_statistics(AmrStorage& cells, int from, int to) {
     int n_coarse = 0;
     int n_retain = 0;
     int n_refine = 0;
 
     for (int ic = from; ic < to; ++ic) {
-        switch (cells[ic].flag()) {
+        switch (cells[ic].flag) {
             case 0:
                 ++n_retain;
                 break;
@@ -52,7 +52,7 @@ static PartialStatistics partial_statistics(Storage& cells, int from, int to) {
 /// @struct Содержит статистику о числе ячеек с флагами -1, 0 и 1, число новых
 /// дочерних и родительских ячеек и другие параметры
 struct Statistics {
-    int n_cells;     ///< Исходное количество в Storage (перед адаптацией)
+    int n_cells;     ///< Исходное количество в AmrStorage (перед адаптацией)
     int n_coarse;    ///< Число ячеек для огрубления (кратно числу дочерних ячеек CpC)
     int n_retain;    ///< Число ячеек для сохранения
     int n_refine;    ///< Число ячеек для разбиения
@@ -71,7 +71,7 @@ struct Statistics {
     /// @brief Конструктор, однопоточный сбор статистики
     /// @details В многопоточном режиме данные получаются после объединения 
     /// статистики с разных потоков
-    explicit Statistics(Storage &cells) :
+    explicit Statistics(AmrStorage &cells) :
         n_coarse(0), 
         n_retain(0), 
         n_refine(0) {
@@ -79,7 +79,7 @@ struct Statistics {
         n_cells = cells.size();
 
         if (n_cells < 1) {
-            throw std::runtime_error("Empty Storage statistics");
+            throw std::runtime_error("Empty AmrStorage statistics");
         }
 
         // Составим статистику
@@ -116,7 +116,7 @@ struct Statistics {
 
         // Пересчитаем завимисые величины
 
-        int dim = cells[0].dim();
+        int dim = cells[0].dim;
 
         if (n_retain + n_refine + n_coarse != n_cells) {
             throw std::runtime_error("Refiner::apply() error 1");

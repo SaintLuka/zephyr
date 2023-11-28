@@ -1,517 +1,724 @@
-#include <vector>
-#include <functional>
-#include <iomanip>
+#include <cstring>
 
 #include <zephyr/geom/maps.h>
 
-namespace zephyr { namespace geom {
+namespace zephyr::geom {
 
-
-Mapping1D::Mapping1D(const ShortList1D& vs)
-    : v1(vs[0]), v2(vs[1]) {
-    vc = 0.5 * (v1 + v2);
+// Перпендикуляр единичной длины 'n' к вектору 'tau', лежащий в плоскости
+// векторов 'a' и 'tau', сонаправленный с вектором 'a', то есть
+// (n, n) = 1       // единичный
+// (tau, n) = 0     // перпендикуляр
+// (tau, n, a) = 0  // в одной плоскости
+// (tau, a) > 0     // сонаправлены
+inline Vector3d perpendicular(const Vector3d &tau, const Vector3d &a) {
+    return tau.cross(a).cross(tau).normalized();
 }
 
-Mapping1D::Mapping1D(const LargeList1D& vs)
-    : v1(vs[0]), vc(vs[1]), v2(vs[2]) {
+// ============================================================================
+//                                    LINE
+// ============================================================================
 
+Line::Line(const Vector3d &v1, const Vector3d &v2)
+        : verts{v1, v2} {}
+
+Vector3d Line::operator()(double x) const {
+    return get(verts[0], verts[1], x);
 }
 
-Vector3d Mapping1D::get(const Vector3d& v1, const Vector3d& vc, const Vector3d& v2, double xi) {
-    return vc + 0.5 * (v2 - v1) * xi + 0.5 * (v2 - 2 * vc + v1) * xi * xi;
+Vector3d Line::get(const Vector3d &v1, const Vector3d &v2, double x) {
+    return 0.5 * (1.0 - x) * v1 + 0.5 * (1.0 + x) * v2;
 }
 
-Vector3d Mapping1D::tangent(const Vector3d& v1, const Vector3d& vc, const Vector3d& v2, double xi) {
-    return 0.5 * (v2 - v1) + (v2 - 2.0 * vc + v1) * xi;
+Vector3d Line::normal(const Vector3d &v1, const Vector3d &v2, const Vector3d &c) {
+    return perpendicular(v2 - v1, v1 - c);
 }
 
-Vector3d Mapping1D::operator()(double xi) const {
-    return get(v1, vc, v2, xi);
+double Line::Jacobian() const {
+    return 0.5 * (verts[1] - verts[0]).norm();
 }
 
-Vector3d Mapping1D::normal(double xi) const {
-    Vector3d a = tangent(v1, vc, v2, xi);
-    if (std::abs(a.z()) <= std::abs(a.x()) && std::abs(a.z()) <= std::abs(a.y())) {
-        return Vector3d(+a.y(), -a.x(), 0.0).normalized();
+Vector3d Line::center() const {
+    return 0.5 * (verts[0] + verts[1]);
+}
+
+Vector3d Line::normal(const Vector3d &c) const {
+    return perpendicular(verts[1] - verts[0], verts[0] - c);
+}
+
+double Line::length() const {
+    return (verts[1] - verts[0]).norm();
+}
+
+// ============================================================================
+//                                  SQ-LINE
+// ============================================================================
+
+SqLine::SqLine(const Vector3d &v1, const Vector3d &v2)
+        : verts({v1, 0.5 * (v1 + v2), v2}) {}
+
+SqLine::SqLine(const Vector3d &v1, const Vector3d &v2, const Vector3d &v3)
+        : verts({v1, v2, v3}) {}
+
+SqLine::SqLine(const Line &vs)
+        : verts({vs[0], vs.center(), vs[1]}) {}
+
+Vector3d SqLine::get(const Vector3d &v1, const Vector3d &vc, const Vector3d &v2, double x) {
+    return vc + 0.5 * (v2 - v1) * x + 0.5 * (v2 - 2.0 * vc + v1) * x * x;
+}
+
+Vector3d SqLine::tangent(const Vector3d &v1, const Vector3d &vc, const Vector3d &v2, double x) {
+    return 0.5 * (v2 - v1) + (v2 - 2.0 * vc + v1) * x;
+}
+
+Vector3d SqLine::projection(const Vector3d &a) const {
+    const double eps = 1.0e-14;
+    double L2 = (verts[2] - verts[0]).squaredNorm();
+
+    // Перпендикуляр к плоскости, в которой лежит кривая
+    // (ноль, если точки лежат на одной линии)
+    Vector3d np = (verts[2] - verts[1]).cross(verts[0] - verts[1]);
+    double np_norm = np.norm();
+
+    if (np_norm < eps * L2) {
+        // Считаем, что точки лежат на одной линии
+        return a;
+    } else {
+        // Проекция точки 'a' на плоскость кривой
+        np /= np_norm;
+        return np.cross(a).cross(np);
     }
-    else if (std::abs(a.y()) <= std::abs(a.x()) && std::abs(a.y()) <= std::abs(a.z())) {
-        return Vector3d(-a.z(), 0.0, +a.x()).normalized();
+}
+
+Vector3d SqLine::operator()(double x) const {
+    return SqLine::get(verts[0], verts[1], verts[2], x);
+}
+
+Vector3d SqLine::get(double x) const {
+    return SqLine::get(verts[0], verts[1], verts[2], x);
+}
+
+Vector3d SqLine::tangent(double x) const {
+    return SqLine::tangent(verts[0], verts[1], verts[2], x);
+}
+
+Vector3d SqLine::normal(double x, const Vector3d &c) const {
+    Vector3d a = projection(verts[1] - c);
+    return perpendicular(tangent(x), a);
+}
+
+double SqLine::Jacobian(double x) const {
+    return SqLine::tangent(verts[0], verts[1], verts[2], x).norm();
+}
+
+const Vector3d &SqLine::center() const {
+    return verts[1];
+}
+
+Vector3d SqLine::normal(const Vector3d &c) const {
+    // Это не заглушка, было установлено, что в расчете потока через
+    // криволинейную грань следует использовать такую же нормаль,
+    // как при расчете через обычную грань.
+    // Единственное, здесь добавляется проекция на плоскость кривой.
+
+    Vector3d a = projection(verts[1] - c);
+    return perpendicular(verts[2] - verts[0], a);
+}
+
+double SqLine::length() const {
+    // Это не заглушка, было установлено, что в расчете потока
+    // по криволинейной грани следует использовать такую длину
+    return (verts[2] - verts[0]).norm();
+}
+
+// ============================================================================
+//                                    QUAD
+// ============================================================================
+
+Quad::Quad(
+        const Vector3d &v00,
+        const Vector3d &v01,
+        const Vector3d &v10,
+        const Vector3d &v11)
+        : verts({v00, v01, v10, v11}) {}
+
+Vector3d Quad::operator()(double x, double y) const {
+    return get(x, y);
+}
+
+Vector3d Quad::get(double x, double y) const {
+    return 0.25 * (((1.0 - x) * (1.0 - y)) * vs<-1, -1>() +
+                   ((1.0 + x) * (1.0 - y)) * vs<+1, -1>() +
+                   ((1.0 - x) * (1.0 + y)) * vs<-1, +1>() +
+                   ((1.0 + x) * (1.0 + y)) * vs<+1, +1>());
+}
+
+Vector3d Quad::tangent_x(double x, double y) const {
+    return 0.25 * ((1.0 - y) * (vs<+1, -1>() - vs<-1, -1>()) +
+                   (1.0 + y) * (vs<+1, +1>() - vs<-1, +1>()));
+}
+
+Vector3d Quad::tangent_y(double x, double y) const {
+    return 0.25 * ((1.0 - x) * (vs<-1, +1>() - vs<-1, -1>()) +
+                   (1.0 + x) * (vs<+1, +1>() - vs<+1, -1>()));
+}
+
+Vector3d Quad::normal(double x, double y, const Vector3d &c) const {
+    Vector3d n = tangent_x(x, y).cross(tangent_y(x, y)).normalized();
+    return (verts[0] - c).dot(n) > 0 ? n : -n;
+}
+
+double Quad::Jacobian(double x, double y) const {
+    return tangent_x(x, y).cross(tangent_y(x, y)).norm();
+}
+
+Vector3d Quad::center() const {
+    return 0.25 * (verts[0] + verts[1] + verts[2] + verts[3]);
+}
+
+Vector3d Quad::normal(const Vector3d &c) const {
+    Vector3d n = (verts[3] - verts[0]).cross(verts[2] - verts[1]);
+    n.normalize();
+    return (verts[0] - c).dot(n) > 0.0 ? n : -n;
+}
+
+double Quad::area() const {
+    return 0.5 * (verts[3] - verts[0]).cross(verts[2] - verts[1]).norm();
+}
+
+double Quad::volume_as() const {
+    // Обход вершин против часовой стрелки
+    int ord[4] = {0, 1, 3, 2};
+
+    double V = 0.0;
+    for (int i: {0, 1, 2, 3}) {
+        auto &v1 = verts[ord[i]];
+        auto &v2 = verts[ord[(i + 1) % 4]];
+
+        V -= (v2.x() - v1.x()) * (v2.y() * v2.y() + v2.y() * v1.y() + v1.y() * v1.y());
     }
-    else {
-        return Vector3d(0.0, +a.z(), -a.y()).normalized();
+    V /= 6.0;
+
+    return V;
+}
+
+Vector3d Quad::centroid(double area) const {
+    if (area == 0.0) {
+        area = Quad::area();
     }
+
+    // Обход вершин против часовой стрелки
+    int ord[4] = {0, 1, 3, 2};
+
+    Vector3d C = {0.0, 0.0, 0.0};
+    for (int i: {0, 1, 2, 3}) {
+        auto &v1 = verts[ord[i]];
+        auto &v2 = verts[ord[(i + 1) % 4]];
+
+        C.x() += (v2.y() - v1.y()) * (v2.x() * v2.x() + v2.x() * v1.x() + v1.x() * v1.x());
+        C.y() -= (v2.x() - v1.x()) * (v2.y() * v2.y() + v2.y() * v1.y() + v1.y() * v1.y());
+    }
+    C /= (6.0 * area);
+
+    return C;
 }
 
-double  Mapping1D::Jacobian(double xi) const {
-    return tangent(v1, vc, v2, xi).norm();
+// ============================================================================
+//                                  SQ-QUAD
+// ============================================================================
+
+SqQuad::SqQuad(
+        const Vector3d &v00, const Vector3d &v01,
+        const Vector3d &v10, const Vector3d &v11)
+        : verts({
+                        v00, 0.5 * (v00 + v01), v01,
+                        0.5 * (v00 + v10), 0.25 * (v00 + v01 + v10 + v11), 0.5 * (v01 + v11),
+                        v10, 0.5 * (v10 + v11), v11
+                }) {}
+
+SqQuad::SqQuad(
+        const Vector3d &v00, const Vector3d &v01, const Vector3d &v02,
+        const Vector3d &v10, const Vector3d &v11, const Vector3d &v12,
+        const Vector3d &v20, const Vector3d &v21, const Vector3d &v22)
+        : verts({
+                        v00, v01, v02,
+                        v10, v11, v12,
+                        v20, v21, v22
+                }) {}
+
+SqQuad::SqQuad(const Quad &quad)
+        : verts({
+                        quad.vs<-1, -1>(), quad(0.0, -1.0), quad.vs<+1, -1>(),
+                        quad(-1.0, 0.0), quad(0.0, 0.0), quad(+1.0, 0.0),
+                        quad.vs<-1, +1>(), quad(0.0, +1.0), quad.vs<+1, +1>()
+                }) {}
+
+Quad SqQuad::reduce() const {
+    return Quad(vs<-1, -1>(), vs<+1, -1>(),
+                vs<-1, +1>(), vs<+1, +1>());
 }
 
-Mapping2D::Mapping2D(const ShortList2D& vs) :
-    SB(ShortList1D({vs[0], vs[1]})),
-    SH(ShortList1D({0.5*(vs[0] + vs[2]), 0.5*(vs[1] + vs[3])})),
-    ST(ShortList1D({vs[2], vs[3]})) {
-
+Vector3d SqQuad::operator()(double x, double y) const {
+    return SqQuad::get(x, y);
 }
 
-Mapping2D::Mapping2D(const LargeList2D& vs) :
-        SB(LargeList1D({vs[0], vs[1], vs[2]})),
-        SH(LargeList1D({vs[3], vs[4], vs[5]})),
-        ST(LargeList1D({vs[6], vs[7], vs[8]})) {
+Vector3d SqQuad::get(double x, double y) const {
+    // Операция упрощается до одномерных в каждом направлении
+    // самый алгоритмически быстрый вариант
+    SqLine sqline = {
+            // Сплайны по строкам матрицы
+            ((SqLine *) &verts[0])->get(x),
+            ((SqLine *) &verts[3])->get(x),
+            ((SqLine *) &verts[6])->get(x),
+    };
+    return sqline.get(y);
 
+//    // Следующие эквивалентные формулы для наглядности,
+//    // также эти формулы проще дифференцировать
+//    SqLine sqline = {
+//            // Сплайны по строкам матрицы
+//            SqLine::get(verts[0], verts[1], verts[2], x),
+//            SqLine::get(verts[3], verts[4], verts[5], x),
+//            SqLine::get(verts[6], verts[7], verts[8], x)
+//    };
+//    return sqline.get(y);
+//
+//    SqLine sqline = {
+//            // Сплайны по столбцам матрицы
+//            SqLine::get(verts[0], verts[3], verts[6], y),
+//            SqLine::get(verts[1], verts[4], verts[7], y),
+//            SqLine::get(verts[2], verts[5], verts[8], y)
+//    };
+//    return sqline.get(x);
 }
 
-Vector3d Mapping2D::operator()(double xi, double eta) const {
-    return Mapping1D::get(SB(xi), SH(xi), ST(xi), eta);
+Vector3d SqQuad::tangent_x(double x, double y) const {
+    SqLine sqline = {
+            // Сплайны по столбцам матрицы
+            SqLine::get(verts[0], verts[3], verts[6], y),
+            SqLine::get(verts[1], verts[4], verts[7], y),
+            SqLine::get(verts[2], verts[5], verts[8], y)
+    };
+    return sqline.tangent(x);
 }
 
-Vector3d Mapping2D::normal(double xi, double eta) const {
-    Mapping1D SL({SB.v1, SH.v1, ST.v1});
-    Mapping1D SV({SB.vc, SH.vc, ST.vc});
-    Mapping1D SR({SB.v2, SH.v2, ST.v2});
-
-    Vector3d W_x = Mapping1D::tangent(SL(eta), SV(eta), SR(eta), xi);
-    Vector3d W_e = Mapping1D::tangent(SB(xi), SH(xi), ST(xi), eta);
-
-    return W_x.cross(W_e).normalized();
+Vector3d SqQuad::tangent_y(double x, double y) const {
+    SqLine sqline = {
+            // Сплайны по строкам матрицы
+            ((SqLine *) &verts[0])->get(x),
+            ((SqLine *) &verts[3])->get(x),
+            ((SqLine *) &verts[6])->get(x),
+    };
+    return sqline.tangent(y);
 }
 
-double Mapping2D::Jacobian(double xi, double eta) const {
-    Mapping1D SL({SB.v1, SH.v1, ST.v1});
-    Mapping1D SV({SB.vc, SH.vc, ST.vc});
-    Mapping1D SR({SB.v2, SH.v2, ST.v2});
-
-    Vector3d W_x = Mapping1D::tangent(SL(eta), SV(eta), SR(eta), xi);
-    Vector3d W_e = Mapping1D::tangent(SB(xi), SH(xi), ST(xi), eta);
-
-    return W_x.cross(W_e).norm();
+Vector3d SqQuad::normal(double x, double y, const Vector3d &c) const {
+    Vector3d tau_x = tangent_x(x, y);
+    Vector3d tau_y = tangent_y(x, y);
+    Vector3d n = tau_x.cross(tau_y).normalized();
+    return (verts[iss<0, 0>()] - c).dot(n) > 0.0 ? n : -n;
 }
 
-Mapping3D::Mapping3D(const ShortList3D& vs)
-    : vs(vs) { }
+double SqQuad::Jacobian(double x, double y) const {
+    Vector3d tau_x = tangent_x(x, y);
+    Vector3d tau_y = tangent_y(x, y);
+    return tau_x.cross(tau_y).norm();
+}
 
-Vector3d Mapping3D::operator()(double xi, double eta, double chi) {
+const Vector3d &SqQuad::center() const {
+    return verts[iss<0, 0>()];
+}
+
+Vector3d SqQuad::normal(const Vector3d &c) const {
+    // Вроде так же, как для линейного четырехугольника
+    // Перепроверить, как?
+    Vector3d n = (verts[3] - verts[0]).cross(verts[2] - verts[1]);
+    n.normalize();
+    return (verts[0] - c).dot(n) > 0.0 ? n : -n;
+}
+
+static const
+std::array<std::array<int, 3>, 4> faces2D = {
+        std::array<int, 3>{6, 3, 0}, // left
+        std::array<int, 3>{2, 5, 8}, // right
+        std::array<int, 3>{0, 1, 2}, // bottom
+        std::array<int, 3>{8, 7, 6}, // top
+};
+
+double SqQuad::area() const {
+    double S = 0.0;
+    for (auto &face: faces2D) {
+        auto &v1 = verts[face[0]];
+        auto &vc = verts[face[1]];
+        auto &v2 = verts[face[2]];
+
+        S += 4.0 * (v2.y() - v1.y()) * vc.x();
+        S -= 4.0 * (v2.x() - v1.x()) * vc.y();
+        S += v2.y() * (3.0 * v2.x() - v1.x()) - v1.y() * (3.0 * v1.x() - v2.x());
+    }
+    S /= 6.0;
+
+    return S;
+}
+
+double SqQuad::volume_as() const {
+    double V = 0.0;
+    for (auto &face: faces2D) {
+        auto &v1 = verts[face[0]];
+        auto &vc = verts[face[1]];
+        auto &v2 = verts[face[2]];
+
+        V -= (8.0 * vc.y() * vc.y() - v1.y() * v2.y()) * (v2.x() - v1.x());
+        V -= (5.0 * v1.y() * v1.y() + 6.0 * v1.y() * vc.y() - v2.y() * v2.y() - 2.0 * v2.y() * vc.y()) *
+             (vc.x() - v1.x());
+        V -= (5.0 * v2.y() * v2.y() + 6.0 * v2.y() * vc.y() - v1.y() * v1.y() - 2.0 * v1.y() * vc.y()) *
+             (v2.x() - vc.x());
+    }
+    V /= 30.0;
+
+    return V;
+}
+
+Vector3d SqQuad::centroid(double area) const {
+    if (area == 0.0) {
+        area = SqQuad::area();
+    }
+
+    Vector3d C = {0.0, 0.0, 0.0};
+    for (auto &face: faces2D) {
+        auto &v1 = verts[face[0]];
+        auto &vc = verts[face[1]];
+        auto &v2 = verts[face[2]];
+
+        C.x() += (8.0 * vc.x() * vc.x() - v1.x() * v2.x()) * (v2.y() - v1.y());
+        C.y() -= (8.0 * vc.y() * vc.y() - v1.y() * v2.y()) * (v2.x() - v1.x());
+
+        C.x() += (5.0 * v1.x() * v1.x() + 6.0 * v1.x() * vc.x() - v2.x() * v2.x() - 2.0 * v2.x() * vc.x()) *
+                 (vc.y() - v1.y());
+        C.y() -= (5.0 * v1.y() * v1.y() + 6.0 * v1.y() * vc.y() - v2.y() * v2.y() - 2.0 * v2.y() * vc.y()) *
+                 (vc.x() - v1.x());
+
+        C.x() += (5.0 * v2.x() * v2.x() + 6.0 * v2.x() * vc.x() - v1.x() * v1.x() - 2.0 * v1.x() * vc.x()) *
+                 (v2.y() - vc.y());
+        C.y() -= (5.0 * v2.y() * v2.y() + 6.0 * v2.y() * vc.y() - v1.y() * v1.y() - 2.0 * v1.y() * vc.y()) *
+                 (v2.x() - vc.x());
+    }
+    C /= (30.0 * area);
+
+    return C;
+}
+
+std::array<SqQuad, 4> SqQuad::children() const {
+    // @formatter:off
+    return {
+            SqQuad(vs<-1, -1>(),    get(-0.5, -1.0), vs<0, -1>(),
+                   get(-1.0, -0.5), get(-0.5, -0.5), get(0.0, -0.5),
+                   vs<-1, 0>(),     get(-0.5, 0.0), vs<0, 0>()),
+
+            SqQuad(vs<0, -1>(),     get(0.5, -1.0), vs<1, -1>(),
+                   get(0.0, -0.5),  get(0.5, -0.5), get(1.0, -0.5),
+                   vs<0, 0>(),      get(0.5, 0.0), vs<1, 0>()),
+
+            SqQuad(vs<-1, 0>(),     get(-0.5, 0.0), vs<0, 0>(),
+                   get(-1.0, 0.5),  get(-0.5, 0.5), get(0.0, 0.5),
+                   vs<-1, 1>(),     get(-0.5, 1.0), vs<0, 1>()),
+
+            SqQuad(vs<0, 0>(),      get(0.5, 0.0), vs<1, 0>(),
+                   get(0.0, 0.5),   get(0.5, 0.5), get(1.0, 0.5),
+                   vs<0, 1>(),      get(0.5, 1.0), vs<1, 1>())
+    };
+    // @formatter:on
+}
+
+// ============================================================================
+//                                    CUBE
+// ============================================================================
+
+Cube::Cube(
+        const Vector3d &v000, const Vector3d &v001,
+        const Vector3d &v010, const Vector3d &v011,
+        const Vector3d &v100, const Vector3d &v101,
+        const Vector3d &v110, const Vector3d &v111)
+        : verts({v000, v001, v010, v011, v100, v101, v110, v111}) {}
+
+Vector3d Cube::operator()(double x, double y, double z) const {
+    return Cube::get(x, y, z);
+}
+
+Vector3d Cube::get(double x, double y, double z) const {
     Vector3d res = {0.0, 0.0, 0.0};
-    res += ((1 - xi) * (1 - eta) * (1 - chi)) * vs[0];
-    res += ((1 + xi) * (1 - eta) * (1 - chi)) * vs[1];
-    res += ((1 - xi) * (1 + eta) * (1 - chi)) * vs[2];
-    res += ((1 + xi) * (1 + eta) * (1 - chi)) * vs[3];
-    res += ((1 - xi) * (1 - eta) * (1 + chi)) * vs[4];
-    res += ((1 + xi) * (1 - eta) * (1 + chi)) * vs[5];
-    res += ((1 - xi) * (1 + eta) * (1 + chi)) * vs[6];
-    res += ((1 + xi) * (1 + eta) * (1 + chi)) * vs[7];
+    res += ((1 - x) * (1 - y) * (1 - z)) * vs<-1, -1, -1>();
+    res += ((1 + x) * (1 - y) * (1 - z)) * vs<+1, -1, -1>();
+    res += ((1 - x) * (1 + y) * (1 - z)) * vs<-1, +1, -1>();
+    res += ((1 + x) * (1 + y) * (1 - z)) * vs<+1, +1, -1>();
+    res += ((1 - x) * (1 - y) * (1 + z)) * vs<-1, -1, +1>();
+    res += ((1 + x) * (1 - y) * (1 + z)) * vs<+1, -1, +1>();
+    res += ((1 - x) * (1 + y) * (1 + z)) * vs<-1, +1, +1>();
+    res += ((1 + x) * (1 + y) * (1 + z)) * vs<+1, +1, +1>();
     res /= 8.0;
     return res;
 }
 
-double Mapping3D::Jacobian(double xi, double eta, double chi) {
-    // Производные по направлениям (xi, eta, chi)
-    // Формулы актуальны в силу линейности отображения по каждой из переменных
-    Vector3d N1 = {0.0, 0.0, 0.0};
-    N1 += ((1 - eta) * (1 - chi)) * (vs[1] - vs[0]);
-    N1 += ((1 + eta) * (1 - chi)) * (vs[3] - vs[2]);
-    N1 += ((1 + eta) * (1 + chi)) * (vs[7] - vs[6]);
-    N1 += ((1 - eta) * (1 + chi)) * (vs[5] - vs[4]);
-
-    Vector3d N2 = {0.0, 0.0, 0.0};
-    N2 += ((1 - xi) * (1 - chi)) * (vs[2] - vs[0]);
-    N2 += ((1 + xi) * (1 - chi)) * (vs[3] - vs[1]);
-    N2 += ((1 - xi) * (1 + chi)) * (vs[6] - vs[4]);
-    N2 += ((1 + xi) * (1 + chi)) * (vs[7] - vs[5]);
-
-    Vector3d N3 = {0.0, 0.0, 0.0};
-    N3 += ((1 - xi) * (1 - eta)) * (vs[4] - vs[0]);
-    N3 += ((1 + xi) * (1 - eta)) * (vs[5] - vs[1]);
-    N3 += ((1 - xi) * (1 + eta)) * (vs[6] - vs[2]);
-    N3 += ((1 + xi) * (1 + eta)) * (vs[7] - vs[3]);
-
-    return N1.dot(N2.cross(N3)) / (8.0*8.0*8.0);
-}
-
-std::vector<double> linspace(double a, double b, int n) {
-    std::vector<double> res(n);
-    for (int i = 0; i < n; ++i) {
-        res[i] = a + (b - a) * i / (n - 1.0);
-    }
+Vector3d Cube::tangent_x(double x, double y, double z) const {
+    Vector3d res = {0.0, 0.0, 0.0};
+    res += (1 - y) * (1 - z) * (vs<+1, -1, -1>() - vs<-1, -1, -1>());
+    res += (1 + y) * (1 - z) * (vs<+1, +1, -1>() - vs<-1, +1, -1>());
+    res += (1 - y) * (1 + z) * (vs<+1, -1, +1>() - vs<-1, -1, +1>());
+    res += (1 + y) * (1 + z) * (vs<+1, +1, +1>() - vs<-1, +1, +1>());
+    res /= 8.0;
     return res;
 }
 
-// Одномерный интеграл
-template <class V>
-V simpson(const std::vector<double>& t, const std::function<V(double)>& f, V zero) {
-    V res = zero;
-    for (int i = 0; i < int(t.size()) - 1; ++i) {
-        res += (t[i + 1] - t[i]) * (f(t[i]) + 4.0 * f(0.5 * (t[i] + t[i + 1])) + f(t[i + 1]));
-    }
-    return res / 6.0;
+Vector3d Cube::tangent_y(double x, double y, double z) const {
+    Vector3d res = {0.0, 0.0, 0.0};
+    res += (1 - x) * (1 - z) * (vs<-1, +1, -1>() - vs<-1, -1, -1>());
+    res += (1 + x) * (1 - z) * (vs<+1, +1, -1>() - vs<+1, -1, -1>());
+    res += (1 - x) * (1 + z) * (vs<-1, +1, +1>() - vs<-1, -1, +1>());
+    res += (1 + x) * (1 + z) * (vs<+1, +1, +1>() - vs<+1, -1, +1>());
+    res /= 8.0;
+    return res;
 }
 
-// Двумерный интеграл
-template <class V>
-V simpson(
-        const std::vector<double>& xi,
-        const std::vector<double>& eta,
-        const std::function<V(double, double)>& f, V zero) {
-    V res = zero;
-    for (int i = 0; i < int(xi.size()) - 1; ++i) {
-        double xi1 = xi[i];
-        double xi2 = xi[i + 1];
-        double xic = 0.5*(xi1 + xi2);
-        for (int j = 0; j < int(eta.size()) - 1; ++j) {
-            double eta1 = eta[j];
-            double eta2 = eta[j + 1];
-            double etac = 0.5 * (eta1 + eta2);
-
-            res += (xi2 - xi1) * (eta2 - eta1) * (
-                    f(xi1, eta1) + 4 * f(xi1, etac) + f(xi1, eta2) +
-                    4 * f(xic, eta1) + 16 * f(xic, etac) + 4 * f(xic, eta2) +
-                    f(xi2, eta1) + 4 * f(xi2, etac) + f(xi2, eta2)
-            );
-        }
-    }
-    return res / 36.0;
+Vector3d Cube::tangent_z(double x, double y, double z) const {
+    Vector3d res = {0.0, 0.0, 0.0};
+    res += (1 - x) * (1 - y) * (vs<-1, -1, +1>() - vs<-1, -1, -1>());
+    res += (1 + x) * (1 - y) * (vs<+1, -1, +1>() - vs<+1, -1, -1>());
+    res += (1 - x) * (1 + y) * (vs<-1, +1, +1>() - vs<-1, +1, -1>());
+    res += (1 + x) * (1 + y) * (vs<+1, +1, +1>() - vs<+1, +1, -1>());
+    res /= 8.0;
+    return res;
 }
 
-// Трехмерный интеграл
-template <class V>
-V simpson(
-        const std::vector<double>& xi,
-        const std::vector<double>& eta,
-        const std::vector<double>& chi,
-        const std::function<V(double, double, double)>& f, V zero) {
-    V res = zero;
-    for (int i = 0; i < int(xi.size()) - 1; ++i) {
-        double xi1 = xi[i];
-        double xi2 = xi[i + 1];
-        double xic = 0.5 * (xi1 + xi2);
-        for (int j = 0; j < int(eta.size()) - 1; ++j) {
-            double eta1 = eta[j];
-            double eta2 = eta[j + 1];
-            double etac = 0.5 * (eta1 + eta2);
+double Cube::Jacobian(double x, double y, double z) const {
+    Vector3d tau_x = tangent_x(x, y, z);
+    Vector3d tau_y = tangent_y(x, y, z);
+    Vector3d tau_z = tangent_z(x, y, z);
+    return tau_x.cross(tau_y).dot(tau_z);
+}
 
-            for (int k = 0; k < int(chi.size()) - 1; ++k) {
-                double chi1 = chi[k];
-                double chi2 = chi[k + 1];
-                double chic = 0.5 * (chi1 + chi2);
+Vector3d Cube::center() const {
+    Vector3d C = {0.0, 0.0, 0.0};
+    for (int i = 0; i < 8; ++i) {
+        C += verts[i];
+    }
+    return C / 8.0;
+}
 
+double Cube::volume() const {
+    // Действительно так сложно?
+    Vector3d cell_c = Cube::center();
 
-                res += (xi2 - xi1) * (eta2 - eta1) * (chi2 - chi1) * (
-                        64.0 * f(xic, etac, chic) +
-                        16.0 * (
-                                f(xic, etac, chi1) + f(xic, etac, chi2) +
-                                f(xic, eta1, chic) + f(xic, eta2, chic) +
-                                f(xi1, etac, chic) + f(xi2, etac, chic)
-                        ) +
-                        4.0 * (
-                                f(xic, eta1, chi1) + f(xic, eta1, chi2) +
-                                f(xic, eta2, chi1) + f(xic, eta2, chi2) +
-                                f(xi1, etac, chi1) + f(xi1, etac, chi2) +
-                                f(xi2, etac, chi1) + f(xi2, etac, chi2) +
-                                f(xi1, eta1, chic) + f(xi1, eta2, chic) +
-                                f(xi2, eta1, chic) + f(xi2, eta2, chic)
-                        ) +
-                        f(xi1, eta1, chi1) + f(xi1, eta1, chi2) +
-                        f(xi1, eta2, chi1) + f(xi1, eta2, chi2) +
-                        f(xi2, eta1, chi1) + f(xi2, eta1, chi2) +
-                        f(xi2, eta2, chi1) + f(xi2, eta2, chi2)
+    std::array<Quad, 6> faces = {
+            Quad({verts[4], verts[0], verts[6], verts[2]}), // left
+            Quad({verts[5], verts[1], verts[7], verts[3]}), // right
+            Quad({verts[4], verts[5], verts[0], verts[1]}), // bottom
+            Quad({verts[6], verts[7], verts[2], verts[3]}), // top
+            Quad({verts[0], verts[1], verts[2], verts[3]}), // back
+            Quad({verts[4], verts[5], verts[6], verts[7]})  // front
+    };
 
-                );
+    double V = 0.0;
+    for (auto &face: faces) {
+        Vector3d face_c = face.center();
+        Vector3d face_s = face.area() * face.normal(cell_c);
+        V += (face_c - cell_c).dot(face_s);
+    }
+    V /= 3.0;
+
+    return V;
+}
+
+Vector3d Cube::centroid(double volume) const {
+    if (volume == 0.0) {
+        volume = Cube::volume();
+    }
+
+    // Аппроксимация объемного интеграла методом Гаусса
+    // демонстрирует огромную точность
+    double a = 1.0 / std::sqrt(3.0);
+
+    Vector3d C = {0.0, 0.0, 0.0};
+    C += get(-a, -a, -a) * Jacobian(-a, -a, -a);
+    C += get(+a, -a, -a) * Jacobian(+a, -a, -a);
+    C += get(-a, +a, -a) * Jacobian(-a, +a, -a);
+    C += get(+a, +a, -a) * Jacobian(+a, +a, -a);
+    C += get(-a, -a, +a) * Jacobian(-a, -a, +a);
+    C += get(+a, -a, +a) * Jacobian(+a, -a, +a);
+    C += get(-a, +a, +a) * Jacobian(-a, +a, +a);
+    C += get(+a, +a, +a) * Jacobian(+a, +a, +a);
+    C /= volume;
+
+    return C;
+}
+
+// ============================================================================
+//                                  SQ-CUBE
+// ============================================================================
+
+SqCube::SqCube(const Vector3d &v000,
+               const Vector3d &v002,
+               const Vector3d &v020,
+               const Vector3d &v022,
+               const Vector3d &v200,
+               const Vector3d &v202,
+               const Vector3d &v220,
+               const Vector3d &v222)
+        : verts({
+            // О ма гадабл, ты что крейзи?
+                        v000, 0.5 * (v000 + v002), v002,
+                        0.5 * (v000 + v020), 0.25 * (v000 + v002 + v020 + v022), 0.5 * (v002 + v022),
+                        v020, 0.5 * (v020 + v022), v022,
+                        0.5 * (v000 + v200), 0.25 * (v000 + v200 + v002 + v202), 0.5 * (v002 + v202),
+                        0.25 * (v000 + v200 + v020 + v220),
+                        0.125 * (v000 + v002 + v020 + v022 + v200 + v202 + v220 + v222),
+                        0.25 * (v002 + v202 + v022 + v222),
+                        0.5 * (v020 + v220), 0.25 * (v020 + v220 + v022 + v222), 0.5 * (v022 + v222),
+                        v200, 0.5 * (v200 + v202), v202,
+                        0.5 * (v200 + v220), 0.25 * (v200 + v202 + v220 + v222), 0.5 * (v202 + v222),
+                        v220, 0.5 * (v220 + v222), v222
+                }) {}
+
+SqCube::SqCube(
+        const Vector3d &v000, const Vector3d &v001, const Vector3d &v002,
+        const Vector3d &v010, const Vector3d &v011, const Vector3d &v012,
+        const Vector3d &v020, const Vector3d &v021, const Vector3d &v022,
+        const Vector3d &v100, const Vector3d &v101, const Vector3d &v102,
+        const Vector3d &v110, const Vector3d &v111, const Vector3d &v112,
+        const Vector3d &v120, const Vector3d &v121, const Vector3d &v122,
+        const Vector3d &v200, const Vector3d &v201, const Vector3d &v202,
+        const Vector3d &v210, const Vector3d &v211, const Vector3d &v212,
+        const Vector3d &v220, const Vector3d &v221, const Vector3d &v222)
+        : verts({
+                        v000, v001, v002, v010, v011, v012, v020, v021, v022,
+                        v100, v101, v102, v110, v111, v112, v120, v121, v122,
+                        v200, v201, v202, v210, v211, v212, v220, v221, v222
+                }) {}
+
+SqCube::SqCube(const Cube &cube)
+        : SqCube(cube[0], cube[1], cube[2], cube[3],
+                 cube[4], cube[5], cube[6], cube[7]) {}
+
+SqCube::SqCube(const Quad& quad)
+    : SqCube(SqQuad(quad)) { }
+
+SqCube::SqCube(const SqQuad& quad) {
+    std::memcpy((void *) verts.data(), (void *) &quad, 9 * sizeof(Vector3d));
+
+    const Vector3d nanvec = {NAN, NAN, NAN};
+    std::fill(verts.begin() + 9, verts.end(), nanvec);
+}
+
+Cube SqCube::reduce() const {
+    return Cube(vs<-1, -1, -1>(), vs<+1, -1, -1>(),
+                vs<-1, +1, -1>(), vs<+1, +1, -1>(),
+                vs<-1, -1, +1>(), vs<+1, -1, +1>(),
+                vs<-1, +1, +1>(), vs<+1, +1, +1>());
+}
+
+using LargeGrid3D = std::array<std::array<std::array<Vector3d, 5>, 5>, 5>;
+
+template<int i, int j, int k>
+inline SqCube sq_cube_from_table(const LargeGrid3D& grid) {
+    static_assert(i == 0 || i == 2);
+    static_assert(j == 0 || j == 2);
+    static_assert(k == 0 || k == 2);
+
+    return {
+            grid[i + 0][j + 0][k + 0], grid[i + 1][j + 0][k + 0], grid[i + 2][j + 0][k + 0],
+            grid[i + 0][j + 1][k + 0], grid[i + 1][j + 1][k + 0], grid[i + 2][j + 1][k + 0],
+            grid[i + 0][j + 2][k + 0], grid[i + 1][j + 2][k + 0], grid[i + 2][j + 2][k + 0],
+
+            grid[i + 0][j + 0][k + 1], grid[i + 1][j + 0][k + 1], grid[i + 2][j + 0][k + 1],
+            grid[i + 0][j + 1][k + 1], grid[i + 1][j + 1][k + 1], grid[i + 2][j + 1][k + 1],
+            grid[i + 0][j + 2][k + 1], grid[i + 1][j + 2][k + 1], grid[i + 2][j + 2][k + 1],
+
+            grid[i + 0][j + 0][k + 2], grid[i + 1][j + 0][k + 2], grid[i + 2][j + 0][k + 2],
+            grid[i + 0][j + 1][k + 2], grid[i + 1][j + 1][k + 2], grid[i + 2][j + 1][k + 2],
+            grid[i + 0][j + 2][k + 2], grid[i + 1][j + 2][k + 2], grid[i + 2][j + 2][k + 2]
+    };
+}
+
+std::array<SqCube, 8> SqCube::children() const {
+    LargeGrid3D grid;
+    for (int i = 0; i < 5; ++i) {
+        double x = 0.5 * (i - 2);
+        for (int j = 0; j < 5; ++j) {
+            double y = 0.5 * (j - 2);
+            for (int k = 0; k < 5; ++k) {
+                double z = 0.5 * (k - 2);
+                grid[i][j][k] = get(x, y, z);
             }
         }
     }
-    return res / (6.0 * 6.0 * 6.0);
+
+    return {
+            sq_cube_from_table<0, 0, 0>(grid),
+            sq_cube_from_table<2, 0, 0>(grid),
+            sq_cube_from_table<0, 2, 0>(grid),
+            sq_cube_from_table<2, 2, 0>(grid),
+            sq_cube_from_table<0, 0, 2>(grid),
+            sq_cube_from_table<2, 0, 2>(grid),
+            sq_cube_from_table<0, 2, 2>(grid),
+            sq_cube_from_table<2, 2, 2>(grid),
+    };
 }
 
-void checkout() {
-
-    // Основной тестовый двумерный набор
-    LargeList2D ML_2D = {
-            Vector3d(0.1, 1.0, 0.0), Vector3d(0.7, 1.1, 0.0), Vector3d(1.3, 1.1, 0.0),
-            Vector3d(0.2, 1.5, 0.0), Vector3d(0.8, 1.7, 0.0), Vector3d(1.4, 1.8, 0.0),
-            Vector3d(0.0, 2.0, 0.0), Vector3d(0.5, 2.4, 0.0), Vector3d(1.2, 2.6, 0.0)
-    };
-
-    // Основной тестовый трехмерный набор
-    ShortList3D ML_3D = {
-            Vector3d(0.0, 0.0, 0.0), Vector3d(1.0, 0.2, 0.1),
-            Vector3d(0.0, 1.0, 0.3), Vector3d(1.0, 1.2, 0.2),
-            Vector3d(0.0, 0.1, 1.0), Vector3d(1.5, 0.5, 1.0),
-            Vector3d(0.4, 1.0, 1.0), Vector3d(1.6, 1.5, 1.3),
-    };
-
-    // Характерная длина, площадь, объем
-    double L1 = (ML_2D[0] - ML_2D[8]).norm();
-    double L2 = L1 * L1;
-    double L3 = L1 * L1 * L1;
-
-    // Центр ячейки
-    Vector3d C = ML_2D[4];
-
-    std::cout << std::setprecision(6);
-
-    {
-        std::cout << "Длина и нормаль простого отрезка\n";
-        ShortList1D vs = {ML_2D[0], ML_2D[2]};
-        Mapping1D map1D(vs);
-
-        // int normal(t) * dl(t) = int tangent(t) normal(t) dt = length() * normal()
-        Vector3d res1 = length(vs) * normal(vs, C);
-
-        std::function<Vector3d(double)> func =
-                [&map1D](double xi) -> Vector3d {
-                    return map1D.Jacobian(xi) * map1D.normal(xi);
-                };
-
-        Vector3d res2 = simpson(
-                linspace(-1.0, 1.0, 51),
-                func, {0.0, 0.0, 0.0});
-
-        std::cout << "    res (formula): " << res1 << "\n";
-        std::cout << "    res (numeric): " << res2 << "\n";
-        std::cout << "    error: " << (res2 - res2).norm() / L1 << "\n\n";
-    }
-
-    {
-        std::cout << "Длина и нормаль криволинейного отрезка\n";
-
-        LargeList1D vs = {ML_2D[0], ML_2D[1], ML_2D[2]};
-        Mapping1D map1D(vs);
-
-        // int normal(t) * dl(t) = int tangent(t) normal(t) dt = length() * normal()
-        Vector3d res1 = length(vs) * normal(vs, C);
-
-        std::function<Vector3d(double)> func =
-                [&map1D](double xi) -> Vector3d {
-                    return map1D.Jacobian(xi) * map1D.normal(xi);
-                };
-
-        Vector3d res2 = simpson(
-                linspace(-1.0, 1.0, 51),
-                func, {0.0, 0.0, 0.0});
-
-        std::cout << "    res (formula): " << res1 << "\n";
-        std::cout << "    res (numeric): " << res2 << "\n";
-        std::cout << "    error: " << (res1 - res2).norm() / L1 << "\n\n";
-    }
-
-    {
-        std::cout << "Площадь простой двумерной ячейки\n";
-
-        ShortList2D vs = {ML_2D[0], ML_2D[2], ML_2D[6], ML_2D[8]};
-        Mapping2D map2D(vs);
-
-        double res1 = area(vs);
-
-        std::function<double(double, double)> func =
-                [&map2D](double xi, double eta) -> double {
-                    return map2D.Jacobian(xi, eta);
-                };
-
-        double res2 = simpson(
-                linspace(-1.0, 1.0, 51),
-                linspace(-1.0, 1.0, 51),
-                func, 0.0);
-
-        std::cout << "    res (formula): " << res1 << "\n";
-        std::cout << "    res (numeric): " << res2 << "\n";
-        std::cout << "    error: " << std::abs(res1 - res2) / L2 << "\n\n";
-    }
-
-    {
-        std::cout << "Площадь и нормаль простой изогнутой двумерной ячейки\n";
-
-        ShortList2D vs = {ML_2D[0], ML_2D[2], ML_2D[6], ML_2D[8]};
-        vs[2].z() += 0.1;
-        vs[3].z() += 0.2;
-        Vector3d C2 = {C.x(), C.y(), C.z() - 0.3};
-
-        Mapping2D map2D(vs);
-
-        Vector3d res1 = area(vs) * normal(vs, C2);
-
-        std::function<Vector3d(double, double)> func =
-                [&map2D](double xi, double eta) -> Vector3d {
-                    return map2D.Jacobian(xi, eta) * map2D.normal(xi, eta);
-                };
-
-        Vector3d res2 = simpson(
-                linspace(-1.0, 1.0, 51),
-                linspace(-1.0, 1.0, 51),
-                func, {0.0, 0.0, 0.0});
-
-        std::cout << "    res (formula): " << res1 << "\n";
-        std::cout << "    res (numeric): " << res2 << "\n";
-        std::cout << "    error: " << (res1 - res2).norm() / L2 << "\n\n";
-    }
-
-    {
-        std::cout << "Площадь криволинейной двумерной ячейки\n";
-
-        LargeList2D& vs = ML_2D;
-        Mapping2D map2D(vs);
-
-        double res1 = area(vs);
-
-        std::function<double(double, double)> func =
-                [&map2D](double xi, double eta) -> double {
-                    return map2D.Jacobian(xi, eta);
-                };
-
-        double res2 = simpson(
-                linspace(-1.0, 1.0, 101),
-                linspace(-1.0, 1.0, 101),
-                func, 0.0);
-
-        std::cout << "    res (formula): " << res1 << "\n";
-        std::cout << "    res (numeric): " << res2 << "\n";
-        std::cout << "    error: " << std::abs(res1 - res2) / L2 << "\n\n";
-    }
-
-    {
-        std::cout << "Объем обычной двумерной ячейки в осесимметричной постновке\n";
-
-        ShortList2D vs = {ML_2D[0], ML_2D[2], ML_2D[6], ML_2D[8]};
-        Mapping2D map2D(vs);
-
-        double res1 = volume_as(vs);
-
-        std::function<double(double, double)> func =
-                [&map2D](double xi, double eta) -> double {
-                    return map2D(xi, eta).y() * map2D.Jacobian(xi, eta);
-                };
-
-        double res2 = simpson(
-                linspace(-1.0, 1.0, 51),
-                linspace(-1.0, 1.0, 51),
-                func, 0.0);
-
-        std::cout << "    res (formula): " << res1 << "\n";
-        std::cout << "    res (numeric): " << res2 << "\n";
-        std::cout << "    error: " << std::abs(res1 - res2) / L2 << "\n\n";
-    }
-
-    {
-        std::cout << "Объем криволинейной ячейки в осесимметричной постновке\n";
-
-        LargeList2D& vs = ML_2D;
-        Mapping2D map2D(vs);
-
-        double res1 = volume_as(vs);
-
-
-        std::function<double(double, double)> func =
-                [&map2D](double xi, double eta) -> double {
-                    return map2D(xi, eta).y() * map2D.Jacobian(xi, eta);
-                };
-
-        double res2 = simpson(
-                linspace(-1.0, 1.0, 501),
-                linspace(-1.0, 1.0, 501),
-                func, 0.0);
-
-        std::cout << "    res (formula): " << res1 << "\n";
-        std::cout << "    res (numeric): " << res2 << "\n";
-        std::cout << "    error: " << std::abs(res1 - res2) / L2 << "\n\n";
-    }
-
-    {
-        std::cout << "Объем трехмерной ячейки\n";
-
-        ShortList3D& vs = ML_3D;
-        Mapping3D map3D(vs);
-
-        double res1 = volume(vs);
-
-        std::function<double(double, double, double)> func =
-                [&map3D](double xi, double eta, double chi) -> double {
-                    return map3D.Jacobian(xi, eta, chi);
-                };
-
-        double res2 = simpson(
-                linspace(-1.0, 1.0, 41),
-                linspace(-1.0, 1.0, 41),
-                linspace(-1.0, 1.0, 41),
-                func, 0.0);
-
-        std::cout << "    res (formula): " << res1 << "\n";
-        std::cout << "    res (numeric): " << res2 << "\n";
-        std::cout << "    error: " << std::abs(res1 - res2) / L3 << "\n\n";
-    }
-
-    {
-        std::cout << "Барицентр простой двумерной ячейки\n";
-
-        ShortList2D vs = {ML_2D[0], ML_2D[2], ML_2D[6], ML_2D[8]};
-        Mapping2D map2D(vs);
-
-        double S = area(vs);
-
-        Vector3d res1 = centroid(vs, S);
-
-        std::function<Vector3d(double, double)> func =
-                [&map2D](double xi, double eta) -> Vector3d {
-                    return map2D(xi, eta) * map2D.Jacobian(xi, eta);
-                };
-
-        Vector3d res2 = simpson(
-                linspace(-1.0, 1.0, 51),
-                linspace(-1.0, 1.0, 51),
-                func, {0.0, 0.0, 0.0}) / S;
-
-        std::cout << "    res (formula): " << res1 << "\n";
-        std::cout << "    res (numeric): " << res2 << "\n";
-        std::cout << "    error: " << (res1 - res2).norm() / L1 << "\n\n";
-    }
-
-    {
-        std::cout << "Барицентр криволинейной двумерной ячейки\n";
-
-        LargeList2D& vs = ML_2D;
-        Mapping2D map2D(vs);
-
-        double S = area(vs);
-
-        Vector3d res1 = centroid(vs, S);
-
-        std::function<Vector3d(double, double)> func =
-                [&map2D](double xi, double eta) -> Vector3d {
-                    return map2D(xi, eta) * map2D.Jacobian(xi, eta);
-                };
-
-        Vector3d res2 = simpson(
-                linspace(-1.0, 1.0, 501),
-                linspace(-1.0, 1.0, 501),
-                func, {0.0, 0.0, 0.0}) / S;
-
-        std::cout << "    res (formula): " << res1 << "\n";
-        std::cout << "    res (numeric): " << res2 << "\n";
-        std::cout << "    error: " << (res1 - res2).norm() / L1 << "\n\n";
-    }
-
-    {
-        std::cout << "Барицентр трехмерной ячейки\n";
-
-        ShortList3D& vs = ML_3D;
-        Mapping3D map3D(vs);
-
-        double V = volume(vs);
-        Vector3d res1 = centroid(vs, V);
-
-        std::function<Vector3d(double, double, double)> func =
-                [&map3D](double xi, double eta, double chi) -> Vector3d {
-                    return map3D(xi, eta, chi) * map3D.Jacobian(xi, eta, chi);
-                };
-
-        Vector3d res2 = simpson(
-                linspace(-1.0, 1.0, 11),
-                linspace(-1.0, 1.0, 11),
-                linspace(-1.0, 1.0, 11),
-                func, {0.0, 0.0, 0.0}) / V;
-
-        std::cout << "    res (formula): " << res1 << "\n";
-        std::cout << "    res (numeric): " << res2 << "\n";
-        std::cout << "    error: " << (res1 - res2).norm() / L1 << "\n\n";
-    }
+Vector3d SqCube::operator()(double x, double y, double z) const {
+    return SqCube::get(x, y, z);
 }
 
-} // geom
-} // zephyr
+Vector3d SqCube::operator()(double x, double y) const {
+    return as2D().get(x, y);
+}
+
+Vector3d SqCube::get(double x, double y, double z) const {
+    // Операция упрощается до одномерных в каждом направлении
+    // самый алгоритмически быстрый вариант
+    SqLine sqline = {
+            // Сплайн по двумерным срезам
+            ((SqQuad *) &verts[ 0])->get(x, y),
+            ((SqQuad *) &verts[ 9])->get(x, y),
+            ((SqQuad *) &verts[18])->get(x, y),
+    };
+    return sqline.get(z);
+}
+
+Vector3d SqCube::tangent_x(double x, double y, double z) const {
+    // Для квадратичных зависимостей центральная разность
+    // дает точный результат
+    return get(x + 0.5, y, z) - get(x - 0.5, y, z);
+}
+
+Vector3d SqCube::tangent_y(double x, double y, double z) const {
+    // Для квадратичных зависимостей центральная разность
+    // дает точный результат
+    return get(x, y + 0.5, z) - get(x, y - 0.5, z);
+}
+
+Vector3d SqCube::tangent_z(double x, double y, double z) const {
+    // Для квадратичных зависимостей центральная разность
+    // дает точный результат
+    return get(x, y, z + 0.5) - get(x, y, z - 0.5);
+}
+
+double SqCube::Jacobian(double x, double y, double z) const {
+    Vector3d tau_x = tangent_x(x, y, z);
+    Vector3d tau_y = tangent_y(x, y, z);
+    Vector3d tau_z = tangent_z(x, y, z);
+    return tau_x.cross(tau_y).dot(tau_z);
+}
+
+Vector3d SqCube::center() const {
+    return vs<0, 0, 0>();
+}
+
+double SqCube::volume() const {
+    // Заплатка для линейных кубов
+    return reduce().volume();
+}
+
+Vector3d SqCube::centroid(double volume) const {
+    // Заплатка для линейных кубов
+    return reduce().centroid(volume);
+}
+
+} // namespace zephyr::geom

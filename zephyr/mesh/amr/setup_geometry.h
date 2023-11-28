@@ -21,12 +21,12 @@ namespace zephyr { namespace mesh { namespace amr {
 /// @param op Оператор распределения данных при огрублении и разбиении
 /// @param from, to Диапазон ячеек
 template<int dim>
-void setup_geometry_partial(Storage &locals, Storage& aliens, int rank,
+void setup_geometry_partial(AmrStorage &locals, AmrStorage& aliens, int rank,
         const Statistics &count, const Distributor& op, int from, int to) {
 
 
     for (int ic = from; ic < to; ++ic) {
-        Cell& cell = locals[ic];
+        AmrCell& cell = locals[ic];
 
         if (cell.flag == 0) {
             retain_cell<dim>(cell, locals, aliens);
@@ -45,7 +45,7 @@ void setup_geometry_partial(Storage &locals, Storage& aliens, int rank,
 /// @brief Осуществляет проход по диапазону ячеек и вызывает для них
 /// соответствующие методы адаптации (без MPI и без тредов)
 template<int dim>
-void setup_geometry(Storage &cells, const Statistics &count, const Distributor& op) {
+void setup_geometry(AmrStorage &cells, const Statistics &count, const Distributor& op) {
     setup_geometry_partial<dim>(cells, cells, 0, count, op, 0, count.n_cells);
 }
 
@@ -53,9 +53,9 @@ void setup_geometry(Storage &cells, const Statistics &count, const Distributor& 
 /// @brief Осуществляет проход по диапазону ячеек и вызывает для них
 /// соответствующие методы адаптации (без MPI и с тредами)
 template<int dim>
-void setup_geometry(Storage &cells, const Statistics<dim> &count,
+void setup_geometry(AmrStorage &cells, const Statistics<dim> &count,
                     const DataDistributor& op, ThreadPool& threads) {
-    Storage aliens;
+    AmrStorage aliens;
     auto num_tasks = threads.size();
     if (num_tasks < 2) {
         setup_geometry_partial<dim>(cells, aliens, 0, count, op, 0, count.n_cells);
@@ -83,7 +83,7 @@ void setup_geometry(Storage &cells, const Statistics<dim> &count,
 /// @brief Осуществляет проход по диапазону ячеек и вызывает для них
 /// соответствующие методы адаптации (с MPI и без тредов)
 template<int dim>
-void setup_geometry(Storage &locals, Storage &aliens, int rank,
+void setup_geometry(AmrStorage &locals, AmrStorage &aliens, int rank,
                     const Statistics<dim> &count, const DataDistributor& op) {
     setup_geometry_partial<dim>(locals, aliens, rank, count, op, 0, count.n_cells);
 }
@@ -92,7 +92,7 @@ void setup_geometry(Storage &locals, Storage &aliens, int rank,
 /// @brief Осуществляет проход по диапазону ячеек и вызывает для них
 /// соответствующие методы адаптации (с MPI и с тредами)
 template<int dim>
-void setup_geometry(Storage &locals, Storage &aliens, int rank,
+void setup_geometry(AmrStorage &locals, AmrStorage &aliens, int rank,
         const Statistics<dim> &count, const DataDistributor& op, ThreadPool& threads) {
 
     auto num_tasks = threads.size();

@@ -1,212 +1,265 @@
 #pragma once
 
-#include <iostream>
-#include <array>
 #include <vector>
+#include <cstring>
+#include <iostream>
 
-#include <zephyr/geom/cell.h>
-
-namespace zephyr { namespace mesh {
-
-using zephyr::geom::Cell;
-using zephyr::geom::Vector3d;
+namespace zephyr::mesh {
 
 using Byte = unsigned char;
 
+/// @class Хранилище для расчетных элементов. Каждый элемент хранилища
+/// содержит геометрию + данные элемента (расчетные величины).
+/// Используется три типа геометрии: AmrCell, BCell и BNode.
+/// @tparam Geom Геометрический тип данных
+template <class Geom>
 class Storage {
 public:
 
-    // Запрещаем создание без типа
-    Storage() = delete;
-
-    Storage(Storage &);
-
-    Storage(Storage &&);
-
-    // Запрещаем любое копирование
-
-    Storage &operator=(Storage &) = delete;
-
-    Storage &operator=(Storage &&) = delete;
-
-    /// @brief Создать хранилище размера size для хранения типа T
-    /// @warning Не устанавливает значения в хранилище
-    template<class T>
-    explicit Storage(const T &, int size = 0) { init(sizeof(T), size); }
-
-
-
-    /// @brief Пустое ли хранилище
-    bool empty() const;
-
-    /// @brief Количество элементов хранилища
-    int size() const;
-
-    /// std::cout << "hello, bitch " << (void*)m_ptr << " " << m_itemsize << "\n"@brief Размер данных элемента хранилища в байтах
-    int datasize() const;
-
-    /// @brief Размер всего элемента хранилища в байтах
-    int itemsize() const;
-
-    /// @brief Изменить размер хранилища
-    void resize(int new_size);
-
-
-    /// @brief Элемент хранилища
-    struct Item {
-    public:
-
-        Item(Byte *ptr, int itemsize) : m_ptr(ptr), m_itemsize(itemsize) { }
-
-        virtual Item &operator*() { return *this; }
-
-        virtual Item &operator++() { m_ptr += m_itemsize; return *this; }
-
-        virtual Item &operator+=(int step) { m_ptr += step * m_itemsize; return *this; }
-
-        Item operator+(int step) { return {m_ptr + step * m_itemsize, m_itemsize}; }
-
-
-        bool operator<(const Item &it) const { return m_ptr < it.m_ptr; }
-
-        bool operator>(const Item &it) const { return m_ptr > it.m_ptr; }
-
-        bool operator<=(const Item &it) const { return m_ptr <= it.m_ptr; }
-
-        bool operator>=(const Item &it) const { return m_ptr >= it.m_ptr; }
-
-        bool operator==(const Item &it) const { return m_ptr == it.m_ptr; }
-
-        bool operator!=(const Item &it) const { return m_ptr != it.m_ptr; }
-
-        int operator-(const Item &it) const { return int(m_ptr - it.m_ptr) / m_itemsize; }
-
-        /// @brief Ссылка на геометрию
-        inline Byte* geom_ptr() { return m_ptr; }
-
-        /// @brief Ссылка на геометрию
-        inline Cell &geom() { return *((Cell *) m_ptr); }
-
-        /// @brief Ссылка на геометрию
-        inline const Cell &geom() const { return *((Cell *) m_ptr); }
-
-        /// @brief Приведение к чистой геометрии
-        inline operator Cell&() { return *((Cell *) m_ptr); }
-
-        /// @brief Приведение к чистой геометрии
-        inline operator const Cell &() const { return *((Cell *) m_ptr); }
-
-        /// @brief Вывести полную информацию о ячейке
-        inline void print_info() const { geom().print_info(); }
-
-        /// @brief Вывести информацию о ячейке в виде python скрипта
-        inline void visualize() const { geom().print_info(); }
-
-        /// @brief Размерность ячейки
-        inline const int& dim() const { return geom().dim; }
-
-        /// @brief Индекс среди базовых ячеек
-        inline const int& b_idx() const { return geom().b_idx; }
-
-        /// @brief Индекс ячейки на z-кривой
-        inline const int& z_idx() const { return geom().z_idx; }
-
-        /// @brief Индекс новой ячейки (в алгоритмах)
-        inline const int& next() const { return geom().next; }
-
-        /// @brief Уровень адаптации ячейки (0 для базовой)
-        inline const int& level() const { return geom().level; }
-
-        /// @brief Желаемый флаг адаптации
-        inline const int& flag() const { return geom().flag; }
-
-        /// @brief Желаемый флаг адаптации
-        inline void set_flag(int flag) { geom().flag = flag; }
-
-        /// @brief Ранг процесса, который обрабатывает ячейку
-        inline const int& rank() const { return geom().rank; }
-
-        /// @brief Индекс ячеки в массиве Storage
-        inline const int& index() const { return geom().index; }
-
-        /// @brief Пометить ячейку как неопределенную (вне сетки)
-        inline void set_undefined() { geom().set_undefined(); }
-
-        /// @brief Является ли ячейка актуальной?
-        inline bool is_actual() const { return geom().is_actual(); }
-
-        /// @brief Является ли ячейка неопределенной?
-        inline bool is_undefined() const { return geom().is_undefined(); }
-
-        /// @brief Барицентр ячейки
-        inline const Vector3d& center() const { return geom().coords; }
-
-        /// @brief Линейный размер ячейки
-        inline const double& size() const { return geom().size; }
-
-        /// @brief Площадь (в 2D) или объем (в 3D) ячейки
-        inline double volume() const { return geom().volume(); }
-
-        /// @brief Список вершин
-        inline const geom::Vertices& vertices() const { return geom().vertices; };
-
-        /// @brief Конкретная вершина
-        inline geom::Vertex& vertices(int i) { return geom().vertices[i]; };
-
-        /// @brief Конкретная вершина
-        inline const geom::Vertex& vertices(int i) const { return geom().vertices[i]; };
-
-        /// @brief Список граней
-        inline const geom::Faces& faces() const { return geom().faces; };
-
-        /// @brief Конкретная грань
-        inline geom::Face& faces(int i) { return geom().faces[i]; };
-
-        /// @brief Конкретная грань
-        inline const geom::Face& faces(int i) const { return geom().faces[i]; };
-
-
-        /// @brief Размер данных в байтах
-        inline int datasize() const { return m_itemsize - int(sizeof(Cell)); }
-
-        /// @brief Ссылка на начало данных
-        inline Byte* data_ptr() const { return m_ptr + sizeof(Cell); }
-
-        /// @brief Копирует данные из одной ячейки в другую.
-        /// @param src Указатель на источник данных.
-        /// @param dest Указатель на область, куда надо записать данные.
-        inline void copy_to(const Storage::Item& dest) const {
-            std::memcpy(dest.m_ptr, m_ptr, m_itemsize);
-        }
-
-        /// @brief Ссылка на данные
-        template<class T>
-        inline T &data() { return *((T *) (m_ptr + sizeof(Cell))); }
-
-        /// @brief Ссылка на данные
-        template<class T>
-        inline T &operator()(const T&) { return *((T *) (m_ptr + sizeof(Cell))); }
-
-    protected:
-        Byte *m_ptr;      ///< Ссылка на начало данных
-        int m_itemsize;   ///< Размер элемента в байтах
+    /// @brief Хранилище без указания типа для хранения,
+    /// содержит только геометрию
+    Storage(int size = 0) {
+        m_size = std::max(0, size);
+        m_itemsize = int(sizeof(Geom));
+        m_data.resize(m_size * m_itemsize);
     };
 
-    Item operator[](int i);
+    /// @brief Создать хранилище размера size для хранения типа U
+    /// @tparam U Тип данных, который предполагается располагать в хранилище,
+    /// используется только для выделения достаточного количества памяти.
+    /// @warning Не устанавливает значения в хранилище
+    template<class U>
+    explicit Storage(const U &, int size = 0) {
+        m_size = std::max(0, size);
+        m_itemsize = int(sizeof(Geom) + sizeof(U));
+        m_data.resize(m_size * m_itemsize);
+    }
 
-    Item begin();
+    /// @brief Конструктор копирования хранилища
+    Storage(const Storage &src)
+        : m_size(src.m_size),
+          m_itemsize(src.m_itemsize),
+          m_data(src.m_data.size()) {
 
-    Item end();
+        std::memcpy(m_data.data(), src.m_data.data(),
+                    m_data.size() * sizeof(Byte));
+    }
+
+    /// @brief Конструктор перемещения хранилища
+    Storage(Storage &&src)
+        : m_size(src.m_size),
+          m_itemsize(src.m_itemsize),
+          m_data(std::move(src.m_data)) { }
+
+    /// @brief Пустое ли хранилище
+    inline bool empty() const {
+        return m_size < 1;
+    }
+
+    /// @brief Количество элементов хранилища
+    inline int size() const {
+        return m_size;
+    }
+
+    /// @brief Размер данных элемента хранилища в байтах
+    inline int datasize() const {
+        return m_itemsize - int(sizeof(Geom));
+    }
+
+    /// @brief Размер элемента хранилища в байтах (> datasize)
+    inline int itemsize() const {
+        return m_itemsize;
+    }
+
+    /// @brief Изменить размер хранилища
+    inline void resize(int new_size) {
+        m_size = std::max(0, new_size);
+        m_data.resize(m_size * m_itemsize);
+    }
+
+    /// @brief Скопировать элемент хранилища с индексом from в элемент
+    /// хранилища с индексом to (геометрия и данные).
+    inline void move_item(int from, int to) {
+        std::memcpy(
+                m_data.data() + to * m_itemsize,
+                m_data.data() + from * m_itemsize,
+                m_itemsize);
+    }
+
+
+    /// @brief Представление элемента данных хранилища.
+    /// @details Все конструкторы запрещены, тип может быть получен
+    /// только в виде ссылки на память из существующего хранилища.
+    class Item : public Geom {
+    public:
+        /// @brief Любое создание запрещено
+        Item() = delete;
+
+        /// @brief Копирование запрещено, использовать только
+        /// по ссылкам
+        Item(const Item&) = delete;
+
+        /// @brief Перемещение запрещено
+        Item(Item&&) = delete;
+
+        /// @brief Существующему элементу хранилища можно присводить
+        /// геометрию, это позволяет создать хранилище с некоторым числом
+        /// элементов, а затем вручную установить геометрию ячеек.
+        inline Item& operator=(const Geom& g) {
+            Geom::operator=(g);
+            return *this;
+        }
+
+        /// @brief Указатель на данные элемента
+        /// (указатель на память сразу за экземпляром класса)
+        inline Byte * data() {
+            return reinterpret_cast<Byte *>(this) + sizeof(Geom);
+        }
+
+        /// @brief Указатель на данные элемента
+        /// (указатель на память сразу за экземпляром класса)
+        inline const Byte * data() const {
+            return reinterpret_cast<const Byte *>(this) + sizeof(Geom);
+        }
+
+        /// @brief Разыменовать данные элемента как тип U.
+        template<class U>
+        inline const U& data(const U &) const {
+            return *reinterpret_cast<const U *>(data());
+        }
+
+        /// @brief Разыменовать данные элемента как тип U.
+        template<class U>
+        inline U& data(const U &) {
+            return *reinterpret_cast<U *>(data());
+        }
+
+        /// @brief Разыменовать данные элемента как тип U.
+        template<class U>
+        inline const U& operator()(const U &) const {
+            return *reinterpret_cast<const U *>(data());
+        }
+
+        /// @brief Разыменовать данные элемента как тип U.
+        template<class U>
+        U& operator()(const U &) {
+            return *reinterpret_cast<U *>(data());
+        }
+    };
+
+
+    /// @brief Итератор по элементам хранилища
+    class Iterator {
+    public:
+        /// @brief Создание нулевого итератора из nullptr
+        inline Iterator(std::nullptr_t null)
+                : m_ptr(nullptr), m_itemsize(0) { }
+
+        /// @brief Создание нормального итератора
+        inline Iterator(Byte *ptr, int itemsize)
+                : m_ptr(ptr), m_itemsize(itemsize) { }
+
+        /// @brief Проверка на совпадение с нулевым указателем
+        inline operator bool() const {
+            return m_ptr;
+        }
+
+        /// @brief Размер данных в байтах
+        inline int datasize() const {
+            return m_itemsize - int(sizeof(Geom));
+        }
+
+        /// @brief -> Перенаправляется на Storage<Geom>::Item*
+        inline Item *operator->() {
+            return reinterpret_cast<Item *>(m_ptr);
+        }
+
+        /// @brief -> Перенаправляется на Storage<Geom>::Item*
+        inline const Item *operator->() const {
+            return reinterpret_cast<const Item *>(m_ptr);
+        }
+
+        /// @brief Разыменование в Storage<Geom>::Item&
+        inline Item &operator*() {
+            return *reinterpret_cast<Item *>(m_ptr);
+        }
+
+        /// @brief Разыменование в Storage<Geom>::Item&
+        inline const Item &operator*() const {
+            return *reinterpret_cast<const Item *>(m_ptr);
+        }
+
+        /// @brief Префиксный инкремент (++it)
+        inline Iterator &operator++() {
+            m_ptr += m_itemsize;
+            return *this;
+        }
+
+        /// @brief Сдвиг итератора (it += step)
+        inline Iterator &operator+=(int step) {
+            m_ptr += step * m_itemsize;
+            return *this;
+        }
+
+        /// @brief Смещенный итератор (it2 = it + step)
+        inline Iterator operator+(int step) {
+            return {m_ptr + step * m_itemsize, m_itemsize};
+        }
+
+        /// @brief Расстояние между парой итераторов
+        inline int operator-(const Iterator &it) const {
+            return int(m_ptr - it.m_ptr) / m_itemsize;
+        }
+
+        // Решил не мелочиться и реализовать все операции сравнения
+
+        inline bool operator<(const Iterator &it) const { return m_ptr < it.m_ptr; }
+
+        inline bool operator>(const Iterator &it) const { return m_ptr > it.m_ptr; }
+
+        inline bool operator<=(const Iterator &it) const { return m_ptr <= it.m_ptr; }
+
+        inline bool operator>=(const Iterator &it) const { return m_ptr >= it.m_ptr; }
+
+        inline bool operator==(const Iterator &it) const { return m_ptr == it.m_ptr; }
+
+        inline bool operator!=(const Iterator &it) const { return m_ptr != it.m_ptr; }
+
+    private:
+        Byte *m_ptr;     ///< Ссылка на начало данных
+        int m_itemsize;  ///< Размер элемента в байтах
+    };
+
+
+    /// @brief Получить итератор по индексу
+    inline Iterator iterator(int idx) {
+        return {m_data.data() + m_itemsize * idx, m_itemsize};
+    }
+
+    /// @brief Ссылка на элемент хранилища
+    Item& operator[](int idx) {
+        return *iterator(idx);
+    }
+
+    /// @brief Константная ссылка на элемент хранилища
+    const Item& operator[](int idx) const {
+        return *iterator(idx);
+    }
+
+    /// @brief Итератор на начало хранилища
+    Storage::Iterator begin() {
+        return iterator(0);
+    }
+
+    /// @brief Итератор за концом хранилища
+    Storage::Iterator end() {
+        return iterator(m_size);
+    }
 
 private:
-
-    /// @brief Проинициализировать хранилище
-    void init(int datasize, int size);
-
     int m_size;
     int m_itemsize;
     std::vector<Byte> m_data;
 };
 
-} // mesh
-} // zephyr
+} // namespace zephyr::mesh

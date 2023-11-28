@@ -1,7 +1,7 @@
-set(RANDOM    0)
-set(INTERFACE 0)
-set(GRADIENT  0)
-set(DENSE     0)
+set(RANDOM    1)
+set(INTERFACE 1)
+set(GRADIENT  1)
+set(DENSE     1)
 
 if (RANDOM)
     message(STATUS "Build AMR random test")

@@ -166,7 +166,7 @@ smf::Flux CIR2::calc_flux(const smf::PState &zL, const smf::PState &zR, const ph
 
     // Матрица слева в спектральном разложении якобиана.
     // Правые собственные вектора якобиана по столбцам
-    Eigen::Matrix<double, 5, 6> OmR;
+    Matrix<double, 5, 6> OmR;
     OmR << 1          ,  0  ,  0  ,  0  ,  1          ,  1  ,
            u - c      ,  0  ,  0  ,  0  ,  u + c      ,  u  ,
            v          ,  1  ,  0  ,  0  ,  v          ,  0  ,
@@ -188,7 +188,7 @@ smf::Flux CIR2::calc_flux(const smf::PState &zL, const smf::PState &zR, const ph
     DiagMatrix6d L = vec_L.asDiagonal();
 
     // Якобиан на грани
-    Eigen::Matrix<double, 5, 6> A;
+    Matrix<double, 5, 6> A;
     A <<  0      ,  1      ,  0  ,  0  ,  0  ,  0  ,
          -u2     ,  2 * u  ,  0  ,  0  ,  0  ,  1  ,
          -u * v  ,  v      ,  u  ,  0  ,  0  ,  0  ,
@@ -196,7 +196,7 @@ smf::Flux CIR2::calc_flux(const smf::PState &zL, const smf::PState &zR, const ph
          -u * h  ,  h      ,  0  ,  0  ,  u  ,  u  ;
 
     double norm1 = (OmR * L * OmL - A).norm();
-    Eigen::Matrix<double, 5, 6> I2 = Eigen::Matrix<double, 5, 6>::Identity();
+    Matrix<double, 5, 6> I2 = Matrix<double, 5, 6>::Identity();
     double norm2 = (OmR*OmL - I2).norm();
 
     double err = 1.0e-10 * A.norm();
@@ -213,11 +213,12 @@ smf::Flux CIR2::calc_flux(const smf::PState &zL, const smf::PState &zR, const ph
 
     // @formatter:on
 
-    Eigen::Matrix<double, 5, 6> abs_A = OmR * abs_L * OmL;
+    Matrix<double, 5, 6> abs_A = OmR * abs_L * OmL;
 
     QState _qL(zL); // Консервативный вектор слева
     QState _qR(zR); // Консервативный вектор справа
 
+#ifdef ZEPHYR_ENABLE_EIGEN
     Vector6d qL, qR;
     qL.segment(0, 5) = _qL.vec();
     qL[5] = zL.pressure;
@@ -230,6 +231,9 @@ smf::Flux CIR2::calc_flux(const smf::PState &zL, const smf::PState &zR, const ph
     Flux res = 0.5 * (fL.vec() + fR.vec()) + 0.5 * abs_A * (qL - qR);
 
     return res;
+#else
+    throw std::runtime_error("CIR2 error: can't compute without eigen");
+#endif
 }
 
 } // namespace zephyr

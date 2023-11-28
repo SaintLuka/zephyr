@@ -4,15 +4,16 @@
 
 #pragma once
 
-#include <zephyr/geom/cell.h>
+#include <zephyr/geom/primitives/side.h>
+#include <zephyr/geom/primitives/amr_cell.h>
 #include <zephyr/mesh/amr/common.h>
 
-namespace zephyr { namespace mesh { namespace amr {
+namespace zephyr::mesh::amr {
 
 /// @brief Устанавливает на новых подгранях значение adjacent и
 /// boundary со старой грани
 template <int dim, int side>
-void split_face_prepare(Faces& faces) {
+void split_face_prepare(BFaces& faces) {
     faces[side + 6].boundary = faces[side].boundary;
     faces[side + 6].adjacent = faces[side].adjacent;
 
@@ -26,129 +27,59 @@ void split_face_prepare(Faces& faces) {
 
 /// @brief Устанавливает на новых подгранях индексы вершин.
 template <int dim, int side>
-void split_face_indices(Faces& faces);
+void split_face_indices(BFaces& faces) {
+    faces[side].vertices = face_indices::cf<dim, Side(side)>();
+    faces[side + 6].vertices = face_indices::cf<dim, Side(side + 6)>();
 
-template <>
-void split_face_indices<2, Side::LEFT>(Faces& faces) {
-    faces[Side::LEFT0].vertices[0] = iww(0, 0);
-    faces[Side::LEFT0].vertices[1] = iww(0, 1);
-    faces[Side::LEFT1].vertices[0] = iww(0, 1);
-    faces[Side::LEFT1].vertices[1] = iww(0, 2);
-}
-
-template <>
-void split_face_indices<2, Side::RIGHT>(Faces& faces) {
-    faces[Side::RIGHT0].vertices[0] = iww(2, 0);
-    faces[Side::RIGHT0].vertices[1] = iww(2, 1);
-    faces[Side::RIGHT1].vertices[0] = iww(2, 1);
-    faces[Side::RIGHT1].vertices[1] = iww(2, 2);
-}
-
-template <>
-void split_face_indices<2, Side::BOTTOM>(Faces& faces) {
-    faces[Side::BOTTOM0].vertices[0] = iww(0, 0);
-    faces[Side::BOTTOM0].vertices[1] = iww(1, 0);
-    faces[Side::BOTTOM1].vertices[0] = iww(1, 0);
-    faces[Side::BOTTOM1].vertices[1] = iww(2, 0);
-}
-
-template <>
-void split_face_indices<2, Side::TOP>(Faces& faces) {
-    faces[Side::TOP0].vertices[0] = iww(0, 2);
-    faces[Side::TOP0].vertices[1] = iww(1, 2);
-    faces[Side::TOP1].vertices[0] = iww(1, 2);
-    faces[Side::TOP1].vertices[1] = iww(2, 2);
-}
-
-template <>
-void split_face_indices<3, Side::LEFT>(Faces& faces) {
-    faces[Side::LEFT0].vertices = {iww(0, 0, 0), iww(0, 1, 0), iww(0, 0, 1), iww(0, 1, 1)};
-    faces[Side::LEFT1].vertices = {iww(0, 1, 0), iww(0, 2, 0), iww(0, 1, 1), iww(0, 2, 1)};
-    faces[Side::LEFT2].vertices = {iww(0, 0, 1), iww(0, 1, 1), iww(0, 0, 2), iww(0, 1, 2)};
-    faces[Side::LEFT3].vertices = {iww(0, 1, 1), iww(0, 2, 1), iww(0, 1, 2), iww(0, 2, 2)};
-}
-
-template <>
-void split_face_indices<3, Side::RIGHT>(Faces& faces) {
-    faces[Side::RIGHT0].vertices = {iww(2, 0, 0), iww(2, 1, 0), iww(2, 0, 1), iww(2, 1, 1)};
-    faces[Side::RIGHT1].vertices = {iww(2, 1, 0), iww(2, 2, 0), iww(2, 1, 1), iww(2, 2, 1)};
-    faces[Side::RIGHT2].vertices = {iww(2, 0, 1), iww(2, 1, 1), iww(2, 0, 2), iww(2, 1, 2)};
-    faces[Side::RIGHT3].vertices = {iww(2, 1, 1), iww(2, 2, 1), iww(2, 1, 2), iww(2, 2, 2)};
-}
-
-template <>
-void split_face_indices<3, Side::BOTTOM>(Faces& faces) {
-    faces[Side::BOTTOM0].vertices = {iww(0, 0, 0), iww(1, 0, 0), iww(0, 0, 1), iww(1, 0, 1)};
-    faces[Side::BOTTOM1].vertices = {iww(1, 0, 0), iww(2, 0, 0), iww(1, 0, 1), iww(2, 0, 1)};
-    faces[Side::BOTTOM2].vertices = {iww(0, 0, 1), iww(1, 0, 1), iww(0, 0, 2), iww(1, 0, 2)};
-    faces[Side::BOTTOM3].vertices = {iww(1, 0, 1), iww(2, 0, 1), iww(1, 0, 2), iww(2, 0, 2)};
-}
-
-template <>
-void split_face_indices<3, Side::TOP>(Faces& faces) {
-    faces[Side::TOP0].vertices = {iww(0, 2, 0), iww(1, 2, 0), iww(0, 2, 1), iww(1, 2, 1)};
-    faces[Side::TOP1].vertices = {iww(1, 2, 0), iww(2, 2, 0), iww(1, 2, 1), iww(2, 2, 1)};
-    faces[Side::TOP2].vertices = {iww(0, 2, 1), iww(1, 2, 1), iww(0, 2, 2), iww(1, 2, 2)};
-    faces[Side::TOP3].vertices = {iww(1, 2, 1), iww(2, 2, 1), iww(1, 2, 2), iww(2, 2, 2)};
-}
-
-template <>
-void split_face_indices<3, Side::BACK>(Faces& faces) {
-    faces[Side::BACK0].vertices = {iww(0, 0, 0), iww(1, 0, 0), iww(0, 1, 0), iww(1, 1, 0)};
-    faces[Side::BACK1].vertices = {iww(1, 0, 0), iww(2, 0, 0), iww(1, 1, 0), iww(2, 1, 0)};
-    faces[Side::BACK2].vertices = {iww(0, 1, 0), iww(1, 1, 0), iww(0, 2, 0), iww(1, 2, 0)};
-    faces[Side::BACK3].vertices = {iww(1, 1, 0), iww(2, 1, 0), iww(1, 2, 0), iww(2, 2, 0)};
-}
-
-template <>
-void split_face_indices<3, Side::FRONT>(Faces& faces) {
-    faces[Side::FRONT0].vertices = {iww(0, 0, 2), iww(1, 0, 2), iww(0, 1, 2), iww(1, 1, 2)};
-    faces[Side::FRONT1].vertices = {iww(1, 0, 2), iww(2, 0, 2), iww(1, 1, 2), iww(2, 1, 2)};
-    faces[Side::FRONT2].vertices = {iww(0, 1, 2), iww(1, 1, 2), iww(0, 2, 2), iww(1, 2, 2)};
-    faces[Side::FRONT3].vertices = {iww(1, 1, 2), iww(2, 1, 2), iww(1, 2, 2), iww(2, 2, 2)};
+    if (dim > 2) {
+        faces[side + 12].vertices = face_indices::cf<dim, Side(side + 12)>();
+        faces[side + 18].vertices = face_indices::cf<dim, Side(side + 18)>();
+    }
 }
 
 /// @brief Устанавливает нормали и площади новых подграней
 template <int dim>
-void setup_face_features(Face& face, Vertices& vertices);
+void setup_face_features(BFace& face, SqCube& vertices);
 
 template <>
-void setup_face_features<2>(Face& face, Vertices& vertices) {
+void setup_face_features<2>(BFace& face, SqCube& vertices) {
     // Точка внутри ячейки
-    Vector3d C = vertices[iww(1, 1)];
+    Vector3d C = vertices.vs<0, 0>();
 
     // Вершины грани
-    ShortList1D vl = {
-            (Vector3d &) vertices[face.vertices[0]],
-            (Vector3d &) vertices[face.vertices[1]],
+    Line vl = {
+            vertices[face.vertices[0]],
+            vertices[face.vertices[1]],
     };
 
     // Установить длину и нормаль
-    face.area = geom::length(vl);
-    face.normal = geom::normal(vl, C);
+    face.area   = vl.length();
+    face.center = vl.center();
+    face.normal = vl.normal(C);
 }
 
 template <>
-void setup_face_features<3>(Face& face, Vertices& vertices) {
+void setup_face_features<3>(BFace& face, SqCube& vertices) {
     // Точка внутри ячейки
-    Vector3d C = (Vector3d&)vertices[iww(1, 1, 1)];
+    const Vector3d& C = vertices.vs<0, 0, 0>();
 
     // Вершины подграней
-    ShortList2D vl = {
-            (Vector3d &) vertices[face.vertices[0]],
-            (Vector3d &) vertices[face.vertices[1]],
-            (Vector3d &) vertices[face.vertices[2]],
-            (Vector3d &) vertices[face.vertices[3]],
+    Quad vl = {
+            vertices[face.vertices[0]],
+            vertices[face.vertices[1]],
+            vertices[face.vertices[2]],
+            vertices[face.vertices[3]],
     };
 
     // Установить площадь и нормаль
-    face.area = geom::area(vl);
-    face.normal = geom::normal(vl, C);
+    face.area   = vl.area();
+    face.center = vl.center();
+    face.normal = vl.normal(C);
 }
 
 /// @brief Устанавливает нормали и площади новых подграней
 template <int dim>
-void split_face_features(Faces& faces, Vertices& vertices, int side) {
+void split_face_features(BFaces& faces, SqCube& vertices, int side) {
     setup_face_features<dim>(faces[side], vertices);
     setup_face_features<dim>(faces[side + 6], vertices);
 
@@ -162,7 +93,7 @@ void split_face_features(Faces& faces, Vertices& vertices, int side) {
 /// Устанавливает площади и нормали новых граней.
 /// Размерность и сторона являются аргументами шаблона
 template <int dim, int side>
-void split_face(Faces& faces, Vertices& vertices) {
+void split_face(BFaces& faces, SqCube& vertices) {
 #if SCRUTINY
     if (faces[side + 6].is_actual()) {
         throw std::runtime_error("Try to cut complex face");
@@ -180,10 +111,10 @@ void split_face(Faces& faces, Vertices& vertices) {
 /// Устанавливает площади и нормали новых граней.
 /// Преобразует аргумент функции side в аргумент шаблона.
 template <int dim>
-void split_face(Faces& faces, Vertices& vertices, int side);
+void split_face(BFaces& faces, SqCube& vertices, int side);
 
 template <>
-void split_face<2>(Faces& faces, Vertices& vertices, int side) {
+void split_face<2>(BFaces& faces, SqCube& vertices, int side) {
     switch (side) {
         case Side::LEFT:
             split_face<2, Side::L>(faces, vertices);
@@ -201,7 +132,7 @@ void split_face<2>(Faces& faces, Vertices& vertices, int side) {
 }
 
 template <>
-void split_face<3>(Faces& faces, Vertices& vertices, int side) {
+void split_face<3>(BFaces& faces, SqCube& vertices, int side) {
     switch (side) {
         case Side::LEFT:
             split_face<3, Side::L>(faces, vertices);
@@ -227,17 +158,17 @@ void split_face<3>(Faces& faces, Vertices& vertices, int side) {
 /// @brief Разбивает грань на стороне side на подграни.
 /// Устанавливает площади и нормали новых граней.
 template <int dim>
-void split_face(Cell& cell, int side) {
+void split_face(AmrCell& cell, int side) {
     split_face<dim>(cell.faces, cell.vertices, side);
 }
 
 /// @brief Объединяет подграни в одну грань на стороне side
 template<int dim, Side side>
-void merge_faces(Cell& cell) {
+void merge_faces(AmrCell& cell) {
     auto &faces = cell.faces;
     auto &vertices = cell.vertices;
 
-    faces[side].vertices = face_indices<dim, side>();
+    faces[side].vertices = face_indices::sf<dim, side>();
 
     faces[side + 6].set_undefined();
 
@@ -251,10 +182,10 @@ void merge_faces(Cell& cell) {
 
 /// @brief Объединяет подграни в одну грань на стороне side
 template<int dim>
-void merge_faces(Cell& cell, Side side);
+void merge_faces(AmrCell& cell, Side side);
 
 template<>
-void merge_faces<2>(Cell& cell, Side side) {
+void merge_faces<2>(AmrCell& cell, Side side) {
     switch (side) {
         case Side::LEFT:
             merge_faces<2, Side::L>(cell);
@@ -272,7 +203,7 @@ void merge_faces<2>(Cell& cell, Side side) {
 }
 
 template<>
-void merge_faces<3>(Cell& cell, Side side) {
+void merge_faces<3>(AmrCell& cell, Side side) {
     switch (side) {
         case Side::LEFT:
             merge_faces<3, Side::L>(cell);
@@ -295,6 +226,4 @@ void merge_faces<3>(Cell& cell, Side side) {
     }
 }
 
-} // namespace amr
-} // namespace mesh
-} // namespace zephyr
+} // namespace zephyr::mesh::amr

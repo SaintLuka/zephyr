@@ -27,15 +27,19 @@ public:
 Solver::State U = Solver::datatype();
 
 // Переменные для сохранения
-double get_u(Storage::Item cell)  { return cell(U).u1; }
+double get_u(AmrStorage::Item& cell)  { return cell(U).u1; }
 
-double get_lvl(Storage::Item cell)  { return cell.level(); }
+double get_lvl(AmrStorage::Item& cell)  { return cell.level; }
 
-double normal_x(Storage::Item cell) { return cell(U).n.x(); }
+double normal_x(AmrStorage::Item& cell) { return cell(U).n.x(); }
 
-double normal_y(Storage::Item cell) { return cell(U).n.y(); }
+double normal_y(AmrStorage::Item& cell) { return cell(U).n.y(); }
 
-double get_over(Storage::Item cell) {
+double point_x(AmrStorage::Item& cell) { return cell(U).p.x(); }
+
+double point_y(AmrStorage::Item& cell) { return cell(U).p.y(); }
+
+double get_over(AmrStorage::Item& cell) {
     auto u = cell(U).u1;
     if (u < 0.0) {
         return u;
@@ -48,6 +52,11 @@ double get_over(Storage::Item cell) {
     }
 }
 
+double get_close(AmrStorage::Item& cell) {
+    auto u = cell(U).u1;
+    return std::abs(u < 0.5 ? u : 1.0 - u);
+}
+
 const double margin = 0.2198;
 
 inline double sqr(double x) {
@@ -55,7 +64,7 @@ inline double sqr(double x) {
 }
 
 // Начальное условие в виде полосы
-void setup_initial_0(Mesh& mesh, double D) {
+void setup_initial_0(EuMesh& mesh, double D) {
     // Обычной блок с резкими границами
     auto func1 = [](double x) -> double {
         return (0.1 < x && x < 0.2) ? 1.0 : 0.0;
@@ -99,7 +108,7 @@ void setup_initial_0(Mesh& mesh, double D) {
 }
 
 // Начальное условие в виде круга
-void setup_initial_1(Mesh& mesh, double D) {
+void setup_initial_1(EuMesh& mesh, double D) {
     double R = D / 2.0;
     Vector3d vc = {R + margin, R + margin, 0.0};
     for (auto cell: mesh) {
@@ -109,7 +118,7 @@ void setup_initial_1(Mesh& mesh, double D) {
 }
 
 // Начальное условие в виде квадрата
-void setup_initial_2(Mesh& mesh, double D) {
+void setup_initial_2(EuMesh& mesh, double D) {
     double x_min = margin;
     double x_max = D + x_min;
     double y_min = margin;
@@ -128,7 +137,7 @@ void setup_initial_2(Mesh& mesh, double D) {
 }
 
 // Объем тела
-double volume(Mesh& cells) {
+double volume(EuMesh& cells) {
     double sum = 0.0;
     for (auto cell: cells) {
         sum += cell.volume() * cell(U).u1;
@@ -140,27 +149,35 @@ int main() {
     // Файл для записи
     PvdFile pvd("mesh", "output");
     PvdFile pvd_body("body", "output");
+    PvdFile pvd_scheme("scheme", "output");
 
     // Переменные для сохранения
     pvd.variables += {"u",  get_u};
     pvd.variables += {"lvl", get_lvl};
     pvd.variables += {"n.x", normal_x};
     pvd.variables += {"n.y", normal_y};
+    pvd.variables += {"p.x", point_x};
+    pvd.variables += {"p.y", point_y};
     pvd.variables += {"over", get_over};
+    pvd.variables += {"close", get_close};
+
+    pvd_scheme.variables += {"u",  get_u};
 
     // Геометрия области
     Rectangle rect(0.0, 1.0, 0.0, 1.0, false);
     rect.set_nx(200);
-    rect.set_boundary_flags(
-            FaceFlag::ZOE, FaceFlag::ZOE,
-            FaceFlag::ZOE, FaceFlag::ZOE);
+    rect.set_boundaries({
+        .left   = Boundary::ZOE, .right = Boundary::ZOE,
+        .bottom = Boundary::ZOE, .top   = Boundary::ZOE});
 
     // Создать решатель
     Solver solver;
     solver.set_CFL(0.5);
+    solver.set_version(1);
+    solver.dir_splitting(true);
 
     // Создать сетку
-    Mesh mesh(U, &rect);
+    EuMesh mesh(U, &rect);
 
     // Настраиваем адаптацию
     mesh.set_max_level(0);
@@ -190,6 +207,9 @@ int main() {
 
     while(curr_time < 10.0 && n_step < 200) {
         if (curr_time >= next_write) {
+            solver.compute_normals(mesh);
+            solver.find_sections(mesh);
+
             std::cout << "\tШаг: " << std::setw(6) << n_step << ";"
                       << "\tВремя: " << std::setw(8) << std::setprecision(3) << std::fixed
                       << curr_time << ";";
@@ -200,15 +220,17 @@ int main() {
 
             pvd.save(mesh.locals(), curr_time);
 
-            solver.compute_normals(mesh);
-            solver.find_sections(mesh);
-            Storage body = solver.body(mesh);
+            AmrStorage body = solver.body(mesh);
             pvd_body.save(body, curr_time);
+
+            AmrStorage scheme = solver.scheme(mesh);
+            pvd_scheme.save(scheme, curr_time);
+
             next_write += 0.0;
         }
 
         // Шаг решения
-        solver.update(mesh, 1);
+        solver.update(mesh);
 
         // Установить флаги адаптации
         solver.set_flags(mesh);

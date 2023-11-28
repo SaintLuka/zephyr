@@ -2,7 +2,7 @@
 
 #include <zephyr/io/variable.h>
 
-namespace zephyr { namespace io {
+namespace zephyr::io {
 
 
 /// @brief Список переменных для записи в VTU файл
@@ -72,38 +72,94 @@ public:
     /// @code
     /// VariableList list;
     /// list.append("momentum", 2,
-    ///     WriteFunction<float>([](Storage::Item cell, float* out) {
+    ///     WriteFunction<float>([](AmrStorage::Item& cell, float* out) {
     ///         out[0] = static_cast<float>(cell.mass * cell.velocity.x);
     ///         out[1] = static_cast<float>(cell.mass * cell.velocity.y);
     ///     }));
     /// @endcode
     template<class T>
-    void append(const char *name, int n_components, const WriteFunction<T> &func) {
+    void append(const char *name, int n_components, const WriteAmrItem<T> &func) {
+        m_list.emplace_back(name, n_components, func);
+    }
+
+    template<class T>
+    void append(const char *name, int n_components, const WriteCellItem<T> &func) {
+        m_list.emplace_back(name, n_components, func);
+    }
+
+    template<class T>
+    void append(const char *name, int n_components, const WriteNodeItem<T> &func) {
         m_list.emplace_back(name, n_components, func);
     }
 
     /// @brief Аналогично функции append(const char*, ...)
     template<class T>
-    void append(const std::string &name, int n_components, const WriteFunction<T> &func) {
+    void append(const std::string &name, int n_components, const WriteAmrItem<T> &func) {
+        m_list.emplace_back(name, n_components, func);
+    }
+
+    template<class T>
+    void append(const std::string &name, int n_components, const WriteCellItem<T> &func) {
+        m_list.emplace_back(name, n_components, func);
+    }
+
+    template<class T>
+    void append(const std::string &name, int n_components, const WriteNodeItem<T> &func) {
         m_list.emplace_back(name, n_components, func);
     }
 
     /// @brief Аналогично функции append(const char*, ... )
     template<class T>
-    void append(const char *name, const WriteFunction<T> &func) {
+    void append(const char *name, const WriteAmrItem<T> &func) {
+        m_list.emplace_back(name, 1, func);
+    }
+
+    template<class T>
+    void append(const char *name, const WriteCellItem<T> &func) {
+        m_list.emplace_back(name, 1, func);
+    }
+
+    template<class T>
+    void append(const char *name, const WriteNodeItem<T> &func) {
         m_list.emplace_back(name, 1, func);
     }
 
     /// @brief Аналогично функции append(const char*, ...)
     template<class T>
-    void append(const std::string &name, const WriteFunction<T> &func) {
+    void append(const std::string &name, const WriteAmrItem<T> &func) {
+        m_list.emplace_back(name, 1, func);
+    }
+
+    template<class T>
+    void append(const std::string &name, const WriteCellItem<T> &func) {
+        m_list.emplace_back(name, 1, func);
+    }
+
+    template<class T>
+    void append(const std::string &name, const WriteNodeItem<T> &func) {
         m_list.emplace_back(name, 1, func);
     }
 
     /// @brief Упрощенный вариант для добавления double полей
-    void append(const std::string& name, std::function<double(Storage::Item)> f) {
-        m_list.emplace_back(name, 1, WriteFunction<double>(
-                [f](Storage::Item cell, double *out) {
+    void append(const std::string& name, std::function<double(AmrStorage::Item&)> f) {
+        m_list.emplace_back(name, 1, WriteAmrItem<double>(
+                [f](AmrStorage::Item& cell, double *out) {
+                    out[0] = f(cell);
+                }));
+    }
+
+    /// @brief Упрощенный вариант для добавления double полей
+    void append(const std::string& name, std::function<double(CellStorage::Item&)> f) {
+        m_list.emplace_back(name, 1, WriteCellItem<double>(
+                [f](CellStorage::Item& cell, double *out) {
+                    out[0] = f(cell);
+                }));
+    }
+
+    /// @brief Упрощенный вариант для добавления double полей
+    void append(const std::string& name, std::function<double(NodeStorage::Item&)> f) {
+        m_list.emplace_back(name, 1, WriteNodeItem<double>(
+                [f](NodeStorage::Item& cell, double *out) {
                     out[0] = f(cell);
                 }));
     }
@@ -112,7 +168,23 @@ public:
     /// @param name Название переменной
     /// @param func Некоторая функция, которая для произвольной ячейки выдает
     /// значение переменной
-    void operator+=(std::pair<std::string, std::function<double(Storage::Item)>> p) {
+    void operator+=(std::pair<std::string, std::function<double(AmrStorage::Item&)>> p) {
+        append(p.first, p.second);
+    }
+
+    /// @brief Упрощенный синтаксис для добавления полей типа double
+    /// @param name Название переменной
+    /// @param func Некоторая функция, которая для произвольной ячейки выдает
+    /// значение переменной
+    void operator+=(std::pair<std::string, std::function<double(CellStorage::Item&)>> p) {
+        append(p.first, p.second);
+    }
+
+    /// @brief Упрощенный синтаксис для добавления полей типа double
+    /// @param name Название переменной
+    /// @param func Некоторая функция, которая для произвольной ячейки выдает
+    /// значение переменной
+    void operator+=(std::pair<std::string, std::function<double(NodeStorage::Item&)>> p) {
         append(p.first, p.second);
     }
 
@@ -132,6 +204,5 @@ private:
     std::vector<Variable> m_list;
 };
 
-} // namespace io
-} // namespace zephyr
+} // namespace zephyr::io
 

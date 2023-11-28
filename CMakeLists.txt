@@ -13,6 +13,7 @@ endif()
 
 option(ZEPHYR_ENABLE_MPI      "Use MPI functions" OFF)
 option(ZEPHYR_ENABLE_YAML     "YAML support"      OFF)
+option(ZEPHYR_ENABLE_EIGEN    "Use Eigen library" ON)
 option(ZEPHYR_ENABLE_TESTS    "Build tests"       ON)
 option(ZEPHYR_ENABLE_PROBLEMS "Build problems"    ON)
 
@@ -32,7 +33,7 @@ add_subdirectory(zephyr)
 
 message(STATUS "zephyr: build shared")
 
-add_library(zephyr SHARED ${ZEPHYR_SOURCES} zephyr/math/cfd/flux/num_flux.cpp)
+add_library(zephyr SHARED ${ZEPHYR_SOURCES})
 target_link_libraries(zephyr PUBLIC ${Boost_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
 target_include_directories(zephyr PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>
@@ -59,7 +60,7 @@ install(EXPORT zephyr-targets DESTINATION share/cmake/zephyr)
 install(DIRECTORY libs/Eigen DESTINATION include)
 
 include(CMakePackageConfigHelpers)
-# generate the config file that is includes the exports
+# gen_eu the config file that is includes the exports
 configure_package_config_file(${CMAKE_CURRENT_SOURCE_DIR}/Config.cmake.in
     "${CMAKE_CURRENT_BINARY_DIR}/zephyr-config.cmake"
     INSTALL_DESTINATION "share/cmake/zephyr"

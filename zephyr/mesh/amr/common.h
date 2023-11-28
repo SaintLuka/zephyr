@@ -18,7 +18,7 @@
 #endif
 
 #include <array>
-#include <zephyr/geom/base.h>
+#include <zephyr/geom/primitives/base.h>
 
 namespace zephyr { namespace mesh { namespace amr {
 

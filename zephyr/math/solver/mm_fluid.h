@@ -11,7 +11,7 @@
 
 namespace zephyr::math {
 
-using zephyr::mesh::ICell;
+using zephyr::mesh::Cell;
 using zephyr::mesh::Mesh;
 using zephyr::mesh::Distributor;
 using zephyr::geom::Vector3d;
@@ -104,13 +104,13 @@ private:
     /// @brief Обновление ячеек
     void swap(Mesh &mesh);
 
-    void compute_grad(Mesh &mesh,  const std::function<mmf::PState(zephyr::mesh::ICell &)> &to_state) const;
+    void compute_grad(Mesh &mesh,  const std::function<mmf::PState(Cell &)> &to_state) const;
 
     void fluxes_stage1(Mesh &mesh) const;
 
     void fluxes_stage2(Mesh &mesh) const;
 
-    mmf::Flux calc_flux_extra(ICell &cell, bool from_begin) const;
+    mmf::Flux calc_flux_extra(Cell &cell, bool from_begin) const;
 
 public:
 

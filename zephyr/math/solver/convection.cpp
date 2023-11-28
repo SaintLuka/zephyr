@@ -1,11 +1,11 @@
 #include <zephyr/math/solver/convection.h>
 
 #include <zephyr/math/cfd/face_extra.h>
-#include <zephyr/geom/face.h>
+#include <zephyr/geom/primitives/bface.h>
 
-namespace zephyr { namespace math {
+namespace zephyr::math {
 
-using mesh::Storage;
+using mesh::AmrStorage;
 using namespace geom;
 
 static const Convection::State U = Convection::datatype();
@@ -53,7 +53,7 @@ Vector3d Convection::velocity(const Vector3d& c) const {
     return Vector3d::UnitX();
 }
 
-double Convection::compute_dt(const ICell &cell) const {
+double Convection::compute_dt(Cell &cell) const {
     double max_area = 0.0;
     for (auto &face: cell.faces()) {
         max_area = std::max(max_area, face.area());
@@ -63,9 +63,10 @@ double Convection::compute_dt(const ICell &cell) const {
     return m_CFL * dx / velocity(cell.center()).norm();
 }
 
-void Convection::compute_grad(ICell &cell, int stage) {
+void Convection::compute_grad(Cell &cell, int stage) {
     double ux = 0.0;
     double uy = 0.0;
+    double uz = 0.0;
 
     double uc = stage < 1 ? cell(U).u1 : cell(U).uh;
 
@@ -77,27 +78,20 @@ void Convection::compute_grad(ICell &cell, int stage) {
         Vector3d S = 0.5 * face.normal() * face.area();
         ux += (uc + un) * S.x();
         uy += (uc + un) * S.y();
+        uz += (uc + un) * S.z();
     }
 
     cell(U).ux = ux / cell.volume();
     cell(U).uy = uy / cell.volume();
+    cell(U).uz = uz / cell.volume();
 }
 
-double lim(double t, double b) {
-    if (b == 0.0 && t == 0.0) {
-        return 0.0;
-    }
-    double r = t / b;
-    return std::max(0.0, std::min(r, 1.0));
-}
-
-void Convection::fluxes(ICell &cell, int stage) {
+void Convection::fluxes(Cell &cell, int stage) {
     auto &zc = cell(U);
 
     double fluxes = 0.0;
     for (auto &face: cell.faces()) {
-        auto neib = face.neib();
-        auto &zn = neib(U);
+        const auto &zn =  face.neib(U);
 
         Vector3d cell_c = cell.center();
         Vector3d face_c = face.center();
@@ -116,8 +110,8 @@ void Convection::fluxes(ICell &cell, int stage) {
             // Второй порядок
             auto fe = FaceExtra::Simple(
                     m_limiter,
-                    uc, zc.ux, zc.uy, 0.0,
-                    un, zn.ux, zn.uy, 0.0,
+                    uc, zc.ux, zc.uy, zc.uz,
+                    un, zn.ux, zn.uy, zc.uz,
                     cell_c, neib_c, face_c);
 
             u_m = fe.m(uc);
@@ -173,7 +167,7 @@ void Convection::update(Mesh &mesh) {
         }
 
         // Шаг предиктора
-        for (auto cell: mesh) {
+        for (auto &cell: mesh) {
             fluxes(cell, 0);
         }
 
@@ -205,12 +199,12 @@ void Convection::set_flags(Mesh& mesh) {
             if (face.is_boundary()) {
                 continue;
             }
-            min_val = std::min(min_val, face.neib()(U).u1);
-            max_val = std::max(max_val, face.neib()(U).u1);
+            min_val = std::min(min_val, face.neib(U).u1);
+            max_val = std::max(max_val, face.neib(U).u1);
         }
 
         if (max_val - min_val > 0.1) {
-            cell.set_flag(1);
+            cell.set_flag(+1);
         }
         else {
             cell.set_flag(-1);
@@ -219,18 +213,23 @@ void Convection::set_flags(Mesh& mesh) {
 }
 
 Distributor Convection::distributor() const {
+    using mesh::Children;
+
     Distributor distr;
 
-    distr.split2D = [](Storage::Item parent, const std::array<Storage::Item, 4> & children) {
-        for (auto child: children) {
-            Vector3d dr = parent.center() - child.center();
-            child(U).u1 = parent(U).u1 + parent(U).ux * dr.x() + parent(U).uy * dr.y();
+    distr.split = [](AmrStorage::Item &parent, Children &children) {
+        for (auto& child: children) {
+            Vector3d dr = parent.center - child.center;
+            child(U).u1 = parent(U).u1 +
+                          parent(U).ux * dr.x() +
+                          parent(U).uy * dr.y() +
+                          parent(U).uz * dr.z();
         }
     };
 
-    distr.merge2D = [](const std::array<Storage::Item, 4> & children, Storage::Item parent) {
+    distr.merge = [](Children &children, AmrStorage::Item &parent) {
         double sum = 0.0;
-        for (auto child: children) {
+        for (auto &child: children) {
             sum += child(U).u1 * child.volume();
         }
         parent(U).u1 = sum / parent.volume();
@@ -239,5 +238,4 @@ Distributor Convection::distributor() const {
     return distr;
 }
 
-}
-}
+} // namespace zephyr::math

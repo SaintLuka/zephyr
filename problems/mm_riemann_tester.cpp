@@ -22,21 +22,21 @@ using zephyr::math::RiemannSolver;
 MmFluid::State U;
 
 /// Переменные для сохранения
-double get_rho(Storage::Item cell) { return cell(U).rho; }
+double get_rho(AmrStorage::Item& cell) { return cell(U).rho; }
 
-double get_u(Storage::Item cell) { return cell(U).v.x(); }
+double get_u(AmrStorage::Item& cell) { return cell(U).v.x(); }
 
-double get_v(Storage::Item cell) { return cell(U).v.y(); }
+double get_v(AmrStorage::Item& cell) { return cell(U).v.y(); }
 
-double get_w(Storage::Item cell) { return cell(U).v.z(); }
+double get_w(AmrStorage::Item& cell) { return cell(U).v.z(); }
 
-double get_p(Storage::Item cell) { return cell(U).p; }
+double get_p(AmrStorage::Item& cell) { return cell(U).p; }
 
-double get_e(Storage::Item cell) { return cell(U).e; }
+double get_e(AmrStorage::Item& cell) { return cell(U).e; }
 
-double get_frac1(Storage::Item cell) { return cell(U).mass_frac[0]; }
+double get_frac1(AmrStorage::Item& cell) { return cell(U).mass_frac[0]; }
 
-double get_frac2(Storage::Item cell) { return cell(U).mass_frac[1]; }
+double get_frac2(AmrStorage::Item& cell) { return cell(U).mass_frac[1]; }
 
 struct MmTest {
     std::shared_ptr<Eos> matL, matR;
@@ -111,40 +111,36 @@ RiemannTesterWithSolver(Fluxes flux, const MmTest &test, int n_cells = 10, int a
     double time = 0.0;
 
     pvd.variables += {"rho_exact",
-                      [&exact, &time](const Storage::Item &cell) -> double {
-                          return exact.density(cell.center().x(), time);
+                      [&exact, &time](AmrStorage::Item& cell) -> double {
+                          return exact.density(cell.center.x(), time);
                       }};
     pvd.variables += {"u_exact",
-                      [&exact, &time](const Storage::Item &cell) -> double {
-                          return exact.velocity(cell.center().x(), time);
+                      [&exact, &time](AmrStorage::Item& cell) -> double {
+                          return exact.velocity(cell.center.x(), time);
                       }};
     pvd.variables += {"p_exact",
-                      [&exact, &time](const Storage::Item &cell) -> double {
-                          return exact.pressure(cell.center().x(), time);
+                      [&exact, &time](AmrStorage::Item& cell) -> double {
+                          return exact.pressure(cell.center.x(), time);
                       }};
     pvd.variables += {"e_exact",
-                      [&exact, &time](const Storage::Item &cell) -> double {
-                          return exact.energy(cell.center().x(), time);
+                      [&exact, &time](AmrStorage::Item& cell) -> double {
+                          return exact.energy(cell.center.x(), time);
                       }};
     pvd.variables += {"c",
-                      [&mixture](Storage::Item cell) -> double {
+                      [&mixture](AmrStorage::Item& cell) -> double {
                           return mixture.sound_speed_rp(cell(U).rho, cell(U).p, cell(U).mass_frac);
                       }};
     pvd.variables += {"c_exact",
-                      [&exact, &time](const Storage::Item &cell) -> double {
-                          return exact.sound_speed(cell.center().x(), time);
+                      [&exact, &time](AmrStorage::Item& cell) -> double {
+                          return exact.sound_speed(cell.center.x(), time);
                       }};
 
     // Создаем одномерную сетку
-    double H = 0.05 * (x_max - x_min);
-    Rectangle rect(x_min, x_max, -H, +H);
-    rect.set_sizes(n_cells, 1);
-    rect.set_boundary_flags(
-            FaceFlag::ZOE, FaceFlag::ZOE,
-            FaceFlag::ZOE, FaceFlag::ZOE);
+    Strip gen(x_min, x_max);
+    gen.set_size(n_cells);
 
     // Создать сетку
-    Mesh mesh(U, &rect);
+    Mesh mesh(U, &gen);
 
     MmFluid solver(mixture, flux);
     solver.set_acc(acc);
@@ -256,9 +252,9 @@ void RiemannTesterWithSolver2D(Fluxes flux, int n_cells = 10, int acc = 1, const
     double r = 0.05 * H;
     Rectangle rect(x_min, x_max, -H / 2, +H / 2);
     rect.set_sizes(n_cells, n_cells);
-    rect.set_boundary_flags(
-            FaceFlag::ZOE, FaceFlag::ZOE,
-            FaceFlag::ZOE, FaceFlag::ZOE);
+    rect.set_boundaries({
+        .left   = Boundary::ZOE, .right = Boundary::ZOE,
+        .bottom = Boundary::ZOE, .top   = Boundary::ZOE});
 
     // Файл для записи
     PvdFile pvd("mesh", filename);
@@ -339,9 +335,6 @@ void test_two_cells() {
 
     Rectangle rect(x_min, x_max, -0.05 / 2, 0.05 / 2);
     rect.set_sizes(2, 1);
-    rect.set_boundary_flags(
-            FaceFlag::ZOE, FaceFlag::ZOE,
-            FaceFlag::ZOE, FaceFlag::ZOE);
 
     // Создать сетку
     Mesh mesh(U, &rect);

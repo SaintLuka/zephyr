@@ -4,15 +4,16 @@
 #include <zephyr/mesh/mesh.h>
 #include <zephyr/io/vtu_file.h>
 
-#include <zephyr/mesh/generator/rectangle.h>
-#include <zephyr/mesh/generator/cuboid.h>
-#include <zephyr/mesh/generator/sector.h>
-#include <zephyr/mesh/generator/vertex.h>
-#include <zephyr/mesh/generator/block.h>
-#include <zephyr/mesh/generator/curve/line.h>
-#include <zephyr/mesh/generator/curve/cubic.h>
-#include <zephyr/mesh/generator/curve/circle.h>
-#include <zephyr/mesh/generator/block_structured.h>
+#include <zephyr/geom/box.h>
+#include <zephyr/geom/generator/rectangle.h>
+#include <zephyr/geom/generator/cuboid.h>
+#include <zephyr/geom/generator/sector.h>
+#include <zephyr/geom/generator/bs_vertex.h>
+#include <zephyr/geom/generator/block.h>
+#include <zephyr/geom/generator/curve/plane.h>
+#include <zephyr/geom/generator/curve/cubic.h>
+#include <zephyr/geom/generator/curve/circle.h>
+#include <zephyr/geom/generator/block_structured.h>
 
 
 using namespace zephyr::io;
@@ -20,6 +21,7 @@ using namespace zephyr::geom;
 using namespace zephyr::mesh;
 using namespace zephyr::mesh::generator;
 
+// Данные ячеек
 struct _U_ {
     int uid;
     double val;
@@ -27,42 +29,73 @@ struct _U_ {
 
 _U_ U;
 
-double get_uid(Storage::Item cell) {
+// Данные узлов
+struct _V_ {
+    int uid;
+    double val;
+};
+
+_V_ V;
+
+double get_uid_amr(AmrStorage::Item& cell) {
     return cell(U).uid;
 }
 
-double get_val(Storage::Item cell) {
+double get_val_amr(AmrStorage::Item& cell) {
     return cell(U).val;
 }
 
-enum class Test {
-    Rectangle, RectangleHex, Cuboid,
-    Sector1, Sector2, Sector3, Disk,
-    BlockStruct1, BlockStruct2, BlockStruct3
+double get_uid_cell(CellStorage::Item& cell) {
+    return cell(U).uid;
+}
+
+double get_val_cell(CellStorage::Item& cell) {
+    return cell(U).val;
+}
+
+double get_uid_node(NodeStorage::Item& cell) {
+    return cell(V).uid;
+}
+
+double get_val_node(NodeStorage::Item& cell) {
+    return cell(V).val;
+}
+
+struct Test {
+    enum TestType {
+        Rectangle, RectangleHex, Cuboid,
+        Sector1, Sector2, Sector3, Disk,
+        BlockStruct1, BlockStruct2, BlockStruct3
+    };
+
+    std::string name;  ///< Название теста
+    std::string file;  ///< Имя выходного файла
+    std::string desc;  ///< Описание теста
+    
+    Generator::Ptr generator;  ///< Сеточный генератор
+    
+    Test(TestType test);
+
+    EuMesh gen_eu() const;
+
+    LaMesh gen_la() const;
 };
 
-std::string name(Test test);
-
-std::string description(Test test);
-
-std::string filename(Test test);
-
-Generator::Ptr get_generator(Test test);
-
-void fill(Storage& cells);
-
 int main() {
-
     // Переменные для записи
     Variables vars;
-    vars += { "uid", get_uid };
-    vars += { "val", get_val };
+    vars += { "uid", get_uid_amr };
+    vars += { "val", get_val_amr };
+    vars += { "uid", get_uid_cell };
+    vars += { "val", get_val_cell };
+    vars += { "uid", get_uid_node };
+    vars += { "val", get_val_node };
 
     // Список тестов
     std::vector<Test> tests_list = {
             Test::Rectangle,
             Test::RectangleHex,
-            Test::Cuboid,
+            //Test::Cuboid,
             Test::Sector1,
             Test::Sector2,
             Test::Sector3,
@@ -72,152 +105,60 @@ int main() {
             Test::BlockStruct3
     };
 
-    for (auto test: tests_list) {
-        std::cout << "Тест '" << name(test) << "'.\n";
-        std::cout << "\t" << description(test) << "\n";
-        std::cout << "\tВыходной файл: " << filename(test) << "\n\n";
+    for (auto& test: tests_list) {
+        std::cout << "Тест '" << test.name << "'.\n";
+        std::cout << "\t" << test.desc << "\n";
+        std::cout << "\tВыходной файл: " << test.file << "\n\n";
 
-        auto gen = get_generator(test);
+        VtuFile file("output/" + test.file, vars);
+        file.hex_only = false; // test != Test::RectangleHex;
 
-        Mesh cells(U, gen.get());
-
-        fill(cells);
-
-        VtuFile file("output/" + filename(test), vars);
-
-        file.hex_only = test != Test::RectangleHex;
-
+        //auto cells = test.gen_eu();
+        auto cells = test.gen_la();
         file.save(cells);
     }
 }
 
-std::string name(Test test) {
-    switch (test) {
-        case Test::Rectangle:
-            return "Rectangle";
-        case Test::RectangleHex:
-            return "RectangleHex";
-        case Test::Cuboid:
-            return "Cuboid";
-
-        case Test::Sector1:
-            return "Sector 1";
-        case Test::Sector2:
-            return "Sector 2";
-        case Test::Sector3:
-            return "Sector 3";
-        case Test::Disk:
-            return "Disk";
-
-        case Test::BlockStruct1:
-            return "Block Structured 1";
-        case Test::BlockStruct2:
-            return "Block Structured 2";
-        case Test::BlockStruct3:
-            return "Block Structured 3";
-        default:
-            throw std::runtime_error("Unknown test");
-    }
-}
-
-std::string description(Test test) {
-    switch (test) {
-        case Test::Rectangle:
-            return "Декартова сетка в прямоуольнике.";
-        case Test::RectangleHex:
-            return "Сетка из шестиугольников в прямоугольнике.";
-        case Test::Cuboid:
-            return "Декартова сетка в прямоугольном параллелепипеде.";
-
-        case Test::Sector1:
-            return "Сетка в секторе с выколотым центром.";
-        case Test::Sector2:
-            return "Сетка в секторе (угол раствора < п)";
-        case Test::Sector3:
-            return "Сетка в секторе (угол раствора > п)";
-        case Test::Disk:
-            return "Блочно-структурированная сетка в круге.";
-
-        case Test::BlockStruct1:
-            return "Блочно-структурированная сетка №1.";
-        case Test::BlockStruct2:
-            return "Блочно-структурированная сетка №2.";
-        case Test::BlockStruct3:
-            return "Блочно-структурированная сетка №3.";
-        default:
-            throw std::runtime_error("Unknown test");
-    }
-}
-
-std::string filename(Test test) {
-    switch (test) {
-        case Test::Rectangle:
-            return "rectangle.vtu";
-        case Test::RectangleHex:
-            return "rectangle_hex.vtu";
-        case Test::Cuboid:
-            return "cuboid.vtu";
-
-        case Test::Sector1:
-            return "sector_1.vtu";
-        case Test::Sector2:
-            return "sector_2.vtu";
-        case Test::Sector3:
-            return "sector_3.vtu";
-        case Test::Disk:
-            return "disk.vtu";
-
-        case Test::BlockStruct1:
-            return "block_structured_1.vtu";
-        case Test::BlockStruct2:
-            return "block_structured_2.vtu";
-        case Test::BlockStruct3:
-            return "block_structured_3.vtu";
-        default:
-            throw std::runtime_error("Unknown test");
-    }
-}
-
 Generator::Ptr create_rectangle() {
-    auto rect = new Rectangle(0.0, 2.0, 0.0, 1.0, false);
+    auto rect = Rectangle::create(0.0, 2.0, 0.0, 1.0, false);
     rect->set_nx(100);
-    return std::unique_ptr<Generator>(rect);
+    return rect;
 }
 
 Generator::Ptr create_rectangle_hex() {
-    auto rect = new Rectangle(0.0, 2.0, 0.0, 1.0, true);
+    auto rect = Rectangle::create(0.0, 2.0, 0.0, 1.0, true);
     rect->set_nx(100);
-    return std::unique_ptr<Generator>(rect);
+    return rect;
 }
 
 Generator::Ptr create_cuboid() {
-    auto cuboid = new Cuboid(0.0, 2.0, 0.0, 1.0, 0.0, 0.5);
+    auto cuboid = Cuboid::create(0.0, 2.0, 0.0, 1.0, 0.0, 0.5);
     cuboid->set_nx(40);
-    return std::unique_ptr<Generator>(cuboid);
+    return cuboid;
 }
 
 Generator::Ptr create_sector1() {
-    auto sector = new Sector(1.0, 0.3, M_PI / 5.0, true);
+    auto sector = Sector::create(1.0, 0.3, M_PI / 5.0, true);
     sector->set_n_phi(17);
-    return std::unique_ptr<Generator>(sector);
+    return sector;
 }
 
 Generator::Ptr create_sector2() {
-    auto sector = new Sector(1.0, 0.3, 0.8 * M_PI, false);
+    auto sector = Sector::create(1.0, 0.3, 0.8 * M_PI, false);
     sector->set_n_phi(28);
-    return std::unique_ptr<Generator>(sector);
+    return sector;
 }
 
 Generator::Ptr create_sector3() {
-    auto sector = new Sector(1.0, 0.3, 1.4 * M_PI, false);
+    auto sector = Sector::create(1.0, 0.3, 1.4 * M_PI, false);
     sector->set_n_phi(36);
-    return std::unique_ptr<Generator>(sector);
+    return sector;
 }
 
 Generator::Ptr create_disk() {
-    auto sector = new Sector(1.0, 0.3, 2.0 * M_PI, false);
+    auto sector = Sector::create(1.0, 0.3, 2.0 * M_PI, false);
     sector->set_n_phi(80);
-    return std::unique_ptr<Generator>(sector);
+    return sector;
 }
 
 Generator::Ptr create_block_structured1() {
@@ -239,12 +180,12 @@ Generator::Ptr create_block_structured1() {
 
     // Ограничивающие кривые области
     Curve::Ptr circle = Circle::create(v3, v6, v7);           // Окружность
-    Curve::Ptr left = Line::create(v1, v7);                   // Прямая слева
+    Curve::Ptr left = Plane::create(v1, v7);                   // Прямая слева
     Curve::Ptr bottom = Cubic::create(*v1, v_s1, v_s2, *v3);  // Сплайн на нижней границе
 
     // Генератор сетки
-    auto blocks_ptr = new BlockStructured(3);
-    BlockStructured& blocks = *blocks_ptr;
+    auto gen = BlockStructured::create(3);
+    BlockStructured& blocks = *gen;
 
     blocks[0] = {v1, v2, v4, v5};
     blocks[0].set_boundary(v1, v4, left);
@@ -277,7 +218,7 @@ Generator::Ptr create_block_structured1() {
     blocks.set_accuracy(1.0e-5);
 
     // Возвращаем генератор
-    return std::unique_ptr<BlockStructured>(blocks_ptr);
+    return gen;
 }
 
 Generator::Ptr create_block_structured2() {
@@ -315,14 +256,14 @@ Generator::Ptr create_block_structured2() {
 
     // Ограничивающие кривые области
     Curve::Ptr circle = Circle::create(v9, v10, v11);
-    Curve::Ptr left   = Line::create(v1, v17);
-    Curve::Ptr right  = Line::create(v4, v20);
-    Curve::Ptr bottom = Line::create(v1, v4);
+    Curve::Ptr left   = Plane::create(v1, v17);
+    Curve::Ptr right  = Plane::create(v4, v20);
+    Curve::Ptr bottom = Plane::create(v1, v4);
     Curve::Ptr top    = Cubic::create(v17, v18, v19, v20);
 
     // Генератор сетки
-    auto blocks_ptr = new BlockStructured(12);
-    BlockStructured& blocks = *blocks_ptr;
+    auto gen = BlockStructured::create(12);
+    BlockStructured& blocks = *gen;
 
     blocks[0] = {v1, v2, v5, v6};
     blocks[0].set_boundary(v1, v5, left);
@@ -388,7 +329,7 @@ Generator::Ptr create_block_structured2() {
     blocks.set_accuracy(1.0e-5);
 
     // Возвращаем генератор
-    return std::unique_ptr<BlockStructured>(blocks_ptr);
+    return gen;
 }
 
 Generator::Ptr create_block_structured3() {
@@ -409,12 +350,12 @@ Generator::Ptr create_block_structured3() {
     // Ограничивающие кривые области
     Curve::Ptr circ = Circle::create(r, {h, 0.0, 0.0});
     Curve::Ptr CIRC = Circle::create(v7, v8, v4);
-    Curve::Ptr left = Line::create(v1, v7);
-    Curve::Ptr bottom = Line::create(v1, v4);
+    Curve::Ptr left = Plane::create(v1, v7);
+    Curve::Ptr bottom = Plane::create(v1, v4);
 
     // Генератор сетки
-    auto blocks_ptr = new BlockStructured(3);
-    BlockStructured& blocks = *blocks_ptr;
+    auto gen = BlockStructured::create(3);
+    BlockStructured& blocks = *gen;
 
     blocks[0] = {v1, v2, v6, v5};
     blocks[0].set_boundary(v1, v2, bottom);
@@ -448,56 +389,121 @@ Generator::Ptr create_block_structured3() {
     blocks.set_accuracy(1.0e-5);
 
     // Возвращаем генератор
-    return std::unique_ptr<BlockStructured>(blocks_ptr);
+    return gen;
 }
 
-Generator::Ptr get_generator(Test test) {
+Test::Test(TestType test) {
     switch (test) {
         case Test::Rectangle:
-            return create_rectangle();
+            name = "Rectangle";
+            file = "rectangle.vtu";
+            desc = "Декартова сетка в прямоуольнике.";
+            generator = create_rectangle();
+            break;
+
         case Test::RectangleHex:
-            return create_rectangle_hex();
+            name = "RectangleHex";
+            file = "rectangle_hex.vtu";
+            desc = "Сетка из шестиугольников в прямоугольнике.";
+            generator = create_rectangle_hex();
+            break;
+
         case Test::Cuboid:
-            return create_cuboid();
+            name = "Cuboid";
+            file = "cuboid.vtu";
+            desc = "Декартова сетка в прямоугольном параллелепипеде.";
+            generator = create_cuboid();
+            break;
 
         case Test::Sector1:
-            return create_sector1();
+            name = "Sector 1";
+            file = "sector_1.vtu";
+            desc = "Сетка в секторе с выколотым центром.";
+            generator = create_sector1();
+            break;
+
         case Test::Sector2:
-            return create_sector2();
+            name = "Sector 2";
+            file = "sector_2.vtu";
+            desc = "Сетка в секторе (угол раствора < п)";
+            generator = create_sector2();
+            break;
+
         case Test::Sector3:
-            return create_sector3();
+            name = "Sector 3";
+            file = "sector_3.vtu";
+            desc = "Сетка в секторе (угол раствора > п)";
+            generator = create_sector3();
+            break;
+
         case Test::Disk:
-            return create_disk();
+            name = "Disk";
+            file = "disk.vtu";
+            desc = "Блочно-структурированная сетка в круге.";
+            generator = create_disk();
+            break;
 
         case Test::BlockStruct1:
-            return create_block_structured1();
+            name = "Block Structured 1";
+            file = "block_structured_1.vtu";
+            desc = "Блочно-структурированная сетка №1.";
+            generator = create_block_structured1();
+            break;
+
         case Test::BlockStruct2:
-            return create_block_structured2();
+            name = "Block Structured 2";
+            file = "block_structured_2.vtu";
+            desc = "Блочно-структурированная сетка №2.";
+            generator = create_block_structured2();
+            break;
+
         case Test::BlockStruct3:
-            return create_block_structured3();
+            name = "Block Structured 3";
+            file = "block_structured_3.vtu";
+            desc = "Блочно-структурированная сетка №3.";
+            generator = create_block_structured3();
+            break;
 
         default:
             throw std::runtime_error("Unknown test");
     }
 }
 
-void fill(Storage& cells) {
-    double inf = std::numeric_limits<double>::infinity();
-    Vector3d vmin = {+inf, +inf, +inf};
-    Vector3d vmax = {-inf, -inf, -inf};
+void fill(AmrStorage& cells) {
+}
 
-    for (auto& cell: cells) {
-        vmin = vmin.cwiseMin(cell.center());
-        vmax = vmax.cwiseMax(cell.center());
-    }
+EuMesh Test::gen_eu() const {
+    EuMesh mesh(U, generator.get());
+    
+    Box box = mesh.bbox();
+    double L = box.diameter();
 
-    double L = (vmax - vmin).norm();
-
-    for (size_t ic = 0; ic < cells.size(); ++ic) {
-        auto cell = cells[ic];
+    for (auto& cell: mesh) {
         Vector3d r = cell.center();
-
-        cell(U).uid = ic;
+        cell(U).uid = cell - mesh.begin();
         cell(U).val = std::cos(1.0 / (r.squaredNorm() / (L * L) + 0.03));
     }
+
+    return mesh;
+}
+
+LaMesh Test::gen_la() const {
+    LaMesh mesh(U, V, generator.get());
+
+    Box box = mesh.bbox();
+    double L = box.diameter();
+    
+    for (auto& cell: mesh.locals()) {
+        Vector3d r = cell.center;
+        cell(U).uid = cell.index;
+        cell(U).val = std::cos(1.0 / (r.squaredNorm() / (L * L) + 0.03));
+    }
+
+    for (auto& node: mesh.nodes()) {
+        Vector3d r = node.coords;
+        node(V).uid = node.index;
+        node(V).val = std::sin(1.0 / (r.squaredNorm() / (L * L) + 0.03));
+    }
+
+    return mesh;
 }

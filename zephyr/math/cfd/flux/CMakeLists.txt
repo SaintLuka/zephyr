@@ -1,17 +1,19 @@
 set(ZEPHYR_MATH_FLUX_SRC
-        ${CMAKE_CURRENT_SOURCE_DIR}/cir.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/rusanov.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/godunov.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/hllc.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/hll.cpp
-        PARENT_SCOPE)
+    ${CMAKE_CURRENT_SOURCE_DIR}/cir.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/rusanov.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/godunov.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/hll.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/hllc.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/num_flux.cpp
+    PARENT_SCOPE)
 
 install(FILES
-        num_flux.h
-        cir.h
-        rusanov.h
-        godunov.h
-        hllc.h
-        hll.h
-        DESTINATION
-        include/${PROJECT_NAME}/math/cfd/fluxes)
+    num_flux.h
+    cir.h
+    rusanov.h
+    godunov.h
+    hll.h
+    hllc.h
+    num_flux.h
+    DESTINATION
+    include/${PROJECT_NAME}/math/cfd/fluxes)

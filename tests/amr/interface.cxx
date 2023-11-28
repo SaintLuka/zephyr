@@ -2,10 +2,9 @@
 /// понимаются узкие области адаптации с шириной в одну ячейку, которые
 /// имеют меру размерности меньше, чем мера самой области.
 
-#include <zephyr/mesh/mesh.h>
-#include <zephyr/mesh/generator/rectangle.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/io/pvd_file.h>
-#include <zephyr/io/variables.h>
 #include <zephyr/utils/stopwatch.h>
 
 using namespace zephyr;
@@ -23,11 +22,11 @@ struct _U_ {
 
 _U_ U;
 
-double get_idx(Storage::Item cell) {
+double get_idx(AmrStorage::Item& cell) {
     return cell(U).idx;
 }
 
-double get_bit(Storage::Item cell) {
+double get_bit(AmrStorage::Item& cell) {
     return cell(U).bit;
 }
 
@@ -36,7 +35,7 @@ inline double sqr(double x) {
 }
 
 // Периодическая функция времени, с периодом = 1
-int calc_idx(ICell& cell, double t) {
+int calc_idx(EuCell& cell, double t) {
     Vector3d c = cell.center();
 
     double r = c.norm();
@@ -58,7 +57,7 @@ int calc_idx(ICell& cell, double t) {
     return a1 + a2;
 }
 
-int calc_bit(ICell& cell) {
+int calc_bit(EuCell& cell) {
     int idx_c = cell(U).idx;
     for (auto& face: cell.faces()) {
         if (face.is_boundary()) {
@@ -73,16 +72,16 @@ int calc_bit(ICell& cell) {
     return 0;
 }
 
-void set_index(ICell& cell, double t) {
+void set_index(EuCell& cell, double t) {
     cell(U).idx = calc_idx(cell, t);
 }
 
-void set_flag(ICell& cell) {
+void set_flag(EuCell& cell) {
     cell(U).bit = calc_bit(cell);
     cell.set_flag(cell(U).bit > 0 ? 1 : -1);
 }
 
-int solution_step(Mesh& mesh, double t = 0.0) {
+int solution_step(EuMesh& mesh, double t = 0.0) {
     for (auto& cell: mesh) {
         if (cell(U).bit > 0) {
             cell.set_flag(1);
@@ -115,7 +114,7 @@ int main() {
     Rectangle rect(-1.0, 1.0, -1.0, 1.0);
     rect.set_nx(20);
 
-    Mesh mesh(U, &rect);
+    EuMesh mesh(U, &rect);
 
     mesh.set_max_level(5);
 

@@ -55,7 +55,7 @@ Packet4f plog<Packet4f>(const Packet4f& _x)
   Packet4f invalid_mask = _mm_cmpnge_ps(x, _mm_setzero_ps()); // not greater equal is true if x is NaN
   Packet4f iszero_mask = _mm_cmpeq_ps(x, _mm_setzero_ps());
 
-  x = pmax(x, p4f_min_norm_pos);  /* cut off denormalized stuff */
+  x = pmax(x, p4f_min_norm_pos);  /* clip off denormalized stuff */
   emm0 = _mm_srli_epi32(_mm_castps_si128(x), 23);
 
   /* keep only the fractional part */

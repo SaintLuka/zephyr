@@ -38,7 +38,7 @@ using utils::Stopwatch;
 /// часть старых ячеек (не листовых) являются неопределенными.
 /// Алгоритм осуществляет удаление данных ячеек.
 template<int dim = 0>
-void apply(Storage &cells, const Distributor& op) {
+void apply(AmrStorage &cells, const Distributor& op) {
     static Stopwatch count_timer;
     static Stopwatch positions_timer;
     static Stopwatch geometry_timer;
@@ -69,14 +69,13 @@ void apply(Storage &cells, const Distributor& op) {
     restore_connections<dim>(cells, count);
     connections_timer.stop();
 
-
     /// Этап 5. Удаление неопределенных ячеек
     clean_timer.resume();
     remove_undefined<dim>(cells, count);
     clean_timer.stop();
 
     for (int idx = 0; idx <cells.size(); ++idx) {
-        cells[idx].geom().index = idx;
+        cells[idx].index = idx;
     }
 
     /// Этап 6. Сортировка ячеек по уровням (не обязательно)
@@ -96,11 +95,11 @@ void apply(Storage &cells, const Distributor& op) {
 
 /// @brief Специализация по умолчанию с автоматическим выбором размерности
 template<>
-void apply<0>(Storage &cells, const Distributor& op) {
+void apply<0>(AmrStorage &cells, const Distributor& op) {
     if (cells.empty())
         return;
 
-    auto dim = cells[0].dim();
+    auto dim = cells[0].dim;
 
     if (dim < 3) {
         amr::apply<2>(cells, op);
@@ -147,8 +146,8 @@ void apply(
     static Stopwatch sort_timer;
     static Stopwatch link_timer;
 
-    Storage& locals = decomposition.inner_elements();
-    Storage& aliens = decomposition.outer_elements();
+    AmrStorage& locals = decomposition.inner_elements();
+    AmrStorage& aliens = decomposition.outer_elements();
     int rank = decomposition.network().rank();
 
     /// Этап 1. Сбор статистики
@@ -209,7 +208,7 @@ void apply<1234>(
         const DataDistributor& op
         if_multithreading(, ThreadPool& threads))
 {
-    Storage& cells = decomposition.inner_elements();
+    AmrStorage& cells = decomposition.inner_elements();
 
     if (cells.empty()) {
         amr::apply<0>(decomposition, op if_multithreading(, threads));

@@ -3,18 +3,18 @@
 #include <memory>
 #include <set>
 
-#include <zephyr/mesh/storage.h>
+#include <zephyr/mesh/euler/amr_storage.h>
 
 namespace zephyr { namespace io {
 
-using zephyr::mesh::Storage;
+using zephyr::mesh::AmrStorage;
 
 /// @class Абстрактный фильтр для сохранения элементов хранилища в VTU файл
 class Filter {
 public:
     /// @brief Оператор фильтрации, возвращает true, если элемент хранилища,
     /// переданный в качетсве аргумента, необходимо сохранить.
-    virtual bool operator()(Storage::Item) const = 0;
+    virtual bool operator()(AmrStorage::Item&) const = 0;
 
     /// @brief Является ли оператор фильтрации тривиальным.
     /// Тривиальным будем считать оператор фильтрации, который оставляет все
@@ -25,7 +25,7 @@ public:
 /// @class Тривиальный фильтр, сохраняет все элементы хранилища
 class TrivialFilter : public Filter {
 public:
-    bool operator()(Storage::Item cell) const override {
+    bool operator()(AmrStorage::Item& cell) const override {
         return true;
     }
 
@@ -47,8 +47,8 @@ public:
           zmin(zmin), zmax(zmax) {
     }
 
-    bool operator()(Storage::Item cell) const override {
-        auto& c = cell.center();
+    bool operator()(AmrStorage::Item& cell) const override {
+        auto& c = cell.center;
         return xmin <= c.x() && c.x() <= xmax &&
                ymin <= c.y() && c.y() <= ymax &&
                zmin <= c.z() && c.z() <= zmax;
@@ -69,8 +69,8 @@ public:
         : r(r), x(x), y(y) {
     }
 
-    bool operator()(Storage::Item cell) const override {
-        auto& c = cell.center();
+    bool operator()(AmrStorage::Item& cell) const override {
+        auto& c = cell.center;
         return (c.x() - x) * (c.x() - x) + (c.y() - y) * (c.y() - y) <= r * r;
     }
 
@@ -92,7 +92,7 @@ private:
 /// @endcode
 class ComplexFilter : public Filter {
 public:
-    bool operator()(Storage::Item cell) const override {
+    bool operator()(AmrStorage::Item& cell) const override {
         for (auto& filter: filters) {
             if (!(*filter)(cell)) {
                 return false;

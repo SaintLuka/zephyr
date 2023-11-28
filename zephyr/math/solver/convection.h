@@ -3,12 +3,12 @@
 #include <zephyr/mesh/mesh.h>
 #include <zephyr/math/cfd/limiter.h>
 
-namespace zephyr { namespace math {
+namespace zephyr::math {
 
-using zephyr::mesh::ICell;
+using zephyr::geom::Vector3d;
+using zephyr::mesh::Cell;
 using zephyr::mesh::Mesh;
 using zephyr::mesh::Distributor;
-using zephyr::geom::Vector3d;
 
 /// @brief Класс для моделирования уравнения переноса.
 /// Пример образцово показательного решателя.
@@ -17,7 +17,7 @@ public:
 
     /// @brief Расширенный вектор состояния на котором решается задача
     struct State {
-        double u1, ux, uy, uh, u2;
+        double u1, ux, uy, uz, uh, u2;
     };
 
     /// @brief Получить экземпляр расширенного вектора состояния
@@ -66,18 +66,18 @@ protected:
 
     /// @brief Посчитать шаг интегрирования по времени с учетом
     /// условия Куранта
-    double compute_dt(const ICell& cell) const;
+    double compute_dt(Cell& cell) const;
 
     /// @brief Посчитать градиент хранимой функции
     /// @param stage При stage = 0 производные считаются для предыдущего
     /// временного слоя, при stage = 1 производные считаются для
     /// промежуточного временного слоя.
-    void compute_grad(ICell& cell, int stage);
+    void compute_grad(Cell& cell, int stage);
 
     /// @brief Просуммировать потоки.
     /// @param stage При stage = 0 выполняется шаг предиктора, при stage = 1
     /// выполняется шаг коррекции.
-    void fluxes(ICell& cell, int stage);
+    void fluxes(Cell& cell, int stage);
 
 protected:
     int m_accuracy;     ///< Точность схемы (1/2/3)
@@ -86,5 +86,4 @@ protected:
     Limiter m_limiter;  ///< Ограничитель
 };
 
-} // namespace math
-} // namespace zephyr
+} // namespace zephyr::mesh

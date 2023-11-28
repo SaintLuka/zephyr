@@ -1,9 +1,13 @@
 #include <cstring>
 
+#include <zephyr/geom/primitives/mov_node.h>
+#include <zephyr/geom/primitives/mov_cell.h>
+#include <zephyr/geom/primitives/amr_cell.h>
+
 #include <zephyr/io/variables.h>
 
 
-namespace zephyr { namespace io {
+namespace zephyr::io {
 
 
 Variables::Variables(const char* name) {
@@ -100,5 +104,4 @@ const std::vector<Variable>& Variables::list() const {
     return m_list;
 }
 
-} // namespace io
-} // namespace zephyr
+} // namespace zephyr::io

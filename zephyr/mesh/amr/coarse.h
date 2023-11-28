@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include <zephyr/geom/cell.h>
+#include <zephyr/geom/primitives/amr_cell.h>
 #include <zephyr/mesh/amr/common.h>
 #include <zephyr/mesh/amr/faces.h>
 #include <zephyr/mesh/amr/siblings.h>
@@ -15,17 +15,17 @@ namespace zephyr { namespace mesh { namespace amr {
 
 /// @return Массив неопределенных итераторов на дочерние ячейки
 template <int dim>
-std::array<Storage::Item, CpC(dim)> undefined_iterators(Storage& cells);
+std::array<AmrStorage::Iterator, CpC(dim)> undefined_iterators(AmrStorage& cells);
 
 /// @return Массив неопределенных итераторов на дочерние ячейки (2D)
 template <>
-std::array<Storage::Item, CpC(2)> undefined_iterators<2>(Storage& cells) {
+std::array<AmrStorage::Iterator, CpC(2)> undefined_iterators<2>(AmrStorage& cells) {
     return {cells.end(), cells.end(), cells.end(), cells.end()};
 }
 
 /// @return Массив неопределенных итераторов на дочерние ячейки (3D)
 template <>
-std::array<Storage::Item, CpC(3)> undefined_iterators<3>(Storage& cells) {
+std::array<AmrStorage::Iterator, CpC(3)> undefined_iterators<3>(AmrStorage& cells) {
     return {cells.end(), cells.end(), cells.end(), cells.end(),
             cells.end(), cells.end(), cells.end(), cells.end()};
 }
@@ -35,32 +35,32 @@ std::array<Storage::Item, CpC(3)> undefined_iterators<3>(Storage& cells) {
 /// @param ic Индекс главной из дочерних ячеек (z_loc = 0)
 /// @return Массив итераторов дочерних ячеек
 template <int dim>
-std::array<Storage::Item, CpC(dim)> select_children(Storage& cells, int ic) {
+Children select_children(AmrStorage& cells, int ic) {
     auto sibs = get_siblings<dim>(cells, ic);
 
     // Дочерние ячейки, упорядоченные по локальному z-индексу
     auto children = undefined_iterators<dim>(cells);
-    children[0] = cells[ic];
+    children[0] = cells.iterator(ic);
     for (auto sib: sibs) {
         scrutiny_check(sib < cells.size(), "Vicinity: Sibling index out of range")
 
-        auto z_loc = cells[sib].z_idx() % CpC(dim);
-        children[z_loc] = cells[sib];
+        auto z_loc = cells[sib].z_idx % CpC(dim);
+        children[z_loc] = cells.iterator(sib);
     }
 
 #if SCRUTINY
-    if (cells[ic].z_idx() % CpC(dim) != 0) {
+    if (cells[ic].z_idx % CpC(dim) != 0) {
         throw std::runtime_error("Not main child collect siblings");
     }
-    auto main_lvl = cells[ic].level();
+    auto main_lvl = cells[ic].level;
 
     std::set<int> found;
     found.insert(0);
     for (auto sib: sibs) {
-        if (cells[sib].level() != main_lvl) {
+        if (cells[sib].level != main_lvl) {
             throw std::runtime_error("Different levels (siblings)");
         }
-        int loc_z = cells[sib].z_idx() % CpC(dim);
+        int loc_z = cells[sib].z_idx % CpC(dim);
         found.insert(loc_z);
     }
     int counter = 0;
@@ -76,31 +76,35 @@ std::array<Storage::Item, CpC(dim)> select_children(Storage& cells, int ic) {
 }
 
 /// @brief Список вершин родительской ячейки
-LargeList2D parent_vs(const std::array<Storage::Item, 4>& children) {
-     return {
-            children[0].geom().vertices[iww(0, 0)],
-            children[0].geom().vertices[iww(2, 0)],
-            children[1].geom().vertices[iww(2, 0)],
-            children[0].geom().vertices[iww(0, 2)],
-            children[0].geom().vertices[iww(2, 2)],
-            children[1].geom().vertices[iww(2, 2)],
-            children[2].geom().vertices[iww(0, 2)],
-            children[2].geom().vertices[iww(2, 2)],
-            children[3].geom().vertices[iww(2, 2)]
+template <int dim>
+typename std::enable_if<dim == 2, SqQuad>::type
+parent_vs(Children& children) {
+    return {
+            children[0].vertices.vs<-1, -1>(),
+            children[0].vertices.vs<+1, -1>(),
+            children[1].vertices.vs<+1, -1>(),
+            children[0].vertices.vs<-1, +1>(),
+            children[0].vertices.vs<+1, +1>(),
+            children[1].vertices.vs<+1, +1>(),
+            children[2].vertices.vs<-1, +1>(),
+            children[2].vertices.vs<+1, +1>(),
+            children[3].vertices.vs<+1, +1>()
     };
 }
 
 /// @brief Список вершин родительской ячейки
-ShortList3D parent_vs(const std::array<Storage::Item, 8>& children) {
+template <int dim>
+typename std::enable_if<dim == 3, Cube>::type
+parent_vs(Children& children) {
     return {
-            children[iss(0, 0, 0)].geom().vertices[isw(0, 0, 0)],
-            children[iss(1, 0, 0)].geom().vertices[isw(1, 0, 0)],
-            children[iss(0, 1, 0)].geom().vertices[isw(0, 1, 0)],
-            children[iss(1, 1, 0)].geom().vertices[isw(1, 1, 0)],
-            children[iss(0, 0, 1)].geom().vertices[isw(0, 0, 1)],
-            children[iss(1, 0, 1)].geom().vertices[isw(1, 0, 1)],
-            children[iss(0, 1, 1)].geom().vertices[isw(0, 1, 1)],
-            children[iss(1, 1, 1)].geom().vertices[isw(1, 1, 1)]
+            children[Cube::iss<-1, -1, -1>()].vertices.vs<-1, -1, -1>(),
+            children[Cube::iss<+1, -1, -1>()].vertices.vs<+1, -1, -1>(),
+            children[Cube::iss<-1, +1, -1>()].vertices.vs<-1, +1, -1>(),
+            children[Cube::iss<+1, +1, -1>()].vertices.vs<+1, +1, -1>(),
+            children[Cube::iss<-1, -1, +1>()].vertices.vs<-1, -1, +1>(),
+            children[Cube::iss<+1, -1, +1>()].vertices.vs<+1, -1, +1>(),
+            children[Cube::iss<-1, +1, +1>()].vertices.vs<-1, +1, +1>(),
+            children[Cube::iss<+1, +1, +1>()].vertices.vs<+1, +1, +1>()
     };
 }
 
@@ -112,29 +116,29 @@ ShortList3D parent_vs(const std::array<Storage::Item, 8>& children) {
 /// @param children Массив дочерних ячеек
 /// @return Полностью готовая родительская ячейка
 template<int dim>
-Cell get_parent(Storage &locals, Storage &aliens, int rank,
-                     std::array<Storage::Item, CpC(dim)> children) {
-    Cell parent(parent_vs(children));
+AmrCell get_parent(AmrStorage &locals, AmrStorage &aliens,
+        int rank, Children& children) {
+    AmrCell parent(parent_vs<dim>(children));
 
-    parent.b_idx = children[0].b_idx();
+    parent.b_idx = children[0].b_idx;
     parent.flag = 0;
-    parent.level = children[0].level() - 1;
-    parent.z_idx = children[0].z_idx() / CpC(dim);
+    parent.level = children[0].level - 1;
+    parent.z_idx = children[0].z_idx / CpC(dim);
 
     auto children_by_side = get_children_by_side<dim>();
 
     /// Линкуем грани
     for (int side = 0; side < FpC(dim); ++side) {
-        auto some_child = children[children_by_side[side][0]];
-        auto &some_face = some_child.geom().faces[side];
+        auto& some_child = children[children_by_side[side][0]];
+        auto& some_face = some_child.faces[side];
 
 #if SCRUTINY
-        if (some_face.boundary == FaceFlag::UNDEFINED) {
+        if (some_face.boundary == Boundary::UNDEFINED) {
             throw std::runtime_error("Undefined boundary (coarse cell");
         }
         for (int i = 0; i < FpF(dim); ++i) {
-            auto child = children[children_by_side[side][i]];
-            auto &face = child.geom().faces[side];
+            auto& child = children[children_by_side[side][i]];
+            auto& face = child.faces[side];
 
             if (face.boundary != some_face.boundary) {
                 throw std::runtime_error("Different boundary conditions");
@@ -144,8 +148,8 @@ Cell get_parent(Storage &locals, Storage &aliens, int rank,
         parent.faces[side].boundary = some_face.boundary;
 
         // Внешняя граница, не требуется линковать
-        if (some_face.boundary != FaceFlag::ORDINARY &&
-            some_face.boundary != FaceFlag::PERIODIC) {
+        if (some_face.boundary != Boundary::ORDINARY &&
+            some_face.boundary != Boundary::PERIODIC) {
             parent.faces[side].adjacent.rank = rank;
             parent.faces[side].adjacent.ghost = -1;
             continue;
@@ -169,13 +173,13 @@ Cell get_parent(Storage &locals, Storage &aliens, int rank,
         }
 #endif
 
-        auto some_neib = some_neib_rank == rank ? locals[some_neib_index] : aliens[some_neib_ghost];
-        auto some_neib_wanted_lvl = some_neib.level() + some_neib.flag();
+        auto& some_neib = some_neib_rank == rank ? locals[some_neib_index] : aliens[some_neib_ghost];
+        auto some_neib_wanted_lvl = some_neib.level + some_neib.flag;
 
 #if SCRUTINY
         for (int i = 1; i < VpF(dim); ++i) {
-            auto child = children[children_by_side[side][i]];
-            auto adj = child.geom().faces[side].adjacent;
+            auto& child = children[children_by_side[side][i]];
+            auto adj = child.faces[side].adjacent;
 
             if (adj.rank == rank && adj.index >= locals.size()) {
                 std::cout << "Child has no local neighbor through the " <<
@@ -190,9 +194,9 @@ Cell get_parent(Storage &locals, Storage &aliens, int rank,
                 throw std::runtime_error("Child has no remote neighbor (coarse_cell) #2");
             }
 
-            auto neib = adj.rank == rank ? locals[adj.index] : aliens[adj.ghost];
+            auto& neib = adj.rank == rank ? locals[adj.index] : aliens[adj.ghost];
 
-            auto neib_wanted_lvl = neib.level() + neib.flag();
+            auto neib_wanted_lvl = neib.level + neib.flag;
             if (neib_wanted_lvl != some_neib_wanted_lvl) {
                 throw std::runtime_error("Different wanted level (coarsing cell neighbor)");
             }
@@ -215,23 +219,21 @@ Cell get_parent(Storage &locals, Storage &aliens, int rank,
         // Центры подграней родительской ячейки
         std::array<Vector3d, FpF(dim)> pfaces;
         for (int i = 0; i < FpF(dim); ++i) {
-            Face& face = parent.faces[side + 6*i];
-            pfaces[i] = face.center<dim>(parent.vertices);
+            pfaces[i] = parent.faces[side + 6 * i].center;
         }
 
         // Центры граней дочерних ячеек
         std::array<Vector3d, FpF(dim)> cfaces;
         for (int i = 0; i < FpF(dim); ++i) {
-            auto child = children[children_by_side[side][i]];
-            if (child.geom().faces[side + 6].is_undefined()) {
+            auto& child = children[children_by_side[side][i]];
+            if (child.faces[side + 6].is_undefined()) {
                 // Простая грань
-                cfaces[i] = face_center<dim>(child.geom().faces[side], child.geom().vertices);
+                cfaces[i] = child.faces[side].center;
             } else {
                 // Сложная грань, считаем центр по основным вершинам
                 cfaces[i] = Vector3d(0.0, 0.0, 0.0);
                 for (int j = 0; j < FpF(dim); ++j) {
-                    //cfaces[i] += face_center<dim>(child.geom().faces[side + 6 * j], child[vertices]);
-                    cfaces[i] += (Vector3d&) child.geom().vertices[child.geom().faces[side + 6 *j].vertices[j]];
+                    cfaces[i] += child.vertices[child.faces[side + 6 *j].vertices[j]];
                 }
                 cfaces[i] /= FpF(dim);
 
@@ -241,8 +243,8 @@ Cell get_parent(Storage &locals, Storage &aliens, int rank,
         /// Находим соответстиве между pfaces и cfaces
         double eps = 1.0e-6 * parent.size;
         for (int i = 0; i < FpF(dim); ++i) {
-            auto child = children[children_by_side[side][i]];
-            auto& child_face = child.geom().faces[side];
+            auto& child = children[children_by_side[side][i]];
+            auto& child_face = child.faces[side];
             for (int j = 0; j < FpF(dim); ++j) {
                 if ((pfaces[i] - cfaces[j]).norm() < eps) {
                     parent.faces[side + 6*j].adjacent.rank = child_face.adjacent.rank;
@@ -274,10 +276,10 @@ Cell get_parent(Storage &locals, Storage &aliens, int rank,
 
             for (int ck = 0; ck < 8; ++ck) {
                 auto child = children[ck];
-                std::cout << child.geom().vertices[child.geom().faces[side].vertices[0]] << ", "
-                          << child.geom().vertices[child.geom().faces[side].vertices[1]] << ", "
-                          << child.geom().vertices[child.geom().faces[side].vertices[2]] << ", "
-                          << child.geom().vertices[child.geom().faces[side].vertices[3]] << "\n";
+                std::cout << child.vertices[child.faces[side].vertices[0]] << ", "
+                          << child.vertices[child.faces[side].vertices[1]] << ", "
+                          << child.vertices[child.faces[side].vertices[2]] << ", "
+                          << child.vertices[child.faces[side].vertices[3]] << "\n";
             }
 
             for (int i = 0; i < FpF(dim); ++i) {
@@ -305,7 +307,7 @@ Cell get_parent(Storage &locals, Storage &aliens, int rank,
 /// @param ic Номер главного ребенка в хранилище
 /// @return Массив индексов дочерних ячеек
 template <int dim>
-std::array<int, CpC(dim)> sorted_siblings(Storage& cells,  int ic) {
+std::array<int, CpC(dim)> sorted_siblings(AmrStorage& cells,  int ic) {
 }
 
 /// @brief Основная функция огрубления ячеек, состоит из сбора сиблингов в
@@ -315,25 +317,23 @@ std::array<int, CpC(dim)> sorted_siblings(Storage& cells,  int ic) {
 /// @param ic Индекс родительской ячейки в хранилище
 /// @param op Оператор огрубления данных
 template<int dim>
-void coarse_cell(Storage &locals, Storage &aliens, int rank, int ic, const Distributor& op) {
+void coarse_cell(AmrStorage &locals, AmrStorage &aliens, int rank, int ic, const Distributor& op) {
     locals[ic].set_undefined();
 
     // главный ребенок всем заведует
-    if (locals[ic].z_idx() % CpC(dim) != 0) {
+    if (locals[ic].z_idx % CpC(dim) != 0) {
         return;
     }
 
     auto children = select_children<dim>(locals, ic);
 
-    auto parent = get_parent<dim>(locals, aliens, rank, children);
+    int ip = locals[ic].next;
 
-    int ip = locals[ic].geom().next;
+    AmrCell parent = get_parent<dim>(locals, aliens, rank, children);
 
-    locals[ic].copy_to(locals[ip]);
+    locals[ip] = parent;
 
-    locals[ip].geom() = parent;
-
-    op.merge<dim>(children, locals[ip]);
+    op.merge(children, locals[ip]);
 }
 
 } // namespace amr

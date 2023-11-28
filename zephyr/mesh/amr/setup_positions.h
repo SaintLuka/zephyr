@@ -23,14 +23,14 @@ namespace zephyr { namespace mesh { namespace amr {
 /// Алгоритм может выполняться как для всего хранилища, так и для части сетки
 /// в многопроцессорном режиме. Многопоточная реализация отсутствует.
 template<int dim>
-void setup_positions(Storage &cells, const Statistics &count)
+void setup_positions(AmrStorage &cells, const Statistics &count)
 {
     cells.resize(count.n_cells_large);
 
     int coarse_counter = count.n_cells;
     int refine_counter = count.n_cells + count.n_parents;
     for (int ic = 0; ic < count.n_cells; ++ic) {
-        Cell& cell = cells[ic].geom();
+        AmrCell& cell = cells[ic];
 
         if (cell.flag == 0) {
             cell.next = ic;
@@ -48,7 +48,7 @@ void setup_positions(Storage &cells, const Statistics &count)
             auto sibs = get_siblings<dim>(cells, ic);
             cell.next = coarse_counter;
             for (int jc: sibs) {
-                cells[jc].geom().next = coarse_counter;
+                cells[jc].next = coarse_counter;
             }
             ++coarse_counter;
         }

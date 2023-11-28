@@ -1,163 +1,14 @@
 #include <zephyr/math/solver/transfer.h>
 
+#include <zephyr/geom/polygon.h>
 #include <zephyr/math/cfd/face_extra.h>
-#include <zephyr/geom/face.h>
+#include <zephyr/geom/primitives/bface.h>
 
-namespace zephyr { namespace math {
+namespace zephyr::math {
 
-using mesh::Storage;
+using mesh::AmrStorage;
 using namespace geom;
-Vector3d intersection(const Vector3d& v1, const Vector3d& v2,
-                      const Vector3d& p, const Vector3d& n) {
-    //return 0.5*(v1 + v2);
-    double xi = (v1 - p).dot(n) / ((v1 - v2).dot(n));
-    if (std::isnan(xi)) {
-        xi = 0.0;
-    }
-    xi = std::max(0.0, std::min(xi, 1.0));
-    return (1.0 - xi) * v1 + xi * v2;
-}
-
-template <int N>
-struct Polygon {
-
-    Polygon(const Cell& cell) {
-
-        int idx_a = cell.faces[Side::L].vertices[0];
-        int idx_b = cell.faces[Side::L].vertices[1];
-        int idx_c = cell.faces[Side::R].vertices[0];
-        int idx_d = cell.faces[Side::R].vertices[1];
-
-        //std::cout << idx_a << " " << idx_b << " " << idx_c << " " << idx_d << "\n";
-        //throw std::runtime_error("kek");
-
-        vertices[0] = (Vector3d &) cell.vertices[0];
-        vertices[1] = (Vector3d &) cell.vertices[6];
-        vertices[2] = (Vector3d &) cell.vertices[2];
-        vertices[3] = (Vector3d &) cell.vertices[8];
-
-        init();
-    }
-
-    Polygon(const std::array<Vector3d, N>& vlist)
-            : vertices(vlist) {
-        init();
-    }
-
-    void init() {
-        center = {0.0, 0.0, 0.0};
-        for(auto& v: vertices) {
-            center += v;
-        }
-        center /= N;
-
-        std::sort(vertices.begin(), vertices.end(),
-                  [this](Vector3d& a, Vector3d& b) -> bool {
-                      double phi_a = std::atan2(a.y() - center.y(), a.x() - center.x());
-                      double phi_b = std::atan2(b.y() - center.y(), b.x() - center.x());
-                      return phi_a < phi_b;
-                  });
-
-        area = geom::area(std::vector<Vector3d>({vertices[0], vertices[1], vertices[2], vertices[3]}));
-    }
-
-    // Отсечь от полигона часть плоскостью с внешней нормалью n,
-    // проходящую через точку p.
-    VerticesList cut(Vector3d p, Vector3d n) {
-        std::array<bool, N> inside;
-        for (int i = 0; i < N; ++i) {
-            inside[i] = (vertices[i] - p).dot(n) <= 0.0;
-        }
-
-        int i2o = -1;
-        int o2i = -1;
-        for (int i = 0; i < N; ++i) {
-            int j = (i + 1) % N;
-
-            if (inside[i] && !inside[j]) {
-                i2o = i;
-            }
-            if (!inside[i] && inside[j]) {
-                o2i = i;
-            }
-        }
-
-        // нет пересечений
-        if (i2o < 0 || o2i < 0) {
-            if (inside[0]) {
-                return {
-                        vertices[0],
-                        vertices[1],
-                        vertices[2],
-                        vertices[3]
-                };
-            }
-            else {
-                return {};
-            }
-        }
-
-        VerticesList vlist;
-        vlist.reserve(6);
-
-        for (int i = 0; i < N; ++i) {
-            if (inside[i]) {
-                vlist.push_back(vertices[i]);
-            }
-            if (i == i2o || i == o2i) {
-                int j = (i + 1) % N;
-                vlist.push_back(intersection(vertices[i], vertices[j], p, n));
-            }
-        }
-
-        return vlist;
-    }
-
-    double cut_volume(Vector3d& p, Vector3d& n) {
-        auto vlist = cut(p, n);
-        return vlist.empty() ? 0.0 : geom::area(vlist);
-    }
-
-    Vector3d find_section(Vector3d& n, double alpha) {
-        auto comp = [&n](Vector3d &a, Vector3d &b) -> bool {
-            return a.dot(n) < b.dot(n);
-        };
-        Vector3d v_min = *std::min_element(vertices.begin(), vertices.end(), comp);
-        Vector3d v_max = *std::max_element(vertices.begin(), vertices.end(), comp);
-
-        if (alpha < 1.0e-7) {
-            return v_min;
-        } else if (alpha > 1.0 - 1.0e-7) {
-            return v_max;
-        }
-
-        Vector3d v_avg = 0.5 * (v_min + v_max);
-
-        double f_min = cut_volume(v_min, n) - alpha * area;
-        double f_avg = cut_volume(v_avg, n) - alpha * area;
-        double f_max = cut_volume(v_max, n) - alpha * area;
-
-        while (f_max - f_min > 1.0e-3 * area) {
-            if (f_avg < 0.0) {
-                v_min = v_avg;
-                f_min = f_avg;
-            } else {
-                v_max = v_avg;
-                f_max = f_avg;
-            }
-
-            v_avg = 0.5 * (v_min + v_max);
-            f_avg = cut_volume(v_avg, n) - alpha * area;
-        }
-
-        v_avg = v_min - f_min * (v_max - v_min) / (f_max - f_min);
-        return v_avg;
-    }
-
-    Vector3d center;
-    double area;
-    std::array<Vector3d, N> vertices;
-};
+using namespace mesh;
 
 static const Transfer::State U = Transfer::datatype();
 
@@ -166,8 +17,10 @@ Transfer::State Transfer::datatype() {
 }
 
 Transfer::Transfer() {
+    m_dt  = 1.0e+300;
     m_CFL = 0.5;
-    m_dt = 1.0e+300;
+    m_ver = 1;
+    m_dir = Direction::ANY;
 }
 
 double Transfer::CFL() const {
@@ -178,15 +31,28 @@ void Transfer::set_CFL(double C) {
     m_CFL = std::max(0.0, std::min(C, 1.0));
 }
 
+void Transfer::set_version(int ver) {
+    m_ver = ver;
+}
+
+void Transfer::dir_splitting(bool flag) {
+    if (flag) {
+        m_dir = Direction::X;
+    }
+    else {
+        m_dir = Direction::ANY;
+    }
+}
+
 double Transfer::dt() const {
     return m_dt;
 }
 
-Vector3d Transfer::velocity(const Vector3d& c) const {
+Vector3d Transfer::velocity(const Vector3d &c) const {
     return Vector3d::UnitX();
 }
 
-double Transfer::compute_dt(ICell &cell) {
+double Transfer::compute_dt(EuCell &cell) {
     double max_area = 0.0;
     for (auto &face: cell.faces()) {
         max_area = std::max(max_area, face.area());
@@ -195,7 +61,7 @@ double Transfer::compute_dt(ICell &cell) {
     return m_CFL * dx / velocity(cell.center()).norm();
 }
 
-double Transfer::compute_dt(Mesh& mesh) {
+double Transfer::compute_dt(EuMesh &mesh) {
     double dt = std::numeric_limits<double>::max();
     for (auto &cell: mesh) {
         dt = std::min(dt, compute_dt(cell));
@@ -203,76 +69,52 @@ double Transfer::compute_dt(Mesh& mesh) {
     return dt;
 }
 
-// Поток из пустой ячейки в ячейку с объемной долей a и шириной h
-// vs -- скорость потока, dt -- шаг интегрирования
-double flux_1D_0(double a, double h, double vs, double dt) {
-    return std::min(0.0, dt * vs + (1.0 - a) * h);
+// Функция знака
+inline double sign(double x) {
+    return x > 0.0 ? 1.0 : (x < 0.0 ? -1.0 : 0.0);
 }
 
-// Поток из ячейки с объемной долей a и шириной h в полную ячейку
-// vs -- скорость потока, dt -- шаг интегрирования
-double flux_1D_1(double a, double h, double vs, double dt) {
-    return std::min(a * h, dt * vs);
+// Помещает x внутрь отрезка [x_min, x_max]
+inline double between(double x_min, double x, double x_max) {
+    return std::max(x_min, std::min(x, x_max));
 }
 
-// Поток между ячейками с объемными долями a1, a2 вдоль нормали от a1 к a2
-// Предполагается, что a1 < a2.
-// h1, h2 -- длина ячеек вдоль нормали к грани
-// as -- объемная доля на грани
-// vs -- скорость вдоль нормали грани
-// dt -- шаг интегрирования по времени
-double flux_2D_less(double a1, double a2, double h1, double h2, double as, double vs, double dt) {
-#if 0
-    double F_in = 0.0;
-    double F_ex = 0.0;
-    if (as < 1.0) {
-        F_ex = flux_1D_0((a2 - as) / (1.0 - as), h2, vs, dt);
-    }
-    if (as > 0.0) {
-        F_in = flux_1D_1(a1 / as, h1, vs, dt);
-    }
-    return (1.0 - as) * F_ex + as * F_in;
-#else
-    double F_in = std::min(a1 * h1, as * dt * vs);
-    double F_ex = std::min(0.0, (1.0 - as) * dt * vs + (1.0 - a2) * h2);
-    return F_in + F_ex;
-#endif
+inline std::tuple<double, double> minmax(double a1, double a2) {
+    return std::make_tuple(std::min(a1, a2), std::max(a1, a2));
 }
 
-double flux_2D(double a1, double a2, double h1, double h2, double as, double vs, double dt) {
-    if (a1 <= a2) {
-        return +flux_2D_less(a1, a2, h1, h2, as, +vs, dt);
-    }
-    else {
-        return -flux_2D_less(a2, a1, h2, h1, as, -vs, dt);
-    }
+// a1, a2 -- объемные доли
+// S -- площадь грани
+// V1, V2 -- объемы ячеек
+// as -- разбиение грани
+// vn -- скорость
+// dt -- шаг интегрирования
+double flux_2D(double a1, double a2, double S, double V1, double V2, double as, double vn, double dt) {
+    double a = vn > 0.0 ? a1 : a2;
+    double V = vn > 0.0 ? V1 : V2;
+
+    double gamma = dt * std::abs(vn) * S;
+
+    double F_min = std::max(0.0, gamma - (1.0 - a) * V);
+    double F_max = a * V;
+    return sign(vn) * between(F_min, gamma * as, F_max);
 }
 
 double face_fraction(double a1, double a2) {
-    double a_min = std::min(a1, a2);
-    double a_max = std::max(a1, a2);
+    auto [a_min, a_max] = minmax(a1, a2);
+
+    // Формула Серёжкина
     double a_sig = a_min / (1.0 - (a_max - a_min));
 
+    // Случай a_min = 0, a_max = 1
     if (std::isnan(a_sig)) {
-        // Случай a_min = 0, a_max = 1
-        a_sig = 0.0; // ??
+        a_sig = 0.5;
     }
 
-    a_sig = std::max(a_min, std::min(a_sig, a_max));
-
-
-    if (a_min == 0.0) {
-        return 0.0;
-    }
-    if (a_max == 1.0) {
-        return 1.0;
-    }
-    return a_min;
-
-    //return a_sig;
+    return between(a_min, a_sig, a_max);
 }
 
-void Transfer::fluxes_CRP(ICell &cell, Direction dir) {
+void Transfer::fluxes_CRP(EuCell &cell, Direction dir) {
     auto &zc = cell(U);
     double a1 = zc.u1;
 
@@ -289,34 +131,80 @@ void Transfer::fluxes_CRP(ICell &cell, Direction dir) {
 
         double as = face_fraction(a1, a2);
 
-        double h1 = cell.volume() / face.area();
-        double h2 = neib.volume() / face.area();
+        double S = face.area();
+        double V1 = cell.volume();
+        double V2 = neib.volume();
 
-        double F = flux_2D(a1, a2, h1, h2, as, vs, m_dt);
-
-        fluxes += F * face.area();
+        fluxes += flux_2D(a1, a2, S, V1, V2, as, vs, m_dt);
     }
 
     zc.u2 = zc.u1 - fluxes / cell.volume();
 }
 
-// Предполагаем vs > 0.0
-double flux_VOF(double a, Vector3d& p, Vector3d& n, const Cell& cell, const Face& face, double vs, double dt) {
-    // Типа upwind
-    Vector3d v1 = (Vector3d &) cell.vertices[face.vertices[0]];
-    Vector3d v2 = (Vector3d &) cell.vertices[face.vertices[1]];
-    Vector3d v3 = v1 - dt * vs * face.normal;
-    Vector3d v4 = v2 - dt * vs * face.normal;
+// Предполагаем verts > 0.0
+// V1, V2 - скорость в узлах грани
+// Предполагаем (vel1 + vel2).dot(n) > 0.0
+double flux_VOF(
+        double a, Vector3d &p, Vector3d &n,
+        EuCell &cell, EuFace &face,
+        const Vector3d &V1, const Vector3d &V2, double dt, double sgn) {
+
+    // Нормаль к грани
+    auto &fn = sgn * face.normal();
+
+    // Нормальная скорость к грани
+    Vector3d Vc = 0.5 * (V1 + V2);
+    Vector3d Vn = Vc.dot(fn) * fn;
+    Vector3d Vt = Vc - Vn;
+
+    const auto &v1 = face.vs(0);
+    const auto &v2 = face.vs(1);
+
+    Line seg1 = {v1, v1 - V1};
+    Line seg2 = {v2, v2 - V2};
+
+    double r = 2.0 / (1.0 + std::sqrt(1.0 - 2.0 * Vc.norm() * dt / face.area()));
+    double xi = dt * Vn.norm() * r;
+
+    auto poly1 = cell.polygon();
+    auto poly2 = poly1.clip(face.center() - xi * fn, -fn);
+    auto poly3 = poly2.clip(seg1.center(), seg1.normal(face.center()));
+    auto poly4 = poly3.clip(seg2.center(), seg2.normal(face.center()));
 
     if (a < 1.0e-12) {
         return 0.0;
     } else {
-        Polygon<4> poly({v1, v2, v3, v4});
-        return poly.cut_volume(p, n);
+        return poly4.clip_area(p, n);
     }
+
+/*
+    double xi1 = V2.dot(fn) / V1.dot(fn);
+    double xi2 = V1.dot(fn) / V2.dot(fn);
+
+    if (V1.dot(fn) == 0.0) {
+        if (V2.dot(fn) == 0.0) {
+            return 0.0;
+        }
+
+        xi1 = -1.0;
+    }
+    if (V2.dot(fn) == 0.0) {
+        xi2 = -1.0;
+    }
+
+    Vector3d v3 = v1 - 0.5 * dt * (1.0 + xi1) * V1;
+    Vector3d v4 = v2 - 0.5 * dt * (1.0 + xi2) * V2;
+
+    if (a < 1.0e-12) {
+        return 0.0;
+    } else {
+        PolyQuad poly(v1, v2, v4, v3);
+        return poly.clip_area(p, n);
+    }
+    */
 }
 
-void Transfer::fluxes_VOF(ICell &cell, Direction dir) {
+void Transfer::fluxes_VOF(EuCell &cell, Direction dir) {
     auto &zc = cell(U);
 
     double fluxes = 0.0;
@@ -327,16 +215,17 @@ void Transfer::fluxes_VOF(ICell &cell, Direction dir) {
 
         auto neib = face.neib();
 
-        double vs = velocity(face.center()).dot(face.normal());
+        const auto& V1 = velocity(face.vs(0));
+        const auto& V2 = velocity(face.vs(1));
 
         // Типа upwind
         double F;
-        if (vs > 0.0) {
-            F = +flux_VOF(zc.u1, zc.p, zc.n, cell.geom(), face.geom(), vs, m_dt);
+        if ((V1 + V2).dot(face.normal()) > 0.0) {
+            F = +flux_VOF(zc.u1, zc.p, zc.n, cell, face, V1, V2, m_dt, +1.0);
         }
         else {
             auto zn = neib(U);
-            F = -flux_VOF(zn.u1, zn.p, zn.n, cell.geom(), face.geom(), vs, m_dt);
+            F = -flux_VOF(zn.u1, zn.p, zn.n, neib, face, V1, V2, m_dt, -1.0);
         }
 
         fluxes += F;
@@ -345,48 +234,22 @@ void Transfer::fluxes_VOF(ICell &cell, Direction dir) {
     zc.u2 = zc.u1 - fluxes / cell.volume();
 }
 
-// Находит оптимальное деление грани a_sig, при котором поток совпадает с потоком по FOV
-double best_face_fraction(double a1, double a2, double h1, double h2, double vs, double dt, double F_VOF) {
-    double a_min = std::min(a1, a2);
-    double a_max = std::max(a1, a2);
-
-    // Ищем a_sig: func(a_sig) = 0
-    auto func = [&](double a_sig) -> double {
-        return flux_2D(a1, a2, h1, h2, a_sig, vs, dt) - F_VOF;
-    };
-
-    double f_min = func(a_min);
-    double f_max = func(a_max);
-
-    if (f_min * f_max >= 0.0) {
-        // Метод дихотомии не применим
-        // Возвращаем одно из крайних значений
-        if (std::abs(f_min) < std::abs(f_max)) {
-            return a_min;
-        } else {
-            return a_max;
-        }
+// Находит оптимальное деление грани a_sig, при котором поток максимально близок к F_VOF
+double best_face_fraction(double a1, double a2, double S, double vs, double dt, double F_VOF) {
+    // Да, удивительно, но вот так.
+    if (vs == 0.0) {
+        return 0.5 * (a1 + a2);
     }
 
-    while (a_max - a_min > 1.0e-4) {
-        double a_avg = 0.5 * (a_min + a_max);
-        double f_avg = func(a_avg);
+    auto[a_min, a_max] = minmax(a1, a2);
 
-        if (f_avg * f_min < 0.0) {
-            a_max = a_avg;
-            f_max = f_avg;
-        } else {
-            a_min = a_avg;
-            f_min = f_avg;
-        }
-    }
+    // F_VOF и vs имеют один знак
+    assert(F_VOF * vs >= 0.0);
 
-    double a_sig = 0.5 * (a_min + a_max);
-    //double a_sig = a_min - (a_max - a_min) * f_min / (f_max - f_min);
-    return a_sig;
+    return between(a_min, F_VOF / (dt * vs * S), a_max);
 }
 
-void Transfer::fluxes_MIX(ICell &cell, Direction dir) {
+void Transfer::fluxes_MIX(EuCell &cell, Direction dir) {
     auto &zc = cell(U);
 
     double fluxes = 0.0;
@@ -398,37 +261,60 @@ void Transfer::fluxes_MIX(ICell &cell, Direction dir) {
         auto neib = face.neib();
         auto zn = neib(U);
 
-        double vs = velocity(face.center()).dot(face.normal());
+        const auto& fn = face.normal();
+        Vector3d V1 = velocity(face.vs(0));//.dot(fn) * fn;
+        Vector3d V2 = velocity(face.vs(1));//.dot(fn) * fn;
+
+        double vs = 0.5*(V1 + V2).dot(fn);
 
         double F_VOF;
         if (vs > 0.0) {
-            F_VOF = +flux_VOF(zc.u1, zc.p, zc.n, cell.geom(), face.geom(), vs, m_dt);
+            F_VOF = +flux_VOF(zc.u1, zc.p, zc.n, cell, face, V1, V2, m_dt, +1.0);
         }
         else {
-            F_VOF = -flux_VOF(zn.u1, zn.p, zn.n, cell.geom(), face.geom(), vs, m_dt);
+            F_VOF = -flux_VOF(zn.u1, zn.p, zn.n, neib, face, V1, V2, m_dt, -1.0);
         }
-        F_VOF /= face.area();
-
-        double h1 = cell.volume() / face.area();
-        double h2 = neib.volume() / face.area();
 
         double a1 = zc.u1;
         double a2 = zn.u1;
 
+        double S = face.area();
+        double vol1 = cell.volume();
+        double vol2 = neib.volume();
+
         // Хочу найти as, при котором flux_2D дает F_VOF
         //double a_sig = face_fraction(a1, a2);
-        double a_sig = best_face_fraction(a1, a2, h1, h2, vs, m_dt, F_VOF);
+        double a_sig = best_face_fraction(a1, a2, S, vs, m_dt, F_VOF);
 
-        double F = flux_2D(a1, a2, h1, h2, a_sig, vs, m_dt);
+        double F_CRP = flux_2D(a1, a2, S, vol1, vol2, a_sig, vs, m_dt);
 
-        fluxes += F * face.area();
+        if (false && F != 0.0 && a1 != 1.0 && std::abs(1.0 - F_VOF / F) > 1.0e-3) {
+            double a_min = std::min(a1, a2);
+            double a_max = std::max(a1, a2);
+
+            std::cout << "a_min:  " << a_min << "\n";
+            std::cout << "a_max:  " << a_max << "\n";
+            std::cout << "a_sig:  " << a_sig << "\n";
+            std::cout << "F_CRP:     " << F_CRP << "\n";
+            std::cout << "F_VOF:     " << F_VOF << "\n";
+            //std::cout << "F(a_min):  " << flux_2D(a1, a2, h1, h2, a_min, vs, m_dt) << "\n";
+            //std::cout << "F(a_max):  " << flux_2D(a1, a2, h1, h2, a_max, vs, m_dt) << "\n";
+            //std::cout << "F(a_sig):  " << F_sig << "\n";
+            //std::cout << "F(a_best): " << F_best << "\n";
+            //std::cout << "F_min:     " << F_min << "\n";
+            //std::cout << "F_max:     " << F_max << "\n";
+
+            //throw std::runtime_error("ololo");
+        }
+
+        fluxes += F_CRP;
     }
 
     zc.u2 = zc.u1 - fluxes / cell.volume();
 }
 
-void Transfer::update(Mesh &mesh, int ver) {
-    switch (ver) {
+void Transfer::update(EuMesh &mesh) {
+    switch (m_ver) {
         case 1:
             update_ver1(mesh);
             break;
@@ -443,46 +329,25 @@ void Transfer::update(Mesh &mesh, int ver) {
     }
 }
 
-void Transfer::update_ver1(Mesh& mesh) {
-    m_dt = compute_dt(mesh);
+void Transfer::update_dir() {
+    // Флаг Direction::ANY не трогаем,
+    // X и Y меняем местами
 
-    // Считаем потоки
-    static int counter = 0;
-    for (auto cell: mesh) {
-        //if (counter % 2 == 0) {
-            fluxes_CRP(cell, Direction::ANY);
-        //}
-        //else {
-        //    fluxes_CRP(cell, Direction::Y);
-        //}
+    if (m_dir == Direction::X) {
+        m_dir = Direction::Y;
     }
-    ++counter;
-
-    // Обновляем слои
-    for (auto cell: mesh) {
-        cell(U).u1 = std::max(0.0, std::min(cell(U).u2, 1.0));
-        cell(U).u2 = 0.0;
+    else if (m_dir == Direction::Y) {
+        m_dir = Direction::X;
     }
 }
 
-void Transfer::update_ver2(Mesh& mesh) {
-    // Определяем dt
+void Transfer::update_ver1(EuMesh& mesh) {
     m_dt = compute_dt(mesh);
 
-    compute_normals(mesh, 3);
-    find_sections(mesh);
-
     // Считаем потоки
-    static int counter = 0;
     for (auto cell: mesh) {
-        if (counter % 2 == 0) {
-            fluxes_VOF(cell, Direction::X);
-        }
-        else {
-            fluxes_VOF(cell, Direction::Y);
-        }
+        fluxes_CRP(cell, m_dir);
     }
-    ++counter;
 
     // Обновляем слои
     for (auto cell: mesh) {
@@ -490,11 +355,10 @@ void Transfer::update_ver2(Mesh& mesh) {
         cell(U).u2 = 0.0;
     }
 
-    compute_normals(mesh, 3);
-    find_sections(mesh);
+    update_dir();
 }
 
-void Transfer::update_ver3(Mesh& mesh) {
+void Transfer::update_ver2(EuMesh& mesh) {
     // Определяем dt
     m_dt = compute_dt(mesh);
 
@@ -502,28 +366,47 @@ void Transfer::update_ver3(Mesh& mesh) {
     find_sections(mesh);
 
     // Считаем потоки
-    static int counter = 0;
     for (auto cell: mesh) {
-        if (counter % 2 == 0) {
-            fluxes_MIX(cell, Direction::X);
-        }
-        else {
-            fluxes_MIX(cell, Direction::Y);
-        }
+        fluxes_VOF(cell, m_dir);
     }
-    ++counter;
 
     // Обновляем слои
-    for (auto cell: mesh) {
-        cell(U).u1 = std::max(-0.0, std::min(cell(U).u2, 1.0));
+    for (auto& cell: mesh) {
+        cell(U).u1 = std::max(0.0, std::min(cell(U).u2, 1.0));
         cell(U).u2 = 0.0;
     }
 
     compute_normals(mesh, 3);
     find_sections(mesh);
+
+    update_dir();
 }
 
-void Transfer::compute_normal(ICell& cell) {
+void Transfer::update_ver3(EuMesh& mesh) {
+    // Определяем dt
+    m_dt = compute_dt(mesh);
+
+    compute_normals(mesh, 3);
+    find_sections(mesh);
+
+    // Считаем потоки
+    for (auto cell: mesh) {
+        fluxes_MIX(cell, m_dir);
+    }
+
+    // Обновляем слои
+    for (auto cell: mesh) {
+        cell(U).u1 = std::max(0.0, std::min(cell(U).u2, 1.0));
+        cell(U).u2 = 0.0;
+    }
+
+    compute_normals(mesh, 3);
+    find_sections(mesh);
+
+    update_dir();
+}
+
+void Transfer::compute_normal(EuCell& cell) {
     double uc = cell(U).u1;
 
     double n_x = 0.0;
@@ -549,7 +432,7 @@ void Transfer::compute_normal(ICell& cell) {
     cell(U).n.normalize();
 }
 
-void Transfer::smooth_normal(ICell& cell) {
+void Transfer::smooth_normal(EuCell& cell) {
     double n_x = 4 * cell(U).n.x();
     double n_y = 4 * cell(U).n.y();
 
@@ -569,12 +452,12 @@ void Transfer::smooth_normal(ICell& cell) {
     cell(U).n.normalize();
 }
 
-void Transfer::find_section(ICell &cell) {
-    Polygon<4> poly(cell.geom());
+void Transfer::find_section(EuCell &cell) {
+    auto poly = cell.polygon();
     cell(U).p = poly.find_section(cell(U).n, cell(U).u1);
 }
 
-void Transfer::compute_normals(Mesh& mesh, int smoothing) {
+void Transfer::compute_normals(EuMesh& mesh, int smoothing) {
     for (auto cell: mesh) {
         compute_normal(cell);
     }
@@ -586,13 +469,13 @@ void Transfer::compute_normals(Mesh& mesh, int smoothing) {
     }
 }
 
-void Transfer::find_sections(Mesh& mesh) {
+void Transfer::find_sections(EuMesh& mesh) {
     for (auto cell: mesh) {
         find_section(cell);
     }
 }
 
-void Transfer::set_flags(Mesh& mesh) {
+void Transfer::set_flags(EuMesh& mesh) {
     for (auto cell: mesh) {
         double min_val = cell(U).u1;
         double max_val = cell(U).u1;
@@ -615,18 +498,20 @@ void Transfer::set_flags(Mesh& mesh) {
 }
 
 Distributor Transfer::distributor() const {
+    using mesh::Children;
+
     Distributor distr;
 
-    distr.split2D = [](Storage::Item parent, const std::array<Storage::Item, 4> & children) {
-        for (auto child: children) {
-            Vector3d dr = parent.center() - child.center();
+    distr.split = [](AmrStorage::Item &parent, Children &children) {
+        for (auto &child: children) {
+            Vector3d dr = parent.center - child.center;
             child(U).u1 = parent(U).u1;
         }
     };
 
-    distr.merge2D = [](const std::array<Storage::Item, 4> & children, Storage::Item parent) {
+    distr.merge = [](Children &children, AmrStorage::Item& parent) {
         double sum = 0.0;
-        for (auto child: children) {
+        for (auto &child: children) {
             sum += child(U).u1 * child.volume();
         }
         parent(U).u1 = sum / parent.volume();
@@ -635,7 +520,7 @@ Distributor Transfer::distributor() const {
     return distr;
 }
 
-Storage Transfer::body(Mesh& mesh) {
+AmrStorage Transfer::body(EuMesh& mesh) {
     double eps = 1.0e-5;
     int count = 0;
     for (auto cell: mesh) {
@@ -645,7 +530,7 @@ Storage Transfer::body(Mesh& mesh) {
         ++count;
     }
 
-    Storage cells(U, count);
+    AmrStorage cells(U, count);
 
     count = 0;
     for (auto cell: mesh) {
@@ -653,11 +538,98 @@ Storage Transfer::body(Mesh& mesh) {
             continue;
         }
 
-        Polygon<4> poly(cell.geom());
+        auto poly = cell.polygon();
+        auto part = poly.clip(cell(U).p, cell(U).n);
+        cells[count] = AmrCell(part);
+        ++count;
+    }
 
-        auto vlist = poly.cut(cell(U).p, cell(U).n);
-        if (!vlist.empty()) {
-            cells[count].geom() = Cell(vlist);
+    return cells;
+}
+
+AmrStorage Transfer::scheme(EuMesh& mesh) {
+    int count = 0;
+
+    for (auto cell: mesh) {
+        if (cell(U).u1 < 1.0e-12) {
+            continue;
+        }
+
+        for (auto face: cell.faces()) {
+            if (face.is_boundary()) {
+                continue;
+            }
+
+            const auto& V1 = velocity(face.vs(0));
+            const auto& V2 = velocity(face.vs(1));
+
+            // Нормаль к грани
+            auto &fn = face.normal();
+
+            if ((V1 + V2).dot(fn) < 0.0) {
+                continue;
+            }
+
+            ++count;
+        }
+    }
+
+    AmrStorage cells(U, count);
+
+    count = 0;
+    for (auto cell: mesh) {
+        if (cell(U).u1 < 1.0e-12) {
+            continue;
+        }
+
+        for (auto face: cell.faces()) {
+            if (face.is_boundary()) {
+                continue;
+            }
+
+            const auto& V1 = velocity(face.vs(0));
+            const auto& V2 = velocity(face.vs(1));
+
+            // Нормаль к грани
+            auto &fn = face.normal();
+
+            if ((V1 + V2).dot(fn) < 0.0) {
+                continue;
+            }
+
+            const auto& v1 = face.vs(0);
+            const auto& v2 = face.vs(1);
+
+            Line seg1 = {v1, v1 - V1};
+            Line seg2 = {v2, v2 - V2};
+
+            auto poly1 = cell.polygon();
+            auto poly2 = poly1.clip(face.center() - 0.5 * m_dt * (V1 + V2).dot(fn) * fn, - fn);
+            auto poly3 = poly2.clip(seg1.center(), seg1.normal(face.center()));
+            auto poly4 = poly3.clip(seg2.center(), seg2.normal(face.center()));
+
+            // Типа upwind
+            double xi1 = V2.dot(fn) / V1.dot(fn);
+            double xi2 = V1.dot(fn) / V2.dot(fn);
+
+            if (V1.dot(fn) == 0.0) {
+                if (V2.dot(fn) == 0.0) {
+                    return 0.0;
+                }
+
+                xi1 = -1.0;
+            }
+            if (V2.dot(fn) == 0.0) {
+                xi2 = -1.0;
+            }
+
+            Vector3d v3 = v1 - 0.5 * m_dt * (1.0 + xi1) * V1;
+            Vector3d v4 = v2 - 0.5 * m_dt * (1.0 + xi2) * V2;
+
+            //PolyQuad poly(v1, v2, v4, v3);
+            //std::cout << poly5.size() << "\n";
+            cells[count] = AmrCell(poly4);
+
             ++count;
         }
     }
@@ -665,5 +637,4 @@ Storage Transfer::body(Mesh& mesh) {
     return cells;
 }
 
-}
-}
+} // namespace zephyr::math

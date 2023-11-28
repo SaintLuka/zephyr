@@ -2,8 +2,9 @@
 /// В данном тесте флаги адаптации выбираются случайным образом
 /// с некоторыми вероятностями.
 
-#include <zephyr/mesh/mesh.h>
-#include <zephyr/mesh/generator/rectangle.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/geom/generator/rectangle.h>
+#include <zephyr/geom/generator/cuboid.h>
 #include <zephyr/io/pvd_file.h>
 #include <zephyr/io/variables.h>
 
@@ -11,6 +12,7 @@ using namespace zephyr;
 using namespace mesh;
 
 using generator::Rectangle;
+using generator::Cuboid;
 using zephyr::io::PvdFile;
 
 
@@ -20,23 +22,23 @@ struct _U_ {
 
 _U_ U;
 
-double get_flag(Storage::Item cell) {
-    return cell.flag();
+double get_flag(AmrStorage::Item& cell) {
+    return cell.flag;
 }
 
-double get_next(Storage::Item cell) {
-    return cell.next();
+double get_next(AmrStorage::Item& cell) {
+    return cell.next;
 }
 
-double get_some(Storage::Item cell) {
-    return cell.index();
+double get_some(AmrStorage::Item& cell) {
+    return cell.index;
 }
 
 inline double sqr(double x) {
     return x * x;
 }
 
-int solution_step(Mesh& mesh) {
+int solution_step(EuMesh& mesh) {
     const double p_coarse = 0.80;
     const double p_retain = 0.18;
     const double p_refine = 0.02;
@@ -69,9 +71,12 @@ int main() {
     Rectangle rect(-1.0, 1.0, -1.0, 1.0);
     rect.set_nx(20);
 
-    Mesh mesh(U, &rect);
+    Cuboid cube(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
+    cube.set_nx(10);
 
-    mesh.set_max_level(5);
+    EuMesh mesh(U, &cube);
+
+    mesh.set_max_level(3);
 
     int res = mesh.check_base();
     if (res < 0) {
