@@ -2,9 +2,6 @@
 
 #include <zephyr/utils/mpi.h>
 #include <zephyr/utils/stopwatch.h>
-#include <zephyr/geom/primitives/amr_cell.h>
-
-#include <zephyr/mesh/euler/eu_cell.h>
 
 #include <zephyr/mesh/euler/eu_mesh.h>
 
@@ -12,7 +9,6 @@
 #include <zephyr/mesh/amr/balancing.h>
 #include <zephyr/mesh/amr/balancing_fast.h>
 
-#include <zephyr/io/vtu_file.h>
 
 namespace zephyr { namespace mesh {
 

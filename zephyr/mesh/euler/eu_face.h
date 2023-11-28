@@ -1,30 +1,20 @@
 #pragma once
 
-#include <zephyr/geom/primitives/basic_face.h>
-
+#include <zephyr/geom/primitives/bface.h>
+#include <zephyr/mesh/euler/amr_storage.h>
 
 namespace zephyr::mesh {
 
 class EuCell;
-using zephyr::geom::AmrFace;
+using zephyr::geom::BFace;
 using zephyr::geom::Boundary;
 using zephyr::geom::Vector3d;
 using zephyr::geom::Direction;
 
-/// @brief Обертка для типа geom::Face, реализует интерфейс грани,
+/// @brief Обертка для типа geom::BFace, реализует интерфейс грани,
 /// необходимый для работы. Также содержит несколько новых функций.
 class EuFace {
 public:
-    /// @brief Создать грань по ячейке
-    /// @param cell Ячейка сетки
-    /// @param fid Индекс грани в ячейке
-    /// @param dir Выбирать грани с определенным направлением
-    EuFace(const EuCell &cell, int fid,
-            Direction dir = Direction::ANY);
-
-    //AmrFace& face();
-
-    const AmrFace &geom() const;
 
     /// @brief Внешняя нормаль
     const Vector3d &normal() const;
@@ -33,9 +23,12 @@ public:
     /// сама ячейка
     EuCell neib() const;
 
-    /// @brief Ячейка по внешней нормали, на границе сетки возвращается
-    /// сама ячейка
-    EuCell neighbor() const;
+    /// @brief Ссылка на данные соседней ячейки через грань
+    /// @details При отсутствии соседа возвращает данные текущей ячейки.
+    template <class T>
+    const T& neib(const T&) const {
+        return *reinterpret_cast<const T *>(neib_data());
+    }
 
     /// @brief Флаг граничных условий
     Boundary flag() const;
@@ -61,30 +54,49 @@ public:
     /// @brief Координата z центра грани
     inline double z() const { return center().z(); }
 
+    /// @brief Количество вершин грани
+    inline int size() const { return m_face->size(); }
 
-    inline const geom::Adjacent& adjacent() const {
-        return geom().adjacent;
+    /// @brief Доступ к вершине грани
+    const Vector3d& vs(int idx) const;
+
+
+    inline const geom::Adjacent &adjacent() const {
+        return m_face->adjacent;
     }
 
     EuFace &operator++() {
         do {
-            ++face_idx;
-        } while (face_idx < geom::AmrFaces::max_count && geom().to_skip(dir));
+            m_face += 1;
+        } while (m_face < m_end && m_face->to_skip(m_dir));
         return *this;
     }
 
     bool operator!=(const EuFace &iface) {
-        return face_idx != iface.face_idx;
+        return m_face != iface.m_face;
     }
 
     EuFace &operator*() {
         return *this;
     }
 
-public:
+protected:
+    friend class EuFaces;
+
+    /// @brief Создать грань по ячейке
+    /// @param cell Ячейка сетки
+    /// @param self Указатель на геометрию текущей грани
+    /// @param end Указатель на область за границей массива
+    /// @param dir Выбирать грани с определенным направлением
+    EuFace(const EuCell &cell, BFace* self, BFace* end,
+           Direction dir = Direction::ANY);
+
+    const Byte* neib_data() const;
+
     const EuCell &m_cell;  ///< Родительская ячейка
-    int face_idx;         ///< Индекс грани в ячейке
-    Direction dir;        ///< Направление
+    BFace *m_face;         ///< Указатель на геометрию грани
+    BFace *m_end;          ///< Указатель на грань за границей массива
+    Direction m_dir;       ///< Направление
 };
 
 
@@ -100,8 +112,8 @@ public:
     EuFace end() const;
 
 private:
-    const EuCell &m_cell; ///< Родительская ячейка
-    Direction dir;        ///< Направления граней
+    const EuCell &m_cell;  ///< Родительская ячейка
+    Direction m_dir;       ///< Направления граней
 };
 
 } // namespace zephyr::mesh

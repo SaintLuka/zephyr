@@ -1,8 +1,8 @@
 #pragma once
 
-#include <zephyr/geom/primitives/basic_face.h>
+#include <zephyr/geom/primitives/bface.h>
 
-#include <zephyr/mesh/storage.h>
+#include <zephyr/mesh/euler/amr_storage.h>
 #include <zephyr/mesh/euler/eu_face.h>
 
 
@@ -12,10 +12,12 @@ using zephyr::geom::Adjacent;
 using zephyr::geom::Vector3d;
 
 /// @brief Ячейка (итератор для доступа к элементам класса EuMesh)
-/// @details Копирует функции AmrStorage::Iterator, а также добавляет
+/// @details Копирует функции AmrStorage::Item, а также добавляет
 /// специфические функции для ячейки: volume, center, faces.
 class EuCell {
 public:
+    // Конструкторы
+
     /// @brief Конструктор копирования
     EuCell(const EuCell &cell) = default;
 
@@ -36,94 +38,92 @@ public:
     /// @param adj Индекс смежности ячейки.
     EuCell(AmrStorage &locals, AmrStorage &aliens, const Adjacent &adj);
 
-    /// @brief Для данной ячейки вернуть ячейку из local AmrStorage
-    /// @param idx Индекс ячейки в локальном хранилище
-    EuCell locals(int idx);
+
+    // Функции итератора
 
     /// @brief Разыменование итератора (для цикла for)
-    EuCell &operator*() {
+    inline EuCell &operator*() {
         return *this;
     }
 
     /// @brief Следующая ячейка
-    EuCell &operator++() {
+    inline EuCell &operator++() {
         ++m_it;
         return *this;
     }
 
-    /// @brief Следующая ячейка
-    EuCell &operator+=(int step) {
+    /// @brief Ячейка через step
+    inline EuCell &operator+=(int step) {
         m_it += step;
         return *this;
     }
 
-    /// @brief Следующая ячейка
-    EuCell operator+(int step) {
+    /// @brief Ячейка через step
+    inline EuCell operator+(int step) {
         EuCell res(*this);
         res += step;
         return res;
     }
 
+    /// @brief Расстояние между двумя ячейками
     int operator-(const EuCell& cell) const {
         return m_it - cell.m_it;
     }
 
+    /// @brief Оператор сравнения
     bool operator<(const EuCell& cell) {
         return m_it < cell.m_it;
     }
 
+    /// @brief Оператор сравнения
     bool operator!=(const EuCell& cell) {
         return m_it != cell.m_it;
     }
 
-    template<class U>
-    const U& operator()(const U &) const {
-        return *reinterpret_cast<const U *>(m_it->data());
+
+    // Получение данных, обход граней и соседей
+
+    /// @brief Указатель на данные ячейки
+    inline Byte* data() {
+        return m_it->data();
     }
 
+    /// @brief Указатель на данные ячейки
+    inline const Byte* data() const {
+        return m_it->data();
+    }
+
+    /// @brief Ссылка на данные ячейки
     template<class U>
     U& operator()(const U &) {
         return *reinterpret_cast<U *>(m_it->data());
     }
 
-    geom::AmrCell& geom() {
-        return m_it->geom();
+    /// @brief Ссылка на данные ячейки
+    template<class U>
+    const U& operator()(const U &) const {
+        return *reinterpret_cast<const U *>(m_it->data());
     }
 
-    const geom::AmrCell& geom() const {
-        return m_it->geom();
-    }
-
-    /// @brief Массив граней
+    /// @brief Итератор по граням
+    /// @param dir Выбрать грани по некоторым направлениям
     EuFaces faces(Direction dir = Direction::ANY) const;
 
     /// @brief Получить смежную ячейку через грань
-    EuCell neib(const AmrFace &face) const;
+    EuCell neib(const BFace &face) const;
 
     /// @brief Получить смежную ячейку через грань
-    EuCell neighbor(const AmrFace &face) const;
-
-    /// @brief Получить указатель на смежную ячейку через грань
     EuCell neib(const EuFace &face) const;
 
     /// @brief Получить смежную ячейку через грань
-    EuCell neighbor(const EuFace &face) const;
-
-    /// @brief Получить указатель на смежную ячейку через грань
     EuCell neib(int face_idx) const;
 
-    /// @brief Получить смежную ячейку через грань
-    EuCell neighbor(int face_idx) const;
-
-    /// @brief Вывести полную информаци о ячейке и её соседях
-    void print_neibs_info() const;
+    /// @brief Для данной ячейки вернуть ячейку из local AmrStorage
+    /// @param idx Индекс ячейки в локальном хранилище
+    EuCell locals(int idx);
 
 
-    /// @brief Вывести полную информацию о ячейке
-    inline void print_info() const { m_it->print_info(); }
-
-    /// @brief Вывести информацию о ячейке в виде python скрипта
-    inline void visualize() const { m_it->print_info(); }
+    // Далее простые get/set функции
 
     /// @brief Размерность ячейки
     inline const int& dim() const { return m_it->dim; }
@@ -155,8 +155,33 @@ public:
     /// @brief Площадь (в 2D) или объем (в 3D) ячейки
     inline double volume() const { return m_it->volume(); }
 
-private:
-    AmrStorage::Iterator m_it;  ///< Итератор хранилища
+    /// @brief Вершина ячейки по индексу
+    inline const Vector3d& vs(int idx) const {
+        return m_it->vertices[idx];
+    }
+
+    /// @brief Скорпировать вершины в полигон (двумерные ячейки)
+    /// Для нелинейных AMR-ячеек возвращает до 8 граней.
+    inline geom::PolygonS<8> polygon() const {
+        return m_it->polygon();
+    }
+
+
+    // Функции для дебага
+
+    /// @brief Вывести полную информаци о ячейке и её соседях
+    void print_neibs_info() const;
+
+    /// @brief Вывести полную информацию о ячейке
+    inline void print_info() const { m_it->print_info(); }
+
+    /// @brief Вывести информацию о ячейке в виде python скрипта
+    inline void visualize() const { m_it->print_info(); }
+
+protected:
+    friend class EuFaces;
+
+    AmrStorage::Iterator m_it;  ///< Итератор по хранилищу
     AmrStorage &m_locals;       ///< Ссылка на хранилище текущего процесса
     AmrStorage &m_aliens;       ///< Ссылка на хранилище соседей
 };

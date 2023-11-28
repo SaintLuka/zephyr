@@ -421,7 +421,7 @@ void Block::link_vertices() {
     // Вершины на границе
     for (int f_idx = 0; f_idx < 4; ++f_idx) {
         if (!boundary(f_idx) && !adjacent_block(f_idx)) {
-            throw std::runtime_error("AmrFace is not boundary and has no neigbor");
+            throw std::runtime_error("BFace is not boundary and has no neigbor");
         }
 
         // Число ячеек по грани

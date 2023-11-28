@@ -1,4 +1,6 @@
 #include <iomanip>
+#include <algorithm>
+
 #include <zephyr/geom/polygon.h>
 
 namespace zephyr::geom {

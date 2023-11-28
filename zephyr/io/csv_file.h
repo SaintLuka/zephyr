@@ -5,7 +5,7 @@
 #include <zephyr/io/variables.h>
 
 
-namespace zephyr { namespace io {
+namespace zephyr::io {
 
 using zephyr::mesh::AmrStorage;
 
@@ -42,5 +42,4 @@ public:
 
 };
 
-} // io
-} // zephyr
+} // namepsace zephyr::io

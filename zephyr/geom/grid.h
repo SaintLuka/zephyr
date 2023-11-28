@@ -6,23 +6,12 @@
 
 #include <zephyr/geom/vector.h>
 #include <zephyr/geom/primitives/boundary.h>
+#include <zephyr/geom/primitives/mov_node.h>
+#include <zephyr/geom/primitives/cell_type.h>
 
 namespace zephyr::geom {
 
-/// @brief Поддерживаемые типы ячеек сетки
-/// Повторяют VTK типы с добавлением типов AMR2D и AMR3D
-enum class CellType : int {
-    TRIANGLE,    ///< Треугольник
-    QUAD,        ///< Четырехугольник
-    POLYGON,     ///< Произвольный полигон
-    AMR2D,       ///< Двумерная AMR-ячейка
-    TETRA,       ///< Тетраэдр
-    PYRAMID,     ///< Пирамида с четырехугольным основанием
-    WEDGE,       ///< Призма с треугольным основанием
-    HEXAHEDRON,  ///< Топологический куб
-    POLYHEDRON,  ///< Произвольный многогранник
-    AMR3D        ///< Трехмерная AMR-ячейка
-};
+class MovNode;
 
 /// @class Узел сетки общего вида
 class GNode {
@@ -61,6 +50,13 @@ public:
 
     /// @brief Добавить соседа
     void add_neib_cell(int idx);
+
+    /// @brief Создать базовую вершину для размещения в хранилище
+    MovNode bnode() const;
+
+    operator MovNode() const {
+        return bnode();
+    }
 
 private:
     /// @brief Множество граничных условий, для узла может быть более одного
@@ -135,12 +131,15 @@ private:
 };
 
 class AmrCell;
+class MovCell;
 
 /// @brief Сетка общего вида, которую выдают сеточные генераторы.
 /// Непосредственно в расчетах не используется, после создания преобразуется
 /// в специализированный сеточный класс.
 class Grid {
 public:
+
+    int n_nodes() const;
 
     int n_cells() const;
 
@@ -165,6 +164,8 @@ public:
 
 
     AmrCell amr_cell(int idx) const;
+
+    MovCell mov_cell(int idx) const;
 
 private:
     std::vector<GNode::Ptr> m_nodes;

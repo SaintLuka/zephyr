@@ -1,9 +1,9 @@
 #include <zephyr/math/solver/convection.h>
 
 #include <zephyr/math/cfd/face_extra.h>
-#include <zephyr/geom/primitives/basic_face.h>
+#include <zephyr/geom/primitives/bface.h>
 
-namespace zephyr { namespace math {
+namespace zephyr::math {
 
 using mesh::AmrStorage;
 using namespace geom;
@@ -53,7 +53,7 @@ Vector3d Convection::velocity(const Vector3d& c) const {
     return Vector3d::UnitX();
 }
 
-double Convection::compute_dt(const EuCell &cell) const {
+double Convection::compute_dt(Cell &cell) const {
     double max_area = 0.0;
     for (auto &face: cell.faces()) {
         max_area = std::max(max_area, face.area());
@@ -63,7 +63,7 @@ double Convection::compute_dt(const EuCell &cell) const {
     return m_CFL * dx / velocity(cell.center()).norm();
 }
 
-void Convection::compute_grad(EuCell &cell, int stage) {
+void Convection::compute_grad(Cell &cell, int stage) {
     double ux = 0.0;
     double uy = 0.0;
     double uz = 0.0;
@@ -86,21 +86,12 @@ void Convection::compute_grad(EuCell &cell, int stage) {
     cell(U).uz = uz / cell.volume();
 }
 
-double lim(double t, double b) {
-    if (b == 0.0 && t == 0.0) {
-        return 0.0;
-    }
-    double r = t / b;
-    return std::max(0.0, std::min(r, 1.0));
-}
-
-void Convection::fluxes(EuCell &cell, int stage) {
+void Convection::fluxes(Cell &cell, int stage) {
     auto &zc = cell(U);
 
     double fluxes = 0.0;
     for (auto &face: cell.faces()) {
-        auto neib = face.neib();
-        auto &zn = neib(U);
+        const auto &zn =  face.neib(U);
 
         Vector3d cell_c = cell.center();
         Vector3d face_c = face.center();
@@ -152,7 +143,7 @@ void Convection::fluxes(EuCell &cell, int stage) {
     }
 }
 
-void Convection::update(EuMesh &mesh) {
+void Convection::update(Mesh &mesh) {
     // Определяем dt
     m_dt = std::numeric_limits<double>::max();
     for (auto& cell: mesh) {
@@ -176,7 +167,7 @@ void Convection::update(EuMesh &mesh) {
         }
 
         // Шаг предиктора
-        for (auto cell: mesh) {
+        for (auto &cell: mesh) {
             fluxes(cell, 0);
         }
 
@@ -199,7 +190,7 @@ void Convection::update(EuMesh &mesh) {
     }
 }
 
-void Convection::set_flags(EuMesh& mesh) {
+void Convection::set_flags(Mesh& mesh) {
     for (auto cell: mesh) {
         double min_val = cell(U).u1;
         double max_val = cell(U).u1;
@@ -208,12 +199,12 @@ void Convection::set_flags(EuMesh& mesh) {
             if (face.is_boundary()) {
                 continue;
             }
-            min_val = std::min(min_val, face.neib()(U).u1);
-            max_val = std::max(max_val, face.neib()(U).u1);
+            min_val = std::min(min_val, face.neib(U).u1);
+            max_val = std::max(max_val, face.neib(U).u1);
         }
 
         if (max_val - min_val > 0.1) {
-            cell.set_flag(1);
+            cell.set_flag(+1);
         }
         else {
             cell.set_flag(-1);
@@ -247,5 +238,4 @@ Distributor Convection::distributor() const {
     return distr;
 }
 
-}
-}
+} // namespace zephyr::math

@@ -1,73 +1,73 @@
 #include <cstring>
 
 #include <zephyr/geom/primitives/amr_cell.h>
-#include <zephyr/geom/primitives/amr_faces.h>
+#include <zephyr/geom/primitives/bfaces.h>
 #include <zephyr/mesh/euler/eu_face.h>
 #include <zephyr/mesh/euler/eu_cell.h>
 
 namespace zephyr::mesh {
 
-EuFace::EuFace(const EuCell &cell, int fid, Direction _dir)
-        : m_cell(cell), face_idx(fid), dir(_dir) {
+EuFace::EuFace(const EuCell &cell, BFace* self, BFace* end, Direction dir)
+        : m_cell(cell), m_face(self), m_end(end), m_dir(dir) {
 
     // Ищем первую определенную грань
-    while (face_idx < geom::AmrFaces::max_count && geom().to_skip(dir)) {
-        ++face_idx;
+    while (m_face < end && m_face->to_skip(m_dir)) {
+        ++m_face;
     }
 }
 
-//AmrFace& EuFace::face() {
-//    return m_cell->faces[face_idx];
-//}
-
-const AmrFace& EuFace::geom() const {
-    return m_cell.geom().faces[face_idx];
-}
-
 const Vector3d &EuFace::normal() const {
-    return geom().normal;
+    return m_face->normal;
 }
 
 EuCell EuFace::neib() const {
-    return geom().is_boundary() ? m_cell : m_cell.neib(face_idx);
+    return m_face->is_boundary() ? m_cell : m_cell.neib(*m_face);
 }
 
-EuCell EuFace::neighbor() const {
-    return geom().is_boundary() ? m_cell : m_cell.neib(face_idx);
+const Byte* EuFace::neib_data() const {
+    return m_face->is_boundary() ? m_cell.data() : m_cell.neib(*m_face).data();
 }
 
 Boundary EuFace::flag() const {
-    return geom().boundary;
+    return m_face->boundary;
 }
 
 bool EuFace::is_boundary() const {
-    return geom().is_boundary();
+    return m_face->is_boundary();
 }
 
 void EuFace::set_boundary(Boundary flag) {
-    AmrFace* face = (AmrFace*)(&geom());
-    face->boundary = flag;
+    m_face->boundary = flag;
 }
 
 double EuFace::area() const {
-    return geom().area;
+    return m_face->area;
 }
 
 Vector3d EuFace::center() const {
-    return geom().center;
+    return m_face->center;
 }
 
-EuFaces::EuFaces(const EuCell& cell, Direction _dir)
-    : m_cell(cell), dir(_dir) {
+const Vector3d& EuFace::vs(int idx) const {
+    return m_cell.vs(m_face->vertices[idx]);
+}
+
+EuFaces::EuFaces(const EuCell& cell, Direction dir)
+    : m_cell(cell), m_dir(dir) {
 
 }
 
 EuFace EuFaces::begin() const {
-    return { m_cell, 0, dir };
+    auto &cell = const_cast<AmrStorage::Iterator &>(m_cell.m_it);
+    BFace *beg = cell->faces.begin();
+    BFace *end = cell->faces.end();
+    return {m_cell, beg, end, m_dir};
 }
 
 EuFace EuFaces::end() const {
-    return {m_cell, geom::AmrFaces::max_count, dir };
+    auto &cell = const_cast<AmrStorage::Iterator &>(m_cell.m_it);
+    BFace *end = cell->faces.end();
+    return {m_cell, end, end, m_dir};
 }
 
 } // namespace zephyr::mesh

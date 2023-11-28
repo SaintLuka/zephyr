@@ -3,9 +3,10 @@
 
 #include <iostream>
 #include <iomanip>
+#include <functional>
 
-#include <zephyr/geom/geom.h>
 #include <zephyr/geom/maps.h>
+
 using namespace zephyr::geom;
 
 std::vector<double> linspace(double a, double b, int n) {

@@ -2,7 +2,7 @@
 
 namespace zephyr::geom {
 
-/// @brief Составной индекс смежности ячейки.
+/// @brief Составной индекс смежности.
 /// @details Короткое объяснение:
 ///               local neib           remote neib
 ///    rank  :    == this.rank    |    != this.rank

@@ -46,13 +46,12 @@ int main() {
             .bottom = Boundary::PERIODIC, .top   = Boundary::PERIODIC});
 
     // Создать сетку
-    EuMesh mesh(U, &rect);
+    Mesh mesh(U, &rect);
 
     // Заполняем начальные данные
-    Vector3d v1(rect.x_min(), rect.y_min(), 0.0);
-    Vector3d v2(rect.x_max(), rect.y_max(), 0.0);
-    Vector3d vc = 0.5 * (v1 + v2);
-    double D = 0.1 * (v2 - v1).norm();
+    Box box = mesh.bbox();
+    Vector3d vc = box.center();
+    double D = 0.1 * box.diameter();
     for (auto cell: mesh) {
         cell(U).u1 = (cell.center() - vc).norm() < D ? 1.0 : 0.0;
         cell(U).u2 = 0.0;
@@ -86,13 +85,12 @@ int main() {
         dt *= CFL;
 
         // Расчет по схеме upwind
-        for (auto cell: mesh) {
+        for (auto& cell: mesh) {
             auto& zc = cell(U);
 
             double fluxes = 0.0;
             for (auto& face: cell.faces()) {
-                auto neib = face.neib();
-                auto& zn = neib(U);
+                const auto& zn = face.neib(U);
 
                 double af = velocity(face.center()).dot(face.normal());
                 double a_p = std::max(af, 0.0);
@@ -105,7 +103,7 @@ int main() {
         }
 
         // Обновляем слои
-        for (auto cell: mesh) {
+        for (auto& cell: mesh) {
             cell(U).u1 = cell(U).u2;
             cell(U).u2 = 0.0;
         }

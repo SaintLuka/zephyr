@@ -105,6 +105,7 @@ protected:
     /// @param part Выходной параметр, многоугольник, который отсекается
     double clip_area(const Vector3d& p, const Vector3d& n, Polygon& part) const;
 
+public:
     /// @brief Площадь и длина сечения
     struct AnS { double area, slice; };
 
@@ -113,6 +114,7 @@ protected:
     /// @param part Выходной параметр, многоугольник, который отсекается
     AnS clip_area_and_slice(const Vector3d& p, const Vector3d& n, Polygon& part) const;
 
+protected:
     /// @brief Находит отсечение от полигона с заданой объемной долей
     /// @param part Выходной параметр, многоугольник, который отсекается
     Vector3d find_section(const Vector3d& n, double alpha, Polygon& part) const;

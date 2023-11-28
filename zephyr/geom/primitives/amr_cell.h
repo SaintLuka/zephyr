@@ -1,8 +1,8 @@
 #pragma once
 
 #include <zephyr/geom/primitives/element.h>
-#include <zephyr/geom/primitives/amr_vertices.h>
-#include <zephyr/geom/primitives/amr_faces.h>
+#include <zephyr/geom/primitives/bvertices.h>
+#include <zephyr/geom/primitives/bfaces.h>
 
 namespace zephyr::geom {
 
@@ -11,13 +11,13 @@ class AmrCell : public Element {
 public:
     // Геометрия ячейки
 
-    int         dim;       ///< Размерность ячейки
-    bool        adaptive;  ///< Адаптивная ячейка?
-    bool        linear;    ///< Линейная ячейка?
-    Vector3d    center;    ///< Барицентр ячейки
-    double      size;      ///< Линейный размер ячейки
-    AmrVertices vertices;  ///< Вершины ячейки
-    AmrFaces    faces;     ///< Список граней
+    int       dim;       ///< Размерность ячейки
+    bool      adaptive;  ///< Адаптивная ячейка?
+    bool      linear;    ///< Линейная ячейка?
+    Vector3d  center;    ///< Барицентр ячейки
+    double    size;      ///< Линейный размер ячейки
+    BVertices vertices;  ///< Вершины ячейки
+    BFaces    faces;     ///< Список граней
 
     // Данные AMR
 

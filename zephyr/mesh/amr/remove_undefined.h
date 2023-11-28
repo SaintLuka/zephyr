@@ -19,7 +19,7 @@ using zephyr::utils::Stopwatch;
 void change_adjacent_partial(AmrStorage& cells, int from, int to) {
     int n_cells = cells.size();
     for (int ic = from; ic < to; ++ic) {
-        for (AmrFace &face: cells[ic].faces) {
+        for (BFace &face: cells[ic].faces) {
             if (face.is_undefined() or face.is_boundary()) continue;
             if (face.adjacent.ghost < 0) {
                 // Локальный сосед

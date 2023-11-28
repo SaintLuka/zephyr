@@ -1,11 +1,12 @@
 #pragma once
 
-#include <zephyr/mesh/storage.h>
+#include <zephyr/mesh/mesh.h>
+
 #include <zephyr/io/filter.h>
 #include <zephyr/io/variables.h>
 
 
-namespace zephyr { namespace io {
+namespace zephyr::io {
 
 using zephyr::mesh::AmrStorage;
 
@@ -32,7 +33,19 @@ public:
 
     /// @brief Базовая функция записи в файл. До вызова функции должен быть
     /// создан экземпляр класса и настроены опции записи.
+    void save(mesh::EuMesh &mesh);
+
+    /// @brief Базовая функция записи в файл. До вызова функции должен быть
+    /// создан экземпляр класса и настроены опции записи.
+    void save(mesh::LaMesh &mesh);
+
+    /// @brief Базовая функция записи в файл. До вызова функции должен быть
+    /// создан экземпляр класса и настроены опции записи.
     void save(AmrStorage &cells);
+
+    /// @brief Базовая функция записи в файл. До вызова функции должен быть
+    /// создан экземпляр класса и настроены опции записи.
+    void save(CellStorage &cells, NodeStorage& nodes);
 
     /// @brief Статическая функция записи в файл. Полный аналог функции-члена
     /// класса write, но вызывается без экземпляра класса, все параметры записи
@@ -41,7 +54,13 @@ public:
                      const Variables &variables, bool hex_only = false,
                      const Filter &filter = TrivialFilter());
 
+    /// @brief Статическая функция записи в файл. Полный аналог функции-члена
+    /// класса write, но вызывается без экземпляра класса, все параметры записи
+    /// передаются непосредственно как аргументы функции.
+    static void save(const std::string &filename, CellStorage &cells,
+                     NodeStorage &nodes, const Variables &variables,
+                     const Filter &filter = TrivialFilter());
+
 };
 
-} // io
-} // zephyr
+} // namespace zephyr::io

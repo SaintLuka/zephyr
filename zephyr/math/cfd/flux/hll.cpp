@@ -30,8 +30,8 @@ smf::Flux HLL::calc_flux(const smf::PState &zL, const smf::PState &zR, const phy
     double c1 = eos.sound_speed_rp(rho1, p1); // скорость звука слева std::sqrt(gamma * pressure / density);
     double c2 = eos.sound_speed_rp(rho2, p2); // скорость звука справа
 
-    double s1 = std::min({u1 - c1, u2 - c2, 0.0}); // SL
-    double s2 = std::max({u1 + c1, u2 + c2, 0.0}); // SR
+    double s1 = std::min(u1 - c1, u2 - c2); // SL
+    double s2 = std::max(u1 + c1, u2 + c2); // SR
 
 
     Flux fL(zL);   // Дифференциальный поток слева

@@ -3,7 +3,6 @@
 #include <zephyr/math/cfd/fluxes.h>
 #include <zephyr/math/cfd/models.h>
 #include <zephyr/phys/tests/shu_osher.h>
-#include <zephyr/geom/generator/collection/plane_with_hole.h>
 
 using namespace zephyr::phys;
 using namespace zephyr::math;
@@ -26,10 +25,6 @@ double get_v(AmrStorage::Item& cell) { return cell(U).v1.y(); }
 double get_w(AmrStorage::Item& cell) { return cell(U).v1.z(); }
 double get_p(AmrStorage::Item& cell) { return cell(U).p1; }
 double get_e(AmrStorage::Item& cell) { return cell(U).e1; }
-double get_faceL(AmrStorage::Item& cell) { return int(cell.faces[0].boundary); }
-double get_faceR(AmrStorage::Item& cell) { return int(cell.faces[1].boundary); }
-double get_faceB(AmrStorage::Item& cell) { return int(cell.faces[2].boundary); }
-double get_faceT(AmrStorage::Item& cell) { return int(cell.faces[3].boundary); }
 
 
 int main() {
@@ -43,10 +38,6 @@ int main() {
     pvd.variables += {"velocity.z", get_w};
     pvd.variables += {"pressure", get_p};
     pvd.variables += {"energy", get_e};
-    pvd.variables += {"faceL", get_faceL};
-    pvd.variables += {"faceR", get_faceR};
-    pvd.variables += {"faceB", get_faceB};
-    pvd.variables += {"faceT", get_faceT};
 
     // Тестовая задача
     ShuOsherTest test;
@@ -91,7 +82,7 @@ int main() {
 
         // Определяем dt
         double dt = std::numeric_limits<double>::max();
-        for (auto cell: mesh) {
+        for (auto& cell: mesh) {
             // скорость звука
             double c = eos.sound_speed_rp(cell(U).rho1, cell(U).p1);
             for (auto &face: cell.faces()) {
@@ -108,7 +99,7 @@ int main() {
         dt *= CFL;
 
         // Расчет по некоторой схеме
-        for (auto cell: mesh) {
+        for (auto& cell: mesh) {
             // Примитивный вектор в ячейке
             PState zc(cell(U).rho1, cell(U).v1, cell(U).p1, cell(U).e1);
 
@@ -161,7 +152,7 @@ int main() {
         }
 
         // Обновляем слои
-        for (auto cell: mesh) {
+        for (auto& cell: mesh) {
             std::swap(cell(U).rho1, cell(U).rho2);
             std::swap(cell(U).v1, cell(U).v2);
             std::swap(cell(U).p1, cell(U).p2);

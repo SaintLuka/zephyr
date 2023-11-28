@@ -1,3 +1,5 @@
+#include <iostream>
+
 #include <zephyr/math/solver/riemann.h>
 
 namespace zephyr { namespace math {

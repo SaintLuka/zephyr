@@ -17,21 +17,20 @@ enum class Direction : int {
 
 /// @brief Базовый класс грани произвольной ячейки, хранит индексы
 /// вершин (узлов), которые хранятся в массиве в самой ячейке.
-template<int N>
-class BasicFace {
+/// BFace -- Base/Basic face
+class BFace {
 public:
+    /// @brief Максимальное число вершин грани
+    static const int max_size = 4;
+
     /// @brief Тип граничного условия
     Boundary boundary = Boundary::UNDEFINED;
 
-    /// @brief Список индексов вершин в массиве вершин ячейки,
-    /// которой принадлежит грань
-    std::array<int, N> vertices;
-
     /// @brief Составной индекс смежной ячейки
-    Adjacent adjacent;
+    Adjacent adjacent = {};
 
     /// @brief Площадь грани
-    double area;
+    double area = NAN;
 
     /// @brief Внешняя нормаль грани
     Vector3d normal;
@@ -39,11 +38,15 @@ public:
     /// @brief Центр грани
     Vector3d center;
 
-    /// @brief Конструктор по умолчанию
-    BasicFace() { vertices.fill(-1); }
+    /// @brief Список индексов вершин в массиве вершин ячейки,
+    /// которой принадлежит грань
+    std::array<int, max_size> vertices = {-1, -1, -1, -1};
 
-	/// @brief Является ли грань граничной?
-	inline bool is_boundary() const {
+    /// @brief Конструктор по умолчанию
+    BFace() = default;
+
+    /// @brief Является ли грань граничной?
+    inline bool is_boundary() const {
         return boundary != Boundary::ORDINARY &&
                boundary != Boundary::PERIODIC &&
                boundary != Boundary::UNDEFINED;
@@ -62,7 +65,14 @@ public:
 	/// @brief Установить неопределенную грань
     inline void set_undefined() {
         boundary = Boundary::UNDEFINED;
-        vertices = {-1, -1, -1, -1};
+    }
+
+    /// @brief Число вершин грани
+    /// Для граней двумерных ячеек равно двум,
+    /// для граней трехмерных ячеек: 3 или 4.
+    inline int size() const {
+        static_assert(max_size == 4);
+        return vertices[2] < 0 ? 2 : (vertices[3] < 0 ? 3 : 4);
     }
 
     /// @brief Пропустить грань?

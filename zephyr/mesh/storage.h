@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <cstring>
 #include <iostream>
 
 namespace zephyr::mesh {
@@ -9,15 +10,19 @@ using Byte = unsigned char;
 
 /// @class Хранилище для расчетных элементов. Каждый элемент хранилища
 /// содержит геометрию + данные элемента (расчетные величины).
-/// Используется три типа геометрии: AmrCell, PolyCell и PolyNode.
+/// Используется три типа геометрии: AmrCell, BCell и BNode.
 /// @tparam Geom Геометрический тип данных
 template <class Geom>
 class Storage {
 public:
 
-    /// @brief Запрещаем создание хранилища без указания
-    /// типа данных для хранения
-    Storage() = delete;
+    /// @brief Хранилище без указания типа для хранения,
+    /// содержит только геометрию
+    Storage(int size = 0) {
+        m_size = std::max(0, size);
+        m_itemsize = int(sizeof(Geom));
+        m_data.resize(m_size * m_itemsize);
+    };
 
     /// @brief Создать хранилище размера size для хранения типа U
     /// @tparam U Тип данных, который предполагается располагать в хранилище,
@@ -101,18 +106,8 @@ public:
         /// геометрию, это позволяет создать хранилище с некоторым числом
         /// элементов, а затем вручную установить геометрию ячеек.
         inline Item& operator=(const Geom& g) {
-            geom() = g;
+            Geom::operator=(g);
             return *this;
-        }
-
-        /// @brief Ссылка на геометрию элемента
-        inline Geom &geom() {
-            return *reinterpret_cast<Geom *>(this);
-        }
-
-        /// @brief Константная ссылка на геометрию элемента
-        inline const Geom &geom() const {
-            return *reinterpret_cast<const Geom *>(this);
         }
 
         /// @brief Указатель на данные элемента
@@ -268,25 +263,3 @@ private:
 };
 
 } // namespace zephyr::mesh
-
-// Forward-declaration для типов, которые можно размещать
-// в хранилище Storage
-namespace zephyr::geom {
-class AmrCell;   ///< AMR-ячейка
-//class PolyCell;  ///< Ячейка подвижной сетки
-//class PolyNode;  ///< Узел подвижной сетки
-}
-
-// Все возможные виды Storage
-namespace zephyr::mesh {
-
-/// @brief Хранилище с эйлеровыми и AMR-ячейками
-using AmrStorage = Storage<zephyr::geom::AmrCell>;
-
-/// @brief Хранилище с подвижными ячейками
-//using CellStorage = Storage<zephyr::geom::PolyCell>;
-
-/// @brief Хранилище с узлами подвижной сетки
-//using NodeStorage = Storage<zephyr::geom::PolyNode>;
-
-}

@@ -5,15 +5,15 @@
 
 namespace zephyr::geom {
 
-class AmrVertices : public SqCube {
+class BVertices : public SqCube {
 public:
 
     /*
     /// @brief Конструктор по умолчанию
-    //AmrVertices() = default;
+    //BVertices() = default;
 
     /// @brief Конструктор по угловым точкам
-    AmrVertices(const Vector3d &v000, const Vector3d &v002,
+    BVertices(const Vector3d &v000, const Vector3d &v002,
                 const Vector3d &v020, const Vector3d &v022,
                 const Vector3d &v200, const Vector3d &v202,
                 const Vector3d &v220, const Vector3d &v222) 
@@ -21,7 +21,7 @@ public:
                          v200, v202, v220, v222) { };
 
     /// @brief Конструктор по полному набору узлов
-    AmrVertices(const Vector3d &v000, const Vector3d &v001, const Vector3d &v002,
+    BVertices(const Vector3d &v000, const Vector3d &v001, const Vector3d &v002,
                 const Vector3d &v010, const Vector3d &v011, const Vector3d &v012,
                 const Vector3d &v020, const Vector3d &v021, const Vector3d &v022,
                 const Vector3d &v100, const Vector3d &v101, const Vector3d &v102,
@@ -36,43 +36,48 @@ public:
                          */
 
     /// @brief Конструктор по угловым точкам
-    AmrVertices(const Cube &cube) : SqCube(cube) { };
+    BVertices(const Cube &cube) : SqCube(cube) { };
 
     /// @brief Конструктор по полному набору точек
-    AmrVertices(const SqCube &cube) : SqCube(cube) { };
+    BVertices(const SqCube &cube) : SqCube(cube) { };
 
     /// @brief Неполный конструктор. Инициализация только первого слоя
     /// вершин для хранения представления двумерной ячейки.
-    AmrVertices(const Quad& quad) : SqCube(quad) { };
+    BVertices(const Quad& quad) : SqCube(quad) { };
 
     /// @brief Неполный конструктор. Инициализация только первого слоя
     /// вершин для хранения представления двумерной ячейки.
-    AmrVertices(const SqQuad& quad) : SqCube(quad) { };
+    BVertices(const SqQuad& quad) : SqCube(quad) { };
 
     /// @brief Конструктор по полигону
-    AmrVertices(const Polygon &poly) {
-        int max_size = verts.size();
-        int mid_size = std::min(poly.size(), max_size);
+    BVertices(const Polygon &poly) {
+        int max_count = verts.size();
+        int mid_count = std::min(poly.size(), max_count);
 
-        for (int i = 0; i < mid_size; ++i) {
+        for (int i = 0; i < mid_count; ++i) {
             verts[i] = poly[i];
         }
-        for (int i = mid_size; i < max_size; ++i) {
+        for (int i = mid_count; i < max_count; ++i) {
             verts[i] = {NAN, NAN, NAN};
         }
     };
+
+    /// @brief Максимальное число вершин
+    constexpr static int max_count() {
+        return 27;
+    }
 
     /// @brief Возвращает количество актуальных вершин.
     /// Функция используется для неадаптивных ячеек, чтобы узнать
     /// количество вершин примитива.
     inline int count() const {
-        int max_size = verts.size();
-        for (int i = 3; i < max_size; ++i) {
+        int _count = verts.size();
+        for (int i = 3; i < max_count(); ++i) {
             if (verts[i].hasNaN()) {
                 return i;
             }
         }
-        return max_size;
+        return _count;
     }
 };
 

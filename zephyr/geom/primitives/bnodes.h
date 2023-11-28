@@ -12,47 +12,50 @@ namespace zephyr::geom {
 ///    Тетраэдр (4 вершины). Пирамида (5 вершин). Клин (6 вершин).
 ///    Шестигранник (8 вершин). Нумерация вершин в соответствии с форматом VTK.
 ///    Произвольный многогранник.
-class PolyNodes {
+class BNodes {
 public:
+    ///@brief Максимальное число вешин
+    static const int max_count = 27;
 
-    static const int max_size = 27;      ///< Максимальное число вешин
-
-    /// @brief Конструктор по умолчанию
-    PolyNodes() {
-        set_undefined();
+    BNodes() {
+        m_nodes.fill(-1);
     }
 
-    /// @brief Число актуальных вершин.
-    int size() const {
+    /// @brief Доступ к вершине по индексу
+    inline int& operator[](int i) {
+        assert(i < max_count);
+        return m_nodes[i];
+    }
+
+    /// @brief Доступ к вершине по индексу
+    inline int operator[](int i) const {
+        assert(i < max_count);
+        return m_nodes[i];
+    }
+
+    /*
+    struct iterator {
+    private:
+        int *m_ptr;
+
+        iterator(int *ptr) : m_ptr(ptr) {}
+
+    };
+     */
+
+    int count() const {
         int count = 0;
-        for (int i = 0; i < max_size; ++i) {
-            if (!list[i].hasNaN()) {
+        for (int idx: m_nodes) {
+            if (idx >= 0) {
                 ++count;
             }
         }
         return count;
     }
 
-    /// @brief Установить неопределенный список
-    void set_undefined() {
-        for (auto &c: list) {
-            setNaN(c);
-        }
-    }
-
-    /// @brief Доступ к вершине по индексу
-    inline Vector3d &operator[](int i) {
-        return list[i];
-    }
-
-    /// @brief Доступ к вершине по индексу
-    inline const Vector3d &operator[](int i) const {
-        return list[i];
-    }
-
 private:
-    /// @brief Массив вершин ячейки (до max_size)
-    std::array<Vector3d, max_size> list;
+    /// @brief Массив индексов вершин ячейки
+    std::array<int, max_count> m_nodes;
 };
 
 } // namespace zephyr::geom

@@ -79,7 +79,7 @@ int main() {
         .bottom = Boundary::WALL, .top   = Boundary::WALL});
 
     // Создать сетку
-    EuMesh mesh(U, &rect);
+    Mesh mesh(U, &rect);
 
     // Заполняем начальные данные
     for (auto cell: mesh) {
@@ -92,8 +92,6 @@ int main() {
     // Число Куранта
     double CFL = 0.5;
 
-    //NumFlux::Ptr nf = HLLC::create();
-    //!!!
     //NumFlux::Ptr nf = CIR1::create();
     NumFlux::Ptr nf = HLLC::create();
 
@@ -121,7 +119,7 @@ int main() {
 
         // Определяем dt
         sw_dt.resume();
-        double dt = mesh.min([&](EuCell cell) -> double {
+        double dt = mesh.min([&](Cell& cell) -> double {
             double dt = 1.0e300;
 
             // скорость звука
@@ -144,7 +142,7 @@ int main() {
 
         // Расчет по схеме CIR
         sw_flux.resume();
-        mesh.for_each([&](EuCell cell) {
+        mesh.for_each([&](Cell& cell) {
 
             // Примитивный вектор в ячейке
             PState zc = cell(U).get_state1();
@@ -185,7 +183,7 @@ int main() {
                         zn.velocity.x() += 1.0e-5 * R * T * A;
                     }
                 } else {
-                    zn = face.neib()(U).get_state1();
+                    zn = face.neib(U).get_state1();
                 }
 
                 // Значение на грани со стороны ячейки
@@ -214,7 +212,7 @@ int main() {
 
         // Обновляем слои
         sw_update.resume();
-        mesh.for_each([](EuCell cell) {
+        mesh.for_each([](Cell& cell) {
             cell(U).swap();
         });
         sw_update.stop();

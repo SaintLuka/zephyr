@@ -34,6 +34,12 @@ public:
     /// @brief Установить число Куранта
     void set_CFL(double C);
 
+    /// @brief Версия функции update
+    void set_version(int ver);
+
+    /// @brief Использовать расщепление по направлениям
+    void dir_splitting(bool flag);
+
     /// @brief Шаг интегрирования на предыдущем вызове update()
     double dt() const;
 
@@ -43,7 +49,10 @@ public:
     virtual Vector3d velocity(const Vector3d& c) const;
 
     /// @brief Один шаг интегрирования по времени
-    void update(EuMesh& mesh, int ver = 1);
+    void update(EuMesh& mesh);
+
+    /// @brief Обновить флаг направления
+    void update_dir();
 
     void compute_normals(EuMesh& mesh, int smoothing = 0);
 
@@ -56,6 +65,8 @@ public:
     Distributor distributor() const;
 
     AmrStorage body(EuMesh& mesh);
+
+    AmrStorage scheme(EuMesh& mesh);
 
 protected:
 
@@ -88,8 +99,10 @@ protected:
     void fluxes_MIX(EuCell& cell, Direction dir = Direction::ANY);
 
 protected:
-    double m_CFL;       ///< Число Куранта
-    double m_dt;        ///< Шаг интегрирования
+    double m_dt;      ///< Шаг интегрирования
+    double m_CFL;     ///< Число Куранта
+    int    m_ver;     ///< Версия функции update
+    Direction m_dir;  ///< Направление на текущем шаге
 };
 
 } // namespace math

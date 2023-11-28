@@ -1,2 +1,3 @@
 #cmakedefine ZEPHYR_ENABLE_MPI
 #cmakedefine ZEPHYR_ENABLE_YAML
+#cmakedefine ZEPHYR_ENABLE_EIGEN

@@ -2,7 +2,7 @@
 
 #include <functional>
 
-#include <zephyr/mesh/storage.h>
+#include <zephyr/mesh/euler/amr_storage.h>
 
 namespace zephyr::mesh {
 

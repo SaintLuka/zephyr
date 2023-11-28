@@ -1,3 +1,5 @@
+#include <iostream>
+
 #include <zephyr/geom/box.h>
 #include <zephyr/geom/generator/generator.h>
 

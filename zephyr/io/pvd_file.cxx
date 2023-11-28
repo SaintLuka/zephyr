@@ -2,10 +2,13 @@
 #include <fstream>
 #include <filesystem>
 
+#include <zephyr/geom/primitives/mov_node.h>
+#include <zephyr/geom/primitives/mov_cell.h>
 #include <zephyr/geom/primitives/amr_cell.h>
 
 #include <zephyr/io/pvd_file.h>
 #include <zephyr/io/vtu_file.h>
+#include <zephyr/mesh/lagrange/la_mesh.h>
 
 namespace zephyr::io {
 
@@ -126,12 +129,28 @@ void PvdFile::open(const std::string& filename, const std::string& _directory) {
     m_open = true;
 }
 
+void PvdFile::save(mesh::EuMesh& mesh, double timestep) {
+    save(mesh.locals(), timestep);
+}
+
 void PvdFile::save(AmrStorage& elements, double timestep) {
     if (!m_open) {
         throw std::runtime_error("PvdFile::save() error: You need to open PvdFile");
     }
     VtuFile::save(get_filename(), elements, variables, hex_only, filter);
-    update_pvd(elements, timestep);
+    update_pvd(timestep);
+}
+
+void PvdFile::save(zephyr::mesh::LaMesh& mesh, double timestep) {
+    save(mesh.locals(), mesh.nodes(), timestep);
+}
+
+void PvdFile::save(CellStorage& cells, NodeStorage& nodes, double timestep) {
+    if (!m_open) {
+        throw std::runtime_error("PvdFile::save() error: You need to open PvdFile");
+    }
+    VtuFile::save(get_filename(), cells, nodes, variables, filter);
+    update_pvd(timestep);
 }
 
 std::string PvdFile::get_filename() const {
@@ -145,23 +164,10 @@ std::string PvdFile::get_filename() const {
     return filename;
 }
 
-void PvdFile::update_pvd(AmrStorage& elements, double timestep) {
+void PvdFile::update_pvd(double timestep) {
     if (!m_open) {
         throw std::runtime_error("You need to open PvdFile");
     }
-
-#ifdef ZEPHYR_ENABLE_DISTRIBUTED
-    std::VECTOR<size_t> part_sizes;
-    if (&net != &dummy_net) {
-        // Параллельная запись нескольких файлов
-        part_sizes = net.all_gather(elements.size());
-
-        if (!net.is_master()) {
-            ++m_counter;
-            return;
-        }
-    }
-#endif
 
     std::fstream ofs;
     ofs.open(m_fullname + ".pvd");
@@ -173,22 +179,8 @@ void PvdFile::update_pvd(AmrStorage& elements, double timestep) {
     ofs.seekg(m_pos, std::ios::beg);
 
     ofs << std::scientific << std::setprecision(15);
-#ifdef ZEPHYR_ENABLE_DISTRIBUTED
-    if (&net != &dummy_net) {
-        for (size_t rank = 0; rank < net.size(); ++rank) {
-            if (part_sizes[rank] > 0) {
-                ofs << "        <DataSet timestep=\"" << timestep << "\" part=\"" << rank << "\" file=\""
-                    << m_filename << "_" << m_counter << ".pt" << rank << ".vtu" << "\"/>\n";
-            }
-        }
-    } else {
-        ofs << "        <DataSet timestep=\"" << timestep << "\" part=\"0\" file=\""
-            << m_filename << "_" << m_counter << ".vtu" << "\"/>\n";
-    }
-#else
     ofs << "        <DataSet timestep=\"" << timestep << "\" part=\"0\" file=\""
             << m_filename << "_" << m_counter << ".vtu" << "\"/>\n";
-#endif
 
     m_pos = ofs.tellg();
 

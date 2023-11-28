@@ -6,3 +6,8 @@ cmake-build-*
 *__pycache__*
 /build/
 /.vscode/
+*.aux
+*.log
+*.pdf
+*.gz
+*.toc

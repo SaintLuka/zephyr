@@ -13,7 +13,7 @@ namespace zephyr::mesh::amr {
 /// @brief Устанавливает на новых подгранях значение adjacent и
 /// boundary со старой грани
 template <int dim, int side>
-void split_face_prepare(AmrFaces& faces) {
+void split_face_prepare(BFaces& faces) {
     faces[side + 6].boundary = faces[side].boundary;
     faces[side + 6].adjacent = faces[side].adjacent;
 
@@ -27,7 +27,7 @@ void split_face_prepare(AmrFaces& faces) {
 
 /// @brief Устанавливает на новых подгранях индексы вершин.
 template <int dim, int side>
-void split_face_indices(AmrFaces& faces) {
+void split_face_indices(BFaces& faces) {
     faces[side].vertices = face_indices::cf<dim, Side(side)>();
     faces[side + 6].vertices = face_indices::cf<dim, Side(side + 6)>();
 
@@ -39,10 +39,10 @@ void split_face_indices(AmrFaces& faces) {
 
 /// @brief Устанавливает нормали и площади новых подграней
 template <int dim>
-void setup_face_features(AmrFace& face, SqCube& vertices);
+void setup_face_features(BFace& face, SqCube& vertices);
 
 template <>
-void setup_face_features<2>(AmrFace& face, SqCube& vertices) {
+void setup_face_features<2>(BFace& face, SqCube& vertices) {
     // Точка внутри ячейки
     Vector3d C = vertices.vs<0, 0>();
 
@@ -59,7 +59,7 @@ void setup_face_features<2>(AmrFace& face, SqCube& vertices) {
 }
 
 template <>
-void setup_face_features<3>(AmrFace& face, SqCube& vertices) {
+void setup_face_features<3>(BFace& face, SqCube& vertices) {
     // Точка внутри ячейки
     const Vector3d& C = vertices.vs<0, 0, 0>();
 
@@ -79,7 +79,7 @@ void setup_face_features<3>(AmrFace& face, SqCube& vertices) {
 
 /// @brief Устанавливает нормали и площади новых подграней
 template <int dim>
-void split_face_features(AmrFaces& faces, SqCube& vertices, int side) {
+void split_face_features(BFaces& faces, SqCube& vertices, int side) {
     setup_face_features<dim>(faces[side], vertices);
     setup_face_features<dim>(faces[side + 6], vertices);
 
@@ -93,7 +93,7 @@ void split_face_features(AmrFaces& faces, SqCube& vertices, int side) {
 /// Устанавливает площади и нормали новых граней.
 /// Размерность и сторона являются аргументами шаблона
 template <int dim, int side>
-void split_face(AmrFaces& faces, SqCube& vertices) {
+void split_face(BFaces& faces, SqCube& vertices) {
 #if SCRUTINY
     if (faces[side + 6].is_actual()) {
         throw std::runtime_error("Try to cut complex face");
@@ -111,10 +111,10 @@ void split_face(AmrFaces& faces, SqCube& vertices) {
 /// Устанавливает площади и нормали новых граней.
 /// Преобразует аргумент функции side в аргумент шаблона.
 template <int dim>
-void split_face(AmrFaces& faces, SqCube& vertices, int side);
+void split_face(BFaces& faces, SqCube& vertices, int side);
 
 template <>
-void split_face<2>(AmrFaces& faces, SqCube& vertices, int side) {
+void split_face<2>(BFaces& faces, SqCube& vertices, int side) {
     switch (side) {
         case Side::LEFT:
             split_face<2, Side::L>(faces, vertices);
@@ -132,7 +132,7 @@ void split_face<2>(AmrFaces& faces, SqCube& vertices, int side) {
 }
 
 template <>
-void split_face<3>(AmrFaces& faces, SqCube& vertices, int side) {
+void split_face<3>(BFaces& faces, SqCube& vertices, int side) {
     switch (side) {
         case Side::LEFT:
             split_face<3, Side::L>(faces, vertices);

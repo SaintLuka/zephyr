@@ -1,3 +1,5 @@
+#include <cstring>
+
 #include <zephyr/geom/maps.h>
 
 namespace zephyr::geom {

@@ -3,7 +3,6 @@
 #include <cassert>
 #include <memory>
 
-#include <zephyr/geom/geom.h>
 #include <zephyr/geom/box.h>
 #include <zephyr/geom/grid.h>
 

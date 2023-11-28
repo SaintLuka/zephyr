@@ -21,18 +21,18 @@ public:
 Solver::State U = Solver::datatype();
 
 // Переменные для сохранения
-double get_u(AmrStorage::Item&cell)  { return cell(U).u1; }
+double get_u(AmrStorage::Item& cell)  { return cell(U).u1; }
 
-double get_ux(AmrStorage::Item&cell)  { return cell(U).ux; }
+double get_ux(AmrStorage::Item& cell)  { return cell(U).ux; }
 
-double get_uy(AmrStorage::Item&cell)  { return cell(U).uy; }
+double get_uy(AmrStorage::Item& cell)  { return cell(U).uy; }
 
-double get_lvl(const AmrStorage::Item &cell)  { return cell.level; }
+double get_lvl(AmrStorage::Item& cell)  { return cell.level; }
 
 const double margin = 0.0198;
 
 // Начальное условие в виде круга
-void setup_initial_1(EuMesh& mesh, double D) {
+void setup_initial_1(Mesh& mesh, double D) {
     //double R = D / 2.0;
     //Vector3d vc = {R + margin, R + margin, 0.2};
     double R = 0.1;
@@ -44,7 +44,7 @@ void setup_initial_1(EuMesh& mesh, double D) {
 }
 
 // Начальное условие в виде квадрата
-void setup_initial_2(EuMesh& mesh, double D) {
+void setup_initial_2(Mesh& mesh, double D) {
     double x_min = margin;
     double x_max = D + x_min;
     double y_min = margin;
@@ -110,16 +110,15 @@ int main() {
     solver.set_limiter("van Leer");
 
     // Создать сетку
-    EuMesh mesh(U, &gen);
+    Mesh mesh(U, &gen);
 
     // Настраиваем адаптацию
     mesh.set_max_level(3);
     mesh.set_distributor(solver.distributor());
 
     // Заполняем начальные данные
-    Vector3d v_min(gen.x_min(), gen.y_min(), 0.0);
-    Vector3d v_max(gen.x_max(), gen.y_max(), 0.0);
-    double D = 0.1*(v_max - v_min).norm();
+    Box box = mesh.bbox();
+    double D = 0.1*box.diameter();
 
     // Адаптация под начальные данные
     for (int k = 0; k < mesh.max_level() + 3; ++k) {

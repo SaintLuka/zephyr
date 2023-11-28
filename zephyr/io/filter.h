@@ -3,7 +3,7 @@
 #include <memory>
 #include <set>
 
-#include <zephyr/mesh/storage.h>
+#include <zephyr/mesh/euler/amr_storage.h>
 
 namespace zephyr { namespace io {
 

@@ -11,6 +11,12 @@ public:
     Vector3d vmin, vmax;
 
     Box(const Vector3d& _vmin, const Vector3d& _vmax);
+
+    Vector3d center() const;
+
+    Vector3d size() const;
+    
+    double diameter() const;
 };
 
 } // namespace zephyr::geom

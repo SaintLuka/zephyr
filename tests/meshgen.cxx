@@ -1,9 +1,10 @@
 #include <iostream>
 #include <vector>
 
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/mesh.h>
 #include <zephyr/io/vtu_file.h>
 
+#include <zephyr/geom/box.h>
 #include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/geom/generator/cuboid.h>
 #include <zephyr/geom/generator/sector.h>
@@ -20,6 +21,7 @@ using namespace zephyr::geom;
 using namespace zephyr::mesh;
 using namespace zephyr::mesh::generator;
 
+// Данные ячеек
 struct _U_ {
     int uid;
     double val;
@@ -27,12 +29,36 @@ struct _U_ {
 
 _U_ U;
 
-double get_uid(AmrStorage::Item& cell) {
+// Данные узлов
+struct _V_ {
+    int uid;
+    double val;
+};
+
+_V_ V;
+
+double get_uid_amr(AmrStorage::Item& cell) {
     return cell(U).uid;
 }
 
-double get_val(AmrStorage::Item& cell) {
+double get_val_amr(AmrStorage::Item& cell) {
     return cell(U).val;
+}
+
+double get_uid_cell(CellStorage::Item& cell) {
+    return cell(U).uid;
+}
+
+double get_val_cell(CellStorage::Item& cell) {
+    return cell(U).val;
+}
+
+double get_uid_node(NodeStorage::Item& cell) {
+    return cell(V).uid;
+}
+
+double get_val_node(NodeStorage::Item& cell) {
+    return cell(V).val;
 }
 
 struct Test {
@@ -41,7 +67,7 @@ struct Test {
         Sector1, Sector2, Sector3, Disk,
         BlockStruct1, BlockStruct2, BlockStruct3
     };
-    
+
     std::string name;  ///< Название теста
     std::string file;  ///< Имя выходного файла
     std::string desc;  ///< Описание теста
@@ -50,27 +76,33 @@ struct Test {
     
     Test(TestType test);
 
-    EuMesh generate() const;
+    EuMesh gen_eu() const;
+
+    LaMesh gen_la() const;
 };
 
 int main() {
     // Переменные для записи
     Variables vars;
-    vars += { "uid", get_uid };
-    vars += { "val", get_val };
+    vars += { "uid", get_uid_amr };
+    vars += { "val", get_val_amr };
+    vars += { "uid", get_uid_cell };
+    vars += { "val", get_val_cell };
+    vars += { "uid", get_uid_node };
+    vars += { "val", get_val_node };
 
     // Список тестов
     std::vector<Test> tests_list = {
-            //Test::Rectangle,
+            Test::Rectangle,
             Test::RectangleHex,
             //Test::Cuboid,
-            //Test::Sector1,
-            //Test::Sector2,
-            //Test::Sector3,
-            //Test::Disk,
-            //Test::BlockStruct1,
-            //Test::BlockStruct2,
-            //Test::BlockStruct3
+            Test::Sector1,
+            Test::Sector2,
+            Test::Sector3,
+            Test::Disk,
+            Test::BlockStruct1,
+            Test::BlockStruct2,
+            Test::BlockStruct3
     };
 
     for (auto& test: tests_list) {
@@ -78,12 +110,11 @@ int main() {
         std::cout << "\t" << test.desc << "\n";
         std::cout << "\tВыходной файл: " << test.file << "\n\n";
 
-        EuMesh cells = test.generate();
-
         VtuFile file("output/" + test.file, vars);
-
         file.hex_only = false; // test != Test::RectangleHex;
 
+        //auto cells = test.gen_eu();
+        auto cells = test.gen_la();
         file.save(cells);
     }
 }
@@ -439,28 +470,40 @@ Test::Test(TestType test) {
 }
 
 void fill(AmrStorage& cells) {
-    double inf = std::numeric_limits<double>::infinity();
-    Vector3d vmin = {+inf, +inf, +inf};
-    Vector3d vmax = {-inf, -inf, -inf};
-
-    for (auto& cell: cells) {
-        vmin = vmin.cwiseMin(cell.center);
-        vmax = vmax.cwiseMax(cell.center);
-    }
-
-    double L = (vmax - vmin).norm();
-
-    for (size_t ic = 0; ic < cells.size(); ++ic) {
-        auto& cell = cells[ic];
-        Vector3d r = cell.center;
-
-        cell(U).uid = ic;
-        cell(U).val = std::cos(1.0 / (r.squaredNorm() / (L * L) + 0.03));
-    }
 }
 
-EuMesh Test::generate() const {
+EuMesh Test::gen_eu() const {
     EuMesh mesh(U, generator.get());
-    fill(mesh);
+    
+    Box box = mesh.bbox();
+    double L = box.diameter();
+
+    for (auto& cell: mesh) {
+        Vector3d r = cell.center();
+        cell(U).uid = cell - mesh.begin();
+        cell(U).val = std::cos(1.0 / (r.squaredNorm() / (L * L) + 0.03));
+    }
+
+    return mesh;
+}
+
+LaMesh Test::gen_la() const {
+    LaMesh mesh(U, V, generator.get());
+
+    Box box = mesh.bbox();
+    double L = box.diameter();
+    
+    for (auto& cell: mesh.locals()) {
+        Vector3d r = cell.center;
+        cell(U).uid = cell.index;
+        cell(U).val = std::cos(1.0 / (r.squaredNorm() / (L * L) + 0.03));
+    }
+
+    for (auto& node: mesh.nodes()) {
+        Vector3d r = node.coords;
+        node(V).uid = node.index;
+        node(V).val = std::sin(1.0 / (r.squaredNorm() / (L * L) + 0.03));
+    }
+
     return mesh;
 }

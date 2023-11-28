@@ -5,7 +5,6 @@
 #include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/io/pvd_file.h>
-#include <zephyr/io/variables.h>
 #include <zephyr/utils/stopwatch.h>
 
 using namespace zephyr;

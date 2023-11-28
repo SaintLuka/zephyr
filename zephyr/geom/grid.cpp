@@ -1,7 +1,10 @@
 #include <cassert>
 #include <zephyr/utils/mpi.h>
+#include <zephyr/geom/primitives/side.h>
 #include <zephyr/geom/grid.h>
+#include <zephyr/geom/primitives/mov_node.h>
 #include <zephyr/geom/primitives/amr_cell.h>
+#include <zephyr/geom/primitives/mov_cell.h>
 
 namespace zephyr::geom {
 
@@ -87,6 +90,23 @@ std::vector<int> GNode::shared_cells(const std::vector<GNode::Ptr> &vs) {
 
 void GNode::add_neib_cell(int idx) {
     m_neibs.insert(idx);
+}
+
+MovNode GNode::bnode() const {
+    MovNode bnode(0, index);
+    if (m_bounds.empty()) {
+        bnode.boundary = *m_bounds.begin();
+    }
+    bnode.coords = this->v;
+
+    int counter = 0;
+    for (int idx: m_neibs) {
+        bnode.neibs[counter].rank = 0;
+        bnode.neibs[counter].index = idx;
+        bnode.neibs[counter].ghost = -1;
+        ++counter;
+    }
+    return bnode;
 }
 
 GCell::GCell()
@@ -316,6 +336,10 @@ int GCell::neib(int idx) const {
 }
 
 
+int Grid::n_nodes() const {
+    return m_nodes.size();
+}
+
 int Grid::n_cells() const {
     return m_cells.size();
 }
@@ -508,6 +532,51 @@ AmrCell Grid::amr_cell(int idx) const {
     }
     else {
         throw std::runtime_error("Can't create AmrCell");
+    }
+}
+
+MovCell Grid::mov_cell(int idx) const {
+    auto gcell = cell(idx);
+
+    assert(gcell.index == idx);
+
+    if (gcell.type() == CellType::QUAD ||
+        gcell.type() == CellType::POLYGON) {
+
+        int n_nodes = gcell.n_nodes();
+
+        std::vector<GNode::Ptr> nodes(n_nodes, nullptr);
+
+        geom::PolygonD poly(n_nodes);
+
+        for (int i = 0; i < n_nodes; ++i) {
+            nodes[i] = m_nodes[gcell.node(i).index];
+            poly[i]  = nodes[i]->v;
+        }
+
+        MovCell cell(poly);
+        for (int i = 0; i < n_nodes; ++i) {
+            cell.nodes[i] = nodes[i]->index;
+        }
+
+        cell.rank  = mpi::rank();
+        cell.index = idx;
+        cell.next  = 0;
+
+        for (int i = 0; i < n_nodes; ++i) {
+            GNode::Ref v1 = nodes[cell.faces[i].vertices[0]];
+            GNode::Ref v2 = nodes[cell.faces[i].vertices[1]];
+
+            cell.faces[i].boundary = gcell.boundary({v1, v2});
+            cell.faces[i].adjacent.rank = 0;
+            cell.faces[i].adjacent.ghost = -1;
+            cell.faces[i].adjacent.index = gcell.adjacent({v1, v2});
+        }
+
+        return cell;
+    }
+    else {
+        throw std::runtime_error("Can't create MovCell");
     }
 }
 

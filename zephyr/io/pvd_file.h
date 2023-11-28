@@ -2,10 +2,9 @@
 
 #include <zephyr/configuration.h>
 
-#include <zephyr/io/filter.h>
-#include <zephyr/io/variables.h>
+#include <zephyr/io/vtu_file.h>
 
-namespace zephyr { namespace io {
+namespace zephyr::io {
 
 /// @class Класс для записи серии VTU файлов и соответствующего PVD файла.
 /// @details Данный класс позволяет сохранять файлы как в однопоточном режиме,
@@ -15,7 +14,7 @@ public:
     /// @brief Набор public переменных: фильр, список переменных и тип
     /// сохранения сетки могут настраиваться пользователем класса.
 
-    Variables variables; ///< Список переменных на запись
+    Variables     variables; ///< Список переменных на запись
     ComplexFilter filter;    ///< Функтор, возвращает true для нужных ячеек
     bool          hex_only;  ///< Записывать как четырехугольники/шестигранники
 
@@ -51,13 +50,28 @@ public:
     /// @brief Записать хранилище (или часть, при распределенном счете) в один
     /// файл VTU (или набор VTU), затем обновить PVD файл.
     /// Используется функция VtuFile::write
+    void save(mesh::EuMesh& mesh, double timestep);
+
+    /// @brief Записать хранилище (или часть, при распределенном счете) в один
+    /// файл VTU (или набор VTU), затем обновить PVD файл.
+    /// Используется функция VtuFile::write
     void save(AmrStorage& elements, double timestep);
+
+    /// @brief Записать хранилище (или часть, при распределенном счете) в один
+    /// файл VTU (или набор VTU), затем обновить PVD файл.
+    /// Используется функция VtuFile::write
+    void save(mesh::LaMesh& mesh, double timestep);
+
+    /// @brief Записать хранилище (или часть, при распределенном счете) в один
+    /// файл VTU (или набор VTU), затем обновить PVD файл.
+    /// Используется функция VtuFile::write
+    void save(CellStorage& cells, NodeStorage& nodes, double timestep);
 
 private:
 
     std::string get_filename() const;
 
-    void update_pvd(AmrStorage& elements, double timestep);
+    void update_pvd(double timestep);
 
     bool           m_open;     ///< Открыт ли pvd файл
     std::string    m_filename; ///< Имя файла без расширения
@@ -70,5 +84,4 @@ private:
 #endif
 };
 
-} // io
-} // zephyr
+} // namespace zephyr::io

@@ -1,7 +1,8 @@
 #include <zephyr/utils/mpi.h>
 
+#include <zephyr/geom/primitives/side.h>
 #include <zephyr/geom/primitives/amr_cell.h>
-#include <zephyr/geom/primitives/amr_faces.h>
+#include <zephyr/geom/primitives/bfaces.h>
 #include <zephyr/geom/primitives/base.h>
 #include <zephyr/mesh/euler/eu_mesh.h>
 
@@ -19,7 +20,7 @@ int check_connectivity(AmrStorage &locals, int ic, AmrStorage& aliens) {
     auto dim = cell.dim;
 
     // Через обычные грани существуют соседи
-    for (int iface = 0; iface < AmrFaces::max_count; ++iface) {
+    for (int iface = 0; iface < BFaces::max_count; ++iface) {
         auto &face = cell.faces[iface];
         if (face.is_undefined()) {
             continue;

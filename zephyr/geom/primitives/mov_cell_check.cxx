@@ -1,7 +1,7 @@
 #include <fstream>
 #include <iomanip>
 
-#include <zephyr/geom/primitives/poly_cell.h>
+#include <zephyr/geom/primitives/mov_cell.h>
 
 namespace zephyr::geom {
 /*
@@ -25,7 +25,7 @@ void PolyCell::print_info() const {
     }
 
     std::cout << "\t\tcell.faces:\n";
-    for (int i = 0; i < AmrFaces::max_size; ++i) {
+    for (int i = 0; i < BFaces::max_size; ++i) {
         auto &face = faces[i];
         if (face.is_undefined()) continue;
 
@@ -103,7 +103,7 @@ void PolyCell::visualize() const {
         file << "ax.plot(curve_Lx, curve_Ly, linestyle='dotted', color='green', linewidth=0.5)\n\n";
     }
 
-    for (int i = 0; i < AmrFaces::max_size; ++i) {
+    for (int i = 0; i < BFaces::max_size; ++i) {
         auto &face = faces[i];
         if (face.is_undefined()) {
             continue;
@@ -249,7 +249,7 @@ int PolyCell::check_base_vertices_order() const {
         bool bad = false;
 
         // Индекс пересечения двух граней
-        auto cross_face = [](const AmrFaces& faces, Side side1, Side side2) -> int {
+        auto cross_face = [](const BFaces& faces, Side side1, Side side2) -> int {
             auto& face1 = faces[side1];
             auto& face2 = faces[side2];
             if (face1.is_undefined()) {
@@ -320,7 +320,7 @@ int PolyCell::check_base_vertices_order() const {
         bool bad = false;
 
         // Индекс пересечения трех граней
-        auto cross_face = [](const AmrFaces& faces, Side side1, Side side2, Side side3) -> int {
+        auto cross_face = [](const BFaces& faces, Side side1, Side side2, Side side3) -> int {
             auto& face1 = faces[side1];
             auto& face2 = faces[side2];
             auto& face3 = faces[side3];

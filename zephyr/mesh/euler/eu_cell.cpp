@@ -1,3 +1,4 @@
+#include <zephyr/geom/primitives/side.h>
 #include <zephyr/geom/primitives/amr_cell.h>
 #include <zephyr/mesh/euler/eu_cell.h>
 
@@ -46,11 +47,7 @@ EuCell EuCell::locals(int idx) {
     return { m_locals, m_aliens, idx };
 }
 
-EuCell EuCell::neib(const AmrFace &face) const {
-    return { m_locals, m_aliens, face.adjacent };
-}
-
-EuCell EuCell::neighbor(const AmrFace &face) const {
+EuCell EuCell::neib(const BFace &face) const {
     return { m_locals, m_aliens, face.adjacent };
 }
 
@@ -58,15 +55,7 @@ EuCell EuCell::neib(const EuFace &face) const {
     return { m_locals, m_aliens, face.adjacent() };
 }
 
-EuCell EuCell::neighbor(const EuFace &face) const {
-    return { m_locals, m_aliens, face.adjacent() };
-}
-
 EuCell EuCell::neib(int face_idx) const {
-    return { m_locals, m_aliens, m_it->faces[face_idx].adjacent };
-}
-
-EuCell EuCell::neighbor(int face_idx) const {
     return { m_locals, m_aliens, m_it->faces[face_idx].adjacent };
 }
 
@@ -78,7 +67,7 @@ void EuCell::print_neibs_info() const {
     m_it->print_info();
 
     std::cout << "\tAll neighbors of cell:\n";
-    for (int i = 0; i < geom::AmrFaces::max_count; ++i) {
+    for (int i = 0; i < geom::BFaces::max_count; ++i) {
         auto &face = m_it->faces[i];
         if (face.is_undefined() or face.is_boundary()) continue;
 

@@ -1,0 +1,152 @@
+\documentclass[12pt]{report}
+\usepackage[left=20mm, top=20mm, right=20mm, bottom=20mm, nohead]{geometry}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8x]{inputenc}
+\usepackage[english, russian]{babel}
+\usepackage{graphicx}
+\usepackage{epstopdf}
+\usepackage{cite}
+\usepackage[english,russian]{babel}
+\usepackage{amssymb,amsmath,latexsym,enumerate}
+\usepackage{physics}
+\usepackage{array,longtable,lscape}
+\usepackage{graphicx}
+\usepackage{subfigure,epsfig}
+\usepackage{ulem}
+\usepackage[usenames]{color}
+\usepackage{titlesec}
+\usepackage{comment}
+\usepackage{arydshln}
+\usepackage{dashrule}
+\usepackage{setspace} 
+\usepackage{physics}
+\usepackage{wrapfig}
+\usepackage{indentfirst}
+
+
+\numberwithin{equation}{section}
+\titlelabel{\thetitle.\quad}
+
+
+\setlength{\parindent}{0.5cm}
+
+\onehalfspacing
+\allowdisplaybreaks
+
+
+\newcommand{\class}[1]{\texttt{\textcolor{cyan}{#1}}}
+\newcommand{\namespace}[1]{\texttt{\textcolor{blue}{#1}}}
+\newcommand{\file}[1]{\texttt{#1}}
+
+
+\begin{document}
+
+\tableofcontents
+\newpage
+
+\chapter{Quick Start}
+
+Короткий гайд по запуску. 
+
+
+
+\chapter{Пространства имен: \namespace{geom}}
+
+\section{Линейная алгебра}
+
+Библиотека Eigen, файл \file{vector.h}
+
+\section{Вычислительная геометрия}
+
+\subsection{Классы \class{Polygon} и \class{Polyhedron}}
+
+
+\section{Отображения}
+
+\subsection{Классы \class{Line}, \class{Quad}, \class{Cube}}
+
+\subsection{Классы \class{SqLine}, \class{SqQuad}, \class{SqCube}}
+
+
+\section{Сетка общего вида}
+
+\subsection{Классы \class{GNode}, \class{GCell} и \class{Grid}}
+
+
+\section{Сеточные генераторы}
+
+\section{Сеточные примитивы}
+
+\subsection{Элементарные классы: \class{Side}, \class{Boundary}, \class{Adjacent}}
+
+\subsection{Классы \class{BFace} и \class{BFaces}}
+
+\subsection{Классы \class{BNodes} и \class{BVertices}}
+
+\subsection{Класс \class{Element}}
+
+\subsection{Класс \class{MovNode}}
+
+\subsection{Класс \class{MovCell}}
+
+\subsection{Класс \class{AmrCell}}
+
+
+
+
+\chapter{Пространства имен: \namespace{mesh}}
+
+\section{Хранилище}
+
+\subsection{Класс \class{Storage}}
+
+\subsection{Классы \class{AmrStorage}, \class{CellStorage}, \class{NodeStorage}}
+
+
+\section{Эйлерова/AMR сетка}
+
+\subsection{Класс \class{EuMesh}}
+
+\subsection{Класс \class{EuCell}}
+
+\subsection{Классы \class{EuFaces} и \class{EuFace}}
+
+
+\section{Лагранжева сетка}
+
+\subsection{Класс \class{LaMesh}}
+
+\subsection{Класс \class{LaNode}}
+
+\subsection{Класс \class{LaCell}}
+
+\subsection{Классы \class{LaFaces} и \class{LaFace}}
+
+
+\section{Общий сеточный интерфейс}
+
+\subsection{Классы \class{Node}, \class{Face}, \class{Faces}, \class{Cell}}
+
+
+\chapter{Пространства имен: \namespace{io}}
+
+\subsection{Классы \class{Variable} и \class{Variables}}
+
+\subsection{Классы \class{VtuFile} и \class{PvdFile}}
+
+
+
+\chapter{Пространства имен: \namespace{utils}}
+
+
+
+\chapter{Пространство имен \namespace{math}}
+
+\chapter{Пространство имен \namespace{phys}}
+
+
+
+
+
+
+\end{document} 

@@ -4,12 +4,11 @@
 
 #include <zephyr/geom/grid.h>
 #include <zephyr/geom/generator/generator.h>
-
 #include <zephyr/geom/primitives/amr_cell.h>
-#include <zephyr/mesh/euler/eu_cell.h>
-#include <zephyr/mesh/storage.h>
-#include <zephyr/mesh/euler/distributor.h>
 
+#include <zephyr/mesh/euler/distributor.h>
+#include <zephyr/mesh/euler/eu_face.h>
+#include <zephyr/mesh/euler/eu_cell.h>
 
 namespace zephyr::mesh {
 
@@ -71,18 +70,21 @@ public:
     }
 
     template<int n_tasks_per_thread = 1, class Func,
-            class Value = typename std::result_of<Func(EuCell)>::type>
+            class Value = typename std::result_of<Func(EuCell&)>::type>
     auto min(const Value &init, Func &&func)
     -> typename std::enable_if<!std::is_void<Value>::value, Value>::type {
         return threads::min<n_tasks_per_thread>(begin(), end(), init, std::forward<Func>(func));
     }
 
     template<int n_tasks_per_thread = 1, class Func,
-            class Value = typename std::result_of<Func(EuCell)>::type>
+            class Value = typename std::result_of<Func(EuCell&)>::type>
     auto min(Func &&func)
     -> typename std::enable_if<std::is_arithmetic<Value>::value, Value>::type {
         return threads::min<n_tasks_per_thread>(begin(), end(), std::forward<Func>(func));
     }
+
+    /// @brief Найти описывающий кубоид (Bounding box)
+    geom::Box bbox();
 
 private:
 

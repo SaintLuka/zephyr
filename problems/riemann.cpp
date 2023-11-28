@@ -97,16 +97,12 @@ int main() {
                       }};
 
     // Создаем одномерную сетку
-    double H = 0.05 * (test.xmax() - test.xmin());
-    Rectangle rect(test.xmin(), test.xmax(), -H, +H);
-    int n_cells = 500;
-    rect.set_sizes(n_cells, 1);
-    rect.set_boundaries({
-        .left   = Boundary::WALL, .right = Boundary::WALL,
-        .bottom = Boundary::WALL, .top   = Boundary::WALL});
+    Strip gen(test.xmin(), test.xmax());
+    int n_cells = 5000;
+    gen.set_size(n_cells);
 
     // Создать сетку
-    EuMesh mesh(U, &rect);
+    EuMesh mesh(U, &gen);
 
     // Заполняем начальные данные
     for (auto cell: mesh) {
@@ -132,14 +128,14 @@ int main() {
     while (time <= 1.01 * test.max_time()) {
         if (time >= next_write) {
             std::cout << "\tStep: " << std::setw(6) << n_step << ";"
-                      << "\t\tTime: " << std::setw(6) << std::setprecision(3) << time << "\n";
+                      << "\t\tTime: " << std::setw(8) << std::setprecision(3) << time << "\n";
             pvd.save(mesh, time);
             next_write += test.max_time() / 100;
         }
 
         // Определяем dt
         double dt = std::numeric_limits<double>::max();
-        for (auto cell: mesh) {
+        for (auto& cell: mesh) {
             // скорость звука
             double c = eos.sound_speed_rp(cell(U).rho1, cell(U).p1);
             for (auto &face: cell.faces()) {
@@ -156,7 +152,7 @@ int main() {
         dt *= CFL;
 
         // Расчет по некоторой схеме
-        for (auto cell: mesh) {
+        for (auto& cell: mesh) {
             // Примитивный вектор в ячейке
             PState zc(cell(U).rho1, cell(U).v1, cell(U).p1, cell(U).e1);
 
@@ -207,7 +203,7 @@ int main() {
         }
 
         // Обновляем слои
-        for (auto cell: mesh) {
+        for (auto& cell: mesh) {
             std::swap(cell(U).rho1, cell(U).rho2);
             std::swap(cell(U).v1, cell(U).v2);
             std::swap(cell(U).p1, cell(U).p2);
@@ -235,6 +231,7 @@ int main() {
     auto fprint = [](const std::string &name, double value) {
         std::cout << name << ": " << value << '\n';
     };
+
     std::cout << "Mean average errors:\n";
     fprint("\tdensity error     ", rho_err / n_cells);
     fprint("\tu error           ", u_err / n_cells);

@@ -149,6 +149,7 @@ int main() {
     // Файл для записи
     PvdFile pvd("mesh", "output");
     PvdFile pvd_body("body", "output");
+    PvdFile pvd_scheme("scheme", "output");
 
     // Переменные для сохранения
     pvd.variables += {"u",  get_u};
@@ -160,8 +161,10 @@ int main() {
     pvd.variables += {"over", get_over};
     pvd.variables += {"close", get_close};
 
+    pvd_scheme.variables += {"u",  get_u};
+
     // Геометрия области
-    Rectangle rect(0.0, 1.0, 0.0, 1.0, true);
+    Rectangle rect(0.0, 1.0, 0.0, 1.0, false);
     rect.set_nx(200);
     rect.set_boundaries({
         .left   = Boundary::ZOE, .right = Boundary::ZOE,
@@ -170,6 +173,8 @@ int main() {
     // Создать решатель
     Solver solver;
     solver.set_CFL(0.5);
+    solver.set_version(1);
+    solver.dir_splitting(true);
 
     // Создать сетку
     EuMesh mesh(U, &rect);
@@ -217,11 +222,15 @@ int main() {
 
             AmrStorage body = solver.body(mesh);
             pvd_body.save(body, curr_time);
+
+            AmrStorage scheme = solver.scheme(mesh);
+            pvd_scheme.save(scheme, curr_time);
+
             next_write += 0.0;
         }
 
         // Шаг решения
-        solver.update(mesh, 2);
+        solver.update(mesh);
 
         // Установить флаги адаптации
         solver.set_flags(mesh);

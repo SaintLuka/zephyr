@@ -1,3 +1,4 @@
+#include <zephyr/geom/primitives/side.h>
 #include <zephyr/geom/primitives/amr_cell.h>
 
 namespace zephyr::geom {
@@ -5,7 +6,7 @@ namespace zephyr::geom {
 AmrCell::AmrCell(const Quad& quad)
     : Element(0, 0), dim(2),
     adaptive(true), linear(true),
-    vertices(quad), faces(2),
+    vertices(quad), faces(CellType::AMR2D),
     b_idx(-1), z_idx(-1), level(0), flag(0) {
 
     double area = quad.area();
@@ -27,12 +28,14 @@ AmrCell::AmrCell(const Quad& quad)
 }
 
 AmrCell::AmrCell(const SqQuad& quad)
-    : AmrCell(quad.reduce()) { }
+    : AmrCell(quad.reduce()) {
+    //std::cerr << "Nonlinear AmrCells is not supported\n";
+}
 
 AmrCell::AmrCell(const Cube& cube)
     : Element(0, 0), dim(3),
     adaptive(true), linear(true),
-    vertices(cube), faces(3),
+    vertices(cube), faces(CellType::AMR3D),
     b_idx(-1), z_idx(-1), level(0), flag(0) {
 
     double volume = cube.volume();
@@ -56,13 +59,13 @@ AmrCell::AmrCell(const Cube& cube)
 
 AmrCell::AmrCell(const SqCube& cube)
     : AmrCell(cube.reduce()) {
-
+    //std::cerr << "Nonlinear AmrCells is not supported\n";
 }
 
 AmrCell::AmrCell(const Polygon& poly)
         : Element(0, 0), dim(2),
           adaptive(false), linear(true),
-          vertices(poly), faces(true, poly.size()),
+          vertices(poly), faces(CellType::POLYGON, poly.size()),
           b_idx(-1), z_idx(-1), level(0), flag(0) {
 
     Vector3d C = poly.center();

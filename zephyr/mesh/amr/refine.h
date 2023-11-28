@@ -97,11 +97,11 @@ std::array<AmrCell, CpC(dim)> get_children(AmrCell &cell) {
             // Ячейка имела сложную грань
             for (int i: children_by_side[side]) {
                 AmrCell &child = children[i];
-                AmrFace &child_face = child.faces[side];
+                BFace &child_face = child.faces[side];
                 auto child_fc = child_face.center;
 
                 for (auto s: subface_sides<dim>(side)) {
-                    AmrFace& cell_face = cell.faces[s];
+                    BFace& cell_face = cell.faces[s];
                     auto cell_fc = cell_face.center;
 
                     if ((child_fc - cell_fc).norm() < 1.0e-5 * cell.size) {
@@ -169,7 +169,7 @@ void refine_cell(AmrStorage &locals, AmrStorage &aliens, int rank, int ic, const
         locals[parent.next + i] = children[i];
 
         for (int s = 0; s < FpC(dim); ++s) {
-            AmrFace &f1 = child.faces[s];
+            BFace &f1 = child.faces[s];
             if (f1.is_undefined() or f1.is_boundary()) {
                 continue;
             }
