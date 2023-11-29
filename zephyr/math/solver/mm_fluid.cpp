@@ -261,12 +261,9 @@ void MmFluid::set_acc(int acc) {
 Distributor MmFluid::distributor() const {
     Distributor distr;
 
-    distr.split2D = [this](Storage::Item parent, const std::array<Storage::Item, 4> &children) {
-//        Fractions parent_mass(parent(U).mass_frac);
-//        parent_mass.vec() *= parent(U).rho * parent.volume();
-//        Fractions diff(parent_mass);
-        for (auto child: children) {
-            Vector3d dr = child.center() - parent.center();
+    distr.split = [this](AmrStorage::Item &parent, mesh::Children &children) {
+        for (auto &child: children) {
+            Vector3d dr = child.center - parent.center;
             PState child_state = parent(U).get_pstate().vec() +
                                  parent(U).d_dx.vec() * dr.x() +
                                  parent(U).d_dy.vec() * dr.y() +
@@ -275,21 +272,12 @@ Distributor MmFluid::distributor() const {
             child_state.energy = mixture.energy_rp(child_state.density, child_state.pressure, child_state.mass_frac);
             child_state.temperature = mixture.temperature_rp(child_state.density, child_state.pressure, child_state.mass_frac);
             child(U).set_state(child_state);
-//            diff.vec() -= child_state.mass_frac.vec() * child.volume() * child(U).rho;
         }
-//        for (int i = 0; i < Fractions::max_size; i++) {
-//            if (parent_mass[i] != 0 && abs(diff[i] / parent_mass[i]) > 1e-3) {
-//                std::cerr << "parent: " << parent_mass[i] << " diff: " << diff[i] << '\n';
-//                std::cerr << "relative_err: " << abs(diff[i] / parent_mass[i]) << '\n';
-//                std::cerr << "step: " << m_step << "\n";
-//                throw std::runtime_error("bad split2D");
-//            }
-//        }
     };
 
-    distr.merge2D = [this](const std::array<Storage::Item, 4> &children, Storage::Item parent) {
+    distr.merge = [this](mesh::Children &children, AmrStorage::Item &parent) {
         PState sum;
-        for (auto child: children) {
+        for (auto &child: children) {
             sum.vec() += child(U).get_pstate().vec() * child.volume();
         }
         parent(U).set_state(sum.vec() / parent.volume());

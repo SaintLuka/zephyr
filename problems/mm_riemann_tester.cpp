@@ -307,7 +307,7 @@ void RiemannTesterWithSolver2D(Fluxes flux, int n_cells = 10, int acc = 1, const
     int n_writes = 100;
     while (time <= 1.01 * max_time) {
         if (time >= next_write) {
-            std::cout << "progress: " << round(100 * time / max_time) << "%\n";
+            std::cout << "progress: " << int(round(100 * time / max_time)) << "%\n";
             pvd.save(mesh, time);
             next_write += max_time / n_writes;
         }
@@ -462,19 +462,19 @@ int main() {
 //    fluxes.push_back(Fluxes::RUSANOV2);
     fluxes.push_back(Fluxes::GODUNOV);
 
-    RiemannTesterWithSolver(Fluxes::GODUNOV, test1, 100, 2);
-    RiemannTesterWithSolver(Fluxes::GODUNOV, test3, 100, 2);
-    RiemannTesterWithSolver(Fluxes::GODUNOV, test4, 100, 2);
-    RiemannTesterWithSolver(Fluxes::GODUNOV, test5, 100, 2);
-    RiemannTesterWithSolver(Fluxes::GODUNOV, mm_toro, 100, 2);
-    RiemannTesterWithSolver(Fluxes::GODUNOV, mm_sod, 100, 2);
+//    RiemannTesterWithSolver(Fluxes::GODUNOV, test1, 100, 2);
+//    RiemannTesterWithSolver(Fluxes::GODUNOV, test3, 100, 2);
+//    RiemannTesterWithSolver(Fluxes::GODUNOV, test4, 100, 2);
+//    RiemannTesterWithSolver(Fluxes::GODUNOV, test5, 100, 2);
+//    RiemannTesterWithSolver(Fluxes::GODUNOV, mm_toro, 100, 2);
+//    RiemannTesterWithSolver(Fluxes::GODUNOV, mm_sod, 100, 2);
 
-//    Stopwatch solve;
-//    solve.start();
-//    RiemannTesterWithSolver2D(Fluxes::GODUNOV, 20, 2, "output_2D_adaptive_2");
-//    solve.stop();
-//    std::cout << "Time: " << solve.milliseconds();
-//    RiemannTesterWithSolver2D(Fluxes::GODUNOV, 250, 1, "output_2D_1");
+    Stopwatch solve;
+    solve.start();
+    RiemannTesterWithSolver2D(Fluxes::GODUNOV, 20, 2, "output_2D_adaptive_2");
+    solve.stop();
+    std::cout << "Time: " << solve.milliseconds();
+//    RiemannTesterWithSolver2D(Fluxes::GODUNOV, 20, 1, "output_2D_1");
 
 //    for (int i = 0; i < fluxes.size(); ++i)
 //        sod_errors[i] = RiemannTester(sod_test, nfs[i]);
