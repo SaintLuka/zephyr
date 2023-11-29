@@ -93,6 +93,12 @@ public:
 
     void update(Mesh &mesh);
 
+    /// @brief Установить флаги адаптации
+    void set_flags(Mesh& mesh);
+
+    /// @brief Распределитель данных при адаптации
+    Distributor distributor() const;
+
 private:
     /// @brief Посчитать шаг интегрирования по времени с учетом
     /// условия Куранта
