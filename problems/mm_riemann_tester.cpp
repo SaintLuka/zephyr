@@ -163,10 +163,6 @@ RiemannTesterWithSolver(Fluxes flux, const MmTest &test, int n_cells = 10, int a
         }
     }
 
-    // Число Куранта
-    double CFL = 0.4;
-    solver.set_CFL(CFL);
-
     double next_write = 0.0;
     int n_writes = 100;
     while (time <= 1.01 * max_time) {
@@ -275,28 +271,37 @@ void RiemannTesterWithSolver2D(Fluxes flux, int n_cells = 10, int acc = 1, const
     MmFluid solver(mixture, flux);
     solver.set_acc(acc);
 
-    Vector3d center = {(x_min + x_max) / 2, 0, 0};
-    for (auto cell: mesh) {
-        if ((cell.center() - center).norm() < r) {
-            cell(U).rho = rho_in;
-            cell(U).v = Vector3d(u_in, 0, 0);
-            cell(U).p = p_in;
-            cell(U).e = e_in;
-            cell(U).t = t_in;
-            cell(U).mass_frac = mass_frac_in;
-        } else {
-            cell(U).rho = rho_out;
-            cell(U).v = Vector3d(u_out, 0, 0);
-            cell(U).p = p_out;
-            cell(U).e = e_out;
-            cell(U).t = t_out;
-            cell(U).mass_frac = mass_frac_out;
-        }
-    }
-
     // Число Куранта
     double CFL = 0.2;
     solver.set_CFL(CFL);
+
+    // Настраиваем адаптацию
+    mesh.set_max_level(5);
+    mesh.set_distributor(solver.distributor());
+
+    Vector3d center = {(x_min + x_max) / 2, 0, 0};
+    // Адаптация под начальные данные
+    for (int k = 0; k < mesh.max_level() + 3; ++k) {
+        for (auto cell: mesh) {
+            if ((cell.center() - center).norm() < r) {
+                cell(U).rho = rho_in;
+                cell(U).v = Vector3d(u_in, 0, 0);
+                cell(U).p = p_in;
+                cell(U).e = e_in;
+                cell(U).t = t_in;
+                cell(U).mass_frac = mass_frac_in;
+            } else {
+                cell(U).rho = rho_out;
+                cell(U).v = Vector3d(u_out, 0, 0);
+                cell(U).p = p_out;
+                cell(U).e = e_out;
+                cell(U).t = t_out;
+                cell(U).mass_frac = mass_frac_out;
+            }
+        }
+        solver.set_flags(mesh);
+        mesh.refine();
+    }
 
     double next_write = 0.0;
     int n_writes = 100;
@@ -306,7 +311,15 @@ void RiemannTesterWithSolver2D(Fluxes flux, int n_cells = 10, int acc = 1, const
             pvd.save(mesh, time);
             next_write += max_time / n_writes;
         }
+
+        // шаг решения
         solver.update(mesh);
+
+        // Установить флаги адаптации
+        solver.set_flags(mesh);
+
+        // Адаптировать сетку
+        mesh.refine();
 
         time = solver.get_time();
     }
@@ -450,7 +463,6 @@ int main() {
     fluxes.push_back(Fluxes::GODUNOV);
 
     RiemannTesterWithSolver(Fluxes::GODUNOV, test1, 100, 2);
-//    RiemannTesterWithSolver(Fluxes::GODUNOV, test2, 100, 2);
     RiemannTesterWithSolver(Fluxes::GODUNOV, test3, 100, 2);
     RiemannTesterWithSolver(Fluxes::GODUNOV, test4, 100, 2);
     RiemannTesterWithSolver(Fluxes::GODUNOV, test5, 100, 2);
@@ -459,7 +471,7 @@ int main() {
 
 //    Stopwatch solve;
 //    solve.start();
-//    RiemannTesterWithSolver2D(Fluxes::GODUNOV, 300, 2, "output_2D_2");
+//    RiemannTesterWithSolver2D(Fluxes::GODUNOV, 20, 2, "output_2D_adaptive_2");
 //    solve.stop();
 //    std::cout << "Time: " << solve.milliseconds();
 //    RiemannTesterWithSolver2D(Fluxes::GODUNOV, 250, 1, "output_2D_1");

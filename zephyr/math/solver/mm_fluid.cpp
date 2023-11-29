@@ -194,19 +194,8 @@ mmf::Flux MmFluid::calc_flux_extra(Cell &cell, bool from_begin) const {
         PState p_plus = face_extra.p(p_neib).in_local(normal);
 
         // исправляем возможные нефизичные значения массовых долей
-        for (auto &v: p_minus.mass_frac.m_data)
-            if (v < 0)
-                v = 0;
-            else if (v > 1)
-                v = 1;
-        p_minus.mass_frac.normalize();
-
-        for (auto &v: p_plus.mass_frac.m_data)
-            if (v < 0)
-                v = 0;
-            else if (v > 1)
-                v = 1;
-        p_plus.mass_frac.normalize();
+        p_minus.mass_frac.fix();
+        p_plus.mass_frac.fix();
 
         // пересчитываем энергию и температуру
         p_minus.energy = mixture.energy_rp(p_minus.density, p_minus.pressure, p_minus.mass_frac);
@@ -267,6 +256,86 @@ void MmFluid::set_CFL(double CFL) {
 
 void MmFluid::set_acc(int acc) {
     m_acc = acc;
+}
+
+Distributor MmFluid::distributor() const {
+    Distributor distr;
+
+    distr.split2D = [this](Storage::Item parent, const std::array<Storage::Item, 4> &children) {
+//        Fractions parent_mass(parent(U).mass_frac);
+//        parent_mass.vec() *= parent(U).rho * parent.volume();
+//        Fractions diff(parent_mass);
+        for (auto child: children) {
+            Vector3d dr = child.center() - parent.center();
+            PState child_state = parent(U).get_pstate().vec() +
+                                 parent(U).d_dx.vec() * dr.x() +
+                                 parent(U).d_dy.vec() * dr.y() +
+                                 parent(U).d_dz.vec() * dr.z();
+            child_state.mass_frac = parent(U).mass_frac;
+            child_state.energy = mixture.energy_rp(child_state.density, child_state.pressure, child_state.mass_frac);
+            child_state.temperature = mixture.temperature_rp(child_state.density, child_state.pressure, child_state.mass_frac);
+            child(U).set_state(child_state);
+//            diff.vec() -= child_state.mass_frac.vec() * child.volume() * child(U).rho;
+        }
+//        for (int i = 0; i < Fractions::max_size; i++) {
+//            if (parent_mass[i] != 0 && abs(diff[i] / parent_mass[i]) > 1e-3) {
+//                std::cerr << "parent: " << parent_mass[i] << " diff: " << diff[i] << '\n';
+//                std::cerr << "relative_err: " << abs(diff[i] / parent_mass[i]) << '\n';
+//                std::cerr << "step: " << m_step << "\n";
+//                throw std::runtime_error("bad split2D");
+//            }
+//        }
+    };
+
+    distr.merge2D = [this](const std::array<Storage::Item, 4> &children, Storage::Item parent) {
+        PState sum;
+        for (auto child: children) {
+            sum.vec() += child(U).get_pstate().vec() * child.volume();
+        }
+        parent(U).set_state(sum.vec() / parent.volume());
+        parent(U).mass_frac.fix();
+        parent(U).e = mixture.energy_rp(parent(U).rho, parent(U).p, parent(U).mass_frac);
+        parent(U).t = mixture.temperature_rp(parent(U).rho, parent(U).p, parent(U).mass_frac);
+    };
+
+    return distr;
+}
+
+void MmFluid::set_flags(Mesh &mesh) {
+    compute_grad(mesh, get_current);
+
+    for (auto cell: mesh) {
+        double p = cell(U).p;
+        Fractions mass_frac = cell(U).mass_frac;
+        bool need_split = false;
+        for (auto face: cell.faces()) {
+            if (face.is_boundary()) {
+                continue;
+            }
+
+            // проверяем большой перепад давлений
+            if (abs(face.neib()(U).p - p) > 0.1 * p) {
+                need_split = true;
+                break;
+            }
+
+            // проверяем большое различие в долях веществ
+            Fractions neib_mass_frac = face.neib()(U).mass_frac;
+            for (int i = 0; i < Fractions::max_size; i++) {
+                if (abs(mass_frac[i] - neib_mass_frac[i]) > 0.1) {
+                    need_split = true;
+                    break;
+                }
+            }
+            if (need_split)
+                break;
+        }
+        if (need_split) {
+            cell.set_flag(1);
+        } else {
+            cell.set_flag(-1);
+        }
+    }
 }
 
 }
