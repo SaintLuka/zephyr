@@ -29,7 +29,7 @@ mmf::PState get_half(Cell &cell) {
     return cell(U).half;
 }
 
-MmFluid::MmFluid(const phys::Materials &mixture, Fluxes flux = Fluxes::GODUNOV) : mixture(mixture) {
+MmFluid::MmFluid(const phys::Materials &mixture, Fluxes flux, double g) : mixture(mixture), g(g) {
     m_nf = NumFlux::create(flux);
     m_CFL = 0.5;
     m_dt = std::numeric_limits<double>::max();
@@ -92,7 +92,11 @@ void MmFluid::fluxes(Mesh &mesh) const {
 
             if (!face.is_boundary()) {
                 p_neib = face.neib()(U).get_pstate();
+            } else if (face.flag() == Boundary::WALL) {
+                Vector3d Vn = normal * p_self.velocity.dot(normal);
+                p_neib.velocity = p_self.velocity - 2 * Vn; // Vt - Vn = p_self.velocity - Vn - Vn
             }
+
 
             // Значение на грани со стороны ячейки
             PState zm = p_self.in_local(normal);
@@ -110,6 +114,7 @@ void MmFluid::fluxes(Mesh &mesh) const {
 
         // Новое значение в ячейке (консервативные переменные)
         QState q_self2 = q_self.vec() - m_dt * flux.vec() / cell.volume();
+        q_self2.momentum.y() -= m_dt * g * p_self.density;
 
         // Новое значение примитивных переменных
         PState p_self2(q_self2, mixture, p_self.pressure, p_self.energy);
@@ -124,8 +129,9 @@ void MmFluid::fluxes(Mesh &mesh) const {
         cell(U).next = p_self2;
 
         if (cell(U).is_bad()) {
-            std::cerr << "calc new cell " << cell.b_idx() << " state from step " << m_step << " to " << m_step + 1
+            std::cerr << "calc new cell with idx: " << cell.b_idx() << " state from step " << m_step << " to " << m_step + 1
                       << "\n";
+            std::cerr << "x: " << cell.center().x() << ", y: " << cell.center().y() << "\n";
             std::cerr << cell(U);
             throw std::runtime_error("bad cell");
         }
@@ -145,6 +151,7 @@ void MmFluid::fluxes_stage1(Mesh &mesh) const {
     mesh.for_each([this](Cell &cell) -> void {
         QState qc(cell(U).get_pstate());
         qc.vec() -= 0.5 * m_dt / cell.volume() * calc_flux_extra(cell, true).vec();
+        qc.momentum.y() -= m_dt * g * cell(U).rho;
         cell(U).half = PState(qc, mixture);
     });
 }
@@ -153,6 +160,7 @@ void MmFluid::fluxes_stage2(Mesh &mesh) const {
     mesh.for_each([this](Cell &cell) -> void {
         QState qc(cell(U).get_pstate());
         qc.vec() -= m_dt / cell.volume() * calc_flux_extra(cell, false).vec();
+        qc.momentum.y() -= m_dt * g * cell(U).half.density;
         cell(U).next = PState(qc, mixture);
     });
 }

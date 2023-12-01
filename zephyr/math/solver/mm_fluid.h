@@ -72,7 +72,7 @@ public:
     [[nodiscard]] static State datatype();
 
     /// @brief Конструктор класса
-    explicit MmFluid(const phys::Materials &mixture, Fluxes flux);
+    explicit MmFluid(const phys::Materials &mixture, Fluxes flux = Fluxes::GODUNOV, double g = 0.0);
 
     /// @brief Число Куранта
     [[nodiscard]] double CFL() const;
@@ -125,6 +125,7 @@ public:
 protected:
     const phys::Materials mixture;
     NumFlux::Ptr m_nf; ///< Метод расчёта потока
+    double g; ///< ускорение свободного падения, направлено против oy
     int m_acc = 1;
     double m_time = 0.0; ///< Прошедшее время
     size_t m_step = 0; ///< Количество шагов расчёта

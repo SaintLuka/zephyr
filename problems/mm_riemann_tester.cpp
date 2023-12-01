@@ -22,21 +22,21 @@ using zephyr::math::RiemannSolver;
 MmFluid::State U;
 
 /// Переменные для сохранения
-double get_rho(AmrStorage::Item& cell) { return cell(U).rho; }
+double get_rho(AmrStorage::Item &cell) { return cell(U).rho; }
 
-double get_u(AmrStorage::Item& cell) { return cell(U).v.x(); }
+double get_u(AmrStorage::Item &cell) { return cell(U).v.x(); }
 
-double get_v(AmrStorage::Item& cell) { return cell(U).v.y(); }
+double get_v(AmrStorage::Item &cell) { return cell(U).v.y(); }
 
-double get_w(AmrStorage::Item& cell) { return cell(U).v.z(); }
+double get_w(AmrStorage::Item &cell) { return cell(U).v.z(); }
 
-double get_p(AmrStorage::Item& cell) { return cell(U).p; }
+double get_p(AmrStorage::Item &cell) { return cell(U).p; }
 
-double get_e(AmrStorage::Item& cell) { return cell(U).e; }
+double get_e(AmrStorage::Item &cell) { return cell(U).e; }
 
-double get_frac1(AmrStorage::Item& cell) { return cell(U).mass_frac[0]; }
+double get_frac1(AmrStorage::Item &cell) { return cell(U).mass_frac[0]; }
 
-double get_frac2(AmrStorage::Item& cell) { return cell(U).mass_frac[1]; }
+double get_frac2(AmrStorage::Item &cell) { return cell(U).mass_frac[1]; }
 
 struct MmTest {
     std::shared_ptr<Eos> matL, matR;
@@ -111,27 +111,27 @@ RiemannTesterWithSolver(Fluxes flux, const MmTest &test, int n_cells = 10, int a
     double time = 0.0;
 
     pvd.variables += {"rho_exact",
-                      [&exact, &time](AmrStorage::Item& cell) -> double {
+                      [&exact, &time](AmrStorage::Item &cell) -> double {
                           return exact.density(cell.center.x(), time);
                       }};
     pvd.variables += {"u_exact",
-                      [&exact, &time](AmrStorage::Item& cell) -> double {
+                      [&exact, &time](AmrStorage::Item &cell) -> double {
                           return exact.velocity(cell.center.x(), time);
                       }};
     pvd.variables += {"p_exact",
-                      [&exact, &time](AmrStorage::Item& cell) -> double {
+                      [&exact, &time](AmrStorage::Item &cell) -> double {
                           return exact.pressure(cell.center.x(), time);
                       }};
     pvd.variables += {"e_exact",
-                      [&exact, &time](AmrStorage::Item& cell) -> double {
+                      [&exact, &time](AmrStorage::Item &cell) -> double {
                           return exact.energy(cell.center.x(), time);
                       }};
     pvd.variables += {"c",
-                      [&mixture](AmrStorage::Item& cell) -> double {
+                      [&mixture](AmrStorage::Item &cell) -> double {
                           return mixture.sound_speed_rp(cell(U).rho, cell(U).p, cell(U).mass_frac);
                       }};
     pvd.variables += {"c_exact",
-                      [&exact, &time](AmrStorage::Item& cell) -> double {
+                      [&exact, &time](AmrStorage::Item &cell) -> double {
                           return exact.sound_speed(cell.center.x(), time);
                       }};
 
@@ -249,8 +249,8 @@ void RiemannTesterWithSolver2D(Fluxes flux, int n_cells = 10, int acc = 1, const
     Rectangle rect(x_min, x_max, -H / 2, +H / 2);
     rect.set_sizes(n_cells, n_cells);
     rect.set_boundaries({
-        .left   = Boundary::ZOE, .right = Boundary::ZOE,
-        .bottom = Boundary::ZOE, .top   = Boundary::ZOE});
+                                .left   = Boundary::ZOE, .right = Boundary::ZOE,
+                                .bottom = Boundary::ZOE, .top   = Boundary::ZOE});
 
     // Файл для записи
     PvdFile pvd("mesh", filename);
@@ -272,7 +272,7 @@ void RiemannTesterWithSolver2D(Fluxes flux, int n_cells = 10, int acc = 1, const
     solver.set_acc(acc);
 
     // Число Куранта
-    double CFL = 0.2;
+    double CFL = 0.4;
     solver.set_CFL(CFL);
 
     // Настраиваем адаптацию
@@ -324,6 +324,122 @@ void RiemannTesterWithSolver2D(Fluxes flux, int n_cells = 10, int acc = 1, const
         time = solver.get_time();
     }
 }
+
+void RiemannTesterWithSolverVertical(double g = 9.81, int acc = 1, const std::string &filename = "output") {
+    // Уравнение состояния
+    auto mat_up = IdealGas::create(1.4, 718.0_J_kgK);
+    auto mat_down = IdealGas::create(1.6, 718.0_J_kgK);
+
+    Materials mixture;
+    mixture += mat_up;
+    mixture += mat_down;
+
+    double max_time = 2;
+    double rho_up = 100, rho_down = 20;
+    double p_up = 1e4, p_down = 1e4;
+    double v_up = 0, v_down = 0;
+    double e_up = mat_up->energy_rp(rho_up, p_up), e_down = mat_down->energy_rp(rho_down, p_down);
+    double t_up = mat_up->temperature_rp(rho_up, p_up), t_down = mat_down->temperature_rp(rho_down, p_down);
+    double x_min = 0, x_max = 0.1;
+    double y_min = 0.0, y_max = 1.0;
+    double y_jump = 0.5 * (y_max - y_min);
+
+    Fractions mass_frac_up({1, 0});
+    Fractions mass_frac_down({0, 1});
+    // Состояния слева и справа в тесте
+    PState z_up(rho_up, Vector3d(0, v_up, 0), p_up, e_up, t_up, mass_frac_up);
+    PState z_down(rho_down, Vector3d(0, v_down, 0), p_down, e_down, t_down, mass_frac_down);
+
+    std::cout << "Z_u: " << z_up << "\n" << "Z_d: " << z_down << "\n";
+
+    // Создаем одномерную сетку
+    double H = y_max - y_min;
+    Rectangle rect(x_min, x_max, 0, H);
+    rect.set_sizes(4, 20);
+    rect.set_boundaries({
+                                .left   = Boundary::WALL, .right = Boundary::WALL,
+                                .bottom = Boundary::WALL, .top   = Boundary::WALL});
+
+    // Файл для записи
+    PvdFile pvd("mesh", filename);
+
+    // Переменные для сохранения
+    pvd.variables += {"rho", get_rho};
+    pvd.variables += {"v", get_v};
+    pvd.variables += {"p", get_p};
+    pvd.variables += {"e", get_e};
+    pvd.variables += {"frac1", get_frac1};
+    pvd.variables += {"frac2", get_frac2};
+
+    double time = 0.0;
+
+    // Создать сетку
+    Mesh mesh(U, &rect);
+
+    MmFluid solver(mixture, Fluxes::GODUNOV, g);
+    solver.set_acc(acc);
+
+    // Число Куранта
+    double CFL = 0.4;
+    solver.set_CFL(CFL);
+
+    // Настраиваем адаптацию
+    mesh.set_max_level(5);
+    mesh.set_distributor(solver.distributor());
+
+    for (int k = 0; k < mesh.max_level() + 3; ++k) {
+        for (auto cell: mesh) {
+            if (cell.center().y() > y_jump) {
+                cell(U).set_state(z_up);
+            } else {
+                cell(U).set_state(z_down);
+            }
+        }
+        solver.set_flags(mesh);
+        mesh.refine();
+    }
+
+    double L = x_max - x_min;
+    for (auto cell: mesh) {
+        double x = cell.center().x(), y = cell.center().y();
+        if (cell(U).mass_frac[1] == 0 && y - y_jump < 0.05 * H && abs(x - L / 2) < 0.1 * L) {
+            bool exist = false;
+            for (auto &face: cell.faces()) {
+                if (face.is_boundary())
+                    continue;
+                exist = face.neib()(U).mass_frac[1] > 0;
+                if (exist)
+                    break;
+            }
+            if (exist) {
+                cell(U).mass_frac[0] = 0.9;
+                cell(U).mass_frac[1] = 0.1;
+            }
+        }
+    }
+
+    double next_write = 0.0;
+    int n_writes = 200;
+    while (time <= 1.01 * max_time) {
+        if (time >= next_write) {
+            std::cout << "progress: " << std::fixed << std::setprecision(1) << 100 * time / max_time << "%\n";
+            pvd.save(mesh, time);
+            next_write += max_time / n_writes;
+        }
+
+        // шаг решения
+        solver.update(mesh);
+
+        // Установить флаги адаптации
+        solver.set_flags(mesh);
+
+        // Адаптировать сетку
+        mesh.refine();
+
+        time = solver.get_time();
+    }
+}
+
 
 void test_two_cells() {
     auto matL = IdealGas::create(1.4, 718.0_J_kgK);
@@ -469,11 +585,14 @@ int main() {
 //    RiemannTesterWithSolver(Fluxes::GODUNOV, mm_toro, 100, 2);
 //    RiemannTesterWithSolver(Fluxes::GODUNOV, mm_sod, 100, 2);
 
-    Stopwatch solve;
-    solve.start();
-    RiemannTesterWithSolver2D(Fluxes::GODUNOV, 20, 2, "output_2D_adaptive_2");
-    solve.stop();
-    std::cout << "Time: " << solve.milliseconds();
+//    RiemannTesterWithSolverVertical(100, 1, "output_1");
+    RiemannTesterWithSolverVertical(100, 2, "output_3");
+
+//    Stopwatch solve;
+//    solve.start();
+//    RiemannTesterWithSolver2D(Fluxes::GODUNOV, 20, 2, "output_2D_adaptive_2");
+//    solve.stop();
+//    std::cout << "Time: " << solve.milliseconds();
 //    RiemannTesterWithSolver2D(Fluxes::GODUNOV, 20, 1, "output_2D_1");
 
 //    for (int i = 0; i < fluxes.size(); ++i)
@@ -485,5 +604,6 @@ int main() {
 //    for (int i = 0; i < fluxes.size(); ++i)
 //        toro_errors[i] = RiemannTesterWithSolver(toro_test, fluxes[i]);
 
+    std::cout << "\nfinished\n";
     return 0;
 }
