@@ -3,6 +3,7 @@
 #include <zephyr/geom/primitives/element.h>
 #include <zephyr/geom/primitives/bvertices.h>
 #include <zephyr/geom/primitives/bfaces.h>
+#include <zephyr/geom/primitives/bnodes.h>
 
 namespace zephyr::geom {
 
@@ -18,6 +19,11 @@ public:
     double    size;      ///< Линейный размер ячейки
     BVertices vertices;  ///< Вершины ячейки
     BFaces    faces;     ///< Список граней
+
+    /// @brief Индексы узлов в глобальном массиве вершин.
+    /// Необязательное поле, используется только в некоторых алгоритмах,
+    /// обычно заполнено неопределенными индексами (-1)
+    BNodes    nodes;
 
     // Данные AMR
 
@@ -49,6 +55,11 @@ public:
     /// @brief Скорпировать вершины в полигон (двумерные ячейки)
     /// Для нелинейных AMR-ячеек возвращает до 8 граней.
     PolygonS<8> polygon() const;
+
+    /// @brief Помечает индексы в массиве nodes. Выставляет индексы актуальных
+    /// вершин равными flag, для остальных вершин выставляет значение -1.
+    /// Актуальными считаем вершины, на которые ссылаются грани.
+    void mark_actual_nodes(int mark);
 
     /// @brief Вывести информацию о ячейке
     void print_info() const;

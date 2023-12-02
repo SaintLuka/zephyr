@@ -75,6 +75,13 @@ public:
         return vertices[2] < 0 ? 2 : (vertices[3] < 0 ? 3 : 4);
     }
 
+    /// @brief Вершина содержит указаный индекс?
+    inline bool contain(int idx) const {
+        static_assert(max_size == 4);
+        return vertices[0] == idx || vertices[1] == idx ||
+               vertices[2] == idx || vertices[3] == idx;
+    }
+
     /// @brief Пропустить грань?
     /// @return 'true' если грань неопределена или
     /// не совпадает с выбраным направлением

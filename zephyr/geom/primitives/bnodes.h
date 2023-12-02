@@ -43,7 +43,15 @@ public:
     };
      */
 
-    int count() const {
+    /// @brief Очистить список узлов
+    inline void clear() {
+        m_nodes.fill(-1);
+    }
+
+    /// @brief Число актуальных узлов
+    /// Считает количество индексов >= 0, требуется пройти весь массив,
+    /// поскольку узлы могут располагаться в массиве с пропусками.
+    inline int count() const {
         int count = 0;
         for (int idx: m_nodes) {
             if (idx >= 0) {

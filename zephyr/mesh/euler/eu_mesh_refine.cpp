@@ -55,6 +55,8 @@ void EuMesh::set_distributor(Distributor distr) {
 }
 
 void EuMesh::refine() {
+    break_nodes();
+
     static Stopwatch balance;
     static Stopwatch apply;
     static Stopwatch full;

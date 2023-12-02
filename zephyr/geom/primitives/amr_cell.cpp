@@ -128,4 +128,21 @@ PolygonS<8> AmrCell::polygon() const {
     return poly;
 }
 
+void AmrCell::mark_actual_nodes(int mark) {
+    static_assert(BNodes::max_count == BVertices::max_count);
+
+    nodes.clear();
+    for (const BFace &face: faces) {
+        for (int k = 0; k < BFace::max_size; ++k) {
+            int iv = face.vertices[k];
+            if (iv >= 0) {
+                nodes[iv] = -13;
+            }
+            else {
+                break;
+            }
+        }
+    }
+}
+
 } // namespace zephyr::geom

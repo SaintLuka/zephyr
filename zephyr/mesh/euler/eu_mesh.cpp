@@ -1,3 +1,4 @@
+#include <map>
 
 #include <zephyr/geom/grid.h>
 #include <zephyr/geom/primitives/amr_cell.h>
@@ -5,6 +6,8 @@
 #include <zephyr/geom/box.h>
 #include <zephyr/mesh/euler/eu_cell.h>
 #include <zephyr/mesh/euler/eu_mesh.h>
+#include <numeric>
+#include <problems/fast.h>
 
 namespace zephyr::mesh {
 
@@ -33,6 +36,264 @@ geom::Box EuMesh::bbox() {
     }
 
     return geom::Box(vmin, vmax);
+}
+
+bool EuMesh::has_nodes() const {
+    return !m_nodes.empty();
+}
+
+void EuMesh::break_nodes() {
+    m_nodes.clear();
+}
+
+inline int nodes_estimation(int n_cells, int dim) {
+    assert(dim == 2 || dim == 3);
+    if (dim < 3) {
+        int nx = int(std::ceil(std::sqrt(n_cells))) + 2;
+        return nx * nx;
+    } else {
+        int nx = int(std::ceil(std::cbrt(n_cells))) + 2;
+        return nx * nx * nx;
+    }
+}
+
+// Владелец узла (любая ячейка, которая содержит узел)
+// Основной владелец: ячейка с минимальным индексом.
+struct NodeOwner {
+    int ic;  // Индекс ячейки
+    int iv;  // Индекс вершины в ячейке
+
+    // Можно создать без указания iv, типа просто индекс ячейки
+    // используется для поиска в множестве std::set<NodeOwner>;
+    NodeOwner(int _ic, int _iv)
+            : ic(_ic), iv(_iv) {}
+
+    // Считаем различие только по индексу ячейки
+    inline bool operator<(const NodeOwner& other) const {
+        return ic < other.ic;
+    }
+
+    static const int base = 64;
+
+    // Смешаный индекс вершины (владелец + индекс внутри)
+    inline int node_index() const {
+        return base * ic + iv;
+    }
+
+    // Восстановление из смешаного индекса
+    inline static NodeOwner from_index(int idx) {
+        return NodeOwner(idx / base, idx % base);
+    }
+};
+
+// Простая структура, хранит множество ячеек, которые владеют
+// некоторым узлом
+struct NodeOwners {
+
+    // Добавить владельца
+    inline void insert(int ic, int iv) {
+        owners.insert(NodeOwner(ic, iv));
+    }
+
+    // Имеется владелец с индексом ic?
+    inline bool contain(int ic) {
+        return owners.count(NodeOwner(ic, -1)) > 0;
+    }
+
+    inline NodeOwner main() const {
+        return *std::min_element(owners.begin(), owners.end());
+    }
+
+    inline auto begin() {
+        return owners.begin();
+    }
+
+    inline auto end() {
+        return owners.end();
+    }
+
+    std::set<NodeOwner> owners;
+};
+
+NodeOwners find_owners(AmrStorage& cells, AmrCell& base_cell, int base_iv) {
+    NodeOwners owners;
+
+    // Интересующая нас вершина
+    Vector3d base_v = base_cell.vertices[base_iv];
+    double eps = 1.0e-10 * base_cell.size;
+
+    // Моделирует стек с ячейками в работе
+    std::vector<NodeOwner> in_work;
+
+    in_work.emplace_back(base_cell.index, base_iv);
+
+    while (!in_work.empty()) {
+        // Извлекли из стека последнюю ячейку
+        auto[ic_c, iv_c] = in_work.back();
+        in_work.pop_back();
+
+        owners.insert(ic_c, iv_c);
+
+        AmrCell &cell = cells[ic_c];
+
+        // Проходим по граням, ищем грани, которые содержат искомую вершину
+        // и при этом указывают на ячейки, которых нет в множестве done
+        for (const BFace &face: cell.faces) {
+            if (face.is_undefined() ||
+                face.is_boundary()) {
+                continue;
+            }
+
+            // Грань содержит целевую вершину
+            if (face.contain(iv_c)) {
+                // Сосед через грань
+                AmrCell &neib = cells[face.adjacent.index];
+                int ic_n = neib.index;
+
+                // Сосед уже есть в массиве
+                if (owners.contain(ic_n)) {
+                    continue;
+                }
+
+                // Ищем интересующую вершину среди вершин соседа
+                int iv_n = neib.vertices.find(base_v, eps);
+
+                assert(iv_n >= 0 && "EuMesh::collect_nodes: Impossible error #1");
+
+                // Соседняя ячейка нам подходит, помещаем в стек
+                in_work.emplace_back(ic_n, iv_n);
+            }
+        }
+    }
+
+    return owners;
+}
+
+// Для узлов ячейки, которые помечены индексом -13 выставляет их основного
+// владельца. Кроме этого возвращает количество узлов, для которых ячейка
+// является основным владельцем.
+int count_owned(AmrStorage::Item& cell, AmrStorage& cells) {
+    int owned = 0;
+    for (int iv = 0; iv < BNodes::max_count; ++iv) {
+        // Интересуют актуальные (помеченые) узлы,
+        // которые ещё не получили свой номер.
+        if (cell.nodes[iv] != -13) {
+            continue;
+        }
+
+        // Ищем все ячейки, которые содержат узел
+        auto owners = find_owners(cells, cell, iv);
+
+        // Основной владелец узла
+        NodeOwner owner = owners.main();
+
+        // Устанавливаем смешаный индекс (кодирует основного
+        // владельца) для каждого узла
+        cell.nodes[iv] = owner.node_index();
+
+        if (owner.ic == cell.index) {
+            ++owned;
+        }
+    }
+    return owned;
+};
+
+void setup_nodes(AmrStorage& cells, std::vector<Vector3d>& nodes) {
+    if (cells.empty()) {
+        return;
+    }
+
+    // Стираем существующий массив узлов
+    nodes.clear();
+
+    // Помечаем актуальные узлы (которые есть на каких-либо гранях),
+    // индексом -13.
+    threads::for_each(cells.begin(), cells.end(),
+            [](AmrStorage::Item& cell) {
+                cell.mark_actual_nodes(-13);
+            });
+
+    // TODO: Заменить set, vector на быстрые версии на стеке
+
+    // TODO: Есть только наметки, как это сделать параллельно
+
+    if (true || threads::is_off()) {
+        /// Последовательная версия работает за один проход по ячейкам
+        nodes.reserve(nodes_estimation(cells.size(), cells[0].dim));
+
+        int counter = 0;
+        for (auto &cell: cells) {
+            for (int iv = 0; iv < BNodes::max_count; ++iv) {
+                // Интересуют актуальные (помеченые) узлы,
+                // которые ещё не получили свой номер.
+                if (cell.nodes[iv] != -13) {
+                    continue;
+                }
+
+                // Ищем все ячейки, которые содержат узел
+                auto owners = find_owners(cells, cell, iv);
+
+                // Отмечаем индекс узла у каждого владельца
+                for (auto &owner: owners) {
+                    cells[owner.ic].nodes[owner.iv] = counter;
+                }
+
+                // Добавляем узел в массив
+                nodes.push_back(cell.vertices[iv]);
+                ++counter;
+            }
+        }
+    }
+    else {
+        // Параллельная версия отличается от последовательной и
+        // содержит две стадии.
+
+        std::vector<int> n_owned = threads::partial_sum(
+                cells.begin(), cells.end(), 0,
+                count_owned, std::ref(cells));
+
+        // Смещение индексации в каждом треде
+        std::vector<int> offset;
+        offset.reserve(n_owned.size());
+        offset.push_back(0);
+        for (size_t i = 1; i < n_owned.size(); ++i) {
+            offset[i] = offset[i - 1] + n_owned[i];
+        }
+
+        int counter = 0;
+        for (auto &cell: cells) {
+
+            // Идем по всем вершинам с выставленным номером
+            for (int iv = 0; iv < BNodes::max_count; ++iv) {
+                if (cell.nodes[iv] < 0) {
+                    continue;
+                }
+
+                NodeOwner owner = NodeOwner::from_index(cell.nodes[iv]);
+
+                if (owner.ic == cell.index) {
+                    // Вершина принадлежит ячейке
+                    nodes.push_back(cell.vertices[iv]);
+
+                    cell.nodes[iv] = counter;
+                    ++counter;
+                }
+                else {
+                    assert(owner.ic < cell.index && "setup unique, error #1534");
+                    cell.nodes[iv] = cells[owner.ic].nodes[owner.iv];
+                }
+
+
+            }
+        }
+    }
+}
+
+void EuMesh::collect_nodes() {
+    if (has_nodes()) {
+        return;
+    }
+    setup_nodes(m_locals, m_nodes);
 }
 
 } // namespace zephyr::mesh

@@ -240,6 +240,91 @@ struct Handler {
             file.write((char *) &val, sizeof(uint64_t));
         }
     }
+    
+    /// @brief Вариант вызывается при заданых nodes.
+    void write_connectivity2(std::ofstream &file, geom::AmrCell& cell, size_t &counter) {
+        auto& nodes = cell.nodes;
+
+        if (cell.adaptive) {
+            // Адаптивная ячейка
+            if (cell.dim < 3) {
+                if (hex_only) {
+                    // Сохраняем как простой четырехугольник (VTK_QUAD)
+                    const size_t n = 4;
+                    std::array<size_t, n> vals = {
+                            uint64_t(nodes[SqQuad::iss<-1, -1>()]),
+                            uint64_t(nodes[SqQuad::iss<+1, -1>()]),
+                            uint64_t(nodes[SqQuad::iss<+1, +1>()]),
+                            uint64_t(nodes[SqQuad::iss<-1, +1>()])
+                    };
+
+                    file.write((char *) vals.data(), n * sizeof(uint64_t));
+                    counter += n;
+                    return;
+                } else {
+                    // Сохраняем как полигон
+                    auto &faces = cell.faces;
+
+                    size_t n = 0;
+                    std::array<uint64_t, 8> vals;
+
+                    vals[n++] = nodes[SqQuad::iss<-1, -1>()];
+                    if (faces[Side::BOTTOM1].is_actual()) {
+                        vals[n++] = nodes[SqQuad::iss<0, -1>()];
+                    }
+
+                    vals[n++] = nodes[SqQuad::iss<+1, -1>()];
+                    if (faces[Side::RIGHT1].is_actual()) {
+                        vals[n++] = nodes[SqQuad::iss<+1, 0>()];
+                    }
+
+                    vals[n++] = nodes[SqQuad::iss<+1, +1>()];
+                    if (faces[Side::TOP1].is_actual()) {
+                        vals[n++] = nodes[SqQuad::iss<0, +1>()];
+                    }
+
+                    vals[n++] = nodes[SqQuad::iss<-1, +1>()];
+                    if (faces[Side::LEFT1].is_actual()) {
+                        vals[n++] = nodes[SqQuad::iss<-1, 0>()];
+                    }
+
+                    file.write((char *) vals.data(), n * sizeof(uint64_t));
+                    counter += n;
+                    return;
+                }
+            } else {
+                // Сохраняем как простой шестигранник (VTK_HEXAHEDRON)
+                const size_t n = 8;
+                std::array<uint64_t, n> vals = {
+                        uint64_t(nodes[SqCube::iss<-1, -1, -1>()]),
+                        uint64_t(nodes[SqCube::iss<+1, -1, -1>()]),
+                        uint64_t(nodes[SqCube::iss<+1, +1, -1>()]),
+                        uint64_t(nodes[SqCube::iss<-1, +1, -1>()]),
+                        uint64_t(nodes[SqCube::iss<-1, -1, +1>()]),
+                        uint64_t(nodes[SqCube::iss<+1, -1, +1>()]),
+                        uint64_t(nodes[SqCube::iss<+1, +1, +1>()]),
+                        uint64_t(nodes[SqCube::iss<-1, +1, +1>()]),
+
+                };
+                file.write((char *) vals.data(), n * sizeof(uint64_t));
+                counter += n;
+                return;
+            }
+        }
+        else {
+            // В обратном случае это полигон или обычный трехмерный элемент
+
+            // В данном случае подразумеваем, что вершины пронумерованы
+            // в соответствии с соглашениями, принятыми в формате VTK
+            
+            auto n = n_points(cell);
+            for (int i = 0; i < n; ++i) {
+                uint64_t val = nodes[i];
+                file.write((char *) &val, sizeof(uint64_t));
+            }
+            counter += n;
+        }
+    }
 
     /// @brief Записать порядок вершин элемента
     static void write_connectivity(std::ofstream &file, geom::MovCell& cell, size_t &counter) {
@@ -313,6 +398,71 @@ void write_mesh_header(
     }
 
     file << "      </CellData>\n";
+    file << "    </Piece>\n";
+    file << "  </UnstructuredGrid>\n";
+}
+
+void write_mesh_header(
+        std::ofstream &file, AmrStorage &cells,
+        const std::vector<Vector3d>& nodes,
+        const Variables &variables, bool hex_only) {
+
+    Handler handler(hex_only);
+
+    // Количество вершин
+    int n_nodes = nodes.size();
+    int n_cells = cells.size();
+    int n_connectivity = 0;
+    for (auto& cell: cells) {
+        n_connectivity += handler.n_points(cell);
+    }
+
+    std::string byteord = is_big_endian() ? "BigEndian" : "LittleEndian";
+
+    file << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" byte_order=\"" + byteord + "\">\n";
+    file << "  <UnstructuredGrid>" << '\n';
+    file << "    <Piece NumberOfPoints=\"" << n_nodes << "\" NumberOfCells=\"" << n_cells << "\">\n";
+
+    // Points
+    size_t offset = 0;
+    file << "      <Points>\n";
+    file << "        <DataArray type=\"Float64\" Name=\"Points\" NumberOfComponents=\"3\" format=\"appended\" offset=\""
+         << offset << "\"/>\n";
+    file << "      </Points>\n";
+    offset += 3 * n_nodes * sizeof(double) + sizeof(uint32_t);
+
+    // Cells
+    file << "      <Cells>" << '\n';
+    file << "        <DataArray type=\"Int64\" Name=\"connectivity\" format=\"appended\" offset=\"" << offset
+         << "\"/>\n";
+    offset += n_connectivity * sizeof(uint64_t) + sizeof(uint32_t);
+
+    file << "        <DataArray type=\"Int64\" Name=\"offsets\" format=\"appended\" offset=\""
+         << offset << "\"/>\n";
+    offset += n_cells * sizeof(uint64_t) + sizeof(uint32_t);
+
+    file << "        <DataArray type=\"UInt8\" Name=\"types\" format=\"appended\" offset=\"" << offset << "\"/>\n";
+    offset += n_cells * sizeof(uint8_t) + sizeof(uint32_t);
+
+    file << "      </Cells>\n";
+
+    // CellData
+    file << "      <CellData>\n";
+    for (auto &field: variables.list()) {
+        if (!field.is_eu_cell()) {
+            continue;
+        }
+
+        file << "        <DataArray type=\"" << field.type() << "\" Name=\"" << field.name();
+        if (!field.is_scalar()) {
+            file << "\" NumberOfComponents=\"" << field.n_components();
+        }
+        file << "\" format=\"appended\" offset=\"" << offset << "\"/>\n";
+
+        offset += n_cells * field.size() + sizeof(uint32_t);
+    }
+    file << "      </CellData>\n";
+
     file << "    </Piece>\n";
     file << "  </UnstructuredGrid>\n";
 }
@@ -460,6 +610,60 @@ void write_mesh_primitives(
 }
 
 void write_mesh_primitives(
+        std::ofstream &file, AmrStorage &cells,
+        const std::vector<Vector3d>& nodes,
+        const Variables &variables, bool hex_only
+) {
+    Handler handler(hex_only);
+
+    // Количество вершин
+    int n_nodes = nodes.size();
+    int n_cells = cells.size();
+    int n_connectivity = 0;
+    for (auto& cell: cells) {
+        n_connectivity += handler.n_points(cell);
+    }
+
+    // AppendedData
+    file << "  <AppendedData encoding=\"raw\">\n";
+    file << "_";
+
+    // PointsCoords
+    uint32_t data_size = static_cast<uint32_t>(3 * n_nodes * sizeof(double));
+    file.write((char *) &data_size, sizeof(uint32_t));
+    file.write((char *) nodes.data(), data_size);
+
+    // Cells
+    // Connectivity
+    data_size = static_cast<uint32_t>(n_connectivity * sizeof(uint64_t));
+    file.write((char *) &data_size, sizeof(uint32_t));
+
+    size_t counter = 0;
+    for (auto &cell: cells) {
+        handler.write_connectivity2(file, cell, counter);
+    }
+
+    // Offsets
+    data_size = static_cast<uint32_t>(n_cells * sizeof(uint64_t));
+    file.write((char *) &data_size, sizeof(uint32_t));
+
+    uint64_t offset = 0;
+    for (auto& cell: cells) {
+        offset += handler.n_points(cell);
+        file.write((char *) &(offset), sizeof(uint64_t));
+    }
+
+    // Types
+    data_size = static_cast<uint32_t>(n_cells * sizeof(uint8_t));
+    file.write((char *) &data_size, sizeof(uint32_t));
+
+    for (auto& cell: cells) {
+        uint8_t type = handler.type(cell);
+        file.write((char *) &type, sizeof(uint8_t));
+    }
+}
+
+void write_mesh_primitives(
         std::ofstream &file, CellStorage &cells,
         NodeStorage &nodes, const Variables &variables
 ) {
@@ -545,6 +749,34 @@ void write_cells_data(
 }
 
 void write_cells_data(
+        std::ofstream &file, AmrStorage &cells,
+        const Variables &variables
+) {
+    std::vector<char> temp;
+
+    for (auto &field: variables.list()) {
+        if (!field.is_eu_cell()) {
+            continue;
+        }
+
+        size_t field_size = field.size();
+        uint32_t data_size = cells.size() * field_size;
+
+        file.write((char *) &data_size, sizeof(uint32_t));
+
+        temp.resize(data_size);
+
+        size_t counter = 0;
+        for (auto& cell: cells) {
+            field.write(cell, temp.data() + counter * field_size);
+            ++counter;
+        }
+
+        file.write((char *) temp.data(), data_size);
+    }
+}
+
+void write_cells_data(
         std::ofstream &file, CellStorage &cells,
         const Variables &variables
 ) {
@@ -612,7 +844,15 @@ VtuFile::VtuFile(
 }
 
 void VtuFile::save(mesh::EuMesh &mesh) {
-    save(mesh.locals());
+    if (unique_nodes) {
+        mesh.collect_nodes();
+    }
+    if (mesh.has_nodes()) {
+        save(mesh.locals(), mesh.nodes());
+    }
+    else {
+        save(mesh.locals());
+    }
 }
 
 void VtuFile::save(mesh::LaMesh &mesh) {
@@ -621,6 +861,10 @@ void VtuFile::save(mesh::LaMesh &mesh) {
 
 void VtuFile::save(AmrStorage &cells) {
     save(filename, cells, variables, hex_only, filter);
+}
+
+void VtuFile::save(AmrStorage &cells, const std::vector<Vector3d>& nodes) {
+    save(filename, cells, nodes, variables, hex_only);
 }
 
 void VtuFile::save(CellStorage &cells, NodeStorage &nodes) {
@@ -646,6 +890,29 @@ void VtuFile::save(
     write_mesh_header(file, cells, n_cells, variables, hex_only, filter);
     write_mesh_primitives(file, cells, n_cells, variables, hex_only, filter);
     write_cells_data(file, cells, n_cells, variables, filter);
+
+    file.close();
+}
+
+
+void VtuFile::save(
+        const std::string &filename, AmrStorage &cells,
+        const std::vector<geom::Vector3d>& nodes,
+        const Variables &variables, bool hex_only) {
+
+    if (cells.empty()) {
+        return;
+    }
+
+    std::ofstream file(filename, std::ios::out | std::ios::binary);
+    if (!file.is_open()) {
+        std::cerr << "Warning: Cannot open file '" << filename << "'\n";
+        return;
+    }
+
+    write_mesh_header(file, cells, nodes, variables, hex_only);
+    write_mesh_primitives(file, cells, nodes, variables, hex_only);
+    write_cells_data(file, cells, variables);
 
     file.close();
 }

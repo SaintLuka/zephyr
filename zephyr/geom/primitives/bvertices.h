@@ -7,6 +7,8 @@ namespace zephyr::geom {
 
 class BVertices : public SqCube {
 public:
+    ///@brief Максимальное число вешин
+    static const int max_count = 27;
 
     /*
     /// @brief Конструктор по умолчанию
@@ -50,35 +52,28 @@ public:
     BVertices(const SqQuad& quad) : SqCube(quad) { };
 
     /// @brief Конструктор по полигону
-    BVertices(const Polygon &poly) {
-        int max_count = verts.size();
-        int mid_count = std::min(poly.size(), max_count);
+    BVertices(const Polygon &poly);
 
-        for (int i = 0; i < mid_count; ++i) {
-            verts[i] = poly[i];
-        }
-        for (int i = mid_count; i < max_count; ++i) {
-            verts[i] = {NAN, NAN, NAN};
-        }
-    };
-
-    /// @brief Максимальное число вершин
-    constexpr static int max_count() {
-        return 27;
-    }
+    /// @brief Найти индекс вершины в списке
+    /// @param v Целевая вершина
+    /// @param eps Точность (близость вершин)
+    /// @return -1, если вершина не найдена
+    int find(const Vector3d& v, double eps) const;
 
     /// @brief Возвращает количество актуальных вершин.
     /// Функция используется для неадаптивных ячеек, чтобы узнать
     /// количество вершин примитива.
     inline int count() const {
-        int _count = verts.size();
-        for (int i = 3; i < max_count(); ++i) {
+        for (int i = 3; i < max_count; ++i) {
             if (verts[i].hasNaN()) {
                 return i;
             }
         }
-        return _count;
+        return max_count;
     }
 };
+
+static_assert(sizeof(BVertices) == sizeof(SqCube));
+static_assert(BVertices::max_count == sizeof(BVertices) / (sizeof(Vector3d)));
 
 } // namespace zephyr::geom

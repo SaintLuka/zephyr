@@ -129,6 +129,26 @@ public:
     /// @details Целевая функция func в качестве аргументов принимает
     /// разыменованный итератор Iter (DeRef) и набор аргументов Args...,
     /// целевая функция должна возвращать значение типа Value.
+    /// @return Массив из частичных сумм (на каждом треде в отдельности), размер
+    /// выходного массива будет равен n_threads * n_tasks_per_thread.
+    template<int n_tasks_per_thread = 1, class Iter, class Func, class... Args,
+            class DeRef = decltype(*std::declval<Iter&>()),
+            class Value = typename std::result_of<Func(DeRef, Args...)>::type>
+    static auto partial_sum(Iter begin, Iter end, const Value &init, Func &&func, Args &&... args)
+    -> typename std::enable_if<!std::is_void<Value>::value, std::vector<Value>>::type;
+
+    /// @brief Суммировать результаты выполенения функции на диапазоне элементов
+    /// @param begin Итератор, указывающий на начало диапазона
+    /// @param end Итератор, указывающий за последний элемент диапазона
+    /// @param init Начальное значение для суммирование (нейтральный элемент по сложению)
+    /// @param func Целевая функция, принимает аргументы (*Iter, Args...)
+    /// @param args Аргуметры функции
+    /// @tparam DeRef Тип итератора после разыменования
+    /// @tparam Value Тип возвращаемого значения целевой функции, для данного
+    /// типа должен быть определен оператор добавления +=.
+    /// @details Целевая функция func в качестве аргументов принимает
+    /// разыменованный итератор Iter (DeRef) и набор аргументов Args...,
+    /// целевая функция должна возвращать значение типа Value.
     template<int n_tasks_per_thread = 1, class Iter, class Func, class... Args,
             class DeRef = decltype(*std::declval<Iter&>()),
             class Value = typename std::result_of<Func(DeRef, Args...)>::type>
@@ -294,6 +314,49 @@ auto threads::max(Iter begin, Iter end, const Value& init, Func&& func, Args&&..
             res = temp;
         }
     }
+    return res;
+}
+
+template<int n_tasks_per_thread, class Iter, class Func, class ...Args, class DeRef, class Value>
+auto threads::partial_sum(Iter begin, Iter end, const Value& init, Func&& func, Args&&... args)
+-> typename std::enable_if<!std::is_void<Value>::value, std::vector<Value>>::type {
+    auto bin_function =
+            [&init, &func, &args...](const Iter &a, const Iter &b) -> Value {
+                Value res(init);
+                for (auto it = a; it < b; ++it) {
+                    res += func(*it, std::forward<Args>(args)...);
+                }
+                return res;
+            };
+
+    int size = end - begin;
+
+    // Пустой диапазон
+    if (size < 1) return {init};
+
+    // Выполняем последовательно
+    if (n_threads < 2) {
+        return {bin_function(begin, end)};
+    }
+
+    int n_tasks = n_tasks_per_thread * n_threads;
+    int bin = size / n_tasks;
+    std::vector<std::future<Value>> results;
+    results.reserve(n_tasks);
+
+    Iter from = begin;
+    for (int i = 0; i < n_tasks - 1; ++i) {
+        results.emplace_back(pool->enqueue(bin_function, from, from + bin));
+        from += bin;
+    }
+    results.emplace_back(pool->enqueue(bin_function, from, end));
+
+    std::vector<Value> res;
+    res.reserve(n_tasks);
+    for (auto& r: results) {
+        res.push_back(r.get());
+    }
+
     return res;
 }
 

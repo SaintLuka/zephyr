@@ -95,7 +95,7 @@ int main() {
     std::vector<Test> tests_list = {
             Test::Rectangle,
             Test::RectangleHex,
-            //Test::Cuboid,
+            Test::Cuboid,
             Test::Sector1,
             Test::Sector2,
             Test::Sector3,
@@ -111,17 +111,18 @@ int main() {
         std::cout << "\tВыходной файл: " << test.file << "\n\n";
 
         VtuFile file("output/" + test.file, vars);
-        file.hex_only = false; // test != Test::RectangleHex;
+        file.hex_only = false;
+        file.unique_nodes = true;
 
-        //auto cells = test.gen_eu();
-        auto cells = test.gen_la();
+        auto cells = test.gen_eu();
+        //auto cells = test.gen_la();
         file.save(cells);
     }
 }
 
 Generator::Ptr create_rectangle() {
     auto rect = Rectangle::create(0.0, 2.0, 0.0, 1.0, false);
-    rect->set_nx(100);
+    rect->set_nx(1000);
     return rect;
 }
 
