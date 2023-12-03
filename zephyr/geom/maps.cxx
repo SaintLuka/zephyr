@@ -1,8 +1,13 @@
 #include <cstring>
+#include <iostream>
 
 #include <zephyr/geom/maps.h>
 
 namespace zephyr::geom {
+
+inline double sqr(double x) {
+    return x * x;
+}
 
 // Перпендикуляр единичной длины 'n' к вектору 'tau', лежащий в плоскости
 // векторов 'a' и 'tau', сонаправленный с вектором 'a', то есть
@@ -220,6 +225,144 @@ Vector3d Quad::centroid(double area) const {
     C /= (6.0 * area);
 
     return C;
+}
+
+double Quad::integrate_r(const std::function<double(const Vector3d&)>& func, int n) {
+    double h = 1.0 / n;
+    double res = 0.0;
+    for (int i = 0; i < n; ++i) {
+        double x = (2 * i + 1) * h - 1.0;
+        for (int j = 0; j < n; ++j) {
+            double y = (2 * j + 1) * h - 1.0;
+            res += func(get(x, y)) * Jacobian(x, y);
+        }
+    }
+    return res * sqr(2.0 * h);
+}
+
+double Quad::integrate_t(const std::function<double(const Vector3d&)>& func, int n) {
+    double h = 2.0 / n;
+    double res = 0.0;
+    for (int i = 0; i <= n; ++i) {
+        double x = i * h - 1.0;
+        for (int j = 0; j <= n; ++j) {
+            double y = j * h - 1.0;
+
+            double w = 1.0;
+            if (i < 1 || i > n - 1) {
+                w *= 0.5;
+            }
+            if (j < 1 || j > n - 1) {
+                w *= 0.5;
+            }
+
+            res += w * func(get(x, y)) * Jacobian(x, y);
+        }
+    }
+    return res * sqr(h);
+}
+
+double Quad::integrate_g(const std::function<double(const Vector3d&)>& func, int n) {
+    static const double cm = 1.0 - 1.0 / std::sqrt(3.0);
+    static const double cp = 1.0 + 1.0 / std::sqrt(3.0);
+
+    double h = 1.0 / n;
+    double res = 0.0;
+    for (int i = 0; i < n; ++i) {
+        double x1 = (2 * i + cm) * h - 1.0;
+        double x2 = (2 * i + cp) * h - 1.0;
+
+        for (int j = 0; j < n; ++j) {
+            double y1 = (2 * j + cm) * h - 1.0;
+            double y2 = (2 * j + cp) * h - 1.0;
+
+            res += func(get(x1, y1)) * Jacobian(x1, y1) +
+                   func(get(x1, y2)) * Jacobian(x1, y2) +
+                   func(get(x2, y1)) * Jacobian(x2, y1) +
+                   func(get(x2, y2)) * Jacobian(x2, y2);
+        }
+    }
+    return res * sqr(h);
+}
+
+double Quad::integrate_s(const std::function<double(const Vector3d&)>& func, int n) {
+    double h = 2.0 / n;
+    double res = 0.0;
+    for (int i = 0; i < n; ++i) {
+        double x1 = (i + 0) * h - 1.0;
+        double x2 = (i + 1) * h - 1.0;
+        double xc = 0.5 * (x1 + x2);
+
+        for (int j = 0; j < n; ++j) {
+            double y1 = j * h - 1.0;
+            double y2 = (j + 1) * h - 1.0;
+            double yc = 0.5 * (y1 + y2);
+
+            res += func(get(x1, y1)) * Jacobian(x1, y1) +
+                   func(get(x1, y2)) * Jacobian(x1, y2) +
+                   func(get(x2, y1)) * Jacobian(x2, y1) +
+                   func(get(x2, y2)) * Jacobian(x2, y2) +
+
+                   4.0 * func(get(x1, yc)) * Jacobian(x1, yc) +
+                   4.0 * func(get(x2, yc)) * Jacobian(x2, yc) +
+                   4.0 * func(get(xc, y1)) * Jacobian(xc, y1) +
+                   4.0 * func(get(xc, y2)) * Jacobian(xc, y2) +
+
+                   16.0 * func(get(xc, yc)) * Jacobian(xc, yc);
+        }
+    }
+    return res * sqr(h / 6.0);
+}
+
+
+double Quad::integrate_m(const std::function<double(const Vector3d&)>& func, int n) {
+    static const double a = std::sqrt((114.0 - 3.0 * std::sqrt(583.0)) / 287.0);
+    static const double b = std::sqrt((114.0 + 3.0 * std::sqrt(583.0)) / 287.0);
+    static const double c = std::sqrt(6.0 / 7.0);
+
+    static const double wa = 307.0 / 810.0 + 923.0 / 270.0 / std::sqrt(583.0);
+    static const double wb = 307.0 / 810.0 - 923.0 / 270.0 / std::sqrt(583.0);
+    static const double wc = 98.0 / 405.0;
+
+    const double h = 1.0 / n;
+    const double ah = a * h;
+    const double bh = b * h;
+    const double ch = c * h;
+
+    double res = 0.0;
+    for (int i = 0; i < n; ++i) {
+        double x_c = (2 * i + 1) * h - 1.0;
+        double x_ma = x_c - ah;
+        double x_pa = x_c + ah;
+        double x_mb = x_c - bh;
+        double x_pb = x_c + bh;
+        double x_mc = x_c - ch;
+        double x_pc = x_c + ch;
+
+        for (int j = 0; j < n; ++j) {
+            double y_c = (2 * j + 1) * h - 1.0;
+            double y_ma = y_c - ah;
+            double y_pa = y_c + ah;
+            double y_mb = y_c - bh;
+            double y_pb = y_c + bh;
+            double y_mc = y_c - ch;
+            double y_pc = y_c + ch;
+
+            res += wa * (func(get(x_ma, y_ma)) * Jacobian(x_ma, y_ma) +
+                         func(get(x_ma, y_pa)) * Jacobian(x_ma, y_pa) +
+                         func(get(x_pa, y_ma)) * Jacobian(x_pa, y_ma) +
+                         func(get(x_pa, y_pa)) * Jacobian(x_pa, y_pa)) +
+                   wb * (func(get(x_mb, y_mb)) * Jacobian(x_mb, y_mb) +
+                         func(get(x_mb, y_pb)) * Jacobian(x_mb, y_pb) +
+                         func(get(x_pb, y_mb)) * Jacobian(x_pb, y_mb) +
+                         func(get(x_pb, y_pb)) * Jacobian(x_pb, y_pb)) +
+                   wc * (func(get(x_mc, y_c)) * Jacobian(x_mc, y_c) +
+                         func(get(x_pc, y_c)) * Jacobian(x_pc, y_c) +
+                         func(get(x_c, y_mc)) * Jacobian(x_c, y_mc) +
+                         func(get(x_c, y_pc)) * Jacobian(x_c, y_pc));
+        }
+    }
+    return res * sqr(h);
 }
 
 // ============================================================================

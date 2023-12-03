@@ -276,6 +276,31 @@ public:
     /// Вершины должны располагаться в плоскости (x, y).
     /// @param area Площадь ячейки (если известна)
     Vector3d centroid(double area = 0.0) const;
+
+    /// @brief Интеграл скалярной функции по квадратному элементу
+    /// @param n Число подъячеек по осям
+    /// @details Метод прямоугольников
+    double integrate_r(const std::function<double(const Vector3d&)>& func, int n);
+
+    /// @brief Интеграл скалярной функции по квадратному элементу
+    /// @param n Число подъячеек по осям
+    /// @details Метод трапеций
+    double integrate_t(const std::function<double(const Vector3d&)>& func, int n);
+
+    /// @brief Интеграл скалярной функции по квадратному элементу
+    /// @param n Число подъячеек по осям
+    /// @details Метод Гаусса
+    double integrate_g(const std::function<double(const Vector3d&)>& func, int n);
+
+    /// @brief Интеграл скалярной функции по квадратному элементу
+    /// @param n Число подъячеек по осям
+    /// @details Метод симпсона
+    double integrate_s(const std::function<double(const Vector3d&)>& func, int n);
+
+    /// @brief Интеграл скалярной функции по квадратному элементу
+    /// @param n Число подъячеек по осям
+    /// @details Метод 7-го порядка по 12 точкам
+    double integrate_m(const std::function<double(const Vector3d&)>& func, int n);
 };
 
 /// @brief Квадратичное отображение на четырехугольник
