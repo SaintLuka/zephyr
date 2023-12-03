@@ -31,6 +31,7 @@ public:
         initialize(grid);
     }
 
+    inline int n_cells() { return m_locals.size(); }
 
     EuCell begin() { return {m_locals, m_aliens, 0}; }
 

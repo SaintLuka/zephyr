@@ -46,6 +46,12 @@ public:
     /// @brief Инициализировать хранилище
     Grid make() override;
 
+    /// @brief Установить условие на узлы, которые не сглаживаются
+    /// @param func Функция, возвращает true для неподвижных узлов.
+    void set_fixed(std::function<bool(const Vector3d&)> func) {
+        m_fixed = func;
+    }
+
 protected:
     /// @brief Количество ячеек
     int calc_cells() const;
@@ -66,6 +72,9 @@ protected:
 
     /// @brief Вывод информации при генерации
     bool m_verbose;
+
+    /// @brief Условие стационарных узлов
+    std::function<bool(const Vector3d&)> m_fixed;
 };
 
 } // namespace zephyr::geom::generator

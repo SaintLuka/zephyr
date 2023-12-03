@@ -1,5 +1,7 @@
 set(ZEPHYR_GENERATOR_COLLECTION
-	${CMAKE_CURRENT_SOURCE_DIR}/collection/plane_with_hole.cpp)
+	${CMAKE_CURRENT_SOURCE_DIR}/collection/plane_with_hole.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/collection/semicircle_cutout.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/collection/wedge.cpp)
 
 set(ZEPHYR_GEOM_GENERATOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/generator.cpp
@@ -9,7 +11,7 @@ set(ZEPHYR_GEOM_GENERATOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/cuboid.cpp
 
 	${CMAKE_CURRENT_SOURCE_DIR}/curve/curve.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/curve/plane.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/curve/plane.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/curve/circle.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/curve/cubic.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/bs_vertex.cpp
@@ -24,7 +26,7 @@ install(FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/curve/circle.h
 	${CMAKE_CURRENT_SOURCE_DIR}/curve/cubic.h
 	${CMAKE_CURRENT_SOURCE_DIR}/curve/curve.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/curve/plane.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/curve/plane.h
 	DESTINATION
 	include/${PROJECT_NAME}/geom/generator/curve
 )
@@ -44,6 +46,7 @@ install(FILES
 
 install(FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/collection/plane_with_hole.h
+	${CMAKE_CURRENT_SOURCE_DIR}/collection/semicircle_cutout.h
+	${CMAKE_CURRENT_SOURCE_DIR}/collection/wedge.h
 	DESTINATION
-	include/${PROJECT_NAME}/geom/generator/collection
-	)
+	include/${PROJECT_NAME}/geom/generator/collection)

@@ -414,14 +414,14 @@ void Block::link_vertices() {
             }
         }
 
-        corner_vertex(v_idx)->set_boundary(boundary);
+        corner_vertex(v_idx)->add_boundary(boundary);
         corner_vertex(v_idx)->set_adjacent_vertices(adj_vertices);
     }
 
     // Вершины на границе
     for (int f_idx = 0; f_idx < 4; ++f_idx) {
         if (!boundary(f_idx) && !adjacent_block(f_idx)) {
-            throw std::runtime_error("BFace is not boundary and has no neigbor");
+            throw std::runtime_error("BFace is not boundary and has no neighbor");
         }
 
         // Число ячеек по грани
@@ -438,7 +438,7 @@ void Block::link_vertices() {
                     }
                 );
 
-                boundary_vertex(f_idx, idx)->set_boundary(
+                boundary_vertex(f_idx, idx)->add_boundary(
                     m_boundaries[f_idx].get()
                 );
             }
@@ -485,7 +485,6 @@ double Block::smooth() {
 
     for (auto& row: m_vertices) {
         for (auto& vertex: row) {
-            Curve *boundary = vertex->boundary();
             auto &adjacent = vertex->adjacent_vertices();
 
             Vector3d avg = {0.0, 0.0, 0.0};
@@ -493,16 +492,23 @@ double Block::smooth() {
             if (adjacent.empty()) {
                 // Фиксированная вершина
                 avg = vertex->v1;
-            } else if (boundary) {
+            } else if (!vertex->inner()) {
                 // Вершина на границе
-                avg += adjacent[0]->v1 / 2.0;
-                for (int n = 1; n < int(adjacent.size()) - 1; ++n) {
-                    avg += boundary->projection(adjacent[n]->v1);
+                if (vertex->corner()) {
+                    avg = vertex->v1;
                 }
-                avg += adjacent.back()->v1 / 2.0;
-                avg /= adjacent.size() - 1.0;
+                else {
+                    Curve *boundary = vertex->boundary();
 
-                avg = vertex->boundary()->projection(avg);
+                    avg += adjacent[0]->v1 / 2.0;
+                    for (int n = 1; n < int(adjacent.size()) - 1; ++n) {
+                        avg += boundary->projection(adjacent[n]->v1);
+                    }
+                    avg += adjacent.back()->v1 / 2.0;
+                    avg /= adjacent.size() - 1.0;
+
+                    avg = vertex->boundary()->projection(avg);
+                }
             } else {
                 // Внутренняя вершина
                 for (auto neib: adjacent) {

@@ -20,6 +20,10 @@ BlockStructured::BlockStructured(int n_blocks)
 
     m_epsilon = 1.0e-3;
     m_verbose = false;
+
+    m_fixed = [](const Vector3d&) -> bool {
+        return false;
+    };
 }
 
 Block &BlockStructured::operator[](int idx) {
@@ -131,6 +135,18 @@ void BlockStructured::initialize() {
     if (m_verbose) {
         std::cout << "smoothing:\n";
     }
+
+    // Фиксируем часть вершин по критерию
+    for (auto& block: m_blocks) {
+        for (auto &row: block.m_vertices) {
+            for (auto &node: row) {
+                if (m_fixed(node->v1)) {
+                    node->fix();
+                }
+            }
+        }
+    }
+
     while (error > m_epsilon) {
         if (m_verbose && counter % 100 == 0) {
             std::cout << std::scientific << std::setprecision(2);
@@ -174,11 +190,8 @@ Grid BlockStructured::make() {
 
                     GNode::Ptr node = GNode::create(v->v1);
                     node->index = n_nodes;
-                    if (v->boundary()) {
-                        node->add_boundary(v->boundary()->boundary());
-                    }
+                    node->set_boundaries(v->boundaries());
                     grid += node;
-
                     ++n_nodes;
                 }
             }

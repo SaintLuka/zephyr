@@ -2,8 +2,10 @@
 
 #include <memory>
 #include <vector>
+#include <set>
 
 #include <zephyr/geom/vector.h>
+#include <zephyr/geom/primitives/boundary.h>
 
 namespace zephyr::geom::generator {
 
@@ -99,6 +101,9 @@ public:
     /// структурированных блоков.
     int n_adjacent() const;
 
+    /// @brief Зафиксировать вершину (удалеет смежные)
+    void fix();
+
     /// @brief Смежные вершины
     const std::vector<BsVertex *> &adjacent_vertices() const;
 
@@ -107,11 +112,23 @@ public:
     /// остается в начале.
     void set_adjacent_vertices(const std::vector<BsVertex::Ptr> &vertices);
 
-    /// @brief Указатель на границу
+    /// @brief Вершина считается внутренней, если она не лежит на границе
+    bool inner() const;
+
+    /// @brief Вершина считается угловой, если она лежит на пересечении
+    /// нескольких линий границ.
+    bool corner() const;
+
+    /// @brief Указатель на границу,
+    /// @throw runtime_error, если более одной границы
     Curve *boundary() const;
 
+    /// @brief Множнство граничных условий, пустое множество
+    /// для внутренних вершин.
+    std::set<Boundary> boundaries() const;
+
     /// @brief Установить границу
-    void set_boundary(Curve *boundary);
+    void add_boundary(Curve *boundary);
 
 
     int index;
@@ -119,9 +136,11 @@ public:
     Vector3d v2;  ///< Дополнительное положение
 
 private:
-    /// @brief Кривая, на которой лежит вершина.
+    /// @brief Кривые, на которых лежит вершина.
     /// Если кривая отсутствует (nullptr), то вершина считается внутренней.
-    Curve *m_boundary;
+    /// Если кривая одна -- обычная вершина на границе.
+    /// Если более одной -- вершина в углу.
+    std::set<Curve *> m_boundaries;
 
     /// @brief Список смежных вершин. Используется строгий порядок заполнения.
     /// Вершины обходятся против часовой стрелки внутри области. Таким образом,
