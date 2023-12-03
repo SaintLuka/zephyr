@@ -2,249 +2,108 @@
 #include <zephyr/math/cfd/models.h>
 #include <zephyr/phys/eos/ideal_gas.h>
 #include <zephyr/math/solver/sm_fluid.h>
-#include <zephyr/math/cfd/face_extra.h>
-#include <zephyr/math/cfd/compute_grad.h>
 
-namespace zephyr::math {
+namespace zephyr { namespace math {
 
-using mesh::Storage;
-using namespace geom;
-using namespace smf;
 using namespace zephyr::phys;
+using namespace smf;
 
 static const SmFluid::State U = SmFluid::datatype();
 
-[[nodiscard]] SmFluid::State SmFluid::datatype() {
+SmFluid::State SmFluid::datatype() {
     return {};
 }
 
-smf::PState get_smf_half(ICell &cell) {
-    return cell(U).half;
-}
+SmFluid::SmFluid() {
+    
+};
 
-SmFluid::SmFluid(const phys::Eos &eos, Fluxes flux = Fluxes::HLLC2) : m_eos(eos) {
-    m_nf = NumFlux::create(flux);
-    m_CFL = 0.9;
-    m_dt = std::numeric_limits<double>::max();
-}
-
-[[nodiscard]] double SmFluid::CFL() const {
-    return m_CFL;
-}
-
-void SmFluid::set_CFL(double CFL) {
-    m_CFL = std::max(0.0, std::min(CFL, 1.0));
-}
-
-[[nodiscard]] double SmFluid::dt() const {
-    return m_dt;
-}
-
-void SmFluid::init_cells(Mesh &mesh, const phys::ClassicTest &test) {
-    // Заполняем начальные данные
-    for (auto cell: mesh) {
-        cell(U).rho = test.density(cell.center());
-        cell(U).v = test.velocity(cell.center());
-        cell(U).p = test.pressure(cell.center());
-        cell(U).e = m_eos.energy_rp(cell(U).rho, cell(U).p);
-    }
-}
-
-[[nodiscard]] std::string SmFluid::get_flux_name() const {
-    return m_nf->get_name();
-}
-
-Vector3d SmFluid::velocity(const Vector3d &c) const {
+Vector3d SmFluid::velocity(const Vector3d& c) const {
     return Vector3d::UnitX();
+}
+
+double SmFluid::compute_dt(EuCell &cell) {
+    double max_area = 0.0;
+    for (auto &face: cell.faces()) {
+        max_area = std::max(max_area, face.area());
+    }
+    double dx = cell.volume() / max_area;
+    return m_CFL * dx / velocity(cell.center()).norm();
+}
+
+void SmFluid::compute_grad(EuCell &cell, int stage) {
+
+}
+
+void SmFluid::fluxes(EuCell &cell, int stage) {
+
 };
 
-double SmFluid::compute_dt(Mesh &mesh) {
-    m_dt = std::numeric_limits<double>::max();
+void SmFluid::update(EuMesh& mesh, IdealGas &eos) {
+    NumFlux::Ptr nf = HLL::create(); // ?
+
     for (auto cell: mesh) {
-        // скорость звука
-        double c = m_eos.sound_speed_rp(cell(U).rho, cell(U).p);
-        for (auto &face: cell.faces()) {
-            // Нормальная составляющая скорости
-            double vn = cell(U).v.dot(face.normal());
+        // Примитивный вектор в ячейке
+        PState zc = cell(U).get_state1();
 
-            // Максимальное по модулю СЗ
-            double lambda = std::max(std::abs(vn + c), std::abs(vn - c));
+        // Консервативный вектор в ячейке
+        QState qc(zc);
 
-            // Условие КФЛ
-            m_dt = std::min(m_dt, cell.volume() / face.area() / lambda);
+        // Переменная для потока
+        Flux flux;
+        for (auto& face: cell.faces()) {
+            // Внешняя нормаль
+            auto &normal = face.normal();
+
+            // Примитивный вектор соседа
+            PState zn(zc);
+
+            if (face.is_boundary()) {
+                const double d = 0.5;
+
+                // Граничные условия типа "стенка"
+                double vn = zc.velocity.dot(face.normal());
+                zn.velocity -= 2.0 * vn * face.normal();
+            }
+            else {
+                zn = face.neib()(U).get_state1();
+            }
+
+            // Значение на грани со стороны ячейки
+            PState zm = zc.in_local(normal);
+
+            // Значение на грани со стороны соседа
+            PState zp = zn.in_local(normal);
+
+            // Численный поток на грани
+            auto loc_flux = nf->flux(zm, zp, eos);
+            loc_flux.to_global(normal);
+
+            // Суммируем поток
+            flux.vec() += loc_flux.vec() * face.area();
         }
-    }
-    m_dt *= m_CFL;
 
+        // Новое значение в ячейке (консервативные переменные)
+        QState Qc = qc.vec() - compute_dt(cell) * flux.vec() / cell.volume();
+
+        // Новое значение примитивных переменных
+        PState Zc(Qc, eos);
+
+        cell(U).set_state2(Zc);
+    }
+
+    // Обновляем слои
+    for (auto cell: mesh) {
+        cell(U).swap();
+    }
+};
+
+void SmFluid::solution_step() {
+
+};
+
+double SmFluid::dt() const {
     return m_dt;
 };
-
-void SmFluid::set_accuracy(int acc) {
-    m_acc = acc;    // 1 или 2
-};
-
-void SmFluid::fluxes_stage1(Mesh &mesh) {
-    for (auto cell: mesh)
-        cell(U).half = cell(U).get_state();
-
-    for (auto cell: mesh) {
-        // Консервативный вектор в ячейке
-        QState qc(cell(U).get_state());
-        if (m_acc == 1) {
-            qc.vec() -= m_dt / cell.volume() * calc_flux(cell).vec();
-        }
-        if (m_acc == 2) {
-            qc.vec() -= 0.5 * m_dt / cell.volume() * calc_flux_extra(cell).vec();
-        }
-        cell(U).half = PState(qc, m_eos);
-    }
-}
-
-void SmFluid::fluxes_stage2(Mesh &mesh) {
-    if (m_acc == 1) {
-        for (auto cell: mesh) {
-            cell(U).set_state(cell(U).half);
-        }
-    }
-    if (m_acc == 2) {
-        for (auto cell: mesh) {
-            // Консервативный вектор в ячейке
-            QState qc(cell(U).get_state());
-            // Расчет потока f2
-            qc.vec() -= m_dt / cell.volume() * calc_flux_extra(cell).vec();
-            cell(U).next = PState(qc, m_eos);
-        }
-        for (auto cell: mesh) {
-            cell(U).set_state(cell(U).next);
-        }
-    }
-}
-
-void SmFluid::compute_grad(Mesh &mesh) {
-    for (auto cell: mesh) {
-        auto grad = math::compute_grad<smf::PState>(cell, get_smf_half);
-        cell(U).d_dx = grad[0];
-        cell(U).d_dy = grad[1];
-        cell(U).d_dz = grad[2];
-    }
-}
-
-// для первого порядка точности
-Flux SmFluid::calc_flux(ICell &cell) {
-    // Примитивный вектор в ячейке
-    PState zc = cell(U).get_state();
-
-    // Консервативный вектор в ячейке
-    QState qc(zc);
-
-    // Переменная для потока
-    Flux flux;
-    for (auto &face: cell.faces()) {
-        // Внешняя нормаль
-        auto &normal = face.normal();
-
-        // Примитивный вектор соседа
-        PState zn(zc);
-
-        //Единмтаенное различие
-        if (face.is_boundary()) {
-            // Граничные условия типа "стенка"
-            // double vn = zc.velocity.dot(face.normal());
-            // zn.velocity -= 2.0 * vn * face.normal();
-        } else {
-            zn = face.neib()(U).get_state();
-        }
-
-        // Значение на грани со стороны ячейки
-        PState zm = zc.in_local(normal);
-
-        // Значение на грани со стороны соседа
-        PState zp = zn.in_local(normal);
-
-        // Численный поток на грани
-        auto loc_flux = m_nf->flux(zm, zp, m_eos);
-        loc_flux.to_global(normal);
-
-        // Суммируем поток
-        flux.vec() += loc_flux.vec() * face.area();
-    }
-
-    return flux;
-};
-
-/// берем только слой half
-Flux SmFluid::calc_flux_extra(ICell &cell) {
-    // Примитивный вектор в ячейке
-    PState zc = cell(U).half;
-
-    // Переменная для потока
-    Flux flux;
-    for (auto &face: cell.faces()) {
-        // Внешняя нормаль
-        auto &normal = face.normal();
-
-        // Примитивный вектор соседа
-        PState zn(zc);
-
-        if (face.is_boundary()) {
-            // Граничные условия типа "стенка"
-            // double vn = zc.velocity.dot(face.normal());
-            // zn.velocity -= 2.0 * vn * face.normal();
-        } else {
-            zn = face.neib()(U).half;
-        }
-
-        Vector3d cell_c = cell.center();
-        Vector3d face_c = face.center();
-        Vector3d neib_c = 2 * face_c - cell_c;
-
-        // Второй порядок
-        auto fe = FaceExtra::ATvL(
-                zc, cell(U).d_dx, cell(U).d_dy, cell(U).d_dz,
-                zn, face.neib()(U).d_dx, face.neib()(U).d_dy, face.neib()(U).d_dz,
-                cell_c, neib_c, face_c);
-
-        PState zm = fe.m(zc).in_local(normal); // -
-        PState zp = fe.p(zn).in_local(normal); // + 
-
-        zm.energy = m_eos.energy_rp(zm.density, zm.pressure);
-        zp.energy = m_eos.energy_rp(zp.density, zp.pressure);
-
-        // Численный поток на грани
-        auto loc_flux = m_nf->flux(zm, zp, m_eos);
-        loc_flux.to_global(normal);
-
-        // Суммируем поток
-        flux.vec() += loc_flux.vec() * face.area();
-    }
-
-    return flux;
-};
-
-void SmFluid::update(Mesh &mesh) {
-    /// @brief Выбор шага интегрирования
-    compute_dt(mesh);
-
-    /// @brief Считает градиенты для переменных с основного слоя (только для 2ого порядка)
-    if (m_acc == 2) {
-        compute_grad(mesh);
-    }
-    fluxes_stage1(mesh);
-    if (m_acc == 2) {
-        compute_grad(mesh);
-    }
-    fluxes_stage2(mesh);
-    /// 
-    m_time += m_dt;
-    m_step += 1;
-};
-
-[[nodiscard]] double SmFluid::get_time() const {
-    return m_time;
-};
-
-[[nodiscard]] double SmFluid::get_step() const {
-    return m_step;
 }
 }
-

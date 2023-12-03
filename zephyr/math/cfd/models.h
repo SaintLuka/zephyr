@@ -24,8 +24,6 @@ struct PState {
     double pressure;
     double energy;
 
-    PState();
-
     PState(const double &density, const Vector3d &velocity,
            const double &pressure, const double &energy);
 
@@ -116,35 +114,6 @@ struct Flux {
 };
 
 } // namespace smf
-
-/// @brief Многоматериальная модель Multi Material Fluid
-namespace mmf {
-
-using zephyr::phys::Fractions;
-
-/// @brief Примитивный вектор состояния
-struct PState {
-    double    density;
-    Vector3d  velocity;
-    double    pressure;
-    double    temperature;
-    double    energy;
-    Fractions mass_frac;
-
-
-    VECTORIZE(PState)
-};
-
-/// @brief Консервативный вектор состояния
-struct QState {
-    double    mass;
-    Vector3d  momentum;
-    double    energy;
-    Fractions mass_frac;
-
-};
-
-} // namespace mmf
 
 /// @brief Многоматериальная модель Multi Material Fluid
 namespace mmf {

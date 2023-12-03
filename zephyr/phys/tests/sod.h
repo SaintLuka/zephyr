@@ -72,6 +72,7 @@ public:
     /// @brief Начальная внутренняя энергия
     double energy(const double &x) const { return x < x_jump ? eL : eR; }
 
+
     /// @brief Начальная плотность
     double density(const Vector3d &r) const { return density(r.x()); }
 
