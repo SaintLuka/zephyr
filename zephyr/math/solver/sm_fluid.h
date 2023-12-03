@@ -101,10 +101,10 @@ public:
     Flux calc_flux(ICell &cell);
 
     // С экстраполяцией
-    Flux calc_flux_extra(ICell &cell, bool from_begin); 
+    Flux calc_flux_extra(ICell &cell); 
 
     ///@brief вычисление градиента
-    void compute_grad(Mesh &mesh,  const std::function<smf::PState(zephyr::mesh::ICell &)> &to_state) const;
+    void compute_grad(Mesh& mesh);
 
     /// @brief установить порядок метода
     void set_accuracy(int acc);
