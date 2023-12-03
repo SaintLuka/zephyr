@@ -1,6 +1,6 @@
 #pragma once
 
-#include <zephyr/mesh/mesh.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/math/cfd/limiter.h>
 #include "zephyr/phys/eos/eos.h"
 #include "zephyr/phys/tests/classic_test.h"
@@ -9,8 +9,8 @@
 
 namespace zephyr { namespace math {
 
-using zephyr::mesh::ICell;
-using zephyr::mesh::Mesh;
+using zephyr::mesh::EuCell;
+using zephyr::mesh::EuMesh;
 using zephyr::mesh::Distributor;
 using zephyr::geom::Vector3d;
 
@@ -18,28 +18,45 @@ using namespace zephyr::phys;
 using namespace zephyr::math;
 using namespace zephyr::math::smf;
 
+/// @brief GK_solver 2D???
 
 class SmFluid {
 public:
 
     struct State {
-        double rho;
-        Vector3d v;
-        double p;
-        double e;
-        PState half, next;
-        PState d_dx, d_dy, d_dz;
+        double rho1, rho2, rhoh;
+        Vector3d v1, v2, vh;
+        double p1, p2, ph;
+        double e1, e2, eh;
 
-        PState get_state() const {
-            return {rho, v, p, e};
+        PState get_state1() const {
+            return {rho1, v1, p1, e1};
+        };
+
+        PState get_state_h() const {
+            return {rhoh, vh, ph, eh};
+        };
+
+        void set_state2(const PState& z) {
+            rho2 = z.density;
+            v2 = z.velocity;
+            p2 = z.pressure;
+            e2 = z.energy;
+        };
+
+        void set_state_h(const PState &z) {
+            rhoh = z.density;
+            vh = z.velocity;
+            ph = z.pressure;
+            eh = z.energy;
         }
 
-        void set_state(const PState& z) {
-            rho = z.density;
-            v = z.velocity;
-            p = z.pressure;
-            e = z.energy;
-        }     
+        void swap() {
+            std::swap(rho1, rho2);
+            std::swap(v1, v2);
+            std::swap(p1, p2);
+            std::swap(e1, e2);
+        };
     };
 
     /// @brief Получить экземпляр расширенного вектора состояния
@@ -57,15 +74,14 @@ public:
     ///@brief
     std::string get_flux_name() const;
 
-    ///@brief
-    void set_CFL(double CFL);
+    void compute_grad(EuCell &cell, int stage);
 
     /// @brief Посчитать шаг интегрирования по времени с учетом
     /// условия Куранта
-    double compute_dt(Mesh &mesh);
+    double compute_dt(EuCell& cell);
 
     /// @brief Один шаг интегрирования по времени
-    void update(Mesh& mesh);
+    void update(EuMesh& mesh, IdealGas &eos);
 
     /// @brief Векторное поле скорости
     /// @details Виртуальная функция, следует унаследоваться от класса
@@ -75,46 +91,10 @@ public:
     /// @brief Шаг интегрирования на предыдущем вызове update()
     [[nodiscard]] double dt() const;
 
-    ///@brief
-    [[nodiscard]] double get_time() const;
+    /// @brief 
+    void fluxes(EuCell& cell, int stage);
 
-    ///@brief
-    [[nodiscard]] double get_step() const;
-
-<<<<<<< HEAD
-    Flux calc_flux(ICell &cell, int stage);
-
-    void compute_grad(ICell &cell, int stage);
-
-    ///@brief 
-    void fluxes(Mesh &mesh);
-
-    ///@brief
-    void fluxes2(Mesh &mesh);
-
-    void fluxes3(Mesh &mesh);
-
-    ///@brief
-    void fluxes4(Mesh &mesh);
-=======
-    // Дифференциальный поток
-    Flux calc_flux(ICell &cell);
-
-    // С экстраполяцией
-    Flux calc_flux_extra(ICell &cell); 
-
-    ///@brief вычисление градиента
-    void compute_grad(Mesh& mesh);
-
-    /// @brief установить порядок метода
-    void set_accuracy(int acc);
-
-    ///@brief Стадия 1
-    void fluxes_stage1(Mesh &mesh);
-
-    ///@brief Стадия 2
-    void fluxes_stage2(Mesh &mesh);
->>>>>>> 1b14d8a (беды с шу-ошером)
+    void solution_step();
 
 protected:
     const phys::Eos &m_eos;
@@ -123,7 +103,6 @@ protected:
     size_t m_step = 0; ///< Количество шагов расчёта
     double m_CFL; ///< Число Куранта
     double m_dt; ///< Шаг интегрирования
-    int m_acc; ///< Порядок
 };
 }
 }
