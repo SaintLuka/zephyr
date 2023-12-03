@@ -72,18 +72,18 @@ void setup_initial(EuMesh &mesh, double u0, double u3, double P0, double P3, dou
     for (auto cell : mesh) {
         // Инициализация
         if (cell.center().x() > 0) {
-            cell(U).v1.x() = u0;
-            cell(U).v1.y() = 0;
-            cell(U).rho1 = 1.0 / eos.volume_pt(P0, 20.0_C);
-            cell(U).p1 = P0; 
-            cell(U).e1 = eos.energy_rp(cell(U).rho1, cell(U).p1);
+            cell(U).v.x() = u0;
+            cell(U).v.y() = 0;
+            cell(U).rho = 1.0 / eos.volume_pt(P0, 20.0_C);
+            cell(U).p = P0;
+            cell(U).e = eos.energy_rp(cell(U).rho, cell(U).p);
         }
         else {
-            cell(U).v1.x() = u3;
-            cell(U).v1.y() = 0;
-            cell(U).rho1 = 1.0 / eos.volume_pt(P3, 20.0_C);
-            cell(U).p1 = P3; 
-            cell(U).e1 = eos.energy_rp(cell(U).rho1, cell(U).p1);
+            cell(U).v.x() = u3;
+            cell(U).v.y() = 0;
+            cell(U).rho = 1.0 / eos.volume_pt(P3, 20.0_C);
+            cell(U).p = P3;
+            cell(U).e = eos.energy_rp(cell(U).rho, cell(U).p);
         }
     }
 }
@@ -121,15 +121,14 @@ int main () {
     double ymax = H;
 
     // кол-во ячеек по x
-    int nx_cells = 1000;
+    int nx_cells = 500;
 
     // размер ячейки
     double cell_size_x = (xmax - xmin) / nx_cells;
 
     // сек
     double time = 0.0;
-    double max_time = 1.0;
-    double dt = 1.0;
+    double max_time = 0.05;
 
     //шаг
     int n_step = 0;
@@ -139,6 +138,8 @@ int main () {
     // Переменные для сохранения
     pvd.variables += {"rho", get_rho};
     pvd.variables += {"u", get_u};
+    pvd.variables += {"v", get_v};
+    pvd.variables += {"w", get_w};
     pvd.variables += {"p", get_p};
     pvd.variables += {"e", get_e};
     pvd.variables += {"inside", get_inside};
@@ -154,19 +155,21 @@ int main () {
 
 
     // Создать решатель
-    auto solver = zephyr::math::SmFluid();
+    auto solver = zephyr::math::SmFluid(eos, zephyr::math::Fluxes::HLL);
+    solver.set_accuracy(2);
 
-    while (time <= max_time) {
+    while (n_step < 1000) {
         std::cout << "\tStep: " << std::setw(6) << n_step << ";"
                   << "\tTime: " << std::setw(6) << std::setprecision(3) << time << "\n";
 
-        pvd.save(mesh, time);
-
-        // Шаг решения
-        solver.update(mesh, eos);
+        if (std::fmod(n_step, 20) == 0) {
+            pvd.save(mesh, time);
+        }
+        
+        solver.update(mesh);
 
         n_step += 1;
-        time += dt;
+        time = solver.get_time();
     }
 
     return 0;
