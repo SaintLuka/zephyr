@@ -1,10 +1,8 @@
 #include <stdexcept>
 #include <cmath>
-#include <string>
 
 #include <zephyr/phys/eos/eos.h>
 #include <zephyr/phys/eos/stiffened_gas.h>
-#include <iostream>
 
 namespace zephyr { namespace phys {
 

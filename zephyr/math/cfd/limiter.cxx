@@ -155,7 +155,7 @@ double superbee(double a, double b) {
 } // namespace limiters
 
 Limiter::Limiter()
-    : Limiter("") { }
+    : Limiter("minmod") { }
 
 Limiter::Limiter(const char *name)
     : Limiter(std::string(name)) { }

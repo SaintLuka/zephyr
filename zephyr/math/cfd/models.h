@@ -24,8 +24,6 @@ struct PState {
     double pressure;
     double energy;
 
-    PState();
-
     PState(const double &density, const Vector3d &velocity,
            const double &pressure, const double &energy);
 
