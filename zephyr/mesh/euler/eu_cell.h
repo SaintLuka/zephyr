@@ -105,6 +105,16 @@ public:
         return *reinterpret_cast<const U *>(m_it->data());
     }
 
+    /// @brief Ссылка на геометрию ячейки
+    inline geom::AmrCell& geom(){
+        return *m_it;
+    }
+
+    /// @brief Ссылка на геометрию ячейки
+    inline const geom::AmrCell& geom() const {
+        return *m_it;
+    }
+
     /// @brief Итератор по граням
     /// @param dir Выбрать грани по некоторым направлениям
     EuFaces faces(Direction dir = Direction::ANY) const;
@@ -164,6 +174,26 @@ public:
     /// Для нелинейных AMR-ячеек возвращает до 8 граней.
     inline geom::PolygonS<8> polygon() const {
         return m_it->polygon();
+    }
+
+    /// @brief Оценка объемной доли, которая отсекается от ячейки некоторым телом.
+    /// @param inside Характеристическая функция области, возвращает true для
+    /// точек, которые располагаются внутри области.
+    /// @details Относительно быстрая функция, проверяет функцию inside только
+    /// на узлах ячейки, позволяет быстро выяснить, содержит ли ячейка
+    /// границу двух областей. Если ячейка внутри тела, то возвращает строго
+    /// единицу 1.0, если снаружи -- строго ноль 0.0.
+    inline double approx_vol_fraction(const std::function<double(const Vector3d &)> &inside) const {
+        return m_it->approx_vol_fraction(inside);
+    }
+
+    /// @brief Объемная доля, которая отсекается от ячейки некоторым телом.
+    /// @param inside Характеристическая функция области, возвращает true для
+    /// точек, которые располагаются внутри области.
+    /// @param n_points Число тестовых точек, для которых проверяется функция
+    /// inside, погрешность определения объемной доли ~ 1/N.
+    inline double volume_fraction(const std::function<double(const Vector3d &)> &inside, int n_points) const {
+        return m_it->volume_fraction(inside, n_points);
     }
 
 

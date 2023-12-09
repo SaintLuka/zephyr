@@ -42,6 +42,10 @@ void EuMesh::init_amr() {
     }
 }
 
+bool EuMesh::is_adaptive() const {
+    return m_max_level > 0;
+}
+
 int EuMesh::max_level() const {
     return m_max_level;
 }

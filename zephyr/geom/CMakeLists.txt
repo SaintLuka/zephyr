@@ -4,8 +4,11 @@ add_subdirectory(primitives)
 set(ZEPHYR_GEOM_SRC
         ${ZEPHYR_GEOM_GENERATOR_SRC}
         ${ZEPHYR_GEOM_PRIMITIVES_SRC}
-        ${CMAKE_CURRENT_SOURCE_DIR}/box.cxx
-        ${CMAKE_CURRENT_SOURCE_DIR}/maps.cxx
+        ${CMAKE_CURRENT_SOURCE_DIR}/box.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/line.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/quad.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/cube.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/triangle.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/polygon.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/grid.cpp
         PARENT_SCOPE
@@ -14,9 +17,12 @@ set(ZEPHYR_GEOM_SRC
 install(FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/vector.h
         ${CMAKE_CURRENT_SOURCE_DIR}/box.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/geom.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/maps.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/line.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/quad.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/cube.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/triangle.h
         ${CMAKE_CURRENT_SOURCE_DIR}/polygon.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/geom.h
         ${CMAKE_CURRENT_SOURCE_DIR}/grid.h
         DESTINATION include/${PROJECT_NAME}/geom
 )

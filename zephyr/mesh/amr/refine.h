@@ -5,7 +5,7 @@
 #pragma once
 
 #include <zephyr/geom/primitives/amr_cell.h>
-#include <zephyr/geom/maps.h>
+#include <zephyr/geom/cube.h>
 
 #include <zephyr/mesh/amr/common.h>
 #include <zephyr/mesh/amr/faces.h>

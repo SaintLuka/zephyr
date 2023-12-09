@@ -1,6 +1,6 @@
 #pragma once
 
-#include <zephyr/geom/maps.h>
+#include <zephyr/geom/cube.h>
 #include <zephyr/geom/polygon.h>
 
 namespace zephyr::geom {
