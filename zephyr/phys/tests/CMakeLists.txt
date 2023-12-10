@@ -7,5 +7,7 @@ install(FILES
         sod.h
         toro.h
         classic_test.h
+        blast_wave.h
+        RiemannTest2D.h
         DESTINATION
         include/${PROJECT_NAME}/phys/tests)

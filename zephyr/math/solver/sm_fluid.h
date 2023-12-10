@@ -76,9 +76,12 @@ protected:
 
     void solution_step();
 
+public:
+    double m_dt;        ///< Шаг интегрирования
+
 protected:
     
-    double m_dt;        ///< Шаг интегрирования
+    //double m_dt;        ///< Шаг интегрирования
     Limiter m_limiter;  ///< Ограничитель
     double m_CFL;
 };
