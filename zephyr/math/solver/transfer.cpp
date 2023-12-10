@@ -45,7 +45,14 @@ void Transfer::dir_splitting(bool flag) {
 }
 
 double Transfer::dt() const {
-    return m_dt;
+    switch (m_dir) {
+        case Direction::X:
+            return 0.0001 * m_dt;
+        case Direction::Y:
+            return 0.9999 * m_dt;
+        default:
+            return m_dt;
+    }
 }
 
 Vector3d Transfer::velocity(const Vector3d &c) const {
@@ -141,16 +148,14 @@ void Transfer::fluxes_CRP(EuCell &cell, Direction dir) {
     zc.u2 = zc.u1 - fluxes / cell.volume();
 }
 
-// Предполагаем verts > 0.0
-// V1, V2 - скорость в узлах грани
-// Предполагаем (vel1 + vel2).dot(n) > 0.0
+// V1, V2 -- скорость в узлах грани
+// fn -- нормаль к грани
+// Предполагаем (V1 + V2).dot(fn) > 0.0
 double flux_VOF(
         double a, Vector3d &p, Vector3d &n,
         EuCell &cell, EuFace &face,
-        const Vector3d &V1, const Vector3d &V2, double dt, double sgn) {
-
-    // Нормаль к грани
-    auto &fn = sgn * face.normal();
+        const Vector3d& V1, const Vector3d& V2,
+        double dt, const Vector3d& fn) {
 
     // Нормальная скорость к грани
     Vector3d Vc = 0.5 * (V1 + V2);
@@ -160,48 +165,32 @@ double flux_VOF(
     const auto &v1 = face.vs(0);
     const auto &v2 = face.vs(1);
 
-    Line seg1 = {v1, v1 - V1};
-    Line seg2 = {v2, v2 - V2};
+    Line line1 = {v1, v1 - V1};
+    Line line2 = {v2, v2 - V2};
 
-    double r = 2.0 / (1.0 + std::sqrt(1.0 - 2.0 * Vc.norm() * dt / face.area()));
-    double xi = dt * Vn.norm() * r;
+    double xi = dt * Vn.norm();
 
     auto poly1 = cell.polygon();
     auto poly2 = poly1.clip(face.center() - xi * fn, -fn);
-    auto poly3 = poly2.clip(seg1.center(), seg1.normal(face.center()));
-    auto poly4 = poly3.clip(seg2.center(), seg2.normal(face.center()));
+    auto poly3 = poly2.clip(line1.center(), line1.normal(face.center()));
+    auto poly4 = poly3.clip(line2.center(), line2.normal(face.center()));
 
-    if (a < 1.0e-12) {
-        return 0.0;
-    } else {
-        return poly4.clip_area(p, n);
-    }
+    auto& poly = poly4;
 
-/*
-    double xi1 = V2.dot(fn) / V1.dot(fn);
-    double xi2 = V1.dot(fn) / V2.dot(fn);
-
-    if (V1.dot(fn) == 0.0) {
-        if (V2.dot(fn) == 0.0) {
+    if (a < 1.0e-6) {
+        // Маленькую часть отправляем по нормали
+        if (Vn.squaredNorm() > Vt.squaredNorm())
+            return a * poly.area();
+        else {
             return 0.0;
         }
-
-        xi1 = -1.0;
+    } else if (a > 1.0 - 1.0e-6) {
+        // От полной ячейки отрезаем весь кусок
+        return poly.area();
     }
-    if (V2.dot(fn) == 0.0) {
-        xi2 = -1.0;
-    }
-
-    Vector3d v3 = v1 - 0.5 * dt * (1.0 + xi1) * V1;
-    Vector3d v4 = v2 - 0.5 * dt * (1.0 + xi2) * V2;
-
-    if (a < 1.0e-12) {
-        return 0.0;
-    } else {
-        PolyQuad poly(v1, v2, v4, v3);
+    else {
         return poly.clip_area(p, n);
     }
-    */
 }
 
 void Transfer::fluxes_VOF(EuCell &cell, Direction dir) {
@@ -215,17 +204,24 @@ void Transfer::fluxes_VOF(EuCell &cell, Direction dir) {
 
         auto neib = face.neib();
 
-        const auto& V1 = velocity(face.vs(0));
-        const auto& V2 = velocity(face.vs(1));
+        Vector3d fn = face.normal();
+        Vector3d V1 = velocity(face.vs(0));
+        Vector3d V2 = velocity(face.vs(1));
+
+        // Расчет с расщеплением
+        if (m_dir != Direction::ANY) {
+            V1 = V1.dot(fn) * fn;
+            V2 = V2.dot(fn) * fn;
+        }
 
         // Типа upwind
         double F;
         if ((V1 + V2).dot(face.normal()) > 0.0) {
-            F = +flux_VOF(zc.u1, zc.p, zc.n, cell, face, V1, V2, m_dt, +1.0);
+            F = +flux_VOF(zc.u1, zc.p, zc.n, cell, face, V1, V2, m_dt, fn);
         }
         else {
             auto zn = neib(U);
-            F = -flux_VOF(zn.u1, zn.p, zn.n, neib, face, V1, V2, m_dt, -1.0);
+            F = -flux_VOF(zn.u1, zn.p, zn.n, neib, face, V1, V2, m_dt, -fn);
         }
 
         fluxes += F;
@@ -261,18 +257,23 @@ void Transfer::fluxes_MIX(EuCell &cell, Direction dir) {
         auto neib = face.neib();
         auto zn = neib(U);
 
-        const auto& fn = face.normal();
-        Vector3d V1 = velocity(face.vs(0));//.dot(fn) * fn;
-        Vector3d V2 = velocity(face.vs(1));//.dot(fn) * fn;
+        const auto &fn = face.normal();
+        Vector3d V1 = velocity(face.vs(0));
+        Vector3d V2 = velocity(face.vs(1));
 
-        double vs = 0.5*(V1 + V2).dot(fn);
+        // Расчет с расщеплением
+        if (m_dir != Direction::ANY) {
+            V1 = V1.dot(fn) * fn;
+            V2 = V2.dot(fn) * fn;
+        }
+
+        double vs = 0.5 * (V1 + V2).dot(fn);
 
         double F_VOF;
         if (vs > 0.0) {
-            F_VOF = +flux_VOF(zc.u1, zc.p, zc.n, cell, face, V1, V2, m_dt, +1.0);
-        }
-        else {
-            F_VOF = -flux_VOF(zn.u1, zn.p, zn.n, neib, face, V1, V2, m_dt, -1.0);
+            F_VOF = +flux_VOF(zc.u1, zc.p, zc.n, cell, face, V1, V2, m_dt, fn);
+        } else {
+            F_VOF = -flux_VOF(zn.u1, zn.p, zn.n, neib, face, V1, V2, m_dt, -fn);
         }
 
         double a1 = zc.u1;
@@ -287,25 +288,6 @@ void Transfer::fluxes_MIX(EuCell &cell, Direction dir) {
         double a_sig = best_face_fraction(a1, a2, S, vs, m_dt, F_VOF);
 
         double F_CRP = flux_2D(a1, a2, S, vol1, vol2, a_sig, vs, m_dt);
-
-        if (false && F != 0.0 && a1 != 1.0 && std::abs(1.0 - F_VOF / F) > 1.0e-3) {
-            double a_min = std::min(a1, a2);
-            double a_max = std::max(a1, a2);
-
-            std::cout << "a_min:  " << a_min << "\n";
-            std::cout << "a_max:  " << a_max << "\n";
-            std::cout << "a_sig:  " << a_sig << "\n";
-            std::cout << "F_CRP:     " << F_CRP << "\n";
-            std::cout << "F_VOF:     " << F_VOF << "\n";
-            //std::cout << "F(a_min):  " << flux_2D(a1, a2, h1, h2, a_min, vs, m_dt) << "\n";
-            //std::cout << "F(a_max):  " << flux_2D(a1, a2, h1, h2, a_max, vs, m_dt) << "\n";
-            //std::cout << "F(a_sig):  " << F_sig << "\n";
-            //std::cout << "F(a_best): " << F_best << "\n";
-            //std::cout << "F_min:     " << F_min << "\n";
-            //std::cout << "F_max:     " << F_max << "\n";
-
-            //throw std::runtime_error("ololo");
-        }
 
         fluxes += F_CRP;
     }
@@ -406,55 +388,86 @@ void Transfer::update_ver3(EuMesh& mesh) {
     update_dir();
 }
 
+// Производная по теореме Гаусса--Остроградского
 void Transfer::compute_normal(EuCell& cell) {
     double uc = cell(U).u1;
 
-    double n_x = 0.0;
-    double n_y = 0.0;
+    if (uc < 1.0e-6 || uc > 1.0 - 1.0e-6) {
+        cell(U).n = Vector3d::Zero();
+        return;
+    }
 
+    Vector3d n = Vector3d::Zero();
     for (auto &face: cell.faces()) {
         if (face.is_boundary()) {
             continue;
         }
 
-        auto neib = face.neib();
-
-        double un = neib(U).u1;
+        double un = face.neib(U).u1;
 
         Vector3d S = 0.5 * face.normal() * face.area();
-        n_x -= (uc + un) * S.x();
-        n_y -= (uc + un) * S.y();
+        n -= (uc + un) * S;
     }
 
-    cell(U).n.x() = n_x / cell.volume();
-    cell(U).n.y() = n_y / cell.volume();
-
-    cell(U).n.normalize();
+    cell(U).n = n.normalized();
 }
 
 void Transfer::smooth_normal(EuCell& cell) {
-    double n_x = 4 * cell(U).n.x();
-    double n_y = 4 * cell(U).n.y();
+    Vector3d n2 = Vector3d::Zero();
 
+    if (cell(U).n.squaredNorm() == 0.0) {
+        cell(U).n2 = n2;
+        return;
+    }
+
+    int counter = 0;
     for (auto &face: cell.faces()) {
         if (face.is_boundary()) {
             continue;
         }
 
-        auto neib = face.neib();
-        n_x += neib(U).n.x();
-        n_y += neib(U).n.y();
+        Vector3d nn = face.neib(U).n;
+        if (nn.squaredNorm() > 0.0) {
+            n2 += nn;
+            ++counter;
+        }
     }
 
-    cell(U).n.x() = n_x;
-    cell(U).n.y() = n_y;
+    if (counter == 0) {
+        cell(U).n2 = cell(U).n;
+        int counter = 0;
+        for (auto &face: cell.faces()) {
+            if (face.is_boundary()) {
+                continue;
+            }
 
-    cell(U).n.normalize();
+            Vector3d nn = face.neib(U).n;
+            if (nn.squaredNorm() > 0.0) {
+                n2 += nn;
+                ++counter;
+            }
+        }
+        n2 += counter * cell(U).n;
+
+    }
+    else {
+        n2 += counter * cell(U).n;
+        cell(U).n2 = n2.normalized();
+    }
+
+}
+
+void Transfer::update_normal(EuCell& cell) {
+    cell(U).n = cell(U).n2;
 }
 
 void Transfer::find_section(EuCell &cell) {
-    auto poly = cell.polygon();
-    cell(U).p = poly.find_section(cell(U).n, cell(U).u1);
+    if (cell(U).zero_normal()) {
+        cell(U).p = cell.center();
+    } else {
+        auto poly = cell.polygon();
+        cell(U).p = poly.find_section(cell(U).n, cell(U).u1);
+    }
 }
 
 void Transfer::compute_normals(EuMesh& mesh, int smoothing) {
@@ -463,8 +476,11 @@ void Transfer::compute_normals(EuMesh& mesh, int smoothing) {
     }
 
     for (int i = 0; i < smoothing; ++i) {
-        for (auto cell: mesh) {
+        for (auto &cell: mesh) {
             smooth_normal(cell);
+        }
+        for (auto &cell: mesh) {
+            update_normal(cell);
         }
     }
 }
@@ -521,10 +537,9 @@ Distributor Transfer::distributor() const {
 }
 
 AmrStorage Transfer::body(EuMesh& mesh) {
-    double eps = 1.0e-5;
     int count = 0;
     for (auto cell: mesh) {
-        if (cell(U).u1 < eps) {
+        if (cell(U).u1 < 1.0e-6) {
             continue;
         }
         ++count;
@@ -534,13 +549,18 @@ AmrStorage Transfer::body(EuMesh& mesh) {
 
     count = 0;
     for (auto cell: mesh) {
-        if (cell(U).u1 < eps) {
+        if (cell(U).u1 < 1.0e-6) {
             continue;
         }
 
-        auto poly = cell.polygon();
-        auto part = poly.clip(cell(U).p, cell(U).n);
-        cells[count] = AmrCell(part);
+        if (cell(U).u1 < 1.0 - 1.0e-6) {
+            auto poly = cell.polygon();
+            auto part = poly.clip(cell(U).p, cell(U).n);
+            cells[count] = AmrCell(part);
+        }
+        else {
+            cells[count] = cell.geom();
+        }
         ++count;
     }
 

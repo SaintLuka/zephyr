@@ -57,80 +57,81 @@ double get_close(AmrStorage::Item& cell) {
     return std::abs(u < 0.5 ? u : 1.0 - u);
 }
 
-const double margin = 0.2198;
-
-inline double sqr(double x) {
-    return x * x;
-}
-
 // Начальное условие в виде полосы
-void setup_initial_0(EuMesh& mesh, double D) {
-    // Обычной блок с резкими границами
-    auto func1 = [](double x) -> double {
-        return (0.1 < x && x < 0.2) ? 1.0 : 0.0;
-    };
-    // Блок с гладкими границами
-    auto func2 = [](double x) -> double {
-        if (x < 0.1) {
-            return 0.0;
-        }
-        else if (x < 0.2) {
-            return sqr(std::sin(0.5 * M_PI * (x - 0.1) / 0.1));
-        }
-        else if (x < 0.4) {
-            return 1.0;
-        }
-        else if (x < 0.5) {
-            return sqr(std::sin(0.5 * M_PI * (0.5 - x) / 0.1));
-        }
-        else {
-            return 0.0;
-        }
-    };
-    // Блок с гладкими границами
-    auto func3 = [](double x) -> double {
-        if (x < 0.1) {
-            return 0.0;
-        }
-        else if (x < 0.5) {
-            return 0.4 + 0.6*std::pow(1.0 - std::cos(1.0 * M_PI * (0.3 - x) / 0.4), 0.4);
-        }
-        else {
-            return 0.0;
-        }
+void setup_initial_1(EuMesh& mesh, bool exact = false) {
+    // Полоса задана двумя линиями
+    auto inside = [](const Vector3d& v) -> bool {
+        const Vector3d p1 = {0.1, 0.0, 0.0};
+        const Vector3d p2 = {0.3, 0.0, 0.0};
+        const Vector3d n1 = {-1.0, 0.0, 0.0};
+        const Vector3d n2 = {+1.0, 0.0, 0.0};
+
+        return (v - p1).dot(n1) < 0.0 &&
+               (v - p2).dot(n2) < 0.0;
     };
 
     for (auto cell: mesh) {
-        double x = cell.center().x();
-        cell(U).u1 = func2(x);
-        cell(U).u2 = 0.0;
-    }
-}
-
-// Начальное условие в виде круга
-void setup_initial_1(EuMesh& mesh, double D) {
-    double R = D / 2.0;
-    Vector3d vc = {R + margin, R + margin, 0.0};
-    for (auto cell: mesh) {
-        cell(U).u1 = (cell.center() - vc).norm() < R ? 1.0 : 0.0;
+        if (!exact) {
+            cell(U).u1 = inside(cell.center());
+        }
+        else {
+            double vol_frac = cell.approx_vol_fraction(inside);
+            if (0.0 < vol_frac && vol_frac < 1.0) {
+                vol_frac = cell.volume_fraction(inside, 10000);
+            }
+            cell(U).u1 = vol_frac;
+        }
         cell(U).u2 = 0.0;
     }
 }
 
 // Начальное условие в виде квадрата
-void setup_initial_2(EuMesh& mesh, double D) {
-    double x_min = margin;
-    double x_max = D + x_min;
-    double y_min = margin;
-    double y_max = D + y_min;
+void setup_initial_2(EuMesh& mesh, bool exact = false) {
+    auto inside = [](const Vector3d& v) -> bool {
+        const double x_min = 0.1;
+        const double x_max = 0.4;
+        const double y_min = 0.1;
+        const double y_max = 0.4;
+
+        return x_min < v.x() && v.x() < x_max &&
+               y_min < v.y() && v.y() < y_max;
+    };
 
     for (auto cell: mesh) {
-        Vector3d vc = cell.center();
-        if (x_min <= vc.x() && vc.x() <= x_max &&
-            y_min <= vc.y() && vc.y() <= y_max) {
-            cell(U).u1 = 1.0;
-        } else {
-            cell(U).u1 = 0.0;
+        if (!exact) {
+            cell(U).u1 = inside(cell.center());
+        }
+        else {
+            double vol_frac = cell.approx_vol_fraction(inside);
+            if (0.0 < vol_frac && vol_frac < 1.0) {
+                vol_frac = cell.volume_fraction(inside, 10000);
+            }
+            cell(U).u1 = vol_frac;
+        }
+        cell(U).u2 = 0.0;
+    }
+}
+
+// Начальное условие в виде круга
+void setup_initial_3(EuMesh& mesh, bool exact = false) {
+    auto inside = [](const Vector3d& v) -> bool {
+        const double R = 0.15;
+        const double R2 = R * R;
+        const Vector3d c = {0.25, 0.25, 0.0};
+
+        return (v - c).squaredNorm() < R2;
+    };
+
+    for (auto cell: mesh) {
+        if (!exact) {
+            cell(U).u1 = inside(cell.center());
+        }
+        else {
+            double vol_frac = cell.approx_vol_fraction(inside);
+            if (0.0 < vol_frac && vol_frac < 1.0) {
+                vol_frac = cell.volume_fraction(inside, 10000);
+            }
+            cell(U).u1 = vol_frac;
         }
         cell(U).u2 = 0.0;
     }
@@ -164,7 +165,7 @@ int main() {
     pvd_scheme.variables += {"u",  get_u};
 
     // Геометрия области
-    Rectangle rect(0.0, 1.0, 0.0, 1.0, false);
+    Rectangle rect(0.0, 1.0, 0.0, 1.0, true);
     rect.set_nx(200);
     rect.set_boundaries({
         .left   = Boundary::ZOE, .right = Boundary::ZOE,
@@ -173,8 +174,8 @@ int main() {
     // Создать решатель
     Solver solver;
     solver.set_CFL(0.5);
-    solver.set_version(1);
-    solver.dir_splitting(true);
+    solver.set_version(2);
+    solver.dir_splitting(false);
 
     // Создать сетку
     EuMesh mesh(U, &rect);
@@ -183,20 +184,13 @@ int main() {
     mesh.set_max_level(0);
     mesh.set_distributor(solver.distributor());
 
-    // Заполняем начальные данные
-    Vector3d v_min(rect.x_min(), rect.y_min(), 0.0);
-    Vector3d v_max(rect.x_max(), rect.y_max(), 0.0);
-    double D = 0.2*(v_max - v_min).norm();
-
     // Адаптация под начальные данные
-    for (int k = 0; k < mesh.max_level() + 3; ++k) {
-        setup_initial_2(mesh, D);
+    int n_init_loops = mesh.is_adaptive() ? mesh.max_level() + 2 : 0;
+    for (int k = n_init_loops; k >= 0; --k) {
+        setup_initial_2(mesh, k < 1);
         solver.set_flags(mesh);
         mesh.refine();
     }
-
-    solver.compute_normals(mesh);
-    solver.find_sections(mesh);
 
     double init_volume = volume(mesh);
     std::cout << "Начальный объем: " << init_volume << "\n";
@@ -205,11 +199,8 @@ int main() {
     double curr_time = 0.0;
     double next_write = 0.0;
 
-    while(curr_time < 10.0 && n_step < 200) {
+    while(curr_time < 0.8 && n_step < 200000) {
         if (curr_time >= next_write) {
-            solver.compute_normals(mesh);
-            solver.find_sections(mesh);
-
             std::cout << "\tШаг: " << std::setw(6) << n_step << ";"
                       << "\tВремя: " << std::setw(8) << std::setprecision(3) << std::fixed
                       << curr_time << ";";
@@ -217,6 +208,9 @@ int main() {
             double curr_volume = volume(mesh);
             std::cout << "\tОшибка: " << std::setw(12) << std::setprecision(3) << std::scientific
                       << (curr_volume - init_volume) / (init_volume) << "\n";
+
+            solver.compute_normals(mesh, 3);
+            solver.find_sections(mesh);
 
             pvd.save(mesh.locals(), curr_time);
 
@@ -226,7 +220,7 @@ int main() {
             AmrStorage scheme = solver.scheme(mesh);
             pvd_scheme.save(scheme, curr_time);
 
-            next_write += 0.0;
+            next_write += 0.02;
         }
 
         // Шаг решения

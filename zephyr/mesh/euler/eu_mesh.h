@@ -52,6 +52,9 @@ public:
     /// @return -1, если сетка имеет неверную структуру.
     int check_refined();
 
+    /// @brief Адаптивная сетка?
+    bool is_adaptive() const;
+
     /// @brief Максимальный допустимый уровень адаптации (>= 0)
     int max_level() const;
 

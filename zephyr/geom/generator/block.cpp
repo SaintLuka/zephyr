@@ -3,7 +3,7 @@
 #include <map>
 #include <set>
 
-#include <zephyr/geom/maps.h>
+#include <zephyr/geom/cube.h>
 
 #include <zephyr/geom/generator/block.h>
 #include <zephyr/geom/generator/bs_vertex.h>

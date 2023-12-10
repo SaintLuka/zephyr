@@ -4,7 +4,8 @@
 #include <vector>
 
 #include <zephyr/geom/vector.h>
-#include <zephyr/geom/maps.h>
+#include <zephyr/geom/line.h>
+#include <zephyr/geom/quad.h>
 
 namespace zephyr::geom {
 
