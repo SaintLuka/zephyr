@@ -46,12 +46,11 @@ double get_e(AmrStorage::Item& cell) { return cell(U).e1; }
 
 int main() {
     // Тестовая задача
-    BlastWave test;
-    //RiemannTest2D test(1);
+    //BlastWave test;
+    RiemannTest2D test(1);
 
     // Уравнение состояния
-    Eos& eos = test.eos;
-    IdealGas ig(1.4, 1.0);
+    Eos& eos = test.m_eos;
 
     // Файл для записи
     PvdFile pvd("mesh", "output");
@@ -80,7 +79,11 @@ int main() {
     EuMesh mesh(U, &gen);
     int n_cells = mesh.n_cells();
 
-    // mesh.set_max_level(5);
+    // Создать решатель
+    auto solver = zephyr::math::SmFluid(eos, Fluxes::HLLC);
+
+    mesh.set_max_level(5);
+    mesh.set_distributor(solver.distributor());
         
     // Заполняем начальные данные
     Box box = mesh.bbox();
@@ -105,9 +108,6 @@ int main() {
     double next_write = 0.0;
     size_t n_step = 0;
 
-    // Создать решатель
-    auto solver = zephyr::math::SmFluid();
-
     while (time <= test.max_time()) {
         std::cout << "\tStep: " << std::setw(6) << n_step << ";"
                   << "\tTime: " << std::setw(6) << std::setprecision(3) << time << "\n";
@@ -115,10 +115,10 @@ int main() {
         pvd.save(mesh, time);
 
         // Шаг решения
-        solver.update(mesh, ig);
+        solver.update(mesh);
 
         n_step += 1;
-        time += solver.m_dt;
+        time = solver.get_time();
     }
 
     auto fprint = [](const std::string &name, double value) {

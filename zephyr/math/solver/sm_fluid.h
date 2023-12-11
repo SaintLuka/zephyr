@@ -1,9 +1,11 @@
 #pragma once
 
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/mesh.h>
 #include <zephyr/math/cfd/limiter.h>
-#include <zephyr/math/cfd/models.h>
-#include <zephyr/phys/eos/ideal_gas.h>
+#include "zephyr/phys/eos/eos.h"
+#include "zephyr/phys/tests/classic_test.h"
+#include "riemann.h"
+#include <zephyr/math/cfd/fluxes.h>
 
 namespace zephyr { namespace math {
 
@@ -16,75 +18,98 @@ using namespace zephyr::phys;
 using namespace zephyr::math;
 using namespace zephyr::math::smf;
 
-/// @brief GK_solver 2D???
 
 class SmFluid {
 public:
 
     struct State {
-        double rho1, rho2;
-        Vector3d v1, v2;
-        double p1, p2;
-        double e1, e2;
+        double rho;
+        Vector3d v;
+        double p;
+        double e;
+        PState half, next;
+        PState d_dx, d_dy, d_dz;
 
-        PState get_state1() const {
-            return {rho1, v1, p1, e1};
+        PState get_state() const {
+            return {rho, v, p, e};
         }
 
-        void set_state2(const PState& z) {
-            rho2 = z.density;
-            v2 = z.velocity;
-            p2 = z.pressure;
-            e2 = z.energy;
-        }
-
-        void swap() {
-            std::swap(rho1, rho2);
-            std::swap(v1, v2);
-            std::swap(p1, p2);
-            std::swap(e1, e2);
-        }
+        void set_state(const PState& z) {
+            rho = z.density;
+            v = z.velocity;
+            p = z.pressure;
+            e = z.energy;
+        }     
     };
 
     /// @brief Получить экземпляр расширенного вектора состояния
-    static State datatype();
+    [[nodiscard]] static State datatype();
 
     ///@brief Конструктор класса, параметры по умолчанию
-    SmFluid();
+    SmFluid(const phys::Eos &eos, Fluxes flux);
 
-    void compute_grad(EuCell &cell, int stage);
+    ///@brief
+    void init_cells(EuMesh &mesh, const phys::ClassicTest &test);
+
+    ///@brief 
+    double CFL() const;
+
+    ///@brief
+    std::string get_flux_name() const;
+
+    ///@brief
+    void set_CFL(double CFL);
 
     /// @brief Посчитать шаг интегрирования по времени с учетом
     /// условия Куранта
-    double compute_dt(EuCell& cell);
+    void compute_dt(EuMesh &mesh);
 
     /// @brief Один шаг интегрирования по времени
-    void update(EuMesh& mesh, IdealGas &eos);
+    void update(EuMesh& mesh);
 
     /// @brief Векторное поле скорости
     /// @details Виртуальная функция, следует унаследоваться от класса
     /// Convection и написать собственную функцию скорости
     virtual Vector3d velocity(const Vector3d& c) const;
 
-protected:
-
     /// @brief Шаг интегрирования на предыдущем вызове update()
-    double dt() const;
+    [[nodiscard]] double dt() const;
 
-    /// @brief 
-    void fluxes(EuCell& cell, int stage);
+    ///@brief
+    [[nodiscard]] double get_time() const;
 
-    void solution_step();
+    ///@brief
+    [[nodiscard]] double get_step() const;
 
-public:
-    double m_dt;        ///< Шаг интегрирования
+    // Дифференциальный поток
+    Flux calc_flux(EuCell &cell);
+
+    // С экстраполяцией
+    Flux calc_flux_extra(EuCell &cell, bool from_begin); 
+
+    ///@brief вычисление градиента
+    void compute_grad(EuMesh &mesh,  const std::function<smf::PState(zephyr::mesh::EuCell &)> &to_state) const;
+
+    /// @brief установить порядок метода
+    void set_accuracy(int acc);
+
+    ///@brief Стадия 1
+    void fluxes_stage1(EuMesh &mesh);
+
+    ///@brief Стадия 2
+    void fluxes_stage2(EuMesh &mesh);
+
+    /// @brief Распределитель данных при адаптации
+    Distributor distributor() const;
 
 protected:
-    
-    //double m_dt;        ///< Шаг интегрирования
-    Limiter m_limiter;  ///< Ограничитель
-    double m_CFL;
+    const phys::Eos &m_eos;
+    NumFlux::Ptr m_nf; ///< Метод расчёта потока
+    double m_time = 0.0; ///< Прошедшее время
+    size_t m_step = 0; ///< Количество шагов расчёта
+    double m_CFL; ///< Число Куранта
+    double m_dt; ///< Шаг интегрирования
+    int m_acc = 2; ///< Порядок
 };
 }
 }
-

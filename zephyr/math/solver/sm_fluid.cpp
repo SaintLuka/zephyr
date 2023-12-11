@@ -7,7 +7,7 @@
 
 namespace zephyr::math {
 
-using mesh::Storage;
+using mesh::AmrStorage;
 using namespace geom;
 using namespace smf;
 using namespace zephyr::phys;
@@ -16,6 +16,14 @@ static const SmFluid::State U = SmFluid::datatype();
 
 [[nodiscard]] SmFluid::State SmFluid::datatype() {
     return {};
+}
+
+smf::PState get_smf_pstate(EuCell &cell) {
+    return cell(U).get_state();
+}
+
+smf::PState get_smf_half(EuCell &cell) {
+    return cell(U).half;
 }
 
 SmFluid::SmFluid(const phys::Eos &eos, Fluxes flux = Fluxes::HLLC2) : m_eos(eos) {
@@ -36,7 +44,7 @@ void SmFluid::set_CFL(double CFL) {
     return m_dt;
 }
 
-void SmFluid::init_cells(Mesh &mesh, const phys::ClassicTest &test) {
+void SmFluid::init_cells(EuMesh &mesh, const phys::ClassicTest &test) {
     // Заполняем начальные данные
     for (auto cell: mesh) {
         cell(U).rho = test.density(cell.center());
@@ -54,7 +62,7 @@ Vector3d SmFluid::velocity(const Vector3d &c) const {
     return Vector3d::UnitX();
 };
 
-void SmFluid::compute_dt(Mesh &mesh) {
+void SmFluid::compute_dt(EuMesh &mesh) {
     m_dt = std::numeric_limits<double>::max();
     for (auto cell: mesh) {
         // скорость звука
@@ -77,7 +85,7 @@ void SmFluid::set_accuracy(int acc) {
     m_acc = acc;    // 1 или 2
 };
 
-void SmFluid::fluxes_stage1(Mesh &mesh) {
+void SmFluid::fluxes_stage1(EuMesh &mesh) {
     for (auto cell: mesh) {
         // Консервативный вектор в ячейке
         QState qc(cell(U).get_state());
@@ -91,7 +99,7 @@ void SmFluid::fluxes_stage1(Mesh &mesh) {
     }
 }
 
-void SmFluid::fluxes_stage2(Mesh &mesh) {
+void SmFluid::fluxes_stage2(EuMesh &mesh) {
     if (m_acc == 1) {
         for (auto cell: mesh) 
             cell(U).set_state(cell(U).half);
@@ -109,17 +117,19 @@ void SmFluid::fluxes_stage2(Mesh &mesh) {
     }
 }
 
-void SmFluid::compute_grad(Mesh &mesh,const std::function<smf::PState(zephyr::mesh::ICell &)> &to_state) const {
+void SmFluid::compute_grad(EuMesh &mesh,const std::function<smf::PState(zephyr::mesh::EuCell &)> &to_state) const {
     for (auto cell: mesh) {
-        auto grad = math::compute_grad<smf::PState>(cell, to_state);
+        auto grad = math::compute_grad_eu<smf::PState>(cell, to_state);
         cell(U).d_dx = grad[0];
         cell(U).d_dy = grad[1];
         cell(U).d_dz = grad[2];
     }
 }
 
+
+
 // для первого порядка точности
-Flux SmFluid::calc_flux(ICell &cell) {
+Flux SmFluid::calc_flux(EuCell &cell) {
     // Примитивный вектор в ячейке
     PState zc = cell(U).get_state();
 
@@ -162,7 +172,7 @@ Flux SmFluid::calc_flux(ICell &cell) {
 };
 
 /// берем только слой half]
-Flux SmFluid::calc_flux_extra(ICell &cell, bool from_begin) {
+Flux SmFluid::calc_flux_extra(EuCell &cell, bool from_begin) {
     // Примитивный вектор в ячейке
     PState zc = cell(U).half;
 
@@ -213,7 +223,7 @@ Flux SmFluid::calc_flux_extra(ICell &cell, bool from_begin) {
     return flux;
 };
 
-void SmFluid::update(Mesh &mesh) {
+void SmFluid::update(EuMesh &mesh) {
     /// @brief Выбор шага интегрирования
     compute_dt(mesh);
 
@@ -230,6 +240,33 @@ void SmFluid::update(Mesh &mesh) {
     m_time += m_dt;
     m_step += 1;
 };
+
+Distributor SmFluid::distributor() const {
+    Distributor distr;
+
+    distr.split = [this](AmrStorage::Item &parent, mesh::Children &children) {
+        for (auto &child: children) {
+            Vector3d dr = child.center - parent.center;
+            PState child_state = parent(U).get_state().vec() +
+                                 parent(U).d_dx.vec() * dr.x() +
+                                 parent(U).d_dy.vec() * dr.y() +
+                                 parent(U).d_dz.vec() * dr.z();
+            child_state.energy = m_eos.energy_rp(child_state.density, child_state.pressure);
+            child(U).set_state(child_state);
+        }
+    };
+
+    distr.merge = [this](mesh::Children &children, AmrStorage::Item &parent) {
+        PState sum;
+        for (auto &child: children) {
+            sum.vec() += child(U).get_state().vec() * child.volume();
+        }
+        parent(U).set_state(sum.vec() / parent.volume());
+        parent(U).e = m_eos.energy_rp(parent(U).rho, parent(U).p);
+    };
+
+    return distr;
+}
 
 [[nodiscard]] double SmFluid::get_time() const {
     return m_time;
