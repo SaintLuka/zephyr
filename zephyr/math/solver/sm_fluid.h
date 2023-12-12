@@ -107,9 +107,6 @@ public:
     ///@brief Стадия 2
     void fluxes_stage2(EuMesh &mesh);
 
-    /// @brief Расчёт потоков
-    void fluxes(Mesh &mesh) const;
-
     /// @brief Распределитель данных при адаптации
     Distributor distributor() const;
 
