@@ -12,24 +12,30 @@ class BlastWave {
 public:
 
     IdealGas eos;   ///< Используемый УрС
-    double x_jump;  ///< Положение разрыва
+    double r_jump;  ///< Положение разрыва
     double finish;  ///< Конечный момент времени
-    double rL, rR;  ///< Плотность
-    double uL, uR;  ///< Скорость
-    double pL, pR;  ///< Давление
-    double eL, eR;  ///< Внутренняя энергия
+    double rS, ra;  ///< Плотность
+    Vector3d vS, va;  ///< Скорость
+    double pS, pa;  ///< Давление
+    double eS, ea;  ///< Внутренняя энергия
+    int type = 1;
+    Vector3d center = {0.5, 0.5, 0};
 
 
     /// @brief Конструктор
-    BlastWave() : eos(1.4) {
-        rL = 0.125;
-        uL = 0.0;
-        pL = 0.1;
-        rR = 1.0;
-        uR = 0.0;
-        pR = 1.0;
-        x_jump = 0.4;
+    BlastWave(int type) : eos(1.4) {
+        
+        rS = 0.125;
+        vS = Vector3d{0.0, 0.0, 0.0};
+        pS = 0.1;
+
+        ra = 1.0;
+        va = Vector3d{0.0, 0.0, 0.0};
+        pa = 1.0;
+        
+        r_jump = 0.2;
         finish = 1.0;
+        type = type;;
     }
 
     std::string get_name() const { return "BlastWave";}
@@ -38,7 +44,13 @@ public:
     double xmin() const { return 0.0; }
 
     /// @brief Правая граница области
-    double xmax() const { return 2.0; }
+    double xmax() const { return 1.0; }
+
+    /// @brief Левая граница области
+    double ymin() const { return 0.0; }
+
+    /// @brief Правая граница области
+    double ymax() const { return 1.0; }
 
     /// @brief Конечный момент времени
     double max_time() const { return finish; }
@@ -47,25 +59,41 @@ public:
     const Eos& get_eos() const { return eos; }
 
     ///@brief Получить положение разрыва
-    double get_x_jump() const { return x_jump; }
+    double get_r_jump() const { return r_jump; }
 
     /// @brief Начальная плотность
     double density(const Vector3d &x) const 
     { 
-        double r = x.norm() / x_jump;
-        return r < 1.0 ? rL : rR; 
+        if (type == 1) {
+            double r = x.norm() / r_jump;
+            return r < 1.0 ? rS : ra; 
+        }
+        if (type == 2) {
+            double Mach = 0;
+        }
     }
 
     /// @brief Начальная скорость
-    Vector3d velocity(const Vector3d &x) const { 
-        return {0.0, 0.0, 0.0}; 
+    Vector3d velocity(const Vector3d &x) const 
+    { 
+        if (type == 1) {
+            double r = x.norm() / r_jump;
+            return r < 1.0 ? vS : va;
+        }
+        if (type == 2) {
+        }
     }
 
     /// @brief Начальное давление
     double pressure(const Vector3d &x) const 
     { 
-        double r = x.norm() / x_jump;
-        return r < 1.0 ? pL : pR; 
+        if (type == 1) {
+            double r = x.norm() / r_jump;
+            return r < 1.0 ? pS : pa; 
+        }
+        if (type == 2) {
+
+        }
     }
 
     /// @brief Начальная внутренняя энергия

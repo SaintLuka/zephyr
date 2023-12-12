@@ -16,12 +16,12 @@ struct _U_ : public SmFluid::State {
 _U_ U;
 
 /// Переменные для сохранения
-double get_rho(AmrStorage::Item& cell) { return cell(U).rho1; }
-double get_u(AmrStorage::Item& cell) { return cell(U).v1.x(); }
-double get_v(AmrStorage::Item& cell) { return cell(U).v1.y(); }
-double get_w(AmrStorage::Item& cell) { return cell(U).v1.z(); }
-double get_p(AmrStorage::Item& cell) { return cell(U).p1; }
-double get_e(AmrStorage::Item& cell) { return cell(U).e1; }
+double get_rho(AmrStorage::Item& cell) { return cell(U).rho; }
+double get_u(AmrStorage::Item& cell) { return cell(U).v.x(); }
+double get_v(AmrStorage::Item& cell) { return cell(U).v.y(); }
+double get_w(AmrStorage::Item& cell) { return cell(U).v.z(); }
+double get_p(AmrStorage::Item& cell) { return cell(U).p; }
+double get_e(AmrStorage::Item& cell) { return cell(U).e; }
 double get_inside(AmrStorage::Item& cell) { return double(cell(U).inside); }
 
 EuMesh make_pipe(double xmin, double xmax, double ymin, double ymax, double H, double h, double L, double l, int nx_cells) {
@@ -72,18 +72,18 @@ void setup_initial(EuMesh &mesh, double u0, double u3, double P0, double P3, dou
     for (auto cell : mesh) {
         // Инициализация
         if (cell.center().x() > 0) {
-            cell(U).v1.x() = u0;
-            cell(U).v1.y() = 0;
-            cell(U).rho1 = 1.0 / eos.volume_pt(P0, 20.0_C);
-            cell(U).p1 = P0; 
-            cell(U).e1 = eos.energy_rp(cell(U).rho1, cell(U).p1);
+            cell(U).v.x() = u0;
+            cell(U).v.y() = 0;
+            cell(U).rho = 1.0 / eos.volume_pt(P0, 20.0_C);
+            cell(U).p = P0; 
+            cell(U).e = eos.energy_rp(cell(U).rho, cell(U).p);
         }
         else {
-            cell(U).v1.x() = u3;
-            cell(U).v1.y() = 0;
-            cell(U).rho1 = 1.0 / eos.volume_pt(P3, 20.0_C);
-            cell(U).p1 = P3; 
-            cell(U).e1 = eos.energy_rp(cell(U).rho1, cell(U).p1);
+            cell(U).v.x() = u3;
+            cell(U).v.y() = 0;
+            cell(U).rho = 1.0 / eos.volume_pt(P3, 20.0_C);
+            cell(U).p = P3; 
+            cell(U).e = eos.energy_rp(cell(U).rho, cell(U).p);
         }
     }
 }
@@ -148,13 +148,14 @@ int main () {
 
     //EOS
     IdealGas eos("Air");
+    Eos 
 
     // Инициализация начальных условий
     setup_initial(mesh, u0, u3, P0, P3, rho0, rho3, cell_size_x, eos);
 
 
     // Создать решатель
-    auto solver = zephyr::math::SmFluid();
+    auto solver = zephyr::math::SmFluid(mesh, flux);
 
     while (time <= max_time) {
         std::cout << "\tStep: " << std::setw(6) << n_step << ";"
@@ -163,7 +164,7 @@ int main () {
         pvd.save(mesh, time);
 
         // Шаг решения
-        solver.update(mesh, eos);
+        solver.update(mesh);
 
         n_step += 1;
         time += dt;

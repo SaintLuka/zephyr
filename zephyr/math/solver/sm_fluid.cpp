@@ -19,16 +19,16 @@ static const SmFluid::State U = SmFluid::datatype();
 }
 
 smf::PState get_smf_pstate(EuCell &cell) {
-    return cell(U).get_state();
+    return cell(U).get_pstate();
 }
 
 smf::PState get_smf_half(EuCell &cell) {
     return cell(U).half;
 }
 
-SmFluid::SmFluid(const phys::Eos &eos, Fluxes flux = Fluxes::HLLC2) : m_eos(eos) {
+SmFluid::SmFluid(const phys::Eos &eos, Fluxes flux) : m_eos(eos) {
     m_nf = NumFlux::create(flux);
-    m_CFL = 0.9;
+    m_CFL = 0.4;
     m_dt = std::numeric_limits<double>::max();
 }
 
@@ -48,9 +48,31 @@ void SmFluid::init_cells(EuMesh &mesh, const phys::ClassicTest &test) {
     // Заполняем начальные данные
     for (auto cell: mesh) {
         cell(U).rho = test.density(cell.center());
-        cell(U).v = test.velocity(cell.center());
-        cell(U).p = test.pressure(cell.center());
-        cell(U).e = m_eos.energy_rp(cell(U).rho, cell(U).p);
+        cell(U).v   = test.velocity(cell.center());
+        cell(U).p   = test.pressure(cell.center());
+        cell(U).e   = m_eos.energy_rp(cell(U).rho, cell(U).p);
+    }
+}
+
+void SmFluid::init_cells(EuMesh &mesh, const phys::BlastWave &test) {
+    // Заполняем начальные данные
+    for (auto cell: mesh) {
+        if (test.type == 1) {
+            cell(U).rho = test.density(cell.center());
+            cell(U).v   = test.velocity(cell.center());
+            cell(U).p   = test.pressure(cell.center());
+            cell(U).e   = m_eos.energy_rp(cell(U).rho, cell(U).p);
+        }
+    }
+}
+
+void SmFluid::init_cells(EuMesh &mesh, const phys::RiemannTest2D &test) {
+    // Заполняем начальные данные
+    for (auto cell: mesh) {
+        cell(U).rho = test.density(cell.center());
+        cell(U).v   = test.velocity(cell.center());
+        cell(U).p   = test.pressure(cell.center());
+        cell(U).e   = m_eos.energy_rp(cell(U).rho, cell(U).p);
     }
 }
 
@@ -88,13 +110,13 @@ void SmFluid::set_accuracy(int acc) {
 void SmFluid::fluxes_stage1(EuMesh &mesh) {
     for (auto cell: mesh) {
         // Консервативный вектор в ячейке
-        QState qc(cell(U).get_state());
+        QState qc(cell(U).get_pstate());
         if (m_acc == 1) {
             qc.vec() -= m_dt / cell.volume() * calc_flux(cell).vec();
         }
         if (m_acc == 2) {
             qc.vec() -= 0.5 * m_dt / cell.volume() * calc_flux_extra(cell, false).vec();
-        }
+        }   
         cell(U).half = PState(qc, m_eos);
     }
 }
@@ -107,7 +129,7 @@ void SmFluid::fluxes_stage2(EuMesh &mesh) {
     if (m_acc == 2) {
         for (auto cell: mesh) {
             // Консервативный вектор в ячейке
-            QState qc(cell(U).get_state());
+            QState qc(cell(U).get_pstate());
             // Расчет потока f2
             qc.vec() -= m_dt / cell.volume() * calc_flux_extra(cell, true).vec();
             cell(U).next = PState(qc, m_eos);
@@ -126,12 +148,10 @@ void SmFluid::compute_grad(EuMesh &mesh,const std::function<smf::PState(zephyr::
     }
 }
 
-
-
 // для первого порядка точности
 Flux SmFluid::calc_flux(EuCell &cell) {
     // Примитивный вектор в ячейке
-    PState zc = cell(U).get_state();
+    PState zc = cell(U).get_pstate();
 
     // Консервативный вектор в ячейке
     QState qc(zc);
@@ -148,10 +168,11 @@ Flux SmFluid::calc_flux(EuCell &cell) {
         //Единмтаенное различие
         if (face.is_boundary()) {
             // Граничные условия типа "стенка"
-            // double vn = zc.velocity.dot(face.normal());
-            // zn.velocity -= 2.0 * vn * face.normal();
-        } else {
-            zn = face.neib()(U).get_state();
+            double vn = zc.velocity.dot(face.normal());
+            zn.velocity -= 2.0 * vn * face.normal();
+        } else if (face.flag() == Boundary::WALL) {
+
+            zn = face.neib()(U).get_pstate();
         }
 
         // Значение на грани со стороны ячейки
@@ -171,7 +192,7 @@ Flux SmFluid::calc_flux(EuCell &cell) {
     return flux;
 };
 
-/// берем только слой half]
+/// берем только слой half
 Flux SmFluid::calc_flux_extra(EuCell &cell, bool from_begin) {
     // Примитивный вектор в ячейке
     PState zc = cell(U).half;
@@ -187,13 +208,12 @@ Flux SmFluid::calc_flux_extra(EuCell &cell, bool from_begin) {
 
         if (face.is_boundary()) {
             // Граничные условия типа "стенка"
-            // double vn = zc.velocity.dot(face.normal());
-            // zn.velocity -= 2.0 * vn * face.normal();
-        } else {
+            double vn = zc.velocity.dot(face.normal());
+            zn.velocity -= 2.0 * vn * face.normal();
+        } 
+        else {
             if(from_begin)
-                zn = face.neib()(U).get_state();
-            else
-                zn = face.neib()(U).half;
+                zn = face.neib()(U).get_pstate();
         }
 
         Vector3d cell_c = cell.center();
@@ -231,12 +251,15 @@ void SmFluid::update(EuMesh &mesh) {
     if (m_acc == 2) {
         compute_grad(mesh, get_smf_pstate);
     }
+    
     fluxes_stage1(mesh);
+
     if (m_acc == 2) {
         compute_grad(mesh, get_smf_half);
     }
+    
     fluxes_stage2(mesh);
-    /// 
+
     m_time += m_dt;
     m_step += 1;
 };
@@ -247,7 +270,7 @@ Distributor SmFluid::distributor() const {
     distr.split = [this](AmrStorage::Item &parent, mesh::Children &children) {
         for (auto &child: children) {
             Vector3d dr = child.center - parent.center;
-            PState child_state = parent(U).get_state().vec() +
+            PState child_state = parent(U).get_pstate().vec() +
                                  parent(U).d_dx.vec() * dr.x() +
                                  parent(U).d_dy.vec() * dr.y() +
                                  parent(U).d_dz.vec() * dr.z();
@@ -259,7 +282,7 @@ Distributor SmFluid::distributor() const {
     distr.merge = [this](mesh::Children &children, AmrStorage::Item &parent) {
         PState sum;
         for (auto &child: children) {
-            sum.vec() += child(U).get_state().vec() * child.volume();
+            sum.vec() += child(U).get_pstate().vec() * child.volume();
         }
         parent(U).set_state(sum.vec() / parent.volume());
         parent(U).e = m_eos.energy_rp(parent(U).rho, parent(U).p);

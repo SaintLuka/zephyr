@@ -20,37 +20,25 @@ using namespace zephyr::math::smf;
 using zephyr::math::RiemannSolver;
 using zephyr::math::SmFluid;
 
-struct _U_ {
-    double rho1, rho2;
-    Vector3d v1, v2;
-    double p1, p2;
-    double e1, e2;
-};
-
 // Для быстрого доступа по типу
-_U_ U;
+SmFluid::State U;
 
 /// Переменные для сохранения
-double get_rho(AmrStorage::Item& cell) { return cell(U).rho1; }
-
-double get_u(AmrStorage::Item& cell) { return cell(U).v1.x(); }
-
-double get_v(AmrStorage::Item& cell) { return cell(U).v1.y(); }
-
-double get_w(AmrStorage::Item& cell) { return cell(U).v1.z(); }
-
-double get_p(AmrStorage::Item& cell) { return cell(U).p1; }
-
-double get_e(AmrStorage::Item& cell) { return cell(U).e1; }
+double get_rho(AmrStorage::Item& cell) { return cell(U).rho; }
+double get_u(AmrStorage::Item& cell) { return cell(U).v.x(); }
+double get_v(AmrStorage::Item& cell) { return cell(U).v.y(); }
+double get_w(AmrStorage::Item& cell) { return cell(U).v.z(); }
+double get_p(AmrStorage::Item& cell) { return cell(U).p; }
+double get_e(AmrStorage::Item& cell) { return cell(U).e; }
 
 
 int main() {
     // Тестовая задача
-    //BlastWave test;
-    RiemannTest2D test(1);
+    BlastWave test(1);
+    //RiemannTest2D test(6);
 
     // Уравнение состояния
-    Eos& eos = test.m_eos;
+    Eos& eos = test.eos;
 
     // Файл для записи
     PvdFile pvd("mesh", "output");
@@ -60,17 +48,13 @@ int main() {
     pvd.variables += {"u", get_u};
     pvd.variables += {"p", get_p};
     pvd.variables += {"e", get_e};
-
-    double time = 0.0;
-
     pvd.variables += {"c",
                       [&eos](AmrStorage::Item& cell) -> double {
-                          return eos.sound_speed_rp(cell(U).rho1, cell(U).p1);
+                          return eos.sound_speed_rp(cell(U).rho, cell(U).p);
                       }};
 
-    Rectangle gen(0, 1.0, 0, 1.0, true);
-    gen.set_nx(40);
-    gen.set_nx(40);
+    Rectangle gen(-1.0, 1.0, -1.0, 1.0);
+    gen.set_ny(50);
     gen.set_boundaries({.left=Boundary::WALL, .right=Boundary::WALL,
                         .bottom=Boundary::WALL, .top=Boundary::WALL});
 
@@ -81,45 +65,30 @@ int main() {
 
     // Создать решатель
     auto solver = zephyr::math::SmFluid(eos, Fluxes::HLLC);
+    solver.init_cells(mesh, test);
+    solver.set_accuracy(1); // 2
 
-    mesh.set_max_level(5);
-    mesh.set_distributor(solver.distributor());
-        
-    // Заполняем начальные данные
-    Box box = mesh.bbox();
-    Vector3d vc = box.center();
-    for (auto cell: mesh) {
-        cell(U).rho1 = test.density(cell.center() - vc);
-        cell(U).v1   = test.velocity(cell.center() - vc);
-        cell(U).p1   = test.pressure(cell.center() - vc);
-        cell(U).e1   = eos.energy_rp(cell(U).rho1, cell(U).p1);
-    }
-
-    // Число Куранта
-    double CFL = 0.5;
-
-    // Функция вычисления потока
-    // NumFlux::Ptr nf = CIR1::create();
-       NumFlux::Ptr nf = HLLC::create();
-    // NumFlux::Ptr nf = Rusanov::create();
-    // NumFlux::Ptr nf = Godunov::create();
-    // NumFlux::Ptr nf = HLL::create();
-
+    // mesh.set_max_level(5);
+    // mesh.set_distributor(solver.distributor());
+    
+    double time = 0.0;
     double next_write = 0.0;
     size_t n_step = 0;
 
-    while (time <= test.max_time()) {
-        std::cout << "\tStep: " << std::setw(6) << n_step << ";"
-                  << "\tTime: " << std::setw(6) << std::setprecision(3) << time << "\n";
+    while (time <= 1.01 * test.max_time()) {
+        if (time >= next_write) {
+            std::cout << "\tStep: " << std::setw(6) << n_step << ";"
+                      << "\tTime: " << std::setw(6) << std::setprecision(3) << time << "\n";
+            pvd.save(mesh, time);
+            next_write += test.max_time() / 100;
+        };
 
-        pvd.save(mesh, time);
-
-        // Шаг решения
+        // Обновляем слои
         solver.update(mesh);
 
         n_step += 1;
         time = solver.get_time();
-    }
+    };
 
     auto fprint = [](const std::string &name, double value) {
         std::cout << name << ": " << value << '\n';

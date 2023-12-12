@@ -4,6 +4,8 @@
 #include <zephyr/math/cfd/limiter.h>
 #include "zephyr/phys/eos/eos.h"
 #include "zephyr/phys/tests/classic_test.h"
+#include "zephyr/phys/tests/blast_wave.h"
+#include "zephyr/phys/tests/RiemannTest2D.h"
 #include "riemann.h"
 #include <zephyr/math/cfd/fluxes.h>
 
@@ -30,7 +32,7 @@ public:
         PState half, next;
         PState d_dx, d_dy, d_dz;
 
-        PState get_state() const {
+        PState get_pstate() const {
             return {rho, v, p, e};
         }
 
@@ -50,6 +52,12 @@ public:
 
     ///@brief
     void init_cells(EuMesh &mesh, const phys::ClassicTest &test);
+
+    ///@brief
+    void init_cells(EuMesh &mesh, const phys::BlastWave &test);
+
+    ///@brief
+    void init_cells(EuMesh &mesh, const phys::RiemannTest2D &test);
 
     ///@brief 
     double CFL() const;
@@ -99,6 +107,9 @@ public:
     ///@brief Стадия 2
     void fluxes_stage2(EuMesh &mesh);
 
+    /// @brief Расчёт потоков
+    void fluxes(Mesh &mesh) const;
+
     /// @brief Распределитель данных при адаптации
     Distributor distributor() const;
 
@@ -109,7 +120,7 @@ protected:
     size_t m_step = 0; ///< Количество шагов расчёта
     double m_CFL; ///< Число Куранта
     double m_dt; ///< Шаг интегрирования
-    int m_acc = 2; ///< Порядок
+    int m_acc = 1; ///< Порядок
 };
 }
 }
