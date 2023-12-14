@@ -10,74 +10,41 @@
 #include <zephyr/mesh/amr/coarse.h>
 #include <zephyr/mesh/amr/statistics.h>
 
-namespace zephyr { namespace mesh { namespace amr {
+namespace zephyr::mesh::amr {
 
-/// @brief Осуществляет проход по диапазону ячеек и вызывает для них
-/// соответствующие методы адаптации
+/// @brief Вызывает для ячейки соответствующий метод адаптации
 /// @param locals Локальные ячейки
 /// @param aliens Удаленные ячейки
 /// @param rank Ранг текущего процесса
-/// @param count Статистика адапатции
 /// @param op Оператор распределения данных при огрублении и разбиении
-/// @param from, to Диапазон ячеек
 template<int dim>
-void setup_geometry_partial(AmrStorage &locals, AmrStorage& aliens, int rank,
-        const Statistics &count, const Distributor& op, int from, int to) {
+void setup_geometry_one(AmrStorage::Item& cell, AmrStorage &locals, AmrStorage& aliens,
+        int rank, const Distributor& op) {
 
-
-    for (int ic = from; ic < to; ++ic) {
-        AmrCell& cell = locals[ic];
-
-        if (cell.flag == 0) {
-            retain_cell<dim>(cell, locals, aliens);
-            continue;
-        }
-
-        if (cell.flag > 0) {
-            refine_cell<dim>(locals, aliens, rank, ic, op);
-            continue;
-        }
-
-        coarse_cell<dim>(locals, aliens, rank, ic, op);
-    }
-}
-
-/// @brief Осуществляет проход по диапазону ячеек и вызывает для них
-/// соответствующие методы адаптации (без MPI и без тредов)
-template<int dim>
-void setup_geometry(AmrStorage &cells, const Statistics &count, const Distributor& op) {
-    setup_geometry_partial<dim>(cells, cells, 0, count, op, 0, count.n_cells);
-}
-
-#ifdef ZEPHYR_ENABLE_MULTITHREADING
-/// @brief Осуществляет проход по диапазону ячеек и вызывает для них
-/// соответствующие методы адаптации (без MPI и с тредами)
-template<int dim>
-void setup_geometry(AmrStorage &cells, const Statistics<dim> &count,
-                    const DataDistributor& op, ThreadPool& threads) {
-    AmrStorage aliens;
-    auto num_tasks = threads.size();
-    if (num_tasks < 2) {
-        setup_geometry_partial<dim>(cells, aliens, 0, count, op, 0, count.n_cells);
+    if (cell.flag == 0) {
+        retain_cell<dim>(cell, locals, aliens);
         return;
     }
-    std::vector<std::future<void>> results(num_tasks);
 
-    std::int bin = count.n_cells / num_tasks + 1;
-    std::int pos = 0;
-    for (auto &res : results) {
-        res = threads.enqueue(setup_geometry_partial<dim>,
-                              std::ref(cells), std::ref(aliens), 0, std::ref(count), std::ref(op),
-                              pos, std::min(pos + bin, count.n_cells)
-        );
-        pos += bin;
+    if (cell.flag > 0) {
+        refine_cell<dim>(cell, locals, aliens, rank, op);
+        return;
     }
 
-    for (auto &result: results) {
-        result.get();
-    }
+    coarse_cell<dim>(cell, locals, aliens, rank, op);
 }
-#endif
+
+/// @brief Осуществляет проход по ячейкам и вызывает для них
+/// соответствующие методы адаптации (без MPI)
+template<int dim>
+void setup_geometry(AmrStorage &cells, const Statistics &count, const Distributor& op) {
+    static AmrStorage aliens{};
+
+    threads::for_each<10>(
+            cells.begin(), cells.begin() + count.n_cells,
+            setup_geometry_one<dim>, std::ref(cells),
+            std::ref(aliens), 0, std::ref(op));
+}
 
 #ifdef ZEPHYR_ENABLE_MPI
 /// @brief Осуществляет проход по диапазону ячеек и вызывает для них
@@ -119,6 +86,4 @@ void setup_geometry(AmrStorage &locals, AmrStorage &aliens, int rank,
 #endif
 #endif
 
-} // namespace amr
-} // namespace mesh
-} // namespace zephyr
+} // namespace zephyr::mesh::amr

@@ -7,31 +7,32 @@
 
 #include <zephyr/mesh/amr/common.h>
 
-namespace zephyr { namespace mesh { namespace amr {
+namespace zephyr::mesh::amr {
 
 using zephyr::utils::Stopwatch;
 
 /// @brief Функция меняет индексы соседей через грань на новые, выполняется
-/// для части ячеек. Предполагается, что в поле element.index записан индекс,
+/// для одной ячейки. Предполагается, что в поле element.index записан индекс,
 /// куда ячейка будет перемещена в дальнейшем
+/// @param cell Целевая ячейка
 /// @param cells Хранилище ячеек
-/// @param from, to Диапазон ячеек, по которому осуществляется обход
-void change_adjacent_partial(AmrStorage& cells, int from, int to) {
-    int n_cells = cells.size();
-    for (int ic = from; ic < to; ++ic) {
-        for (BFace &face: cells[ic].faces) {
-            if (face.is_undefined() or face.is_boundary()) continue;
-            if (face.adjacent.ghost < 0) {
-                // Локальный сосед
-#if SCRUTINY
-                if (face.adjacent.index >= n_cells) {
-                    throw std::runtime_error("change_adjacent_partial() error: adjacent.index out of range");
-                }
-#endif
-                face.adjacent.index = cells[face.adjacent.index].index;
-            }
-
+void change_adjacent_one(AmrStorage::Item& cell, AmrStorage& cells) {
+    for (BFace &face: cell.faces) {
+        if (face.is_undefined() || face.is_boundary()) {
+            continue;
         }
+
+        if (face.adjacent.ghost < 0) {
+            // Локальный сосед
+#if SCRUTINY
+            int n_cells = cells.size();
+            if (face.adjacent.index >= n_cells) {
+                throw std::runtime_error("change_adjacent_partial() error: adjacent.index out of range");
+            }
+#endif
+            face.adjacent.index = cells[face.adjacent.index].index;
+        }
+
     }
 }
 
@@ -40,37 +41,27 @@ void change_adjacent_partial(AmrStorage& cells, int from, int to) {
 /// element.index записан индекс, куда ячейка будет перемещена в дальнейшем
 /// @param cells Хранилище ячеек
 void change_adjacent(AmrStorage& cells) {
-    change_adjacent_partial(cells, 0, cells.size());
+    threads::for_each<20>(
+            cells.begin(), cells.end(),
+            change_adjacent_one,
+            std::ref(cells));
 }
 
-#ifdef ZEPHYR_ENABLE_MULTITHREADING
-/// @brief Функция меняет индексы соседей через грань на новые, выполняется
-/// для всех ячеек в многопоточном режиме. Предполагается, что в поле
-/// element.index записан индекс, куда ячейка будет перемещена в дальнейшем
-/// @param cells Хранилище ячеек
-void change_adjacent(AmrStorage& cells, ThreadPool& threads) {
-    auto num_tasks = threads.size();
-    if (num_tasks < 2) {
-        change_adjacent(cells);
-        return;
-    }
-    std::vector<std::future<void>> results(num_tasks);
+/// @brief Выполняет перемещение элемента в соответствии с индексом
+/// в поле Element.index для одной ячейки.
+/// @details Данные актуальной ячейки перемещаются на место неактуальной
+/// ячейки, индексы смежности не изменяются, они должны быть выставлены
+/// заранее.
+void move_cell(int ic, AmrStorage& cells) {
+    int jc = cells[ic].index;
 
-    std::int bin = cells.size() / num_tasks + 1;
-    std::int pos = 0;
-    for (auto &res : results) {
-        res = threads.enqueue(change_adjacent_partial,
-                              std::ref(cells),
-                              pos, std::min(pos + bin, cells.size())
-        );
-        pos += bin;
-    }
+    // move from jc to ic
+    cells.move_item(jc, ic);
 
-    for (auto &result: results) {
-        result.get();
-    }
+    cells[ic].index = ic;
+    cells[ic].next = ic;
+    cells[jc].set_undefined();
 }
-#endif
 
 /// @struct Вспомогательная структура, содержит два списка индексов: неопределенные
 /// ячейки и актуальные ячейки. После обмена местами неопределенных и актуальных
@@ -96,7 +87,7 @@ struct SwapLists {
     /// свойство undefined_cells[i] < actual_cells[i] для любых i
     /// @param max_swap_count Максимальное число элементов, для которых может
     /// потребоваться перестановка, размеры списков ограничены данным числом.
-    /// TODO: Многопоточная версия конструктора
+    // TODO: Многопоточная версия конструктора
     SwapLists(AmrStorage& cells, int max_index, int max_swap_count) {
         undefined_cells.reserve(max_swap_count);
         for (int ic = 0; ic < max_index; ++ic) {
@@ -228,62 +219,15 @@ struct SwapLists {
 #endif
 
     /// @brief Выполняет перестановку элементов в соответствии с индексом
-    /// в поле element.index для части ячеек.
-    /// @details Данные актуальной ячейки перемещаются на место неактуальной
-    /// ячейки, индексы смежности не изменяются, они должны быть выставлены
-    /// заранее.
-    /// @param cells Ссылка на хранилище ячеек
-    /// @param from, to Диапазон индексов в массиве undefined_cells
-    void move_elements_partial(AmrStorage &cells, int from, int to) const {
-        for (int i = from; i < to; ++i) {
-            int ic = undefined_cells[i];
-            int jc = cells[ic].index;
-
-            cells.move_item(jc, ic);
-
-            cells[ic].index = ic;
-            cells[ic].next = ic;
-            cells[jc].set_undefined();
-        }
-    }
-
-    /// @brief Выполняет перестановку элементов в соответствии с индексом
     /// в поле element.index в однопоточном режиме.
     /// @details Данные актуальной ячейки перемещаются на место неактуальной
     /// ячейки, индексы смежности не изменяются, они должны быть выставлены
     /// заранее.
     void move_elements(AmrStorage &cells) const {
-        move_elements_partial(cells, 0, size());
+        threads::for_each<20>(
+                undefined_cells.begin(), undefined_cells.end(),
+                move_cell, std::ref(cells));
     }
-
-#ifdef ZEPHYR_ENABLE_MULTITHREADING
-    /// @brief Выполняет перестановку элементов в соответствии с индексом
-    /// в поле element.index в многопоточном режиме.
-    /// @details Данные актуальной ячейки перемещаются на место неактуальной
-    /// ячейки, индексы смежности не изменяются, они должны быть выставлены
-    /// заранее.
-    void move_elements(AmrStorage &cells, ThreadPool& threads) const {
-        auto num_tasks = threads.size();
-        if (num_tasks < 2) {
-            move_elements(cells);
-            return;
-        }
-        std::vector<std::future<void>> results(num_tasks);
-
-        std::int bin = size() / num_tasks + 1;
-        std::int pos = 0;
-        for (auto &res : results) {
-            res = threads.enqueue(
-                    &SwapLists::move_elements_partial,
-                    this, std::ref(cells),
-                    pos, std::min(pos + bin, size())
-            );
-            pos += bin;
-        }
-
-        for (auto &result: results) result.get();
-    }
-#endif
 
     /// @brief Число ячеек для перестановки
     inline int size() const {
@@ -339,13 +283,11 @@ void remove_undefined(AmrStorage &cells, const Statistics &count) {
     cells.resize(count.n_cells_short);
 
 #if CHECK_PERFORMANCE
-    std::cout << "      Create SwapList elapsed: " << create_swap_timer.seconds() << " sec\n";
-    std::cout << "      Set mapping elapsed: " << set_mapping_timer.seconds() << " sec\n";
-    std::cout << "      Change adjacent elapsed: " << change_adjacent_timer.seconds() << " sec\n";
-    std::cout << "      Move elements elapsed: " << move_elements_timer.seconds() << " sec\n";
+    std::cout << "      Create SwapList elapsed: " << std::setw(10) << create_swap_timer.milliseconds() << " ms\n";
+    std::cout << "      Set mapping elapsed:     " << std::setw(10) << set_mapping_timer.milliseconds() << " ms\n";
+    std::cout << "      Change adjacent elapsed: " << std::setw(10) << change_adjacent_timer.milliseconds() << " ms\n";
+    std::cout << "      Move elements elapsed:   " << std::setw(10) << move_elements_timer.milliseconds() << " ms\n";
 #endif
 }
 
-} // namespace amr
-} // namespace mesh
-} // namespace zephyr
+} // namespace zephyr::mesh::amr

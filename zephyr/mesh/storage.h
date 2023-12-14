@@ -236,14 +236,24 @@ public:
         return {m_data.data() + m_itemsize * idx, m_itemsize};
     }
 
+    /// @brief Получить элемент по индексу
+    inline Item& item(int idx) {
+        return *reinterpret_cast<Item*>(m_data.data() + m_itemsize * idx);
+    }
+
+    /// @brief Получить элемент по индексу
+    inline const Item& item(int idx) const {
+        return *reinterpret_cast<const Item*>(m_data.data() + m_itemsize * idx);
+    }
+
     /// @brief Ссылка на элемент хранилища
-    Item& operator[](int idx) {
-        return *iterator(idx);
+    inline Item& operator[](int idx) {
+        return item(idx);
     }
 
     /// @brief Константная ссылка на элемент хранилища
-    const Item& operator[](int idx) const {
-        return *iterator(idx);
+    inline const Item& operator[](int idx) const {
+        return item(idx);
     }
 
     /// @brief Итератор на начало хранилища

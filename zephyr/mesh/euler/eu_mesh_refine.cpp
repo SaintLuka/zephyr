@@ -75,7 +75,7 @@ void EuMesh::refine() {
     balance.resume();
     if (mpi::is_single()) {
 #if FAST_BALANCING
-        amr::balance_flags_fast(m_locals, max_level);
+        amr::balance_flags_fast(m_locals, m_max_level);
 #else
         amr::balance_flags_slow(m_locals, m_aliens, m_max_level);
 #endif
@@ -97,9 +97,9 @@ void EuMesh::refine() {
     full.stop();
 
 #if CHECK_PERFORMANCE
-    std::cout << "  Balance steps elapsed: " << balance.seconds() << " sec\n";
-    std::cout << "  Apply steps elapsed:   " << apply.seconds() << " sec\n";
-    std::cout << "Refine steps elapsed: " << full.seconds() << " sec\n";
+    std::cout << "  Balance steps elapsed: " << std::setw(10) << balance.milliseconds() << " ms\n";
+    std::cout << "  Apply steps elapsed:   " << std::setw(10) << apply.milliseconds() << " ms\n";
+    std::cout << "Refine steps elapsed:    " << std::setw(10) << full.milliseconds() << " ms\n";
 #endif
 }
 

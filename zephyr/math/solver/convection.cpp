@@ -145,53 +145,58 @@ void Convection::fluxes(Cell &cell, int stage) {
 
 void Convection::update(Mesh &mesh) {
     // Определяем dt
-    m_dt = std::numeric_limits<double>::max();
-    for (auto& cell: mesh) {
-        m_dt = std::min(m_dt, compute_dt(cell));
-    }
+    m_dt = mesh.min(
+            [this](Cell &cell) -> double {
+                return compute_dt(cell);
+            });
 
     if (m_accuracy < 2) {
         // Схема первого порядка, простой снос значений
         // на промежуточный слой
-        for (auto &cell: mesh) {
-            cell(U).uh = cell(U).u1;
-        }
-    }
-    else {
+        mesh.for_each(
+                [](Cell &cell) {
+                    cell(U).uh = cell(U).u1;
+                });
+    } else {
         // Схема высокого порядка, считаем производные,
         // выполняем шаг предиктора
 
         // Считаем производные
-        for (auto &cell: mesh) {
-            compute_grad(cell, 0);
-        }
+        mesh.for_each(
+                [this](Cell &cell) {
+                    compute_grad(cell, 0);
+                });
 
         // Шаг предиктора
-        for (auto &cell: mesh) {
-            fluxes(cell, 0);
-        }
+        mesh.for_each(
+                [this](Cell &cell) {
+                    fluxes(cell, 0);
+                });
 
         // Считаем производные
-        for (auto &cell: mesh) {
-            compute_grad(cell, 1);
-        }
+        mesh.for_each(
+                [this](Cell &cell) {
+                    compute_grad(cell, 1);
+                });
     }
 
     // Шаг корректора
-    for (auto cell: mesh) {
-        fluxes(cell, 1);
-    }
+    mesh.for_each(
+            [this](Cell &cell) {
+                fluxes(cell, 1);
+            });
 
     // Обновляем слои
-    for (auto cell: mesh) {
-        cell(U).u1 = cell(U).u2;
-        cell(U).uh = 0.0;
-        cell(U).u2 = 0.0;
-    }
+    mesh.for_each(
+            [this](Cell &cell) {
+                cell(U).u1 = cell(U).u2;
+                cell(U).uh = 0.0;
+                cell(U).u2 = 0.0;
+            });
 }
 
 void Convection::set_flags(Mesh& mesh) {
-    for (auto cell: mesh) {
+    mesh.for_each([](Cell &cell) {
         double min_val = cell(U).u1;
         double max_val = cell(U).u1;
 
@@ -205,11 +210,10 @@ void Convection::set_flags(Mesh& mesh) {
 
         if (max_val - min_val > 0.1) {
             cell.set_flag(+1);
-        }
-        else {
+        } else {
             cell.set_flag(-1);
         }
-    }
+    });
 }
 
 Distributor Convection::distributor() const {

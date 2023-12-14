@@ -104,7 +104,7 @@ int solution_step(EuMesh& mesh, double t = 0.0) {
 }
 
 int main() {
-    threads::off();
+    threads::on();
 
     PvdFile pvd("mesh", "output");
     pvd.variables = {"index", "level"};
@@ -112,7 +112,7 @@ int main() {
     pvd.variables += { "bit", get_bit };
 
     Rectangle rect(-1.0, 1.0, -1.0, 1.0);
-    rect.set_nx(20);
+    rect.set_nx(50);
 
     EuMesh mesh(U, &rect);
 

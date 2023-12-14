@@ -8,7 +8,7 @@
 #include <zephyr/mesh/amr/common.h>
 #include <zephyr/mesh/amr/faces.h>
 
-namespace zephyr { namespace mesh { namespace amr {
+namespace zephyr::mesh::amr {
 
 /// @brief Функция вызывается для ячеек с флагом адаптации = 0, хотя сама
 /// ячейка не разбивается и не огрубляется, у неё может измениться набор граней:
@@ -48,7 +48,7 @@ void retain_cell(AmrCell& cell, AmrStorage &locals, AmrStorage& aliens) {
             throw std::runtime_error("AmrCell has no remote neighbor (retain_cell)");
         }
 #endif
-        AmrCell& neib = (adj.rank == rank ? locals[adj.index] : aliens[adj.ghost]);
+        const AmrCell& neib = (adj.rank == rank ? locals[adj.index] : aliens[adj.ghost]);
         auto lvl_n = neib.level;
 
         if (lvl_c == lvl_n) {
@@ -130,6 +130,4 @@ void retain_cell(AmrCell& cell, AmrStorage &locals, AmrStorage& aliens) {
     }
 }
 
-} // namespace amr
-} // namespace mesh
-} // namespace zephyr
+} // namespace zephyr::mesh::amr
