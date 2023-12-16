@@ -8,7 +8,7 @@ namespace zephyr::geom {
 class BVertices : public SqCube {
 public:
     ///@brief Максимальное число вешин
-    static const int max_count = 27;
+    static constexpr int max_count = 27;
 
     /*
     /// @brief Конструктор по умолчанию

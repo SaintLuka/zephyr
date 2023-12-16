@@ -129,7 +129,7 @@ int main() {
         mesh.refine();
     }
 
-    Stopwatch elapsed(true);
+    Stopwatch elapsed;
     Stopwatch sw_write;
     Stopwatch sw_update;
     Stopwatch sw_flags;
@@ -139,7 +139,8 @@ int main() {
     double curr_time = 0.0;
     double next_write = 0.0;
 
-    while(curr_time < 1.0) {
+    elapsed.start();
+    while(curr_time <= 1.0) {
         sw_write.resume();
         if (curr_time >= next_write) {
             std::cout << "\tШаг: " << std::setw(6) << n_step << ";"

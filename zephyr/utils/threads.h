@@ -208,12 +208,25 @@ void threads::for_each(Iter begin, Iter end, Func&& func, Args&&... args) {
     std::vector<std::future<void>> results;
     results.reserve(n_tasks);
 
+#if 1
+    for (int j = 0; j < n_tasks_per_thread; ++j) {
+        for (int i = 0; i < n_threads; ++i) {
+            int a = (i * n_tasks_per_thread + j) * bin;
+            int b = a + bin;
+            if (i * n_tasks_per_thread + j == n_tasks - 1) {
+                b = size;
+            }
+            results.emplace_back(pool->enqueue(bin_function, begin + a, begin + b));
+        }
+    }
+#else
     Iter from = begin;
     for (int i = 0; i < n_tasks - 1; ++i) {
         results.emplace_back(pool->enqueue(bin_function, from, from + bin));
         from += bin;
     }
     results.emplace_back(pool->enqueue(bin_function, from, end));
+#endif
 
     for (auto &result : results)
         result.wait();

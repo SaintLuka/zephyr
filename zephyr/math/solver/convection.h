@@ -62,7 +62,7 @@ public:
     /// @brief Распределитель данных при адаптации
     Distributor distributor() const;
 
-protected:
+public:
 
     /// @brief Посчитать шаг интегрирования по времени с учетом
     /// условия Куранта

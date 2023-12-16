@@ -54,36 +54,23 @@ Vector3d Convection::velocity(const Vector3d& c) const {
 }
 
 double Convection::compute_dt(Cell &cell) const {
-    double max_area = 0.0;
-    for (auto &face: cell.faces()) {
-        max_area = std::max(max_area, face.area());
-    }
-    double dx = cell.volume() / max_area;
-
-    return m_CFL * dx / velocity(cell.center()).norm();
+    double h = cell.incircle_radius();
+    return m_CFL * h / velocity(cell.center()).norm();
 }
 
 void Convection::compute_grad(Cell &cell, int stage) {
-    double ux = 0.0;
-    double uy = 0.0;
-    double uz = 0.0;
-
     double uc = stage < 1 ? cell(U).u1 : cell(U).uh;
 
-    for (auto &face: cell.faces()) {
-        auto neib = face.neib();
-
-        double un = stage < 1 ? neib(U).u1 : neib(U).uh;
-
-        Vector3d S = 0.5 * face.normal() * face.area();
-        ux += (uc + un) * S.x();
-        uy += (uc + un) * S.y();
-        uz += (uc + un) * S.z();
+    Vector3d grad = Vector3d::Zero();
+    for (auto face: cell.faces()) {
+        double un = stage < 1 ? face.neib(U).u1 : face.neib(U).uh;
+        grad += (0.5 * (uc + un) * face.area()) * face.normal();
     }
+    grad /= cell.volume();
 
-    cell(U).ux = ux / cell.volume();
-    cell(U).uy = uy / cell.volume();
-    cell(U).uz = uz / cell.volume();
+    cell(U).ux = grad.x();
+    cell(U).uy = grad.y();
+    cell(U).uz = grad.z();
 }
 
 void Convection::fluxes(Cell &cell, int stage) {

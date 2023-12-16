@@ -129,6 +129,33 @@ PolygonS<8> AmrCell::polygon() const {
     return poly;
 }
 
+inline double min(double x, double y, double z) {
+    return std::min(x, std::min(y, z));
+}
+
+double AmrCell::incircle_radius() const {
+    if (adaptive) {
+        if (dim == 2) {
+            return std::sqrt(std::min(
+                    (vertices.vs<+1, 0>() - vertices.vs<-1, 0>()).squaredNorm(),
+                    (vertices.vs<0, +1>() - vertices.vs<0, -1>()).squaredNorm()));
+        }
+        else {
+            return std::sqrt(min(
+                    (vertices.vs<+1, 0, 0>() - vertices.vs<-1, 0, 0>()).squaredNorm(),
+                    (vertices.vs<0, +1, 0>() - vertices.vs<0, -1, 0>()).squaredNorm(),
+                    (vertices.vs<0, 0, +1>() - vertices.vs<0, 0, -1>()).squaredNorm()));
+        }
+    }
+    else {
+        assert(dim == 2);
+        int n = vertices.count();
+        // Диаметр описаной окружности вокруг правильного многоугольника
+        // с площадью size^2.
+        return 2.0 * size / std::sqrt(n * std::tan(M_PI / n));
+    }
+}
+
 double AmrCell::approx_vol_fraction(const std::function<double(const Vector3d &)> &inside) const {
     if (dim < 3) {
         if (adaptive) {

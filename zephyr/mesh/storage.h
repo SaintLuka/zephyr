@@ -230,6 +230,10 @@ public:
         int m_itemsize;  ///< Размер элемента в байтах
     };
 
+    /// @brief Получить указатель на данные по индексу
+    inline const Byte* data_at(int idx) const {
+        return m_data.data() + m_itemsize * idx + sizeof(Geom);
+    }
 
     /// @brief Получить итератор по индексу
     inline Iterator iterator(int idx) {

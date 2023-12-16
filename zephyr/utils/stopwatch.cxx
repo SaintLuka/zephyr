@@ -27,6 +27,11 @@ void Stopwatch::start() {
     m_start = clock::now();
 }
 
+void Stopwatch::reset() {
+    m_up = false;
+    m_elapsed = duration::zero();
+}
+
 void Stopwatch::stop() {
     if (m_up) {
         m_elapsed += (clock::now() - m_start);

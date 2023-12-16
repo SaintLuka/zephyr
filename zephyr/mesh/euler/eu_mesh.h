@@ -68,20 +68,20 @@ public:
     /// с флагами amr.flag ячеек.
     void refine();
 
-    template<int n_tasks_per_thread = 1, class Func, class... Args>
+    template<int n_tasks_per_thread = 10, class Func, class... Args>
     void for_each(Func &&func, Args&&... args) {
         threads::for_each<n_tasks_per_thread>(begin(), end(),
                 std::forward<Func>(func), std::forward<Args>(args)...);
     }
 
-    template<int n_tasks_per_thread = 1, class Func,
+    template<int n_tasks_per_thread = 10, class Func,
             class Value = typename std::result_of<Func(EuCell&)>::type>
     auto min(const Value &init, Func &&func)
     -> typename std::enable_if<!std::is_void<Value>::value, Value>::type {
         return threads::min<n_tasks_per_thread>(begin(), end(), init, std::forward<Func>(func));
     }
 
-    template<int n_tasks_per_thread = 1, class Func,
+    template<int n_tasks_per_thread = 10, class Func,
             class Value = typename std::result_of<Func(EuCell&)>::type>
     auto min(Func &&func)
     -> typename std::enable_if<std::is_arithmetic<Value>::value, Value>::type {
