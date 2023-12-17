@@ -4,8 +4,6 @@ using zephyr::geom::generator::Rectangle;
 
 #include <zephyr/math/cfd/fluxes.h>
 #include <zephyr/math/cfd/models.h>
-#include <zephyr/phys/tests/sod.h>
-#include <zephyr/phys/tests/toro.h>
 #include <zephyr/phys/tests/blast_wave.h>
 #include <zephyr/phys/tests/RiemannTest2D.h>
 
@@ -34,8 +32,8 @@ double get_e(AmrStorage::Item& cell) { return cell(U).e; }
 
 int main() {
     // Тестовая задача
-    BlastWave test(1);
-    //RiemannTest2D test(6);
+    //BlastWave test(1);
+    RiemannTest2D test(6);
 
     // Уравнение состояния
     Eos& eos = test.eos;
@@ -53,8 +51,9 @@ int main() {
                           return eos.sound_speed_rp(cell(U).rho, cell(U).p);
                       }};
 
-    Rectangle gen(-1.0, 1.0, -1.0, 1.0);
-    gen.set_ny(50);
+    Rectangle gen(0, 1, 0, 1);
+    gen.set_ny(400);
+    gen.set_nx(400);
     gen.set_boundaries({.left=Boundary::WALL, .right=Boundary::WALL,
                         .bottom=Boundary::WALL, .top=Boundary::WALL});
 
@@ -65,8 +64,8 @@ int main() {
 
     // Создать решатель
     auto solver = zephyr::math::SmFluid(eos, Fluxes::HLLC);
-    solver.init_cells(mesh, test);
-    solver.set_accuracy(1); // 2
+    solver.set_accuracy(2); // 2
+    solver.set_CFL(0.475);
 
     // mesh.set_max_level(5);
     // mesh.set_distributor(solver.distributor());
@@ -74,6 +73,14 @@ int main() {
     double time = 0.0;
     double next_write = 0.0;
     size_t n_step = 0;
+
+    solver.init_cells(mesh, test);
+
+    // for (int k = 0; k < mesh.max_level() + 3; ++k) {
+    //     solver.init_cells(mesh, test);
+    //     solver.set_flags(mesh);
+    //     mesh.refine();
+    // }
 
     while (time <= 1.01 * test.max_time()) {
         if (time >= next_write) {
@@ -86,6 +93,9 @@ int main() {
         // Обновляем слои
         solver.update(mesh);
 
+        // solver.set_flags(mesh);
+        // mesh.refine();
+        
         n_step += 1;
         time = solver.get_time();
     };

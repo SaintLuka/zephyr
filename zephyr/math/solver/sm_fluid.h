@@ -1,123 +1,135 @@
 #pragma once
 
+#include <cmath>
 #include <zephyr/mesh/mesh.h>
 #include <zephyr/math/cfd/limiter.h>
-#include "zephyr/phys/eos/eos.h"
-#include "zephyr/phys/tests/classic_test.h"
-#include "zephyr/phys/tests/blast_wave.h"
-#include "zephyr/phys/tests/RiemannTest2D.h"
-#include "riemann.h"
+#include <zephyr/phys/eos/eos.h>
+#include <boost/format.hpp>
+#include <zephyr/phys/tests/classic_test.h>
+#include <zephyr/phys/tests/blast_wave.h>
+#include <zephyr/phys/tests/RiemannTest2D.h>
+#include <zephyr/math/solver/riemann.h>
 #include <zephyr/math/cfd/fluxes.h>
+#include <zephyr/math/cfd/limiter.h>
 
-namespace zephyr { namespace math {
+namespace zephyr::math {
 
-using zephyr::mesh::EuCell;
-using zephyr::mesh::EuMesh;
+using zephyr::mesh::Cell;
+using zephyr::mesh::Mesh;
 using zephyr::mesh::Distributor;
 using zephyr::geom::Vector3d;
-
-using namespace zephyr::phys;
-using namespace zephyr::math;
-using namespace zephyr::math::smf;
-
 
 class SmFluid {
 public:
 
+    /// @brief Расширенный вектор состояния на котором решается задача
     struct State {
-        double rho;
-        Vector3d v;
-        double p;
-        double e;
-        PState half, next;
-        PState d_dx, d_dy, d_dz;
+        double rho; ///< плотность
+        Vector3d v; ///< скорость
+        double p; ///< давление
+        double e; ///< энергия
+        smf::PState half, next;
+        smf::PState d_dx, d_dy, d_dz;
 
-        PState get_pstate() const {
-            return {rho, v, p, e};
+        [[nodiscard]] smf::PState get_pstate() const {
+            return smf::PState(rho, v, p, e);
         }
 
-        void set_state(const PState& z) {
-            rho = z.density;
-            v = z.velocity;
-            p = z.pressure;
-            e = z.energy;
-        }     
+        void set_state(const smf::PState &pstate) {
+            rho = pstate.density;
+            v = pstate.velocity;
+            p = pstate.pressure;
+            e = pstate.energy;
+        }
     };
+
+    friend std::ostream &operator<<(std::ostream &os, const State &state) {
+        os << boost::format(
+                "State1: density: %1%, velocity: {%2%, %3%, %4%}, pressure: %5%, energy: %6%\n") %
+              state.rho % state.v.x() % state.v.y() % state.v.z() % state.p;
+        os << boost::format(
+                "State2: density: %1%, velocity: {%2%, %3%, %4%}, pressure: %5%, energy: %6%\n") %
+              state.next.density % state.next.velocity.x() % state.next.velocity.y() % state.next.velocity.z() %
+              state.next.pressure % state.next.energy;
+        return os;
+    }
 
     /// @brief Получить экземпляр расширенного вектора состояния
     [[nodiscard]] static State datatype();
 
-    ///@brief Конструктор класса, параметры по умолчанию
-    SmFluid(const phys::Eos &eos, Fluxes flux);
+    /// @brief Конструктор класса
+    explicit SmFluid(const phys::Eos &eos, Fluxes flux = Fluxes::HLLC);
 
-    ///@brief
-    void init_cells(EuMesh &mesh, const phys::ClassicTest &test);
+    /// @brief Число Куранта
+    [[nodiscard]] double CFL() const;
 
-    ///@brief
-    void init_cells(EuMesh &mesh, const phys::BlastWave &test);
-
-    ///@brief
-    void init_cells(EuMesh &mesh, const phys::RiemannTest2D &test);
-
-    ///@brief 
-    double CFL() const;
-
-    ///@brief
-    std::string get_flux_name() const;
-
-    ///@brief
+    /// @brief Установить число Куранта
     void set_CFL(double CFL);
 
-    /// @brief Посчитать шаг интегрирования по времени с учетом
-    /// условия Куранта
-    void compute_dt(EuMesh &mesh);
+    void set_acc(int acc);
 
-    /// @brief Один шаг интегрирования по времени
-    void update(EuMesh& mesh);
+    [[nodiscard]] double get_time() const;
 
-    /// @brief Векторное поле скорости
-    /// @details Виртуальная функция, следует унаследоваться от класса
-    /// Convection и написать собственную функцию скорости
-    virtual Vector3d velocity(const Vector3d& c) const;
+    [[nodiscard]] size_t get_step() const;
+
+    [[nodiscard]] std::string get_flux_name() const;
 
     /// @brief Шаг интегрирования на предыдущем вызове update()
     [[nodiscard]] double dt() const;
 
-    ///@brief
-    [[nodiscard]] double get_time() const;
+    void update(Mesh &mesh);
 
-    ///@brief
-    [[nodiscard]] double get_step() const;
-
-    // Дифференциальный поток
-    Flux calc_flux(EuCell &cell);
-
-    // С экстраполяцией
-    Flux calc_flux_extra(EuCell &cell, bool from_begin); 
-
-    ///@brief вычисление градиента
-    void compute_grad(EuMesh &mesh,  const std::function<smf::PState(zephyr::mesh::EuCell &)> &to_state) const;
-
-    /// @brief установить порядок метода
-    void set_accuracy(int acc);
-
-    ///@brief Стадия 1
-    void fluxes_stage1(EuMesh &mesh);
-
-    ///@brief Стадия 2
-    void fluxes_stage2(EuMesh &mesh);
+    /// @brief Установить флаги адаптации
+    void set_flags(Mesh& mesh);
 
     /// @brief Распределитель данных при адаптации
     Distributor distributor() const;
 
+    void set_accuracy(int acc);
+
+    template<typename Test>
+    void init_cells(Mesh &mesh, const Test &test) {
+        static const SmFluid::State U = SmFluid::datatype();
+        // Заполняем начальные данные
+        for (auto cell: mesh) {
+            cell(U).rho = test.density(cell.center());
+            cell(U).v = test.velocity(cell.center());
+            cell(U).p = test.pressure(cell.center());
+            cell(U).e = m_eos.energy_rp(cell(U).rho, cell(U).p);
+        }
+    }
+
+private:
+    /// @brief Посчитать шаг интегрирования по времени с учетом
+    /// условия Куранта
+    double compute_dt(Mesh &mesh);
+
+    /// @brief Расчёт потоков
+    void fluxes(Mesh &mesh) const;
+
+    /// @brief Обновление ячеек
+    void swap(Mesh &mesh);
+
+    void compute_grad(Mesh &mesh,  const std::function<smf::PState(Cell &)> &to_state) const;
+
+    void fluxes_stage1(Mesh &mesh) const;
+
+    void fluxes_stage2(Mesh &mesh) const;
+
+    smf::Flux calc_flux_extra(Cell &cell, bool from_begin) const;
+
+public:
+
+    ~SmFluid() = default;
+
 protected:
     const phys::Eos &m_eos;
     NumFlux::Ptr m_nf; ///< Метод расчёта потока
+    int m_acc = 1;
     double m_time = 0.0; ///< Прошедшее время
     size_t m_step = 0; ///< Количество шагов расчёта
     double m_CFL; ///< Число Куранта
     double m_dt; ///< Шаг интегрирования
-    int m_acc = 1; ///< Порядок
 };
-}
-}
+
+} // namespace zephyr

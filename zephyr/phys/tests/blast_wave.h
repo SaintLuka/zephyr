@@ -19,7 +19,6 @@ public:
     double pS, pa;  ///< Давление
     double eS, ea;  ///< Внутренняя энергия
     int type = 1;
-    Vector3d center = {0.5, 0.5, 0};
 
 
     /// @brief Конструктор
@@ -33,9 +32,9 @@ public:
         va = Vector3d{0.0, 0.0, 0.0};
         pa = 1.0;
         
-        r_jump = 0.2;
+        r_jump = 0.1;
         finish = 1.0;
-        type = type;;
+        type = type;
     }
 
     std::string get_name() const { return "BlastWave";}
@@ -69,7 +68,6 @@ public:
             return r < 1.0 ? rS : ra; 
         }
         if (type == 2) {
-            double Mach = 0;
         }
     }
 
