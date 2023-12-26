@@ -110,7 +110,7 @@ void Fractions::normalize() {
     double sum = 0.0;
     for (auto &v: m_data) {
         if (v < 0) {
-            if (-1e-3 < v)
+            if (-2e-3 < v)
                 v = 0;
             else {
                 std::cerr << *this;

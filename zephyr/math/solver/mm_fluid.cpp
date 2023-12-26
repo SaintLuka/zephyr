@@ -31,7 +31,7 @@ mmf::PState get_half(Cell &cell) {
 
 MmFluid::MmFluid(const phys::Materials &mixture, Fluxes flux, double g) : mixture(mixture), g(g) {
     m_nf = NumFlux::create(flux);
-    m_CFL = 0.5;
+    m_CFL = 0.4;
     m_dt = std::numeric_limits<double>::max();
 }
 

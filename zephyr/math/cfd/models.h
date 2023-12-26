@@ -146,7 +146,7 @@ struct PState {
     PState(const double &density, const Vector3d &velocity,
            const double &pressure, const double &energy, const double &temperature, const Fractions &mass_frac);
 
-    PState(const QState &q, const phys::Materials &mixture, double P0 = 1e3, double T0 = 300.0);
+    PState(const QState &q, const phys::Materials &mixture, double P0 = 1e3, double T0 = 200.0);
 
     [[nodiscard]] std::vector<double> get_densities() const;
 
@@ -238,6 +238,8 @@ struct Flux {
     [[nodiscard]] Flux in_global(const Vector3d &normal) const;
 
     friend std::ostream &operator<<(std::ostream &os, const Flux &flux);
+
+    bool is_bad() const;
 
     VECTORIZE(Flux)
 };

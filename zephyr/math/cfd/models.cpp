@@ -316,6 +316,13 @@ std::ostream &operator<<(std::ostream &os, const Flux &flux) {
 Flux::Flux(double mass, const Vector3d &momentum, double energy,
            const FractionsFlux &mass_frac) : mass(mass), momentum(momentum), energy(energy), mass_frac(mass_frac) {}
 
+bool Flux::is_bad() const {
+    return std::isinf(mass) || std::isnan(mass) ||
+           std::isinf(momentum.x()) || std::isnan(momentum.x()) ||
+           std::isinf(momentum.y()) || std::isnan(momentum.y()) ||
+           std::isinf(momentum.z()) || std::isnan(momentum.z()) ||
+           std::isinf(energy) || std::isnan(energy);
+}
 
 } // namespace mmf
 

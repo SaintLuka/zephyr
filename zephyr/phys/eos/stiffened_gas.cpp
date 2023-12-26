@@ -14,7 +14,7 @@ StiffenedGas::StiffenedGas(const std::string &name) {
 
     if (name == "Air") {
         gamma = 1.4;
-        Cv    = 0.0;
+        Cv    = 718.0_J_kgK;
         P0    = 0.0;
         eps_0 = 0.0;
     }

@@ -4,7 +4,7 @@
 
 namespace zephyr { namespace phys {
 
-    /// @brief Создание указателя на базовый класс Eos
+/// @brief Создание указателя на базовый класс Eos
 /// @brief Уравнение состояния идеального газа
 class IdealGas : public Eos {
 public:
