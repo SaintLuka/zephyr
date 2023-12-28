@@ -3,7 +3,7 @@
 #include <iostream>
 #include <zephyr/utils/thread-pool.h>
 
-namespace zephyr { namespace utils {
+namespace zephyr::utils {
 
 
 /// @brief Статический класс. Упрощенный интерфейс для многопоточности.
@@ -38,7 +38,7 @@ public:
     /// @details Целевая функция func в качестве аргументов принимает
     /// разыменованный итератор Iter и набор аргументов Args..., целевая
     /// функция может иметь возвращаемое значение, но оно игнорируется.
-    template<int n_tasks_per_thread = 1, class Iter, class Func, class... Args>
+    template<int n_tasks_per_thread = 10, class Iter, class Func, class... Args>
     static void for_each(Iter begin, Iter end, Func &&func, Args &&... args);
 
     /// @brief Минимизировать результаты выполенения функции на диапазоне элементов
@@ -53,7 +53,7 @@ public:
     /// @details Целевая функция func в качестве аргументов принимает
     /// разыменованный итератор Iter (DeRef) и набор аргументов Args...,
     /// целевая функция должна возвращать значение типа Value.
-    template<int n_tasks_per_thread = 1, class Iter, class Func, class... Args,
+    template<int n_tasks_per_thread = 10, class Iter, class Func, class... Args,
             class DeRef = decltype(*std::declval<Iter&>()),
             class Value = typename std::result_of<Func(DeRef, Args...)>::type>
     static auto min(Iter begin, Iter end, const Value &init, Func &&func, Args &&... args)
@@ -70,7 +70,7 @@ public:
     /// @details Целевая функция func в качестве аргументов принимает
     /// разыменованный итератор Iter (DeRef) и набор аргументов Args...,
     /// целевая функция должна возвращать арифметический тип.
-    template<int n_tasks_per_thread = 1, class Iter, class Func, class... Args,
+    template<int n_tasks_per_thread = 10, class Iter, class Func, class... Args,
             class DeRef = decltype(*std::declval<Iter&>()),
             class Value = typename std::result_of<Func(DeRef, Args...)>::type>
     static auto min(Iter begin, Iter end, Func &&func, Args &&... args)
@@ -91,7 +91,7 @@ public:
     /// @details Целевая функция func в качестве аргументов принимает
     /// разыменованный итератор Iter (DeRef) и набор аргументов Args...,
     /// целевая функция должна возвращать значение типа Value.
-    template<int n_tasks_per_thread = 1, class Iter, class Func, class... Args,
+    template<int n_tasks_per_thread = 10, class Iter, class Func, class... Args,
             class DeRef = decltype(*std::declval<Iter&>()),
             class Value = typename std::result_of<Func(DeRef, Args...)>::type>
     static auto max(Iter begin, Iter end, const Value &init, Func &&func, Args &&... args)
@@ -108,7 +108,7 @@ public:
     /// @details Целевая функция func в качестве аргументов принимает
     /// разыменованный итератор Iter (DeRef) и набор аргументов Args...,
     /// целевая функция должна возвращать арифметический тип.
-    template<int n_tasks_per_thread = 1, class Iter, class Func, class... Args,
+    template<int n_tasks_per_thread = 10, class Iter, class Func, class... Args,
             class DeRef = decltype(*std::declval<Iter&>()),
             class Value = typename std::result_of<Func(DeRef, Args...)>::type>
     static auto max(Iter begin, Iter end, Func &&func, Args &&... args)
@@ -131,7 +131,7 @@ public:
     /// целевая функция должна возвращать значение типа Value.
     /// @return Массив из частичных сумм (на каждом треде в отдельности), размер
     /// выходного массива будет равен n_threads * n_tasks_per_thread.
-    template<int n_tasks_per_thread = 1, class Iter, class Func, class... Args,
+    template<int n_tasks_per_thread = 10, class Iter, class Func, class... Args,
             class DeRef = decltype(*std::declval<Iter&>()),
             class Value = typename std::result_of<Func(DeRef, Args...)>::type>
     static auto partial_sum(Iter begin, Iter end, const Value &init, Func &&func, Args &&... args)
@@ -149,7 +149,7 @@ public:
     /// @details Целевая функция func в качестве аргументов принимает
     /// разыменованный итератор Iter (DeRef) и набор аргументов Args...,
     /// целевая функция должна возвращать значение типа Value.
-    template<int n_tasks_per_thread = 1, class Iter, class Func, class... Args,
+    template<int n_tasks_per_thread = 10, class Iter, class Func, class... Args,
             class DeRef = decltype(*std::declval<Iter&>()),
             class Value = typename std::result_of<Func(DeRef, Args...)>::type>
     static auto sum(Iter begin, Iter end, const Value &init, Func &&func, Args &&... args)
@@ -168,7 +168,7 @@ public:
     /// @details Целевая функция func в качестве аргументов принимает
     /// разыменованный итератор Iter (DeRef) и набор аргументов Args...,
     /// целевая функция должна возвращать значение типа Value.
-    template<int n_tasks_per_thread = 1, class Iter, class Func, class... Args,
+    template<int n_tasks_per_thread = 10, class Iter, class Func, class... Args,
             class DeRef = decltype(*std::declval<Iter&>()),
             class Value = typename std::result_of<Func(DeRef, Args...)>::type>
     static auto reduce(Iter begin, Iter end, const Value &init, Func &&func, Args &&... args)
@@ -208,7 +208,8 @@ void threads::for_each(Iter begin, Iter end, Func&& func, Args&&... args) {
     std::vector<std::future<void>> results;
     results.reserve(n_tasks);
 
-#if 1
+#if 0
+    // Тестировал вариант с непоследовательной загрузкой задач
     for (int j = 0; j < n_tasks_per_thread; ++j) {
         for (int i = 0; i < n_threads; ++i) {
             int a = (i * n_tasks_per_thread + j) * bin;
@@ -455,5 +456,4 @@ auto threads::reduce(Iter begin, Iter end, const Value& init, Func&& func, Args&
     return res;
 }
 
-} // utils
 } // zephyr

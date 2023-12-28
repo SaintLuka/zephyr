@@ -13,7 +13,7 @@
 #include <functional>
 #include <stdexcept>
 
-namespace zephyr { namespace utils {
+namespace zephyr::utils {
 
 class ThreadPool {
 public:
@@ -97,5 +97,4 @@ inline ThreadPool::~ThreadPool() {
         worker.join();
 }
 
-} // utils
 } // zephyr
