@@ -121,12 +121,6 @@ namespace mmf {
 using zephyr::phys::Fractions;
 using zephyr::phys::FractionsFlux;
 
-struct Component {
-    double density;
-    double energy;
-    double frac;
-};
-
 struct QState;
 
 /// @brief Примитивный многоматериальный вектор состояния
@@ -140,8 +134,8 @@ struct PState {
 
     PState();
 
-    PState(const double &pressure, const double &temperature, const Vector3d &velocity,
-           const std::vector<Component> &components);
+//    PState(const double &pressure, const double &temperature, const Vector3d &velocity,
+//           const std::vector<Component> &components);
 
     PState(const double &density, const Vector3d &velocity,
            const double &pressure, const double &energy, const double &temperature, const Fractions &mass_frac);
@@ -179,6 +173,8 @@ struct QState {
     Vector3d momentum;
     double energy;
     FractionsFlux mass_frac;
+
+    QState() : mass(0), momentum(0, 0, 0), energy(0), mass_frac() {}
 
     QState(const double &mass, const Vector3d &momentum, const double &energy, const FractionsFlux &mass_frac);
 

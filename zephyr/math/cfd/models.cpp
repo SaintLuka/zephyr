@@ -129,28 +129,6 @@ namespace mmf {
 
 PState::PState() : density(0), velocity(0, 0, 0), pressure(0), temperature(0), energy(0), mass_frac() {}
 
-PState::PState(const double &pressure, const double &temperature,
-               const Vector3d &velocity, const std::vector<Component> &components) :
-        pressure(pressure), temperature(temperature), velocity(velocity) {
-    if (components.size() > Fractions::max_size) {
-        throw std::runtime_error("When construct PState got components.size() > Fractions::max_size (" +
-                                 std::to_string(components.size()) + " > " + std::to_string(Fractions::max_size));
-    }
-
-    std::vector<double> fracs(components.size());
-    density = 0;
-    for (size_t i = 0; i < components.size(); ++i) {
-        fracs[i] = components[i].frac;
-    }
-    mass_frac = Fractions(fracs);
-
-    energy = 0;
-    for (size_t i = 0; i < components.size(); ++i) {
-        density += mass_frac[i] * components[i].density;
-        energy += mass_frac[i] * components[i].energy;
-    }
-}
-
 PState::PState(const double &density, const Vector3d &velocity,
                const double &pressure, const double &energy, const double &temperature, const Fractions &mass_frac)
         : density(density), velocity(velocity),
@@ -225,7 +203,7 @@ bool PState::is_bad() const {
            std::isinf(energy) || std::isnan(energy) ||
            std::isinf(temperature) || std::isnan(temperature) ||
            mass_frac.empty() ||
-           density < 0 || pressure < 0 || energy < 0 || temperature < 0;
+           density < 0 || energy < 0 || temperature < 0;
 }
 
 

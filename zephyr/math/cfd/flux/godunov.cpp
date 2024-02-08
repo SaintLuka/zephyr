@@ -1,5 +1,6 @@
 #include <zephyr/math/solver/riemann.h>
 #include <zephyr/math/cfd/flux/godunov.h>
+#include <zephyr/math/cfd/flux/rusanov.h>
 #include <iostream>
 #include <boost/format.hpp>
 
@@ -30,6 +31,15 @@ smf::Flux Godunov::flux(const smf::PState &zL, const smf::PState &zR, const Eos 
 }
 
 mmf::Flux Godunov::calc_mm_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) {
+    if (zL.is_bad()) {
+        std::cerr << "Bad left state in input of Godunov flux:" << zL << "\n";
+        throw std::runtime_error("bad left state");
+    }
+    if (zR.is_bad()) {
+        std::cerr << "Bad right state in input of Godunov flux:" << zR << "\n";
+        throw std::runtime_error("bad right state");
+    }
+
     auto sol = RiemannSolver::solve(zL.to_smf(), zR.to_smf(),
                                     mixture.stiffened_gas(zL.density, zL.pressure, zL.mass_frac),
                                     mixture.stiffened_gas(zR.density, zR.pressure, zR.mass_frac));
