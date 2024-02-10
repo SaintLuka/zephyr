@@ -20,6 +20,11 @@ public:
         double u1, u2;  ///< Объемные доли
         Vector3d n;     ///< Внешняя нормаль поверхности
         Vector3d p;     ///< Базисная точка поверхности
+        Vector3d n2;    ///< Нормаль (вспомогательное значение)
+
+        inline bool zero_normal() const {
+            return n.squaredNorm() == 0.0;
+        }
     };
 
     /// @brief Получить экземпляр расширенного вектора состояния
@@ -81,8 +86,6 @@ protected:
     /// @brief Посчитать нормали
     void compute_normal(EuCell& cell);
 
-    void smooth_normal(EuCell& cell);
-
     void update_ver1(EuMesh& mesh);
 
     void update_ver2(EuMesh& mesh);
@@ -99,6 +102,12 @@ protected:
     void fluxes_MIX(EuCell& cell, Direction dir = Direction::ANY);
 
 protected:
+
+    void smooth_normal(EuCell& cell);
+
+    void update_normal(EuCell& cell);
+
+
     double m_dt;      ///< Шаг интегрирования
     double m_CFL;     ///< Число Куранта
     int    m_ver;     ///< Версия функции update

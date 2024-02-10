@@ -28,7 +28,7 @@ inline bool is_big_endian() {
 }
 
 PvdFile::PvdFile()
-    : variables(), filter(), hex_only(false), m_counter(0)
+    : variables(), filter(), hex_only(true), m_counter(0)
     , m_open(false)
 #ifdef ZEPHYR_ENABLE_DISTRIBUTED
     , net(dummy_net)
@@ -42,7 +42,7 @@ PvdFile::PvdFile()
 }
 
 PvdFile::PvdFile(const std::string &filename, const std::string &directory)
-    : variables(), filter(), hex_only(false), m_counter(0)
+    : variables(), filter(), hex_only(true), m_counter(0)
     , m_open(false)
 #ifdef ZEPHYR_ENABLE_DISTRIBUTED
     , net(dummy_net)
@@ -130,7 +130,15 @@ void PvdFile::open(const std::string& filename, const std::string& _directory) {
 }
 
 void PvdFile::save(mesh::EuMesh& mesh, double timestep) {
-    save(mesh.locals(), timestep);
+    if (unique_nodes) {
+        mesh.collect_nodes();
+    }
+    if (mesh.has_nodes()) {
+        save(mesh.locals(), mesh.nodes(), timestep);
+    }
+    else {
+        save(mesh.locals(), timestep);
+    }
 }
 
 void PvdFile::save(AmrStorage& elements, double timestep) {
@@ -138,6 +146,14 @@ void PvdFile::save(AmrStorage& elements, double timestep) {
         throw std::runtime_error("PvdFile::save() error: You need to open PvdFile");
     }
     VtuFile::save(get_filename(), elements, variables, hex_only, filter);
+    update_pvd(timestep);
+}
+
+void PvdFile::save(AmrStorage& elements, const std::vector<geom::Vector3d>& nodes, double timestep) {
+    if (!m_open) {
+        throw std::runtime_error("PvdFile::save() error: You need to open PvdFile");
+    }
+    VtuFile::save(get_filename(), elements, nodes, variables, hex_only);
     update_pvd(timestep);
 }
 

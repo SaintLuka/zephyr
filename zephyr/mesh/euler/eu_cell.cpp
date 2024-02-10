@@ -59,6 +59,21 @@ EuCell EuCell::neib(int face_idx) const {
     return { m_locals, m_aliens, m_it->faces[face_idx].adjacent };
 }
 
+const Byte* EuCell::neib_data(const BFace& face) const {
+    if (face.is_undefined() || face.is_boundary()) {
+        return m_it->data();
+    }
+    const auto &adj = face.adjacent;
+
+    if (adj.ghost >= 0) {
+        return m_aliens.data_at(adj.ghost);
+    } else if (adj.index < m_locals.size()) {
+        return m_locals.data_at(adj.index);
+    } else {
+        return m_it->data();
+    }
+}
+
 EuFaces EuCell::faces(Direction dir) const {
     return { *this, dir };
 }

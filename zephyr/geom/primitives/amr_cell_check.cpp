@@ -3,7 +3,7 @@
 
 #include <zephyr/geom/primitives/side.h>
 #include <zephyr/geom/primitives/base.h>
-#include <zephyr/geom/maps.h>
+#include <zephyr/geom/cube.h>
 #include <zephyr/geom/primitives/amr_cell.h>
 
 namespace zephyr::geom {

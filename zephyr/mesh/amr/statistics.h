@@ -9,44 +9,40 @@
 #include <zephyr/utils/threads.h>
 #include <zephyr/utils/mpi.h>
 
-namespace zephyr { namespace mesh { namespace amr {
+namespace zephyr::mesh::amr {
 
 using zephyr::utils::threads;
 using zephyr::utils::mpi;
 
 /// @struct Содержит статистику о числе ячеек с флагами -1, 0 и 1 в некотором
-/// диапазоне ячеек. Вспомогательная структура для реализации многопоточности.
-struct PartialStatistics {
-    int n_coarse;  ///< Число ячеек в диапазоне для огрубления
-    int n_retain;  ///< Число ячеек в диапазоне, которые сохраняют уровень
-    int n_refine;  ///< Число ячеек в диапазоне для разбиения
+/// диапазоне ячеек. В том числе и для одной ячейки.
+struct PartStatistics {
+    int n_coarse = 0; ///< Число ячеек в диапазоне для огрубления
+    int n_retain = 0; ///< Число ячеек в диапазоне, которые сохраняют уровень
+    int n_refine = 0; ///< Число ячеек в диапазоне для разбиения
 
-    /// @brief Простой конструктор
-    PartialStatistics(int n_coarse, int n_retain, int n_refine)
-        : n_coarse(n_coarse), n_retain(n_retain), n_refine(n_refine) {
+    /// @brief Конструктор по умолчанию с нулями.
+    PartStatistics() = default;
+
+    /// @brief Для суммирования статистики в тредах
+    PartStatistics& operator+=(const PartStatistics& other) {
+        n_coarse += other.n_coarse;
+        n_retain += other.n_retain;
+        n_refine += other.n_refine;
+        return *this;
     }
 };
 
-/// @brief Собрать частичную статистику с части хранилища
-static PartialStatistics partial_statistics(AmrStorage& cells, int from, int to) {
-    int n_coarse = 0;
-    int n_retain = 0;
-    int n_refine = 0;
-
-    for (int ic = from; ic < to; ++ic) {
-        switch (cells[ic].flag) {
-            case 0:
-                ++n_retain;
-                break;
-            case 1:
-                ++n_refine;
-                break;
-            default:
-                ++n_coarse;
-                break;
+inline PartStatistics cell_statistics(AmrStorage::Item& cell) {
+    if (!cell.flag) {
+        return {.n_retain=1};
+    } else {
+        if (cell.flag > 0) {
+            return {.n_refine=1};
+        } else {
+            return {.n_coarse=1};
         }
     }
-    return { n_coarse, n_retain, n_refine };
 }
 
 /// @struct Содержит статистику о числе ячеек с флагами -1, 0 и 1, число новых
@@ -71,60 +67,23 @@ struct Statistics {
     /// @brief Конструктор, однопоточный сбор статистики
     /// @details В многопоточном режиме данные получаются после объединения 
     /// статистики с разных потоков
-    explicit Statistics(AmrStorage &cells) :
-        n_coarse(0), 
-        n_retain(0), 
-        n_refine(0) {
-
+    explicit Statistics(AmrStorage &cells) {
         n_cells = cells.size();
 
-        if (n_cells < 1) {
-            throw std::runtime_error("Empty AmrStorage statistics");
-        }
+        scrutiny_check(n_cells >= 0, "Empty AmrStorage statistics");
 
-        // Составим статистику
-        if (threads::is_off()) {
-            // В один поток
-            PartialStatistics sp = partial_statistics(cells, 0, n_cells);
+        PartStatistics ps = threads::sum(
+                cells.begin(), cells.end(), {}, cell_statistics);
 
-            n_coarse = sp.n_coarse;
-            n_retain = sp.n_retain;
-            n_refine = sp.n_refine;
-        }
-        else {
-            // В много потоков
-            auto n_tasks = threads::count();
-
-            std::vector<std::future<PartialStatistics>> results(n_tasks);
-            int bin = n_cells / n_tasks + 1;
-            int pos = 0;
-            for (auto &res : results) {
-                res = std::async(partial_statistics,
-                                 std::ref(cells),
-                                 pos, std::min(pos + bin, n_cells)
-                );
-                pos += bin;
-            }
-
-            for (auto &result: results) {
-                auto count = result.get();
-                n_coarse += count.n_coarse;
-                n_retain += count.n_retain;
-                n_refine += count.n_refine;
-            }
-        }
+        n_coarse = ps.n_coarse;
+        n_retain = ps.n_retain;
+        n_refine = ps.n_refine;
 
         // Пересчитаем завимисые величины
-
         int dim = cells[0].dim;
 
-        if (n_retain + n_refine + n_coarse != n_cells) {
-            throw std::runtime_error("Refiner::apply() error 1");
-        }
-
-        if (n_coarse % CpC(dim) != 0) {
-            throw std::runtime_error("Refiner::apply() error 2");
-        }
+        scrutiny_check(n_coarse % CpC(dim) == 0, "Refiner::apply() error #2")
+        scrutiny_check(n_retain + n_refine + n_coarse == n_cells, "Refiner::apply() error #1");
 
         n_parents =  n_coarse / CpC(dim);
         n_children = n_refine * CpC(dim);
@@ -152,6 +111,4 @@ struct Statistics {
     }
 };
 
-} // namespace amr
-} // namespace mesh
-} // namespace zephyr
+} // namespace zephyr::mesh::amr

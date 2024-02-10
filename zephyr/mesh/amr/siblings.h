@@ -96,7 +96,7 @@ bool can_coarse(AmrStorage& cells, int ic) {
 /// В фукнции используется сложная механика перехода от одного сиблинга
 /// к следующему, что позволяет прервать функцию, не обходя всех сиблингов
 template <int dim>
-bool can_coarse(const AmrCell& main_cell, AmrStorage& cells) {
+bool can_coarse(const AmrCell& main_cell, const AmrStorage& cells) {
     const std::array<Side, CpC(dim)> sides = side_to_next_sibling<dim>();
 
     if (main_cell.flag >= 0) {
@@ -106,7 +106,7 @@ bool can_coarse(const AmrCell& main_cell, AmrStorage& cells) {
 
     int ic = main_cell.index;
     for (int i = 0; i < CpC(dim) - 1; ++i) {
-        auto& cell = cells[ic];
+        const auto& cell = cells[ic];
 
         // локальный z-индекс
         auto z = cell.z_idx % CpC(dim);
@@ -118,7 +118,7 @@ bool can_coarse(const AmrCell& main_cell, AmrStorage& cells) {
         }
 
         ic = adj.index;
-        auto& neib = cells[ic];
+        const auto& neib = cells[ic];
         if (neib.level != cell.level) {
             // Сосед другого уровня (точно не сиблинг)
             // Может быть потомком сиблинга более высокого уровня
@@ -149,9 +149,9 @@ bool can_coarse(const AmrCell& main_cell, AmrStorage& cells) {
 /// @param ic Целевая ячейка (от которой запрос)
 template<int dim>
 std::array<int, CpC(dim) - 1> get_siblings(AmrStorage &cells, int ic) {
-    std::array<int, CpC(dim) - 1> siblings;
+    const std::array<Side, CpC(dim)> sides = side_to_next_sibling<dim>();
 
-    std::array<Side, CpC(dim)> sides = side_to_next_sibling<dim>();
+    std::array<int, CpC(dim) - 1> siblings;
 
     int jc = ic;
     for (int i = 0; i < CpC(dim) - 1; ++i) {
@@ -244,18 +244,17 @@ std::array<int, CpC(dim) - 1> get_siblings(AmrStorage &cells, int ic) {
 /// @param locals Хранилище ячеек
 template<int dim>
 std::array<int, CpC(dim) - 1> get_siblings(const AmrCell& main_cell, AmrStorage &locals) {
-    std::array<int, CpC(dim) - 1> siblings;
+    const std::array<Side, CpC(dim)> sides = side_to_next_sibling<dim>();
 
-    std::array<Side, CpC(dim)> sides = side_to_next_sibling<dim>();
+    std::array<int, CpC(dim) - 1> siblings;
 
     int jc = main_cell.index;
     for (int i = 0; i < CpC(dim) - 1; ++i) {
-        auto& cell = locals[jc];
+        const auto& cell = locals[jc];
 
         // локальный z-индекс
         auto z = cell.z_idx % CpC(dim);
-        auto adj = cell.faces[sides[z]].adjacent;
-        jc = adj.index;
+        jc = cell.faces[sides[z]].adjacent.index;
         siblings[i] = jc;
 
 #if SCRUTINY

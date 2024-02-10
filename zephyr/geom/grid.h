@@ -38,6 +38,9 @@ public:
     /// @brief Установить граничное условие
     void add_boundary(Boundary flag);
 
+    /// @brief Установить граничное условие
+    void set_boundaries(std::set<Boundary> flags);
+
     /// @brief Граничное условие на грани, образованной несколькими вершинами
     /// @details Ищет пересечение флагов граничных условий
     static Boundary face_boundary(const std::vector<GNode::Ptr> &vs);

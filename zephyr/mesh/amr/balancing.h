@@ -9,7 +9,7 @@
 #include <zephyr/mesh/amr/siblings.h>
 #include <zephyr/mesh/amr/balancing_restrictions.h>
 
-namespace zephyr { namespace mesh { namespace amr {
+namespace zephyr::mesh::amr {
 
 /// @struct Vicinity - окрестность, прикольное слово, да?
 /// @brief Простая структура, содержит ссылки на данные (уровни и флаги)
@@ -53,15 +53,15 @@ public:
     void setup(const AmrCell& cell, AmrStorage &locals, AmrStorage& aliens) {
         scrutiny_check(cell.index < locals.size(), "setup: ic >= locals.size()")
 
+        neib_count = 0;
+        sibs_count = 0;
+
         // Эти ячейки не интересуют
         if (cell.flag > 0) {
-            neib_count = 0;
-            sibs_count = 0;
             return;
         }
 
         // Поиск соседей
-        neib_count = 0;
         for (auto &face: cell.faces) {
             if (face.is_undefined() || face.is_boundary()) {
                 continue;
@@ -92,7 +92,6 @@ public:
 
         // Поиск сиблингов для ячеек с флагом -1
         if (cell.flag  < 0) {
-            sibs_count = 0;
             if (cell.flag < 0) {
                 scrutiny_check(can_coarse<dim>(cell, locals), "Can't coarse")
 
@@ -102,8 +101,7 @@ public:
                 for (auto is: sibs) {
                     scrutiny_check(is < locals.size(), "Vicinity: Sibling index out of range")
 
-                    AmrCell& sib = locals[is];
-                    sibs_flags[sibs_count] = &sib.flag;
+                    sibs_flags[sibs_count] = &locals[is].flag;
                     ++sibs_count;
                 }
 
@@ -143,11 +141,15 @@ template <int dim>
 struct VicinityList {
     std::vector<Vicinity<dim>> m_list;
 
+    /// @brief Конструктор только с размером
+    /// Удобно для создания статического списка
+    VicinityList() = default;
+
     /// @brief Конструктор построения окружения
     /// @param locals Ссылка на локальное хранилище
     /// @param aliens Ссылка на хранилище ячеек с других процессов
-    VicinityList(AmrStorage& locals, AmrStorage& aliens)
-        : m_list(locals.size()) {
+    void fill(AmrStorage& locals, AmrStorage& aliens) {
+        m_list.resize(locals.size());
         threads::for_each(
                 locals.begin(), locals.end(),
                 [this, &locals, &aliens](const AmrStorage::Item &item) {
@@ -180,11 +182,8 @@ struct VicinityList {
 /// @param vicinity_list Ссылка на массив с окружением ячеек
 /// @return true если ячейка изменила свой флаг
 template <int dim>
-bool update_flag(AmrCell& cell, AmrStorage& locals, const VicinityList<dim>& vicinity_list) {
-    int ic = cell.index;
-    auto vicinity = vicinity_list[ic];
-
-    scrutiny_check(ic < locals.size(), "update_flag: ic >= locals.size()")
+bool update_flag(AmrCell& cell, const VicinityList<dim>& vicinity_list) {
+    auto vicinity = vicinity_list[cell.index];
 
     if (cell.flag > 0) {
         return false;
@@ -233,7 +232,7 @@ bool flag_balancing_step(AmrStorage& locals, const VicinityList<dim>& vicinity_l
     // Функция max в данном контексте заменяет логическое "И"
     return threads::max(
             locals.begin(), locals.end(),
-            update_flag<dim>, std::ref(locals), std::ref(vicinity_list)
+            update_flag<dim>, std::ref(vicinity_list)
     );
 }
 
@@ -261,12 +260,15 @@ void balance_flags(AmrStorage &locals, AmrStorage& aliens, int max_level) {
     static Stopwatch setup_vicinity_timer;
     static Stopwatch flag_balancing_timer;
 
+    // Делаем статическим, чтобы не выделять каждый раз память (гениально)
+    static VicinityList<dim> vicinity_list;
+
     base_restrictions_timer.resume();
     base_restrictions<dim>(locals, max_level);
     base_restrictions_timer.stop();
 
     setup_vicinity_timer.resume();
-    VicinityList<dim> vicinity_list(locals, aliens);
+    vicinity_list.fill(locals, aliens);
     setup_vicinity_timer.stop();
 
     flag_balancing_timer.resume();
@@ -278,9 +280,9 @@ void balance_flags(AmrStorage &locals, AmrStorage& aliens, int max_level) {
     flag_balancing_timer.stop();
 
 #if CHECK_PERFORMANCE
-    std::cout << "    Restrictions elapsed:   " << base_restrictions_timer.milliseconds() << " sec\n";
-    std::cout << "    Setup vicinity elapsed: " << setup_vicinity_timer.milliseconds() << " sec\n";
-    std::cout << "    Flag balancing elapsed: " << flag_balancing_timer.milliseconds() << " sec\n";
+    std::cout << "    Restrictions elapsed:   " << std::setw(10) << base_restrictions_timer.milliseconds() << " ms\n";
+    std::cout << "    Setup vicinity elapsed: " << std::setw(10) << setup_vicinity_timer.milliseconds() << " ms\n";
+    std::cout << "    Flag balancing elapsed: " << std::setw(10) << flag_balancing_timer.milliseconds() << " ms\n";
 #endif
 }
 
@@ -399,6 +401,4 @@ void balance_flags_slow(
 
 #endif
 
-} // namespace amr
-} // namespace mesh
-} // namespace zephyr
+} // namespace zephyr::mesh::amr

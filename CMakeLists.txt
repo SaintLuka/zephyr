@@ -15,7 +15,7 @@ option(ZEPHYR_ENABLE_MPI      "Use MPI functions" OFF)
 option(ZEPHYR_ENABLE_YAML     "YAML support"      OFF)
 option(ZEPHYR_ENABLE_EIGEN    "Use Eigen library" ON)
 option(ZEPHYR_ENABLE_TESTS    "Build tests"       ON)
-option(ZEPHYR_ENABLE_PROBLEMS "Build problems"    ON)
+option(ZEPHYR_ENABLE_PROBLEMS "Build problems"    OFF)
 
 configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/configuration.h.in

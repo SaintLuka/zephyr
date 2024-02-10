@@ -1,5 +1,6 @@
 #include <zephyr/geom/primitives/side.h>
 #include <zephyr/geom/primitives/amr_cell.h>
+#include <zephyr/geom/geom.h>
 
 namespace zephyr::geom {
 
@@ -126,6 +127,149 @@ PolygonS<8> AmrCell::polygon() const {
 
     poly.resize(n_nodes);
     return poly;
+}
+
+inline double min(double x, double y, double z) {
+    return std::min(x, std::min(y, z));
+}
+
+double AmrCell::incircle_radius() const {
+    if (adaptive) {
+        if (dim == 2) {
+            return std::sqrt(std::min(
+                    (vertices.vs<+1, 0>() - vertices.vs<-1, 0>()).squaredNorm(),
+                    (vertices.vs<0, +1>() - vertices.vs<0, -1>()).squaredNorm()));
+        }
+        else {
+            return std::sqrt(min(
+                    (vertices.vs<+1, 0, 0>() - vertices.vs<-1, 0, 0>()).squaredNorm(),
+                    (vertices.vs<0, +1, 0>() - vertices.vs<0, -1, 0>()).squaredNorm(),
+                    (vertices.vs<0, 0, +1>() - vertices.vs<0, 0, -1>()).squaredNorm()));
+        }
+    }
+    else {
+        assert(dim == 2);
+        int n = vertices.count();
+        // Диаметр описаной окружности вокруг правильного многоугольника
+        // с площадью size^2.
+        return 2.0 * size / std::sqrt(n * std::tan(M_PI / n));
+    }
+}
+
+double AmrCell::approx_vol_fraction(const std::function<double(const Vector3d &)> &inside) const {
+    if (dim < 3) {
+        if (adaptive) {
+            int sum = 0;
+            // Угловые точки, вес = 1
+            if (inside(vertices.vs<-1, -1>()))
+                sum += 1;
+            if (inside(vertices.vs<-1, +1>()))
+                sum += 1;
+            if (inside(vertices.vs<+1, +1>()))
+                sum += 1;
+            if (inside(vertices.vs<+1, -1>()))
+                sum += 1;
+
+            // Ребра, вес = 2
+            if (inside(vertices.vs<0, -1>()))
+                sum += 2;
+            if (inside(vertices.vs<0, +1>()))
+                sum += 2;
+            if (inside(vertices.vs<-1, 0>()))
+                sum += 2;
+            if (inside(vertices.vs<+1, 0>()))
+                sum += 2;
+
+            // Центр, вес = 3
+            if (inside(vertices.vs<0, 0>()))
+                sum += 4;
+
+            if (sum == 0) {
+                return 0.0;
+            }
+            else if (sum == 16) {
+                return 1.0;
+            }
+            else {
+                return 0.0625 * sum; // sum / 16.0
+            }
+        }
+        else {
+            // Не адаптивная ячейка
+            int sum = 0;
+            int count = 0;
+            for (; count < BVertices::max_count; ++count) {
+                const Vector3d &v = vertices[count];
+
+                // Дошли до конца
+                if (v.hasNaN()) {
+                    break;
+                } else {
+                    // Вершины многоугольника, вес 2
+                    if (inside(v)) {
+                        sum += 2;
+                    }
+                }
+            }
+            // Центр многоугольника, вес равен числу вершин
+            if (inside(center)) {
+                sum += count;
+            }
+            return sum / (3.0 * count);
+        }
+    }
+    else {
+        // Трехмерная ячейка
+        throw std::runtime_error("AmrCell::approx_vol_fraction #1");
+    }
+}
+
+double AmrCell::volume_fraction(const std::function<double(const Vector3d &)> &inside, int n_points) const {
+    if (dim < 3) {
+        if (adaptive) {
+            if (linear) {
+                return vertices.as2D().reduce().volume_fraction(inside, n_points);
+            }
+            else {
+                return vertices.as2D().volume_fraction(inside, n_points);
+            }
+        }
+        else {
+            // Полигон
+            int count = vertices.count();
+            int N = n_points / count + 1;
+
+            double res = 0.0;
+            for (int i = 0; i < count; ++i) {
+                int j = (i + 1) % count;
+                Triangle tri(center, vertices[i], vertices[j]);
+                res += tri.volume_fraction(inside, N) * tri.area();
+            }
+
+            return res / volume();
+        }
+    }
+    else {
+        // Трехмерная ячейка
+        throw std::runtime_error("AmrCell::volume_fraction #1");
+    }
+}
+
+void AmrCell::mark_actual_nodes(int mark) {
+    static_assert(BNodes::max_count == BVertices::max_count);
+
+    nodes.clear();
+    for (const BFace &face: faces) {
+        for (int k = 0; k < BFace::max_size; ++k) {
+            int iv = face.vertices[k];
+            if (iv >= 0) {
+                nodes[iv] = -13;
+            }
+            else {
+                break;
+            }
+        }
+    }
 }
 
 } // namespace zephyr::geom

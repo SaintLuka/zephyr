@@ -1,5 +1,11 @@
 #include "fast.h"
 
+#include <zephyr/geom/generator/collection/wedge.h>
+#include <zephyr/geom/generator/collection/semicircle_cutout.h>
+
+using zephyr::geom::generator::collection::Wedge;
+using zephyr::geom::generator::collection::SemicircleCutout;
+
 #include <zephyr/math/cfd/fluxes.h>
 #include <zephyr/math/cfd/models.h>
 #include <zephyr/phys/tests/sod.h>
@@ -40,8 +46,8 @@ double get_e(AmrStorage::Item& cell) { return cell(U).e1; }
 
 int main() {
     // Тестовая задача
-    SodTest test;
-    // ToroTest test(2);
+    //SodTest test;
+    ToroTest test(3);
     // test.inverse();
 
     // Уравнение состояния
@@ -96,13 +102,31 @@ int main() {
                           return exact.sound_speed(cell.center.x(), time);
                       }};
 
+    // Часть области с регулярной сеткой
+    auto fix_condition = [&test](const Vector3d& v) {
+        return v.x() <= test.x_jump + 0.01 * (test.xmax() - test.xmin());
+    };
+
     // Создаем одномерную сетку
-    Strip gen(test.xmin(), test.xmax());
-    int n_cells = 5000;
-    gen.set_size(n_cells);
+    //Strip gen(test.xmin(), test.xmax());
+    //int n_cells = 5000;
+    //gen.set_size(n_cells);
+
+    //Wedge gen(0.40, 0.9, 0.0, 0.20, 0.6, 0.1 * M_PI);
+    //gen.set_nx(200);
+    //gen.set_fixed(fix_condition);
+    //gen.set_boundaries({.left=Boundary::ZOE, .right=Boundary::WALL,
+    //                    .bottom=Boundary::WALL, .top=Boundary::ZOE});
+
+    SemicircleCutout gen(0.49, 0.7, 0.0, 0.07, 0.6, 0.02);
+    gen.set_ny(50);
+    gen.set_fixed(fix_condition);
+    gen.set_boundaries({.left=Boundary::ZOE, .right=Boundary::ZOE,
+                        .bottom=Boundary::WALL, .top=Boundary::ZOE});
 
     // Создать сетку
     EuMesh mesh(U, &gen);
+    int n_cells = mesh.n_cells();
 
     // Заполняем начальные данные
     for (auto cell: mesh) {
@@ -113,7 +137,7 @@ int main() {
     }
 
     // Число Куранта
-    double CFL = 0.9;
+    double CFL = 0.5;
 
     // Функция вычисления потока
     // NumFlux::Ptr nf = CIR1::create();
@@ -174,6 +198,10 @@ int main() {
                     zn.velocity = neib(U).v1;
                     zn.pressure = neib(U).p1;
                     zn.energy = neib(U).e1;
+                }
+                else if (face.flag() == Boundary::WALL) {
+                    Vector3d Vn = normal * zc.velocity.dot(normal);
+                    zn.velocity = zc.velocity - 2.0 * Vn;
                 }
 
                 // Значение на грани со стороны ячейки

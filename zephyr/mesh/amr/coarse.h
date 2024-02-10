@@ -10,7 +10,7 @@
 #include <zephyr/mesh/amr/faces.h>
 #include <zephyr/mesh/amr/siblings.h>
 
-namespace zephyr { namespace mesh { namespace amr {
+namespace zephyr::mesh::amr {
 
 
 /// @return Массив неопределенных итераторов на дочерние ячейки
@@ -118,6 +118,8 @@ parent_vs(Children& children) {
 template<int dim>
 AmrCell get_parent(AmrStorage &locals, AmrStorage &aliens,
         int rank, Children& children) {
+    const auto children_by_side = get_children_by_side<dim>();
+
     AmrCell parent(parent_vs<dim>(children));
 
     parent.b_idx = children[0].b_idx;
@@ -125,12 +127,10 @@ AmrCell get_parent(AmrStorage &locals, AmrStorage &aliens,
     parent.level = children[0].level - 1;
     parent.z_idx = children[0].z_idx / CpC(dim);
 
-    auto children_by_side = get_children_by_side<dim>();
-
     /// Линкуем грани
     for (int side = 0; side < FpC(dim); ++side) {
-        auto& some_child = children[children_by_side[side][0]];
-        auto& some_face = some_child.faces[side];
+        const auto& some_child = children[children_by_side[side][0]];
+        const auto& some_face = some_child.faces[side];
 
 #if SCRUTINY
         if (some_face.boundary == Boundary::UNDEFINED) {
@@ -173,7 +173,7 @@ AmrCell get_parent(AmrStorage &locals, AmrStorage &aliens,
         }
 #endif
 
-        auto& some_neib = some_neib_rank == rank ? locals[some_neib_index] : aliens[some_neib_ghost];
+        const auto& some_neib = some_neib_rank == rank ? locals[some_neib_index] : aliens[some_neib_ghost];
         auto some_neib_wanted_lvl = some_neib.level + some_neib.flag;
 
 #if SCRUTINY
@@ -225,7 +225,7 @@ AmrCell get_parent(AmrStorage &locals, AmrStorage &aliens,
         // Центры граней дочерних ячеек
         std::array<Vector3d, FpF(dim)> cfaces;
         for (int i = 0; i < FpF(dim); ++i) {
-            auto& child = children[children_by_side[side][i]];
+            const auto& child = children[children_by_side[side][i]];
             if (child.faces[side + 6].is_undefined()) {
                 // Простая грань
                 cfaces[i] = child.faces[side].center;
@@ -243,8 +243,8 @@ AmrCell get_parent(AmrStorage &locals, AmrStorage &aliens,
         /// Находим соответстиве между pfaces и cfaces
         double eps = 1.0e-6 * parent.size;
         for (int i = 0; i < FpF(dim); ++i) {
-            auto& child = children[children_by_side[side][i]];
-            auto& child_face = child.faces[side];
+            const auto& child = children[children_by_side[side][i]];
+            const auto& child_face = child.faces[side];
             for (int j = 0; j < FpF(dim); ++j) {
                 if ((pfaces[i] - cfaces[j]).norm() < eps) {
                     parent.faces[side + 6*j].adjacent.rank = child_face.adjacent.rank;
@@ -314,28 +314,21 @@ std::array<int, CpC(dim)> sorted_siblings(AmrStorage& cells,  int ic) {
 /// один массив, вызова функции get_parent и переноса полученных данных в
 /// хранилище на место родительской ячейки.
 /// @param locals Хранилище ячеек
-/// @param ic Индекс родительской ячейки в хранилище
 /// @param op Оператор огрубления данных
 template<int dim>
-void coarse_cell(AmrStorage &locals, AmrStorage &aliens, int rank, int ic, const Distributor& op) {
-    locals[ic].set_undefined();
+void coarse_cell(AmrStorage::Item& child, AmrStorage &locals, AmrStorage &aliens, int rank, const Distributor& op) {
+    child.set_undefined();
 
     // главный ребенок всем заведует
-    if (locals[ic].z_idx % CpC(dim) != 0) {
+    if (child.z_idx % CpC(dim) != 0) {
         return;
     }
 
-    auto children = select_children<dim>(locals, ic);
+    auto children = select_children<dim>(locals, child.index);
 
-    int ip = locals[ic].next;
-
-    AmrCell parent = get_parent<dim>(locals, aliens, rank, children);
-
-    locals[ip] = parent;
-
-    op.merge(children, locals[ip]);
+    AmrStorage::Item& parent = locals[child.next];
+    parent = get_parent<dim>(locals, aliens, rank, children);
+    op.merge(children, parent);
 }
 
-} // namespace amr
-} // namespace mesh
-} // namespace zephyr
+} // namespace zephyr::mesh::amr

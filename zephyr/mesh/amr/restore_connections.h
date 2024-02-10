@@ -9,14 +9,14 @@
 #include <zephyr/mesh/amr/siblings.h>
 #include <zephyr/mesh/amr/statistics.h>
 
-namespace zephyr { namespace mesh { namespace amr {
+namespace zephyr::mesh::amr {
 
-/// @brief Восстанавливает связи у части ячеек в диапазоне
+/// @brief Восстанавливает связи у одной ячейки
+/// @param cell Целевая ячейка
 /// @param locals Локальные ячейки
 /// @param aliens Удаленные ячейки
-/// @param count Статистика адаптации
 /// @param rank Ранг процесса
-/// @param from, to Диапазон ячеек (в locals)
+/// @param count Статистика адаптации
 /// @details Старые ячейки (существовшие до процедуры адаптации) в поле amrData.next
 /// содержат данные о расположении ячеек, которые придут им на смену
 /// (см. setup_positions). Если ячейка не меняется, тогда cells[ic].next = ic.
@@ -34,186 +34,108 @@ namespace zephyr { namespace mesh { namespace amr {
 /// Грани через процессы остаются без изменений. Линковка граней между процессами
 /// происходит на последнем этапе алгоритма адапатции.
 template<int dim>
-void restore_connections_partial(AmrStorage &locals, AmrStorage &aliens, int rank,
-        const Statistics &count, int from, int to) {
-    for (int ic = from; ic < to; ++ic) {
-        auto& cell = locals[ic];
+void restore_connections_one(AmrStorage::Item& cell,
+        AmrStorage &locals, AmrStorage &aliens,
+        int rank, const Statistics &count) {
 
-        // Ячейка неактуальна, пропускаем
-        if (cell.is_undefined()) continue;
+    // Ячейка неактуальна, пропускаем
+    if (cell.is_undefined()) {
+        return;
+    }
 
-        for (int i = 0; i < BFaces::max_count; ++i) {
-            auto &face1 = cell.faces[i];
-            if (face1.is_undefined() or face1.is_boundary()) continue;
+    for (int i = 0; i < BFaces::max_count; ++i) {
+        auto &face1 = cell.faces[i];
+        if (face1.is_undefined() || face1.is_boundary()) {
+            continue;
+        }
 
-            auto idx = face1.adjacent.index;
-            if (face1.adjacent.rank != rank or idx > count.n_cells) {
+        auto idx = face1.adjacent.index;
+        if (face1.adjacent.rank != rank || idx > count.n_cells) {
+            continue;
+        }
+        const auto &old_neib = locals[idx];
+
+        // Актуальный сосед через грань
+        if (old_neib.is_actual()) {
+            continue;
+        }
+
+        // Сосед через грань ничего не делал - ничего не надо,
+        // ссылки актуальны
+        if (old_neib.flag == 0) {
+            continue;
+        }
+
+        // Сосед через грань огрубился
+        if (old_neib.flag < 1) {
+            // Соседняя ячейка огрубляется
+            face1.adjacent.index = old_neib.next;
+            continue;
+        }
+
+        // Сосед через грань адаптировался
+        bool found = false;
+
+        for (int j = 0; j < CpC(dim); ++j) {
+            auto jc = old_neib.next + j;
+
+            if (jc > count.n_cells_large) {
                 continue;
             }
-            auto& old_neib = locals[idx];
 
-            // Актуальный сосед через грань
-            if (old_neib.is_actual()) continue;
-
-            // Сосед через грань ничего не делал - ничего не надо,
-            // ссылки актуальны
-            if (old_neib.flag == 0) {
+            const auto &neib = locals[jc];
+            if (&neib == &cell) {
                 continue;
             }
 
-            // Сосед через грань огрубился
-            if (old_neib.flag < 1) {
-                // Соседняя ячейка огрубляется
-                face1.adjacent.index = old_neib.next;
-                continue;
-            }
-
-            // Сосед через грань адаптировался
-            bool found = false;
-
-            for (int j = 0; j < CpC(dim); ++j) {
-                auto jc = old_neib.next + j;
-                if (jc == ic) continue;
-                if (jc > count.n_cells_large) {
+            for (const auto &face2: neib.faces) {
+                if (face2.is_undefined())
                     continue;
-                }
 
-                auto& neib = locals[jc];
-                for (auto &face2: neib.faces) {
-                    if (face2.is_undefined())
-                        continue;
-
-                    if ((face1.center - face2.center).norm() < 1.0e-5 * cell.size) {
-                        face1.adjacent.index = jc;
-                        found = true;
-                        break;
-                    }
-                }
-                if (found) {
+                if ((face1.center - face2.center).norm() < 1.0e-5 * cell.size) {
+                    face1.adjacent.index = jc;
+                    found = true;
                     break;
                 }
             }
-            if (!found) {
-                std::cout << "Can't find neighbor through the " << side_to_string(Side(i % 6)) << " face (" << i / 6 << ")\n";
-                //AmrStorage aliens();
-                //amr::print_cell_info(locals, aliens, ic);
-                throw std::runtime_error("Can't find neighbor");
+            if (found) {
+                break;
             }
+        }
+        if (!found) {
+            std::cout << "Can't find neighbor through the " << side_to_string(Side(i % 6)) << " face (" << i / 6
+                      << ")\n";
+            //amr::print_cell_info(locals, aliens, ic);
+            throw std::runtime_error("Can't find neighbor");
         }
     }
 }
 
-/// @brief Устанавливает поле amrData.next в неопределенное состояние
-void set_undefined_next(AmrStorage& cells, int from, int to) {
-    for (int ic = from; ic < to; ++ic) {
-        cells[ic].next = -1;
-    }
+/// @brief Устанавливает поле AmrCell.next в неопределенное состояние
+void set_undefined_next(AmrStorage::Item& cell) {
+    cell.next = -1;
 }
 
-/// @brief Восстанавливает связи (без MPI и без тредов)
+/// @brief Восстанавливает связи (без MPI)
 /// @details см. restore_connections_partial
 template<int dim>
-void restore_connections(AmrStorage &cells, const Statistics &count) {
-    restore_connections_partial<dim>(cells, cells, 0, count, 0, count.n_cells_large);
-    set_undefined_next(cells, 0, count.n_cells_large);
+void restore_connections(
+        AmrStorage &locals, AmrStorage& aliens,
+        int rank, const Statistics &count) {
+
+    threads::for_each<20>(
+            locals.begin(),
+            locals.iterator(count.n_cells_large),
+            restore_connections_one<dim>,
+            std::ref(locals),
+            std::ref(aliens),
+            rank, std::ref(count)
+    );
+
+    threads::for_each(
+            locals.begin(),
+            locals.iterator(count.n_cells_large),
+            set_undefined_next);
 }
 
-#ifdef ZEPHYR_ENABLE_MULTITHREADING
-/// @brief Восстанавливает связи (без MPI с тредами)
-/// @details см. restore_connections_partial
-template<int dim>
-void restore_connections(AmrStorage &cells, const Statistics<dim> &count, ThreadPool& threads) {
-    AmrStorage aliens;
-    auto num_tasks = threads.size();
-    if (num_tasks < 2) {
-        restore_connections_partial<dim>(cells, aliens, 0, count, 0, count.n_cells_large);
-        set_undefined_next(cells, 0, count.n_cells_large);
-        return;
-    }
-    std::vector<std::future<void>> results(num_tasks);
-
-    std::int bin = count.n_cells_large / num_tasks + 1;
-    std::int pos = 0;
-    for (auto &res : results) {
-        res = threads.enqueue(restore_connections_partial<dim>,
-                              std::ref(cells), std::ref(aliens), 0, std::ref(count),
-                              pos, std::min(pos + bin, count.n_cells_large)
-        );
-        pos += bin;
-    }
-
-    for (auto &result: results) {
-        result.get();
-    }
-
-    pos = 0;
-    for (auto &res : results) {
-        res = threads.enqueue(set_undefined_next,
-                              std::ref(cells),
-                              pos, std::min(pos + bin, count.n_cells_large)
-        );
-        pos += bin;
-    }
-
-    for (auto &result: results) {
-        result.get();
-    }
-}
-#endif
-
-#ifdef ZEPHYR_ENABLE_MPI
-/// @brief Восстанавливает связи (с MPI и без тредов)
-/// @details см. restore_connections_partial
-template<int dim>
-void restore_connections(AmrStorage &locals, AmrStorage& aliens, int rank, const Statistics<dim> &count) {
-    restore_connections_partial<dim>(locals, aliens, rank, count, 0, count.n_cells_large);
-    set_undefined_next(locals, 0, count.n_cells_large);
-}
-
-#ifdef ZEPHYR_ENABLE_MULTITHREADING
-/// @brief Восстанавливает связи (с MPI и с тркдами)
-/// @details см. restore_connections_partial
-template<int dim>
-void restore_connections(AmrStorage &locals, AmrStorage &aliens, int rank,
-                         const Statistics<dim> &count, ThreadPool& threads) {
-    auto num_tasks = threads.size();
-    if (num_tasks < 2) {
-        restore_connections_partial<dim>(locals, aliens, rank, count, 0, count.n_cells_large);
-        set_undefined_next(locals, 0, count.n_cells_large);
-        return;
-    }
-    std::vector<std::future<void>> results(num_tasks);
-
-    std::int bin = count.n_cells_large / num_tasks + 1;
-    std::int pos = 0;
-    for (auto &res : results) {
-        res = threads.enqueue(restore_connections_partial<dim>,
-                              std::ref(locals), std::ref(aliens), rank, std::ref(count),
-                              pos, std::min(pos + bin, count.n_cells_large)
-        );
-        pos += bin;
-    }
-
-    for (auto &result: results) {
-        result.get();
-    }
-
-    pos = 0;
-    for (auto &res : results) {
-        res = threads.enqueue(set_undefined_next,
-                              std::ref(locals),
-                              pos, std::min(pos + bin, count.n_cells_large)
-        );
-        pos += bin;
-    }
-
-    for (auto &result: results) {
-        result.get();
-    }
-}
-#endif
-#endif
-
-} // namespace amr
-} // namespace mesh
 } // namespace zephyr

@@ -29,6 +29,10 @@ void GNode::add_boundary(Boundary flag) {
     m_bounds.insert(flag);
 }
 
+void GNode::set_boundaries(std::set<Boundary> flags) {
+    m_bounds = flags;
+}
+
 Boundary GNode::face_boundary(const std::vector<GNode::Ptr>& vs) {
     if (vs.empty()) {
         return Boundary::UNDEFINED;
@@ -47,6 +51,11 @@ Boundary GNode::face_boundary(const std::vector<GNode::Ptr>& vs) {
     }
 
     if (intersection.empty()) {
+        for (auto& node: vs) {
+            if (!node->m_bounds.empty()) {
+                return *node->m_bounds.begin();
+            }
+        }
         return Boundary::UNDEFINED;
     }
     else {
