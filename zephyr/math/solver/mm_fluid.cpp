@@ -125,7 +125,7 @@ void MmFluid::fluxes(Mesh &mesh) const {
             PState p_neib(p_self);
 
             if (!face.is_boundary()) {
-                p_neib = face.neib()(U).get_pstate();
+                p_neib = face.neib(U).get_pstate();
             } else if (face.flag() == Boundary::WALL) {
                 Vector3d Vn = normal * p_self.velocity.dot(normal);
                 p_neib.velocity = p_self.velocity - 2 * Vn; // Vt - Vn = p_self.velocity - Vn - Vn
@@ -151,7 +151,7 @@ void MmFluid::fluxes(Mesh &mesh) const {
         q_self2.momentum.y() -= m_dt * g * p_self.density;
 
         // Новое значение примитивных переменных
-        PState p_self2(q_self2, mixture, p_self.pressure, p_self.energy);
+        PState p_self2(q_self2, mixture, p_self.pressure, p_self.temperature);
         check_state(p_self2, q_self2, p_self, "fluxes", cell.b_idx());
 
 //        std::cout << "step: " << m_step << '\n';

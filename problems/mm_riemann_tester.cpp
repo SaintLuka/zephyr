@@ -34,6 +34,8 @@ double get_p(AmrStorage::Item &cell) { return cell(U).p; }
 
 double get_e(AmrStorage::Item &cell) { return cell(U).e; }
 
+double get_T(AmrStorage::Item &cell) { return cell(U).t; }
+
 double get_frac1(AmrStorage::Item &cell) { return cell(U).mass_frac[0]; }
 
 double get_frac2(AmrStorage::Item &cell) { return cell(U).mass_frac[1]; }
@@ -1019,8 +1021,10 @@ void Bubble2DStatic(int n_cells = 100, int acc = 2, const std::string &filename 
     double t_wave = water->temperature_rp(rho_wave, p_wave), t_water = water->temperature_rp(rho_water, p_water), t_air = air->temperature_rp(rho_air, p_air);
 
     double x_min = 0.0_cm, x_max = 0.8_cm;
-    double y_min = 0.0_cm, y_max = 0.8_cm;
-    double r = 0.3_cm, x_bubble = (x_max + x_min) / 2, y_bubble = (y_max + y_min) / 2;
+    double y_min = 0.4_cm, y_max = 0.8_cm;
+    double r = 0.3_cm;
+    double x_bubble = 0.4_cm;
+    double y_bubble = 0.4_cm;
     double x_wave = 0.06_cm;
 
     Fractions mass_frac_water({1, 0});
@@ -1032,10 +1036,10 @@ void Bubble2DStatic(int n_cells = 100, int acc = 2, const std::string &filename 
 
     // Создаем одномерную сетку
     Rectangle rect(x_min, x_max, y_min, y_max);
-    rect.set_sizes(n_cells, n_cells);
+    rect.set_nx(n_cells);
     rect.set_boundaries({
-                                .left   = Boundary::ZOE, .right = Boundary::ZOE,
-                                .bottom = Boundary::WALL, .top   = Boundary::WALL});
+        .left   = Boundary::ZOE, .right = Boundary::ZOE,
+        .bottom = Boundary::WALL, .top   = Boundary::ZOE});
 
     // Файл для записи
     PvdFile pvd("mesh", filename);
@@ -1046,6 +1050,7 @@ void Bubble2DStatic(int n_cells = 100, int acc = 2, const std::string &filename 
     pvd.variables += {"v", get_v};
     pvd.variables += {"p", get_p};
     pvd.variables += {"e", get_e};
+    pvd.variables += {"T", get_T};
     pvd.variables += {"frac1", get_frac1};
     pvd.variables += {"frac2", get_frac2};
     pvd.variables += {"c1", get_c1};
@@ -1066,16 +1071,44 @@ void Bubble2DStatic(int n_cells = 100, int acc = 2, const std::string &filename 
     solver.set_CFL(CFL);
 
     Vector3d bubble_center = {x_bubble, y_bubble, 0};
+    auto in_water = [bubble_center, r](const Vector3d& v) -> bool {
+        return (v - bubble_center).norm() > r;
+    };
+
     for (auto cell: mesh) {
         if (cell.center().x() < x_wave) {
             cell(U).set_state(state_wave);
             continue;
         }
 
-        if ((cell.center() - bubble_center).norm() < r) {
-            cell(U).set_state(state_air);
-        } else {
-            cell(U).set_state(state_water);
+        double vol_frac1 = cell.approx_vol_fraction(in_water);
+        if (false && 0.0 < vol_frac1 && vol_frac1 < 1.0) {
+            vol_frac1 = cell.volume_fraction(in_water, 10000);
+            double vol_frac2 = 1.0 - vol_frac1;
+
+            mmf::PState& z1 = state_water;
+            mmf::PState& z2 = state_air;
+
+            mmf::PState z(z1);
+
+            // rho = sum a_i rho_i
+            z.density = vol_frac1 * z1.density + vol_frac2 * z2.density;
+            z.mass_frac = {vol_frac1 * z1.density / z.density, vol_frac2 * z2.density / z.density};
+            z.velocity = z.mass_frac[0] * z1.velocity + z.mass_frac[1] * z2.velocity;
+            z.pressure = z.mass_frac[0] * z1.pressure + z.mass_frac[1] * z2.pressure;
+
+            z.temperature = mixture.temperature_rp(z.density, z.pressure, z.mass_frac);
+            z.energy  = mixture.energy_pt(z.pressure, z.temperature, z.mass_frac);
+
+            cell(U).set_state(z);
+        }
+        else {
+            if (vol_frac1 > 0.5) {
+                cell(U).set_state(state_water);
+            }
+            else {
+                cell(U).set_state(state_air);
+            }
         }
     }
 
@@ -1292,7 +1325,7 @@ int main() {
 //    twoCellsFlux();
 //    calcTests();
 //    Bubble2D(30, 2, "output_bubble_4");
-    Bubble2DStatic(700, 1, "output_bubble_static2");
+    Bubble2DStatic(600, 2, "output_bubble_static2");
 //    AirWithSF62D(46, 2, "sf6");
 
     std::cout << "\nfinished\n";

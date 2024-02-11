@@ -6,11 +6,12 @@
 
 namespace zephyr::phys {
 
-StiffenedGas::StiffenedGas(double gamma, double p_inf, double eps_0, double Cv)
-    : gamma(gamma), P0(p_inf), eps_0(eps_0), Cv(Cv) { }
+StiffenedGas::StiffenedGas(double gamma, double p_inf, double eps_0, double Cv, double T0)
+    : gamma(gamma), P0(p_inf), eps_0(eps_0), Cv(Cv), T0(T0) { }
 
 StiffenedGas::StiffenedGas(const std::string &name) {
     // @formatter:off
+    T0 = 0.0;
 
     if (name == "Air") {
         gamma = 1.4;
@@ -29,6 +30,7 @@ StiffenedGas::StiffenedGas(const std::string &name) {
         Cv    = 1400.0_J_kgK;
         P0    = 600.0_MPa;
         eps_0 = 0.0;
+        T0    = 221.3;
     }
     else if (name == "Water2") {
         gamma = 3.0;
@@ -70,18 +72,18 @@ double StiffenedGas::sound_speed_rp(double rho, double P, const Options& options
 }
 
 double StiffenedGas::pressure_rt(double rho, double T, const Options& options) const {
-    return (gamma - 1.0) * Cv * rho * T - P0;
+    return (gamma - 1.0) * Cv * rho * (T - T0) - P0;
 }
 
 double StiffenedGas::temperature_rp(double rho, double P, const Options& options) const {
-    return (P + P0) / ((gamma - 1.0) * Cv * rho);
+    return T0 + (P + P0) / ((gamma - 1.0) * Cv * rho);
 }
 
 dPdT StiffenedGas::volume_pt(double P, double T, const Options& options) const {
-    dPdT res{((gamma - 1.0) * Cv * T) / (P + P0)};
+    dPdT res{((gamma - 1.0) * Cv * (T - T0)) / (P + P0)};
     if (options.deriv) {
         res.dP = -res.val / (P + P0);
-        res.dT = +res.val / T;
+        res.dT = +res.val / (T - T0);
     }
     return res;
 }
@@ -89,16 +91,16 @@ dPdT StiffenedGas::volume_pt(double P, double T, const Options& options) const {
 inline double sqr(double x) { return x * x; }
 
 dPdT StiffenedGas::energy_pt(double P, double T, const Options& options) const {
-    dPdT res{eps_0 + ((P + gamma * P0) / (P + P0)) * Cv * T};
+    dPdT res{eps_0 + ((P + gamma * P0) / (P + P0)) * Cv * (T - T0)};
     if (options.deriv) {
-        res.dP = (1.0 - gamma) * P0 * Cv * T / sqr(P + P0);
+        res.dP = (1.0 - gamma) * P0 * Cv * (T - T0) / sqr(P + P0);
         res.dT = ((P + gamma * P0) / (P + P0)) * Cv;
     }
     return res;
 }
 
 StiffenedGas StiffenedGas::stiffened_gas(double rho, double P, const Options& options) const {
-    return StiffenedGas(gamma, P0, eps_0, Cv);
+    return StiffenedGas(gamma, P0, eps_0, Cv, T0);
 }
 
 double StiffenedGas::min_pressure() const {

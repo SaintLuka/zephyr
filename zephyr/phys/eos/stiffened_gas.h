@@ -11,10 +11,11 @@ public:
     double Cv;
     double P0;
     double eps_0;
+    double T0;
 
     /// @brief Конструктор с заданием параметров
     explicit StiffenedGas(double gamma, double p_inf = 0.0,
-                          double eps_0 = 0.0, double Cv = 1.0);
+                          double eps_0 = 0.0, double Cv = 1.0, double T0 = 0.0);
 
     /// @brief Конструктор для известных материалов
     explicit StiffenedGas(const std::string &name);

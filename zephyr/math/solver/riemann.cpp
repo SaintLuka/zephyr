@@ -102,12 +102,14 @@ inline double deriv_fK(
 struct SolPU {
     double P;   ///< Давление на контакте
     double U;   ///< Скорость на контакте
+    bool conv;  ///< Хорошая сходимость
 
     /// @brief Конструктор по умолчанию
-    SolPU() : P(0.0 / 0.0), U(0.0 / 0.0) {}
+    SolPU() : P(0.0 / 0.0), U(0.0 / 0.0), conv(false) {}
 
     /// @brief Простейший конструктор
-    SolPU(cref P, cref U) : P(P), U(U) {}
+    SolPU(cref P, cref U, bool conv)
+        : P(P), U(U), conv(conv) {}
 };
 
 /// @brief Найти давление и скорость на контактном разрыве
@@ -141,7 +143,7 @@ inline SolPU contact_p(
     // Вакуумный случай
     if (f_dno > 0.0) {
         std::cout << "Вакуум\n";
-        return {p_dno, 0.0};
+        return {p_dno, 0.0, true};
     }
 
     // Классифицируем случай и выбираем начальное приближение
@@ -187,7 +189,8 @@ inline SolPU contact_p(
 
     double fL, fR, dfL, dfR;
 
-    for (int counter = 0; counter < max_iterations; ++counter) {
+    int counter = 0;
+    for (; counter < max_iterations; ++counter) {
         fL = func_fK(P, rL, pL, cL, gL, p0L, AL, BL, GL);
         fR = func_fK(P, rR, pR, cR, gR, p0R, AR, BR, GR);
 
@@ -205,9 +208,11 @@ inline SolPU contact_p(
         P = Pn;
     }
 
+    bool conv = counter < max_iterations;
+
     double U = 0.5 * (uL + uR + fR - fL);
 
-    return {P, U};
+    return {P, U, conv};
 }
 
 /// @brief Скорость ударной волны
@@ -341,6 +346,7 @@ RiemannSolver::Solution RiemannSolver::solve(
 
     cref P = PU.P;
     cref U = PU.U;
+    bool conv = PU.conv;
 
     if (U > 0.0) {
         // Положительная скорость на контакте
@@ -351,29 +357,30 @@ RiemannSolver::Solution RiemannSolver::solve(
 
             if (D > 0.0) {
                 // Положительная скорость УВ
-                return {rL, uL, pL};
+                return {rL, uL, pL, conv};
             } else {
                 // Отрицательная скорость УВ
-                return {shock_wave_density(rL, uL, pL, U, P), U, P};
+                return {shock_wave_density(rL, uL, pL, U, P), U, P, conv};
             }
         } else {
             // Слева волна разрежения
             double DL1 = uL - cL;
             if (DL1 > 0.0) {
                 // Волна разрежения полностью справа
-                return {rL, uL, pL};
+                return {rL, uL, pL, conv};
             } else {
                 double cl = rarefaction_sound_L(U, uL, cL, gL);
                 double DL2 = U - cl;
                 if (DL2 < 0.0) {
                     // Волна разрежения полностью слева
-                    return {eos_density(P, cl, gL, p0L), U, P};
+                    return {eos_density(P, cl, gL, p0L), U, P, conv};
                 } else {
                     // Волна разрежения приходится на грань
                     return {
                             density_lfan(rL, uL, cL, gL),
                             velocity_lfan(uL, cL, gL),
-                            pressure_lfan(uL, pL, cL, gL, p0L)
+                            pressure_lfan(uL, pL, cL, gL, p0L),
+                            conv
                     };
                 }
             }
@@ -387,10 +394,10 @@ RiemannSolver::Solution RiemannSolver::solve(
 
             if (D < 0.0) {
                 // Отрицательная скорость УВ
-                return {rR, uR, pR};
+                return {rR, uR, pR, conv};
             } else {
                 // Положительная скорость УВ
-                return {shock_wave_density(rR, uR, pR, U, P), U, P};
+                return {shock_wave_density(rR, uR, pR, U, P), U, P, conv};
             }
         } else {
             // Справа волна разрежения
@@ -399,19 +406,20 @@ RiemannSolver::Solution RiemannSolver::solve(
 
             if (DR2 < 0.0) {
                 // Волна разрежения полностью слева
-                return {rR, uR, pR};
+                return {rR, uR, pR, conv};
             } else {
                 double cr = rarefaction_sound_R(U, uR, cR, gR);
                 double DR1 = U + cr;
                 if (DR1 > 0.0) {
                     // Волна разрежения полностью справа
-                    return {eos_density(P, cr, gR, p0R), U, P};
+                    return {eos_density(P, cr, gR, p0R), U, P, conv};
                 } else {
                     // Волна разрежения приходится на грань
                     return {
                             density_rfan(rR, uR, cR, gR),
                             velocity_rfan(uR, cR, gR),
-                            pressure_rfan(uR, pR, cR, gR, p0R)
+                            pressure_rfan(uR, pR, cR, gR, p0R),
+                            conv
                     };
                 }
             }

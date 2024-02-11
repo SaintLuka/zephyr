@@ -140,7 +140,7 @@ PState::PState(const QState &q, const phys::Materials &mixture, double P0, doubl
     density = q.mass;
     velocity = q.momentum / density;
     energy = q.energy / density - 0.5 * velocity.squaredNorm();
-    pressure = mixture.pressure_re(density, energy, mass_frac, {.P0=P0});
+    pressure = mixture.pressure_re(density, energy, mass_frac, {.P0=P0, .T0=T0});
     temperature = mixture.temperature_rp(density, pressure, mass_frac, {.T0=T0});
 }
 
