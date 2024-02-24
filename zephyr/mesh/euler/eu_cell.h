@@ -178,7 +178,7 @@ public:
 
     /// @brief Скорпировать вершины в полигон (двумерные ячейки)
     /// Для нелинейных AMR-ячеек возвращает до 8 граней.
-    inline geom::PolygonS<8> polygon() const {
+    inline geom::Polygon polygon() const {
         return m_it->polygon();
     }
 

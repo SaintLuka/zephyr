@@ -3,60 +3,92 @@
 #include <array>
 #include <vector>
 
+#include <zephyr/geom/box.h>
 #include <zephyr/geom/vector.h>
 #include <zephyr/geom/line.h>
 #include <zephyr/geom/quad.h>
 
 namespace zephyr::geom {
 
-/// @brief Базовый класс для описания двумерного полигона
-/// При наличии массива вершин можно создать полигон на его основе, при
-/// этом будет использован тот же буффер памяти без дополнительного
-/// копирования. К примеру,
-/// std::vector<Vector3d> verts;    // Создаем массив и заполняем
-///                                    некоторым образом
-/// Polygon(verts).sort();          // Упорядочивает массив вершин
-///                                    против часовой стрелки
-///                                    (без выделения памяти)
-/// auto S = Polygon(verts).area(); // Вычисляем площадь полигона
-///                                    (без выделения памяти)
-///
-/// Другой вариант: использование дочерних классов PolygonS или PolygonD
-/// (лучше данный класс, если операция создания полигона является массовой
-/// или вызывается на тредах)
+/// @brief Представление многоугольника в плоскости OXY.
+/// Для треугольника лучше использовать класс geom::Triangle
+/// @warning По умолчанию вершины полигона не сортируются, если порядок
+/// вершин в конструкторе неизвестен, то лучше вызвать функцию Polygon::sort()
 class Polygon {
 public:
+    /// @brief Пустой полигон (заглушка)
+    Polygon();
+
+    /// @brief Полигон с заданым числом вершин
+    /// Все вершины устанавливаются равными нулю
+    explicit Polygon(int size);
 
     /// @brief Создание полигона на основе имеющегося массива вершин
-    /// заданого размера
-    /// @warning Допускается изменение массива, запрещено удалять массив
-    /// до уничножения экземпляра Polygon.
-    Polygon(std::vector<Vector3d>& vertices);
+    /// заданого размера. Вершины копируются в буффер полигона
+    /// @param sort Необходимо сортировать?
+    Polygon(const Vector3d* buff, int size, bool sort = false);
 
-    /// @brief Копирование запрещено
-    Polygon(const Polygon& ) = delete;
+    /// @brief Создание полигона на основе имеющегося массива вершин
+    /// @param sort Необходимо сортировать?
+    explicit Polygon(const std::vector<Vector3d>& vertices, bool sort = false);
 
-    /// @brief Перемещение запрещено
-    Polygon(Polygon&& ) = delete;
+    /// @brief Создание полигона на основе имеющегося массива вершин
+    /// @param sort Необходимо сортировать?
+    explicit Polygon(std::vector<Vector3d>&& vertices, bool sort = false);
+
+    /// @brief Вершины полигона можно напрямую задавать в фигурных скобках
+    /// Vector3d v1, v2, v3, v4;
+    /// ...
+    /// Polygon poly = {v1, v2, v3, v4};
+    /// @param sort Необходимо сортировать?
+    Polygon(std::initializer_list<Vector3d>&& list, bool sort = false);
+
+    /// @brief Копирование
+    Polygon(const Polygon& ) = default;
+
+    /// @brief Перемещение
+    Polygon(Polygon&& ) = default;
 
     /// @brief Число вершин в буфере
-    inline int size() const { return m_size; };
+    inline int size() const {
+        return vs.size();
+    };
 
     /// @brief Пустой полигон?
-    inline bool empty() const { return m_size < 3; }
+    inline bool empty() const {
+        return vs.empty();
+    }
 
     /// @brief Оператор доступа по индексу
-    inline Vector3d& operator[](int idx) { return vs[idx]; }
+    inline const Vector3d& operator[](int idx) const {
+        return vs[idx];
+    }
 
-    /// @brief Оператор доступа по индексу
-    inline const Vector3d& operator[](int idx) const { return vs[idx]; }
+    /// @brief Установить новое положение вершины полигона
+    /// @details Центр полигона пересчитывается
+    void set(int idx, const Vector3d& p);
+
+    /// @brief Зарезервировать место в массиве для новых вершин
+    void reserve(int size);
+
+    /// @brief Добавить вершину в массив
+    /// @details Центр полигона пересчитывается
+    void operator+=(const Vector3d& p);
+
+    /// @brief Координаты x вершин многоугольника (с замыканием)
+    std::vector<double> xs() const;
+
+    /// @brief Координаты y вершин многоугольника (с замыканием)
+    std::vector<double> ys() const;
+
+    /// @brief Ограничивающий прямоугольник
+    Box bbox() const;
 
     /// @brief Центр полигона (среднее вершин)
     Vector3d center() const;
 
     /// @brief Сортировать вершины по часовой стрелке
-    /// @param c Точка внутри полигона, если известена
-    void sort(const Vector3d& c = {NAN, NAN, NAN});
+    void sort();
 
     /// @brief Точка внутри полигона?
     bool inside(const Vector3d& p) const;
@@ -64,184 +96,66 @@ public:
     /// @brief Площадь произвольного многоугольника
     /// Вершины должны располагаться в плоскости (x, y).
     /// @param c Точка внутри полигона, если известена
-    double area(const Vector3d& c = {NAN, NAN, NAN}) const;
+    double area() const;
 
     /// @brief Барицентр произвольного многоугольника.
     /// Вершины должны располагаться в плоскости (x, y).
     /// @param area Площадь многоугольника (если известна)
     Vector3d centroid(double area = 0.0) const;
 
-    /// @brief Объем фигуры вращения (вокруг оси x).
-    /// Вершины должны располагаться в плоскости (x, y).
+    /// @brief Объем фигуры вращения (вокруг оси x)
     double volume_as() const;
 
-protected:
-    /// @brief Создание полигона на основе имеющегося массива вершин
-    /// заданого размера
-    /// Используется в конструкторах PolygonS и PolygonD
-    Polygon(Vector3d* buff, int size);
+    /// @brief Площадь внутри многоугольника на пересечении с характеристической
+    /// функцией inside. Вычисляется приближенно с точностью ~ 1 / N
+    /// @param inside Характеристическая функция, возвращает true, если точка p
+    /// находится внутри области, иначе -- false.
+    /// @param N Число пробных точек
+    double clip_area(const std::function<bool(const Vector3d& p)>& inside, int N = 10000) const;
 
-    struct MinMax {
-        Vector3d min;
-        Vector3d max;
+    /// @brief Отсечь от полигона часть с помощью прямой с внешней нормалью n,
+    /// проходящей через точку p
+    /// @return Отсеченный многоугольник
+    Polygon clip(const Vector3d& p, const Vector3d& n) const;
+
+    /// @brief Площадь многоугольника, отсекаемого прямой с внешней нормалью n,
+    /// проходящей через точку p
+    double clip_area(const Vector3d& p, const Vector3d& n) const;
+
+    /// @return Две точки прямой (p1, p2). Точка p1 находится в центре
+    /// сечения, точка p2 на многоугольнике, таким образом, что при обходе
+    /// в направлении p1 -> p2 область остается слева.
+    struct section {
+        Vector3d p1, p2;
+
+        section(const Vector3d& v1, const Vector3d& v2) : p1(v1), p2(v2) { }
+
+        operator const Vector3d&() const { return p1; }
     };
 
-    /// @brief Минимальная и максимальныя (по проекции на ось n)
-    /// вершины многоугольника
-    MinMax minmax(const Vector3d& n) const;
+    /// @brief Находит отсечение от полигона с заданой объемной долей
+    /// @param n Внешняя нормаль прямой
+    /// @param alpha Объемная доля
+    section find_section(const Vector3d& n, double alpha) const;
 
-    /// @brief Отсечь от полигона часть прямой с внешней нормалью n,
-    /// проходящей через точку p
-    /// @param part Выходной параметр, многоугольник, который отсекается
-    void clip(const Vector3d& p, const Vector3d& n, Polygon& part) const;
+    /// @brief Площадь пересечения многоугольника с кругом
+    /// @param c, R Центр круга, радиус круга
+    double disk_clip_area(const Vector3d& c, double R) const;
 
-    /// @brief Отсечь от полигона часть прямой с внешней нормалью n,
-    /// проходящей через точку p
-    /// @param part Выходной параметр, многоугольник, который отсекается
-    /// @param slice Выходной параметр, сечение.
-    void clip(const Vector3d& p, const Vector3d& n, Polygon& part, Line& slice) const;
-
-    /// @brief Площадь многоугольника, отсекаемая прямой с внешней
-    /// нормалью n, проходящей через точку p
-    /// @param part Выходной параметр, многоугольник, который отсекается
-    double clip_area(const Vector3d& p, const Vector3d& n, Polygon& part) const;
-
-public:
-    /// @brief Площадь и длина сечения
-    struct AnS { double area, slice; };
-
-    /// @brief Площадь многоугольника, отсекаемая прямой с внешней
-    /// нормалью n, проходящей через точку p
-    /// @param part Выходной параметр, многоугольник, который отсекается
-    AnS clip_area_and_slice(const Vector3d& p, const Vector3d& n, Polygon& part) const;
+    /// @brief Нормаль в точке окружности при пересечении многоугольника с кругом
+    /// @param c, R Центр круга, радиус круга
+    /// @return Средняя нормаль к окружности внутри многоугольника, если
+    /// окружность пересекает многоугольник, нулевая нормаль в остальных случаях.
+    Vector3d disk_clip_normal(const Vector3d& c, double R) const;
 
 protected:
-    /// @brief Находит отсечение от полигона с заданой объемной долей
-    /// @param part Выходной параметр, многоугольник, который отсекается
-    Vector3d find_section(const Vector3d& n, double alpha, Polygon& part) const;
+    /// @brief Пересчитывает центр полигона
+    void setup_center();
 
-    /// @brief Метод дихотомии
-    Vector3d find_section_bisect(const Vector3d& n, double alpha, Polygon& part) const;
-
-    /// @brief Метод Ньютона
-    Vector3d find_section_newton(const Vector3d& n, double alpha, Polygon& part) const;
-
-
-    int m_size;    ///< Число вершин полигона
-    Vector3d* vs;  ///< Указатель на первую вершину массива
+    std::vector<Vector3d> vs;  ///< Массив вершин
+    Vector3d m_center;         ///< Центр полигона
 };
 
-template <int max_size = 8>
-class PolygonS : public Polygon {
-public:
-    /// @brief Контруктор по умолчанию, создает пустой полигон
-    PolygonS() : Polygon(buffer.data(), 0) { }
-
-    /// @brief Конструктор копирования
-    PolygonS(const PolygonS<max_size>& poly)
-        : Polygon(buffer.data(), poly.size()),
-          buffer(poly.buffer) {
-    }
-
-    /// @brief Простых путей мы не ищем, вместо инициализации с использованием
-    /// initializer_list делаем рекурсивное заполнение по переменному числу
-    /// входных параметров. Создание класса:
-    /// PolygonS poly = {a, b, c, ... }, где a, b, c - имеют тип Vector3d
-    /// Число аргументов должно быть равно max_size.
-    template<class...Args, typename = typename
-            std::enable_if<sizeof...(Args) == max_size>::type>
-    PolygonS(Args... args) : Polygon(buffer.data(), sizeof...(Args)) {
-        fill(buffer.data(), std::forward<Args>(args)...);
-    }
-
-    /// @brief Изменить размер полигона
-    void resize(int new_size) {
-        m_size = std::min(new_size, max_size);
-    }
-
-    /// @brief Создание четырехугольника из уголовых точек
-    /// адаптивной ячейки.
-    PolygonS(const Quad& quad) : Polygon(buffer.data(), 4) {
-        vs[0] = quad.vs<-1, -1>();
-        vs[1] = quad.vs<+1, -1>();
-        vs[2] = quad.vs<+1, +1>();
-        vs[3] = quad.vs<-1, +1>();
-    }
-
-    /// @brief Отсечь от полигона часть прямой с внешней нормалью n,
-    /// проходящей через точку p
-    PolygonS<max_size + 1> clip(const Vector3d& p, const Vector3d& n) const {
-        PolygonS<max_size + 1> part;
-
-        Polygon::clip(p, n, part);
-        return part;
-    }
-
-    /// @brief Площадь многоугольника, отсекаемая прямой с внешней
-    /// нормалью n, проходящей через точку p
-    double clip_area(const Vector3d& p, const Vector3d& n) const {
-        PolygonS<max_size + 1> part;
-        return Polygon::clip_area(p, n, part);
-    }
-
-    /// @brief Находит отсечение от полигона с заданой объемной долей
-    /// @param part Выходной параметр, многоугольник, который отсекается
-    Vector3d find_section(const Vector3d& n, double alpha) const {
-        PolygonS<max_size + 1> part;
-        return Polygon::find_section(n, alpha, part);
-    }
-
-protected:
-
-    /// @brief Заполнение элементов массива по одному
-    template <class... Args>
-    void fill(Vector3d* ptr, const Vector3d& x, Args... args) {
-        *ptr = x;
-        fill(ptr + 1, std::forward<Args>(args)...);
-    }
-
-    /// @brief Заполнение элементов массива по одному (база рекурсии)
-    void fill(Vector3d* ptr, const Vector3d& x) {
-        *ptr = x;
-    }
-
-    /// @brief Массив вершин
-    std::array<Vector3d, max_size> buffer;
-};
-
-using PolyTri  = PolygonS<3>;
-using PolyQuad = PolygonS<4>;
-
-class PolygonD : public Polygon {
-public:
-    PolygonD(const std::vector<Vector3d>& verts)
-        : Polygon(nullptr, 0) {
-        buffer = verts;
-        update();
-    }
-
-    PolygonD(int size)
-            : Polygon(nullptr, size), buffer(size) {
-        update();
-    }
-
-    void reserve(int size) {
-        buffer.reserve(size);
-        update();
-    }
-
-    void resize(int size) {
-        buffer.resize(size);
-        update();
-    }
-
-private:
-    void update() {
-        vs = buffer.data();
-        m_size = buffer.size();
-    }
-
-    std::vector<Vector3d> buffer;
-};
+std::ostream& operator<<(std::ostream& os, const Polygon& poly);
 
 } // namespace zephyr::geom
