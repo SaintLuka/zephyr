@@ -2,7 +2,7 @@
 .idea/*
 cmake-build-*
 /bin/
-/output/
+/output*/
 *__pycache__*
 /build/
 /.vscode/

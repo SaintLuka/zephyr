@@ -1,5 +1,5 @@
-project(zephyr C CXX)
 cmake_minimum_required(VERSION 3.5)
+project(zephyr C CXX)
 
 set(CMAKE_LIB_NAME zephyr)
 
