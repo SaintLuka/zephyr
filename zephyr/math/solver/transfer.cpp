@@ -90,6 +90,14 @@ inline std::tuple<double, double> minmax(double a1, double a2) {
     return std::make_tuple(std::min(a1, a2), std::max(a1, a2));
 }
 
+inline bool is_zero(const Vector3d& p) {
+    return p.x() == 0.0 && p.y() == 0.0 && p.z() == 0.0;
+}
+
+inline double cross(const Vector3d& v1, const Vector3d& v2) {
+    return v1.x() * v2.y() - v1.y() * v2.x();
+}
+
 // a1, a2 -- объемные доли
 // S -- площадь грани
 // V1, V2 -- объемы ячеек
@@ -337,15 +345,14 @@ void Transfer::update_ver1(EuMesh& mesh) {
         cell(U).u2 = 0.0;
     }
 
+    update_interface(mesh);
+
     update_dir();
 }
 
 void Transfer::update_ver2(EuMesh& mesh) {
     // Определяем dt
     m_dt = compute_dt(mesh);
-
-    compute_normals(mesh, 3);
-    find_sections(mesh);
 
     // Считаем потоки
     for (auto cell: mesh) {
@@ -358,8 +365,7 @@ void Transfer::update_ver2(EuMesh& mesh) {
         cell(U).u2 = 0.0;
     }
 
-    compute_normals(mesh, 3);
-    find_sections(mesh);
+    update_interface(mesh);
 
     update_dir();
 }
@@ -367,9 +373,6 @@ void Transfer::update_ver2(EuMesh& mesh) {
 void Transfer::update_ver3(EuMesh& mesh) {
     // Определяем dt
     m_dt = compute_dt(mesh);
-
-    compute_normals(mesh, 3);
-    find_sections(mesh);
 
     // Считаем потоки
     for (auto cell: mesh) {
@@ -382,8 +385,7 @@ void Transfer::update_ver3(EuMesh& mesh) {
         cell(U).u2 = 0.0;
     }
 
-    compute_normals(mesh, 3);
-    find_sections(mesh);
+    update_interface(mesh, 3);
 
     update_dir();
 }
@@ -392,7 +394,7 @@ void Transfer::update_ver3(EuMesh& mesh) {
 void Transfer::compute_normal(EuCell& cell) {
     double uc = cell(U).u1;
 
-    if (uc < 1.0e-6 || uc > 1.0 - 1.0e-6) {
+    if (uc < 1.0e-8 || uc > 1.0 - 1.0e-8) {
         cell(U).n = Vector3d::Zero();
         return;
     }
@@ -412,57 +414,14 @@ void Transfer::compute_normal(EuCell& cell) {
     cell(U).n = n.normalized();
 }
 
-void Transfer::smooth_normal(EuCell& cell) {
-    Vector3d n2 = Vector3d::Zero();
-
-    if (cell(U).n.squaredNorm() == 0.0) {
-        cell(U).n2 = n2;
-        return;
-    }
-
-    int counter = 0;
-    for (auto &face: cell.faces()) {
-        if (face.is_boundary()) {
-            continue;
-        }
-
-        Vector3d nn = face.neib(U).n;
-        if (nn.squaredNorm() > 0.0) {
-            n2 += nn;
-            ++counter;
-        }
-    }
-
-    if (counter == 0) {
-        cell(U).n2 = cell(U).n;
-        int counter = 0;
-        for (auto &face: cell.faces()) {
-            if (face.is_boundary()) {
-                continue;
-            }
-
-            Vector3d nn = face.neib(U).n;
-            if (nn.squaredNorm() > 0.0) {
-                n2 += nn;
-                ++counter;
-            }
-        }
-        n2 += counter * cell(U).n;
-
-    }
-    else {
-        n2 += counter * cell(U).n;
-        cell(U).n2 = n2.normalized();
-    }
-
-}
-
-void Transfer::update_normal(EuCell& cell) {
-    cell(U).n = cell(U).n2;
+void Transfer::compute_normals(EuMesh &mesh) {
+    threads::for_each(
+            mesh.begin(), mesh.end(),
+            &Transfer::compute_normal);
 }
 
 void Transfer::find_section(EuCell &cell) {
-    if (cell(U).zero_normal()) {
+    if (is_zero(cell(U).n)) {
         cell(U).p = cell.center();
     } else {
         auto poly = cell.polygon();
@@ -470,24 +429,100 @@ void Transfer::find_section(EuCell &cell) {
     }
 }
 
-void Transfer::compute_normals(EuMesh& mesh, int smoothing) {
-    for (auto cell: mesh) {
-        compute_normal(cell);
-    }
-
-    for (int i = 0; i < smoothing; ++i) {
-        for (auto &cell: mesh) {
-            smooth_normal(cell);
-        }
-        for (auto &cell: mesh) {
-            update_normal(cell);
-        }
-    }
+void Transfer::find_sections(EuMesh& mesh) {
+    threads::for_each(
+            mesh.begin(), mesh.end(),
+            &Transfer::find_section);
 }
 
-void Transfer::find_sections(EuMesh& mesh) {
-    for (auto cell: mesh) {
-        find_section(cell);
+// Существует пересечение прямой и отрезка
+bool intersection_exists(
+        const Vector3d& p, const Vector3d& n,
+        const Vector3d& f1, const Vector3d& f2) {
+    Vector3d tau = f2 - f1;
+    double det = tau.dot(n);
+    if (std::abs(det) < 1.0e-12) {
+        return false;
+    }
+    double t = n.dot(p - f1) / det;
+    return 0.0 <= t && t < 1.0;
+}
+
+// Пересечение двух прямых, параметризованных следующим образом:
+// a(t) = a1 + tau1 * t
+// b(s) = a2 + tau2 * s
+// Возвращает два параметра (t, s) пересечения
+// a(t) = b(s)
+std::array<double, 2> intersection(
+        const Vector3d& a1, const Vector3d& tau1,
+        const Vector3d& a2, const Vector3d& tau2) {
+
+    double det = cross(tau1, tau2);
+    if (std::abs(det) < 1.0e-12) {
+        return {NAN, NAN};
+    }
+
+    Vector3d b = a2 - a1;
+
+    double t = cross(b, tau2) / det;
+    double s = cross(b, tau1) / det;
+
+    return {t, s};
+}
+
+void Transfer::adjust_normal(EuCell& cell) {
+    if (is_zero(cell(U).n)) {
+        return;
+    }
+
+    Vector3d p = cell(U).p;
+    Vector3d n = cell(U).n;
+
+    std::vector<Vector3d> ints;
+    for (auto face: cell.faces()) {
+        const Vector3d& v1 = face.vs(0);
+        const Vector3d& v2 = face.vs(1);
+
+        if (intersection_exists(p, n, v1, v2)) {
+            if (is_zero(face.neib(U).n)) {
+                Vector3d delta = 1.0e-3 * (v2 - v1);
+                if (n.dot(v2 - v1) * (face.neib(U).u1 - 0.5) > 0.0) {
+                    ints.emplace_back(v2 + delta);
+                }
+                else {
+                    ints.emplace_back(v1 - delta);
+                }
+            }
+            else {
+                Vector3d pn = face.neib(U).p;
+                auto[t, s] = intersection(p, pn - p, v1, v2 - v1);
+                ints.emplace_back(p + (pn - p) * t);
+            }
+        }
+    }
+
+    Vector3d new_n = {ints[0].y() - ints[1].y(),
+                      ints[1].x() - ints[0].x(), 0.0};
+
+    if (n.dot(new_n) < 0.0) {
+        new_n *= -1.0;
+    }
+
+    cell(U).n = new_n.normalized();
+}
+
+void Transfer::adjust_normals(EuMesh& mesh) {
+    threads::for_each(
+            mesh.begin(), mesh.end(),
+            &Transfer::adjust_normal);
+}
+
+void Transfer::update_interface(EuMesh& mesh, int smoothing) {
+    compute_normals(mesh);
+    find_sections(mesh);
+    for (int i = 0; i < smoothing; ++i) {
+        adjust_normals(mesh);
+        find_sections(mesh);
     }
 }
 

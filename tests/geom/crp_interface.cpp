@@ -60,6 +60,41 @@ std::array<double, 2> intersection2(
     return {t, s};
 }
 
+
+struct FaceClip {
+    double alpha;  // [0, 1]
+    double sgn;    // {-1, +1},
+                   // +1 от первой точки,
+                   // -1 - от второй точки
+};
+
+// Отсечение полуплоскостью (p, n) от грани (f1, f2)
+FaceClip clip_face(
+        const Vector3d& p, const Vector3d& n,
+        const Vector3d& f1, const Vector3d& f2) {
+    Vector3d tau = f2 - f1;
+
+    double det = tau.dot(n);
+    if (std::abs(det) < 1.0e-12) {
+        if (cross(tau, n) > 0.0) {
+            return {1.0, 1.0};
+        }
+        else {
+            return {0.0, 1.0};
+        }
+    }
+
+    double t = n.dot(p - f1) / det;
+    t = std::max(0.0, std::min(t, 1.0));
+
+    if (tau.dot(n) > 0.0) {
+        return {t, 1.0};
+    }
+    else {
+        return {1.0 - t, -1.0};
+    }
+}
+
 enum show {
     LESS,
     MORE,
@@ -148,7 +183,7 @@ inline double some_weight_f(double x) {
     return x < 0.0 ? 0.0 : 1.0 / (1.0 + x);
 }
 
-void test(double phi1, double phi2, double alpha1, double alpha2) {
+void test1(double phi1, double phi2, double alpha1, double alpha2) {
     Vector3d v1{-1.0, 0.0, 0.0};
     Vector3d v2{0.0, 0.0, 0.0};
     Vector3d v3{1.0, 0.0, 0.0};
@@ -332,8 +367,98 @@ void test(double phi1, double phi2, double alpha1, double alpha2) {
     plt::show();
 }
 
+void test2(double phi1, double phi2, double alpha1, double alpha2) {
+    Vector3d v1{-1.0, 0.0, 0.0};
+    Vector3d v2{0.0, 0.0, 0.0};
+    Vector3d v3{1.0, 0.0, 0.0};
+    Vector3d v4{-1.0, 1.0, 0.0};
+    Vector3d v5{0.0, 1.0, 0.0};
+    Vector3d v6{1.0, 1.0, 0.0};
+
+    Polygon cell_1 = {v1, v2, v5, v4};
+    Polygon cell_2 = {v2, v3, v6, v5};
+
+    Vector3d f1 = v2;
+    Vector3d f2 = v5;
+    Vector3d fc = 0.5 * (f1 + f2);
+
+    Vector3d n1 = {std::cos(phi1), std::sin(phi1), 0.0};
+    Vector3d n2 = {std::cos(phi2), std::sin(phi2), 0.0};
+
+    if (n1.hasNaN()) {
+        n1 = Vector3d::Zero();
+    }
+    if (n2.hasNaN()) {
+        n2 = Vector3d::Zero();
+    }
+
+
+    auto[a1, b1] = cell_1.find_section(n1, alpha1);
+    auto[a2, b2] = cell_2.find_section(n2, alpha2);
+
+    Vector3d tau1 = b1 - a1;
+    Vector3d tau2 = b2 - a2;
+
+    Polygon clip1 = cell_1.clip(a1, n1);
+    Polygon clip2 = cell_2.clip(a2, n2);
+
+
+    plt::figure_size(14.0, 8.0);
+    plt::title("Реконструкция CRP");
+    plt::set_aspect_equal();
+
+    plt::plot(cell_1.xs(), cell_2.ys(), "k-");
+    plt::plot(cell_2.xs(), cell_2.ys(), "k-");
+
+    plt::fill(clip1.xs(), clip1.ys(), {{"color", "#0000ff0f"}});
+    plt::fill(clip2.xs(), clip2.ys(), {{"color", "#0000ff0f"}});
+
+    plt::plot(
+            std::vector<double>({2.0 * a1.x() - b1.x(), b1.x()}),
+            std::vector<double>({2.0 * a1.y() - b1.y(), b1.y()}), "k--");
+    plt::plot(
+            std::vector<double>({2.0 * a2.x() - b2.x(), b2.x()}),
+            std::vector<double>({2.0 * a2.y() - b2.y(), b2.y()}), "k--");
+
+    auto[as1, dir1] = clip_face(a1, n1, f1, f2);
+    auto[as2, dir2] = clip_face(a2, n2, f1, f2);
+
+    Vector3d fint1 = f1 + (f2 - f1) * (dir1 > 0.0 ? as1 : 1.0 - as1);
+    Vector3d fint2 = f1 + (f2 - f1) * (dir2 > 0.0 ? as2 : 1.0 - as2);
+
+    plt::plot({fint1.x()}, {fint1.y()}, {{"label", "left"}, {"color", "green"}, {"marker", "x"}});
+    plt::plot({fint2.x()}, {fint2.y()}, {{"label", "right"}, {"color", "blue"}, {"marker", "x"}});
+
+    std::cout << "as1, as2: " << as1 << " " << as2 << "\n";
+
+    std::cout << "s1, s2: " << dir1 << " " << dir2 << "\n";
+
+    double inter;
+    double a_sig1, a_sig2;
+    if (dir1 * dir2 > 0.0) {
+        inter = std::min(as1, as2);
+    }
+    else {
+        inter = std::max(0.0, as1 + as2 - 1.0);
+    }
+    a_sig1 = 0.5 * (as1 + inter);
+    a_sig2 = 0.5 * (as2 + inter);
+    std::cout << "inter: " << inter << "\n";
+
+    Vector3d aint1 = f1 + (f2 - f1) * (dir1 > 0.0 ? a_sig1 : 1.0 - a_sig1);
+    Vector3d aint2 = f1 + (f2 - f1) * (dir2 > 0.0 ? a_sig2 : 1.0 - a_sig2);
+
+    plt::plot({aint1.x()}, {aint1.y()}, {{"color", "green"}, {"marker", "o"}});
+    plt::plot({aint2.x()}, {aint2.y()}, { {"color", "blue"}, {"marker", "o"}});
+    plt::legend();
+
+    plt::tight_layout();
+    plt::show();
+}
+
 int main() {
-    test(0.01 * M_PI, 0.51 * M_PI, 0.12, 0.1);
+    //test1(0.01 * M_PI, 0.51 * M_PI, 0.12, 0.1);
+    test2(0.0, NAN, 0.22, 0.0);
 
     return 0;
 }

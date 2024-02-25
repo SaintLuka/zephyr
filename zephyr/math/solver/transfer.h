@@ -20,11 +20,6 @@ public:
         double u1, u2;  ///< Объемные доли
         Vector3d n;     ///< Внешняя нормаль поверхности
         Vector3d p;     ///< Базисная точка поверхности
-        Vector3d n2;    ///< Нормаль (вспомогательное значение)
-
-        inline bool zero_normal() const {
-            return n.squaredNorm() == 0.0;
-        }
     };
 
     /// @brief Получить экземпляр расширенного вектора состояния
@@ -56,12 +51,12 @@ public:
     /// @brief Один шаг интегрирования по времени
     void update(EuMesh& mesh);
 
+    /// @brief Подсеточная реконструкция границы
+    /// @param smoothing Число итераций сглаживания
+    void update_interface(EuMesh& mesh, int smoothing = 3);
+
     /// @brief Обновить флаг направления
     void update_dir();
-
-    void compute_normals(EuMesh& mesh, int smoothing = 0);
-
-    void find_sections(EuMesh& mesh);
 
     /// @brief Установить флаги адаптации
     void set_flags(EuMesh& mesh);
@@ -76,15 +71,29 @@ public:
 protected:
 
     /// @brief Посчитать шаг интегрирования по времени с учетом
-    /// условия Куранта
+    /// условия Куранта (для одной ячейки)
     double compute_dt(EuCell& cell);
 
+    /// @brief Посчитать шаг интегрирования по времени с учетом
+    /// условия Куранта (для всех ячеек)
     double compute_dt(EuMesh& mesh);
 
-    void find_section(EuCell& cell);
 
-    /// @brief Посчитать нормали
-    void compute_normal(EuCell& cell);
+    /// @brief Оценка нормали по производным объемной доли
+    static void compute_normal(EuCell& cell);
+
+    static void compute_normals(EuMesh& mesh);
+
+    /// @brief Найти сечение ячейки по существующим нормалям
+    static void find_section(EuCell& cell);
+
+    static void find_sections(EuMesh& mesh);
+
+    /// @brief Поправить нормали с учетом соседей
+    static void adjust_normal(EuCell& cell);
+
+    static void adjust_normals(EuMesh& mesh);
+
 
     void update_ver1(EuMesh& mesh);
 
@@ -101,12 +110,8 @@ protected:
     /// @brief Потоки по схеме CRP, но a_sig выбирается по аналогу VOF
     void fluxes_MIX(EuCell& cell, Direction dir = Direction::ANY);
 
+
 protected:
-
-    void smooth_normal(EuCell& cell);
-
-    void update_normal(EuCell& cell);
-
 
     double m_dt;      ///< Шаг интегрирования
     double m_CFL;     ///< Число Куранта
