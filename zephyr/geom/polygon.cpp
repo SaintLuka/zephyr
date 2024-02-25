@@ -6,6 +6,7 @@
 
 #include <zephyr/geom/polygon.h>
 #include <zephyr/geom/triangle.h>
+#include <zephyr/geom/intersection.h>
 
 namespace zephyr::geom {
 
@@ -175,27 +176,16 @@ double cross(const Vector3d& c, const Vector3d& v1, const Vector3d& v2) {
 }
 
 bool Polygon::inside(const Vector3d& p) const {
-    const Vector3d n = {0.123, 0.346433, 0.0};
+    obj::ray ray = {p, Vector3d{0.123, 0.346433, 0.0}};
 
+    // even-odd rule
     int counter = 0;
     for (int i = 0; i < size(); ++i) {
-        const auto &v1 = vs[i];
-        const auto &v2 = vs[(i + 1) % size()];
-
-        double dot1 = (v1 - p).dot(n);
-        double dot2 = (v2 - p).dot(n);
-
-        // Проверяем пересечение
-        if (dot1 * dot2 < 0.0) {
-            double Det = (v2 - v1).dot(n);
-
-            Vector3d vi = (dot2 * v1 - dot1 * v2) / Det;
-            if (cross(vi - p, n) > 0.0) {
-                ++counter;
-            }
+        obj::segment seg = {vs[i], vs[(i + 1) % size()]};
+        if (intersection2D::exist(ray, seg)) {
+            ++counter;
         }
     }
-
     return counter % 2 > 0;
 }
 
@@ -555,40 +545,6 @@ Polygon::section Polygon::find_section(const Vector3d& _n, double alpha) const {
     return find_section_newton(*this, n, alpha);
 }
 
-// Пересечение окружности и отрезка
-// Отрезок задан параметрически p(t) = v1 + (v2 - v1) * t
-// Если пересечения существуют, тогда находятся параметры t1, t2
-// и соответствующие точки пересечения p1, p2
-struct circle_segment_intersection {
-    bool exist;
-    double t1, t2;
-    Vector3d p1, p2;
-
-    circle_segment_intersection(const Vector3d& v1, const Vector3d& v2, const Vector3d& c, double R) {
-        Vector3d tau = v2 - v1;
-
-        double A = tau.squaredNorm();
-        double B = tau.dot(v1 - c);
-        double C = (v1 - c).squaredNorm() - R * R;
-
-        double D = B * B - A * C;
-
-        if (D <= 0.0) {
-            exist = false;
-        }
-        else {
-            exist = true;
-
-            double SD = std::sqrt(D);
-            t1 = (-B - SD) / A;
-            t2 = (-B + SD) / A;
-
-            p1 = v1 + tau * t1;
-            p2 = v1 + tau * t2;
-        }
-    }
-};
-
 // Средний угол между векторами p1 - c, p2 - c.
 inline double angle_avg(const Vector3d& c, const Vector3d& p1, const Vector3d& p2) {
     return std::atan2(0.5 * (p1.y() + p2.y()) - c.y(),
@@ -613,12 +569,14 @@ inline double angle(const Vector3d& c, const Vector3d& p1, const Vector3d& p2) {
 }
 
 double Polygon::disk_clip_area(const Vector3d& c, double R) const {
+    obj::circle circle{c, R};
+
     double res = 0.0;
     for (int i = 0; i < size(); ++i) {
         const auto &v1 = vs[i];
         const auto &v2 = vs[(i + 1) % size()];
 
-        circle_segment_intersection sec(v1, v2, c, R);
+        auto sec = intersection2D::find(circle, obj::segment{v1, v2});
 
         auto inner = [this, &c, &R](const Vector3d& p1, const Vector3d& p2) -> double {
             return cross(m_center, p1, p2);
@@ -670,6 +628,8 @@ double Polygon::disk_clip_area(const Vector3d& c, double R) const {
 }
 
 Vector3d Polygon::disk_clip_normal(const Vector3d& c, double R) const {
+    obj::circle circle{c, R};
+
     // Ищем точку снаружи
     int out_idx = 0;
     while (out_idx < size() && (vs[out_idx] - c).norm() < R) {
@@ -684,10 +644,12 @@ Vector3d Polygon::disk_clip_normal(const Vector3d& c, double R) const {
     // Ищем пересечения
     std::vector<Vector3d> inout;
     for (int i = out_idx; i < out_idx + size(); ++i) {
-        const auto &v1 = vs[i % size()];
-        const auto &v2 = vs[(i + 1) % size()];
+        obj::segment segment{
+            vs[i % size()],
+                vs[(i + 1) % size()]
+        };
 
-        circle_segment_intersection sec(v1, v2, c, R);
+        auto sec = intersection2D::find(circle, segment);
 
         if (sec.exist) {
             if (0.0 <= sec.t1 && sec.t1 < 1.0) {

@@ -11,6 +11,7 @@ set(ZEPHYR_GEOM_SRC
         ${CMAKE_CURRENT_SOURCE_DIR}/triangle.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/polygon.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/grid.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/intersection.cpp
         PARENT_SCOPE
 )
 
@@ -24,5 +25,6 @@ install(FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/polygon.h
         ${CMAKE_CURRENT_SOURCE_DIR}/geom.h
         ${CMAKE_CURRENT_SOURCE_DIR}/grid.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/intersection.h
         DESTINATION include/${PROJECT_NAME}/geom
 )

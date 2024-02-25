@@ -53,7 +53,7 @@ int main() {
     std::cout << "Polygon area:  " << poly.area() << "\n\n";
 
     // Сечение многоугольника прямой
-    {
+    if (true) {
         // Тестовая прямая
         TLine line(poly[0] + 0.28 * (poly[2] - poly[0]),
                    (poly[2] - poly[0]).normalized());
@@ -89,7 +89,7 @@ int main() {
     }
 
     // Сечение многоугольника окружностью
-    {
+    if (true) {
         // Тестовая окружность
         TDisk disk({1.5, -0.3, 0.0}, 5.0);
 

@@ -1,6 +1,7 @@
 #include <zephyr/math/solver/transfer.h>
 
 #include <zephyr/geom/polygon.h>
+#include <zephyr/geom/intersection.h>
 #include <zephyr/math/cfd/face_extra.h>
 #include <zephyr/geom/primitives/bface.h>
 
@@ -341,7 +342,7 @@ void Transfer::update_ver1(EuMesh& mesh) {
 
     // Обновляем слои
     for (auto cell: mesh) {
-        cell(U).u1 = std::max(0.0, std::min(cell(U).u2, 1.0));
+        cell(U).u1 = between(0.0, cell(U).u2, 1.0);
         cell(U).u2 = 0.0;
     }
 
@@ -361,7 +362,7 @@ void Transfer::update_ver2(EuMesh& mesh) {
 
     // Обновляем слои
     for (auto& cell: mesh) {
-        cell(U).u1 = std::max(0.0, std::min(cell(U).u2, 1.0));
+        cell(U).u1 = between(0.0, cell(U).u2, 1.0);
         cell(U).u2 = 0.0;
     }
 
@@ -381,7 +382,7 @@ void Transfer::update_ver3(EuMesh& mesh) {
 
     // Обновляем слои
     for (auto cell: mesh) {
-        cell(U).u1 = std::max(0.0, std::min(cell(U).u2, 1.0));
+        cell(U).u1 = between(0.0, cell(U).u2, 1.0);
         cell(U).u2 = 0.0;
     }
 
@@ -435,80 +436,45 @@ void Transfer::find_sections(EuMesh& mesh) {
             &Transfer::find_section);
 }
 
-// Существует пересечение прямой и отрезка
-bool intersection_exists(
-        const Vector3d& p, const Vector3d& n,
-        const Vector3d& f1, const Vector3d& f2) {
-    Vector3d tau = f2 - f1;
-    double det = tau.dot(n);
-    if (std::abs(det) < 1.0e-12) {
-        return false;
-    }
-    double t = n.dot(p - f1) / det;
-    return 0.0 <= t && t < 1.0;
-}
-
-// Пересечение двух прямых, параметризованных следующим образом:
-// a(t) = a1 + tau1 * t
-// b(s) = a2 + tau2 * s
-// Возвращает два параметра (t, s) пересечения
-// a(t) = b(s)
-std::array<double, 2> intersection(
-        const Vector3d& a1, const Vector3d& tau1,
-        const Vector3d& a2, const Vector3d& tau2) {
-
-    double det = cross(tau1, tau2);
-    if (std::abs(det) < 1.0e-12) {
-        return {NAN, NAN};
-    }
-
-    Vector3d b = a2 - a1;
-
-    double t = cross(b, tau2) / det;
-    double s = cross(b, tau1) / det;
-
-    return {t, s};
-}
-
 void Transfer::adjust_normal(EuCell& cell) {
     if (is_zero(cell(U).n)) {
         return;
     }
 
-    Vector3d p = cell(U).p;
-    Vector3d n = cell(U).n;
+    obj::plane plane{cell(U).p, cell(U).n};
 
     std::vector<Vector3d> ints;
     for (auto face: cell.faces()) {
-        const Vector3d& v1 = face.vs(0);
-        const Vector3d& v2 = face.vs(1);
+        obj::segment seg{face.vs(0), face.vs(1)};
 
-        if (intersection_exists(p, n, v1, v2)) {
+        if (intersection2D::exist(plane, seg)) {
             if (is_zero(face.neib(U).n)) {
-                Vector3d delta = 1.0e-3 * (v2 - v1);
-                if (n.dot(v2 - v1) * (face.neib(U).u1 - 0.5) > 0.0) {
-                    ints.emplace_back(v2 + delta);
+                if (plane.n.dot(seg.tau()) * (face.neib(U).u1 - 0.5) > 0.0) {
+                    ints.emplace_back(seg.get(1.001));
                 }
                 else {
-                    ints.emplace_back(v1 - delta);
+                    ints.emplace_back(seg.get(-0.001));
                 }
             }
             else {
                 Vector3d pn = face.neib(U).p;
-                auto[t, s] = intersection(p, pn - p, v1, v2 - v1);
-                ints.emplace_back(p + (pn - p) * t);
+                Vector3d vi = intersection2D::find_fast(
+                        obj::segment{plane.p, pn}, seg);
+                ints.emplace_back(vi);
             }
         }
     }
 
-    Vector3d new_n = {ints[0].y() - ints[1].y(),
-                      ints[1].x() - ints[0].x(), 0.0};
+    if (ints.size() > 1) {
+        Vector3d n2 = {ints[0].y() - ints[1].y(),
+                       ints[1].x() - ints[0].x(), 0.0};
 
-    if (n.dot(new_n) < 0.0) {
-        new_n *= -1.0;
+        if (plane.n.dot(n2) < 0.0) {
+            n2 *= -1.0;
+        }
+
+        cell(U).n = n2.normalized();
     }
-
-    cell(U).n = new_n.normalized();
 }
 
 void Transfer::adjust_normals(EuMesh& mesh) {
