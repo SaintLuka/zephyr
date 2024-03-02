@@ -1,5 +1,7 @@
 #include <zephyr/utils/threads.h>
 
+#include <memory>
+
 namespace zephyr { namespace utils {
 
 int threads::n_threads = 1;
@@ -7,7 +9,7 @@ std::unique_ptr<ThreadPool> threads::pool = nullptr;
 
 void threads::on() {
     n_threads = int(std::thread::hardware_concurrency());
-    pool = std::unique_ptr<ThreadPool>(new ThreadPool(n_threads));
+    pool = std::make_unique<ThreadPool>(n_threads);
 }
 
 void threads::on(int count) {
@@ -18,7 +20,7 @@ void threads::on(int count) {
         int HC = int(std::thread::hardware_concurrency());
         n_threads = count < HC ? count : HC;
     }
-    pool = std::unique_ptr<ThreadPool>(new ThreadPool(n_threads));
+    pool = std::make_unique<ThreadPool>(n_threads);
 }
 
 void threads::off() {

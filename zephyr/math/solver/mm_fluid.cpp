@@ -99,12 +99,13 @@ double MmFluid::compute_dt(Mesh &mesh) {
 void check_state(const PState &next, const QState &qc, const PState &old, const std::string &func_name, size_t cell_idx) {
     if (!next.is_bad())
         return;
-    std::cerr << "Cell: " << cell_idx << "\n";
+    std::cerr << "Bad cell: " << cell_idx << "\n";
     std::cerr << "Failed to calc PState from QState in " + func_name + "\n";
     std::cerr << "QState: " << qc << "\n";
     std::cerr << "PState: " << next << "\n";
     std::cerr << "Previous PState: " << old << "\n";
-    throw std::runtime_error("bad cell");
+    exit(1); // чтобы расчёт моментально выключился
+//    throw std::runtime_error("bad cell");
 }
 
 void MmFluid::fluxes(Mesh &mesh) const {
@@ -339,8 +340,8 @@ Distributor MmFluid::distributor() const {
 //        }
 //        parent(U).set_state(sum.vec() / parent.volume());
         parent(U).mass_frac.fix();
-        parent(U).e = mixture.energy_rp(parent(U).rho, parent(U).p, parent(U).mass_frac);
-        parent(U).t = mixture.temperature_rp(parent(U).rho, parent(U).p, parent(U).mass_frac);
+        parent(U).e = mixture.energy_rp(parent(U).rho, parent(U).p, parent(U).mass_frac, {.T0=mean_t});
+        parent(U).t = mixture.temperature_rp(parent(U).rho, parent(U).p, parent(U).mass_frac, {.T0=mean_t});
         if (parent(U).is_bad1()) {
             std::cerr << "Failed to calc PState in merge\n";
             std::cerr << "PState: " << parent(U).get_pstate() << "\n";
@@ -358,7 +359,7 @@ void MmFluid::set_flags(Mesh &mesh) {
         double p = cell(U).p;
         Fractions mass_frac = cell(U).mass_frac;
         bool need_split = false;
-        double c = mixture.sound_speed_rp(cell(U).rho, cell(U).p, cell(U).mass_frac);
+//        double c = mixture.sound_speed_rp(cell(U).rho, cell(U).p, cell(U).mass_frac);
         for (auto face: cell.faces()) {
             if (face.is_boundary()) {
                 continue;
@@ -371,21 +372,19 @@ void MmFluid::set_flags(Mesh &mesh) {
             }
 
             // проверяем то что ячейка имеют большую относительную скорость
-            if ((cell(U).v - face.neib()(U).v).norm() > 0.2 * c) {
-                need_split = true;
-                break;
-            }
+//            if ((cell(U).v - face.neib()(U).v).norm() > 0.2 * c) {
+//                need_split = true;
+//                break;
+//            }
 
             // проверяем большое различие в долях веществ
             Fractions neib_mass_frac = face.neib()(U).mass_frac;
-            for (int i = 0; i < Fractions::max_size; i++) {
+            for (int i = 0; i < mixture.size(); i++) {
                 if (abs(mass_frac[i] - neib_mass_frac[i]) > 0.1) {
                     need_split = true;
                     break;
                 }
             }
-            if (need_split)
-                break;
         }
         if (need_split) {
             cell.set_flag(1);
