@@ -52,6 +52,10 @@ struct Node {
     double i, j, k, w;
 };
 
+double Triangle::clip_area(const std::function<bool(const Vector3d &)> &inside, int n_points) const {
+    return volume_fraction(inside, n_points) * area();
+}
+
 double Triangle::volume_fraction(const std::function<bool(const Vector3d&)>& inside, int N) const {
     static const double a = 1.0 / 3.0;
     static const double b = 2.0 / 3.0;

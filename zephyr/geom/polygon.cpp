@@ -1,7 +1,11 @@
 #include <iomanip>
 #include <algorithm>
+#include <iostream>
+
+#include <zephyr/math/calc/integrals.h>
 
 #include <zephyr/geom/polygon.h>
+#include <zephyr/geom/triangle.h>
 
 namespace zephyr::geom {
 
@@ -9,65 +13,200 @@ inline bool bad_normal(const Vector3d& n) {
     return n.hasNaN() || n.squaredNorm() == 0.0;
 }
 
-Polygon::Polygon(std::vector<Vector3d>& vertices)
-    : vs(vertices.data()), m_size(vertices.size()) { }
-
-Polygon::Polygon(Vector3d* buff, int size)
-    : vs(buff), m_size(size) { }
-
-Vector3d Polygon::center() const {
-    Vector3d C = {0.0, 0.0, 0.0};
-    for (int i = 0; i < m_size; ++i) {
-        C += vs[i];
-    }
-    return C / m_size;
+Polygon::Polygon()
+    : vs({}) , m_center(Vector3d::Zero()) {
 }
 
-void Polygon::sort(const Vector3d& _c) {
-    Vector3d c = _c.hasNaN() ? center() : _c;
+Polygon::Polygon(int size)
+    : vs(size, Vector3d::Zero()), m_center(Vector3d::Zero()) {
 
-    std::sort(vs, vs + m_size,
-              [&c](const Vector3d &a, const Vector3d &b) -> bool {
-                  double phi_a = std::atan2(a.y() - c.y(), a.x() - c.x());
-                  double phi_b = std::atan2(b.y() - c.y(), b.x() - c.x());
+}
+
+Polygon::Polygon(const Vector3d* buff, int size, bool sort) {
+    vs.resize(size);
+    std::memcpy((void *) vs.data(), (void *) buff, size * sizeof(Vector3d));
+    setup_center();
+    if (sort) {
+        Polygon::sort();
+    }
+}
+
+Polygon::Polygon(const std::vector<Vector3d>& vertices, bool sort)
+        : vs(vertices) {
+    setup_center();
+    if (sort) {
+        Polygon::sort();
+    }
+}
+
+Polygon::Polygon(std::vector<Vector3d>&& vertices, bool sort)
+    :vs(std::move(vertices)) {
+    setup_center();
+    if (sort) {
+        Polygon::sort();
+    }
+}
+
+Polygon::Polygon(std::initializer_list<Vector3d>&& list, bool sort)
+    : vs(std::move(list)) {
+    setup_center();
+    if (sort) {
+        Polygon::sort();
+    }
+}
+
+void Polygon::setup_center() {
+    m_center = {0.0, 0.0, 0.0};
+    for (auto &v: vs) {
+        m_center += v;
+    }
+    m_center /= vs.size();
+}
+
+void Polygon::reserve(int size) {
+    vs.reserve(size);
+}
+
+void Polygon::set(int idx, const Vector3d& p) {
+    m_center += (p - vs[idx]) / vs.size();
+    vs[idx] = p;
+}
+
+void Polygon::operator+=(const Vector3d& p) {
+    m_center = (vs.size() * m_center + p) / (vs.size() + 1);
+    vs.emplace_back(p);
+}
+
+std::vector<double> Polygon::xs() const {
+    if (empty()) {
+        return {};
+    }
+    std::vector<double> res(size() + 1);
+    for (int i = 0; i < size(); ++i) {
+        res[i] = vs[i].x();
+    }
+    res[size()] = vs[0].x();
+    return res;
+}
+
+std::vector<double> Polygon::ys() const {
+    if (empty()) {
+        return {};
+    }
+    std::vector<double> res(size() + 1);
+    for (int i = 0; i < size(); ++i) {
+        res[i] = vs[i].y();
+    }
+    res[size()] = vs[0].y();
+    return res;
+}
+/*
+void Polygon::print_numpy() const {
+    std::cout << "x = np.array([";
+    for (int i = 0; i < size(); ++i) {
+        std::cout << vs[i].x() << ", ";
+    }
+    if (!empty()) {
+        std::cout << vs[0].x();
+    }
+    std::cout << "])\n";
+
+    std::cout << "y = np.array([";
+    for (int i = 0; i < size(); ++i) {
+        std::cout << vs[i].y() << ", ";
+    }
+    if (!empty()) {
+        std::cout << vs[0].y();
+    }
+    std::cout << "])\n";
+}
+*/
+Box Polygon::bbox() const {
+    if (empty()) {
+        return {Vector3d::Zero(), Vector3d::Zero()};
+    }
+
+    const double max = +std::numeric_limits<double>::infinity();
+    const double min = -std::numeric_limits<double>::infinity();
+
+    Vector3d vmin = {max, max, min};
+    Vector3d vmax = {min, min, max};
+    for (int i = 0; i < size(); ++i) {
+        if (vs[i].x() < vmin.x()) {
+            vmin.x() = vs[i].x();
+        }
+        else if (vs[i].x() > vmax.x()) {
+            vmax.x() = vs[i].x();
+        }
+
+        if (vs[i].y() < vmin.y()) {
+            vmin.y() = vs[i].y();
+        }
+        else if (vs[i].y() > vmax.y()) {
+            vmax.y() = vs[i].y();
+        }
+    }
+
+    return {vmin, vmax};
+}
+
+Vector3d Polygon::center() const {
+    return m_center;
+}
+
+void Polygon::sort() {
+    std::sort(vs.begin(), vs.end(),
+              [this](const Vector3d &a, const Vector3d &b) -> bool {
+                  double phi_a = std::atan2(a.y() - m_center.y(), a.x() - m_center.x());
+                  double phi_b = std::atan2(b.y() - m_center.y(), b.x() - m_center.x());
                   return phi_a < phi_b;
               });
+}
+
+// vector product [v1, v2].z
+double cross(const Vector3d& v1, const Vector3d& v2) {
+    return v1.x() * v2.y() - v1.y() * v2.x();
+}
+
+// vector product [v1 - c, v2 - c].z
+double cross(const Vector3d& c, const Vector3d& v1, const Vector3d& v2) {
+    return (v1.x() - c.x()) * (v2.y() - c.y()) -
+           (v1.y() - c.y()) * (v2.x() - c.x());
 }
 
 bool Polygon::inside(const Vector3d& p) const {
     const Vector3d n = {0.123, 0.346433, 0.0};
 
     int counter = 0;
-    for (int i = 0; i < m_size; ++i) {
-        const auto& v1 = vs[i];
-        const auto& v2 = vs[(i + 1) % m_size];
+    for (int i = 0; i < size(); ++i) {
+        const auto &v1 = vs[i];
+        const auto &v2 = vs[(i + 1) % size()];
 
         double dot1 = (v1 - p).dot(n);
         double dot2 = (v2 - p).dot(n);
 
         // Проверяем пересечение
         if (dot1 * dot2 < 0.0) {
-            ++counter;
+            double Det = (v2 - v1).dot(n);
+
+            Vector3d vi = (dot2 * v1 - dot1 * v2) / Det;
+            if (cross(vi - p, n) > 0.0) {
+                ++counter;
+            }
         }
     }
 
     return counter % 2 > 0;
 }
 
-double Polygon::area(const Vector3d& _c) const {
-    Vector3d c = _c.hasNaN() ? center() : _c;
-
+double Polygon::area() const {
     double S = 0.0;
-    for (int i = 0; i < m_size; ++i) {
-        const Vector3d &v1 = vs[i];
-        const Vector3d &v2 = vs[(i + 1) % m_size];
+    for (int i = 0; i < size(); ++i) {
+        const auto &v1 = vs[i];
+        const auto &v2 = vs[(i + 1) % size()];
 
-        Vector3d face_c = 0.5 * (v1 + v2);
-        Vector3d normal = {v2.y() - v1.y(), v1.x() - v2.x(), 0.0};
-
-        S += std::abs((face_c - c).dot(normal));
+        S += cross(m_center, v1, v2);
     }
-
     return 0.5 * S;
 }
 
@@ -77,9 +216,9 @@ Vector3d Polygon::centroid(double S) const {
     }
 
     Vector3d C = {0.0, 0.0, 0.0};
-    for (int i = 0; i < m_size; ++i) {
+    for (int i = 0; i < size(); ++i) {
         auto &v1 = vs[i];
-        auto &v2 = vs[(i + 1) % m_size];
+        auto &v2 = vs[(i + 1) % size()];
 
         C.x() += (v2.y() - v1.y()) * (v2.x() * v2.x() + v2.x() * v1.x() + v1.x() * v1.x());
         C.y() -= (v2.x() - v1.x()) * (v2.y() * v2.y() + v2.y() * v1.y() + v1.y() * v1.y());
@@ -93,123 +232,194 @@ double Polygon::volume_as() const {
     return NAN;
 }
 
-Polygon::MinMax Polygon::minmax(const Vector3d& n) const {
-    auto comp = [&n](const Vector3d &a, const Vector3d &b) -> bool {
-        return a.dot(n) < b.dot(n);
-    };
-    auto mm = std::minmax_element(vs, vs + m_size, comp);
-    return {*mm.first, *mm.second};
-}
+double Polygon::clip_area(const std::function<bool(const Vector3d&)>& inside, int N) const {
+    int n = std::max(1, N / size());
 
-void Polygon::clip(const Vector3d& p, const Vector3d& n, Polygon& part) const {
-    // Подразумевается, что в part выделен массив вершин достаточного размера
-    part.m_size = 0;
-    if (empty()) {
-        return;
+    double area = 0.0;
+    for (int i = 0; i < size(); ++i) {
+        const auto &v1 = vs[i];
+        const auto &v2 = vs[(i + 1) % size()];
+
+        Triangle tri(m_center, v1, v2);
+        area += tri.clip_area(inside, n);
     }
 
-    for (int i = 0; i < m_size; ++i) {
-        const auto& v1 = vs[i];
-        const auto& v2 = vs[(i + 1) % m_size];
+    return area;
+}
+
+Polygon Polygon::clip(const Vector3d& p, const Vector3d& n) const {
+    if (empty()) {
+        return {};
+    }
+
+    std::vector<Vector3d> part;
+    part.reserve(size() + 1);
+    for (int i = 0; i < size(); ++i) {
+        const auto &v1 = vs[i];
+        const auto &v2 = vs[(i + 1) % size()];
 
         double dot1 = (v1 - p).dot(n);
         double dot2 = (v2 - p).dot(n);
         double Det = (v2 - v1).dot(n);
 
-        double eps = 0.0e-12;
-
         // Проверяем вершину (если внутри)
-        if (dot1 <= eps) {
-            part[part.m_size] = v1;
-            ++part.m_size;
+        if (dot1 <= 1.0e-14) {
+            part.emplace_back(v1);
         }
 
         // Проверяем пересечение
-        if ((dot1 - eps) * (dot2 - eps) < 0.0) {
-            part[part.m_size] = (dot2 * v1 - dot1 * v2) / Det;
-            ++part.m_size;
+        if (dot1 * dot2 < 0.0) {
+            part.emplace_back((dot2 * v1 - dot1 * v2) / Det);
         }
     }
+    return Polygon(std::move(part));
 }
 
-void Polygon::clip(const Vector3d& p, const Vector3d& n, Polygon& part, Line& line) const {
-    // Подразумевается, что в part выделен массив вершин достаточного размера
+struct AnS {
+    double area;   ///< Площадь отсечения
+    Vector3d p1;   ///< Точка сечения
+    Vector3d p2;   ///< Точка сечения
+    bool tri_in;   ///< Отсекается треугольник
+    bool tri_out;  ///< Остается треугольник
 
-    part.m_size = 0;
-    line[0] = line[1] = Vector3d::Zero();
+    // Длина сечения
+    double slice() const {
+        return (p2 - p1).norm();
+    }
+};
 
-    if (empty()) {
-        return;
+// Найти площадь отсечения и длину сечения (если надо)
+AnS clip_area_and_slice(const Polygon& poly, const Vector3d& p, const Vector3d& n, bool slice) {
+    const Vector3d nan = {NAN, NAN, NAN};
+    const Vector3d zero = Vector3d::Zero();
+
+    if (poly.empty()) {
+        return {0.0, nan, nan, false};
     }
 
-    // Число пересечений
-    int n_inters = 0;
-    for (int i = 0; i < m_size; ++i) {
-        const auto& v1 = vs[i];
-        const auto& v2 = vs[(i + 1) % m_size];
+    if (bad_normal(n)) {
+        if (poly.inside(p)) {
+            return {poly.area(), nan, nan, false};
+        }
+        else {
+            return {0.0, nan, nan, false};
+        }
+    }
 
-        double dot1 = (v1 - p).dot(n);
+    int size = poly.size();
+
+    // Индекс стороны многоугольника, на которой первая точка снаружи,
+    // а вторая внутри, sec_out_in -- пересечение
+    int idx_out_in = -1;
+    Vector3d sec_out_in;
+
+    // Индекс стороны многоугольника, на которой первая точка внутри,
+    // а вторая снуружи, sec_in_out -- пересечение
+    int idx_in_out = -1;
+    Vector3d sec_in_out;
+
+    double dot1 = (poly[size - 1] - p).dot(n);
+    for (int i2 = 0; i2 < size; ++i2) {
+        const auto &v2 = poly[i2];
+
         double dot2 = (v2 - p).dot(n);
-        double Det = (v2 - v1).dot(n);
 
-        const double eps = 0.0;
+        // Найдено пересечение
+        if (dot1 * dot2 < 0.0) {
+            int i1 = (i2 - 1 + size) % poly.size();
 
-        // Проверяем вершину (если внутри)
-        if (dot1 <= eps) {
-            part[part.m_size] = v1;
-            ++part.m_size;
+            const auto &v1 = poly[i1];
+            double Det = (v2 - v1).dot(n);
+
+            Vector3d sec = (dot2 * v1 - dot1 * v2) / Det;
+            if (dot1 <= 0.0) {
+                idx_in_out = i1;
+                sec_in_out = sec;
+            } else {
+                idx_out_in = i1;
+                sec_out_in = sec;
+            }
         }
 
-        // Проверяем пересечение
-        if ((dot1 - eps) * (dot2 - eps) < 0.0) {
-            Vector3d inter = (dot2 * v1 - dot1 * v2) / Det;
-            part[part.m_size] = inter;
-            line[n_inters]  = inter;
+        dot1 = dot2;
+    }
 
-            ++part.m_size;
-            ++n_inters;
+    // Нет пересечений, полностью внутри или снаружи
+    if (idx_in_out < 0 || idx_out_in < 0) {
+        if (dot1 < 0.0) {
+            return {poly.area(), Vector3d::Zero(), Vector3d::Zero(), false};
+        }
+        else {
+            return {0.0, zero, zero, false};
         }
     }
-}
 
-double Polygon::clip_area(const Vector3d& p, const Vector3d& n, Polygon& part) const {
-    if (bad_normal(n)) {
-        return inside(p) ? 1.0 : 0.0;
+    AnS res = {0.0, zero, zero, false};
+    if (slice) {
+        res.p1 = sec_in_out;
+        res.p2 = sec_out_in;
+        res.tri_in = (idx_in_out - idx_out_in + size) % size == 1;
+        res.tri_out = (idx_out_in - idx_in_out + size) % size == 1;
     }
 
-    clip(p, n, part);
-    return part.area();
-}
+    res.area += cross(poly.center(), sec_out_in, poly[(idx_out_in + 1) % size]);
+    res.area += cross(poly.center(), poly[idx_in_out], sec_in_out);
+    res.area += cross(poly.center(), sec_in_out, sec_out_in);
 
-Polygon::AnS Polygon::clip_area_and_slice(const Vector3d& p, const Vector3d& n, Polygon& part) const {
-    if (bad_normal(n)) {
-        return {.area=(inside(p) ? 1.0 : 0.0), .slice=NAN};
+    if (idx_in_out < idx_out_in) {
+        idx_in_out += size;
     }
 
-    Line line(Vector3d::Zero(), Vector3d::Zero());
-    clip(p, n, part, line);
-    return {.area=part.area(), .slice=line.length()};
-}
-
-Vector3d Polygon::find_section(const Vector3d& n, double alpha, Polygon& part) const {
-    if (bad_normal(n)) {
-        return alpha < 0.5 ? vs[0] + 10.0 * (vs[1] - vs[0]) : center();
+    for (int i = idx_out_in + 1; i < idx_in_out; ++i) {
+        const auto& v1 = poly[i % size];
+        const auto& v2 = poly[(i + 1) % size];
+        res.area += cross(poly.center(), v1, v2);
     }
 
-    return find_section_bisect(n, alpha, part);
-    //return find_section_newton(n, alpha, part);
+    res.area *= 0.5;
+
+    return res;
+}
+
+double Polygon::clip_area(const Vector3d& p, const Vector3d& n) const {
+    return clip_area_and_slice(*this, p, n, false).area;
+}
+
+std::tuple<Vector3d, Vector3d> minmax(const Polygon& poly, const Vector3d& n) {
+    if (poly.empty()) {
+        return std::make_tuple(
+                Vector3d{NAN, NAN, NAN},
+                Vector3d{NAN, NAN, NAN});
+    }
+
+    Vector3d min = poly[0];
+    Vector3d max = poly[0];
+    double min_dot = min.dot(n);
+    double max_dot = min_dot;
+    for (int i = 1; i < poly.size(); ++i) {
+        double dot = poly[i].dot(n);
+        if (dot < min_dot) {
+            min = poly[i];
+            min_dot = dot;
+        } else if (dot > max_dot) {
+            max = poly[i];
+            max_dot = dot;
+        }
+    }
+
+    return std::make_tuple(min, max);
 }
 
 #define COUNT_ITERATIONS 0
 
-Vector3d Polygon::find_section_bisect(const Vector3d& n, double alpha, Polygon& part) const {
-    // Допускается оптимизация, использовать метод Ньютона
-    Vector3d C = center();
-    double S = area();
+// Найти сечение полигона прямой методом бисекции
+Vector3d find_section_bisect(const Polygon& poly, const Vector3d& n, double alpha) {
+#if COUNT_ITERATIONS
+    static int n_starts = 0; ++n_starts;
+    static int total_iterations = 0;
+#endif
 
-    auto mm = minmax(n);
-    Vector3d v_min = mm.min;
-    Vector3d v_max = mm.max;
+    auto [v_min, v_max] = minmax(poly, n);
 
     // Отсекаем сразу только очень близкие к 0.0 и 1.0
     if (alpha < 1.0e-14) {
@@ -218,19 +428,17 @@ Vector3d Polygon::find_section_bisect(const Vector3d& n, double alpha, Polygon& 
         return v_max + 0.1 * n;
     }
 
+    double S = poly.area();
+
     Vector3d v_avg = 0.5 * (v_min + v_max);
 
     double f_min = - alpha * S;
-    double f_avg = clip_area(v_avg, n, part) - alpha * S;
+    double f_avg = poly.clip_area(v_avg, n) - alpha * S;
     double f_max = (1.0 - alpha) * S;
 
-#if COUNT_ITERATIONS
-    static int n_starts = 0; ++n_starts;
-    static int total_iterations = 0;
-#endif
-
     int n_iterations = 0;
-    while (f_max - f_min > 1.0e-6 * S && n_iterations < 30) {
+    double dS = 1.0e-6 * S;
+    while (f_max - f_min > dS && n_iterations < 30) {
         if (f_avg < 0.0) {
             v_min = v_avg;
             f_min = f_avg;
@@ -240,7 +448,7 @@ Vector3d Polygon::find_section_bisect(const Vector3d& n, double alpha, Polygon& 
         }
 
         v_avg = 0.5 * (v_min + v_max);
-        f_avg = clip_area(v_avg, n, part) - alpha * S;
+        f_avg = poly.clip_area(v_avg, n) - alpha * S;
         ++n_iterations;
     }
     v_avg = v_min - f_min * (v_max - v_min) / (f_max - f_min);
@@ -258,41 +466,51 @@ Vector3d Polygon::find_section_bisect(const Vector3d& n, double alpha, Polygon& 
 
 // Сходится дольше, чем метод бисекции, почему?
 // Надо ещё метод Брента попробовать
-Vector3d Polygon::find_section_newton(const Vector3d& n, double alpha, Polygon& part) const {
-    // Допускается оптимизация, использовать метод Ньютона
-    Vector3d C = center();
-    double S = area();
-
-    auto mm = minmax(n);
-    Vector3d v_min = mm.min;
-    Vector3d v_max = mm.max;
-
-    double DV = (v_max - v_min).dot(n);
-    Vector3d dv = DV * n;
-
-    // Отсекаем сразу только очень близкие к 0.0 и 1.0
-    if (alpha < 1.0e-14) {
-        return v_min - 0.1 * n;
-    } else if (alpha > 1.0 - 1.0e-14) {
-        return v_max + 0.1 * n;
-    }
-
+Polygon::section find_section_newton(const Polygon& poly, const Vector3d& n, double alpha) {
 #if COUNT_ITERATIONS
     static int n_starts = 0; ++n_starts;
     static int total_iterations = 0;
 #endif
+    auto [v_min, v_max] = minmax(poly, n);
+
+    // Отсекаем сразу только очень близкие к 0.0 и 1.0
+    if (alpha < 1.0e-14) {
+        Vector3d out = v_min - 0.1 * n;
+        return {out, out};
+    } else if (alpha > 1.0 - 1.0e-14) {
+        Vector3d out = v_max + 0.1 * n;
+        return {out, out};
+    }
+
+    double DV = (v_max - v_min).dot(n);
+    Vector3d dv = DV * n;
+
+    double S = poly.area();
 
     double x = alpha;
 
-    AnS    res = clip_area_and_slice(v_min + x * dv, n, part);
-    double err = std::abs(res.area / S - 1.0);
+    AnS func = clip_area_and_slice(poly, v_min + x * dv, n, true);
 
+    double err = std::abs(func.area / S - alpha);
     int n_iterations = 0;
-    while (err > 1.0e-6 && n_iterations < 30) {
-        x -= (res.area - alpha * S) / (DV * res.slice);
-        res = clip_area_and_slice(v_min + x * dv, n, part);
+    while (err > 1.0e-12 && n_iterations < 30){
+        if (func.tri_in) {
+            // Отсекается внутренний треугольник
+            x = std::sqrt(2.0 * alpha * x * S / (DV * func.slice()));
+        }
+        else if (func.tri_out) {
+            // Отсекается внешний треугольник
+            x = 1.0 - std::sqrt(2.0 * (1.0 - alpha) * (1.0 - x) * S / (DV * func.slice()));
+        }
+        else {
+            x -= (func.area - alpha * S) / (DV * func.slice());
+        }
+        x = std::max(0.0, std::min(x, 1.0));
 
-        err = std::abs(clip_area(v_min + x * dv, n, part) / S - 1.0);
+        func = clip_area_and_slice(poly, v_min + x * dv, n, true);
+
+        err = std::abs(func.area / S - alpha);
+
         ++n_iterations;
     }
 
@@ -304,13 +522,237 @@ Vector3d Polygon::find_section_newton(const Vector3d& n, double alpha, Polygon& 
     }
 #endif
 
-    if (x < 1.0e-14) {
-        return v_min - 0.1 * n;
-    } else if (x > 1.0 - 1.0e-14) {
-        return v_max + 0.1 * n;
-    } else {
-        return v_min + x * dv;
+    if (alpha < 1.0e-14) {
+        Vector3d out = v_min - 0.1 * n;
+        return {out, out};
+    } else if (alpha > 1.0 - 1.0e-14) {
+        Vector3d out = v_max + 0.1 * n;
+        return {out, out};
     }
+    else {
+        return {0.5 * (func.p1 + func.p2), func.p2};
+    }
+}
+
+Polygon::section Polygon::find_section(const Vector3d& _n, double alpha) const {
+    const Vector3d nan = {NAN, NAN, NAN};
+    if (empty()) {
+        return {nan, nan};
+    }
+
+    Vector3d n = _n.normalized();
+
+    if (bad_normal(n)) {
+        if (alpha < 0.5) {
+            return {nan, nan};
+        }
+        else {
+            return {center(), center()};
+        }
+    }
+
+    //return {find_section_bisect(*this, n, alpha), Vector3d::Zero()};
+    return find_section_newton(*this, n, alpha);
+}
+
+// Пересечение окружности и отрезка
+// Отрезок задан параметрически p(t) = v1 + (v2 - v1) * t
+// Если пересечения существуют, тогда находятся параметры t1, t2
+// и соответствующие точки пересечения p1, p2
+struct circle_segment_intersection {
+    bool exist;
+    double t1, t2;
+    Vector3d p1, p2;
+
+    circle_segment_intersection(const Vector3d& v1, const Vector3d& v2, const Vector3d& c, double R) {
+        Vector3d tau = v2 - v1;
+
+        double A = tau.squaredNorm();
+        double B = tau.dot(v1 - c);
+        double C = (v1 - c).squaredNorm() - R * R;
+
+        double D = B * B - A * C;
+
+        if (D <= 0.0) {
+            exist = false;
+        }
+        else {
+            exist = true;
+
+            double SD = std::sqrt(D);
+            t1 = (-B - SD) / A;
+            t2 = (-B + SD) / A;
+
+            p1 = v1 + tau * t1;
+            p2 = v1 + tau * t2;
+        }
+    }
+};
+
+// Средний угол между векторами p1 - c, p2 - c.
+inline double angle_avg(const Vector3d& c, const Vector3d& p1, const Vector3d& p2) {
+    return std::atan2(0.5 * (p1.y() + p2.y()) - c.y(),
+                      0.5 * (p1.x() + p2.x()) - c.x());
+}
+
+// Положительный угол между векторами p1 - c, p2 - c.
+inline double angle(const Vector3d& c, const Vector3d& p1, const Vector3d& p2) {
+    double d_phi = std::atan2(p2.y() - c.y(), p2.x() - c.x()) -
+                   std::atan2(p1.y() - c.y(), p1.x() - c.x());
+
+    if (std::abs(d_phi) >= M_PI) {
+        // перескочили через ось
+        if (d_phi < 0.0) {
+            d_phi += 2.0 * M_PI;
+        }
+        else {
+            d_phi -= 2.0 * M_PI;
+        }
+    }
+    return d_phi;
+}
+
+double Polygon::disk_clip_area(const Vector3d& c, double R) const {
+    double res = 0.0;
+    for (int i = 0; i < size(); ++i) {
+        const auto &v1 = vs[i];
+        const auto &v2 = vs[(i + 1) % size()];
+
+        circle_segment_intersection sec(v1, v2, c, R);
+
+        auto inner = [this, &c, &R](const Vector3d& p1, const Vector3d& p2) -> double {
+            return cross(m_center, p1, p2);
+        };
+
+        auto outer = [this, &c, &R](const Vector3d& p1, const Vector3d& p2) -> double {
+            return R * R * angle(c, p1, p2) + cross(p2 - p1, m_center - c);
+        };
+
+        double part = 0.0;
+        if (sec.exist) {
+            if (sec.t1 < 0.0) {
+                if (sec.t2 < 0.0) {
+                    // t1 < t2 < 0.0
+                    part = outer(v1, v2);
+                }
+                else if (sec.t2 < 1.0) {
+                    // t1 < 0.0 < t2 < 1.0
+                    part = inner(v1, sec.p2) + outer(sec.p2, v2);
+                }
+                else {
+                    // t1 < 0.0 < 1.0 < t2
+                    part = inner(v1, v2);
+                }
+            }
+            else if (sec.t1 < 1.0) {
+                if (sec.t2 < 1.0) {
+                    // 0.0 < t1 < t2 < 1.0
+                    part = outer(v1, sec.p1) + inner(sec.p1, sec.p2) + outer(sec.p2, v2);
+                }
+                else {
+                    // 0.0 < t1 < 1.0 < t2
+                    part = outer(v1, sec.p1) + inner(sec.p1, v2);
+                }
+            }
+            else {
+                // 1.0 < t1 < t2
+                part = outer(v1, v2);
+            }
+        }
+        else {
+            // Нет пересечений
+            part = outer(v1, v2);
+        }
+
+        res += 0.5 * part;
+    }
+    return res;
+}
+
+Vector3d Polygon::disk_clip_normal(const Vector3d& c, double R) const {
+    // Ищем точку снаружи
+    int out_idx = 0;
+    while (out_idx < size() && (vs[out_idx] - c).norm() < R) {
+        ++out_idx;
+    }
+
+    // Все точки внутри
+    if (out_idx == size()) {
+        return Vector3d::Zero();
+    }
+
+    // Ищем пересечения
+    std::vector<Vector3d> inout;
+    for (int i = out_idx; i < out_idx + size(); ++i) {
+        const auto &v1 = vs[i % size()];
+        const auto &v2 = vs[(i + 1) % size()];
+
+        circle_segment_intersection sec(v1, v2, c, R);
+
+        if (sec.exist) {
+            if (0.0 <= sec.t1 && sec.t1 < 1.0) {
+                inout.push_back(sec.p1);
+            }
+            if (0.0 <= sec.t2 && sec.t2 < 1.0) {
+                inout.push_back(sec.p2);
+            }
+        }
+    }
+
+    // Нет пересечений
+    if (inout.empty()) {
+        return Vector3d::Zero();
+    }
+
+    inout.insert(inout.begin(), inout.back());
+    inout.pop_back();
+
+    if (inout.size() % 2 != 0) {
+        //throw std::runtime_error("Something is wrong");
+    }
+
+    double phi = 0.0;
+    double max_delta = 0.0;
+    for (int i = 0; i < size() / 2; i += 2) {
+        Vector3d &v1 = inout[2 * i];
+        Vector3d &v2 = inout[2 * i + 1];
+
+        double dphi = angle(c, v1, v2);
+        bool wide = cross(c, v1, v2) < 0.0;
+
+        if (wide) {
+            dphi += 2.0 * M_PI;
+        }
+
+        if (dphi > max_delta) {
+            max_delta = dphi;
+            phi = angle_avg(c, v1, v2);
+
+            if (wide) {
+                phi += M_PI;
+            }
+        }
+    }
+
+    return {std::cos(phi), std::sin(phi), 0.0};
+}
+
+std::ostream& operator<<(std::ostream& os, const Polygon& poly) {
+    if (poly.empty()) {
+        os << "{ }";
+        return os;
+    }
+
+    os << std::scientific << std::setprecision(6);
+
+    os << "{\n";
+    for (int i = 0; i < poly.size() - 1; ++i) {
+        os << "    { " << poly[i].x() << ", " << poly[i].y() << ", " << poly[i].z() << " },\n";
+    }
+    Vector3d last = poly[poly.size() - 1];
+    os << "    { " << last.x() << ", " << last.y() << ", " << last.z() << " }\n";
+    os << "};";
+    return os;
 }
 
 } // namespace zephyr::geom

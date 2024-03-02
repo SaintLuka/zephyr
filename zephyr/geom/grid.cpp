@@ -508,11 +508,10 @@ AmrCell Grid::amr_cell(int idx) const {
 
         std::vector<GNode::Ptr> nodes(n_nodes, nullptr);
 
-        geom::PolygonD poly(n_nodes);
-
+        Polygon poly(n_nodes);
         for (int i = 0; i < n_nodes; ++i) {
             nodes[i] = m_nodes[gcell.node(i).index];
-            poly[i]  = nodes[i]->v;
+            poly.set(i, nodes[i]->v);
         }
 
         AmrCell cell(poly);
@@ -556,11 +555,10 @@ MovCell Grid::mov_cell(int idx) const {
 
         std::vector<GNode::Ptr> nodes(n_nodes, nullptr);
 
-        geom::PolygonD poly(n_nodes);
-
+        geom::Polygon poly(n_nodes);
         for (int i = 0; i < n_nodes; ++i) {
             nodes[i] = m_nodes[gcell.node(i).index];
-            poly[i]  = nodes[i]->v;
+            poly.set(i, nodes[i]->v);
         }
 
         MovCell cell(poly);

@@ -7,6 +7,7 @@ set(ZEPHYR_UTILS_SRC
 
 install(FILES
     error_list.h
+    matplotlib.h
     mpi.h
     threads.h
     range.h
