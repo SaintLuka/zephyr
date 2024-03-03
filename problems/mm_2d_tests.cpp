@@ -280,6 +280,9 @@ void Bubble2D(int n_cells = 20, int acc = 2, const std::string &filename = "outp
     stats.reserve(10 * n_writes);
     Stopwatch timer(false), set_flags(false), refine(false);
     while (time <= 1.01 * max_time) {
+        if (std::abs(time / max_time - 0.5) < 0.05) {
+            pvd.save(mesh, time);
+        }
         if (time >= next_write) {
             std::cout << "progress: " << std::fixed << std::setprecision(1) << 100 * time / max_time << "%\n";
             pvd.save(mesh, time);
@@ -578,8 +581,8 @@ int main() {
     threads::on();
 
 //    KelvinHelmholtzInstability(2, "output_kelvin_3");
-    Bubble2D(15, 2, "output_bubble_5");
-    Bubble2DStatic(500, 2, "output_bubble_static");
+    Bubble2D(20, 2, "output_bubble_5");
+    Bubble2DStatic(640, 2, "output_bubble_static");
 //    AirWithSF62D(46, 2, "sf6");
 
     threads::off();

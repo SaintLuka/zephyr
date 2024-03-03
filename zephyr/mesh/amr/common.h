@@ -24,6 +24,11 @@ namespace zephyr::mesh::amr {
 
 using namespace zephyr::geom;
 
+#ifdef CHECK_PERFORMANCE
+/// @brief Частота вывода сообщений о производительности
+static const size_t check_frequency = 100;
+#endif
+
 /// @brief Локальные индексы ячеек, прилегающих к стороне.
 template<int dim>
 inline constexpr std::array<std::array<int, VpF(dim)>, FpC(dim)> get_children_by_side();
