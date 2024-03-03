@@ -95,14 +95,26 @@ public:
 
     /// @brief Ссылка на данные ячейки
     template<class U>
-    U& operator()(const U &) {
+    inline U& operator()(const U &) {
         return *reinterpret_cast<U *>(m_it->data());
     }
 
     /// @brief Ссылка на данные ячейки
     template<class U>
-    const U& operator()(const U &) const {
+    inline const U& operator()(const U &) const {
         return *reinterpret_cast<const U *>(m_it->data());
+    }
+
+    /// @brief Ссылка на конкретные данные ячейки
+    template<class T>
+    inline T& operator()(const VarExtra<T> & var) {
+        return *reinterpret_cast<T *>(m_it->data() + var.offset);
+    }
+
+    /// @brief Ссылка на конкретные данные ячейки
+    template<class T>
+    inline const T& operator()(const VarExtra<T> & var) const {
+        return *reinterpret_cast<const T *>(m_it->data() + var.offset);
     }
 
     /// @brief Ссылка на геометрию ячейки

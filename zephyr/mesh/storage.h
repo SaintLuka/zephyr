@@ -8,6 +8,13 @@ namespace zephyr::mesh {
 
 using Byte = unsigned char;
 
+/// @brief Вспомогательный тип для
+/// точечного извлечения данных из Storage
+template <typename T>
+struct VarExtra {
+    int offset;
+};
+
 /// @class Хранилище для расчетных элементов. Каждый элемент хранилища
 /// содержит геометрию + данные элемента (расчетные величины).
 /// Используется три типа геометрии: AmrCell, BCell и BNode.
@@ -142,8 +149,20 @@ public:
 
         /// @brief Разыменовать данные элемента как тип U.
         template<class U>
-        U& operator()(const U &) {
+        inline U& operator()(const U &) {
             return *reinterpret_cast<U *>(data());
+        }
+
+        /// @brief Извлечь данные элемента
+        template<class T>
+        inline const T& operator()(const VarExtra<T> & var) const {
+            return *reinterpret_cast<const T *>(data() + var.offset);
+        }
+
+        /// @brief Извлечь данные элемента
+        template<class T>
+        inline T& operator()(const VarExtra<T> & var) {
+            return *reinterpret_cast<T *>(data() + var.offset);
         }
     };
 

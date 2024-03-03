@@ -17,7 +17,11 @@ Transfer::State Transfer::datatype() {
     return {};
 }
 
-Transfer::Transfer() {
+Transfer::Transfer()
+    : interface{offsetof(State, u1),
+                offsetof(State, n),
+                offsetof(State, p)} {
+
     m_dt  = 1.0e+300;
     m_CFL = 0.5;
     m_ver = 1;
@@ -186,14 +190,14 @@ double flux_VOF(
 
     auto& poly = poly4;
 
-    if (a < 1.0e-6) {
+    if (a < 1.0e-8) {
         // Маленькую часть отправляем по нормали
         if (Vn.squaredNorm() > Vt.squaredNorm())
             return a * poly.area();
         else {
             return 0.0;
         }
-    } else if (a > 1.0 - 1.0e-6) {
+    } else if (a > 1.0 - 1.0e-8) {
         // От полной ячейки отрезаем весь кусок
         return poly.area();
     }
@@ -391,105 +395,8 @@ void Transfer::update_ver3(EuMesh& mesh) {
     update_dir();
 }
 
-// Производная по теореме Гаусса--Остроградского
-void Transfer::compute_normal(EuCell& cell) {
-    double uc = cell(U).u1;
-
-    if (uc < 1.0e-8 || uc > 1.0 - 1.0e-8) {
-        cell(U).n = Vector3d::Zero();
-        return;
-    }
-
-    Vector3d n = Vector3d::Zero();
-    for (auto &face: cell.faces()) {
-        if (face.is_boundary()) {
-            continue;
-        }
-
-        double un = face.neib(U).u1;
-
-        Vector3d S = 0.5 * face.normal() * face.area();
-        n -= (uc + un) * S;
-    }
-
-    cell(U).n = n.normalized();
-}
-
-void Transfer::compute_normals(EuMesh &mesh) {
-    threads::for_each(
-            mesh.begin(), mesh.end(),
-            &Transfer::compute_normal);
-}
-
-void Transfer::find_section(EuCell &cell) {
-    if (is_zero(cell(U).n)) {
-        cell(U).p = cell.center();
-    } else {
-        auto poly = cell.polygon();
-        cell(U).p = poly.find_section(cell(U).n, cell(U).u1);
-    }
-}
-
-void Transfer::find_sections(EuMesh& mesh) {
-    threads::for_each(
-            mesh.begin(), mesh.end(),
-            &Transfer::find_section);
-}
-
-void Transfer::adjust_normal(EuCell& cell) {
-    if (is_zero(cell(U).n)) {
-        return;
-    }
-
-    obj::plane plane{cell(U).p, cell(U).n};
-
-    std::vector<Vector3d> ints;
-    for (auto face: cell.faces()) {
-        obj::segment seg{face.vs(0), face.vs(1)};
-
-        if (intersection2D::exist(plane, seg)) {
-            if (is_zero(face.neib(U).n)) {
-                if (plane.n.dot(seg.tau()) * (face.neib(U).u1 - 0.5) > 0.0) {
-                    ints.emplace_back(seg.get(1.001));
-                }
-                else {
-                    ints.emplace_back(seg.get(-0.001));
-                }
-            }
-            else {
-                Vector3d pn = face.neib(U).p;
-                Vector3d vi = intersection2D::find_fast(
-                        obj::segment{plane.p, pn}, seg);
-                ints.emplace_back(vi);
-            }
-        }
-    }
-
-    if (ints.size() > 1) {
-        Vector3d n2 = {ints[0].y() - ints[1].y(),
-                       ints[1].x() - ints[0].x(), 0.0};
-
-        if (plane.n.dot(n2) < 0.0) {
-            n2 *= -1.0;
-        }
-
-        cell(U).n = n2.normalized();
-    }
-}
-
-void Transfer::adjust_normals(EuMesh& mesh) {
-    threads::for_each(
-            mesh.begin(), mesh.end(),
-            &Transfer::adjust_normal);
-}
-
 void Transfer::update_interface(EuMesh& mesh, int smoothing) {
-    compute_normals(mesh);
-    find_sections(mesh);
-    for (int i = 0; i < smoothing; ++i) {
-        adjust_normals(mesh);
-        find_sections(mesh);
-    }
+    interface.update(mesh, smoothing);
 }
 
 void Transfer::set_flags(EuMesh& mesh) {
@@ -538,34 +445,7 @@ Distributor Transfer::distributor() const {
 }
 
 AmrStorage Transfer::body(EuMesh& mesh) {
-    int count = 0;
-    for (auto cell: mesh) {
-        if (cell(U).u1 < 1.0e-6) {
-            continue;
-        }
-        ++count;
-    }
-
-    AmrStorage cells(U, count);
-
-    count = 0;
-    for (auto cell: mesh) {
-        if (cell(U).u1 < 1.0e-6) {
-            continue;
-        }
-
-        if (cell(U).u1 < 1.0 - 1.0e-6) {
-            auto poly = cell.polygon();
-            auto part = poly.clip(cell(U).p, cell(U).n);
-            cells[count] = AmrCell(part);
-        }
-        else {
-            cells[count] = cell.geom();
-        }
-        ++count;
-    }
-
-    return cells;
+    return interface.body(mesh);
 }
 
 AmrStorage Transfer::scheme(EuMesh& mesh) {

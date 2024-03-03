@@ -1,8 +1,9 @@
 #pragma once
 
 #include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/geom/interface_recovery.h>
 
-namespace zephyr { namespace math {
+namespace zephyr::math {
 
 using zephyr::mesh::EuCell;
 using zephyr::mesh::EuMesh;
@@ -10,6 +11,8 @@ using zephyr::mesh::AmrStorage;
 using zephyr::mesh::Distributor;
 using zephyr::geom::Vector3d;
 using zephyr::geom::Direction;
+using zephyr::geom::InterfaceRecovery;
+
 
 /// @brief Класс для моделирования уравнения переноса с аналогом CRP.
 class Transfer {
@@ -79,22 +82,6 @@ protected:
     double compute_dt(EuMesh& mesh);
 
 
-    /// @brief Оценка нормали по производным объемной доли
-    static void compute_normal(EuCell& cell);
-
-    static void compute_normals(EuMesh& mesh);
-
-    /// @brief Найти сечение ячейки по существующим нормалям
-    static void find_section(EuCell& cell);
-
-    static void find_sections(EuMesh& mesh);
-
-    /// @brief Поправить нормали с учетом соседей
-    static void adjust_normal(EuCell& cell);
-
-    static void adjust_normals(EuMesh& mesh);
-
-
     void update_ver1(EuMesh& mesh);
 
     void update_ver2(EuMesh& mesh);
@@ -117,7 +104,8 @@ protected:
     double m_CFL;     ///< Число Куранта
     int    m_ver;     ///< Версия функции update
     Direction m_dir;  ///< Направление на текущем шаге
+
+    InterfaceRecovery interface; ///< Реконструкция границы
 };
 
-} // namespace math
-} // namespace zephyr
+} // namespace zephyr::math
