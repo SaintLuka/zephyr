@@ -1,5 +1,8 @@
 #include <zephyr/math/solver/riemann.h>
 #include <zephyr/math/cfd/flux/godunov.h>
+#include <zephyr/math/cfd/flux/rusanov.h>
+#include <iostream>
+#include <boost/format.hpp>
 
 namespace zephyr::math {
 
@@ -28,25 +31,51 @@ smf::Flux Godunov::flux(const smf::PState &zL, const smf::PState &zR, const Eos 
 }
 
 mmf::Flux Godunov::calc_mm_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) {
+    if (zL.is_bad()) {
+        std::cerr << "Bad left state in input of Godunov flux:" << zL << "\n";
+        throw std::runtime_error("bad left state");
+    }
+    if (zR.is_bad()) {
+        std::cerr << "Bad right state in input of Godunov flux:" << zR << "\n";
+        throw std::runtime_error("bad right state");
+    }
+
     auto sol = RiemannSolver::solve(zL.to_smf(), zR.to_smf(),
                                     mixture.stiffened_gas(zL.density, zL.pressure, zL.mass_frac),
                                     mixture.stiffened_gas(zR.density, zR.pressure, zR.mass_frac));
 
+    mmf::Flux flux;
     if (sol.U >= 0) {
         Vector3d v(sol.U, zL.velocity.y(), zL.velocity.z());
         double energy = mixture.energy_rp(sol.rho, sol.P, zL.mass_frac, {.T0=zL.temperature});
         double temperature = mixture.temperature_rp(sol.rho, sol.P, zL.mass_frac, {.T0=zL.temperature});
         mmf::PState z(sol.rho, v, sol.P, energy, temperature, zL.mass_frac);
 
-        return mmf::Flux(z);
+        flux = mmf::Flux(z);
     } else {
         Vector3d v(sol.U, zR.velocity.y(), zR.velocity.z());
         double energy = mixture.energy_rp(sol.rho, sol.P, zR.mass_frac, {.T0=zR.temperature});
         double temperature = mixture.temperature_rp(sol.rho, sol.P, zR.mass_frac, {.T0=zR.temperature});
         mmf::PState z(sol.rho, v, sol.P, energy, temperature, zR.mass_frac);
 
-        return mmf::Flux(z);
+        flux = mmf::Flux(z);
     }
+
+    if (flux.is_bad()) {
+        std::cerr << "calc Godunov flux\n";
+        std::cerr << "zL: " << zL << "\nzR: " << zR << "\n";
+        std::cerr << "Flux: " << flux << "\n";
+        std::cerr << "Code for debug:\n";
+        std::cerr << boost::format("PState zL(%1%, {%2%, %3%, %4%}, %5%, %6%, %7%, %8%);\n") %
+                     zL.density % zL.velocity.x() % zL.velocity.y() % zL.velocity.z() % zL.pressure %
+                     zL.energy % zL.temperature % zL.mass_frac;
+        std::cerr << boost::format("PState zR(%1%, {%2%, %3%, %4%}, %5%, %6%, %7%, %8%);\n") %
+                     zR.density % zR.velocity.x() % zR.velocity.y() % zR.velocity.z() % zR.pressure %
+                     zR.energy % zR.temperature % zR.mass_frac;
+        throw std::runtime_error("Bad Godunov flux");
+    }
+
+    return flux;
 }
 
 mmf::Flux Godunov::mm_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) const {

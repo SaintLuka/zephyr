@@ -2,6 +2,7 @@
 
 #include <zephyr/geom/vector.h>
 #include <zephyr/math/cfd/flux/rusanov.h>
+#include <boost/format.hpp>
 
 namespace zephyr::math {
 
@@ -66,6 +67,10 @@ smf::Flux Rusanov2::calc_flux(const smf::PState &zL, const smf::PState &zR, cons
 }
 
 mmf::Flux Rusanov2::mm_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) const {
+    return calc_mm_flux(zL, zR, mixture);
+}
+
+mmf::Flux Rusanov2::calc_mm_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) {
     using namespace mmf;
 
     double rho1 = zL.density, rho2 = zR.density;
@@ -84,9 +89,23 @@ mmf::Flux Rusanov2::mm_flux(const mmf::PState &zL, const mmf::PState &zR, const 
     Flux fL(zL);   // Дифференциальный поток слева
     Flux fR(zR);   // Дифференциальный поток справа
 
-    Flux res = 0.5 * (fL.vec() + fR.vec()) + 0.5 * max_lambda * (qL.vec() - qR.vec());
+    Flux flux = 0.5 * (fL.vec() + fR.vec()) + 0.5 * max_lambda * (qL.vec() - qR.vec());
 
-    return res;
+    if(flux.is_bad()){
+        std::cerr << "calc Rusanov2 flux\n";
+        std::cerr << "zL: " << zL << "\nzR: " << zR << "\n";
+        std::cerr << "Flux: " << flux << "\n";
+        std::cerr << "Code for debug:\n";
+        std::cerr << boost::format("PState zL(%1%, {%2%, %3%, %4%}, %5%, %6%, %7%, %8%);\n") %
+                     zL.density % zL.velocity.x() % zL.velocity.y() % zL.velocity.z() % zL.pressure %
+                     zL.energy % zL.temperature % zL.mass_frac;
+        std::cerr << boost::format("PState zR(%1%, {%2%, %3%, %4%}, %5%, %6%, %7%, %8%);\n") %
+                     zR.density % zR.velocity.x() % zR.velocity.y() % zR.velocity.z() % zR.pressure %
+                     zR.energy % zR.temperature % zR.mass_frac;
+        throw std::runtime_error("Bad Godunov flux");
+    }
+
+    return flux;
 }
 
 

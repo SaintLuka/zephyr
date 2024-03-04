@@ -97,9 +97,13 @@ void EuMesh::refine() {
     full.stop();
 
 #if CHECK_PERFORMANCE
-    std::cout << "  Balance steps elapsed: " << std::setw(10) << balance.milliseconds() << " ms\n";
-    std::cout << "  Apply steps elapsed:   " << std::setw(10) << apply.milliseconds() << " ms\n";
-    std::cout << "Refine steps elapsed:    " << std::setw(10) << full.milliseconds() << " ms\n";
+    static size_t counter = 0;
+    if (counter % amr::check_frequency == 0) {
+        std::cout << "  Balance steps elapsed: " << std::setw(10) << balance.milliseconds() << " ms\n";
+        std::cout << "  Apply steps elapsed:   " << std::setw(10) << apply.milliseconds() << " ms\n";
+        std::cout << "Refine steps elapsed:    " << std::setw(10) << full.milliseconds() << " ms\n";
+    }
+    ++counter;
 #endif
 }
 

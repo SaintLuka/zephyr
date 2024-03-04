@@ -2,12 +2,12 @@
 .idea/*
 cmake-build-*
 /bin/
+output*
 /output*/
 *__pycache__*
 /build/
 /.vscode/
-/python/SodTest/
-/python/ToroTest*/
+plan.md
 diplom
 /diplom/*
 *.aux

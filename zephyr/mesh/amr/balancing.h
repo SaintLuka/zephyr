@@ -280,9 +280,13 @@ void balance_flags(AmrStorage &locals, AmrStorage& aliens, int max_level) {
     flag_balancing_timer.stop();
 
 #if CHECK_PERFORMANCE
-    std::cout << "    Restrictions elapsed:   " << std::setw(10) << base_restrictions_timer.milliseconds() << " ms\n";
-    std::cout << "    Setup vicinity elapsed: " << std::setw(10) << setup_vicinity_timer.milliseconds() << " ms\n";
-    std::cout << "    Flag balancing elapsed: " << std::setw(10) << flag_balancing_timer.milliseconds() << " ms\n";
+    static size_t counter = 0;
+    if (counter % amr::check_frequency == 0) {
+        std::cout << "    Restrictions elapsed:   " << std::setw(10) << base_restrictions_timer.milliseconds() << " ms\n";
+        std::cout << "    Setup vicinity elapsed: " << std::setw(10) << setup_vicinity_timer.milliseconds() << " ms\n";
+        std::cout << "    Flag balancing elapsed: " << std::setw(10) << flag_balancing_timer.milliseconds() << " ms\n";
+    }
+    ++counter;
 #endif
 }
 
@@ -348,9 +352,13 @@ void balance_flags(
     round_timer.stop();
 
 #if CHECK_PERFORMANCE
-    std::cout << "    Restriction elapsed: " << restriction_timer.wall() << "\n";
-    std::cout << "    Setup around elapsed: " << setup_around_timer.times().wall() << "\n";
-    std::cout << "    Round elapsed: " << round_timer.times().wall() << "\n";
+    static size_t counter = 0;
+    if (counter % amr::check_frequency == 0) {
+        std::cout << "    Restriction elapsed: " << restriction_timer.wall() << "\n";
+        std::cout << "    Setup around elapsed: " << setup_around_timer.times().wall() << "\n";
+        std::cout << "    Round elapsed: " << round_timer.times().wall() << "\n";
+    }
+    ++counter;
 #endif
 }
 

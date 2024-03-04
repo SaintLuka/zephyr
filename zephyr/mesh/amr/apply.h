@@ -88,12 +88,16 @@ void apply(AmrStorage &cells, const Distributor& op) {
     //sort_timer.stop();
 
 #if CHECK_PERFORMANCE
-    std::cout << "    Statistics elapsed:  " << std::setw(10) << count_timer.milliseconds() << " ms\n";
-    std::cout << "    Positions elapsed:   " << std::setw(10) << positions_timer.milliseconds() << " ms\n";
-    std::cout << "    Geometry elapsed:    " << std::setw(10) << geometry_timer.milliseconds() << " ms\n";
-    std::cout << "    Connections elapsed: " << std::setw(10) << connections_timer.milliseconds() << " ms\n";
-    std::cout << "    Clean elapsed:       " << std::setw(10) << clean_timer.milliseconds() << " ms\n";
-    std::cout << "    Sorting elapsed:     " << std::setw(10) << sort_timer.milliseconds() << " ms\n";
+    static size_t counter = 0;
+    if (counter % amr::check_frequency == 0) {
+        std::cout << "    Statistics elapsed:  " << std::setw(10) << count_timer.milliseconds() << " ms\n";
+        std::cout << "    Positions elapsed:   " << std::setw(10) << positions_timer.milliseconds() << " ms\n";
+        std::cout << "    Geometry elapsed:    " << std::setw(10) << geometry_timer.milliseconds() << " ms\n";
+        std::cout << "    Connections elapsed: " << std::setw(10) << connections_timer.milliseconds() << " ms\n";
+        std::cout << "    Clean elapsed:       " << std::setw(10) << clean_timer.milliseconds() << " ms\n";
+        std::cout << "    Sorting elapsed:     " << std::setw(10) << sort_timer.milliseconds() << " ms\n";
+    }
+    ++counter;
 #endif
 }
 
@@ -186,12 +190,16 @@ void apply(
     link_timer.stop();
 
 #if CHECK_PERFORMANCE
-    std::cout << "    Statistics elapsed: " << count_timer.times().wall() << "\n";
-    std::cout << "    Positions elapsed: " << positions_timer.times().wall() << "\n";
-    std::cout << "    Geometry elapsed: " << geometry_timer.times().wall() << "\n";
-    std::cout << "    Connections elapsed: " << connections_timer.times().wall() << "\n";
-    std::cout << "    Clean elapsed: " << clean_timer.times().wall() << "\n";
-    std::cout << "    Sorting elapsed: " << sort_timer.times().wall() << "\n";
+    static size_t counter = 0;
+    if (counter % amr::check_frequency == 0) {
+        std::cout << "    Statistics elapsed: " << count_timer.times().wall() << "\n";
+        std::cout << "    Positions elapsed: " << positions_timer.times().wall() << "\n";
+        std::cout << "    Geometry elapsed: " << geometry_timer.times().wall() << "\n";
+        std::cout << "    Connections elapsed: " << connections_timer.times().wall() << "\n";
+        std::cout << "    Clean elapsed: " << clean_timer.times().wall() << "\n";
+        std::cout << "    Sorting elapsed: " << sort_timer.times().wall() << "\n";
+    }
+    ++counter;
 #endif
 }
 

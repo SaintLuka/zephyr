@@ -129,28 +129,6 @@ namespace mmf {
 
 PState::PState() : density(0), velocity(0, 0, 0), pressure(0), temperature(0), energy(0), mass_frac() {}
 
-PState::PState(const double &pressure, const double &temperature,
-               const Vector3d &velocity, const std::vector<Component> &components) :
-        pressure(pressure), temperature(temperature), velocity(velocity) {
-    if (components.size() > Fractions::max_size) {
-        throw std::runtime_error("When construct PState got components.size() > Fractions::max_size (" +
-                                 std::to_string(components.size()) + " > " + std::to_string(Fractions::max_size));
-    }
-
-    std::vector<double> fracs(components.size());
-    density = 0;
-    for (size_t i = 0; i < components.size(); ++i) {
-        fracs[i] = components[i].frac;
-    }
-    mass_frac = Fractions(fracs);
-
-    energy = 0;
-    for (size_t i = 0; i < components.size(); ++i) {
-        density += mass_frac[i] * components[i].density;
-        energy += mass_frac[i] * components[i].energy;
-    }
-}
-
 PState::PState(const double &density, const Vector3d &velocity,
                const double &pressure, const double &energy, const double &temperature, const Fractions &mass_frac)
         : density(density), velocity(velocity),
@@ -162,7 +140,7 @@ PState::PState(const QState &q, const phys::Materials &mixture, double P0, doubl
     density = q.mass;
     velocity = q.momentum / density;
     energy = q.energy / density - 0.5 * velocity.squaredNorm();
-    pressure = mixture.pressure_re(density, energy, mass_frac, {.P0=P0});
+    pressure = mixture.pressure_re(density, energy, mass_frac, {.P0=P0, .T0=T0});
     temperature = mixture.temperature_rp(density, pressure, mass_frac, {.T0=T0});
 }
 
@@ -225,7 +203,7 @@ bool PState::is_bad() const {
            std::isinf(energy) || std::isnan(energy) ||
            std::isinf(temperature) || std::isnan(temperature) ||
            mass_frac.empty() ||
-           density < 0 || pressure < 0 || energy < 0 || temperature < 0;
+           density < 0 || energy < 0 || temperature < 0;
 }
 
 
@@ -316,6 +294,13 @@ std::ostream &operator<<(std::ostream &os, const Flux &flux) {
 Flux::Flux(double mass, const Vector3d &momentum, double energy,
            const FractionsFlux &mass_frac) : mass(mass), momentum(momentum), energy(energy), mass_frac(mass_frac) {}
 
+bool Flux::is_bad() const {
+    return std::isinf(mass) || std::isnan(mass) ||
+           std::isinf(momentum.x()) || std::isnan(momentum.x()) ||
+           std::isinf(momentum.y()) || std::isnan(momentum.y()) ||
+           std::isinf(momentum.z()) || std::isnan(momentum.z()) ||
+           std::isinf(energy) || std::isnan(energy);
+}
 
 } // namespace mmf
 

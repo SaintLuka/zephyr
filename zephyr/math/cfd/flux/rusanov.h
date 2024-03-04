@@ -41,6 +41,9 @@ public:
 
     [[nodiscard]] smf::Flux flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) const final;
 
+    /// @brief Поток как решение задачи о распаде разрыва
+    static mmf::Flux calc_mm_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture);
+
     mmf::Flux mm_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) const override;
 };
 

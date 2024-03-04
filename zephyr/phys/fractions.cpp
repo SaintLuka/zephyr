@@ -110,7 +110,7 @@ void Fractions::normalize() {
     double sum = 0.0;
     for (auto &v: m_data) {
         if (v < 0) {
-            if (-1e-11 < v)
+            if (-5e-3 < v)
                 v = 0;
             else {
                 std::cerr << *this;
@@ -123,6 +123,7 @@ void Fractions::normalize() {
     for (int i = 0; i < max_size; ++i) {
         m_data[i] /= sum;
     }
+    cutoff(1e-8);
 }
 
 void Fractions::cutoff(double eps) {
@@ -150,6 +151,16 @@ bool Fractions::empty() const {
 
 size_t Fractions::get_size() const {
     return max_size;
+}
+
+void Fractions::fix() {
+    for (auto &v: m_data)
+        if (v < 0)
+            v = 0;
+        else if (v > 1)
+            v = 1;
+
+    normalize();
 }
 
 std::ostream &operator<<(std::ostream &os, const Fractions &frac) {

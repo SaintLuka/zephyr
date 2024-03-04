@@ -1,5 +1,5 @@
 set(ZEPHYR_PYTHON_FILES
-        csv.py
+        #csv.py
         plot1D.py)
 
 file(COPY

@@ -9,7 +9,7 @@ namespace phys {
 
 using zephyr::geom::Vector3d;
 
-/// @class Набор тестов на распад разрыва из монографии Торо (глава 10)
+/// @class Набор тестов на распад разрыва из монографии Торо (глава 10) и (4.3.3 Numerical Tests)
 /// E.F. Toro. Riemann Solvers and Numerical Methods for Fluid Dynamics.
 class ToroTest : public ClassicTest {
 public:

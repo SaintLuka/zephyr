@@ -152,7 +152,7 @@ double Materials::temperature_rp(double rho, double P,
 dPdT Materials::volume_pt(double P, double T, const Fractions& beta) const {
     dPdT vol = {0.0, 0.0, 0.0};
     for (int i = 0; i < size(); ++i) {
-        if (beta.has(i)) {
+        if (beta.has(i) && P > m_materials[i]->min_pressure() + 1.0e-5) {
             auto v_i = m_materials[i]->volume_pt(P, T, {.deriv = true});
             vol.val += beta[i] * v_i.val;
             vol.dP  += beta[i] * v_i.dP;
@@ -165,7 +165,7 @@ dPdT Materials::volume_pt(double P, double T, const Fractions& beta) const {
 dPdT Materials::energy_pt(double P, double T, const Fractions& beta) const {
     dPdT eps = {0.0, 0.0, 0.0};
     for (int i = 0; i < size(); ++i) {
-        if (beta.has(i)) {
+        if (beta.has(i) && P > m_materials[i]->min_pressure() + 1.0e-5) {
             auto e_i = m_materials[i]->energy_pt(P, T, {.deriv = true});
             eps.val += beta[i] * e_i.val;
             eps.dP  += beta[i] * e_i.dP;
