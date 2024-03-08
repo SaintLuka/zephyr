@@ -2,16 +2,21 @@
 /// уровнем адаптации. Под большими областями понимаются области, которые имеют
 /// ту же меру размерности, что и сама область.
 
+#include <iomanip>
+
 #include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/geom/generator/rectangle.h>
+#include <zephyr/geom/polygon.h>
 #include <zephyr/io/pvd_file.h>
 #include <zephyr/io/variables.h>
+#include <zephyr/utils/stopwatch.h>
 
 using namespace zephyr;
 using namespace mesh;
 
 using generator::Rectangle;
 using zephyr::io::PvdFile;
+using zephyr::utils::Stopwatch;
 
 
 struct _U_ {
@@ -30,36 +35,17 @@ inline double sqr(double x) {
 
 /// @brief Пятиконечная звезда
 struct Star {
-    std::array<Vector3d, 10> vs;
     double R;
+    Polygon poly;
 
     /// @param R Радиус описаной окружности
-    explicit Star(double R) : R(R) {
-        std::fill(vs.begin(), vs.end(), Vector3d::Zero());
+    explicit Star(double R) : R(R), poly(10) {
         update(0.0);
     }
 
     /// @brief Точка внутри полигона?
-    bool is_inside(const Vector3d& v) const {
-        int counter = 0;
-
-        int n_points = int(vs.size());
-        for (int i = 0; i < n_points; ++i) {
-            int j = (i + 1) % n_points;
-
-            auto v1 = vs[i];
-            auto v2 = vs[j];
-            v1.y() -= v.y();
-            v2.y() -= v.y();
-            if (v1.y() * v2.y() < 0.0) {
-                double x = v1.x() - v1.y() * (v2.x() - v1.x()) / (v2.y() - v1.y());
-                if (x > v.x()) {
-                    ++counter;
-                }
-            }
-        }
-        // Нечетное число пересечений
-        return counter % 2 == 1;
+    bool inside(const Vector3d& v) const {
+        return poly.inside(v);
     }
 
     void update(double t) {
@@ -75,31 +61,24 @@ struct Star {
         double yc = xc * std::sin(xi);
 
         for (int i = 0; i < 10; i += 2) {
-            vs[i].x() = xc + R * std::cos(M_PI * i / 5.0 + phi);
-            vs[i].y() = yc + R * std::sin(M_PI * i / 5.0 + phi);
-            vs[i + 1].x() = xc + r * std::cos(M_PI * (i + 1) / 5.0 + phi);
-            vs[i + 1].y() = yc + r * std::sin(M_PI * (i + 1) / 5.0 + phi);
+            Vector3d v1 = {xc + R * std::cos(M_PI * i / 5.0 + phi),
+                           yc + R * std::sin(M_PI * i / 5.0 + phi), 0.0};
+
+            Vector3d v2 = {xc + r * std::cos(M_PI * (i + 1) / 5.0 + phi),
+                           yc + r * std::sin(M_PI * (i + 1) / 5.0 + phi), 0.0};
+
+            poly.set(i, v1);
+            poly.set(i + 1, v2);
         }
     }
 };
 
-int solution_step(EuMesh& mesh, Star& star) {
-    for (auto cell: mesh) {
-        cell(U).bit = star.is_inside(cell.center());
-    }
+void set_index(EuCell& cell, Star& star) {
+    cell(U).bit = star.inside(cell.center());
+}
 
-    for (auto& cell: mesh) {
-        if (cell(U).bit > 0) {
-            cell.set_flag(1);
-        }
-        else {
-            cell.set_flag(-1);
-        }
-    }
-
-    mesh.refine();
-
-    return mesh.check_refined();
+void set_flag(EuCell& cell) {
+    cell.set_flag(cell(U).bit > 0 ? 1 : -1);
 }
 
 int main() {
@@ -110,7 +89,7 @@ int main() {
     pvd.variables += { "bit", get_bit };
 
     Rectangle rect(-2.0, 2.0, -1.0, 1.0);
-    rect.set_nx(20);
+    rect.set_nx(50);
 
     EuMesh mesh(U, &rect);
 
@@ -126,23 +105,70 @@ int main() {
     Star star(0.5);
 
     // Начальная адаптация
-    std::cout << "Начальная адапция\n";
+    std::cout << "Init refinement\n";
     for (int lvl = 0; lvl < mesh.max_level() + 4; ++lvl) {
-        std::cout << "  Уровень " << lvl << "\n";
-        solution_step(mesh, star);
+        std::cout << "  Level " << lvl << "\n";
+        mesh.for_each(set_index, star);
+        mesh.for_each(set_flag);
+        mesh.refine();
     }
 
-    std::cout << "\nРасчет\n";
+    Stopwatch elapsed;
+    Stopwatch sw_write;
+    Stopwatch sw_star;
+    Stopwatch sw_set_index;
+    Stopwatch sw_set_flags;
+    Stopwatch sw_refine;
+
+    std::cout << "\nRUN\n";
+    elapsed.resume();
     for (int step = 0; step < 1000; ++step) {
-        if (step % 10 == 0) {
-            std::cout << "  Шаг " << step << " / 1000\n";
+        sw_write.resume();
+        if (step % 20 == 0) {
+            std::cout << "  Step " << std::setw(4) << step << " / 1000\n";
             pvd.save(mesh, step);
         }
+        sw_write.stop();
 
+        sw_star.resume();
         star.update(step / 1000.0);
+        sw_star.stop();
 
-        solution_step(mesh, star);
+        sw_set_index.resume();
+        mesh.for_each(set_index, star);
+        sw_set_index.stop();
+
+        sw_set_flags.resume();
+        mesh.for_each(set_flag);
+        sw_set_flags.stop();
+
+        sw_refine.resume();
+        mesh.refine();
+        sw_refine.stop();
+
+        //if (mesh.check_refined() < 0) {
+        //    throw std::runtime_error("Bad mesh");
+        //}
     }
+    elapsed.stop();
+
+    std::cout << "\nElapsed:       " << elapsed.extended_time()
+              << " ( " << elapsed.milliseconds() << " ms)\n";
+
+    std::cout << "  Write:       " << sw_write.extended_time()
+              << " ( " << sw_write.milliseconds() << " ms)\n";
+
+    std::cout << "  Update star: " << sw_star.extended_time()
+              << " ( " << sw_star.milliseconds() << " ms)\n";
+
+    std::cout << "  Set index:   " << sw_set_index.extended_time()
+              << " ( " << sw_set_index.milliseconds() << " ms)\n";
+
+    std::cout << "  Set flags:   " << sw_set_flags.extended_time()
+              << " ( " << sw_set_flags.milliseconds() << " ms)\n";
+
+    std::cout << "  Refine:      " << sw_refine.extended_time()
+              << " ( " << sw_refine.milliseconds() << " ms)\n";
 
     return 0;
 }

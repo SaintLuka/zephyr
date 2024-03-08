@@ -322,9 +322,9 @@ void Bubble2D(int n_cells = 20, int acc = 2, const std::string &filename = "outp
         time = solver.get_time();
     }
 
-    std::cout << "Update seconds elapsed: " << timer.seconds() << '\n';
-    std::cout << "Set flags seconds elapsed: " << set_flags.seconds() << '\n';
-    std::cout << "Refine seconds elapsed: " << refine.seconds() << '\n';
+    std::cout << "Update seconds elapsed: " << timer.milliseconds() << " ms\n";
+    std::cout << "Set flags seconds elapsed: " << set_flags.milliseconds() << " ms \n";
+    std::cout << "Refine seconds elapsed: " << refine.milliseconds() << " ms \n";
     // Update seconds elapsed: 23
     // Set flags seconds elapsed: 5
     // Refine seconds elapsed: 108
@@ -582,10 +582,8 @@ int main() {
 
 //    KelvinHelmholtzInstability(2, "output_kelvin_3");
     Bubble2D(20, 2, "output_bubble_5");
-    Bubble2DStatic(640, 2, "output_bubble_static");
+    //Bubble2DStatic(640, 2, "output_bubble_static");
 //    AirWithSF62D(46, 2, "sf6");
-
-    threads::off();
 
     return 0;
 }

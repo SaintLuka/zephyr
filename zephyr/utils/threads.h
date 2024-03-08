@@ -5,6 +5,12 @@
 
 namespace zephyr::utils {
 
+/// @brief Число задач на тред по умолчанию
+static const int default_n_tasks_per_thread = 10;
+
+/// @brief Минимальное число элементов на задачу по умолчанию
+static const int default_min_elements_per_task = 250;
+
 
 /// @brief Статический класс. Упрощенный интерфейс для многопоточности.
 class threads {
@@ -38,7 +44,9 @@ public:
     /// @details Целевая функция func в качестве аргументов принимает
     /// разыменованный итератор Iter и набор аргументов Args..., целевая
     /// функция может иметь возвращаемое значение, но оно игнорируется.
-    template<int n_tasks_per_thread = 10, class Iter, class Func, class... Args>
+    template<int n_tasks_per_thread = default_n_tasks_per_thread,
+            int min_elements_per_task = default_min_elements_per_task,
+            class Iter, class Func, class... Args>
     static void for_each(Iter begin, Iter end, Func &&func, Args &&... args);
 
     /// @brief Минимизировать результаты выполенения функции на диапазоне элементов
@@ -53,8 +61,10 @@ public:
     /// @details Целевая функция func в качестве аргументов принимает
     /// разыменованный итератор Iter (DeRef) и набор аргументов Args...,
     /// целевая функция должна возвращать значение типа Value.
-    template<int n_tasks_per_thread = 10, class Iter, class Func, class... Args,
-            class DeRef = decltype(*std::declval<Iter&>()),
+    template<int n_tasks_per_thread = default_n_tasks_per_thread,
+            int min_elements_per_task = default_min_elements_per_task,
+            class Iter, class Func, class... Args,
+            class DeRef = decltype(*std::declval<Iter &>()),
             class Value = typename std::result_of<Func(DeRef, Args...)>::type>
     static auto min(Iter begin, Iter end, const Value &init, Func &&func, Args &&... args)
     -> typename std::enable_if<!std::is_void<Value>::value, Value>::type;
@@ -70,12 +80,15 @@ public:
     /// @details Целевая функция func в качестве аргументов принимает
     /// разыменованный итератор Iter (DeRef) и набор аргументов Args...,
     /// целевая функция должна возвращать арифметический тип.
-    template<int n_tasks_per_thread = 10, class Iter, class Func, class... Args,
-            class DeRef = decltype(*std::declval<Iter&>()),
+    template<int n_tasks_per_thread = default_n_tasks_per_thread,
+            int min_elements_per_task = default_min_elements_per_task,
+            class Iter, class Func, class... Args,
+            class DeRef = decltype(*std::declval<Iter &>()),
             class Value = typename std::result_of<Func(DeRef, Args...)>::type>
     static auto min(Iter begin, Iter end, Func &&func, Args &&... args)
     -> typename std::enable_if<std::is_arithmetic<Value>::value, Value>::type {
-        return min<n_tasks_per_thread>(begin, end, std::numeric_limits<Value>::max(),
+        return min<n_tasks_per_thread, min_elements_per_task>(
+                begin, end, std::numeric_limits<Value>::max(),
                 std::forward<Func>(func), std::forward<Args>(args)...);
     }
 
@@ -91,8 +104,10 @@ public:
     /// @details Целевая функция func в качестве аргументов принимает
     /// разыменованный итератор Iter (DeRef) и набор аргументов Args...,
     /// целевая функция должна возвращать значение типа Value.
-    template<int n_tasks_per_thread = 10, class Iter, class Func, class... Args,
-            class DeRef = decltype(*std::declval<Iter&>()),
+    template<int n_tasks_per_thread = default_n_tasks_per_thread,
+            int min_elements_per_task = default_min_elements_per_task,
+            class Iter, class Func, class... Args,
+            class DeRef = decltype(*std::declval<Iter &>()),
             class Value = typename std::result_of<Func(DeRef, Args...)>::type>
     static auto max(Iter begin, Iter end, const Value &init, Func &&func, Args &&... args)
     -> typename std::enable_if<!std::is_void<Value>::value, Value>::type;
@@ -108,13 +123,16 @@ public:
     /// @details Целевая функция func в качестве аргументов принимает
     /// разыменованный итератор Iter (DeRef) и набор аргументов Args...,
     /// целевая функция должна возвращать арифметический тип.
-    template<int n_tasks_per_thread = 10, class Iter, class Func, class... Args,
-            class DeRef = decltype(*std::declval<Iter&>()),
+    template<int n_tasks_per_thread = default_n_tasks_per_thread,
+            int min_elements_per_task = default_min_elements_per_task,
+            class Iter, class Func, class... Args,
+            class DeRef = decltype(*std::declval<Iter &>()),
             class Value = typename std::result_of<Func(DeRef, Args...)>::type>
     static auto max(Iter begin, Iter end, Func &&func, Args &&... args)
     -> typename std::enable_if<std::is_arithmetic<Value>::value, Value>::type {
-        return max<n_tasks_per_thread>(begin, end, std::numeric_limits<Value>::lowest(),
-                                       std::forward<Func>(func), std::forward<Args>(args)...);
+        return max<n_tasks_per_thread, min_elements_per_task>(
+                begin, end, std::numeric_limits<Value>::lowest(),
+                std::forward<Func>(func), std::forward<Args>(args)...);
     }
 
     /// @brief Суммировать результаты выполенения функции на диапазоне элементов
@@ -131,8 +149,10 @@ public:
     /// целевая функция должна возвращать значение типа Value.
     /// @return Массив из частичных сумм (на каждом треде в отдельности), размер
     /// выходного массива будет равен n_threads * n_tasks_per_thread.
-    template<int n_tasks_per_thread = 10, class Iter, class Func, class... Args,
-            class DeRef = decltype(*std::declval<Iter&>()),
+    template<int n_tasks_per_thread = default_n_tasks_per_thread,
+            int min_elements_per_task = default_min_elements_per_task,
+            class Iter, class Func, class... Args,
+            class DeRef = decltype(*std::declval<Iter &>()),
             class Value = typename std::result_of<Func(DeRef, Args...)>::type>
     static auto partial_sum(Iter begin, Iter end, const Value &init, Func &&func, Args &&... args)
     -> typename std::enable_if<!std::is_void<Value>::value, std::vector<Value>>::type;
@@ -149,8 +169,10 @@ public:
     /// @details Целевая функция func в качестве аргументов принимает
     /// разыменованный итератор Iter (DeRef) и набор аргументов Args...,
     /// целевая функция должна возвращать значение типа Value.
-    template<int n_tasks_per_thread = 10, class Iter, class Func, class... Args,
-            class DeRef = decltype(*std::declval<Iter&>()),
+    template<int n_tasks_per_thread = default_n_tasks_per_thread,
+            int min_elements_per_task = default_min_elements_per_task,
+            class Iter, class Func, class... Args,
+            class DeRef = decltype(*std::declval<Iter &>()),
             class Value = typename std::result_of<Func(DeRef, Args...)>::type>
     static auto sum(Iter begin, Iter end, const Value &init, Func &&func, Args &&... args)
     -> typename std::enable_if<!std::is_void<Value>::value, Value>::type;
@@ -168,8 +190,10 @@ public:
     /// @details Целевая функция func в качестве аргументов принимает
     /// разыменованный итератор Iter (DeRef) и набор аргументов Args...,
     /// целевая функция должна возвращать значение типа Value.
-    template<int n_tasks_per_thread = 10, class Iter, class Func, class... Args,
-            class DeRef = decltype(*std::declval<Iter&>()),
+    template<int n_tasks_per_thread = default_n_tasks_per_thread,
+            int min_elements_per_task = default_min_elements_per_task,
+            class Iter, class Func, class... Args,
+            class DeRef = decltype(*std::declval<Iter &>()),
             class Value = typename std::result_of<Func(DeRef, Args...)>::type>
     static auto reduce(Iter begin, Iter end, const Value &init, Func &&func, Args &&... args)
     -> typename std::enable_if<!std::is_void<Value>::value, Value>::type;
@@ -182,9 +206,14 @@ public:
     static std::unique_ptr<ThreadPool> pool;
 };
 
+template<int n_tasks_per_thread, int min_elements_per_task>
+int get_n_tasks(int n_threads, int size) {
+    return std::max(1, std::min(n_tasks_per_thread * n_threads, size / min_elements_per_task));
+}
 
-template<int n_tasks_per_thread, class Iter, class Func, class ...Args>
-void threads::for_each(Iter begin, Iter end, Func&& func, Args&&... args) {
+template<int n_tpt, int min_ept,
+        class Iter, class Func, class ...Args>
+void threads::for_each(Iter begin, Iter end, Func &&func, Args &&... args) {
     auto bin_function =
             [&func, &args...](const Iter &a, const Iter &b) {
                 for (auto it = a; it < b; ++it) {
@@ -203,7 +232,7 @@ void threads::for_each(Iter begin, Iter end, Func&& func, Args&&... args) {
         return;
     }
 
-    int n_tasks = n_tasks_per_thread * n_threads;
+    int n_tasks = get_n_tasks<n_tpt, min_ept>(n_threads, size);
     int bin = size / n_tasks;
     std::vector<std::future<void>> results;
     results.reserve(n_tasks);
@@ -233,9 +262,10 @@ void threads::for_each(Iter begin, Iter end, Func&& func, Args&&... args) {
         result.wait();
 }
 
-template<int n_tasks_per_thread, class Iter, class Func, class ...Args, class DeRef, class Value>
-auto threads::min(Iter begin, Iter end, const Value& init, Func&& func, Args&&... args)
-    -> typename std::enable_if<!std::is_void<Value>::value, Value>::type {
+template<int n_tpt, int min_ept,
+        class Iter, class Func, class ...Args, class DeRef, class Value>
+auto threads::min(Iter begin, Iter end, const Value &init, Func &&func, Args &&... args)
+-> typename std::enable_if<!std::is_void<Value>::value, Value>::type {
     auto bin_function =
             [&init, &func, &args...](const Iter &a, const Iter &b) -> Value {
                 Value res(init);
@@ -259,7 +289,7 @@ auto threads::min(Iter begin, Iter end, const Value& init, Func&& func, Args&&..
         return bin_function(begin, end);
     }
 
-    int n_tasks = n_tasks_per_thread * n_threads;
+    int n_tasks = get_n_tasks<n_tpt, min_ept>(n_threads, size);
     int bin = size / n_tasks;
     std::vector<std::future<Value>> results;
     results.reserve(n_tasks);
@@ -282,8 +312,9 @@ auto threads::min(Iter begin, Iter end, const Value& init, Func&& func, Args&&..
     return res;
 }
 
-template<int n_tasks_per_thread, class Iter, class Func, class ...Args, class DeRef, class Value>
-auto threads::max(Iter begin, Iter end, const Value& init, Func&& func, Args&&... args)
+template<int n_tpt, int min_ept,
+        class Iter, class Func, class ...Args, class DeRef, class Value>
+auto threads::max(Iter begin, Iter end, const Value &init, Func &&func, Args &&... args)
 -> typename std::enable_if<!std::is_void<Value>::value, Value>::type {
     auto bin_function =
             [&init, &func, &args...](const Iter &a, const Iter &b) -> Value {
@@ -308,7 +339,7 @@ auto threads::max(Iter begin, Iter end, const Value& init, Func&& func, Args&&..
         return bin_function(begin, end);
     }
 
-    int n_tasks = n_tasks_per_thread * n_threads;
+    int n_tasks = get_n_tasks<n_tpt, min_ept>(n_threads, size);
     int bin = size / n_tasks;
     std::vector<std::future<Value>> results;
     results.reserve(n_tasks);
@@ -331,8 +362,9 @@ auto threads::max(Iter begin, Iter end, const Value& init, Func&& func, Args&&..
     return res;
 }
 
-template<int n_tasks_per_thread, class Iter, class Func, class ...Args, class DeRef, class Value>
-auto threads::partial_sum(Iter begin, Iter end, const Value& init, Func&& func, Args&&... args)
+template<int n_tpt, int min_ept,
+        class Iter, class Func, class ...Args, class DeRef, class Value>
+auto threads::partial_sum(Iter begin, Iter end, const Value &init, Func &&func, Args &&... args)
 -> typename std::enable_if<!std::is_void<Value>::value, std::vector<Value>>::type {
     auto bin_function =
             [&init, &func, &args...](const Iter &a, const Iter &b) -> Value {
@@ -353,7 +385,7 @@ auto threads::partial_sum(Iter begin, Iter end, const Value& init, Func&& func, 
         return {bin_function(begin, end)};
     }
 
-    int n_tasks = n_tasks_per_thread * n_threads;
+    int n_tasks = get_n_tasks<n_tpt, min_ept>(n_threads, size);
     int bin = size / n_tasks;
     std::vector<std::future<Value>> results;
     results.reserve(n_tasks);
@@ -367,15 +399,16 @@ auto threads::partial_sum(Iter begin, Iter end, const Value& init, Func&& func, 
 
     std::vector<Value> res;
     res.reserve(n_tasks);
-    for (auto& r: results) {
+    for (auto &r: results) {
         res.push_back(r.get());
     }
 
     return res;
 }
 
-template<int n_tasks_per_thread, class Iter, class Func, class ...Args, class DeRef, class Value>
-auto threads::sum(Iter begin, Iter end, const Value& init, Func&& func, Args&&... args)
+template<int n_tpt, int min_ept,
+        class Iter, class Func, class ...Args, class DeRef, class Value>
+auto threads::sum(Iter begin, Iter end, const Value &init, Func &&func, Args &&... args)
 -> typename std::enable_if<!std::is_void<Value>::value, Value>::type {
     auto bin_function =
             [&init, &func, &args...](const Iter &a, const Iter &b) -> Value {
@@ -396,7 +429,7 @@ auto threads::sum(Iter begin, Iter end, const Value& init, Func&& func, Args&&..
         return bin_function(begin, end);
     }
 
-    int n_tasks = n_tasks_per_thread * n_threads;
+    int n_tasks = get_n_tasks<n_tpt, min_ept>(n_threads, size);
     int bin = size / n_tasks;
     std::vector<std::future<Value>> results;
     results.reserve(n_tasks);
@@ -415,8 +448,9 @@ auto threads::sum(Iter begin, Iter end, const Value& init, Func&& func, Args&&..
     return res;
 }
 
-template<int n_tasks_per_thread, class Iter, class Func, class ...Args, class DeRef, class Value>
-auto threads::reduce(Iter begin, Iter end, const Value& init, Func&& func, Args&&... args)
+template<int n_tpt, int min_ept,
+        class Iter, class Func, class ...Args, class DeRef, class Value>
+auto threads::reduce(Iter begin, Iter end, const Value &init, Func &&func, Args &&... args)
 -> typename std::enable_if<!std::is_void<Value>::value, Value>::type {
     auto bin_function =
             [&init, &func, &args...](const Iter &a, const Iter &b) -> Value {
@@ -437,7 +471,7 @@ auto threads::reduce(Iter begin, Iter end, const Value& init, Func&& func, Args&
         return bin_function(begin, end);
     }
 
-    int n_tasks = n_tasks_per_thread * n_threads;
+    int n_tasks = get_n_tasks<n_tpt, min_ept>(n_threads, size);
     int bin = size / n_tasks;
     std::vector<std::future<Value>> results;
     results.reserve(n_tasks);
