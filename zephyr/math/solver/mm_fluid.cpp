@@ -315,8 +315,8 @@ Distributor MmFluid::distributor() const {
                                  parent(U).d_dy.vec() * dr.y() +
                                  parent(U).d_dz.vec() * dr.z();
             child_state.mass_frac = parent(U).mass_frac;
-            child_state.energy = mixture.energy_rp(child_state.density, child_state.pressure, child_state.mass_frac);
-            child_state.temperature = mixture.temperature_rp(child_state.density, child_state.pressure, child_state.mass_frac);
+            child_state.energy = mixture.energy_rp(child_state.density, child_state.pressure, child_state.mass_frac, {.T0 = parent(U).t});
+            child_state.temperature = mixture.temperature_rp(child_state.density, child_state.pressure, child_state.mass_frac, {.T0 = parent(U).t});
             child(U).set_state(child_state);
         }
     };
@@ -340,8 +340,8 @@ Distributor MmFluid::distributor() const {
 //        }
 //        parent(U).set_state(sum.vec() / parent.volume());
         parent(U).mass_frac.fix();
-        parent(U).e = mixture.energy_rp(parent(U).rho, parent(U).p, parent(U).mass_frac, {.T0=mean_t});
-        parent(U).t = mixture.temperature_rp(parent(U).rho, parent(U).p, parent(U).mass_frac, {.T0=mean_t});
+        parent(U).e = mixture.energy_rp(parent(U).rho, parent(U).p, parent(U).mass_frac, {.T0 = mean_t});
+        parent(U).t = mixture.temperature_rp(parent(U).rho, parent(U).p, parent(U).mass_frac, {.T0 = mean_t});
         if (parent(U).is_bad1()) {
             std::cerr << "Failed to calc PState in merge\n";
             std::cerr << "PState: " << parent(U).get_pstate() << "\n";
@@ -359,23 +359,16 @@ void MmFluid::set_flags(Mesh &mesh) {
         double p = cell(U).p;
         Fractions mass_frac = cell(U).mass_frac;
         bool need_split = false;
-//        double c = mixture.sound_speed_rp(cell(U).rho, cell(U).p, cell(U).mass_frac);
         for (auto face: cell.faces()) {
             if (face.is_boundary()) {
                 continue;
             }
 
             // проверяем большой перепад давлений
-            if (abs(face.neib()(U).p - p) > 0.15 * p) {
+            if (abs(face.neib()(U).p - p) > 0.3 * p) {
                 need_split = true;
                 break;
             }
-
-            // проверяем то что ячейка имеют большую относительную скорость
-//            if ((cell(U).v - face.neib()(U).v).norm() > 0.2 * c) {
-//                need_split = true;
-//                break;
-//            }
 
             // проверяем большое различие в долях веществ
             Fractions neib_mass_frac = face.neib()(U).mass_frac;
