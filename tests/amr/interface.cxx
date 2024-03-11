@@ -182,5 +182,6 @@ int main() {
     std::cout << "  Refine:    " << sw_refine.extended_time()
               << " ( " << sw_refine.milliseconds() << " ms)\n";
 
+    threads::off();
     return 0;
 }

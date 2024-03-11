@@ -578,12 +578,13 @@ void AirWithSF62D(int n_cells = 25, int acc = 2, const std::string &filename = "
 }
 
 int main() {
-    threads::on();
+    threads::on(16);
 
 //    KelvinHelmholtzInstability(2, "output_kelvin_3");
-    Bubble2D(20, 2, "output_bubble_5");
+    Bubble2D(20, 2, "output_bubble_test");
     //Bubble2DStatic(640, 2, "output_bubble_static");
 //    AirWithSF62D(46, 2, "sf6");
 
+    threads::off();
     return 0;
 }

@@ -73,7 +73,7 @@ int main() {
     std::cout << "RUN\n";
     for (int step = 0; step < 1000; ++step) {
         if (step % 20 == 0) {
-            std::cout << "  Step " << std::setw(4) << step << " / 200\n";
+            std::cout << "  Step " << std::setw(4) << step << " / 1000\n";
             sw_write.resume();
             pvd.save(mesh, step);
             sw_write.stop();
@@ -105,5 +105,6 @@ int main() {
     std::cout << "  Refine:    " << sw_refine.extended_time()
               << " ( " << sw_refine.milliseconds() << " ms)\n";
 
+    threads::off();
     return 0;
 }
