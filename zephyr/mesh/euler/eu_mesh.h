@@ -37,6 +37,20 @@ public:
 
     EuCell end() { return {m_locals, m_aliens, m_locals.size()}; }
 
+    EuCell operator[](int idx) {
+        return {m_locals, m_aliens, idx};
+    }
+
+    /// @brief Получить ячейку по нескольким индексам подразумевая,
+    /// что сетка является структурированной. Индексы периодически
+    /// замкнуты (допускаются отрицательные индексы и индексы сверх нормы)
+    EuCell operator()(int i, int j);
+
+    /// @brief Получить ячейку по нескольким индексам подразумевая,
+    /// что сетка является структурированной. Индексы периодически
+    /// замкнуты (допускаются отрицательные индексы и индексы сверх нормы)
+    EuCell operator()(int i, int j, int k);
+
     operator AmrStorage &() { return m_locals; }
 
     AmrStorage &locals() { return m_locals; }
@@ -102,6 +116,18 @@ public:
         return m_nodes;
     }
 
+    /// @brief Число ячеек по оси x для структурированных сеток,
+    /// число всех ячеек для сеток общего вида
+    inline int nx() const { return m_nx; };
+
+    /// @brief Число ячеек по оси y для структурированных сеток,
+    /// единица для сеток общего вида
+    inline int ny() const { return m_ny; };
+
+    /// @brief Число ячеек по оси z для структурированных сеток,
+    /// единица для сеток общего вида
+    inline int nz() const { return m_nz; };
+
 private:
     /// @brief Создать эйлерову сетку из сетки общего вида
     void initialize(const Grid& gen);
@@ -123,6 +149,10 @@ private:
     /// @brief Массив уникальных узлов. Используется в редких алгоритмах,
     /// по умолчанию пустой, заполняются при вызове функции collect_nodes().
     std::vector<Vector3d> m_nodes;
+
+    /// @brief Структура сетки, если предполагается, что сетка декартова.
+    bool structured = false;
+    int m_nx, m_ny, m_nz;
 };
 
 

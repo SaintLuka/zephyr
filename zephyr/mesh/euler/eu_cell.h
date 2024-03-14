@@ -105,6 +105,18 @@ public:
         return *reinterpret_cast<const U *>(m_it->data());
     }
 
+    /// @brief Ссылка на данные ячейки
+    template<class U>
+    inline U& data(const U &) {
+        return *reinterpret_cast<U *>(m_it->data());
+    }
+
+    /// @brief Ссылка на данные ячейки
+    template<class U>
+    inline const U& data(const U &) const {
+        return *reinterpret_cast<const U *>(m_it->data());
+    }
+
     /// @brief Ссылка на конкретные данные ячейки
     template<class T>
     inline T& operator()(const VarExtra<T> & var) {

@@ -295,6 +295,7 @@ Grid Rectangle::create_classic() const {
     }
 
     grid.setup_adjacency();
+    grid.assume_structured(m_nx, m_ny);
 
     return grid;
 }

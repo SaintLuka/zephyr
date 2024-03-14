@@ -141,6 +141,7 @@ class MovCell;
 /// в специализированный сеточный класс.
 class Grid {
 public:
+    Grid();
 
     int n_nodes() const;
 
@@ -170,9 +171,23 @@ public:
 
     MovCell mov_cell(int idx) const;
 
+    void assume_structured(int nx, int ny, int nz = 1);
+
+    bool is_structured() const;
+
+    int nx() const;
+
+    int ny() const;
+
+    int nz() const;
+
 private:
     std::vector<GNode::Ptr> m_nodes;
     std::vector<GCell> m_cells;
+
+    /// Поля для структурированной сетки
+    bool structured = false;
+    int m_nx, m_ny, m_nz;
 };
 
 } // namespace zephyr::geom
