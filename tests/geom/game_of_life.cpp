@@ -30,8 +30,7 @@ void update(EuMesh& mesh) {
 
            // Другой вариант получить данные
            // mesh(i, j)(U).u1
-           // но я мне не нравятся такие двойные скобки
-           mesh(i, j).vs()
+           // но мне не нравятся такие )( двойные скобки
            int s = mesh(i + 1, j).data(U).u1 +
                    mesh(i - 1, j).data(U).u1 +
                    mesh(i, j + 1).data(U).u1 +
