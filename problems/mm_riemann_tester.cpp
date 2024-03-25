@@ -11,10 +11,13 @@
 
 #include <zephyr/math/solver/riemann.h>
 #include <zephyr/phys/eos/stiffened_gas.h>
+#include <zephyr/utils/matplotlib.h>
+
 
 using namespace zephyr::phys;
 using namespace zephyr::math;
 using namespace zephyr::math::mmf;
+namespace plt = zephyr::utils::matplotlib;
 
 using zephyr::math::RiemannSolver;
 
@@ -91,7 +94,7 @@ RiemannTesterWithSolver(Fluxes flux, const MmTest &test, int n_cells = 10, int a
     double uL = test.uL, uR = test.uR;
     double eL = test.matL->energy_rp(rhoL, pL), eR = test.matR->energy_rp(rhoR, pR);
     double tL = test.matL->temperature_rp(rhoL, pL), tR = test.matR->temperature_rp(rhoR, pR);
-    double x_min = 0.0, x_max = 1.0;
+    double x_min = test.x_min, x_max = test.x_max;
 
     Fractions mass_fracL({1, 0});
     Fractions mass_fracR({0, 1});
@@ -155,6 +158,7 @@ RiemannTesterWithSolver(Fluxes flux, const MmTest &test, int n_cells = 10, int a
 
     MmFluid solver(mixture, flux);
     solver.set_acc(acc);
+    solver.set_CFL(0.4);
 
     for (auto cell: mesh) {
         if (cell.center().x() < x_jump) {
@@ -175,20 +179,23 @@ RiemannTesterWithSolver(Fluxes flux, const MmTest &test, int n_cells = 10, int a
     }
 
     double next_write = 0.0;
-    int n_writes = 100;
+    int n_writes = 500;
     while (time <= 1.01 * max_time) {
         if (time >= next_write) {
-//            std::cout << "progress: " << round(100 * time / max_time) << "%\n";
+            std::cout << "progress: " << round(100 * time / max_time) << "%\n";
             pvd.save(mesh, time);
             next_write += max_time / n_writes;
         }
         solver.update(mesh);
 
+//        time += max_time / n_writes;
         time = solver.get_time();
     }
 
     // расчёт ошибок
+
     std::pair<double, double> rho_err = {0, 0}, u_err = {0, 0}, p_err = {0, 0}, e_err = {0, 0}, c_err = {0, 0}; // {mean_err, relative_err}
+    /*
     auto sum_err = [](std::pair<double, double> &err, double pred, double real) -> void {
         err.first += abs(pred - real);
         if (real != 0.0)
@@ -225,7 +232,7 @@ RiemannTesterWithSolver(Fluxes flux, const MmTest &test, int n_cells = 10, int a
     fprint("\tenergy error      ", e_err);
     fprint("\tsound speed error ", c_err);
     std::cout << '\n';
-
+    */
     return {rho_err.first, u_err.first, p_err.first, e_err.first, c_err.first};
 }
 
@@ -530,27 +537,153 @@ void calcTests() {
 }
 
 void twoCellsFlux() {
-    auto matL = IdealGas::create(1.5, 718.0_J_kgK);
-    auto matR = IdealGas::create(2, 718.0_J_kgK);
+    auto matL = StiffenedGas::create("Water");
+    auto matR = IdealGas::create("Air");
 
     Materials mixture;
     mixture += matL;
     mixture += matR;
 
-    // density, velocity, pressure, energy, temperature, mass_frac
-    PState zL(0.930887, {-1.98519, 0, 0}, 0.372293, 0.799867, 0.00111402, {1, 0, 0, 0, 0});
-    PState zR(0.930951, {1.98507, 0, 0}, 0.372315, 0.399941, 0.00055702, {5.27393e-05, 0.999947, 0, 0, 0});
+    // density,  velocity, pressure, energy, temperature, mass_frac
+//    PState zL(952.086, {1, 0, 0}, -1.026 * 1e7, 812376, 351.429, {1, 0, 0, 0, 0});
+//    PState zR(1, {0, 0, 0}, 1e5, 250000, 348.189, {0, 1, 0, 0, 0});
+//    PState zL(844.421, {1249.39, -58.5863, 0}, -3.02777e+08, 814071, 295.246, {1, 0, 0, 0, 0});
+//    PState zR(933.798, {1323.63, -73.5489, 0}, 48.9301, 814647, 353.548, {1 - 1.04705e-08, 1.04705e-08, 0, 0, 0});
+    PState zL(778.501, {-142.966, -767.994, 0}, 5.34596, 823425, 354.973, {1 - 1.17486e-08, 1.17486e-08, 0, 0, 0});
+    PState zR(812.511, {-140.59, -776.187, 0}, -3.79503e+08, 818268, 278.312, {1, 0, 0, 0, 0});
+    zL.energy = matL->energy_rp(zL.density, zL.pressure);
+    zL.temperature = matL->temperature_rp(zL.density, zL.pressure);
+    zR.energy = matR->energy_rp(zR.density, zR.pressure);
+    zR.temperature = matR->temperature_rp(zR.density, zR.pressure);
+
+    std::cout << "ZL: " << zL << "\n" << "zR: " << zR << "\n";
 
     auto m_nf = NumFlux::create(Fluxes::GODUNOV);
     auto loc_flux = m_nf->mm_flux(zL, zR, mixture);
     std::cout << loc_flux;
 }
 
+void find_PT() {
+//    QState q(952.086, {-48.0352, 0, 0}, 7.76441e+08, FractionsFlux(std::vector<double>{952.086, 3.02876e-05, 0, 0, 0}));
+/*
+Failed to calc PState from QState in fluxes_stage2
+QState: mass: 861.669, momentum: {2.49503e+06, -41249.7, 0}, energy: 4.07937e+09, mass_frac: [856.787, 4.88194, 0, 0, 0]
+Failed to calc PState from QState in fluxes_stage2
+QState: mass: 879.816, momentum: {2.55266e+06, -40768.9, 0}, energy: 4.14476e+09, mass_frac: [874.83, 4.98573, 0, 0, 0]
+PState: density: 861.669, velocity: {2895.58, -47.8719, 0}, pressure: nan, temperature: nan, energy: 540935, mass_frac: [0.994334, 0.00566568, 0, 0, 0]
+Previous PState:
+density: 855.307, velocity: {2863.68, -50.7467, 0}, pressure: 2.07384e+08, temperature: 420.184, energy: 978081, mass_frac: [0.994294, 0.00570604, 0, 0, 0]
+
+Failed to calc PState from QState in fluxes_stage2
+QState: mass: 43.3173, momentum: {-75385.5, 154394, 0}, energy: 1.98132e+08, mass_frac: [39.8422, 3.4751, 0, 0, 0]
+PState: density: 43.3173, velocity: {-1740.31, 3564.25, 0}, pressure: nan, temperature: nan, energy: -3.29232e+06, mass_
+frac: [0.919776, 0.0802243, 0, 0, 0]
+Previous PState: density: 41.7965, velocity: {-1730.7, 3563, 0}, pressure: 5.39294e+06, temperature: 2191.69, energy: 1.
+11809e+07, mass_frac: [0.916691, 0.0833089, 0, 0, 0]
+
+Failed to calc PState from QState in fluxes_stage2
+QState: mass: 890.801, momentum: {1.19051e+06, -143374, 0}, energy: -1.65055e+09, mass_frac: [890.068, 0.73281, 0, 0, 0]
+PState: density: 890.801, velocity: {1336.45, -160.949, 0}, pressure: nan, temperature: nan, energy: -2.75889e+06, mass_
+frac: [0.999177, 0.000822642, 0, 0, 0]
+Previous PState: density: 885.444, velocity: {1332.07, -161.556, 0}, pressure: 179612, temperature: 307.596, energy: 531
+182, mass_frac: [0.999094, 0.000905938, 0, 0, 0]
+
+ */
+    QState q(879.816, {2.55266e+06, -40768.9, 0}, 4.14476e+09, FractionsFlux(std::vector<double>{874.83, 4.98573, 0, 0, 0}));
+//    QState q(43.3173, {-75385.5, 154394, 0}, 1.98132e+08, FractionsFlux(std::vector<double>{39.8422, 3.4751, 0, 0, 0}));
+//    QState q(890.801, {1.19051e+06, -143374, 0}, -1.65055e+09, FractionsFlux(std::vector<double>{890.068, 0.73281, 0, 0, 0}));
+    Materials mixture_eos;
+    mixture_eos += StiffenedGas::create("Water");
+    mixture_eos += StiffenedGas::create("Air");
+    std::cout << PState(q, mixture_eos, 2.07384e+08, 420.184) << "\n";
+
+    PState p_state;
+    auto mass_frac = Fractions(q.mass_frac);
+    p_state.mass_frac = mass_frac;
+    p_state.density = q.mass;
+    p_state.velocity = q.momentum / p_state.density;
+    p_state.energy = q.energy / p_state.density - 0.5 * p_state.velocity.squaredNorm();
+
+    std::vector<StiffenedGas> mixture = {StiffenedGas("Water"), StiffenedGas("Air")};
+    int n = mixture.size();
+
+    double eps0;
+    std::vector<double> B(n, 0), g(n), P0(n), T0(n);
+    double P_min = -1e10;
+    for (int i = 0; i < n; i++) {
+        if (mass_frac.has(i)) {
+            eps0 += mass_frac[i] * mixture[i].eps_0;
+            B[i] = mass_frac[i] * mixture[i].Cv;
+        }
+        g[i] = mixture[i].gamma - 1;
+        P0[i] = mixture[i].P0;
+        T0[i] = mixture[i].T0;
+        P_min = std::max(P_min, mixture[i].min_pressure());
+    }
+    P_min += 1;
+
+    P_min = 1e4;
+    double P_max = 2e5;
+    int size = 100000;
+    double step = (P_max - P_min) / size;
+
+    std::vector<double> P(size);
+    std::vector<double> f(size);
+    int sol_idx = 0;
+    for (int idx = 0; idx < size; idx++) {
+        double p = idx == 0 ? P_min : P[idx - 1] + step;
+        P[idx] = p;
+        double sum1 = 0, sum2 = 0, sum3 = 0;
+        for (int i = 0; i < n; i++) {
+            double tmp = B[i] * (1 + g[i] * P0[i] / (p + P0[i]));
+            sum1 += tmp;
+
+            double sub_sum = 0;
+            for (int k = 0; k < n; k++) {
+                if (k == i)
+                    continue;
+                sub_sum += B[k] * g[k] * (T0[k] - T0[i]) / (p + P0[k]);
+            }
+            sum2 += tmp * sub_sum;
+
+            sum3 += B[i] * g[i] / (p + P0[i]);
+        }
+        sum1 /= p_state.density;
+        sum3 *= (p_state.energy - eps0);
+        f[idx] = sum1 + sum2 - sum3;
+
+        if (abs(f[idx]) < abs(f[sol_idx])) {
+            sol_idx = idx;
+        }
+    }
+
+    plt::figure_size(14, 8);
+    std::map<std::string, std::string> m({{"color", "orange"}});
+    std::cout << "P: " << P[sol_idx] << ", f: " << f[sol_idx] << '\n';
+    plt::plot(P, f);
+//    std::vector<double> sub_p(P.begin() + sol_idx - size / 1000, P.begin() + sol_idx + size / 1000);
+//    std::vector<double> sub_f(f.begin() + sol_idx - size / 1000, f.begin() + sol_idx + size / 1000);
+//    plt::plot(sub_p, sub_f);
+    plt::tight_layout();
+    plt::show();
+
+//    p.pressure = mixture.pressure_re(density, energy, mass_frac, {.P0=P0, .T0=T0});
+//    p.temperature = mixture.temperature_rp(density, pressure, mass_frac, {.T0=T0});
+}
+
 int main() {
-    threads::on();
+//    threads::on();
     // Тестовая задача
     SodTest sod_test;
     ToroTest toro_test(3);
+
+    MmTest waterAir(StiffenedGas::create("Water"), IdealGas::create("Air"),
+                    0, 1e-3, // x_jump, max_time
+                    952.086, 1.0, // rho
+                    -1e5, 1e5, // p
+                    10, 0, // u
+                    -1, 1  // x_min, x_max
+    );
 
     MmTest transfer(IdealGas::create(1.4, 718.0_J_kgK), IdealGas::create(1.5, 718.0_J_kgK),
                     0.2, 0.1, // x_jump, max_time
@@ -618,12 +751,16 @@ int main() {
                   x_min, x_max // x_min, x_max
     );
 
-//    RiemannTesterWithSolver(Fluxes::GODUNOV, test1, 100, 2);
+    twoCellsFlux();
+
+//    RiemannTesterWithSolver(Fluxes::GODUNOV, waterAir, 1000, 1, "water_air");
 //    RiemannTesterWithSolver(Fluxes::GODUNOV, test3, 100, 2);
 //    RiemannTesterWithSolver(Fluxes::GODUNOV, test4, 100, 2);
 //    RiemannTesterWithSolver(Fluxes::GODUNOV, test5, 100, 2);
 //    RiemannTesterWithSolver(Fluxes::GODUNOV, mm_toro, 100, 2);
 //    RiemannTesterWithSolver(Fluxes::GODUNOV, mm_sod, 100, 2);
+
+//    find_PT();
 
 //    Stopwatch solve;
 //    solve.start();

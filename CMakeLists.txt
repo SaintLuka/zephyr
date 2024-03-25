@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.15)
 project(zephyr C CXX)
 
 set(CMAKE_LIB_NAME zephyr)
@@ -15,7 +15,7 @@ option(ZEPHYR_ENABLE_MPI      "Use MPI functions" OFF)
 option(ZEPHYR_ENABLE_YAML     "YAML support"      OFF)
 option(ZEPHYR_ENABLE_EIGEN    "Use Eigen library" ON)
 option(ZEPHYR_ENABLE_TESTS    "Build tests"       ON)
-option(ZEPHYR_ENABLE_PROBLEMS "Build problems"    OFF)
+option(ZEPHYR_ENABLE_PROBLEMS "Build problems"    ON)
 
 configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/configuration.h.in
@@ -86,9 +86,9 @@ if (ZEPHYR_ENABLE_TESTS)
     add_subdirectory(tests)
 endif()
 
-if (ZEPHYR_ENABLE_PROBLEMS)
+#if (ZEPHYR_ENABLE_PROBLEMS)
     add_subdirectory(problems)
-endif()
+#endif()
 
 add_subdirectory(python)
 

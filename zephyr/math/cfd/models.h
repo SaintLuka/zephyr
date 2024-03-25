@@ -7,6 +7,7 @@
 #include <zephyr/phys/eos/materials.h>
 
 #include <zephyr/phys/fractions.h>
+#include "zephyr/phys/eos/types.h"
 
 namespace zephyr::math {
 
@@ -23,6 +24,9 @@ struct PState {
     Vector3d velocity;
     double pressure;
     double energy;
+
+    PState() : density(0), velocity(0), pressure(0), energy(0)
+    {}
 
     PState(const double &density, const Vector3d &velocity,
            const double &pressure, const double &energy);
@@ -159,6 +163,8 @@ struct PState {
 
     /// @brief Возвращает вектор состояния в глобальной системе координат
     [[nodiscard]] PState in_global(const Vector3d &normal) const;
+
+    void sync_temperature_energy_rp(const phys::Materials &mixture, const phys::Options& options = {});
 
     friend std::ostream &operator<<(std::ostream &os, const PState &state);
 

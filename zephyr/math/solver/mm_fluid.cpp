@@ -105,7 +105,7 @@ void check_state(const PState &next, const QState &qc, const PState &old, const 
     std::cerr << "PState: " << next << "\n";
     std::cerr << "Previous PState: " << old << "\n";
     exit(1); // чтобы расчёт моментально выключился
-//    throw std::runtime_error("bad cell");
+    throw std::runtime_error("bad cell");
 }
 
 void MmFluid::fluxes(Mesh &mesh) const {
@@ -141,6 +141,11 @@ void MmFluid::fluxes(Mesh &mesh) const {
 
             // Численный поток на грани
             auto loc_flux = m_nf->mm_flux(zm, zp, mixture);
+            if (loc_flux.is_bad()) {
+                std::cerr << "Step: " << m_step << '\n';
+                std::cerr << "Bad flux for " << cell.b_idx() << " and " << face.neib().b_idx() << '\n';
+                exit(1);
+            }
             loc_flux.to_global(normal);
 
             // Суммируем поток
@@ -174,9 +179,21 @@ void MmFluid::fluxes(Mesh &mesh) const {
     });
 }
 
+PState boundary_value(const PState &zc, const Vector3d &normal, Boundary flag) {
+    if (flag != Boundary::WALL)
+        return zc;
+
+    PState zn(zc);
+    Vector3d Vn = normal * zc.velocity.dot(normal);
+    zn.velocity = zc.velocity - 2 * Vn;
+
+    return zn;
+}
+
 void MmFluid::compute_grad(Mesh &mesh, const std::function<mmf::PState(Cell &)> &to_state) const {
     mesh.for_each([&to_state](Cell &cell) -> void {
-        auto grad = math::compute_grad<mmf::PState>(cell, to_state);
+        auto grad = math::compute_gradient_LSM<mmf::PState>(cell, to_state, boundary_value);
+        auto grad_lim = math::gradient_limiting<mmf::PState>(cell, grad, to_state, boundary_value);
         cell(U).d_dx = grad[0];
         cell(U).d_dy = grad[1];
         cell(U).d_dz = grad[2];
@@ -239,16 +256,35 @@ mmf::Flux MmFluid::calc_flux_extra(Cell &cell, bool from_begin) const {
         PState p_minus = face_extra.m(p_self).in_local(normal);
         PState p_plus = face_extra.p(p_neib).in_local(normal);
 
+        /*
+        Vector3d dr = face.center() - cell.center();
+        PState p_minus = p_self.vec() +
+                         cell(U).d_dx.vec() * dr.x() +
+                         cell(U).d_dy.vec() * dr.y() +
+                         cell(U).d_dz.vec() * dr.z();
+        p_minus.to_local(normal);
+
+        dr = face.center() - neib_c;
+        PState p_plus = p_minus;
+        if (!face.is_boundary())
+            p_plus = p_neib.vec() +
+                     face.neib()(U).d_dx.vec() * dr.x() +
+                     face.neib()(U).d_dy.vec() * dr.y() +
+                     face.neib()(U).d_dz.vec() * dr.z();
+        else if (face.flag() == Boundary::WALL) {
+            Vector3d Vn = normal * p_minus.velocity.dot(normal);
+            p_plus.velocity = p_minus.velocity - 2 * Vn;
+        }
+        p_plus.to_local(normal);
+        */
+
         // исправляем возможные нефизичные значения массовых долей
         p_minus.mass_frac.fix();
         p_plus.mass_frac.fix();
 
         // пересчитываем энергию и температуру
-        p_minus.energy = mixture.energy_rp(p_minus.density, p_minus.pressure, p_minus.mass_frac);
-        p_plus.energy = mixture.energy_rp(p_plus.density, p_plus.pressure, p_plus.mass_frac);
-
-        p_minus.temperature = mixture.temperature_rp(p_minus.density, p_minus.pressure, p_minus.mass_frac);
-        p_plus.temperature = mixture.temperature_rp(p_plus.density, p_plus.pressure, p_plus.mass_frac);
+        p_minus.sync_temperature_energy_rp(mixture);
+        p_plus.sync_temperature_energy_rp(mixture);
 
         // Численный поток на грани
         auto loc_flux = m_nf->mm_flux(p_minus, p_plus, mixture);
@@ -315,9 +351,20 @@ Distributor MmFluid::distributor() const {
                                  parent(U).d_dy.vec() * dr.y() +
                                  parent(U).d_dz.vec() * dr.z();
             child_state.mass_frac = parent(U).mass_frac;
-            child_state.energy = mixture.energy_rp(child_state.density, child_state.pressure, child_state.mass_frac, {.T0 = parent(U).t});
-            child_state.temperature = mixture.temperature_rp(child_state.density, child_state.pressure, child_state.mass_frac, {.T0 = parent(U).t});
+            child_state.sync_temperature_energy_rp(mixture, {.T0 = parent(U).t});
             child(U).set_state(child_state);
+            if (m_step > 0 && child(U).is_bad1()) {
+                std::cerr << "Failed to calc child PState in split\n";
+                std::cerr << "Parent PState: " << parent(U).get_pstate() << '\n';
+                std::cerr << "Child center: {" << child.center.x() << ", " << child.center.y() << ", " << child.center.z() << "}\n";
+                std::cerr << "Parent center: {" << parent.center.x() << ", " << parent.center.y() << ", " << parent.center.z() << "}\n";
+                std::cerr << "Parent grad x: " << parent(U).d_dx << '\n';
+                std::cerr << "Parent grad y: " << parent(U).d_dy << '\n';
+                std::cerr << "Parent grad z: " << parent(U).d_dz << '\n';
+                std::cerr << "Child PState: " << child(U).get_pstate() << '\n';
+                exit(1);
+                throw std::runtime_error("bad cell");
+            }
         }
     };
 
@@ -332,19 +379,19 @@ Distributor MmFluid::distributor() const {
         sum.vec() /= parent.volume();
         mean_p /= parent.volume();
         mean_t /= parent.volume();
+        for (auto &b: sum.mass_frac.m_data)
+            if (b < 0)
+                b = 0;
         PState state(sum, mixture, mean_p, mean_t);
         parent(U).set_state(state);
-//        PState sum;
-//        for (auto &child: children) {
-//            sum.vec() += child(U).get_pstate().vec() * child.volume();
-//        }
-//        parent(U).set_state(sum.vec() / parent.volume());
-        parent(U).mass_frac.fix();
-        parent(U).e = mixture.energy_rp(parent(U).rho, parent(U).p, parent(U).mass_frac, {.T0 = mean_t});
-        parent(U).t = mixture.temperature_rp(parent(U).rho, parent(U).p, parent(U).mass_frac, {.T0 = mean_t});
+//        auto [t, e] = mixture.temperature_energy_rp(parent(U).rho, parent(U).p, parent(U).mass_frac, {.T0 = mean_t});
+//        parent(U).e = e;
+//        parent(U).t = t;
         if (parent(U).is_bad1()) {
-            std::cerr << "Failed to calc PState in merge\n";
+            std::cerr << "Failed to calc parent PState in merge\n";
+            std::cerr << "QState: " << sum << '\n';
             std::cerr << "PState: " << parent(U).get_pstate() << "\n";
+            exit(1);
             throw std::runtime_error("bad cell");
         }
     };
@@ -365,7 +412,7 @@ void MmFluid::set_flags(Mesh &mesh) {
             }
 
             // проверяем большой перепад давлений
-            if (abs(face.neib()(U).p - p) > 0.3 * p) {
+            if (abs(face.neib()(U).p - p) / abs(face.neib()(U).p + p) > 0.15) {
                 need_split = true;
                 break;
             }

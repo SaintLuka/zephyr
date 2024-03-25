@@ -57,18 +57,19 @@ smf::Flux HLL::calc_flux(const smf::PState &zL, const smf::PState &zR, const phy
 }
 
 mmf::Flux HLL::mm_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) const {
-    using namespace mmf;
+    return HLL::calc_mm_flux(zL, zR, mixture);
+}
 
-    double rho1 = zL.density, rho2 = zR.density;
-    double u1 = zL.velocity.x(), u2 = zR.velocity.x();
-    double p1 = zL.pressure, p2 = zR.pressure;
+mmf::Flux HLL::calc_mm_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) {
+    using namespace mmf;
 
     QState qL(zL); // U_L
     QState qR(zR); // U_R
 
-    double c1 = mixture.sound_speed_rp(rho1, p1, zL.mass_frac); // скорость звука слева
-    double c2 = mixture.sound_speed_rp(rho2, p2, zR.mass_frac); // скорость звука справа
+    double c1 = mixture.sound_speed_rp(zL.density, zL.pressure, zL.mass_frac, {.T0 = zL.temperature}); // скорость звука слева
+    double c2 = mixture.sound_speed_rp(zR.density, zR.pressure, zR.mass_frac, {.T0 = zR.temperature}); // скорость звука справа
 
+    double u1 = zL.velocity.x(), u2 = zR.velocity.x();
     double s1 = std::min({u1 - c1, u2 - c2, 0.0}); // SL
     double s2 = std::max({u1 + c1, u2 + c2, 0.0}); // SR
 
@@ -87,17 +88,18 @@ mmf::Flux HLL::mm_flux(const mmf::PState &zL, const mmf::PState &zR, const phys:
         std::cerr << "Zr: " << zR << "\n";
         std::cerr << "Sound speed left: " << c1 << " , Sound speed right: " << c2 << "\n";
         std::cerr << "SL: " << s1;
-        throw std::runtime_error("HLL::calc_flux Error, strange case in switch");
+        exit(1);
+        throw std::runtime_error("HLL::calc_mm_flux Error, strange case in switch");
     }
 
-    if (std::isnan(F_hll.mass) || std::isnan(F_hll.momentum.x()) || std::isnan(F_hll.momentum.y()) ||
-        std::isnan(F_hll.momentum.z()) || std::isnan(F_hll.energy)) {
+    if (F_hll.is_bad()) {
         std::cerr << "zL: " << zL << "\n";
         std::cerr << "Zr: " << zR << "\n";
         std::cerr << "Sound speed left: " << c1 << " , Sound speed right: " << c2 << "\n";
         std::cerr << "SL: " << s1 << ", SR: " << s2;
         std::cerr << "F_HLL: " << F_hll << "\n";
-        throw std::runtime_error("HLL::mm_flux Error, F_HLL has the bad value");
+        exit(1);
+        throw std::runtime_error("HLL::calc_mm_flux Error, F_HLL has the bad value");
     }
 
     return F_hll;

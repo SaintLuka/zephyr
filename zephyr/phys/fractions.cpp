@@ -110,7 +110,7 @@ void Fractions::normalize() {
     double sum = 0.0;
     for (auto &v: m_data) {
         if (v < 0) {
-            if (-5e-3 < v)
+            if (-1e-5 < v)
                 v = 0;
             else {
                 std::cerr << *this;
@@ -164,11 +164,11 @@ void Fractions::fix() {
 }
 
 std::ostream &operator<<(std::ostream &os, const Fractions &frac) {
-    os << "[";
+    os << "{";
     for (int i = 0; i < frac.get_size() - 1; ++i) {
         os << frac[i] << ", ";
     }
-    os << frac[frac.get_size() - 1] << "]";
+    os << frac[frac.get_size() - 1] << "}";
     return os;
 }
 
@@ -199,11 +199,11 @@ bool FractionsFlux::has(int idx) const {
 }
 
 std::ostream &operator<<(std::ostream &os, const FractionsFlux &frac) {
-    os << "[";
+    os << "{";
     for (int i = 0; i < frac.get_size() - 1; ++i) {
         os << frac.m_data[i] << ", ";
     }
-    os << frac.m_data[frac.get_size() - 1] << "]";
+    os << frac.m_data[frac.get_size() - 1] << "}";
     return os;
 }
 

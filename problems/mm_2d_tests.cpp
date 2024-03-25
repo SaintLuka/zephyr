@@ -47,6 +47,8 @@ double get_rho1(AmrStorage::Item &cell) { return cell(U).densities[0]; }
 
 double get_rho2(AmrStorage::Item &cell) { return cell(U).densities[1]; }
 
+double check_vacuum(AmrStorage::Item &cell) { return cell(U).p <= 0; }
+
 struct Stat {
     double min_size, max_size, mean_size; // размеры ячеек
     int n_cells, n_min, n_max; // количество всех ячеек, количество ячеек с минимальным размером, количество ячеек с максимальным размером
@@ -556,7 +558,7 @@ void Bubble2D(int n_cells = 20, int acc = 2, const std::string &filename = "outp
     mixture += water;
     mixture += air;
 
-    double max_time = 2.9e-6;
+    double max_time = 3.5e-6;
     double rho_wave = 1323.65_kg_m3, rho_water = 1000.0_kg_m3, rho_air = 1.0_kg_m3;
     double p_wave = 1.9e4_bar, p_water = 1.0_bar, p_air = 1.0_bar;
     double u_wave = 681.58_m_s, u_water = 0, u_air = 0;
@@ -600,6 +602,7 @@ void Bubble2D(int n_cells = 20, int acc = 2, const std::string &filename = "outp
     pvd.variables += {"c2", get_c2};
     pvd.variables += {"rho1", get_rho1};
     pvd.variables += {"rho2", get_rho2};
+    pvd.variables += {"vacuum", check_vacuum};
 //    pvd.variables += {"size", [](AmrStorage::Item &cell) -> double { return cell.size; }};
 
     double time = 0.0;
@@ -706,7 +709,7 @@ void Bubble2DStatic(int n_cells = 100, int acc = 2, const std::string &filename 
     mixture += water;
     mixture += air;
 
-    double max_time = 2.9e-6;
+    double max_time = 4e-6;
     double rho_wave = 1323.65_kg_m3, rho_water = 1000.0_kg_m3, rho_air = 1.0_kg_m3;
     double p_wave = 1.9e4_bar, p_water = 1.0_bar, p_air = 1.0_bar;
     double u_wave = 681.58_m_s, u_water = 0, u_air = 0;
@@ -731,8 +734,8 @@ void Bubble2DStatic(int n_cells = 100, int acc = 2, const std::string &filename 
     Rectangle rect(x_min, x_max, y_min, y_max);
     rect.set_nx(n_cells);
     rect.set_boundaries({
-                                .left   = Boundary::ZOE, .right = Boundary::ZOE,
-                                .bottom = Boundary::WALL, .top   = Boundary::ZOE});
+                                .left   = Boundary::WALL, .right = Boundary::WALL,
+                                .bottom = Boundary::WALL, .top   = Boundary::WALL});
 
     // Файл для записи
     PvdFile pvd("mesh", filename);
@@ -750,6 +753,7 @@ void Bubble2DStatic(int n_cells = 100, int acc = 2, const std::string &filename 
     pvd.variables += {"c2", get_c2};
     pvd.variables += {"rho1", get_rho1};
     pvd.variables += {"rho2", get_rho2};
+    pvd.variables += {"vacuum", check_vacuum};
 
     double time = 0.0;
 
@@ -832,7 +836,7 @@ void Bubble2DStatic(int n_cells = 100, int acc = 2, const std::string &filename 
 
     timer.stop();
     std::cout << "Update seconds elapsed: " << timer.seconds() << '\n'; // 165
-    write_stats_to_csv(stats, "bubble2D_static.csv");
+//    write_stats_to_csv(stats, "bubble2D_static_test.csv");
 }
 
 void AirWithSF62D(int n_cells = 25, int acc = 2, const std::string &filename = "output") {
@@ -895,7 +899,7 @@ void AirWithSF62D(int n_cells = 25, int acc = 2, const std::string &filename = "
     solver.set_CFL(CFL);
 
     // Настраиваем адаптацию
-    mesh.set_max_level(5);
+    mesh.set_max_level(6);
     mesh.set_distributor(solver.distributor());
 
     // Адаптация под начальные данные
@@ -942,12 +946,12 @@ void AirWithSF62D(int n_cells = 25, int acc = 2, const std::string &filename = "
 }
 
 int main() {
-    threads::on(16);
+    threads::on(32);
 
 //    kelvin_helmholtz_instability(2, "output_kelvin_3");
 //    Bubble2D(20, 2, "output_bubble");
-//    Bubble2DStatic(640, 2, "output_bubble_static");
-    AirWithSF62D(100, 2, "sf6");
+    Bubble2DStatic(640, 1, "output_bubble_static_test");
+//    AirWithSF62D(100, 2, "sf6");
 //    RiemannTesterWithSolverVertical(100, 1, "output_1");
 //    vertical_instability_adaptive(20, 2, "vertical_instability_adaptive2");
 //    vertical_instability_static(20, 2, "vertical_instability_static");
