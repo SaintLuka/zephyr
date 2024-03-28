@@ -558,18 +558,18 @@ void Bubble2D(int n_cells = 20, int acc = 2, const std::string &filename = "outp
     mixture += water;
     mixture += air;
 
-    double max_time = 3.5e-6;
+    double max_time = 4.5e-6;
     double rho_wave = 1323.65_kg_m3, rho_water = 1000.0_kg_m3, rho_air = 1.0_kg_m3;
     double p_wave = 1.9e4_bar, p_water = 1.0_bar, p_air = 1.0_bar;
     double u_wave = 681.58_m_s, u_water = 0, u_air = 0;
     double e_wave = water->energy_rp(rho_wave, p_wave), e_water = water->energy_rp(rho_water, p_water), e_air = air->energy_rp(rho_air, p_air);
     double t_wave = water->temperature_rp(rho_wave, p_wave), t_water = water->temperature_rp(rho_water, p_water), t_air = air->temperature_rp(rho_air, p_air);
 
-    double x_min = 0.0_cm, x_max = 0.8_cm;
-    double y_min = 0.4_cm, y_max = 0.8_cm;
+    double x_min = 0.0_cm, x_max = 1.2_cm;
+    double y_min = 0.6_cm, y_max = 1.2_cm;
     double r = 0.3_cm;
-    double x_bubble = 0.4_cm;
-    double y_bubble = 0.4_cm;
+    double x_bubble = 0.6_cm;
+    double y_bubble = 0.6_cm;
     double x_wave = 0.06_cm;
 
     Fractions mass_frac_water({1, 0});
@@ -584,7 +584,7 @@ void Bubble2D(int n_cells = 20, int acc = 2, const std::string &filename = "outp
     rect.set_nx(n_cells);
     rect.set_boundaries({
                                 .left   = Boundary::ZOE, .right = Boundary::ZOE,
-                                .bottom = Boundary::WALL, .top   = Boundary::ZOE});
+                                .bottom = Boundary::WALL, .top   = Boundary::WALL});
 
     // Файл для записи
     PvdFile pvd("mesh", filename);
@@ -614,11 +614,11 @@ void Bubble2D(int n_cells = 20, int acc = 2, const std::string &filename = "outp
     solver.set_acc(acc);
 
     // Число Куранта
-    double CFL = 0.5;
+    double CFL = 0.4;
     solver.set_CFL(CFL);
 
     // Настраиваем адаптацию
-    mesh.set_max_level(5);
+    mesh.set_max_level(6);
     mesh.set_distributor(solver.distributor());
 
     Vector3d bubble_center = {x_bubble, y_bubble, 0};
@@ -646,9 +646,6 @@ void Bubble2D(int n_cells = 20, int acc = 2, const std::string &filename = "outp
     stats.reserve(10 * n_writes);
     Stopwatch timer(false), set_flags(false), refine(false);
     while (time <= 1.01 * max_time) {
-//        if (std::abs(time / max_time - 0.5) < 0.05) {
-//            pvd.save(mesh, time);
-//        }
         if (time >= next_write) {
             std::cout << "progress: " << std::fixed << std::setprecision(1) << 100 * time / max_time << "%\n";
             pvd.save(mesh, time);
@@ -660,20 +657,20 @@ void Bubble2D(int n_cells = 20, int acc = 2, const std::string &filename = "outp
         solver.update(mesh);
         timer.stop();
 
-        double min_size = 1e6, max_size = 0, mean_size = 0;
-        for (auto &cell: mesh) {
-            min_size = std::min(cell.size(), min_size);
-            max_size = std::max(cell.size(), max_size);
-            mean_size += cell.size();
-        }
-        int n_min = 0, n_max = 0;
-        for (auto &cell: mesh) {
-            if (abs(cell.size() - min_size) / min_size < 1e-3)
-                n_min++;
-            else if (abs(cell.size() - max_size) / max_size < 1e-3)
-                n_max++;
-        }
-        stats.push_back({min_size, max_size, mean_size / mesh.n_cells(), mesh.n_cells(), n_min, n_max, solver.get_time(), solver.dt()});
+//        double min_size = 1e6, max_size = 0, mean_size = 0;
+//        for (auto &cell: mesh) {
+//            min_size = std::min(cell.size(), min_size);
+//            max_size = std::max(cell.size(), max_size);
+//            mean_size += cell.size();
+//        }
+//        int n_min = 0, n_max = 0;
+//        for (auto &cell: mesh) {
+//            if (abs(cell.size() - min_size) / min_size < 1e-3)
+//                n_min++;
+//            else if (abs(cell.size() - max_size) / max_size < 1e-3)
+//                n_max++;
+//        }
+//        stats.push_back({min_size, max_size, mean_size / mesh.n_cells(), mesh.n_cells(), n_min, n_max, solver.get_time(), solver.dt()});
 
         set_flags.resume();
         // Установить флаги адаптации
@@ -709,18 +706,18 @@ void Bubble2DStatic(int n_cells = 100, int acc = 2, const std::string &filename 
     mixture += water;
     mixture += air;
 
-    double max_time = 4e-6;
+    double max_time = 4.5e-6;
     double rho_wave = 1323.65_kg_m3, rho_water = 1000.0_kg_m3, rho_air = 1.0_kg_m3;
     double p_wave = 1.9e4_bar, p_water = 1.0_bar, p_air = 1.0_bar;
     double u_wave = 681.58_m_s, u_water = 0, u_air = 0;
     double e_wave = water->energy_rp(rho_wave, p_wave), e_water = water->energy_rp(rho_water, p_water), e_air = air->energy_rp(rho_air, p_air);
     double t_wave = water->temperature_rp(rho_wave, p_wave), t_water = water->temperature_rp(rho_water, p_water), t_air = air->temperature_rp(rho_air, p_air);
 
-    double x_min = 0.0_cm, x_max = 0.8_cm;
-    double y_min = 0.4_cm, y_max = 0.8_cm;
+    double x_min = 0.0_cm, x_max = 1.2_cm;
+    double y_min = 0.6_cm, y_max = 1.2_cm;
     double r = 0.3_cm;
-    double x_bubble = 0.4_cm;
-    double y_bubble = 0.4_cm;
+    double x_bubble = 0.6_cm;
+    double y_bubble = 0.6_cm;
     double x_wave = 0.06_cm;
 
     Fractions mass_frac_water({1, 0});
@@ -734,7 +731,7 @@ void Bubble2DStatic(int n_cells = 100, int acc = 2, const std::string &filename 
     Rectangle rect(x_min, x_max, y_min, y_max);
     rect.set_nx(n_cells);
     rect.set_boundaries({
-                                .left   = Boundary::WALL, .right = Boundary::WALL,
+                                .left   = Boundary::ZOE, .right = Boundary::ZOE,
                                 .bottom = Boundary::WALL, .top   = Boundary::WALL});
 
     // Файл для записи
@@ -764,7 +761,7 @@ void Bubble2DStatic(int n_cells = 100, int acc = 2, const std::string &filename 
     solver.set_acc(acc);
 
     // Число Куранта
-    double CFL = 0.5;
+    double CFL = 0.4;
     solver.set_CFL(CFL);
 
     Vector3d bubble_center = {x_bubble, y_bubble, 0};
@@ -808,7 +805,7 @@ void Bubble2DStatic(int n_cells = 100, int acc = 2, const std::string &filename 
     }
 
     double next_write = 0.0;
-    int n_writes = 200;
+    int n_writes = 400;
     std::vector<Stat> stats;
     stats.reserve(10 * n_writes);
     Stopwatch timer(false);
@@ -946,15 +943,18 @@ void AirWithSF62D(int n_cells = 25, int acc = 2, const std::string &filename = "
 }
 
 int main() {
-    threads::on(32);
+    threads::on(16);
 
 //    kelvin_helmholtz_instability(2, "output_kelvin_3");
-//    Bubble2D(20, 2, "output_bubble");
-    Bubble2DStatic(640, 1, "output_bubble_static_test");
+    Bubble2D(50, 2, "output_bubble_test3");
+//    Bubble2DStatic(800, 1, "output_bubble_static_test");
 //    AirWithSF62D(100, 2, "sf6");
 //    RiemannTesterWithSolverVertical(100, 1, "output_1");
 //    vertical_instability_adaptive(20, 2, "vertical_instability_adaptive2");
 //    vertical_instability_static(20, 2, "vertical_instability_static");
+
+//    Vector3d dr = Vector3d{0.00897937, 0.00620062, 0} - Vector3d{0.00898125, 0.00619875, 0};
+//    std::cout << dr.x() * 99.9063 + dr.y() * (29.2343) << '\n';
 
     threads::off();
 

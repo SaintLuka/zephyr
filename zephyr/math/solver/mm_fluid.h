@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cmath>
+#include <mutex>
 #include <zephyr/mesh/mesh.h>
 #include <zephyr/math/cfd/limiter.h>
 #include <zephyr/phys/eos/eos.h>
@@ -111,6 +112,9 @@ public:
     Distributor distributor() const;
 
 private:
+
+    void check_state(const mmf::PState &next, const mmf::QState &qc, const mmf::PState &old, const std::string &func_name, size_t cell_idx);
+
     /// @brief Посчитать шаг интегрирования по времени с учетом
     /// условия Куранта
     double compute_dt(Mesh &mesh);
@@ -118,27 +122,28 @@ private:
     void compute_components_chars(Mesh &mesh);
 
     /// @brief Расчёт потоков
-    void fluxes(Mesh &mesh) const;
+    void fluxes(Mesh &mesh);
 
     /// @brief Обновление ячеек
     void swap(Mesh &mesh);
 
-    void compute_grad(Mesh &mesh, const std::function<mmf::PState(Cell &)> &to_state) const;
+    void compute_grad(Mesh &mesh, const std::function<mmf::PState(Cell &)> &to_state);
 
-    void fluxes_stage1(Mesh &mesh) const;
+    void fluxes_stage1(Mesh &mesh);
 
-    void fluxes_stage2(Mesh &mesh) const;
+    void fluxes_stage2(Mesh &mesh);
 
-    mmf::Flux calc_flux_extra(Cell &cell, bool from_begin) const;
+    mmf::Flux calc_flux_extra(Cell &state, bool from_begin);
 
 public:
 
     ~MmFluid() = default;
 
 protected:
+    std::mutex out_mu{};
     const phys::Materials mixture;
     NumFlux::Ptr m_nf; ///< Метод расчёта потока
-    double g; ///< ускорение свободного падения, направлено против oy
+    double g = 0.0; ///< ускорение свободного падения, направлено против oy
     int m_acc = 1;
     double m_time = 0.0; ///< Прошедшее время
     size_t m_step = 0; ///< Количество шагов расчёта

@@ -107,13 +107,19 @@ int Fractions::index() const {
 }
 
 void Fractions::normalize() {
-    double sum = 0.0;
+    double sub = 0.0;
+    for(auto &v: m_data){
+       sub += abs(v);
+    }
+
+    double sum = 0;
     for (auto &v: m_data) {
         if (v < 0) {
-            if (-1e-5 < v)
+            if (-1e-5 * sub < v)
                 v = 0;
             else {
-                std::cerr << *this;
+                std::cerr << "mass_frac[i] < 0: " <<  *this;
+                exit(1);
                 throw std::runtime_error("mass_frac[i] < 0");
             }
         } else

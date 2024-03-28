@@ -128,7 +128,7 @@ std::array<T, 3> gradient_limiting(Cell &cell, const std::array<T, 3> &grad,
         A += weight * dr * dr.transpose();
 
         StateVec dF = zn.vec() - zc.vec();
-        StateVec theta = grad[0].vec() * dr.x() + grad[1].vec() * dr.y() + grad[2].vec() * dr.z();
+        StateVec theta = 2 * (grad[0].vec() * dr.x() + grad[1].vec() * dr.y() + grad[2].vec() * dr.z());
         StateVec dF_lim = StateVec::Zero();
         for (int i = 0; i < rows; i++)
             for (int j = 0; j < cols; j++) {

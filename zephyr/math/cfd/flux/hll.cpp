@@ -84,19 +84,21 @@ mmf::Flux HLL::calc_mm_flux(const mmf::PState &zL, const mmf::PState &zR, const 
     else if (s2 < 0)
         F_hll = fR;
     else {
+        std::cerr << "Error in HLL\n";
         std::cerr << "zL: " << zL << "\n"; // сюда попадает только если где-то none или другие кривые значения
         std::cerr << "Zr: " << zR << "\n";
         std::cerr << "Sound speed left: " << c1 << " , Sound speed right: " << c2 << "\n";
-        std::cerr << "SL: " << s1;
+        std::cerr << "SL: " << s1 << ", SR: " << s2 << '\n';
         exit(1);
         throw std::runtime_error("HLL::calc_mm_flux Error, strange case in switch");
     }
 
     if (F_hll.is_bad()) {
+        std::cerr << "Error in HLL\n";
         std::cerr << "zL: " << zL << "\n";
         std::cerr << "Zr: " << zR << "\n";
         std::cerr << "Sound speed left: " << c1 << " , Sound speed right: " << c2 << "\n";
-        std::cerr << "SL: " << s1 << ", SR: " << s2;
+        std::cerr << "SL: " << s1 << ", SR: " << s2 << '\n';
         std::cerr << "F_HLL: " << F_hll << "\n";
         exit(1);
         throw std::runtime_error("HLL::calc_mm_flux Error, F_HLL has the bad value");

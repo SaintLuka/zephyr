@@ -549,8 +549,10 @@ void twoCellsFlux() {
 //    PState zR(1, {0, 0, 0}, 1e5, 250000, 348.189, {0, 1, 0, 0, 0});
 //    PState zL(844.421, {1249.39, -58.5863, 0}, -3.02777e+08, 814071, 295.246, {1, 0, 0, 0, 0});
 //    PState zR(933.798, {1323.63, -73.5489, 0}, 48.9301, 814647, 353.548, {1 - 1.04705e-08, 1.04705e-08, 0, 0, 0});
-    PState zL(778.501, {-142.966, -767.994, 0}, 5.34596, 823425, 354.973, {1 - 1.17486e-08, 1.17486e-08, 0, 0, 0});
-    PState zR(812.511, {-140.59, -776.187, 0}, -3.79503e+08, 818268, 278.312, {1, 0, 0, 0, 0});
+//    PState zL(778.501, {-142.966, -767.994, 0}, 5.34596, 823425, 354.973, {1 - 1.17486e-08, 1.17486e-08, 0, 0, 0});
+//    PState zR(812.511, {-140.59, -776.187, 0}, -3.79503e+08, 818268, 278.312, {1, 0, 0, 0, 0});
+    PState zL(1244.18, {617.159, -0.254738, 0}, 1.32954 * 1e9, 938374, 547.107, {1, 0, 0, 0, 0});
+    PState zR(1244.18, {617.159, 0.254738, 0}, 1.32954 * 1e9, 938374, 547.107, {1, 0, 0, 0, 0});
     zL.energy = matL->energy_rp(zL.density, zL.pressure);
     zL.temperature = matL->temperature_rp(zL.density, zL.pressure);
     zR.energy = matR->energy_rp(zR.density, zR.pressure);
@@ -588,28 +590,36 @@ frac: [0.999177, 0.000822642, 0, 0, 0]
 Previous PState: density: 885.444, velocity: {1332.07, -161.556, 0}, pressure: 179612, temperature: 307.596, energy: 531
 182, mass_frac: [0.999094, 0.000905938, 0, 0, 0]
 
+ Failed to calc PState from QState in fluxes
+QState: mass: 897.95, momentum: {891630, -112319, 0}, energy: -1.34419e+09, mass_frac: {897.557, 0.393557, 0, 0, 0}
+PState: density: 897.95, velocity: {992.962, -125.084, 0}, pressure: nan, temperature: nan, energy: -1.99776e+06, mass_f
+rac: {0.999562, 0.000438284, 0, 0, 0}
+Previous PState: density: 892.942, velocity: {988.304, -123.779, 0}, pressure: 1.26422e+06, temperature: 358.184, energy
+: 841574, mass_frac: {0.999549, 0.000451239, 0, 0, 0}
+
  */
-    QState q(879.816, {2.55266e+06, -40768.9, 0}, 4.14476e+09, FractionsFlux(std::vector<double>{874.83, 4.98573, 0, 0, 0}));
+//    QState q(879.816, {2.55266e+06, -40768.9, 0}, 4.14476e+09, FractionsFlux(std::vector<double>{874.83, 4.98573, 0, 0, 0}));
 //    QState q(43.3173, {-75385.5, 154394, 0}, 1.98132e+08, FractionsFlux(std::vector<double>{39.8422, 3.4751, 0, 0, 0}));
 //    QState q(890.801, {1.19051e+06, -143374, 0}, -1.65055e+09, FractionsFlux(std::vector<double>{890.068, 0.73281, 0, 0, 0}));
+    QState q(904.759, {992.962, -125.084, 0}, -1.34419e+09, FractionsFlux(std::vector<double>{1, 0, 0, 0, 0}));
     Materials mixture_eos;
     mixture_eos += StiffenedGas::create("Water");
     mixture_eos += StiffenedGas::create("Air");
-    std::cout << PState(q, mixture_eos, 2.07384e+08, 420.184) << "\n";
+    std::cout << PState(q, mixture_eos, -2, 300) << "\n";
 
     PState p_state;
     auto mass_frac = Fractions(q.mass_frac);
     p_state.mass_frac = mass_frac;
     p_state.density = q.mass;
-    p_state.velocity = q.momentum / p_state.density;
-    p_state.energy = q.energy / p_state.density - 0.5 * p_state.velocity.squaredNorm();
+//    p_state.velocity = q.momentum / p_state.density;
+//    p_state.energy = q.energy / p_state.density - 0.5 * p_state.velocity.squaredNorm();
+    p_state.energy = 824908;
 
     std::vector<StiffenedGas> mixture = {StiffenedGas("Water"), StiffenedGas("Air")};
     int n = mixture.size();
 
     double eps0;
     std::vector<double> B(n, 0), g(n), P0(n), T0(n);
-    double P_min = -1e10;
     for (int i = 0; i < n; i++) {
         if (mass_frac.has(i)) {
             eps0 += mass_frac[i] * mixture[i].eps_0;
@@ -618,13 +628,13 @@ Previous PState: density: 885.444, velocity: {1332.07, -161.556, 0}, pressure: 1
         g[i] = mixture[i].gamma - 1;
         P0[i] = mixture[i].P0;
         T0[i] = mixture[i].T0;
-        P_min = std::max(P_min, mixture[i].min_pressure());
     }
-    P_min += 1;
+    double P_min = mixture_eos.min_pressure(mass_frac);
+    std::cout << "P_min: " << P_min << '\n';
 
-    P_min = 1e4;
-    double P_max = 2e5;
-    int size = 100000;
+    P_min = -3e8;
+    double P_max = -5e7;
+    int size = 10000;
     double step = (P_max - P_min) / size;
 
     std::vector<double> P(size);
@@ -751,7 +761,7 @@ int main() {
                   x_min, x_max // x_min, x_max
     );
 
-    twoCellsFlux();
+//    twoCellsFlux();
 
 //    RiemannTesterWithSolver(Fluxes::GODUNOV, waterAir, 1000, 1, "water_air");
 //    RiemannTesterWithSolver(Fluxes::GODUNOV, test3, 100, 2);
@@ -760,7 +770,7 @@ int main() {
 //    RiemannTesterWithSolver(Fluxes::GODUNOV, mm_toro, 100, 2);
 //    RiemannTesterWithSolver(Fluxes::GODUNOV, mm_sod, 100, 2);
 
-//    find_PT();
+    find_PT();
 
 //    Stopwatch solve;
 //    solve.start();
