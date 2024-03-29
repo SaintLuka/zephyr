@@ -685,9 +685,9 @@ void Bubble2D(int n_cells = 20, int acc = 2, const std::string &filename = "outp
         time = solver.get_time();
     }
 
-    std::cout << "Update seconds elapsed: " << timer.seconds() << '\n';
-    std::cout << "Set flags seconds elapsed: " << set_flags.seconds() << '\n';
-    std::cout << "Refine seconds elapsed: " << refine.seconds() << '\n';
+    std::cout << "Update seconds elapsed: " << timer.milliseconds() << " ms\n";
+    std::cout << "Set flags seconds elapsed: " << set_flags.milliseconds() << " ms \n";
+    std::cout << "Refine seconds elapsed: " << refine.milliseconds() << " ms \n";
     // Update seconds elapsed: 23
     // Set flags seconds elapsed: 5
     // Refine seconds elapsed: 108
@@ -848,7 +848,7 @@ void AirWithSF62D(int n_cells = 25, int acc = 2, const std::string &filename = "
     double max_time = 4.0e-3;
     double rho_wave = 1153.0_kg_m3, rho_air = 1667.0_kg_m3, rho_sf6 = 5805.0_kg_m3;
     double p_wave = 1.63256e5_bar, p_air = 0.96856e5_bar, p_sf6 = 0.96856e5_bar;
-    double u_wave = 10.273_m_s, u_air = 0, u_sf6 = 0;
+    double u_wave = 133.273_m_s, u_air = 0, u_sf6 = 0;
     double e_wave = air->energy_rp(rho_wave, p_wave), e_air = air->energy_rp(rho_air, p_air), e_sf6 = sf6->energy_rp(rho_sf6, p_sf6);
     double t_wave = air->temperature_rp(rho_wave, p_wave), t_air = air->temperature_rp(rho_air, p_air), t_sf6 = sf6->temperature_rp(rho_sf6, p_sf6);
 

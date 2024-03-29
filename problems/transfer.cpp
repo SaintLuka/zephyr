@@ -113,26 +113,13 @@ void setup_initial_2(EuMesh& mesh, bool exact = false) {
 }
 
 // Начальное условие в виде круга
-void setup_initial_3(EuMesh& mesh, bool exact = false) {
-    auto inside = [](const Vector3d& v) -> bool {
-        const double R = 0.15;
-        const double R2 = R * R;
-        const Vector3d c = {0.25, 0.25, 0.0};
-
-        return (v - c).squaredNorm() < R2;
-    };
+void setup_initial_3(EuMesh& mesh, bool exact = true) {
+    const double R = 0.15;
+    const Vector3d c = {0.25, 0.25, 0.0};
 
     for (auto cell: mesh) {
-        if (!exact) {
-            cell(U).u1 = inside(cell.center());
-        }
-        else {
-            double vol_frac = cell.approx_vol_fraction(inside);
-            if (0.0 < vol_frac && vol_frac < 1.0) {
-                vol_frac = cell.volume_fraction(inside, 10000);
-            }
-            cell(U).u1 = vol_frac;
-        }
+        auto poly = cell.polygon();
+        cell(U).u1 = poly.disk_clip_area(c, R) / cell.volume();
         cell(U).u2 = 0.0;
     }
 }
@@ -187,10 +174,11 @@ int main() {
     // Адаптация под начальные данные
     int n_init_loops = mesh.is_adaptive() ? mesh.max_level() + 2 : 0;
     for (int k = n_init_loops; k >= 0; --k) {
-        setup_initial_2(mesh, k < 1);
+        setup_initial_3(mesh, k < 1);
         solver.set_flags(mesh);
         mesh.refine();
     }
+    solver.update_interface(mesh);
 
     double init_volume = volume(mesh);
     std::cout << "Начальный объем: " << init_volume << "\n";
@@ -199,7 +187,7 @@ int main() {
     double curr_time = 0.0;
     double next_write = 0.0;
 
-    while(curr_time < 0.8 && n_step < 200000) {
+    while(curr_time < 0.8 && n_step < 200) {
         if (curr_time >= next_write) {
             std::cout << "\tШаг: " << std::setw(6) << n_step << ";"
                       << "\tВремя: " << std::setw(8) << std::setprecision(3) << std::fixed
@@ -209,9 +197,6 @@ int main() {
             std::cout << "\tОшибка: " << std::setw(12) << std::setprecision(3) << std::scientific
                       << (curr_volume - init_volume) / (init_volume) << "\n";
 
-            solver.compute_normals(mesh, 3);
-            solver.find_sections(mesh);
-
             pvd.save(mesh.locals(), curr_time);
 
             AmrStorage body = solver.body(mesh);
@@ -220,7 +205,7 @@ int main() {
             AmrStorage scheme = solver.scheme(mesh);
             pvd_scheme.save(scheme, curr_time);
 
-            next_write += 0.02;
+            next_write += 0.0;
         }
 
         // Шаг решения

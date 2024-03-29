@@ -328,6 +328,7 @@ Grid Cuboid::make() {
     }
 
     grid.setup_adjacency();
+    grid.assume_structured(m_nx, m_ny, m_nz);
 
     return grid;
 

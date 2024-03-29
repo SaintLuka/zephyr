@@ -1,8 +1,9 @@
 #pragma once
 
 #include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/geom/interface_recovery.h>
 
-namespace zephyr { namespace math {
+namespace zephyr::math {
 
 using zephyr::mesh::EuCell;
 using zephyr::mesh::EuMesh;
@@ -10,6 +11,8 @@ using zephyr::mesh::AmrStorage;
 using zephyr::mesh::Distributor;
 using zephyr::geom::Vector3d;
 using zephyr::geom::Direction;
+using zephyr::geom::InterfaceRecovery;
+
 
 /// @brief Класс для моделирования уравнения переноса с аналогом CRP.
 class Transfer {
@@ -20,11 +23,6 @@ public:
         double u1, u2;  ///< Объемные доли
         Vector3d n;     ///< Внешняя нормаль поверхности
         Vector3d p;     ///< Базисная точка поверхности
-        Vector3d n2;    ///< Нормаль (вспомогательное значение)
-
-        inline bool zero_normal() const {
-            return n.squaredNorm() == 0.0;
-        }
     };
 
     /// @brief Получить экземпляр расширенного вектора состояния
@@ -56,12 +54,12 @@ public:
     /// @brief Один шаг интегрирования по времени
     void update(EuMesh& mesh);
 
+    /// @brief Подсеточная реконструкция границы
+    /// @param smoothing Число итераций сглаживания
+    void update_interface(EuMesh& mesh, int smoothing = 3);
+
     /// @brief Обновить флаг направления
     void update_dir();
-
-    void compute_normals(EuMesh& mesh, int smoothing = 0);
-
-    void find_sections(EuMesh& mesh);
 
     /// @brief Установить флаги адаптации
     void set_flags(EuMesh& mesh);
@@ -76,15 +74,13 @@ public:
 protected:
 
     /// @brief Посчитать шаг интегрирования по времени с учетом
-    /// условия Куранта
+    /// условия Куранта (для одной ячейки)
     double compute_dt(EuCell& cell);
 
+    /// @brief Посчитать шаг интегрирования по времени с учетом
+    /// условия Куранта (для всех ячеек)
     double compute_dt(EuMesh& mesh);
 
-    void find_section(EuCell& cell);
-
-    /// @brief Посчитать нормали
-    void compute_normal(EuCell& cell);
 
     void update_ver1(EuMesh& mesh);
 
@@ -101,18 +97,15 @@ protected:
     /// @brief Потоки по схеме CRP, но a_sig выбирается по аналогу VOF
     void fluxes_MIX(EuCell& cell, Direction dir = Direction::ANY);
 
+
 protected:
-
-    void smooth_normal(EuCell& cell);
-
-    void update_normal(EuCell& cell);
-
 
     double m_dt;      ///< Шаг интегрирования
     double m_CFL;     ///< Число Куранта
     int    m_ver;     ///< Версия функции update
     Direction m_dir;  ///< Направление на текущем шаге
+
+    InterfaceRecovery interface; ///< Реконструкция границы
 };
 
-} // namespace math
-} // namespace zephyr
+} // namespace zephyr::math

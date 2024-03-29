@@ -1,6 +1,7 @@
 #include <zephyr/math/solver/transfer.h>
 
 #include <zephyr/geom/polygon.h>
+#include <zephyr/geom/intersection.h>
 #include <zephyr/math/cfd/face_extra.h>
 #include <zephyr/geom/primitives/bface.h>
 
@@ -16,7 +17,11 @@ Transfer::State Transfer::datatype() {
     return {};
 }
 
-Transfer::Transfer() {
+Transfer::Transfer()
+    : interface{offsetof(State, u1),
+                offsetof(State, n),
+                offsetof(State, p)} {
+
     m_dt  = 1.0e+300;
     m_CFL = 0.5;
     m_ver = 1;
@@ -88,6 +93,14 @@ inline double between(double x_min, double x, double x_max) {
 
 inline std::tuple<double, double> minmax(double a1, double a2) {
     return std::make_tuple(std::min(a1, a2), std::max(a1, a2));
+}
+
+inline bool is_zero(const Vector3d& p) {
+    return p.x() == 0.0 && p.y() == 0.0 && p.z() == 0.0;
+}
+
+inline double cross(const Vector3d& v1, const Vector3d& v2) {
+    return v1.x() * v2.y() - v1.y() * v2.x();
 }
 
 // a1, a2 -- объемные доли
@@ -177,14 +190,14 @@ double flux_VOF(
 
     auto& poly = poly4;
 
-    if (a < 1.0e-6) {
+    if (a < 1.0e-8) {
         // Маленькую часть отправляем по нормали
         if (Vn.squaredNorm() > Vt.squaredNorm())
             return a * poly.area();
         else {
             return 0.0;
         }
-    } else if (a > 1.0 - 1.0e-6) {
+    } else if (a > 1.0 - 1.0e-8) {
         // От полной ячейки отрезаем весь кусок
         return poly.area();
     }
@@ -333,9 +346,11 @@ void Transfer::update_ver1(EuMesh& mesh) {
 
     // Обновляем слои
     for (auto cell: mesh) {
-        cell(U).u1 = std::max(0.0, std::min(cell(U).u2, 1.0));
+        cell(U).u1 = between(0.0, cell(U).u2, 1.0);
         cell(U).u2 = 0.0;
     }
+
+    update_interface(mesh);
 
     update_dir();
 }
@@ -344,9 +359,6 @@ void Transfer::update_ver2(EuMesh& mesh) {
     // Определяем dt
     m_dt = compute_dt(mesh);
 
-    compute_normals(mesh, 3);
-    find_sections(mesh);
-
     // Считаем потоки
     for (auto cell: mesh) {
         fluxes_VOF(cell, m_dir);
@@ -354,12 +366,11 @@ void Transfer::update_ver2(EuMesh& mesh) {
 
     // Обновляем слои
     for (auto& cell: mesh) {
-        cell(U).u1 = std::max(0.0, std::min(cell(U).u2, 1.0));
+        cell(U).u1 = between(0.0, cell(U).u2, 1.0);
         cell(U).u2 = 0.0;
     }
 
-    compute_normals(mesh, 3);
-    find_sections(mesh);
+    update_interface(mesh);
 
     update_dir();
 }
@@ -368,9 +379,6 @@ void Transfer::update_ver3(EuMesh& mesh) {
     // Определяем dt
     m_dt = compute_dt(mesh);
 
-    compute_normals(mesh, 3);
-    find_sections(mesh);
-
     // Считаем потоки
     for (auto cell: mesh) {
         fluxes_MIX(cell, m_dir);
@@ -378,117 +386,17 @@ void Transfer::update_ver3(EuMesh& mesh) {
 
     // Обновляем слои
     for (auto cell: mesh) {
-        cell(U).u1 = std::max(0.0, std::min(cell(U).u2, 1.0));
+        cell(U).u1 = between(0.0, cell(U).u2, 1.0);
         cell(U).u2 = 0.0;
     }
 
-    compute_normals(mesh, 3);
-    find_sections(mesh);
+    update_interface(mesh, 3);
 
     update_dir();
 }
 
-// Производная по теореме Гаусса--Остроградского
-void Transfer::compute_normal(EuCell& cell) {
-    double uc = cell(U).u1;
-
-    if (uc < 1.0e-6 || uc > 1.0 - 1.0e-6) {
-        cell(U).n = Vector3d::Zero();
-        return;
-    }
-
-    Vector3d n = Vector3d::Zero();
-    for (auto &face: cell.faces()) {
-        if (face.is_boundary()) {
-            continue;
-        }
-
-        double un = face.neib(U).u1;
-
-        Vector3d S = 0.5 * face.normal() * face.area();
-        n -= (uc + un) * S;
-    }
-
-    cell(U).n = n.normalized();
-}
-
-void Transfer::smooth_normal(EuCell& cell) {
-    Vector3d n2 = Vector3d::Zero();
-
-    if (cell(U).n.squaredNorm() == 0.0) {
-        cell(U).n2 = n2;
-        return;
-    }
-
-    int counter = 0;
-    for (auto &face: cell.faces()) {
-        if (face.is_boundary()) {
-            continue;
-        }
-
-        Vector3d nn = face.neib(U).n;
-        if (nn.squaredNorm() > 0.0) {
-            n2 += nn;
-            ++counter;
-        }
-    }
-
-    if (counter == 0) {
-        cell(U).n2 = cell(U).n;
-        int counter = 0;
-        for (auto &face: cell.faces()) {
-            if (face.is_boundary()) {
-                continue;
-            }
-
-            Vector3d nn = face.neib(U).n;
-            if (nn.squaredNorm() > 0.0) {
-                n2 += nn;
-                ++counter;
-            }
-        }
-        n2 += counter * cell(U).n;
-
-    }
-    else {
-        n2 += counter * cell(U).n;
-        cell(U).n2 = n2.normalized();
-    }
-
-}
-
-void Transfer::update_normal(EuCell& cell) {
-    cell(U).n = cell(U).n2;
-}
-
-void Transfer::find_section(EuCell &cell) {
-    if (cell(U).zero_normal()) {
-        cell(U).p = cell.center();
-    } else {
-        auto poly = cell.polygon();
-        cell(U).p = poly.find_section(cell(U).n, cell(U).u1);
-    }
-}
-
-void Transfer::compute_normals(EuMesh& mesh, int smoothing) {
-    for (auto cell: mesh) {
-        compute_normal(cell);
-    }
-
-    for (int i = 0; i < smoothing; ++i) {
-        for (auto &cell: mesh) {
-            smooth_normal(cell);
-        }
-        for (auto &cell: mesh) {
-            update_normal(cell);
-        }
-    }
-}
-
-void Transfer::find_sections(EuMesh& mesh) {
-    for (auto cell: mesh) {
-        find_section(cell);
-    }
+void Transfer::update_interface(EuMesh& mesh, int smoothing) {
+    interface.update(mesh, smoothing);
 }
 
 void Transfer::set_flags(EuMesh& mesh) {
@@ -537,34 +445,7 @@ Distributor Transfer::distributor() const {
 }
 
 AmrStorage Transfer::body(EuMesh& mesh) {
-    int count = 0;
-    for (auto cell: mesh) {
-        if (cell(U).u1 < 1.0e-6) {
-            continue;
-        }
-        ++count;
-    }
-
-    AmrStorage cells(U, count);
-
-    count = 0;
-    for (auto cell: mesh) {
-        if (cell(U).u1 < 1.0e-6) {
-            continue;
-        }
-
-        if (cell(U).u1 < 1.0 - 1.0e-6) {
-            auto poly = cell.polygon();
-            auto part = poly.clip(cell(U).p, cell(U).n);
-            cells[count] = AmrCell(part);
-        }
-        else {
-            cells[count] = cell.geom();
-        }
-        ++count;
-    }
-
-    return cells;
+    return interface.body(mesh);
 }
 
 AmrStorage Transfer::scheme(EuMesh& mesh) {
