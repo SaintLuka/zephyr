@@ -190,13 +190,21 @@ PState boundary_value(const PState &zc, const Vector3d &normal, Boundary flag) {
 }
 
 void MmFluid::compute_grad(Mesh &mesh, const std::function<mmf::PState(Cell &)> &to_state) {
-    mesh.for_each([&to_state](Cell &cell) -> void {
-        auto grad = math::compute_gradient_LSM<mmf::PState>(cell, to_state, boundary_value);
-        auto grad_lim = math::gradient_limiting<mmf::PState>(cell, grad, to_state, boundary_value);
-        cell(U).d_dx = grad_lim[0];
-        cell(U).d_dy = grad_lim[1];
-        cell(U).d_dz = grad_lim[2];
-    });
+    if (dim > 1) {
+        mesh.for_each([&to_state](Cell &cell) -> void {
+            auto grad = math::compute_gradient_LSM<mmf::PState>(cell, to_state, boundary_value);
+            auto grad_lim = math::gradient_limiting<mmf::PState>(cell, grad, to_state, boundary_value);
+            cell(U).d_dx = grad_lim[0];
+            cell(U).d_dy = grad_lim[1];
+            cell(U).d_dz = grad_lim[2];
+        });
+    } else {
+        mesh.for_each([&to_state](Cell &cell) -> void {
+            auto grad = math::compute_gradient_LSM_1D<mmf::PState>(cell, to_state, boundary_value);
+            auto grad_lim = math::gradient_limiting_1D<mmf::PState>(cell, grad, to_state, boundary_value);
+            cell(U).d_dx = grad_lim;
+        });
+    }
 }
 
 void MmFluid::fluxes_stage1(Mesh &mesh) {
@@ -432,7 +440,7 @@ Distributor MmFluid::distributor() const {
 void MmFluid::set_flags(Mesh &mesh) {
     compute_grad(mesh, get_current);
 
-    mesh.for_each([this](Cell &cell)-> void {
+    mesh.for_each([this](Cell &cell) -> void {
         double p = cell(U).p;
         double rho = cell(U).rho;
         Fractions mass_frac = cell(U).mass_frac;
@@ -468,6 +476,10 @@ void MmFluid::set_flags(Mesh &mesh) {
             cell.set_flag(-1);
         }
     });
+}
+
+void MmFluid::set_dim(int dim_) {
+    dim = dim_;
 }
 
 }

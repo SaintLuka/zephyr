@@ -9,7 +9,7 @@ namespace zephyr::utils {
 static const int default_n_tasks_per_thread = 10;
 
 /// @brief Минимальное число элементов на задачу по умолчанию
-static const int default_min_elements_per_task = 250;
+static const int default_min_elements_per_task = 500;
 
 
 /// @brief Статический класс. Упрощенный интерфейс для многопоточности.

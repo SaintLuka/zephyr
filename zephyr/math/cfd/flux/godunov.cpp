@@ -85,7 +85,8 @@ mmf::Flux Godunov::calc_mm_flux(const mmf::PState &zL, const mmf::PState &zR, co
 //        std::cerr << boost::format("PState zR(%1%, {%2%, %3%, %4%}, %5%, %6%, %7%, %8%);\n") %
 //                     zR.density % zR.velocity.x() % zR.velocity.y() % zR.velocity.z() % zR.pressure %
 //                     zR.energy % zR.temperature % zR.mass_frac;
-        flux = HLL::calc_mm_flux(zL, zR, mixture);
+//        std::cerr << "Godunov flux RIP\n";
+        flux = Rusanov2::calc_mm_flux(zL, zR, mixture);
 //        exit(1);
 //        throw std::runtime_error("Bad Godunov flux");
     }

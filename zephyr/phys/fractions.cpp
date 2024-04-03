@@ -108,8 +108,8 @@ int Fractions::index() const {
 
 void Fractions::normalize() {
     double sub = 0.0;
-    for(auto &v: m_data){
-       sub += abs(v);
+    for (auto &v: m_data) {
+        sub += abs(v);
     }
 
     double sum = 0;
@@ -118,7 +118,7 @@ void Fractions::normalize() {
             if (-1e-5 * sub < v)
                 v = 0;
             else {
-                std::cerr << "mass_frac[i] < 0: " <<  *this;
+                std::cerr << "mass_frac[i] < 0: " << *this;
                 exit(1);
                 throw std::runtime_error("mass_frac[i] < 0");
             }
@@ -129,7 +129,7 @@ void Fractions::normalize() {
     for (int i = 0; i < max_size; ++i) {
         m_data[i] /= sum;
     }
-    cutoff(1e-8);
+    cutoff(1e-12);
 }
 
 void Fractions::cutoff(double eps) {
@@ -202,6 +202,14 @@ bool FractionsFlux::has(int idx) const {
     if (idx > m_data.size())
         return false;
     return m_data[idx] > 0.0;
+}
+
+double &FractionsFlux::operator[](size_t idx) {
+    return m_data[idx];
+}
+
+const double &FractionsFlux::operator[](size_t idx) const {
+    return m_data[idx];
 }
 
 std::ostream &operator<<(std::ostream &os, const FractionsFlux &frac) {

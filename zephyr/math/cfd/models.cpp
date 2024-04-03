@@ -141,6 +141,16 @@ PState::PState(const QState &q, const phys::Materials &mixture, double P0, doubl
     velocity = q.momentum / density;
     energy = q.energy / density - 0.5 * velocity.squaredNorm();
     pressure = mixture.pressure_re(density, energy, mass_frac, {.P0=P0, .T0=T0});
+    if (std::isnan(pressure)) {
+        pressure = mixture.pressure_re(density, energy, mass_frac, {.P0=-P0, .T0=T0});
+//        if (std::isnan(pressure)) {
+//            mass_frac.cutoff(1e-8);
+//            pressure = mixture.pressure_re(density, energy, mass_frac, {.P0=P0, .T0=T0});
+//            if (std::isnan(pressure)) {
+//                pressure = mixture.pressure_re(density, energy, mass_frac, {.P0=-P0, .T0=T0});
+//            }
+//        }
+    }
     temperature = mixture.temperature_rp(density, pressure, mass_frac, {.T0=T0});
 }
 
@@ -203,7 +213,7 @@ bool PState::is_bad() const {
            std::isinf(energy) || std::isnan(energy) ||
            std::isinf(temperature) || std::isnan(temperature) ||
            mass_frac.empty() ||
-           density < 0 || temperature < 0;
+           density < 0;
 }
 
 void PState::sync_temperature_energy_rp(const phys::Materials &mixture, const phys::Options &options) {

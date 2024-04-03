@@ -234,7 +234,7 @@ PairPT Materials::find_PT(double rho, double eps,
 
     double err = 1.0;
     int counter = 0;
-    while (err > 1.0e-12 && counter < 30) {
+    while (err > 1.0e-12 && counter < 30 && !std::isnan(P)) {
         auto v = volume_pt(P, T, beta);
         auto e = energy_pt(P, T, beta);
 

@@ -94,6 +94,8 @@ public:
 
     void set_acc(int acc);
 
+    void set_dim(int dim_);
+
     [[nodiscard]] double get_time() const;
 
     [[nodiscard]] size_t get_step() const;
@@ -140,8 +142,8 @@ public:
     ~MmFluid() = default;
 
 protected:
-    std::mutex out_mu{};
     const phys::Materials mixture;
+    int dim = 3;
     NumFlux::Ptr m_nf; ///< Метод расчёта потока
     double g = 0.0; ///< ускорение свободного падения, направлено против oy
     int m_acc = 1;
@@ -149,6 +151,8 @@ protected:
     size_t m_step = 0; ///< Количество шагов расчёта
     double m_CFL; ///< Число Куранта
     double m_dt; ///< Шаг интегрирования
+
+    std::mutex out_mu{};
 };
 
 } // namespace zephyr

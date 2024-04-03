@@ -79,6 +79,18 @@ mmf::Flux Rusanov2::calc_mm_flux(const mmf::PState &zL, const mmf::PState &zR, c
 
     double c1 = mixture.sound_speed_rp(rho1, p1, zL.mass_frac, {.T0 = zL.temperature});
     double c2 = mixture.sound_speed_rp(rho2, p2, zR.mass_frac, {.T0 = zR.temperature});
+    if(std::isnan(c1)) {
+        c1 = 0;
+        if(abs(p1) > 1e-3){
+            std::cerr << "Can't find sound speed for state: " << zL << "\n";
+        }
+    }
+    if(std::isnan(c2)) {
+        c1 = 0;
+        if(abs(p2) > 1e-3){
+            std::cerr << "Can't find sound speed for state: " << zR << "\n";
+        }
+    }
 
     // Максимальное собственное значение
     double max_lambda = std::max(std::abs(u1) + c1, std::abs(u2) + c2);

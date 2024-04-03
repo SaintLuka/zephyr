@@ -11,6 +11,7 @@
 
 #include <zephyr/math/solver/riemann.h>
 #include <zephyr/phys/eos/stiffened_gas.h>
+#include <zephyr/phys/eos/mie_gruneisen.h>
 #include <zephyr/utils/matplotlib.h>
 
 
@@ -158,7 +159,8 @@ RiemannTesterWithSolver(Fluxes flux, const MmTest &test, int n_cells = 10, int a
 
     MmFluid solver(mixture, flux);
     solver.set_acc(acc);
-    solver.set_CFL(0.4);
+    solver.set_CFL(0.5);
+    solver.set_dim(1);
 
     for (auto cell: mesh) {
         if (cell.center().x() < x_jump) {
@@ -188,7 +190,6 @@ RiemannTesterWithSolver(Fluxes flux, const MmTest &test, int n_cells = 10, int a
         }
         solver.update(mesh);
 
-//        time += max_time / n_writes;
         time = solver.get_time();
     }
 
@@ -235,6 +236,90 @@ RiemannTesterWithSolver(Fluxes flux, const MmTest &test, int n_cells = 10, int a
     */
     return {rho_err.first, u_err.first, p_err.first, e_err.first, c_err.first};
 }
+
+void ImpactProblem(int n_cells = 500, int acc = 2, const std::string &filename = "output") {
+    // Уравнение состояния
+    auto pb = MieGruneisen::create("Pb");
+    auto air = IdealGas::create("Air");
+
+    Materials mixture;
+    mixture += pb;
+    mixture += air;
+
+    double x_min = 0.0_cm, x_max = 1.0_cm;
+    double x_jump = 0.5_cm;
+
+    double max_time = 20.0_us;
+    double rhoL = 11.4_g_cm3, rhoR = 1.0_kg_m3;
+    double pL = 1.0_bar, pR = 1.0_bar;
+    double uL = -1200.0_m_s, uR = -1200.0_m_s;
+    double eL = pb->energy_rp(rhoL, pL), eR = air->energy_rp(rhoR, pR);
+    double tL = pb->temperature_rp(rhoL, pL), tR = air->temperature_rp(rhoR, pR);
+
+    Fractions mass_fracL({1, 0});
+    Fractions mass_fracR({0, 1});
+    // Состояния слева и справа в тесте
+    PState zL(rhoL, Vector3d(uL, 0, 0), pL, eL, tL, mass_fracL);
+    PState zR(rhoR, Vector3d(uR, 0, 0), pR, eR, tR, mass_fracR);
+
+    std::cout << "ZL: " << zL << "\n" << "zR: " << zR << "\n";
+
+    // Файл для записи
+    PvdFile pvd("mesh", filename);
+
+    // Переменные для сохранения
+    pvd.variables += {"rho", get_rho};
+    pvd.variables += {"u", get_u};
+    pvd.variables += {"p", get_p};
+    pvd.variables += {"e", get_e};
+    pvd.variables += {"frac1", get_frac1};
+    pvd.variables += {"frac2", get_frac2};
+    pvd.variables += {"T", get_T};
+
+    double time = 0.0;
+
+    // Создаем одномерную сетку
+    Strip gen(x_min, x_max);
+    gen.set_size(n_cells);
+    gen.set_boundaries({.left   = Boundary::WALL, .right = Boundary::ZOE});
+
+    // Создать сетку
+    Mesh mesh(U, &gen);
+
+    MmFluid solver(mixture, Fluxes::GODUNOV);
+    solver.set_acc(acc);
+    solver.set_dim(1);
+    solver.set_CFL(0.5);
+
+    for (auto cell: mesh) {
+        if (cell.center().x() < x_jump) {
+            cell(U).set_state(zL);
+        } else {
+            cell(U).set_state(zR);
+        }
+    }
+
+    double next_write = 0.0;
+    int n_writes = 2000;
+    bool is_set = false;
+    while (time <= 1.01 * max_time) {
+        if (time >= next_write) {
+            std::cout << "progress: " << std::fixed << std::setprecision(2) << 100 * time / max_time << "%\n";
+            pvd.save(mesh, time);
+            next_write += max_time / n_writes;
+        }
+
+        if (!is_set && time >= 3.6e-6) {
+            solver.set_CFL(0.5);
+            is_set = true;
+        }
+
+        solver.update(mesh);
+
+        time = solver.get_time();
+    }
+}
+
 
 std::vector<double>
 RiemannTesterWithSolverCSV(Fluxes flux, const MmTest &test, int n_cells = 10, int acc = 1, const std::string &filename = "output.csv") {
@@ -681,8 +766,67 @@ Previous PState: density: 892.942, velocity: {988.304, -123.779, 0}, pressure: 1
 //    p.temperature = mixture.temperature_rp(density, pressure, mass_frac, {.T0=T0});
 }
 
+void find_PT2() {
+    /*
+    Failed to calc PState from QState in fluxes_stage2
+    QState: mass: 2304.05, momentum: {-411216, 0, 0}, energy: -2.08431e+08, mass_frac: {2304.05, 8.50948e-05, 0, 0, 0}
+    PState: density: 2304.05, velocity: {-178.476, 0, 0}, pressure: nan, temperature: nan, energy: -106390, mass_frac: {1, 3.69328e-08, 0, 0, 0}
+    Previous PState: density: 1736.32, velocity: {-64.1133, 0, 0}, pressure: 74.4769, temperature: 2676.13, energy: 365287, mass_frac: {1, 4.50739e-08, 0, 0, 0}
+
+     Failed to calc PState from QState in fluxes_stage2
+    QState: mass: 1344.46, momentum: {-1.73939e+06, 0, 0}, energy: -1.19307e+09, mass_frac: {1344.46, 5.43148e-05, 0, 0, 0}
+    PState: density: 1344.46, velocity: {-1293.75, 0, 0}, pressure: nan, temperature: nan, energy: -1.72429e+06, mass_frac:{1, 4.03989e-08, 0, 0, 0}
+    Previous PState: density: 1117.4, velocity: {698.168, 0, 0}, pressure: 61.6383, temperature: 3077.63, energy: 453402, mass_frac: {1, 5.43048e-08, 0, 0, 0}
+
+     Failed to calc PState from QState in fluxes_stage2
+    QState: mass: 1128.72, momentum: {-2.13144e+06, 0, 0}, energy: -1.12074e+09, mass_frac: {1128.72, 6.31637e-05, 0, 0, 0}
+    PState: density: 1128.72, velocity: {-1888.36, 0, 0}, pressure: nan, temperature: nan, energy: -2.77588e+06, mass_frac: {1, 5.59605e-08, 0, 0, 0}
+    Previous PState: density: 915.281, velocity: {703.643, 0, 0}, pressure: 110.601, temperature: 4780.4, energy: 920560, mass_frac: {1, 7.63444e-08, 0, 0, 0}
+
+     Failed to calc PState from QState in fluxes_stage2
+    QState: mass: 2062.58, momentum: {-1.35768e+06, -420176, 0}, energy: -7.80816e+08, mass_frac: {2062.58, 4.42559e-08, 0, 0, 0}
+    PState: density: 2062.58, velocity: {-658.241, -203.713, 0}, pressure: nan, temperature: nan, energy: -615952, mass_frac: {1, 2.14565e-11, 0, 0, 0}
+    Previous PState: density: 2088.02, velocity: {-659.333, -204.721, 0}, pressure: 128.072, temperature: 17533.1, energy: -411741, mass_frac: {1, 2.14709e-11, 0, 0, 0}
+     */
+//    QState q(2304.05, {-411216, 0, 0}, -2.08431e+08, FractionsFlux(std::vector<double>{2304.05, 8.50948e-05, 0, 0, 0}));
+//    double P0 = 74.4769, T0 = 2676.13;
+//    QState q(1344.46, {-1.73939e+06, 0, 0}, -1.19307e+09, FractionsFlux(std::vector<double>{1344.46, 5.43148e-05, 0, 0, 0}));
+//    double P0 = 61.6383, T0 = 3077.63;
+//    QState q(1128.72, {-2.13144e+06, 0, 0}, -1.12074e+09, FractionsFlux(std::vector<double>{1128.72, 6.31637e-05, 0, 0, 0}));
+//    double P0 = 110.601, T0 = 4780.4;
+    QState q(2062.58, {-1.35768e+06, -420176, 0}, -7.80816e+08, FractionsFlux(std::vector<double>{2062.58, 4.42559e-08, 0, 0, 0}));
+    double P0 = 128.072, T0 = 17533.1;
+    Materials mixture_eos;
+    mixture_eos += MieGruneisen::create("Pb");
+    mixture_eos += IdealGas::create("Air");
+
+    std::cout << PState(q, mixture_eos, P0, T0) << "\n";
+    std::cout << PState(q, mixture_eos, -P0, T0) << "\n";
+
+    std::cout << PState(q, mixture_eos, P0, 50) << "\n";
+    std::cout << PState(q, mixture_eos, -P0, 50) << "\n";
+
+    std::cout << PState(q, mixture_eos, P0, 2000) << "\n";
+    std::cout << PState(q, mixture_eos, -P0, 2000) << "\n";
+
+    std::cout << PState(q, mixture_eos, 1e5, T0) << "\n";
+    std::cout << PState(q, mixture_eos, -1e5, T0) << "\n";
+
+    std::cout << PState(q, mixture_eos, 1e5, 2000) << "\n";
+    std::cout << PState(q, mixture_eos, -1e5, 2000) << "\n";
+
+    std::cout << PState(q, mixture_eos, 1e2, 20) << "\n";
+    std::cout << PState(q, mixture_eos, -1e2, 20) << "\n";
+
+    std::cout << PState(q, mixture_eos, 1e5, 20) << "\n";
+    std::cout << PState(q, mixture_eos, -1e5, 20) << "\n";
+
+    std::cout << PState(q, mixture_eos, 1e2, 2000) << "\n";
+    std::cout << PState(q, mixture_eos, -1e2, 2000) << "\n";
+}
+
 int main() {
-//    threads::on();
+    threads::on(16);
     // Тестовая задача
     SodTest sod_test;
     ToroTest toro_test(3);
@@ -770,7 +914,8 @@ int main() {
 //    RiemannTesterWithSolver(Fluxes::GODUNOV, mm_toro, 100, 2);
 //    RiemannTesterWithSolver(Fluxes::GODUNOV, mm_sod, 100, 2);
 
-    find_PT();
+//    find_PT2();
+    ImpactProblem(1000, 2, "impact_problem2");
 
 //    Stopwatch solve;
 //    solve.start();

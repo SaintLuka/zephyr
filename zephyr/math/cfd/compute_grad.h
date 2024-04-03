@@ -80,7 +80,7 @@ std::array<T, 3> compute_gradient_LSM(Cell &cell,
         Fz += weight * dF * dr.z();
     }
 
-    if (Fz.squaredNorm() < 1e-10) {
+    if (Fz.squaredNorm() < 1e-10 && abs(A(2, 2)) < 1e-10) {
         A(2, 2) = 1;
     }
     check_matrix(A, "A");
@@ -141,7 +141,7 @@ std::array<T, 3> gradient_limiting(Cell &cell, const std::array<T, 3> &grad,
         Fz += weight * dF_lim * dr.z();
     }
 
-    if (Fz.squaredNorm() < 1e-10) {
+    if (Fz.squaredNorm() < 1e-10 && abs(A(2, 2)) < 1e-10) {
         A(2, 2) = 1;
     }
     check_matrix(A, "A");
@@ -159,6 +159,88 @@ std::array<T, 3> gradient_limiting(Cell &cell, const std::array<T, 3> &grad,
 
     return z_xyz;
 }
+
+template<class T>
+T compute_gradient_LSM_1D(Cell &cell,
+                          const std::function<T(Cell &)> &to_state,
+                          const std::function<T(const T &, const Vector3d &, Boundary)> &boundary_value) {
+    T zc = to_state(cell);
+    constexpr int rows = 1;
+    constexpr int cols = T::size();
+    using StateVec = Matrix<double, rows, cols>;
+
+    StateVec Fx = StateVec::Zero();
+    double A = 0;
+    for (auto &face: cell.faces()) {
+        auto neib = face.neib();
+        T zn(zc);
+
+        if (!face.is_boundary()) {
+            zn = to_state(neib);
+        } else {
+            zn = boundary_value(zc, face.normal(), face.flag());
+        }
+
+        Vector3d dr = 2 * (face.center() - cell.center());
+        double weight = face.area() / dr.squaredNorm();
+
+        A += weight * dr.x() * dr.x();
+
+        StateVec dF = zn.vec() - zc.vec();
+
+        Fx += weight * dF * dr.x();
+    }
+
+    check_matrix(Fx, "Fx");
+
+    return Fx / A;
+}
+
+template<class T>
+T gradient_limiting_1D(Cell &cell, const T &grad,
+                       const std::function<T(Cell &)> &to_state,
+                       const std::function<T(const T &, const Vector3d &, Boundary)> &boundary_value) {
+    T zc = to_state(cell);
+
+    const double epsilon = std::numeric_limits<double>::min();
+    constexpr int rows = 1;
+    constexpr int cols = T::size();
+    using StateVec = Matrix<double, rows, cols>;
+
+    StateVec Fx = StateVec::Zero();
+    double A = 0;
+    for (auto &face: cell.faces()) {
+        auto neib = face.neib();
+        T zn(zc);
+
+        if (!face.is_boundary()) {
+            zn = to_state(neib);
+        } else {
+            zn = boundary_value(zc, face.normal(), face.flag());
+        }
+
+        Vector3d dr = 2 * (face.center() - cell.center());
+        double weight = face.area() / dr.squaredNorm();
+
+        A += weight * dr.x() * dr.x();
+
+        StateVec dF = zn.vec() - zc.vec();
+        StateVec theta = 2 * grad.vec() * dr.x();
+        StateVec dF_lim = StateVec::Zero();
+        for (int i = 0; i < rows; i++)
+            for (int j = 0; j < cols; j++) {
+                theta(i, j) = limiters::MC(theta(i, j) / (dF(i, j) + epsilon) - 1);
+                dF_lim(i, j) = dF(i, j) * theta(i, j);
+            }
+
+        Fx += weight * dF_lim * dr.x();
+    }
+
+    check_matrix(Fx, "Fx");
+
+    return Fx / A;
+}
+
 
 /*
 

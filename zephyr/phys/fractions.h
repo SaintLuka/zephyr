@@ -115,6 +115,12 @@ struct FractionsFlux {
         return m_data;
     }
 
+    /// @brief Оператор доступа по индексу
+    double &operator[](size_t idx);
+
+    /// @brief Оператор доступа по индексу
+    const double &operator[](size_t idx) const;
+
     std::array<double, Fractions::max_size> m_data{};
 
     VECTORIZE(FractionsFlux)
