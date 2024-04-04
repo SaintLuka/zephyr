@@ -269,20 +269,16 @@ mmf::Flux MmFluid::calc_flux_extra(Cell &cell, bool from_begin) {
                          cell(U).d_dx.vec() * dr.x() +
                          cell(U).d_dy.vec() * dr.y() +
                          cell(U).d_dz.vec() * dr.z();
-        p_minus.to_local(normal);
 
         dr = face.center() - neib_c;
         PState p_plus = p_minus;
         if (!face.is_boundary())
-            p_plus = p_neib.vec() +
+            p_plus = face.neib()(U).get_pstate().vec() +
                      face.neib()(U).d_dx.vec() * dr.x() +
                      face.neib()(U).d_dy.vec() * dr.y() +
                      face.neib()(U).d_dz.vec() * dr.z();
-        else if (face.flag() == Boundary::WALL) {
-            Vector3d Vn = normal * p_minus.velocity.dot(normal);
-            p_plus.velocity = p_minus.velocity - 2 * Vn;
-        }
         p_plus.to_local(normal);
+        p_minus.to_local(normal);
         */
 
         // исправляем возможные нефизичные значения массовых долей

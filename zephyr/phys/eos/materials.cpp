@@ -210,7 +210,7 @@ StiffenedGas Materials::stiffened_gas(double rho, double P,
 
 double Materials::min_pressure(const Fractions &beta) const {
     double P_min = -std::numeric_limits<double>::infinity();
-    for (int i = 0; i < Fractions::max_size; ++i) {
+    for (int i = 0; i < size(); ++i) {
         if (beta.has(i)) {
             P_min = std::max(P_min, m_materials[i]->min_pressure());
         }

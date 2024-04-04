@@ -275,6 +275,15 @@ void ImpactProblem(int n_cells = 500, int acc = 2, const std::string &filename =
     pvd.variables += {"frac1", get_frac1};
     pvd.variables += {"frac2", get_frac2};
     pvd.variables += {"T", get_T};
+//    pvd.variables += {"P_min", [&mixture](AmrStorage::Item &cell) -> double {
+//        return -mixture.stiffened_gas(cell(U).rho, cell(U).p, cell(U).mass_frac, {.T0 = cell(U).t}).P0;
+//    }};
+//    pvd.variables += {"gamma", [&mixture](AmrStorage::Item &cell) -> double {
+//        return mixture.stiffened_gas(cell(U).rho, cell(U).p, cell(U).mass_frac, {.T0 = cell(U).t}).gamma;
+//    }};
+//    pvd.variables += {"eps_0", [&mixture](AmrStorage::Item &cell) -> double {
+//        return mixture.stiffened_gas(cell(U).rho, cell(U).p, cell(U).mass_frac, {.T0 = cell(U).t}).eps_0;
+//    }};
 
     double time = 0.0;
 
