@@ -230,7 +230,7 @@ PairPT Materials::find_PT(double rho, double eps,
 
     double P_min = min_pressure(beta);
     if (P < P_min)
-        P = P_min + 1e-1;
+        P = P_min + 1;
 
     double err = 1.0;
     int counter = 0;

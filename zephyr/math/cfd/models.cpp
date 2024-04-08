@@ -143,13 +143,6 @@ PState::PState(const QState &q, const phys::Materials &mixture, double P0, doubl
     pressure = mixture.pressure_re(density, energy, mass_frac, {.P0=P0, .T0=T0});
     if (std::isnan(pressure)) {
         pressure = mixture.pressure_re(density, energy, mass_frac, {.P0=-P0, .T0=T0});
-//        if (std::isnan(pressure)) {
-//            mass_frac.cutoff(1e-8);
-//            pressure = mixture.pressure_re(density, energy, mass_frac, {.P0=P0, .T0=T0});
-//            if (std::isnan(pressure)) {
-//                pressure = mixture.pressure_re(density, energy, mass_frac, {.P0=-P0, .T0=T0});
-//            }
-//        }
     }
     temperature = mixture.temperature_rp(density, pressure, mass_frac, {.T0=T0});
 }

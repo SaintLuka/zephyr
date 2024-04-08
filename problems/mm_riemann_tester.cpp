@@ -796,6 +796,12 @@ void find_PT2() {
     QState: mass: 2062.58, momentum: {-1.35768e+06, -420176, 0}, energy: -7.80816e+08, mass_frac: {2062.58, 4.42559e-08, 0, 0, 0}
     PState: density: 2062.58, velocity: {-658.241, -203.713, 0}, pressure: nan, temperature: nan, energy: -615952, mass_frac: {1, 2.14565e-11, 0, 0, 0}
     Previous PState: density: 2088.02, velocity: {-659.333, -204.721, 0}, pressure: 128.072, temperature: 17533.1, energy: -411741, mass_frac: {1, 2.14709e-11, 0, 0, 0}
+
+     Failed to calc PState from QState in fluxes_stage1
+    QState: mass: 1680.78, momentum: {-931039, 0, 0}, energy: -4.8223e+08, mass_frac: {1680.78, 0.00708158, 0, 0, 0}
+    PState: density: 1680.78, velocity: {-553.931, 0, 0}, pressure: nan, temperature: nan, energy: -440328, mass_frac: {0.999996, 4.21326e-06, 0, 0, 0}
+    Previous PState: density: 1399.53, velocity: {-457.989, 0, 0}, pressure: 734232, temperature: 24269.7, energy: -59244.6, mass_frac: {0.999995, 5.19436e-06, 0, 0, 0}
+
      */
 //    QState q(2304.05, {-411216, 0, 0}, -2.08431e+08, FractionsFlux(std::vector<double>{2304.05, 8.50948e-05, 0, 0, 0}));
 //    double P0 = 74.4769, T0 = 2676.13;
@@ -803,8 +809,10 @@ void find_PT2() {
 //    double P0 = 61.6383, T0 = 3077.63;
 //    QState q(1128.72, {-2.13144e+06, 0, 0}, -1.12074e+09, FractionsFlux(std::vector<double>{1128.72, 6.31637e-05, 0, 0, 0}));
 //    double P0 = 110.601, T0 = 4780.4;
-    QState q(2062.58, {-1.35768e+06, -420176, 0}, -7.80816e+08, FractionsFlux(std::vector<double>{2062.58, 4.42559e-08, 0, 0, 0}));
-    double P0 = 128.072, T0 = 17533.1;
+//    QState q(2062.58, {-1.35768e+06, -420176, 0}, -7.80816e+08, FractionsFlux(std::vector<double>{2062.58, 4.42559e-08, 0, 0, 0}));
+//    double P0 = 128.072, T0 = 17533.1;
+    QState q(1680.78, {-931039, 0, 0}, -4.8223e+08, FractionsFlux(std::vector<double>{1680.78, 0.00708158, 0, 0, 0}));
+    double P0 = -1.61141e+10, T0 = 24269.7;
     Materials mixture_eos;
     mixture_eos += MieGruneisen::create("Pb");
     mixture_eos += IdealGas::create("Air");
