@@ -77,8 +77,20 @@ mmf::Flux Rusanov2::calc_mm_flux(const mmf::PState &zL, const mmf::PState &zR, c
     double u1 = zL.velocity.x(), u2 = zR.velocity.x();
     double p1 = zL.pressure, p2 = zR.pressure;
 
-    double c1 = mixture.sound_speed_rp(rho1, p1, zL.mass_frac);
-    double c2 = mixture.sound_speed_rp(rho2, p2, zR.mass_frac);
+    double c1 = mixture.sound_speed_rp(rho1, p1, zL.mass_frac, {.T0 = zL.temperature});
+    double c2 = mixture.sound_speed_rp(rho2, p2, zR.mass_frac, {.T0 = zR.temperature});
+    if(std::isnan(c1)) {
+        c1 = 0;
+        if(abs(p1) > 1e-3){
+            std::cerr << "Can't find sound speed for state: " << zL << "\n";
+        }
+    }
+    if(std::isnan(c2)) {
+        c1 = 0;
+        if(abs(p2) > 1e-3){
+            std::cerr << "Can't find sound speed for state: " << zR << "\n";
+        }
+    }
 
     // Максимальное собственное значение
     double max_lambda = std::max(std::abs(u1) + c1, std::abs(u2) + c2);
@@ -91,18 +103,20 @@ mmf::Flux Rusanov2::calc_mm_flux(const mmf::PState &zL, const mmf::PState &zR, c
 
     Flux flux = 0.5 * (fL.vec() + fR.vec()) + 0.5 * max_lambda * (qL.vec() - qR.vec());
 
-    if(flux.is_bad()){
+    if (flux.is_bad()) {
         std::cerr << "calc Rusanov2 flux\n";
         std::cerr << "zL: " << zL << "\nzR: " << zR << "\n";
+        std::cerr << "c1: " << c1 << " c2: " << c2 << '\n';
         std::cerr << "Flux: " << flux << "\n";
-        std::cerr << "Code for debug:\n";
-        std::cerr << boost::format("PState zL(%1%, {%2%, %3%, %4%}, %5%, %6%, %7%, %8%);\n") %
-                     zL.density % zL.velocity.x() % zL.velocity.y() % zL.velocity.z() % zL.pressure %
-                     zL.energy % zL.temperature % zL.mass_frac;
-        std::cerr << boost::format("PState zR(%1%, {%2%, %3%, %4%}, %5%, %6%, %7%, %8%);\n") %
-                     zR.density % zR.velocity.x() % zR.velocity.y() % zR.velocity.z() % zR.pressure %
-                     zR.energy % zR.temperature % zR.mass_frac;
-        throw std::runtime_error("Bad Godunov flux");
+//        std::cerr << "Code for debug:\n";
+//        std::cerr << boost::format("PState zL(%1%, {%2%, %3%, %4%}, %5%, %6%, %7%, %8%);\n") %
+//                     zL.density % zL.velocity.x() % zL.velocity.y() % zL.velocity.z() % zL.pressure %
+//                     zL.energy % zL.temperature % zL.mass_frac;
+//        std::cerr << boost::format("PState zR(%1%, {%2%, %3%, %4%}, %5%, %6%, %7%, %8%);\n") %
+//                     zR.density % zR.velocity.x() % zR.velocity.y() % zR.velocity.z() % zR.pressure %
+//                     zR.energy % zR.temperature % zR.mass_frac;
+        exit(1);
+        throw std::runtime_error("Bad Rusanov2 flux");
     }
 
     return flux;
