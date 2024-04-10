@@ -7,7 +7,7 @@
 
 #define SCRUTINY 0          ///< Тщательная проверка вычислений
 #define CHECK_PERFORMANCE 0 ///< Выводить производительность частей алгоритма
-#define FAST_BALANCING 0    ///< Быстрая функция балансировки флагов
+#define FAST_BALANCING 1    ///< Быстрая функция балансировки флагов
 
 #if SCRUTINY
 /// @brief Бросает исключение, если условие не выполняется
@@ -20,9 +20,14 @@
 #include <array>
 #include <zephyr/geom/primitives/base.h>
 
-namespace zephyr { namespace mesh { namespace amr {
+namespace zephyr::mesh::amr {
 
 using namespace zephyr::geom;
+
+#ifdef CHECK_PERFORMANCE
+/// @brief Частота вывода сообщений о производительности
+static const size_t check_frequency = 100;
+#endif
 
 /// @brief Локальные индексы ячеек, прилегающих к стороне.
 template<int dim>
@@ -68,6 +73,4 @@ inline std::array<int, 4> subface_sides<3>(int side) {
     return {side, side + 6, side + 12, side + 18};
 }
 
-} // namespace amr
-} // namespace mesh
-} // namespace zephyr
+} // namespace zephyr::mesh::amr

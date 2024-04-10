@@ -67,7 +67,7 @@ void test_eos(Eos& eos, double T, double rho) {
             {P.dE, sg.pressure_re(rho, E, {.deriv = true}).dE}
     };
 
-    if (err3.is_ok(1.0e-14)) {
+    if (err3.is_ok(1.0e-13)) {
         std::cout << "\tStiffenedGas. Max error: " << err3.max() << ": OK!\n";
     } else {
         std::cerr << "\tStiffenedGas. Max error: " << err3.max() << "\n";

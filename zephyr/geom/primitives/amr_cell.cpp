@@ -69,8 +69,7 @@ AmrCell::AmrCell(const Polygon& poly)
           vertices(poly), faces(CellType::POLYGON, poly.size()),
           b_idx(-1), z_idx(-1), level(0), flag(0) {
 
-    Vector3d C = poly.center();
-    double area = poly.area(C);
+    double area = poly.area();
 
     size = std::sqrt(area);
     center = poly.centroid(area);
@@ -92,41 +91,65 @@ double AmrCell::volume() const {
     return size * (dim < 3 ? size : size * size);
 }
 
-PolygonS<8> AmrCell::polygon() const {
+Polygon AmrCell::polygon() const {
     if (dim > 2) {
         throw std::runtime_error("AmrCell::polygon() error #1");
     }
 
-    PolygonS<8> poly;
-    int n_nodes = 0;
-
     if (adaptive) {
-        poly[n_nodes++] = vertices.vs<-1, -1>();
+        Polygon poly;
+        poly.reserve(8);
+
+        poly += vertices.vs<-1, -1>();
         if (!linear && faces[Side::BOTTOM1].is_actual()) {
-            poly[n_nodes++] = vertices.vs<0, -1>();
-        }
-        poly[n_nodes++] = vertices.vs<+1, -1>();
-        if (!linear && faces[Side::RIGHT1].is_actual()) {
-            poly[n_nodes++] = vertices.vs<+1, 0>();
-        }
-        poly[n_nodes++] = vertices.vs<+1, +1>();
-        if (!linear && faces[Side::TOP1].is_actual()) {
-            poly[n_nodes++] = vertices.vs<0, +1>();
-        }
-        poly[n_nodes++] = vertices.vs<-1, +1>();
-        if (!linear && faces[Side::LEFT1].is_actual()) {
-            poly[n_nodes++] = vertices.vs<-1, 0>();
+            poly += vertices.vs<0, -1>();
         }
 
+        poly += vertices.vs<+1, -1>();
+        if (!linear && faces[Side::RIGHT1].is_actual()) {
+            poly += vertices.vs<+1, 0>();
+        }
+
+        poly += vertices.vs<+1, +1>();
+        if (!linear && faces[Side::TOP1].is_actual()) {
+            poly += vertices.vs<0, +1>();
+        }
+
+        poly += vertices.vs<-1, +1>();
+        if (!linear && faces[Side::LEFT1].is_actual()) {
+            poly += vertices.vs<-1, 0>();
+        }
+        return poly;
     } else {
-        while (!vertices[n_nodes].hasNaN() && n_nodes < 8) {
-            poly[n_nodes] = vertices[n_nodes];
-            ++n_nodes;
+        return Polygon(&vertices[0], vertices.count());
+    }
+}
+
+inline double min(double x, double y, double z) {
+    return std::min(x, std::min(y, z));
+}
+
+double AmrCell::incircle_radius() const {
+    if (adaptive) {
+        if (dim == 2) {
+            return std::sqrt(std::min(
+                    (vertices.vs<+1, 0>() - vertices.vs<-1, 0>()).squaredNorm(),
+                    (vertices.vs<0, +1>() - vertices.vs<0, -1>()).squaredNorm()));
+        }
+        else {
+            return std::sqrt(min(
+                    (vertices.vs<+1, 0, 0>() - vertices.vs<-1, 0, 0>()).squaredNorm(),
+                    (vertices.vs<0, +1, 0>() - vertices.vs<0, -1, 0>()).squaredNorm(),
+                    (vertices.vs<0, 0, +1>() - vertices.vs<0, 0, -1>()).squaredNorm()));
         }
     }
-
-    poly.resize(n_nodes);
-    return poly;
+    else {
+        assert(dim == 2);
+        int n = vertices.count();
+        // Диаметр описаной окружности вокруг правильного многоугольника
+        // с площадью size^2.
+        return 2.0 * size / std::sqrt(n * std::tan(M_PI / n));
+    }
 }
 
 double AmrCell::approx_vol_fraction(const std::function<double(const Vector3d &)> &inside) const {

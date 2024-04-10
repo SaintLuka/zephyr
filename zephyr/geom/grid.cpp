@@ -344,6 +344,9 @@ int GCell::neib(int idx) const {
     return m_neibs[idx];
 }
 
+Grid::Grid() : structured(false) {
+
+}
 
 int Grid::n_nodes() const {
     return m_nodes.size();
@@ -508,11 +511,10 @@ AmrCell Grid::amr_cell(int idx) const {
 
         std::vector<GNode::Ptr> nodes(n_nodes, nullptr);
 
-        geom::PolygonD poly(n_nodes);
-
+        Polygon poly(n_nodes);
         for (int i = 0; i < n_nodes; ++i) {
             nodes[i] = m_nodes[gcell.node(i).index];
-            poly[i]  = nodes[i]->v;
+            poly.set(i, nodes[i]->v);
         }
 
         AmrCell cell(poly);
@@ -556,11 +558,10 @@ MovCell Grid::mov_cell(int idx) const {
 
         std::vector<GNode::Ptr> nodes(n_nodes, nullptr);
 
-        geom::PolygonD poly(n_nodes);
-
+        geom::Polygon poly(n_nodes);
         for (int i = 0; i < n_nodes; ++i) {
             nodes[i] = m_nodes[gcell.node(i).index];
-            poly[i]  = nodes[i]->v;
+            poly.set(i, nodes[i]->v);
         }
 
         MovCell cell(poly);
@@ -587,6 +588,37 @@ MovCell Grid::mov_cell(int idx) const {
     else {
         throw std::runtime_error("Can't create MovCell");
     }
+}
+
+void Grid::assume_structured(int nx, int ny, int nz) {
+    if (nx <= 0 && ny <= 0 && nz <= 0) {
+        throw std::runtime_error("Grid::assume structured nx | ny | nz <= 0");
+    }
+
+    if (m_cells.size() != nx * ny * nz) {
+        throw std::runtime_error("Grid::assume structured nx * ny * nz != n_cells");
+    }
+
+    structured = true;
+    m_nx = nx;
+    m_ny = ny;
+    m_nz = nz;
+}
+
+bool Grid::is_structured() const {
+    return structured;
+}
+
+int Grid::nx() const {
+    return structured ? m_nx : int(m_cells.size());
+}
+
+int Grid::ny() const {
+    return structured ? m_ny : 1;
+}
+
+int Grid::nz() const {
+    return structured ? m_nz : 1;
 }
 
 } // namespace zephyr::geom

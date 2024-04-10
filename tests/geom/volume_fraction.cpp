@@ -318,7 +318,7 @@ void test3() {
     Quad quad(v11, v21, v12, v22);
 
     // Отсечение прямой
-    double I1 = PolyQuad(quad).clip_area(p, n);
+    double I1 = Polygon({v11, v21, v12, v22}, true).clip_area(p, n);
 
     // скошеный четырехугольник
     Vector3d p11 = {0.0, 0.0, 0.0};
@@ -329,12 +329,12 @@ void test3() {
     Quad skewed(p11, p21, p12, p22);
 
     // Отсечение прямой
-    double I2 = PolyQuad(skewed).clip_area(p, n);
+    double I2 = Polygon({p11, p21, p12, p22}, true).clip_area(p, n);
 
     Triangle triangle(p11, p21, p12);
 
     // Отсечение прямой
-    double I3 = PolyTri(p11, p21, p12).clip_area(p, n);
+    double I3 = Polygon({p11, p21, p12}, true).clip_area(p, n);
 
     std::cout << "Объемная доля полуплоскости на квадратном элементе:\n";
     volume_test(quad, test_func, inside, I1);

@@ -25,7 +25,7 @@ EuCell EuFace::neib() const {
 }
 
 const Byte* EuFace::neib_data() const {
-    return m_face->is_boundary() ? m_cell.data() : m_cell.neib(*m_face).data();
+    return m_cell.neib_data(*m_face);
 }
 
 Boundary EuFace::flag() const {
@@ -42,10 +42,6 @@ void EuFace::set_boundary(Boundary flag) {
 
 double EuFace::area() const {
     return m_face->area;
-}
-
-Vector3d EuFace::center() const {
-    return m_face->center;
 }
 
 const Vector3d& EuFace::vs(int idx) const {

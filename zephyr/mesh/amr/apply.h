@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include <iomanip>
+
 #include <zephyr/mesh/amr/common.h>
 #include <zephyr/mesh/amr/statistics.h>
 #include <zephyr/mesh/amr/setup_positions.h>
@@ -15,7 +17,7 @@
 #include <zephyr/mesh/amr/sorting.h>
 #include <zephyr/mesh/amr/link_aliens.h>
 
-namespace zephyr { namespace mesh { namespace amr {
+namespace zephyr::mesh::amr {
 
 using utils::Stopwatch;
 
@@ -46,6 +48,8 @@ void apply(AmrStorage &cells, const Distributor& op) {
     static Stopwatch clean_timer;
     static Stopwatch sort_timer;
 
+    AmrStorage aliens;
+
     /// Этап 1. Сбор статистики
     count_timer.resume();
     Statistics count(cells);
@@ -66,7 +70,7 @@ void apply(AmrStorage &cells, const Distributor& op) {
 
     /// Этап 4. Восстановление соседства
     connections_timer.resume();
-    restore_connections<dim>(cells, count);
+    restore_connections<dim>(cells, aliens, 0, count);
     connections_timer.stop();
 
     /// Этап 5. Удаление неопределенных ячеек
@@ -74,7 +78,7 @@ void apply(AmrStorage &cells, const Distributor& op) {
     remove_undefined<dim>(cells, count);
     clean_timer.stop();
 
-    for (int idx = 0; idx <cells.size(); ++idx) {
+    for (int idx = 0; idx < cells.size(); ++idx) {
         cells[idx].index = idx;
     }
 
@@ -84,12 +88,16 @@ void apply(AmrStorage &cells, const Distributor& op) {
     //sort_timer.stop();
 
 #if CHECK_PERFORMANCE
-    std::cout << "    Statistics elapsed: " << count_timer.seconds() << " sec\n";
-    std::cout << "    Positions elapsed: " << positions_timer.seconds() << " sec\n";
-    std::cout << "    Geometry elapsed: " << geometry_timer.seconds() << " sec\n";
-    std::cout << "    Connections elapsed: " << connections_timer.seconds() << " sec\n";
-    std::cout << "    Clean elapsed: " << clean_timer.seconds() << " sec\n";
-    std::cout << "    Sorting elapsed: " << sort_timer.seconds() << " sec\n";
+    static size_t counter = 0;
+    if (counter % amr::check_frequency == 0) {
+        std::cout << "    Statistics elapsed:  " << std::setw(10) << count_timer.milliseconds() << " ms\n";
+        std::cout << "    Positions elapsed:   " << std::setw(10) << positions_timer.milliseconds() << " ms\n";
+        std::cout << "    Geometry elapsed:    " << std::setw(10) << geometry_timer.milliseconds() << " ms\n";
+        std::cout << "    Connections elapsed: " << std::setw(10) << connections_timer.milliseconds() << " ms\n";
+        std::cout << "    Clean elapsed:       " << std::setw(10) << clean_timer.milliseconds() << " ms\n";
+        std::cout << "    Sorting elapsed:     " << std::setw(10) << sort_timer.milliseconds() << " ms\n";
+    }
+    ++counter;
 #endif
 }
 
@@ -182,12 +190,16 @@ void apply(
     link_timer.stop();
 
 #if CHECK_PERFORMANCE
-    std::cout << "    Statistics elapsed: " << count_timer.times().wall() << "\n";
-    std::cout << "    Positions elapsed: " << positions_timer.times().wall() << "\n";
-    std::cout << "    Geometry elapsed: " << geometry_timer.times().wall() << "\n";
-    std::cout << "    Connections elapsed: " << connections_timer.times().wall() << "\n";
-    std::cout << "    Clean elapsed: " << clean_timer.times().wall() << "\n";
-    std::cout << "    Sorting elapsed: " << sort_timer.times().wall() << "\n";
+    static size_t counter = 0;
+    if (counter % amr::check_frequency == 0) {
+        std::cout << "    Statistics elapsed: " << count_timer.times().wall() << "\n";
+        std::cout << "    Positions elapsed: " << positions_timer.times().wall() << "\n";
+        std::cout << "    Geometry elapsed: " << geometry_timer.times().wall() << "\n";
+        std::cout << "    Connections elapsed: " << connections_timer.times().wall() << "\n";
+        std::cout << "    Clean elapsed: " << clean_timer.times().wall() << "\n";
+        std::cout << "    Sorting elapsed: " << sort_timer.times().wall() << "\n";
+    }
+    ++counter;
 #endif
 }
 
@@ -226,6 +238,4 @@ void apply<1234>(
 
 #endif
 
-} // namespace amr
-} // namespace mesh
 } // namespace zephyr

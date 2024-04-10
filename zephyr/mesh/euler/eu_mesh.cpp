@@ -18,6 +18,24 @@ void EuMesh::initialize(const Grid& grid) {
     for (int i = 0; i < grid.n_cells(); ++i) {
         m_locals[i] = grid.amr_cell(i);
     }
+
+    structured = grid.is_structured();
+    m_nx = grid.nx();
+    m_ny = grid.ny();
+    m_nz = grid.nz();
+}
+
+EuCell EuMesh::operator()(int i, int j) {
+    i = (i + m_nx) % m_nx;
+    j = (j + m_ny) % m_ny;
+    return operator[](m_ny * i + j);
+}
+
+EuCell EuMesh::operator()(int i, int j, int k) {
+    i = (i + m_nx) % m_nx;
+    j = (j + m_ny) % m_ny;
+    k = (k + m_nz) % m_nz;
+    return operator[](m_nz * (m_ny * i + j) + k);
 }
 
 geom::Box EuMesh::bbox() {

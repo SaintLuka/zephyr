@@ -26,8 +26,15 @@ public:
     /// @brief Ссылка на данные соседней ячейки через грань
     /// @details При отсутствии соседа возвращает данные текущей ячейки.
     template <class T>
-    const T& neib(const T&) const {
+    inline const T& neib(const T&) const {
         return *reinterpret_cast<const T *>(neib_data());
+    }
+
+    /// @brief Ссылка на данные соседней ячейки через грань
+    /// @details При отсутствии соседа возвращает данные текущей ячейки.
+    template <class T>
+    inline const T& neib(const VarExtra<T>& var) const {
+        return *reinterpret_cast<const T *>(neib_data() + var.offset);
     }
 
     /// @brief Флаг граничных условий
@@ -43,7 +50,7 @@ public:
     double area() const;
 
     /// @brief Центр грани
-    Vector3d center() const;
+    inline const Vector3d& center() const { return m_face->center; }
 
     /// @brief Координата x центра грани
     inline double x() const { return center().x(); }

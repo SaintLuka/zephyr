@@ -37,6 +37,20 @@ public:
 
     EuCell end() { return {m_locals, m_aliens, m_locals.size()}; }
 
+    EuCell operator[](int idx) {
+        return {m_locals, m_aliens, idx};
+    }
+
+    /// @brief Получить ячейку по нескольким индексам подразумевая,
+    /// что сетка является структурированной. Индексы периодически
+    /// замкнуты (допускаются отрицательные индексы и индексы сверх нормы)
+    EuCell operator()(int i, int j);
+
+    /// @brief Получить ячейку по нескольким индексам подразумевая,
+    /// что сетка является структурированной. Индексы периодически
+    /// замкнуты (допускаются отрицательные индексы и индексы сверх нормы)
+    EuCell operator()(int i, int j, int k);
+
     operator AmrStorage &() { return m_locals; }
 
     AmrStorage &locals() { return m_locals; }
@@ -68,20 +82,20 @@ public:
     /// с флагами amr.flag ячеек.
     void refine();
 
-    template<int n_tasks_per_thread = 1, class Func, class... Args>
+    template<int n_tasks_per_thread = 10, class Func, class... Args>
     void for_each(Func &&func, Args&&... args) {
         threads::for_each<n_tasks_per_thread>(begin(), end(),
                 std::forward<Func>(func), std::forward<Args>(args)...);
     }
 
-    template<int n_tasks_per_thread = 1, class Func,
+    template<int n_tasks_per_thread = 10, class Func,
             class Value = typename std::result_of<Func(EuCell&)>::type>
     auto min(const Value &init, Func &&func)
     -> typename std::enable_if<!std::is_void<Value>::value, Value>::type {
         return threads::min<n_tasks_per_thread>(begin(), end(), init, std::forward<Func>(func));
     }
 
-    template<int n_tasks_per_thread = 1, class Func,
+    template<int n_tasks_per_thread = 10, class Func,
             class Value = typename std::result_of<Func(EuCell&)>::type>
     auto min(Func &&func)
     -> typename std::enable_if<std::is_arithmetic<Value>::value, Value>::type {
@@ -101,6 +115,18 @@ public:
     const std::vector<Vector3d>& nodes() const {
         return m_nodes;
     }
+
+    /// @brief Число ячеек по оси x для структурированных сеток,
+    /// число всех ячеек для сеток общего вида
+    inline int nx() const { return m_nx; };
+
+    /// @brief Число ячеек по оси y для структурированных сеток,
+    /// единица для сеток общего вида
+    inline int ny() const { return m_ny; };
+
+    /// @brief Число ячеек по оси z для структурированных сеток,
+    /// единица для сеток общего вида
+    inline int nz() const { return m_nz; };
 
 private:
     /// @brief Создать эйлерову сетку из сетки общего вида
@@ -123,6 +149,10 @@ private:
     /// @brief Массив уникальных узлов. Используется в редких алгоритмах,
     /// по умолчанию пустой, заполняются при вызове функции collect_nodes().
     std::vector<Vector3d> m_nodes;
+
+    /// @brief Структура сетки, если предполагается, что сетка декартова.
+    bool structured = false;
+    int m_nx, m_ny, m_nz;
 };
 
 

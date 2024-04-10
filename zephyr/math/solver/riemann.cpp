@@ -2,7 +2,8 @@
 
 #include <zephyr/math/solver/riemann.h>
 
-namespace zephyr { namespace math {
+namespace zephyr {
+namespace math {
 
 using namespace zephyr::phys;
 using namespace smf;
@@ -102,12 +103,14 @@ inline double deriv_fK(
 struct SolPU {
     double P;   ///< Давление на контакте
     double U;   ///< Скорость на контакте
+    bool conv;  ///< Хорошая сходимость
 
     /// @brief Конструктор по умолчанию
-    SolPU() : P(0.0 / 0.0), U(0.0 / 0.0) {}
+    SolPU() : P(0.0 / 0.0), U(0.0 / 0.0), conv(false) {}
 
     /// @brief Простейший конструктор
-    SolPU(cref P, cref U) : P(P), U(U) {}
+    SolPU(cref P, cref U, bool conv)
+            : P(P), U(U), conv(conv) {}
 };
 
 /// @brief Найти давление и скорость на контактном разрыве
@@ -140,12 +143,13 @@ inline SolPU contact_p(
 
     // Вакуумный случай
     if (f_dno > 0.0) {
-        std::cout << "Вакуум\n";
-        return {p_dno, 0.0};
+//        std::cout << "Вакуум\n";
+        std::cout << "Vacuum\n";
+        return {p_dno, 0.0, true};
     }
 
     // Классифицируем случай и выбираем начальное приближение
-    double P = 0.5*(pL + pR);
+    double P = 0.5 * (pL + pR);
 
     double f_min = func_fK(p_min, rL, pL, cL, gL, p0L, AL, BL, GL) +
                    func_fK(p_min, rR, pR, cR, gR, p0R, AR, BR, GR) + uR - uL;
@@ -183,31 +187,54 @@ inline SolPU contact_p(
     double DP2 = 1.0e-12 * std::abs(std::max(pL + p0L, pR + p0R));
     double DP = std::max(DP1, DP2);
 
-    //std::cout << "P init:" << P << "\n";
+//    std::cout << "P init: " << P << "\n";
+//    std::cout << "uL = " << uL << "\nuR = " << uR << "\n";
+//    std::cout << "def fL(P):\n" << "    if P >= " << pL << ":\n";
+//    std::printf("\treturn (P - %e) * np.sqrt(%e / (P + %e))\n", pL, AL, BL);
+//    std::cout << "    else:\n";
+//    std::printf("\treturn 2 * %e / %e * (pow((P + %e) / (%e + %e), %e) - 1)\n\n", cL, gL - 1.0, p0L, pL, p0L, GL);
+//
+//    std::cout << "def fR(P):\n" << "    if P >= " << pR << ":\n";
+//    std::printf("\treturn (P - %e) * np.sqrt(%e / (P + %e))\n", pR, AR, BR);
+//    std::cout << "    else:\n";
+//    std::printf("\treturn 2 * %e / %e * (pow((P + %e) / (%e + %e), %e) - 1)\n", cR, gR - 1.0, p0R, pR, p0R, GR);
 
     double fL, fR, dfL, dfR;
 
-    for (int counter = 0; counter < max_iterations; ++counter) {
+    int counter = 0;
+    double Pn;
+    for (; counter < max_iterations; ++counter) {
         fL = func_fK(P, rL, pL, cL, gL, p0L, AL, BL, GL);
         fR = func_fK(P, rR, pR, cR, gR, p0R, AR, BR, GR);
 
         dfL = deriv_fK(P, rL, pL, cL, gL, p0L, AL, BL, GL);
         dfR = deriv_fK(P, rR, pR, cR, gR, p0R, AR, BR, GR);
 
-        double Pn = P - (fL + fR + uR - uL) / (dfL + dfR);
-
-        //std::cout << "Pn (" << counter << "): " << Pn << "\n";
+        Pn = P - (fL + fR + uR - uL) / (dfL + dfR);
+        if (Pn < p_dno) {
+            Pn = (p_dno + P) / 2;
+        }
 
         if (std::abs(Pn - P) < DP) {
-            break;
+            if (counter > 3)
+                break;
         }
 
         P = Pn;
     }
 
+    bool conv = counter < max_iterations;
+    if (!conv) {
+        if (abs((P - Pn) / (P + Pn)) > 0.02) {
+            std::cerr << "Riemann solver doesn't conv\n";
+            std::cerr << "P: " << P << " Pn: " << Pn << " , DP: " << DP << '\n';
+            throw std::runtime_error("Riemann solver doesn't conv");
+        }
+    }
+
     double U = 0.5 * (uL + uR + fR - fL);
 
-    return {P, U};
+    return {P, U, conv};
 }
 
 /// @brief Скорость ударной волны
@@ -289,7 +316,7 @@ inline double pressure_rfan(cref uR, cref pR, cref cR, cref gR, cref p0R, cref x
 }
 
 RiemannSolver::Solution RiemannSolver::solve(
-        const PState &zL, const PState &zR, const StiffenedGas& eos) {
+        const PState &zL, const PState &zR, const StiffenedGas &eos) {
 
     cref rL = zL.density;
     cref uL = zL.velocity.x();
@@ -309,7 +336,7 @@ RiemannSolver::Solution RiemannSolver::solve(
 }
 
 RiemannSolver::Solution RiemannSolver::solve(
-        const PState &zL, const PState &zR, const StiffenedGas& eosL, const StiffenedGas& eosR) {
+        const PState &zL, const PState &zR, const StiffenedGas &eosL, const StiffenedGas &eosR) {
 
     cref rL = zL.density;
     cref uL = zL.velocity.x();
@@ -341,6 +368,7 @@ RiemannSolver::Solution RiemannSolver::solve(
 
     cref P = PU.P;
     cref U = PU.U;
+    bool conv = PU.conv;
 
     if (U > 0.0) {
         // Положительная скорость на контакте
@@ -351,29 +379,30 @@ RiemannSolver::Solution RiemannSolver::solve(
 
             if (D > 0.0) {
                 // Положительная скорость УВ
-                return {rL, uL, pL};
+                return {rL, uL, pL, conv};
             } else {
                 // Отрицательная скорость УВ
-                return {shock_wave_density(rL, uL, pL, U, P), U, P};
+                return {shock_wave_density(rL, uL, pL, U, P), U, P, conv};
             }
         } else {
             // Слева волна разрежения
             double DL1 = uL - cL;
             if (DL1 > 0.0) {
                 // Волна разрежения полностью справа
-                return {rL, uL, pL};
+                return {rL, uL, pL, conv};
             } else {
                 double cl = rarefaction_sound_L(U, uL, cL, gL);
                 double DL2 = U - cl;
                 if (DL2 < 0.0) {
                     // Волна разрежения полностью слева
-                    return {eos_density(P, cl, gL, p0L), U, P};
+                    return {eos_density(P, cl, gL, p0L), U, P, conv};
                 } else {
                     // Волна разрежения приходится на грань
                     return {
                             density_lfan(rL, uL, cL, gL),
                             velocity_lfan(uL, cL, gL),
-                            pressure_lfan(uL, pL, cL, gL, p0L)
+                            pressure_lfan(uL, pL, cL, gL, p0L),
+                            conv
                     };
                 }
             }
@@ -387,10 +416,10 @@ RiemannSolver::Solution RiemannSolver::solve(
 
             if (D < 0.0) {
                 // Отрицательная скорость УВ
-                return {rR, uR, pR};
+                return {rR, uR, pR, conv};
             } else {
                 // Положительная скорость УВ
-                return {shock_wave_density(rR, uR, pR, U, P), U, P};
+                return {shock_wave_density(rR, uR, pR, U, P), U, P, conv};
             }
         } else {
             // Справа волна разрежения
@@ -399,19 +428,20 @@ RiemannSolver::Solution RiemannSolver::solve(
 
             if (DR2 < 0.0) {
                 // Волна разрежения полностью слева
-                return {rR, uR, pR};
+                return {rR, uR, pR, conv};
             } else {
                 double cr = rarefaction_sound_R(U, uR, cR, gR);
                 double DR1 = U + cr;
                 if (DR1 > 0.0) {
                     // Волна разрежения полностью справа
-                    return {eos_density(P, cr, gR, p0R), U, P};
+                    return {eos_density(P, cr, gR, p0R), U, P, conv};
                 } else {
                     // Волна разрежения приходится на грань
                     return {
                             density_rfan(rR, uR, cR, gR),
                             velocity_rfan(uR, cR, gR),
-                            pressure_rfan(uR, pR, cR, gR, p0R)
+                            pressure_rfan(uR, pR, cR, gR, p0R),
+                            conv
                     };
                 }
             }
@@ -422,7 +452,7 @@ RiemannSolver::Solution RiemannSolver::solve(
 RiemannSolver::RiemannSolver(
         const PState &zL, const PState &zR,
         const StiffenedGas &eos, double x_jump) :
-        RiemannSolver(zL, zR, eos, eos, x_jump) { }
+        RiemannSolver(zL, zR, eos, eos, x_jump) {}
 
 RiemannSolver::RiemannSolver(
         const PState &zL, const PState &zR,

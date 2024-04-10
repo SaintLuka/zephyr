@@ -7,6 +7,7 @@
 #include <zephyr/phys/eos/materials.h>
 
 #include <zephyr/phys/fractions.h>
+#include "zephyr/phys/eos/types.h"
 
 namespace zephyr::math {
 
@@ -24,7 +25,8 @@ struct PState {
     double pressure;
     double energy;
 
-    PState();
+    PState() : density(0), velocity(0), pressure(0), energy(0)
+    {}
 
     PState(const double &density, const Vector3d &velocity,
            const double &pressure, const double &energy);
@@ -123,12 +125,6 @@ namespace mmf {
 using zephyr::phys::Fractions;
 using zephyr::phys::FractionsFlux;
 
-struct Component {
-    double density;
-    double energy;
-    double frac;
-};
-
 struct QState;
 
 /// @brief Примитивный многоматериальный вектор состояния
@@ -142,13 +138,13 @@ struct PState {
 
     PState();
 
-    PState(const double &pressure, const double &temperature, const Vector3d &velocity,
-           const std::vector<Component> &components);
+//    PState(const double &pressure, const double &temperature, const Vector3d &velocity,
+//           const std::vector<Component> &components);
 
     PState(const double &density, const Vector3d &velocity,
            const double &pressure, const double &energy, const double &temperature, const Fractions &mass_frac);
 
-    PState(const QState &q, const phys::Materials &mixture, double P0 = 1e3, double T0 = 300.0);
+    PState(const QState &q, const phys::Materials &mixture, double P0 = 1e3, double T0 = 200.0);
 
     [[nodiscard]] std::vector<double> get_densities() const;
 
@@ -168,6 +164,8 @@ struct PState {
     /// @brief Возвращает вектор состояния в глобальной системе координат
     [[nodiscard]] PState in_global(const Vector3d &normal) const;
 
+    void sync_temperature_energy_rp(const phys::Materials &mixture, const phys::Options& options = {});
+
     friend std::ostream &operator<<(std::ostream &os, const PState &state);
 
     [[nodiscard]] bool is_bad() const;
@@ -181,6 +179,8 @@ struct QState {
     Vector3d momentum;
     double energy;
     FractionsFlux mass_frac;
+
+    QState() : mass(0), momentum(0, 0, 0), energy(0), mass_frac() {}
 
     QState(const double &mass, const Vector3d &momentum, const double &energy, const FractionsFlux &mass_frac);
 
@@ -240,6 +240,8 @@ struct Flux {
     [[nodiscard]] Flux in_global(const Vector3d &normal) const;
 
     friend std::ostream &operator<<(std::ostream &os, const Flux &flux);
+
+    bool is_bad() const;
 
     VECTORIZE(Flux)
 };

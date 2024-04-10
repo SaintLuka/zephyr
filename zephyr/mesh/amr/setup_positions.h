@@ -9,7 +9,7 @@
 #include <zephyr/mesh/amr/siblings.h>
 #include <zephyr/mesh/amr/statistics.h>
 
-namespace zephyr { namespace mesh { namespace amr {
+namespace zephyr::mesh::amr {
 
 /// @brief Определяет положения новых ячеек (созданных при адаптации) в хранилище,
 /// устанавлевает параметр amrData.next.
@@ -25,6 +25,7 @@ namespace zephyr { namespace mesh { namespace amr {
 template<int dim>
 void setup_positions(AmrStorage &cells, const Statistics &count)
 {
+    // TODO: Подумать над параллельной версией
     cells.resize(count.n_cells_large);
 
     int coarse_counter = count.n_cells;
@@ -64,6 +65,4 @@ void setup_positions(AmrStorage &cells, const Statistics &count)
 #endif
 }
 
-} // namespace amr
-} // namespace mesh
-} // namespace zephyr
+} // namespace zephyr::mesh::amr

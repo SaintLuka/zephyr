@@ -5,11 +5,14 @@
 
 #pragma once
 
+#include <numeric>
+#include <iomanip>
+
 #include <zephyr/mesh/amr/common.h>
 #include <zephyr/mesh/amr/siblings.h>
 #include <zephyr/mesh/amr/balancing_restrictions.h>
 
-namespace zephyr { namespace mesh { namespace amr {
+namespace zephyr::mesh::amr {
 
 /// @struct Ячейки из некоторого диапазона, распределенные по уровням и флагам адаптации
 /// @brief Структура содержит индексы ячеек из диапазона в хранилище, которые
@@ -96,6 +99,7 @@ struct CellsByLevel {
 
     /// @brief Списки ячеек по уровням, которые хотят огрубиться
     std::vector<std::vector<size_t>> coarse;
+
     /// @brief Списки ячеек по уровням, которые хотят сохраниться
     std::vector<std::vector<size_t>> retain;
 
@@ -159,20 +163,23 @@ private:
     }
 };
 
-/// @brief Обновляет флаг ячейки, которая имеет флаг 0.
+/// @brief Обновляет флаг ячейки под индексом index, которая имеет флаг 0.
 /// Повышает флаг адаптации, если один из соседей хочет уровень на два выше
-inline void retain_update_flag(AmrStorage &cells, AmrStorage::Item& cell) {
-    scrutiny_check(cell.flag == 0, "retain_update_flag: cell.flag != 0")
+inline void retain_update_flag(int index, AmrStorage &cells) {
+    scrutiny_check(index < cells.size(), "round_1: index >= cells.size()")
+    scrutiny_check(cells[index].flag == 0, "retain_update_flag: cell.flag != 0")
+
+    auto& cell = cells[index];
 
     for (const auto &face: cell.faces) {
         if (face.is_undefined() or face.is_boundary()) {
             continue;
         }
 
-        size_t neib_idx = face.adjacent.index;
+        int neib_idx = face.adjacent.index;
         scrutiny_check(neib_idx < cells.size(), "retain_update_flag: neib_idx >= cells.size()")
 
-        auto& neib = cells[neib_idx];
+        const auto& neib = cells[neib_idx];
         int neib_wanted = neib.level + neib.flag;
         if (neib_wanted > cell.level + 1) {
             cell.flag = 1;
@@ -185,18 +192,23 @@ inline void retain_update_flag(AmrStorage &cells, AmrStorage::Item& cell) {
 /// Ставит флаг адаптации 0, если сосед хочет уровень на 1 выше,
 /// ставит флаг адаптации 1, если сосед хочет уровень на 2 выше,
 /// флаги сиблингов не рассматриваются.
-inline void coarse_update_flag(AmrStorage &cells, AmrStorage::Item& cell) {
-    scrutiny_check(cell.flag < 0, "coarse_update_flag: cell.flag != -1")
+inline void coarse_update_flag(int index, AmrStorage &cells) {
+    scrutiny_check(index < cells.size(), "round_2/3: index >= cells.size()")
 
-    for (auto &face: cell.faces) {
-        if (face.is_undefined() or face.is_boundary()) {
+    auto& cell = cells[index];
+    if (cell.flag >= 0) {
+        return;
+    }
+
+    for (const auto &face: cell.faces) {
+        if (face.is_undefined() || face.is_boundary()) {
             continue;
         }
 
         auto neib_idx = face.adjacent.index;
         scrutiny_check(neib_idx < cells.size(), "coarse_update_flag: neib_idx >= cells.size()")
 
-        auto& neib = cells[neib_idx];
+        const auto& neib = cells[neib_idx];
         int neib_wanted = neib.level + neib.flag;
 
         if (neib_wanted > cell.level) {
@@ -210,22 +222,38 @@ inline void coarse_update_flag(AmrStorage &cells, AmrStorage::Item& cell) {
     }
 }
 
+/// @brief Обновляет флаг ячейки, которая имеет флаг -1.
+/// Ставит флаг адаптации 0, если один из сиблингов не хочет огрубляться.
+template <int dim>
+inline void coarse_update_flag_by_sibs(int index, AmrStorage &cells) {
+    scrutiny_check(index < cells.size(), "round_4: index >= cells.size()")
+
+    auto& cell = cells[index];
+
+    if (cell.flag >= 0) {
+        return;
+    }
+
+    auto sibs = get_siblings<dim>(cells, index);
+    for (auto is: sibs) {
+        scrutiny_check(is < cells.size(), "round_4: Sibling index out of range")
+
+        if (cells[is].flag >= 0) {
+            cell.flag = 0;
+            break;
+        }
+    }
+}
+
 /// @brief Обход диапазона ячеек с флагом = 0, данные ячейки могут только повысить
 /// свой уровень до 1 за счет высокоуровневых соседей, после выпонения обхода
 /// уровень ячеек больше не меняется
-/// @param cells Ссылка на хранилище
 /// @param indices Индексы ячеек с флагом = 0 в хранилище
-/// @param from, to Диапазон индексов внутри массива indices
-void round_1(AmrStorage &cells, const std::vector<size_t> &indices, size_t from, size_t to) {
-    for (size_t i = from; i < to; ++i) {
-        scrutiny_check(indices[i] < cells.size(), "round_1: indices[i] >= cells.size()")
-
-        auto& cell = cells[indices[i]];
-
-        scrutiny_check(cell.flag == 0, "round_1: flag != 0")
-
-        retain_update_flag(cells, cell);
-    }
+/// @param cells Ссылка на хранилище
+void round_1(const std::vector<size_t> &indices, AmrStorage &cells) {
+    threads::for_each(
+            indices.begin(), indices.end(),
+            retain_update_flag, std::ref(cells));
 }
 
 /// @brief Обход диапазона ячеек с флагом = -1, данные ячейки могут повысить
@@ -233,37 +261,24 @@ void round_1(AmrStorage &cells, const std::vector<size_t> &indices, size_t from,
 /// не используются. После выпонения обхода флаги ячеек ещё могут измениться
 /// (@see round_3, @see round_4), но только у тех ячеек, которые не изменили
 /// флаги на данном обходе (сохранили флаг -1).
-/// @param cells Ссылка на хранилище
 /// @param indices Индексы ячеек с флагом = -1 в хранилище
-/// @param from, to Диапазон индексов внутри массива indices
-void round_2(AmrStorage &cells, const std::vector<size_t> &indices, size_t from, size_t to) {
-    for (size_t i = from; i < to; ++i) {
-        scrutiny_check(indices[i] < cells.size(), "round_2: indices[i] >= cells.size()")
-
-        auto& cell = cells[indices[i]];
-
-        scrutiny_check(cell.flag < 0, "round_2: flag != -1")
-
-        coarse_update_flag(cells, cell);
-    }
+/// @param cells Ссылка на хранилище
+void round_2(const std::vector<size_t> &indices, AmrStorage &cells) {
+    threads::for_each(
+            indices.begin(), indices.end(),
+            coarse_update_flag, std::ref(cells));
 }
 
 /// @brief Обход диапазона ячеек с изначальным флагом = -1, данные ячейки могут
 /// повысить свой флаг только до 0 за счет соседей своего же уровня (если при
 /// выполнении round_2 у кого-то из соседей появился флаг 1). После выполнения
 /// обхода флаги ячеек ещё могут измениться (@see round_4).
-/// @param cells Ссылка на хранилище
 /// @param indices Индексы ячеек с исходным флагом = -1 в хранилище
-/// @param from, to Диапазон индексов внутри массива indices
-void round_3(AmrStorage &cells, const std::vector<size_t> &indices, size_t from, size_t to) {
-    for (size_t i = from; i < to; ++i) {
-        scrutiny_check(indices[i] < cells.size(), "round_3: indices[i] >= cells.size()")
-
-        auto& cell = cells[indices[i]];
-        if (cell.flag < 0) {
-            coarse_update_flag(cells, cell);
-        }
-    }
+/// @param cells Ссылка на хранилище
+void round_3(const std::vector<size_t> &indices, AmrStorage &cells) {
+    threads::for_each(
+            indices.begin(), indices.end(),
+            coarse_update_flag, std::ref(cells));
 }
 
 /// @brief Заключительный обход диапазона ячеек, у которых после базовых
@@ -271,32 +286,13 @@ void round_3(AmrStorage &cells, const std::vector<size_t> &indices, size_t from,
 /// уровень до 0, если есть сиблинги, которые не хотят огрубляться, флаги
 /// соседей уже не используются, после выпонения обхода флаги ячеек больше
 /// не меняются
-/// @param cells Ссылка на хранилище
 /// @param indices Индексы ячеек с исходным флагом = -1 в хранилище
-/// @param from, to Диапазон индексов внутри массива indices
+/// @param cells Ссылка на хранилище
 template <int dim>
-void round_4(AmrStorage &cells, const std::vector<size_t> &indices, size_t from, size_t to) {
-    for (size_t i = from; i < to; ++i) {
-        scrutiny_check(indices[i] < cells.size(), "round_4: indices[i] >= cells.size()")
-
-        size_t ic = indices[i];
-        auto& cell = cells[ic];
-
-        if (cell.flag >= 0) {
-            continue;
-        }
-
-        auto sibs = get_siblings<dim>(cells, ic);
-        for (auto is: sibs) {
-            scrutiny_check(is < cells.size(), "round_4: Sibling index out of range")
-
-            auto& sib = cells[is];
-            if (sib.flag >= 0) {
-                cell.flag = 0;
-                break;
-            }
-        }
-    }
+void round_4(const std::vector<size_t> &indices, AmrStorage &cells) {
+    threads::for_each(
+            indices.begin(), indices.end(),
+            coarse_update_flag_by_sibs<dim>, std::ref(cells));
 }
 
 /// @brief Быстрая версия функции балансировки флагов.
@@ -304,9 +300,8 @@ void round_4(AmrStorage &cells, const std::vector<size_t> &indices, size_t from,
 /// ограничениями (ячейка нижнего уровня не огрубляется, ячейка верхнего -
 /// не разбивается), а также с сохранением баланса 1:2 у соседних ячеек.
 /// Баланс достигается повышением флагов адаптации (-1 и 0) у части ячеек.
-/// Функция выполняется в однопоточном режиме.
 /// @param cells Ссылка на хранилище ячеек
-/// @param max_level Максимальный уровень ячеек
+/// @param max_level Максимальный уровень адаптации ячеек
 /// @details Детали алгоритма. На первом этапе на флаги адаптации накладываются
 /// базовые ограничения. На втором этапе ячейки сортируются по уровням (только
 /// те ячейки, которые имеют флаг 0 или -1 и уровень меньше максимального).
@@ -327,40 +322,54 @@ void balance_flags_fast(AmrStorage& cells, int max_level) {
     static Stopwatch round_timer_2;
     static Stopwatch round_timer_3;
     static Stopwatch round_timer_4;
+    static int n_step = 0;
+    static int n_total_retain = 0;
+    static int n_total_coarse = 0;
 
     restriction_timer.resume();
     base_restrictions<dim>(cells, max_level);
     restriction_timer.stop();
 
     sorting_timer.resume();
+    // TODO: Сортировка по тредам
     CellsByLevel sorted(cells, max_level);
     sorting_timer.stop();
 
-    for (int lvl = int(max_level) - 1; lvl >= 0; --lvl) {
+    for (int lvl = max_level - 1; lvl >= 0; --lvl) {
         round_timer_1.resume();
-        round_1(cells, sorted.retain[lvl], 0, sorted.n_retain[lvl]);
+        round_1(sorted.retain[lvl], cells);
         round_timer_1.stop();
 
         round_timer_2.resume();
-        round_2(cells, sorted.coarse[lvl], 0, sorted.n_coarse[lvl]);
+        round_2(sorted.coarse[lvl], cells);
         round_timer_2.stop();
 
         round_timer_3.resume();
-        round_3(cells, sorted.coarse[lvl], 0, sorted.n_coarse[lvl]);
+        round_3(sorted.coarse[lvl], cells);
         round_timer_3.stop();
 
         round_timer_4.resume();
-        round_4<dim>(cells, sorted.coarse[lvl], 0, sorted.n_coarse[lvl]);
+        round_4<dim>(sorted.coarse[lvl], cells);
         round_timer_4.stop();
     }
 
 #if CHECK_PERFORMANCE
-    std::cout << "    Restriction elapsed: " << restriction_timer.seconds() << " sec\n";
-    std::cout << "    Sorting elapsed: " << sorting_timer.seconds() << " sec\n";
-    std::cout << "    Round 1 elapsed: " << round_timer_1.seconds() << " sec\n";
-    std::cout << "    Round 2 elapsed: " << round_timer_2.seconds() << " sec\n";
-    std::cout << "    Round 3 elapsed: " << round_timer_3.seconds() << " sec\n";
-    std::cout << "    Round 4 elapsed: " << round_timer_4.seconds() << " sec\n";
+    n_step += 1;
+    n_total_coarse += std::accumulate(sorted.n_coarse.begin(), sorted.n_coarse.end(), 0);
+    n_total_retain += std::accumulate(sorted.n_retain.begin(), sorted.n_retain.end(), 0);
+
+    static size_t counter = 0;
+    if (counter % amr::check_frequency == 0) {
+        std::cout << "    Restriction elapsed: " << std::setw(10) << restriction_timer.milliseconds() << " ms\n";
+        std::cout << "    Sorting elapsed:     " << std::setw(10) << sorting_timer.milliseconds() << " ms\n";
+        std::cout << "    Round 1 elapsed:     " << std::setw(10) << round_timer_1.milliseconds() << " ms  ";
+        std::cout << "    (avg retain: " << std::setw(10) << n_total_retain / n_step << ")\n";
+        std::cout << "    Round 2 elapsed:     " << std::setw(10) << round_timer_2.milliseconds() << " ms  ";
+        std::cout << "    (avg coarse: " << std::setw(10) << n_total_coarse / n_step << ")\n";
+        std::cout << "    Round 3 elapsed:     " << std::setw(10) << round_timer_3.milliseconds() << " ms\n";
+        std::cout << "    Round 4 elapsed:     " << std::setw(10) << round_timer_4.milliseconds() << " ms\n";
+    }
+    ++counter;
 #endif
 }
 
@@ -385,127 +394,4 @@ void balance_flags_fast<1234>(AmrStorage& cells, int max_level) {
 #endif
 }
 
-#ifdef ZEPHYR_ENABLE_MULTITHREADING
-/// @brief Быстрая версия функции балансировки флагов.
-/// Функция меняет флаги адаптации ячеек в хранилище в соответствии с общими
-/// ограничениями (ячейка нижнего уровня не огрубляется, ячейка верхнего -
-/// не разбивается), а также с сохранением баланса 1:2 у соседних ячеек.
-/// Баланс достигается повышением флагов адаптации (-1 и 0) у части ячеек.
-/// Функция выполняется в многопоточном режиме.
-/// @param cells Ссылка на хранилище ячеек
-/// @param max_level Максимальный уровень ячеек
-/// @param threads Ссылка на пул тредов
-/// @details Детали алгоритма описаны у однопоточной весрии.
-/// Многопоточная фунция быстрой балансировки может уступать по
-/// производительности обычной итерационной функции балансировки.
-template <int dim = 1234>
-void balance_flags_fast(AmrStorage& cells, int max_level, ThreadPool& threads) {
-    using zephyr::performance::timer::Stopwatch;
-    static Stopwatch restriction_timer;
-    static Stopwatch sorting_timer;
-    static Stopwatch round_timer_1;
-    static Stopwatch round_timer_2;
-    static Stopwatch round_timer_3;
-    static Stopwatch round_timer_4;
-
-    std::size_t num_tasks = threads.size();
-    if (num_tasks < 2) {
-        // В однопоточном режиме
-        balance_flags_fast<dim>(cells, max_level);
-        return;
-    }
-    std::vector<std::future<void>> results(num_tasks);
-
-    restriction_timer.resume();
-    base_restrictions<dim>(cells, max_level, threads);
-    restriction_timer.stop();
-
-    sorting_timer.resume();
-    CellsByLevel sorted(cells, max_level, threads);
-    sorting_timer.stop();
-
-    for (int lvl = int(max_level) - 1; lvl >= 0; --lvl) {
-        round_timer_1.resume();
-        std::size_t bin = sorted.n_retain[lvl] / num_tasks + 1;
-        std::size_t pos = 0;
-        for (auto &res : results) {
-            res = threads.enqueue(round_1,
-                                  std::ref(cells), std::ref(sorted.retain[lvl]),
-                                  pos, std::min(pos + bin, sorted.n_retain[lvl])
-            );
-            pos += bin;
-        }
-        for (auto &result: results) result.get();
-        round_timer_1.stop();
-
-        round_timer_2.resume();
-        bin = sorted.n_coarse[lvl] / num_tasks + 1;
-        pos = 0;
-        for (auto &res : results) {
-            res = threads.enqueue(round_2,
-                                  std::ref(cells), std::ref(sorted.coarse[lvl]),
-                                  pos, std::min(pos + bin, sorted.n_coarse[lvl])
-            );
-            pos += bin;
-        }
-        for (auto &result: results) result.get();
-        round_timer_2.stop();
-
-        round_timer_3.resume();
-        pos = 0;
-        for (auto &res : results) {
-            res = threads.enqueue(round_3,
-                                  std::ref(cells), std::ref(sorted.coarse[lvl]),
-                                  pos, std::min(pos + bin, sorted.n_coarse[lvl])
-            );
-            pos += bin;
-        }
-        round_timer_3.stop();
-
-        round_timer_4.resume();
-        pos = 0;
-        for (auto &res : results) {
-            res = threads.enqueue(round_4<dim>,
-                                  std::ref(cells), std::ref(sorted.coarse[lvl]),
-                                  pos, std::min(pos + bin, sorted.n_coarse[lvl])
-            );
-            pos += bin;
-        }
-        for (auto &result: results) result.get();
-        round_timer_4.stop();
-    }
-
-#if CHECK_PERFORMANCE
-    std::cout << "    Restriction elapsed: " << restriction_timer.times().wall() << "\n";
-    std::cout << "    Sorting elapsed: " << sorting_timer.times().wall() << "\n";
-    std::cout << "    Round 1 elapsed: " << round_timer_1.times().wall() << "\n";
-    std::cout << "    Round 2 elapsed: " << round_timer_2.times().wall() << "\n";
-    std::cout << "    Round 3 elapsed: " << round_timer_3.times().wall() << "\n";
-    std::cout << "    Round 4 elapsed: " << round_timer_4.times().wall() << "\n";
-#endif
-}
-
-/// @brief Специализация по умолчанию с автоматическим выбором размерности
-template <>
-void balance_flags_fast<1234>(AmrStorage& cells, int max_level, ThreadPool& threads) {
-    if (cells.empty())
-        return;
-
-    auto dim = cells[0][element].dimension;
-
-    if (dim < 3) {
-        amr::balance_flags_fast<2>(cells, max_level, threads);
-    }
-    else {
-        amr::balance_flags_fast<3>(cells, max_level, threads);
-    }
-
-#if SCRUTINY
-    amr::check_flags(cells, max_level);
-#endif
-}
-#endif
-
-} // namespace amr
-} // namespace mesh
-} // namespace zephyr
+} // namespace zephyr::mesh::amr

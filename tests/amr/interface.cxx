@@ -2,6 +2,8 @@
 /// понимаются узкие области адаптации с шириной в одну ячейку, которые
 /// имеют меру размерности меньше, чем мера самой области.
 
+#include <iomanip>
+
 #include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/io/pvd_file.h>
@@ -104,7 +106,7 @@ int solution_step(EuMesh& mesh, double t = 0.0) {
 }
 
 int main() {
-    threads::off();
+    threads::on();
 
     PvdFile pvd("mesh", "output");
     pvd.variables = {"index", "level"};
@@ -112,11 +114,11 @@ int main() {
     pvd.variables += { "bit", get_bit };
 
     Rectangle rect(-1.0, 1.0, -1.0, 1.0);
-    rect.set_nx(20);
+    rect.set_nx(30);
 
     EuMesh mesh(U, &rect);
 
-    mesh.set_max_level(5);
+    mesh.set_max_level(4);
 
     int res = mesh.check_base();
     if (res < 0) {
@@ -125,9 +127,9 @@ int main() {
     }
 
     // Начальная адаптация
-    std::cout << "Начальная адаптация\n";
+    std::cout << "Init refinement\n";
     for (int lvl = 0; lvl < mesh.max_level() + 2; ++lvl) {
-        std::cout << "  Уровень " << lvl << "\n";
+        std::cout << "  Level " << lvl << "\n";
         solution_step(mesh);
     }
 
@@ -137,12 +139,12 @@ int main() {
     Stopwatch sw_set_flags;
     Stopwatch sw_refine;
 
-    std::cout << "\nРасчет\n";
+    std::cout << "\nRUN\n";
     elapsed.resume();
     for (int step = 0; step <= 1000; ++step) {
         sw_write.resume();
-        if (step % 10 == 0) {
-            std::cout << "  Шаг " << step << " / 1000\n";
+        if (step % 20 == 0) {
+            std::cout << "  Step " << std::setw(4) << step << " / 1000\n";
             pvd.save(mesh, step);
         }
         sw_write.stop();
@@ -165,20 +167,21 @@ int main() {
     }
     elapsed.stop();
 
-    std::cout << "\nElapsed time:     " << elapsed.extended_time()
+    std::cout << "\nElapsed:     " << elapsed.extended_time()
               << " ( " << elapsed.milliseconds() << " ms)\n";
 
-    std::cout << "  Write time:     " << sw_write.extended_time()
+    std::cout << "  Write:     " << sw_write.extended_time()
               << " ( " << sw_write.milliseconds() << " ms)\n";
 
-    std::cout << "  set index time: " << sw_set_index.extended_time()
+    std::cout << "  Set index: " << sw_set_index.extended_time()
               << " ( " << sw_set_index.milliseconds() << " ms)\n";
 
-    std::cout << "  set flags time: " << sw_set_flags.extended_time()
+    std::cout << "  Set flags: " << sw_set_flags.extended_time()
               << " ( " << sw_set_flags.milliseconds() << " ms)\n";
 
-    std::cout << "  Refine time:    " << sw_refine.extended_time()
+    std::cout << "  Refine:    " << sw_refine.extended_time()
               << " ( " << sw_refine.milliseconds() << " ms)\n";
 
+    threads::off();
     return 0;
 }

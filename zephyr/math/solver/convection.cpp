@@ -54,36 +54,23 @@ Vector3d Convection::velocity(const Vector3d& c) const {
 }
 
 double Convection::compute_dt(Cell &cell) const {
-    double max_area = 0.0;
-    for (auto &face: cell.faces()) {
-        max_area = std::max(max_area, face.area());
-    }
-    double dx = cell.volume() / max_area;
-
-    return m_CFL * dx / velocity(cell.center()).norm();
+    double h = cell.incircle_radius();
+    return m_CFL * h / velocity(cell.center()).norm();
 }
 
 void Convection::compute_grad(Cell &cell, int stage) {
-    double ux = 0.0;
-    double uy = 0.0;
-    double uz = 0.0;
-
     double uc = stage < 1 ? cell(U).u1 : cell(U).uh;
 
-    for (auto &face: cell.faces()) {
-        auto neib = face.neib();
-
-        double un = stage < 1 ? neib(U).u1 : neib(U).uh;
-
-        Vector3d S = 0.5 * face.normal() * face.area();
-        ux += (uc + un) * S.x();
-        uy += (uc + un) * S.y();
-        uz += (uc + un) * S.z();
+    Vector3d grad = Vector3d::Zero();
+    for (auto face: cell.faces()) {
+        double un = stage < 1 ? face.neib(U).u1 : face.neib(U).uh;
+        grad += (0.5 * (uc + un) * face.area()) * face.normal();
     }
+    grad /= cell.volume();
 
-    cell(U).ux = ux / cell.volume();
-    cell(U).uy = uy / cell.volume();
-    cell(U).uz = uz / cell.volume();
+    cell(U).ux = grad.x();
+    cell(U).uy = grad.y();
+    cell(U).uz = grad.z();
 }
 
 void Convection::fluxes(Cell &cell, int stage) {
@@ -145,53 +132,58 @@ void Convection::fluxes(Cell &cell, int stage) {
 
 void Convection::update(Mesh &mesh) {
     // Определяем dt
-    m_dt = std::numeric_limits<double>::max();
-    for (auto& cell: mesh) {
-        m_dt = std::min(m_dt, compute_dt(cell));
-    }
+    m_dt = mesh.min(
+            [this](Cell &cell) -> double {
+                return compute_dt(cell);
+            });
 
     if (m_accuracy < 2) {
         // Схема первого порядка, простой снос значений
         // на промежуточный слой
-        for (auto &cell: mesh) {
-            cell(U).uh = cell(U).u1;
-        }
-    }
-    else {
+        mesh.for_each(
+                [](Cell &cell) {
+                    cell(U).uh = cell(U).u1;
+                });
+    } else {
         // Схема высокого порядка, считаем производные,
         // выполняем шаг предиктора
 
         // Считаем производные
-        for (auto &cell: mesh) {
-            compute_grad(cell, 0);
-        }
+        mesh.for_each(
+                [this](Cell &cell) {
+                    compute_grad(cell, 0);
+                });
 
         // Шаг предиктора
-        for (auto &cell: mesh) {
-            fluxes(cell, 0);
-        }
+        mesh.for_each(
+                [this](Cell &cell) {
+                    fluxes(cell, 0);
+                });
 
         // Считаем производные
-        for (auto &cell: mesh) {
-            compute_grad(cell, 1);
-        }
+        mesh.for_each(
+                [this](Cell &cell) {
+                    compute_grad(cell, 1);
+                });
     }
 
     // Шаг корректора
-    for (auto cell: mesh) {
-        fluxes(cell, 1);
-    }
+    mesh.for_each(
+            [this](Cell &cell) {
+                fluxes(cell, 1);
+            });
 
     // Обновляем слои
-    for (auto cell: mesh) {
-        cell(U).u1 = cell(U).u2;
-        cell(U).uh = 0.0;
-        cell(U).u2 = 0.0;
-    }
+    mesh.for_each(
+            [this](Cell &cell) {
+                cell(U).u1 = cell(U).u2;
+                cell(U).uh = 0.0;
+                cell(U).u2 = 0.0;
+            });
 }
 
 void Convection::set_flags(Mesh& mesh) {
-    for (auto cell: mesh) {
+    mesh.for_each([](Cell &cell) {
         double min_val = cell(U).u1;
         double max_val = cell(U).u1;
 
@@ -205,11 +197,10 @@ void Convection::set_flags(Mesh& mesh) {
 
         if (max_val - min_val > 0.1) {
             cell.set_flag(+1);
-        }
-        else {
+        } else {
             cell.set_flag(-1);
         }
-    }
+    });
 }
 
 Distributor Convection::distributor() const {

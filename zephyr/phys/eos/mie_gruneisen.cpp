@@ -238,6 +238,7 @@ void MieGruneisen::table_params(std::string name) {
         n  = 3.7;
         Gr = 2.77;
         Cv = 121.0;
+        T0 = 137.078_C;
     } else if (name == "Pd") {
         r0 = 11950.0;
         c0 = 3955.0;

@@ -54,9 +54,20 @@ public:
     /// @param beta Массовые концентрации компонент
     /// @param options В качестве опции целесообразно передавать начальное
     /// приближение для температуры.
-    /// @details Решается метом итераций Ньютона по одному уравнению.
+    /// @details Решается методом итераций Ньютона по одному уравнению.
     /// Для смеси StiffenedGas точное решение получается за одну итерацию.
     double energy_rp(double density, double pressure, const Fractions& beta,
+                     const Options& options = {}) const;
+
+    /// @brief Найти внутреннюю температуру и энергию смеси
+    /// @param density Смесевая плотность
+    /// @param pressure Равновесное давление
+    /// @param beta Массовые концентрации компонент
+    /// @param options В качестве опции целесообразно передавать начальное
+    /// приближение для температуры.
+    /// @details Решается методом итераций Ньютона по одному уравнению.
+    /// Для смеси StiffenedGas точное решение получается за одну итерацию.
+    std::pair<double, double> temperature_energy_rp(double density, double pressure, const Fractions& beta,
                      const Options& options = {}) const;
 
     /// @brief Смесевая скорость звука

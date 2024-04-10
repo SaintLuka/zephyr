@@ -48,9 +48,9 @@ std::array<AmrCell, CpC(3)> create_children<3>(const SqCube& cube) {
 /// (необходимое число граней, правильную линковку (на старные ячейки))
 template<int dim>
 std::array<AmrCell, CpC(dim)> get_children(AmrCell &cell) {
-    auto children = create_children<dim>(cell.vertices);
+    const auto children_by_side = get_children_by_side<dim>();
 
-    auto children_by_side = get_children_by_side<dim>();
+    auto children = create_children<dim>(cell.vertices);
 
     // По умолчанию дети ссылаются на родительскую ячейку
     for (auto &child: children) {
@@ -80,7 +80,7 @@ std::array<AmrCell, CpC(dim)> get_children(AmrCell &cell) {
         }
     }
 
-    // Далее необходимо слинковать дочерние ячейки с соседями
+    // Далее необходимо связать дочерние ячейки с соседями
     for (int side = 0; side < FpC(dim); ++side) {
         auto flag = cell.faces[side].boundary;
         for (int i: children_by_side[side]) {
@@ -96,8 +96,7 @@ std::array<AmrCell, CpC(dim)> get_children(AmrCell &cell) {
         } else {
             // Ячейка имела сложную грань
             for (int i: children_by_side[side]) {
-                AmrCell &child = children[i];
-                BFace &child_face = child.faces[side];
+                BFace &child_face = children[i].faces[side];
                 auto child_fc = child_face.center;
 
                 for (auto s: subface_sides<dim>(side)) {
@@ -150,15 +149,13 @@ Children select_children<3>(
 }
 
 /// @brief Производит разбиение ячейки, дочерние ячейки помещает в AmrStorage
+/// @param parent Родительская ячейка в хранилище
 /// @param locals Хранилище ячеек
-/// @param ic Индекс родительской ячейки в хранилище
 /// @param op Оператор разделения данных
 /// @details Дочерние ячейки правильно ссылаются друг на друга, на гранях
 /// adjacent указан на старые ячейки.
 template<int dim>
-void refine_cell(AmrStorage &locals, AmrStorage &aliens, int rank, int ic, const Distributor& op) {
-    auto& parent = locals[ic];
-
+void refine_cell(AmrStorage::Item& parent, AmrStorage &locals, AmrStorage &aliens, int rank, const Distributor& op) {
     auto children = get_children<dim>(parent);
 
     for (int i = 0; i < CpC(dim); ++i) {

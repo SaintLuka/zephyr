@@ -6,8 +6,7 @@ MovCell::MovCell(const Polygon& poly)
         : Element(0, 0), dim(2),
           faces(CellType::POLYGON, poly.size()) {
 
-    Vector3d C = poly.center();
-    double area = poly.area(C);
+    double area = poly.area();
 
     size = std::sqrt(area);
     center = poly.centroid(area);

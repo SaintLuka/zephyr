@@ -95,14 +95,38 @@ public:
 
     /// @brief Ссылка на данные ячейки
     template<class U>
-    U& operator()(const U &) {
+    inline U& operator()(const U &) {
         return *reinterpret_cast<U *>(m_it->data());
     }
 
     /// @brief Ссылка на данные ячейки
     template<class U>
-    const U& operator()(const U &) const {
+    inline const U& operator()(const U &) const {
         return *reinterpret_cast<const U *>(m_it->data());
+    }
+
+    /// @brief Ссылка на данные ячейки
+    template<class U>
+    inline U& data(const U &) {
+        return *reinterpret_cast<U *>(m_it->data());
+    }
+
+    /// @brief Ссылка на данные ячейки
+    template<class U>
+    inline const U& data(const U &) const {
+        return *reinterpret_cast<const U *>(m_it->data());
+    }
+
+    /// @brief Ссылка на конкретные данные ячейки
+    template<class T>
+    inline T& operator()(const VarExtra<T> & var) {
+        return *reinterpret_cast<T *>(m_it->data() + var.offset);
+    }
+
+    /// @brief Ссылка на конкретные данные ячейки
+    template<class T>
+    inline const T& operator()(const VarExtra<T> & var) const {
+        return *reinterpret_cast<const T *>(m_it->data() + var.offset);
     }
 
     /// @brief Ссылка на геометрию ячейки
@@ -127,6 +151,12 @@ public:
 
     /// @brief Получить смежную ячейку через грань
     EuCell neib(int face_idx) const;
+
+    /// @brief Получить указатель на данные соседа, минуя всякие промежуточные
+    /// действия (должно работать быстро). Проводит проверки грани, если грань
+    /// не определена или содержит граничное условие -- возвращается указатель
+    /// на данные самой ячейки.
+    const Byte* neib_data(const BFace& face) const;
 
     /// @brief Для данной ячейки вернуть ячейку из local AmrStorage
     /// @param idx Индекс ячейки в локальном хранилище
@@ -172,8 +202,19 @@ public:
 
     /// @brief Скорпировать вершины в полигон (двумерные ячейки)
     /// Для нелинейных AMR-ячеек возвращает до 8 граней.
-    inline geom::PolygonS<8> polygon() const {
+    inline geom::Polygon polygon() const {
         return m_it->polygon();
+    }
+
+    /// @brief Диаметр вписаной окружности.
+    /// @details Для AMR-ячейки представляет собой минимальное расстояние между
+    /// противоположными гранями. Для полигона --- диаметр вписаной окружности
+    /// для правильного многоугольника аналогичной площади.
+    /// Величину удобно использовать совместно с условием Куранта.
+    /// Для двумерных расчетов на прямоугольных сетках совпадает с минимальной
+    /// стороной прямоугольной ячейки.
+    inline double incircle_radius() const {
+        return m_it->incircle_radius();
     }
 
     /// @brief Оценка объемной доли, которая отсекается от ячейки некоторым телом.

@@ -58,6 +58,9 @@ struct Fractions {
     /// @brief Нормализовать концентрации (сумма равна единице)
     void normalize();
 
+    /// @brief Удалить концентрации меньше 0 и большие 1 и затем нормализовать
+    void fix();
+
     /// @brief Обрезать маленькие (< eps) и близкие к единице ( > 1 - eps)
     /// концентрации, затем нормализовать концентрации
     void cutoff(double eps = 1.0e-6);
@@ -111,6 +114,12 @@ struct FractionsFlux {
     [[nodiscard]] const std::array<double, Fractions::max_size> &get_data() const {
         return m_data;
     }
+
+    /// @brief Оператор доступа по индексу
+    double &operator[](size_t idx);
+
+    /// @brief Оператор доступа по индексу
+    const double &operator[](size_t idx) const;
 
     std::array<double, Fractions::max_size> m_data{};
 

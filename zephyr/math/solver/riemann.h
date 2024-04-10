@@ -24,12 +24,14 @@ public:
         double rho; ///< Плотность на грани
         double U;   ///< Скорость на грани
         double P;   ///< Давление на грани
+        bool conv;  ///< Хорошая сходимость
 
         /// @brief Конструктор по умолчанию
-        Solution() : rho(0.0 / 0.0), U(0.0 / 0.0), P(0.0 / 0.0) {}
+        Solution() : rho(0.0 / 0.0), U(0.0 / 0.0), P(0.0 / 0.0), conv(false) {}
 
         /// @brief Простейший конструктор
-        Solution(cref rho, cref U, cref P) : rho(rho), U(U), P(P) {}
+        Solution(cref rho, cref U, cref P, bool conv)
+            : rho(rho), U(U), P(P), conv(conv) {}
     };
 
     /// @brief Решить задачу Римана о распаде разрыва

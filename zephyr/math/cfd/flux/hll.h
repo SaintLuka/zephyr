@@ -24,5 +24,7 @@ public:
     [[nodiscard]] mmf::Flux
     mm_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) const override;
 
+    static mmf::Flux calc_mm_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture);
+
 };
 }

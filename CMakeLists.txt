@@ -1,5 +1,5 @@
+cmake_minimum_required(VERSION 3.15)
 project(zephyr C CXX)
-cmake_minimum_required(VERSION 3.5)
 
 set(CMAKE_LIB_NAME zephyr)
 
@@ -23,7 +23,8 @@ configure_file(
 )
 
 find_package(Threads REQUIRED)
-find_package(Boost COMPONENTS system filesystem)
+find_package(Boost   COMPONENTS system filesystem)
+find_package(Python3 COMPONENTS Interpreter Development NumPy REQUIRED)
 
 if (ZEPHYR_ENABLE_YAML)
     find_package(yaml-cpp REQUIRED)
@@ -35,6 +36,8 @@ message(STATUS "zephyr: build shared")
 
 add_library(zephyr SHARED ${ZEPHYR_SOURCES})
 target_link_libraries(zephyr PUBLIC ${Boost_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(zephyr PUBLIC Python3::Python Python3::NumPy)
+
 target_include_directories(zephyr PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>/libs
@@ -83,9 +86,9 @@ if (ZEPHYR_ENABLE_TESTS)
     add_subdirectory(tests)
 endif()
 
-if (ZEPHYR_ENABLE_PROBLEMS)
+#if (ZEPHYR_ENABLE_PROBLEMS)
     add_subdirectory(problems)
-endif()
+#endif()
 
 add_subdirectory(python)
 
