@@ -123,7 +123,7 @@ void SmFluid::fluxes(Mesh &mesh) const {
 
 void SmFluid::compute_grad(Mesh &mesh, const std::function<smf::PState(Cell &)> &to_state) const {
     mesh.for_each([&to_state](Cell &cell) -> void {
-        auto grad = math::compute_grad<smf::PState>(cell, to_state);
+        auto grad = math::compute_grad_gauss<smf::PState>(cell, to_state);
         cell(U).d_dx = grad[0];
         cell(U).d_dy = grad[1];
         cell(U).d_dz = grad[2];
