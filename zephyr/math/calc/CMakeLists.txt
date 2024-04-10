@@ -3,6 +3,7 @@ set(ZEPHYR_MATH_CALC_SRC
     PARENT_SCOPE)
 
 install(FILES
-        integrals.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/derivatives.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/integrals.h
         DESTINATION
         include/${PROJECT_NAME}/math/calc)

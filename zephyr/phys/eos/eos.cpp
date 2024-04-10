@@ -50,7 +50,7 @@ StiffenedGas Eos::stiffened_gas(double rho, double P, const Options& options) co
 
     double gamma = 1.0 + Pre.dE / rho;
     double eps_0 = eps - rho * Pre.dR / Pre.dE;
-    double P0 = rho * Pre.dR / gamma;
+    double P0 = (rho * Pre.dR - P) / gamma;
 
     return StiffenedGas(gamma, P0, eps_0, NAN);
 }

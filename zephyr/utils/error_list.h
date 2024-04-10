@@ -56,10 +56,25 @@ public:
         return max() < tolerance;
     }
 
+    int size() const {
+        return errs.size();
+    }
+
+    double operator[](int idx) const {
+        return errs[idx];
+    }
+
 private:
     ///@brief Массив ошибок
     std::vector<double> errs;
 };
+
+std::ostream& operator<<(std::ostream& os, const ErrorList& list) {
+    for (int i = 0; i < list.size(); ++i) {
+        os << list[i] << " ";
+    }
+    return os;
+}
 
 }
 }

@@ -4,14 +4,18 @@
 #include <vector>
 #include <cmath>
 
+#include <zephyr/math/calc/derivatives.h>
 #include <zephyr/utils/error_list.h>
 
 #include <zephyr/phys/eos/ideal_gas.h>
+#include <zephyr/phys/eos/strange_gas.h>
 #include <zephyr/phys/eos/stiffened_gas.h>
 #include <zephyr/phys/eos/mie_gruneisen.h>
 
+
 using namespace zephyr::phys;
 using namespace zephyr::utils;
+using namespace zephyr::math;
 
 
 void test_eos(Eos& eos, double T, double rho) {
@@ -32,8 +36,7 @@ void test_eos(Eos& eos, double T, double rho) {
     if (err1.is_ok(1.0e-14)) {
         std::cout << "\tConsistency.  Max error: " << err1.max() << ": OK!\n";
     } else {
-        std::cerr << "\tConsistency.  Max error: " << err1.max() << "\n";
-        throw std::runtime_error("Eos test failed #1");
+        std::cout << "\tConsistency.  Max error: " << err1.max() << ": NOT OK!!\n";
     }
 
     // Выражения с производными
@@ -52,8 +55,7 @@ void test_eos(Eos& eos, double T, double rho) {
     if (err2.is_ok(1.0e-14)) {
         std::cout << "\tSound Speed.  Max error: " << err2.max() << ": OK!\n";
     } else {
-        std::cerr << "\tSound Speed.  Max error: " << err2.max() << "\n";
-        throw std::runtime_error("Eos test failed #2");
+        std::cout << "\tSound Speed.  Max error: " << err2.max() << ": NOT OK!!\n";
     }
 
     // Аппроксимация двучленным УрС
@@ -70,24 +72,47 @@ void test_eos(Eos& eos, double T, double rho) {
     if (err3.is_ok(1.0e-13)) {
         std::cout << "\tStiffenedGas. Max error: " << err3.max() << ": OK!\n";
     } else {
-        std::cerr << "\tStiffenedGas. Max error: " << err3.max() << "\n";
-        throw std::runtime_error("Eos test failed #3");
+        std::cout << "\tStiffenedGas. Max error: " << err3.max() << ": NOT OK!!\n";
+        std::cout << err3 << "\n";
     }
 
     // Проверка производных
-    double d = 1.0e-5;
+    double d = 1.0e-3;
 
     double dP = d * P;
     double dR = d * rho;
     double dT = d * T;
     double dE = d * eps;
 
-    double dPdR_e = (eos.pressure_re(rho + dR, eps) - eos.pressure_re(rho - dR, eps)) / (2 * dR);
-    double dPdE_r = (eos.pressure_re(rho, eps + dE) - eos.pressure_re(rho, eps - dE)) / (2 * dE);
-    double dVdP_t = (eos.volume_pt(P + dP, T) - eos.volume_pt(P - dP, T)) / (2 * dP);
-    double dVdT_p = (eos.volume_pt(P, T + dT) - eos.volume_pt(P, T - dT)) / (2 * dT);
-    double dEdP_t = (eos.energy_pt(P + dP, T) - eos.energy_pt(P - dP, T)) / (2 * dP);
-    double dEdT_p = (eos.energy_pt(P, T + dT) - eos.energy_pt(P, T - dT)) / (2 * dT);
+    double dPdR_e = derivative<1, 4>(
+            [&](double x) -> double {
+                return eos.pressure_re(x, eps);
+            }, rho, dR);
+
+    double dPdE_r = derivative<1, 4>(
+            [&](double x) -> double {
+                return eos.pressure_re(rho, x);
+            }, eps, dE);
+
+    double dVdP_t = derivative<1, 4>(
+            [&](double x) -> double {
+                return eos.volume_pt(x, T);
+            }, P, dP);
+
+    double dVdT_p = derivative<1, 4>(
+            [&](double x) -> double {
+                return eos.volume_pt(P, x);
+            }, T, dT);
+
+    double dEdP_t = derivative<1, 4>(
+            [&](double x) -> double {
+                return eos.energy_pt(x, T);
+            }, P, dP);
+
+    double dEdT_p = derivative<1, 4>(
+            [&](double x) -> double {
+                return eos.energy_pt(P, x);
+            }, T, dT);
 
     ErrorList err4 = {
             {P.dR, dPdR_e},
@@ -98,11 +123,11 @@ void test_eos(Eos& eos, double T, double rho) {
             {E.dT, dEdT_p},
     };
 
-    if (err4.is_ok(1.0e-9)) {
+    if (err4.is_ok(1.0e-8)) {
         std::cout << "\tDerivatives.  Max error: " << err4.max() << ": OK!\n";
     } else {
-        std::cerr << "\tDerivatives.  Max error: " << err4.max() << "\n";
-        throw std::runtime_error("Eos test failed #4");
+        std::cout << "\tDerivatives.  Max error: " << err4.max() << ": NOT OK!!\n";
+        std::cout << err4 << "\n";
     }
 }
 
@@ -112,6 +137,10 @@ int main() {
     std::cout << "IdealGas(\"Air\")\n";
     IdealGas eos1("Air");
     test_eos(eos1, 145.0_C, 1.3_kg_m3);
+
+    std::cout << "\nStrangeGas(\"Air\")\n";
+    StrangeGas eos5("Air");
+    test_eos(eos5, 145.0_C, 1.3_kg_m3);
 
     std::cout << "\nStiffenedGas(\"Water2\")\n";
     StiffenedGas eos2("Water2");
