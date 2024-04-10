@@ -5,8 +5,6 @@ namespace zephyr::math {
 
 namespace smf {
 
-PState::PState(): density(0), velocity(Vector3d(0, 0, 0)), pressure(0), energy(0) {};
-
 PState::PState(const double &density, const Vector3d &velocity,
                const double &pressure, const double &energy)
         : density(density), velocity(velocity),
