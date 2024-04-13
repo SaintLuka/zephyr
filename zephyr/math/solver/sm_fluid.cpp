@@ -73,7 +73,7 @@ double SmFluid::compute_dt(Mesh &mesh) {
     return m_dt;
 }
 
-void SmFluid::fluxes(Mesh &mesh) const {
+void SmFluid::fluxes(Mesh &mesh) {
     mesh.for_each([this](Cell &cell) {
         // Примитивный вектор в ячейке
         PState p_self = cell(U).get_pstate();
@@ -121,7 +121,7 @@ void SmFluid::fluxes(Mesh &mesh) const {
     });
 }
 
-void SmFluid::compute_grad(Mesh &mesh, const std::function<smf::PState(Cell &)> &to_state) const {
+void SmFluid::compute_grad(Mesh &mesh, const std::function<smf::PState(Cell &)> &to_state)  {
     mesh.for_each([&to_state](Cell &cell) -> void {
         auto grad = math::compute_grad_gauss<smf::PState>(cell, to_state);
         cell(U).d_dx = grad[0];
@@ -130,7 +130,7 @@ void SmFluid::compute_grad(Mesh &mesh, const std::function<smf::PState(Cell &)> 
     });
 }
 
-void SmFluid::fluxes_stage1(Mesh &mesh) const {
+void SmFluid::fluxes_stage1(Mesh &mesh)  {
     mesh.for_each([this](Cell &cell) -> void {
         QState qc(cell(U).get_pstate());
         qc.vec() -= 0.5 * m_dt / cell.volume() * calc_flux_extra(cell, true).vec();
@@ -138,7 +138,7 @@ void SmFluid::fluxes_stage1(Mesh &mesh) const {
     });
 }
 
-void SmFluid::fluxes_stage2(Mesh &mesh) const {
+void SmFluid::fluxes_stage2(Mesh &mesh)  {
     mesh.for_each([this](Cell &cell) -> void {
         QState qc(cell(U).get_pstate());
         qc.vec() -= m_dt / cell.volume() * calc_flux_extra(cell, false).vec();
@@ -146,7 +146,7 @@ void SmFluid::fluxes_stage2(Mesh &mesh) const {
     });
 }
 
-smf::Flux SmFluid::calc_flux_extra(Cell &cell, bool from_begin) const {
+smf::Flux SmFluid::calc_flux_extra(Cell &cell, bool from_begin)  {
     // Примитивный вектор в ячейке
     PState p_self = cell(U).half;
     if (from_begin)
@@ -187,12 +187,16 @@ smf::Flux SmFluid::calc_flux_extra(Cell &cell, bool from_begin) const {
 
         // рассчитываем расстояние на грани слева и справа
         PState p_minus = face_extra.m(p_self).in_local(normal);
-        PState p_plus = face_extra.p(p_neib).in_local(normal);
+        PState p_plus = face_extra.p(p_neib).in_local(normal);        
 
         // пересчитываем энергию и температуру
         p_minus.energy = m_eos.energy_rp(p_minus.density, p_minus.pressure);
         p_plus.energy = m_eos.energy_rp(p_plus.density, p_plus.pressure);
 
+        if (face.flag() == Boundary::WALL) {
+            Vector3d Vn = normal * p_minus.velocity.dot(normal);
+            p_plus.velocity = p_minus.velocity - 2 * Vn; // Vt - Vn = p_self.velocity - Vn - Vn
+        }
         // Численный поток на грани
         auto loc_flux = m_nf->flux(p_minus, p_plus, m_eos);
         loc_flux.to_global(normal);

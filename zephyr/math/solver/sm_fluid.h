@@ -7,6 +7,8 @@
 #include <boost/format.hpp>
 #include <zephyr/phys/tests/classic_test.h>
 #include <zephyr/phys/tests/blast_wave.h>
+#include <zephyr/phys/tests/shock-in-a-box.h>
+#include <zephyr/phys/tests/mach.h>
 #include <zephyr/phys/tests/RiemannTest2D.h>
 #include <zephyr/math/solver/riemann.h>
 #include <zephyr/math/cfd/fluxes.h>
@@ -105,18 +107,18 @@ private:
     double compute_dt(Mesh &mesh);
 
     /// @brief Расчёт потоков
-    void fluxes(Mesh &mesh) const;
+    void fluxes(Mesh &mesh);
 
     /// @brief Обновление ячеек
     void swap(Mesh &mesh);
 
-    void compute_grad(Mesh &mesh,  const std::function<smf::PState(Cell &)> &to_state) const;
+    void compute_grad(Mesh &mesh,  const std::function<smf::PState(Cell &)> &to_state);
 
-    void fluxes_stage1(Mesh &mesh) const;
+    void fluxes_stage1(Mesh &mesh);
 
-    void fluxes_stage2(Mesh &mesh) const;
+    void fluxes_stage2(Mesh &mesh);
 
-    smf::Flux calc_flux_extra(Cell &cell, bool from_begin) const;
+    smf::Flux calc_flux_extra(Cell &cell, bool from_begin);
 
 public:
 

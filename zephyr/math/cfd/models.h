@@ -25,7 +25,7 @@ struct PState {
     double pressure;
     double energy;
 
-    PState() : density(0), velocity(0), pressure(0), energy(0)
+    PState() : density(0), velocity({0,0,0}), pressure(0), energy(0)
     {}
 
     PState(const double &density, const Vector3d &velocity,

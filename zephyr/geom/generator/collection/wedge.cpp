@@ -105,7 +105,7 @@ void Wedge::init_blocks() {
 }
 
 
-Box Wedge::bbox() const {
+Box Wedge::bbox() const {   
     Vector3d vmin(m_xmin, m_ymin, 0.0);
     Vector3d vmax(m_xmax, m_ymax, 0.0);
 

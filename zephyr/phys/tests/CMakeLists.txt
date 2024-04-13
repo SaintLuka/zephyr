@@ -8,6 +8,8 @@ install(FILES
         toro.h
         classic_test.h
         blast_wave.h
+        shock-in-a-box.h
+        mach.h
         RiemannTest2D.h
         DESTINATION
         include/${PROJECT_NAME}/phys/tests)

@@ -32,7 +32,7 @@ public:
         va = Vector3d{0.0, 0.0, 0.0};
         pa = 1.0;
         
-        r_jump = 0.1;
+        r_jump = 0.2;
         finish = 1.0;
         type = type;
     }
@@ -64,8 +64,9 @@ public:
     double density(const Vector3d &x) const 
     { 
         if (type == 1) {
-            double r = x.norm() / r_jump;
-            return r < 1.0 ? rS : ra; 
+            auto y = x - Vector3d{(xmax() - xmin())/2, (ymax() - ymin()) / 2, 0};
+            double r = y.norm() / r_jump;
+            return r > 1.0 ? rS : ra; 
         }
         if (type == 2) {
         }
@@ -75,8 +76,9 @@ public:
     Vector3d velocity(const Vector3d &x) const 
     { 
         if (type == 1) {
-            double r = x.norm() / r_jump;
-            return r < 1.0 ? vS : va;
+            auto y = x - Vector3d{(xmax() - xmin())/2, (ymax() - ymin()) / 2, 0};
+            double r = y.norm() / r_jump;
+            return r > 1.0 ? vS : va; 
         }
         if (type == 2) {
         }
@@ -86,11 +88,11 @@ public:
     double pressure(const Vector3d &x) const 
     { 
         if (type == 1) {
-            double r = x.norm() / r_jump;
-            return r < 1.0 ? pS : pa; 
+            auto y = x - Vector3d{(xmax() - xmin())/2, (ymax() - ymin()) / 2, 0};
+            double r = y.norm() / r_jump;
+            return r > 1.0 ? pS : pa; 
         }
         if (type == 2) {
-
         }
     }
 

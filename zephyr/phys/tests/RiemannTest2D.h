@@ -65,11 +65,24 @@ public:
             v1 = -0.5;  v2 = 0.5;   v3 = 0.5;   v4 = -0.5;
             p1 = 1;     p2 = 1;     p3 = 1;     p4 = 1;
             break; 
+        case 8:
+            r1 = 0.5197; r2 = 1.0; r3 = 0.8; r4 = 1.0;
+            p1 = 0.4; p2 = 1.0; p3 = 1.0; p4 = 1.0;
+            u1 = 0.1; u2 = -0.6259; u3 = 0.1; u4 = 0.1;
+            v1 = 0.1; v2 = 0.1; v3 = 0.1; v4 = -0.6259;
+            finish = 0.25;
+            break;
+        case 9:
+            r1 = 1.0; r2 = 2.0; r3 = 1.039; r4 = 0.5197;
+            p1 = 1.0; p2 = 1.0; p3 = 0.4; p4 = 0.4;
+            u1 = 0.0; u2 = 0.0; u3 = 0.0; u4 = 0.0;
+            v1 = 0.3; v2 = -0.3; v3 = -0.8133; v4 = -0.259;
+            break;
         }
+
 
         y_jump = 0.5;
         x_jump = 0.5;
-        finish = 1.0;
     };
 
     std::string get_name() const { return "2D Riemann Test";}
@@ -100,37 +113,37 @@ public:
 
     /// @brief Начальная плотность
     double density(const Vector3d &vec) const { 
-        if (vec.x() > x_jump && vec.y() > y_jump)
+        if (vec.x() >= x_jump && vec.y() >= y_jump)
             return r1;
-        if (vec.x() < x_jump && vec.y() > y_jump)
+        if (vec.x() <= x_jump && vec.y() >= y_jump)
             return r2;
-        if (vec.x() < x_jump && vec.y() < y_jump)
+        if (vec.x() <= x_jump && vec.y() <= y_jump)
             return r3;
-        if (vec.x() > x_jump && vec.y() < y_jump)
+        if (vec.x() >= x_jump && vec.y() <= y_jump)
             return r4;
     };
 
     /// @brief Начальная скорость
     Vector3d velocity(const Vector3d &vec) const { 
-        if (vec.x() > x_jump && vec.y() > y_jump)
+        if (vec.x() >= x_jump && vec.y() >= y_jump)
             return {u1, v1, 0.0};
-        if (vec.x() < x_jump && vec.y() > y_jump)
+        if (vec.x() <= x_jump && vec.y() >= y_jump)
             return {u2, v2, 0.0};
-        if (vec.x() < x_jump && vec.y() < y_jump)
+        if (vec.x() <= x_jump && vec.y() <= y_jump)
             return {u3, v3, 0.0};
-        if (vec.x() > x_jump && vec.y() < y_jump)
+        if (vec.x() >= x_jump && vec.y() <= y_jump)
             return {u4, v4, 0.0};
     };
 
     /// @brief Начальное давление
     double pressure(const Vector3d &vec) const { 
-        if (vec.x() > x_jump && vec.y() > y_jump)
+        if (vec.x() >= x_jump && vec.y() >= y_jump)
             return p1;
-        if (vec.x() < x_jump && vec.y() > y_jump)
+        if (vec.x() <= x_jump && vec.y() >= y_jump)
             return p2;
-        if (vec.x() < x_jump && vec.y() < y_jump)
+        if (vec.x() <= x_jump && vec.y() <= y_jump)
             return p3;
-        if (vec.x() > x_jump && vec.y() < y_jump)
+        if (vec.x() >= x_jump && vec.y() <= y_jump)
             return p4;
     };
 

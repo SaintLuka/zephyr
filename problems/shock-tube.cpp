@@ -148,14 +148,13 @@ int main () {
 
     //EOS
     IdealGas eos("Air");
-    Eos 
 
     // Инициализация начальных условий
     setup_initial(mesh, u0, u3, P0, P3, rho0, rho3, cell_size_x, eos);
 
 
     // Создать решатель
-    auto solver = zephyr::math::SmFluid(mesh, flux);
+    auto solver = zephyr::math::SmFluid(eos);
 
     while (time <= max_time) {
         std::cout << "\tStep: " << std::setw(6) << n_step << ";"
