@@ -146,13 +146,14 @@ public:
     /// (максимальное из минимальных давлений)
     double min_pressure(const Fractions& beta) const;
 
+/// @brief Найти равновесные температуру и давление смеси
+/// @param options В качестве опций целесообразно передавать начальные
+/// приближения для температуры и давления.
+/// @details Решается метом итераций Ньютона по паре уравнений.
+PairPT find_PT(double density, double energy, const Fractions& beta,
+               const Options& options = {}) const;
+
 protected:
-    /// @brief Найти равновесные температуру и давление смеси
-    /// @param options В качестве опций целесообразно передавать начальные
-    /// приближения для температуры и давления.
-    /// @details Решается метом итераций Ньютона по паре уравнений.
-    PairPT find_PT(double density, double energy, const Fractions& beta,
-                   const Options& options = {}) const;
 
     /// @brief Скорость звука от равновесных температуры и давления
     double sound_speed_pt(double pressure, double temperature,
