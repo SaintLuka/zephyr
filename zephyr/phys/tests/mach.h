@@ -34,7 +34,7 @@ public:
         eR = eos.energy_rp(rR, pR);
 
         x_jump = 0.2;
-        finish = 1.0;
+        finish = 0.4;
         // @formatter:on
     }
 
@@ -51,10 +51,10 @@ public:
     std::string get_name() const { return "Mach";}
 
     /// @brief Левая граница области
-    double xmin() const { return 0.0; }
+    double xmin() const { return 0.49; }
 
     /// @brief Правая граница области
-    double xmax() const { return 0.9; }
+    double xmax() const { return 0.7; }
 
     /// @brief Конечный момент времени
     double max_time() const { return finish; }
@@ -66,16 +66,16 @@ public:
     double get_x_jump() const { return x_jump; }
 
     /// @brief Начальная плотность
-    double density(const double &x) const { return x < x_jump ? rL : rR; }
+    double density(const double &x) const { return (x > 0.19) && (x < x_jump) ? rL : rR; }
 
     /// @brief Начальная скорость
-    Vector3d velocity(const double &x) const { return {x < x_jump ? uL : uR, 0.0, 0.0}; }
+    Vector3d velocity(const double &x) const { return { (x > 0.19) && (x < x_jump) ? uL : uR, 0.0, 0.0}; }
 
     /// @brief Начальное давление
-    double pressure(const double &x) const { return x < x_jump ? pL : pR; }
+    double pressure(const double &x) const { return (x > 0.19 ) && (x < x_jump) ? pL : pR; }
 
     /// @brief Начальная внутренняя энергия
-    double energy(const double &x) const { return x < x_jump ? eL : eR; }
+    double energy(const double &x) const { return (x > 0.19) && (x < x_jump) ? eL : eR; }
 
     /// @brief Начальная плотность
     double density(const Vector3d &r) const { return density(r.x()); }

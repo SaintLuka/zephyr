@@ -12,7 +12,6 @@
 #include <zephyr/phys/tests/RiemannTest2D.h>
 #include <zephyr/math/solver/riemann.h>
 #include <zephyr/math/cfd/fluxes.h>
-#include <zephyr/math/cfd/limiter.h>
 
 namespace zephyr::math {
 

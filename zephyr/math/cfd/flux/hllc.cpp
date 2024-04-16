@@ -142,11 +142,11 @@ smf::Flux HLLC::calc_flux(const smf::PState &zL, const smf::PState &zR, const ph
 
     double P = p1 + rho1 * (s1 - u1) * (S - u1); // P*
 
-    //double EL = ((s1 - u1) * E1 + S * P - u1 * p1) / (s1 - S); // сам вывел
-    //double ER = ((s2 - u2) * E2 + S * P - u2 * p2) / (s2 - S);
+    double EL = ((s1 - u1) * E1 + S * P - u1 * p1) / (s1 - S); // сам вывел
+    double ER = ((s2 - u2) * E2 + S * P - u2 * p2) / (s2 - S);
     
-    double EL = rhoL * (E1 / rho1 + (S - u1) * (S + p1 / (rho1 * (s1 - u1)))); // из Тора
-    double ER = rhoR * (E2 / rho2 + (S - u2) * (S + p2 / (rho2 * (s2 - u2))));
+    // double EL = rhoL * (E1 / rho1 + (S - u1) * (S + p1 / (rho1 * (s1 - u1)))); // из Тора
+    // double ER = rhoR * (E2 / rho2 + (S - u2) * (S + p2 / (rho2 * (s2 - u2))));
 
     QState QL(rhoL, rhoL * Vector3d(S, v1, w1), EL); // U*_L
     QState QR(rhoR, rhoR * Vector3d(S, v2, w2), ER); // U*_R

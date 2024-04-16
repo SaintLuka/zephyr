@@ -1,7 +1,8 @@
 set(ZEPHYR_GENERATOR_COLLECTION
 	${CMAKE_CURRENT_SOURCE_DIR}/collection/plane_with_hole.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/collection/semicircle_cutout.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/collection/wedge.cpp)
+	${CMAKE_CURRENT_SOURCE_DIR}/collection/wedge.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/collection/wedge2.cpp)
 
 set(ZEPHYR_GEOM_GENERATOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/generator.cpp
@@ -48,5 +49,6 @@ install(FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/collection/plane_with_hole.h
 	${CMAKE_CURRENT_SOURCE_DIR}/collection/semicircle_cutout.h
 	${CMAKE_CURRENT_SOURCE_DIR}/collection/wedge.h
+	${CMAKE_CURRENT_SOURCE_DIR}/collection/wedge2.h
 	DESTINATION
 	include/${PROJECT_NAME}/geom/generator/collection)

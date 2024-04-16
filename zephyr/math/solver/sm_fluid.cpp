@@ -193,10 +193,11 @@ smf::Flux SmFluid::calc_flux_extra(Cell &cell, bool from_begin)  {
         p_minus.energy = m_eos.energy_rp(p_minus.density, p_minus.pressure);
         p_plus.energy = m_eos.energy_rp(p_plus.density, p_plus.pressure);
 
-        if (face.flag() == Boundary::WALL) {
-            Vector3d Vn = normal * p_minus.velocity.dot(normal);
-            p_plus.velocity = p_minus.velocity - 2 * Vn; // Vt - Vn = p_self.velocity - Vn - Vn
-        }
+        // if (face.flag() == Boundary::WALL) {
+        //     Vector3d Vn = normal * p_minus.velocity.dot(normal);
+        //     p_plus.velocity = p_minus.velocity - 2 * Vn; // Vt - Vn = p_self.velocity - Vn - Vn
+        // }
+
         // Численный поток на грани
         auto loc_flux = m_nf->flux(p_minus, p_plus, m_eos);
         loc_flux.to_global(normal);
