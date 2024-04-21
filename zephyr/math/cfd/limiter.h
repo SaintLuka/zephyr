@@ -109,6 +109,9 @@ double smart(double a, double b);
 double superbee(double r);
 double superbee(double a, double b);
 
+double atvl(double r);
+double atvl(double a, double b);
+
 }
 
 } // math

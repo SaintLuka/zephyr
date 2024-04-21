@@ -72,7 +72,7 @@ public:
     { 
         double ratio = x.norm() / x_jump;
         if (ratio < 1) 
-            return Vector3d{V1 * x.x() / x.norm(), V1 * x.y() / x.norm(), 0};
+            return Vector3d{0.9 * V1 * x.x() / x.norm(), V1 * x.y() / x.norm(), 0};
         return va; 
     }
 

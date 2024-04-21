@@ -42,14 +42,44 @@ void SmFluid::update(Mesh &mesh) {
     if (m_acc == 1) {
         fluxes(mesh);
     } else {
+        
+        mesh.for_each([this](Cell &cell) -> void {
+            assert(cell(U).get_pstate().pressure >= 0 && cell(U).get_pstate().energy >= 0);
+            assert(cell(U).next.pressure >= 0 && cell(U).next.energy >= 0);
+            assert(cell(U).half.pressure >= 0 && cell(U).half.energy >= 0);
+        });
+
         compute_grad(mesh, get_current_sm);
+
+        mesh.for_each([this](Cell &cell) -> void {
+            assert(cell(U).get_pstate().pressure >= 0 && cell(U).get_pstate().energy >= 0);
+            assert(cell(U).next.pressure >= 0 && cell(U).next.energy >= 0);
+            assert(cell(U).half.pressure >= 0 && cell(U).half.energy >= 0);
+        });
+
         fluxes_stage1(mesh);
+
+        mesh.for_each([this](Cell &cell) -> void {
+            assert(cell(U).get_pstate().pressure >= 0 && cell(U).get_pstate().energy >= 0);
+            assert(cell(U).next.pressure >= 0 && cell(U).next.energy >= 0);
+            assert(cell(U).half.pressure >= 0 && cell(U).half.energy >= 0);
+        });
+
         compute_grad(mesh, get_half_sm);
+        
+        mesh.for_each([this](Cell &cell) -> void {
+            assert(cell(U).get_pstate().pressure >= 0 && cell(U).get_pstate().energy >= 0);
+            assert(cell(U).next.pressure >= 0 && cell(U).next.energy >= 0);
+            assert(cell(U).half.pressure >= 0 && cell(U).half.energy >= 0);
+        });
+        
         fluxes_stage2(mesh);
     }
 
     // Обновляем слои
     swap(mesh);
+
+    check_asserts(mesh);
 }
 
 double SmFluid::compute_dt(Mesh &mesh) {
@@ -131,24 +161,29 @@ void SmFluid::compute_grad(Mesh &mesh, const std::function<smf::PState(Cell &)> 
 }
 
 void SmFluid::fluxes_stage1(Mesh &mesh)  {
+    check_asserts(mesh);
     mesh.for_each([this](Cell &cell) -> void {
         QState qc(cell(U).get_pstate());
         qc.vec() -= 0.5 * m_dt / cell.volume() * calc_flux_extra(cell, true).vec();
         cell(U).half = PState(qc, m_eos);
+        assert(cell(U).half.pressure >= 0 && cell(U).half.energy >= 0);
     });
 }
 
 void SmFluid::fluxes_stage2(Mesh &mesh)  {
+    check_asserts(mesh);
     mesh.for_each([this](Cell &cell) -> void {
         QState qc(cell(U).get_pstate());
         qc.vec() -= m_dt / cell.volume() * calc_flux_extra(cell, false).vec();
         cell(U).next = PState(qc, m_eos);
+        assert(cell(U).next.pressure >= 0 && cell(U).next.energy >= 0);
     });
 }
 
-smf::Flux SmFluid::calc_flux_extra(Cell &cell, bool from_begin)  {
+smf::Flux SmFluid::calc_flux_extra(const Cell &cell, bool from_begin)  {
     // Примитивный вектор в ячейке
     PState p_self = cell(U).half;
+
     if (from_begin)
         p_self = cell(U).get_pstate();
 
@@ -173,12 +208,10 @@ smf::Flux SmFluid::calc_flux_extra(Cell &cell, bool from_begin)  {
         Vector3d face_c = face.center();
         Vector3d neib_c = 2 * face_c - cell_c;
 
-        // auto face_extra = FaceExtra::Simple(
-        //         m_limiter,
+        // auto face_extra = FaceExtra::Triad(
         //         p_self, cell(U).d_dx, cell(U).d_dy, cell(U).d_dz,
         //         p_neib, face.neib()(U).d_dx, face.neib()(U).d_dy, face.neib()(U).d_dz,
         //         cell_c, neib_c, face_c);
-
 
         auto face_extra = FaceExtra::ATvL(
                 p_self, cell(U).d_dx, cell(U).d_dy, cell(U).d_dz,
@@ -187,11 +220,18 @@ smf::Flux SmFluid::calc_flux_extra(Cell &cell, bool from_begin)  {
 
         // рассчитываем расстояние на грани слева и справа
         PState p_minus = face_extra.m(p_self).in_local(normal);
-        PState p_plus = face_extra.p(p_neib).in_local(normal);        
+        PState p_plus = face_extra.p(p_neib).in_local(normal);
+
+        // std::cout << p_neib << std::endl;
+        // std::cout << p_minus << std::endl;
+        // std::cout << p_plus << std::endl;     
 
         // пересчитываем энергию и температуру
         p_minus.energy = m_eos.energy_rp(p_minus.density, p_minus.pressure);
         p_plus.energy = m_eos.energy_rp(p_plus.density, p_plus.pressure);
+
+        assert(p_minus.pressure >= 0 && p_minus.energy >= 0);
+        assert(p_plus.pressure >= 0 && p_plus.energy >= 0);
 
         // if (face.flag() == Boundary::WALL) {
         //     Vector3d Vn = normal * p_minus.velocity.dot(normal);
@@ -212,6 +252,9 @@ smf::Flux SmFluid::calc_flux_extra(Cell &cell, bool from_begin)  {
 void SmFluid::swap(Mesh &mesh) {
     size_t step = m_step;
     mesh.for_each([step](Cell &cell) -> void {
+        assert(cell(U).get_pstate().pressure >= 0 && cell(U).get_pstate().energy >= 0);
+        assert(cell(U).next.pressure >= 0 && cell(U).next.energy >= 0);
+        assert(cell(U).half.pressure >= 0 && cell(U).half.energy >= 0);
         cell(U).set_state(cell(U).next);
         cell(U).half = cell(U).next;
     });
@@ -274,7 +317,20 @@ Distributor SmFluid::distributor() const {
     return distr;
 }
 
+void SmFluid::check_asserts(Mesh &mesh, std::string msg) {
+    std::cout << msg << std::endl; 
+    mesh.for_each([this](Cell &cell) -> void {
+        assert(cell(U).get_pstate().pressure >= 0 && cell(U).get_pstate().energy >= 0);
+        assert(cell(U).next.pressure >= 0 && cell(U).next.energy >= 0);
+        assert(cell(U).half.pressure >= 0 && cell(U).half.energy >= 0);
+    });
+    std::cout << "OK" << std::endl;
+}
+
 void SmFluid::set_flags(Mesh &mesh) {
+
+    check_asserts(mesh);
+
     compute_grad(mesh, get_current_sm);
 
     for (auto cell: mesh) {
@@ -286,7 +342,7 @@ void SmFluid::set_flags(Mesh &mesh) {
             }
 
             // проверяем большой перепад давлений
-            if (abs(face.neib()(U).p - p) > 0.1 * p) {
+            if (abs(face.neib()(U).p - p) >= 0.1 * p) {
                 need_split = true;
                 break;
             }
@@ -297,6 +353,8 @@ void SmFluid::set_flags(Mesh &mesh) {
             cell.set_flag(-1);
         }
     }
+
+    check_asserts(mesh);
 }
 
 }

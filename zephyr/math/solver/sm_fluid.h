@@ -80,6 +80,8 @@ public:
 
     void update(Mesh &mesh);
 
+    void check_asserts(Mesh &mesh, std::string msg="");
+
     /// @brief Установить флаги адаптации
     void set_flags(Mesh& mesh);
 
@@ -117,7 +119,7 @@ private:
 
     void fluxes_stage2(Mesh &mesh);
 
-    smf::Flux calc_flux_extra(Cell &cell, bool from_begin);
+    smf::Flux calc_flux_extra(const Cell &cell, bool from_begin);
 
 public:
 

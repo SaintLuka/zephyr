@@ -1,7 +1,6 @@
 #include "fast.h"
 
 #include <zephyr/geom/generator/collection/wedge.h>
-#include <zephyr/geom/generator/collection/wedge2.h>
 #include <zephyr/geom/generator/collection/semicircle_cutout.h>
 
 #include <zephyr/math/cfd/fluxes.h>
@@ -17,7 +16,6 @@
 #include <zephyr/math/solver/sm_fluid.h>
 
 using zephyr::geom::generator::collection::Wedge;
-using zephyr::geom::generator::collection::Wedge2;
 using zephyr::geom::generator::collection::SemicircleCutout;
 using zephyr::geom::generator::Rectangle;
 
@@ -51,7 +49,7 @@ int main() {
     Eos& eos = test.eos;
 
     // Файл для записи
-    PvdFile pvd("mesh", "/mnt/d/blast2");
+    PvdFile pvd("mesh", "/mnt/d/blastfail");
 
     // Переменные для сохранения
     pvd.variables += {"rho", get_rho};
@@ -65,8 +63,8 @@ int main() {
                       }};
 
     Rectangle gen(-0.5, 0.5, -0.5, 0.5);
-    gen.set_ny(200);
-    gen.set_nx(200);
+    gen.set_ny(10);
+    gen.set_nx(10);
     gen.set_boundaries({.left=Boundary::WALL, .right=Boundary::WALL,
                         .bottom=Boundary::WALL, .top=Boundary::WALL});
 
@@ -94,25 +92,23 @@ int main() {
 
     // Создать решатель
     auto solver = zephyr::math::SmFluid(eos, Fluxes::HLLC);
-    solver.set_accuracy(1); // 2
+    solver.set_accuracy(2); // 2
     solver.set_CFL(0.4);
 
-    // mesh.set_max_level(5);
-    // mesh.set_distributor(solver.distributor());
+    mesh.set_max_level(5);
+    mesh.set_distributor(solver.distributor());
     
     double time = 0.0;
     double next_write = 0.0;
     size_t n_step = 0;
 
-    solver.init_cells(mesh, test);
+    //solver.init_cells(mesh, test);
 
-    std::cout << Vector3d(0);
-
-    // for (int k = 0; k < mesh.max_level() + 3; ++k) {
-    //     solver.init_cells(mesh, test);
-    //     solver.set_flags(mesh);
-    //     mesh.refine();
-    // }
+    for (int k = 0; k < mesh.max_level() + 3; ++k) {
+        solver.init_cells(mesh, test);
+        solver.set_flags(mesh);
+        mesh.refine();
+    }
 
     while (time <= 1.01 * test.max_time()) {
         std::cout << "\tStep: " << std::setw(6) << n_step << ";"
@@ -125,8 +121,10 @@ int main() {
         // Обновляем слои
         solver.update(mesh);
 
-        // solver.set_flags(mesh);
-        // mesh.refine();
+        solver.set_flags(mesh);
+        solver.check_asserts(mesh, "set flags");
+        mesh.refine();
+        solver.check_asserts(mesh, "refine");
         
         n_step += 1;
         time = solver.get_time();

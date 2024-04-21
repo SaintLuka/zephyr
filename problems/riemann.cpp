@@ -57,10 +57,10 @@ int main() {
 
     // Точное решение задачи Римана
     //RiemannSolver exact(zL, zR, sg, test.x_jump);
-    RiemannSolver exact(zL, zR, sg, -4.0);
+    // RiemannSolver exact(zL, zR, sg, -4.0);
 
     // Файл для записи
-    PvdFile pvd("mesh", "output");
+    PvdFile pvd("mesh", "/mnt/d/ShuOsher400"); 
 
     // Переменные для сохранения
     pvd.variables += {"rho", get_rho};
@@ -70,30 +70,30 @@ int main() {
 
     double time = 0.0;
 
-    pvd.variables += {"rho_exact",
-                      [&exact, &time](const AmrStorage::Item &cell) -> double {
-                          return exact.density(cell.center.x(), time);
-                      }};
-    pvd.variables += {"u_exact",
-                      [&exact, &time](const AmrStorage::Item &cell) -> double {
-                          return exact.velocity(cell.center.x(), time);
-                      }};
-    pvd.variables += {"p_exact",
-                      [&exact, &time](const AmrStorage::Item &cell) -> double {
-                          return exact.pressure(cell.center.x(), time);
-                      }};
-    pvd.variables += {"e_exact",
-                      [&exact, &time](const AmrStorage::Item &cell) -> double {
-                          return exact.energy(cell.center.x(), time);
-                      }};
-    pvd.variables += {"c",
-                      [&eos](AmrStorage::Item& cell) -> double {
-                          return eos.sound_speed_rp(cell(U).rho, cell(U).p);
-                      }};
-    pvd.variables += {"c_exact",
-                      [&exact, &time](const AmrStorage::Item &cell) -> double {
-                          return exact.sound_speed(cell.center.x(), time);
-                      }};
+    // pvd.variables += {"rho_exact",
+    //                   [&exact, &time](const AmrStorage::Item &cell) -> double {
+    //                       return exact.density(cell.center.x(), time);
+    //                   }};
+    // pvd.variables += {"u_exact",
+    //                   [&exact, &time](const AmrStorage::Item &cell) -> double {
+    //                       return exact.velocity(cell.center.x(), time);
+    //                   }};
+    // pvd.variables += {"p_exact",
+    //                   [&exact, &time](const AmrStorage::Item &cell) -> double {
+    //                       return exact.pressure(cell.center.x(), time);
+    //                   }};
+    // pvd.variables += {"e_exact",
+    //                   [&exact, &time](const AmrStorage::Item &cell) -> double {
+    //                       return exact.energy(cell.center.x(), time);
+    //                   }};
+    // pvd.variables += {"c",
+    //                   [&eos](AmrStorage::Item& cell) -> double {
+    //                       return eos.sound_speed_rp(cell(U).rho, cell(U).p);
+    //                   }};
+    // pvd.variables += {"c_exact",
+    //                   [&exact, &time](const AmrStorage::Item &cell) -> double {
+    //                       return exact.sound_speed(cell.center.x(), time);
+    //                   }};
 
     // Часть области с регулярной сеткой
     // auto fix_condition = [&test](const Vector3d& v) {
@@ -102,7 +102,7 @@ int main() {
 
     // Создаем одномерную сетку
     Strip gen(test.xmin(), test.xmax());
-    int n_cells = 800;
+    int n_cells = 400;
     gen.set_size(n_cells);
 
     //Wedge gen(0.40, 0.9, 0.0, 0.20, 0.6, 0.1 * M_PI);
@@ -130,18 +130,18 @@ int main() {
     solver.set_accuracy(2);
 
     // Число Куранта
-    double CFL = 0.1;
+    double CFL = 0.2;
     solver.set_CFL(CFL);
 
     double next_write = 0.0;
     size_t n_step = 0;
 
-    while (time <= 1.01 * test.max_time()) {
+    while (time <= 5000.01 * test.max_time()) {
         if (time >= next_write) {
             std::cout << "\tStep: " << std::setw(6) << n_step << ";"
                       << "\tTime: " << std::setw(6) << std::setprecision(3) << time << "\n";
             pvd.save(mesh, time);
-            next_write += test.max_time() / 100;
+            next_write += test.max_time() * 20;
         }
 
         // Обновляем слои
