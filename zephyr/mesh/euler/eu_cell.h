@@ -1,5 +1,6 @@
 #pragma once
 
+#include <zephyr/geom/primitives/side.h>
 #include <zephyr/geom/primitives/bface.h>
 
 #include <zephyr/mesh/euler/amr_storage.h>
@@ -139,6 +140,10 @@ public:
         return *m_it;
     }
 
+    /// @brief Выбрать грань на стороне. Корректно работает
+    /// для декартовых сеток без адаптации
+    EuFace face(const geom::Side side) const;
+
     /// @brief Итератор по граням
     /// @param dir Выбрать грани по некоторым направлениям
     EuFaces faces(Direction dir = Direction::ANY) const;
@@ -188,6 +193,15 @@ public:
 
     /// @brief Барицентр ячейки
     inline const Vector3d& center() const { return m_it->center; }
+
+    /// @brief Барицентр ячейки
+    inline const double& x() const { return m_it->center.x(); }
+
+    /// @brief Барицентр ячейки
+    inline const double& y() const { return m_it->center.y(); }
+
+    /// @brief Барицентр ячейки
+    inline const double& z() const { return m_it->center.z(); }
 
     /// @brief Линейный размер ячейки
     inline const double& size() const { return m_it->size; }

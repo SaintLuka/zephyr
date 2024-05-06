@@ -7,6 +7,15 @@
 
 namespace zephyr::mesh {
 
+EuFace::EuFace(const EuCell &cell, geom::Side side)
+    : m_cell(cell),
+      m_face(nullptr),
+      m_end (nullptr),
+      m_dir(Direction::ANY) {
+
+    m_face = m_end = &const_cast<geom::AmrCell &>(cell.geom()).faces[side];
+}
+
 EuFace::EuFace(const EuCell &cell, BFace* self, BFace* end, Direction dir)
         : m_cell(cell), m_face(self), m_end(end), m_dir(dir) {
 

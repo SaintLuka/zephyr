@@ -16,6 +16,10 @@ using zephyr::geom::Direction;
 class EuFace {
 public:
 
+    /// @brief Изолированная грань на стороне side,
+    /// не позволяет обходить грани
+    EuFace(const EuCell &cell, geom::Side side);
+
     /// @brief Внешняя нормаль
     const Vector3d &normal() const;
 

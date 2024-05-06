@@ -74,6 +74,10 @@ const Byte* EuCell::neib_data(const BFace& face) const {
     }
 }
 
+EuFace EuCell::face(const geom::Side side) const {
+    return EuFace(*this, side);
+}
+
 EuFaces EuCell::faces(Direction dir) const {
     return { *this, dir };
 }

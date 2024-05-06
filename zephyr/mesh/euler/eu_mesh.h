@@ -25,6 +25,12 @@ public:
         initialize(gen->make());
     }
 
+    template<class T>
+    EuMesh(const T &val, Generator &gen)
+            : m_locals(val), m_aliens(val) {
+        initialize(gen.make());
+    }
+
     template <class T>
     EuMesh(const T&val, const Grid& grid)
             : m_locals(val), m_aliens(val) {
