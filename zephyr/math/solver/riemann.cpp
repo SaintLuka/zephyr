@@ -379,29 +379,30 @@ RiemannSolver::Solution RiemannSolver::solve(
 
             if (D > 0.0) {
                 // Положительная скорость УВ
-                return {rL, uL, pL, conv};
+                return {rL, uL, pL, PU.U, PU.P, conv};
             } else {
                 // Отрицательная скорость УВ
-                return {shock_wave_density(rL, uL, pL, U, P), U, P, conv};
+                return {shock_wave_density(rL, uL, pL, U, P), U, P, PU.U, PU.P, conv};
             }
         } else {
             // Слева волна разрежения
             double DL1 = uL - cL;
             if (DL1 > 0.0) {
                 // Волна разрежения полностью справа
-                return {rL, uL, pL, conv};
+                return {rL, uL, pL, PU.U, PU.P, conv};
             } else {
                 double cl = rarefaction_sound_L(U, uL, cL, gL);
                 double DL2 = U - cl;
                 if (DL2 < 0.0) {
                     // Волна разрежения полностью слева
-                    return {eos_density(P, cl, gL, p0L), U, P, conv};
+                    return {eos_density(P, cl, gL, p0L), U, P, PU.U, PU.P, conv};
                 } else {
                     // Волна разрежения приходится на грань
                     return {
                             density_lfan(rL, uL, cL, gL),
                             velocity_lfan(uL, cL, gL),
                             pressure_lfan(uL, pL, cL, gL, p0L),
+                            PU.U, PU.P,
                             conv
                     };
                 }
@@ -416,10 +417,10 @@ RiemannSolver::Solution RiemannSolver::solve(
 
             if (D < 0.0) {
                 // Отрицательная скорость УВ
-                return {rR, uR, pR, conv};
+                return {rR, uR, pR, PU.U, PU.P, conv};
             } else {
                 // Положительная скорость УВ
-                return {shock_wave_density(rR, uR, pR, U, P), U, P, conv};
+                return {shock_wave_density(rR, uR, pR, U, P), U, P, PU.U, PU.P, conv};
             }
         } else {
             // Справа волна разрежения
@@ -428,19 +429,20 @@ RiemannSolver::Solution RiemannSolver::solve(
 
             if (DR2 < 0.0) {
                 // Волна разрежения полностью слева
-                return {rR, uR, pR, conv};
+                return {rR, uR, pR, PU.U, PU.P, conv};
             } else {
                 double cr = rarefaction_sound_R(U, uR, cR, gR);
                 double DR1 = U + cr;
                 if (DR1 > 0.0) {
                     // Волна разрежения полностью справа
-                    return {eos_density(P, cr, gR, p0R), U, P, conv};
+                    return {eos_density(P, cr, gR, p0R), U, P, PU.U, PU.P, conv};
                 } else {
                     // Волна разрежения приходится на грань
                     return {
                             density_rfan(rR, uR, cR, gR),
                             velocity_rfan(uR, cR, gR),
                             pressure_rfan(uR, pR, cR, gR, p0R),
+                            PU.U, PU.P,
                             conv
                     };
                 }

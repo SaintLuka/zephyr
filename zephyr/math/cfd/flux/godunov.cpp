@@ -15,12 +15,12 @@ smf::Flux Godunov::calc_flux(const smf::PState &zL, const smf::PState &zR, const
                                     eos.stiffened_gas(zR.density, zR.pressure));
 
     Vector3d v = {
-            sol.U,
+            sol.Uf,
             sol.U > 0.0 ? zL.velocity.y() : zR.velocity.y(),
             sol.U > 0.0 ? zL.velocity.z() : zR.velocity.z()
     };
 
-    smf::PState z(sol.rho, v, sol.P, eos.energy_rp(sol.rho, sol.P));
+    smf::PState z(sol.rho, v, sol.Pf, eos.energy_rp(sol.rho, sol.Pf));
 
     smf::Flux flux(z);
 
@@ -58,36 +58,39 @@ mmf::Flux Godunov::calc_mm_flux(const mmf::PState &zL, const mmf::PState &zR, co
     auto sol = RiemannSolver::solve(zL.to_smf(), zR.to_smf(),
                                     mixture.stiffened_gas(zL.density, zL.pressure, zL.mass_frac, {.T0 = zL.temperature}),
                                     mixture.stiffened_gas(zR.density, zR.pressure, zR.mass_frac, {.T0 = zR.temperature}));
+    if (sol.U * sol.Uf < 0 && abs(sol.U - sol.Uf) > 0.1) {
+        std::cerr << "Different sign of U and Uf\n" << "U: " << sol.U << ", Uf: " << sol.Uf << '\n';
+    }
 
     mmf::Flux flux;
     if (sol.U >= 0) {
-        Vector3d v(sol.U, zL.velocity.y(), zL.velocity.z());
-        auto [temperature, energy] = mixture.temperature_energy_rp(sol.rho, sol.P, zL.mass_frac, {.T0=zL.temperature});
-        mmf::PState z(sol.rho, v, sol.P, energy, temperature, zL.mass_frac);
+        Vector3d v(sol.Uf, zL.velocity.y(), zL.velocity.z());
+        auto [temperature, energy] = mixture.temperature_energy_rp(sol.rho, sol.Pf, zL.mass_frac, {.T0=zL.temperature});
+        mmf::PState z(sol.rho, v, sol.Pf, energy, temperature, zL.mass_frac);
 
         flux = mmf::Flux(z);
     } else {
-        Vector3d v(sol.U, zR.velocity.y(), zR.velocity.z());
-        auto [temperature, energy] = mixture.temperature_energy_rp(sol.rho, sol.P, zR.mass_frac, {.T0=zR.temperature});
-        mmf::PState z(sol.rho, v, sol.P, energy, temperature, zR.mass_frac);
+        Vector3d v(sol.Uf, zR.velocity.y(), zR.velocity.z());
+        auto [temperature, energy] = mixture.temperature_energy_rp(sol.rho, sol.Pf, zR.mass_frac, {.T0=zR.temperature});
+        mmf::PState z(sol.rho, v, sol.Pf, energy, temperature, zR.mass_frac);
 
         flux = mmf::Flux(z);
     }
 
     if (flux.is_bad()) {
-//        std::cerr << "calc Godunov flux\n";
+        std::cerr << "calc Godunov flux\n";
 //        std::cerr << "zL: " << zL << "\nzR: " << zR << "\n";
-//        std::cerr << "Flux: " << flux << "\n";
-//        std::cerr << "Code for debug:\n";
-//        std::cerr << boost::format("PState zL(%1%, {%2%, %3%, %4%}, %5%, %6%, %7%, %8%);\n") %
-//                     zL.density % zL.velocity.x() % zL.velocity.y() % zL.velocity.z() % zL.pressure %
-//                     zL.energy % zL.temperature % zL.mass_frac;
-//        std::cerr << boost::format("PState zR(%1%, {%2%, %3%, %4%}, %5%, %6%, %7%, %8%);\n") %
-//                     zR.density % zR.velocity.x() % zR.velocity.y() % zR.velocity.z() % zR.pressure %
-//                     zR.energy % zR.temperature % zR.mass_frac;
+        std::cerr << "Flux: " << flux << "\n";
+        std::cerr << "Code for debug:\n";
+        std::cerr << boost::format("PState zL(%1%, {%2%, %3%, %4%}, %5%, %6%, %7%, %8%);\n") %
+                     zL.density % zL.velocity.x() % zL.velocity.y() % zL.velocity.z() % zL.pressure %
+                     zL.energy % zL.temperature % zL.mass_frac;
+        std::cerr << boost::format("PState zR(%1%, {%2%, %3%, %4%}, %5%, %6%, %7%, %8%);\n") %
+                     zR.density % zR.velocity.x() % zR.velocity.y() % zR.velocity.z() % zR.pressure %
+                     zR.energy % zR.temperature % zR.mass_frac;
 //        std::cerr << "Godunov flux RIP\n";
-        flux = Rusanov2::calc_mm_flux(zL, zR, mixture);
-//        exit(1);
+//        flux = Rusanov2::calc_mm_flux(zL, zR, mixture);
+        exit(1);
 //        throw std::runtime_error("Bad Godunov flux");
     }
 

@@ -27,7 +27,7 @@ StiffenedGas::StiffenedGas(const std::string &name) {
     }
     else if (name == "Water") {
         gamma = 4.4;
-        Cv    = 1400.0_J_kgK;
+        Cv    = 1400.0_J_kgK; // 4160.0_J_kgK
         P0    = 600.0_MPa;
         eps_0 = 0.0;
         T0    = 221.3;

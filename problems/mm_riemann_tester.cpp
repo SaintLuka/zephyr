@@ -801,7 +801,6 @@ void find_PT2() {
     QState: mass: 1680.78, momentum: {-931039, 0, 0}, energy: -4.8223e+08, mass_frac: {1680.78, 0.00708158, 0, 0, 0}
     PState: density: 1680.78, velocity: {-553.931, 0, 0}, pressure: nan, temperature: nan, energy: -440328, mass_frac: {0.999996, 4.21326e-06, 0, 0, 0}
     Previous PState: density: 1399.53, velocity: {-457.989, 0, 0}, pressure: 734232, temperature: 24269.7, energy: -59244.6, mass_frac: {0.999995, 5.19436e-06, 0, 0, 0}
-
      */
 //    QState q(2304.05, {-411216, 0, 0}, -2.08431e+08, FractionsFlux(std::vector<double>{2304.05, 8.50948e-05, 0, 0, 0}));
 //    double P0 = 74.4769, T0 = 2676.13;

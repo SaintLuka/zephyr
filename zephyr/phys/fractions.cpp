@@ -119,7 +119,7 @@ void Fractions::normalize() {
                 v = 0;
             else {
                 std::cerr << "mass_frac[i] < 0: " << *this;
-                exit(1);
+//                exit(1);
                 throw std::runtime_error("mass_frac[i] < 0");
             }
         } else
