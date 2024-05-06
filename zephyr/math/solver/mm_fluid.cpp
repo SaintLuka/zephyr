@@ -256,7 +256,7 @@ mmf::Flux MmFluid::calc_flux_extra(Cell &cell, bool from_begin) {
 
         auto face_extra = FaceExtra::ATvL(
                 p_self, cell(U).d_dx, cell(U).d_dy, cell(U).d_dz,
-                p_neib, face.neib()(U).d_dx, face.neib()(U).d_dy, face.neib()(U).d_dz,
+                p_neib, face.neib(U).d_dx, face.neib(U).d_dy, face.neib(U).d_dz,
                 cell_c, neib_c, face_c);
 
         // рассчитываем расстояние на грани слева и справа
@@ -379,14 +379,23 @@ Distributor MmFluid::distributor() const {
     distr.split = [this](AmrStorage::Item &parent, mesh::Children &children) {
         for (auto &child: children) {
             Vector3d dr = child.center - parent.center;
-            PState child_state = parent(U).get_pstate().vec() +
-                                 parent(U).d_dx.vec() * dr.x() +
-                                 parent(U).d_dy.vec() * dr.y() +
-                                 parent(U).d_dz.vec() * dr.z();
-//            child_state.mass_frac = parent(U).mass_frac;
-            child_state.mass_frac.fix();
-            child_state.sync_temperature_energy_rp(mixture, {.T0 = parent(U).t});
-            child(U).set_state(child_state);
+//            PState child_state = parent(U).get_pstate().vec() +
+//                                 parent(U).d_dx.vec() * dr.x() +
+//                                 parent(U).d_dy.vec() * dr.y() +
+//                                 parent(U).d_dz.vec() * dr.z();
+//            child_state.mass_frac.fix();
+//            child_state.sync_temperature_energy_rp(mixture, {.T0 = parent(U).t});
+//            child(U).set_state(child_state);
+            PState shift = parent(U).d_dx.vec() * dr.x() +
+                           parent(U).d_dy.vec() * dr.y() +
+                           parent(U).d_dz.vec() * dr.z();
+            child(U).rho = parent(U).rho + shift.density;
+            child(U).v = parent(U).v + parent(U).rho / child(U).rho * shift.velocity;
+            child(U).mass_frac = parent(U).mass_frac.vec() + parent(U).rho / child(U).rho * shift.mass_frac.vec();
+            child(U).mass_frac.fix();
+            child(U).e = parent(U).e + (parent(U).v - child(U).v).squaredNorm() / 2 + parent(U).rho / child(U).rho * shift.energy;
+            child(U).p = mixture.pressure_re(child(U).rho, child(U).e, child(U).mass_frac, {.P0 = parent(U).p, .T0 = parent(U).t});
+            child(U).t = mixture.temperature_rp(child(U).rho, child(U).p, child(U).mass_frac, {.T0 = parent(U).t});
             if (m_step > 0 && child(U).is_bad1()) {
                 std::cerr << "Failed to calc child PState in split\n";
                 std::cerr << "Parent PState: " << parent(U).get_pstate() << '\n';
@@ -460,7 +469,7 @@ void MmFluid::set_flags(Mesh &mesh) {
             // проверяем большое различие в долях веществ
             Fractions neib_mass_frac = face.neib()(U).mass_frac;
             for (int i = 0; i < mixture.size(); i++) {
-                if (abs(mass_frac[i] - neib_mass_frac[i]) > 0.02) {
+                if (abs(mass_frac[i] - neib_mass_frac[i]) > 0.01) {
                     need_split = true;
                     break;
                 }

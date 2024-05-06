@@ -1,5 +1,7 @@
 #include <zephyr/math/cfd/models.h>
 #include <boost/format.hpp>
+#include <stdexcept>
+#include <iostream>
 
 namespace zephyr::math {
 
@@ -136,7 +138,15 @@ PState::PState(const double &density, const Vector3d &velocity,
 }
 
 PState::PState(const QState &q, const phys::Materials &mixture, double P0, double T0) {
-    mass_frac = Fractions(q.mass_frac);
+    try {
+        mass_frac = Fractions(q.mass_frac);
+    } catch (const std::exception &e) {
+        std::cerr << "\nFailed to calc PState from QState, mass frac < 0\n";
+        std::cerr << "QState: " << q << "\n";
+        std::cerr << "P0: " << P0 << ", T0: " << T0 << "\n";
+        std::cerr << e.what() << '\n';
+        exit(1);
+    }
     density = q.mass;
     velocity = q.momentum / density;
     energy = q.energy / density - 0.5 * velocity.squaredNorm();

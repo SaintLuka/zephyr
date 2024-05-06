@@ -174,7 +174,7 @@ void RiemannTesterWithSolver2D(Fluxes flux, int n_cells = 10, int acc = 1, const
     }
 }
 
-void vertical_instability_adaptive(double g = 9.81, int acc = 2, const std::string &filename = "output") {
+void vertical_instability_adaptive(double g = 9.81, const std::string &filename = "output") {
     // Уравнение состояния
     auto mat_up = IdealGas::create(1.4, 718.0_J_kgK);
     auto mat_down = IdealGas::create(1.5, 718.0_J_kgK);
@@ -226,7 +226,7 @@ void vertical_instability_adaptive(double g = 9.81, int acc = 2, const std::stri
     Mesh mesh(U, &rect);
 
     MmFluid solver(mixture, Fluxes::GODUNOV, g);
-    solver.set_acc(acc);
+    solver.set_acc(2);
 
     // Число Куранта
     double CFL = 0.4;
@@ -329,108 +329,152 @@ void vertical_instability_adaptive(double g = 9.81, int acc = 2, const std::stri
     write_stats_to_csv(stats, "vertical_instability_adaptive.csv");
 }
 
-void vertical_instability_static(double g = 9.81, int acc = 2, const std::string &filename = "output") {
+void vertical_instability_adaptive2(double g = 9.81, const std::string &filename = "output_instability_water_air") {
     // Уравнение состояния
-    auto mat_up = IdealGas::create(1.4, 718.0_J_kgK);
-    auto mat_down = IdealGas::create(1.5, 718.0_J_kgK);
+    auto mat_up = StiffenedGas::create("SF6");
+    auto mat_down = StiffenedGas::create("Air");
 
     Materials mixture;
     mixture += mat_up;
     mixture += mat_down;
 
-    double max_time = 2;
-    double rho_up = 100, rho_down = 20;
-    double p_up = 1e4, p_down = 1e4;
-    double v_up = 0, v_down = 0;
-    double e_up = mat_up->energy_rp(rho_up, p_up), e_down = mat_down->energy_rp(rho_down, p_down);
-    double t_up = mat_up->temperature_rp(rho_up, p_up), t_down = mat_down->temperature_rp(rho_down, p_down);
+    double max_time = 2e-1;
+    double rho_up = 6, rho_down = 1;
     double x_min = 0, x_max = 0.1;
-    double y_min = 0.0, y_max = 0.8;
-    double y_jump = 0.5 * (y_max - y_min);
+    double y_min = 0.0, y_max = 0.6;
+    double y_jump = 0.6 * (y_max - y_min);
+    double p_up = 1e3;
+    double p_jump = p_up + rho_up * g * (y_max - y_jump);
+//    double p_down = p_jump + rho_down * y_jump * g;
 
     Fractions mass_frac_up({1, 0});
     Fractions mass_frac_down({0, 1});
-    // Состояния слева и справа в тесте
-    PState z_up(rho_up, Vector3d(0, v_up, 0), p_up, e_up, t_up, mass_frac_up);
-    PState z_down(rho_down, Vector3d(0, v_down, 0), p_down, e_down, t_down, mass_frac_down);
-
-    std::cout << "Z_u: " << z_up << "\n" << "Z_d: " << z_down << "\n";
 
     // Создаем одномерную сетку
-    double H = y_max - y_min;
+    double L = x_max - x_min, H = y_max - y_min;
     Rectangle rect(x_min, x_max, 0, H);
-    rect.set_sizes(20, 500);
+    rect.set_sizes(10, 60);
     rect.set_boundaries({
                                 .left   = Boundary::WALL, .right = Boundary::WALL,
-                                .bottom = Boundary::WALL, .top   = Boundary::WALL});
+                                .bottom = Boundary::WALL, .top   = Boundary::ZOE});
 
     // Файл для записи
     PvdFile pvd("mesh", filename);
 
     // Переменные для сохранения
     pvd.variables += {"rho", get_rho};
+    pvd.variables += {"u", get_u};
     pvd.variables += {"v", get_v};
     pvd.variables += {"p", get_p};
-    pvd.variables += {"e", get_e};
     pvd.variables += {"frac1", get_frac1};
     pvd.variables += {"frac2", get_frac2};
-
+    pvd.variables += {"e", get_e};
+    pvd.variables += {"T", get_T};
+    pvd.variables += {"c1", get_c1};
+    pvd.variables += {"c2", get_c2};
     double time = 0.0;
 
     // Создать сетку
     Mesh mesh(U, &rect);
 
     MmFluid solver(mixture, Fluxes::GODUNOV, g);
-    solver.set_acc(acc);
+    solver.set_acc(2);
 
     // Число Куранта
     double CFL = 0.4;
     solver.set_CFL(CFL);
 
-    for (auto cell: mesh) {
-        if (cell.center().y() > y_jump) {
-            cell(U).set_state(z_up);
-        } else {
-            cell(U).set_state(z_down);
-        }
-    }
+    // Настраиваем адаптацию
+    mesh.set_max_level(5);
+    mesh.set_distributor(solver.distributor());
 
-    double L = x_max - x_min;
-    for (auto cell: mesh) {
-        double x = cell.center().x(), y = cell.center().y();
-        if (cell(U).mass_frac[1] == 0 && y - y_jump < 0.05 * H && abs(x - L / 2) < 0.1 * L) {
-            bool exist = false;
-            for (auto &face: cell.faces()) {
-                if (face.is_boundary())
-                    continue;
-                exist = face.neib()(U).mass_frac[1] > 0;
-                if (exist)
-                    break;
+    auto in_up = [&](const Vector3d &v) -> bool {
+//        return v.y() > y_jump - 1e-5 * H / L * (1 - 20 * pow(abs(v.x() - L / 2) / L, 3));
+        return v.y() > y_jump + 2e-5 * H / L * sqrt(abs(v.x() - L / 2) / L);
+//        return v.y() > y_jump + 0.001 * H / L * cos(2 * M_PI * v.x() / L);
+//        return v.y() > y_jump;
+    };
+
+    for (int k = 0; k < mesh.max_level(); ++k) {
+        for (auto cell: mesh) {
+            double vol_frac_up = cell.approx_vol_fraction(in_up);
+            if (0.0 < vol_frac_up && vol_frac_up < 1.0) {
+                vol_frac_up = cell.volume_fraction(in_up, 10000);
+                double vol_frac_down = 1.0 - vol_frac_up;
+
+                mmf::PState z;
+
+                // rho = sum a_i rho_i
+                z.density = vol_frac_up * rho_up + vol_frac_down * rho_down;
+                z.mass_frac = {vol_frac_up * rho_up / z.density, vol_frac_down * rho_down / z.density};
+                z.mass_frac.normalize();
+                z.velocity = {0, 0, 0};
+                z.pressure = p_jump;
+
+                z.temperature = mixture.temperature_rp(z.density, z.pressure, z.mass_frac);
+                z.energy = mixture.energy_pt(z.pressure, z.temperature, z.mass_frac);
+                if (z.temperature < 0) {
+                    std::cerr << z << '\n';
+                    return;
+                }
+
+                cell(U).set_state(z);
+            } else {
+                if (vol_frac_up > 0.5) {
+                    cell(U).set_state(PState(rho_up, {0, 0, 0}, p_up + (y_max - cell.center().y()) * rho_up * g, 1000, 300, mass_frac_up));
+                    cell(U).t = mat_up->temperature_rp(cell(U).rho, cell(U).p);
+                    cell(U).e = mat_up->energy_pt(cell(U).p, cell(U).t);
+                } else {
+                    cell(U).set_state(PState(rho_down, {0, 0, 0}, p_jump + (y_jump - cell.center().y()) * rho_down * g, 1000, 300, mass_frac_down));
+                    cell(U).t = mat_down->temperature_rp(cell(U).rho, cell(U).p);
+                    cell(U).e = mat_down->energy_pt(cell(U).p, cell(U).t);
+                }
             }
-            if (exist) {
-                cell(U).mass_frac[0] = 0.9;
-                cell(U).mass_frac[1] = 0.1;
+            /*
+            if (in_up(cell.center())) {
+                cell(U).set_state(PState(rho_up, {0, 0, 0}, p_up + (y_max - cell.center().y()) * rho_up * g, 1000, 300, mass_frac_up));
+                cell(U).t = mat_up->temperature_rp(cell(U).rho, cell(U).p);
+                cell(U).e = mat_up->energy_pt(cell(U).p, cell(U).t);
+            } else {
+                cell(U).set_state(PState(rho_down, {0, 0, 0}, p_jump + (y_jump - cell.center().y()) * rho_down * g, 1000, 300, mass_frac_down));
+                cell(U).t = mat_down->temperature_rp(cell(U).rho, cell(U).p);
+                cell(U).e = mat_down->energy_pt(cell(U).p, cell(U).t);
             }
+            */
         }
+        solver.set_flags(mesh);
+        mesh.refine();
     }
 
     double next_write = 0.0;
-    int n_writes = 200;
+    int n_writes = 500;
+    bool check1 = true;
     while (time <= 1.01 * max_time) {
-        if (time >= next_write) {
-            std::cout << "progress: " << std::fixed << std::setprecision(1) << 100 * time / max_time << "%\n";
+        if (time >= next_write || solver.get_step() % 2000 == 0) {
+            std::cout << "progress: " << std::fixed << std::setprecision(1) << 100 * time / max_time << "%";
+            std::cout << " n_cells: " << mesh.n_cells() << "\n";
             pvd.save(mesh, time);
             next_write += max_time / n_writes;
         }
 
-        // шаг решения
         solver.update(mesh);
+
+        // Установить флаги адаптации
+        solver.set_flags(mesh);
+
+        // Адаптировать сетку
+        mesh.refine();
+
+        if (check1 && mesh.n_cells() > 16000) {
+            threads::on(16);
+            check1 = false;
+        }
 
         time = solver.get_time();
     }
 }
 
-void kelvin_helmholtz_instability(int acc = 2, const std::string &filename = "output") {
+void kelvin_helmholtz_instability(int acc = 2, const std::string &filename = "kelvin_helmholtz") {
     // Уравнение состояния
     auto mat_up = IdealGas::create(1.4, 718.0_J_kgK);
     auto mat_down = IdealGas::create(1.4, 718.0_J_kgK);
@@ -440,12 +484,12 @@ void kelvin_helmholtz_instability(int acc = 2, const std::string &filename = "ou
     mixture += mat_down;
 
     double max_time = 0.5;
-    double rho_up = 11, rho_down = 10;
+    double rho_up = 13, rho_down = 10;
     double p_up = 1e4, p_down = 1e4;
-    double u_up = 3, u_down = -3;
+    double u_up = 10, u_down = -10;
     double e_up = mat_up->energy_rp(rho_up, p_up), e_down = mat_down->energy_rp(rho_down, p_down);
     double t_up = mat_up->temperature_rp(rho_up, p_up), t_down = mat_down->temperature_rp(rho_down, p_down);
-    double x_min = 0, x_max = 0.4;
+    double x_min = 0, x_max = 0.2;
     double y_min = 0.0, y_max = 0.15;
     double L = x_max - x_min, H = y_max - y_min;
     double y_jump = y_min + 0.5 * H;
@@ -459,7 +503,7 @@ void kelvin_helmholtz_instability(int acc = 2, const std::string &filename = "ou
     std::cout << "Z_u: " << z_up << "\n" << "Z_d: " << z_down << "\n";
 
     Rectangle rect(x_min, x_max, 0, H);
-    rect.set_sizes(6, 10);
+    rect.set_sizes(6, 11);
     rect.set_boundaries({
                                 .left   = Boundary::ZOE, .right = Boundary::ZOE,
                                 .bottom = Boundary::ZOE, .top   = Boundary::ZOE});
@@ -489,13 +533,23 @@ void kelvin_helmholtz_instability(int acc = 2, const std::string &filename = "ou
     solver.set_CFL(CFL);
 
     // Настраиваем адаптацию
-    mesh.set_max_level(6);
+    mesh.set_max_level(7);
     mesh.set_distributor(solver.distributor());
+    double x_c = (x_min + x_max) / 2;
     // y_jump + sin(10 * pi * x / L) * H * 0.1
 
     for (int k = 0; k < mesh.max_level() + 3; ++k) {
         for (auto cell: mesh) {
-            if (cell.center().y() > y_jump + 0.005 * H * sin(M_PI * cell.center().x() / L)) {
+//            if (abs(cell.center().x() - x_c) / L > 0.45) {
+//                if (cell.center().y() > y_jump) {
+//                    cell(U).set_state(z_up);
+//                } else {
+//                    cell(U).set_state(z_down);
+//                }
+//                continue;
+//            }
+
+            if (cell.center().y() > y_jump + 0.01 * H * sin(M_PI * (cell.center().x() - x_c) / L / 8)) {
                 cell(U).set_state(z_up);
             } else {
                 cell(U).set_state(z_down);
@@ -526,10 +580,10 @@ void kelvin_helmholtz_instability(int acc = 2, const std::string &filename = "ou
 
 
     double next_write = 0.0;
-    int n_writes = 200;
+    int n_writes = 1000;
     while (time <= 1.01 * max_time) {
         if (time >= next_write) {
-            std::cout << "progress: " << std::fixed << std::setprecision(1) << 100 * time / max_time << "%\n";
+            std::cout << "progress: " << std::fixed << std::setprecision(2) << 100 * time / max_time << "%\n";
             pvd.save(mesh, time);
             next_write += max_time / n_writes;
         }
@@ -579,6 +633,10 @@ void Bubble2D(int n_cells, int acc = 2, const std::string &filename = "output") 
     PState state_air(rho_air, Vector3d{u_air, 0, 0}, p_air, e_air, t_air, mass_frac_air);
     PState state_wave(rho_wave, Vector3d{u_wave, 0, 0}, p_wave, e_wave, t_wave, mass_frac_water);
     PState state_water(rho_water, Vector3d{u_water, 0, 0}, p_water, e_water, t_water, mass_frac_water);
+
+    std::cout << "State Air: " << state_air << '\n';
+    std::cout << "State wave: " << state_wave << '\n';
+    std::cout << "State water: " << state_water << '\n';
 
     // Создаем одномерную сетку
     Rectangle rect(x_min, x_max, y_min, y_max);
@@ -642,7 +700,7 @@ void Bubble2D(int n_cells, int acc = 2, const std::string &filename = "output") 
     }
 
     double next_write = 0.0;
-    int n_writes = 200;
+    int n_writes = 500;
     std::vector<Stat> stats;
     stats.reserve(10 * n_writes);
     Stopwatch timer(false), set_flags(false), refine(false);
@@ -1056,14 +1114,15 @@ void EjectaProblem(int acc = 2, const std::string &filename = "output") {
 int main() {
     threads::on(16);
 
-//    kelvin_helmholtz_instability(2, "output_kelvin_3");
-//    Bubble2D(50, 2, "output_bubble_test3");
+//    kelvin_helmholtz_instability(2, "output_kelvin_1");
+//    Bubble2D(70, 2, "output_bubble_test5");
 //    Bubble2DStatic(800, 1, "output_bubble_static_test");
 //    AirWithSF62D(100, 2, "sf6");
 //    RiemannTesterWithSolverVertical(100, 1, "output_1");
-//    vertical_instability_adaptive(20, 2, "vertical_instability_adaptive2");
+    vertical_instability_adaptive(20, "vertical_instability_adaptive2"); // вот этот считается
 //    vertical_instability_static(20, 2, "vertical_instability_static");
-    EjectaProblem(2, "ejecta_problem2");
+//    EjectaProblem(2, "ejecta_problem2");
+    vertical_instability_adaptive2(10, "vertical_instability_sf6_air3"); // вот этот новый и не хочет
 
 //    Vector3d dr = Vector3d{0.00897937, 0.00620062, 0} - Vector3d{0.00898125, 0.00619875, 0};
 //    std::cout << dr.x() * 99.9063 + dr.y() * (29.2343) << '\n';

@@ -22,16 +22,18 @@ public:
     /// вычисления потока в одноматериальной газодинамической задаче.
     struct Solution {
         double rho; ///< Плотность на грани
-        double U;   ///< Скорость на грани
-        double P;   ///< Давление на грани
+        double Uf;  ///< Скорость на грани
+        double Pf;  ///< Давление на грани
+        double P;   ///< Давление на контактном разрыве
+        double U;   ///< Скорость контактного разрыва
         bool conv;  ///< Хорошая сходимость
 
         /// @brief Конструктор по умолчанию
-        Solution() : rho(0.0 / 0.0), U(0.0 / 0.0), P(0.0 / 0.0), conv(false) {}
+        Solution() : rho(0.0 / 0.0), Uf(0.0 / 0.0), Pf(0.0 / 0.0), conv(false) {}
 
         /// @brief Простейший конструктор
-        Solution(cref rho, cref U, cref P, bool conv)
-            : rho(rho), U(U), P(P), conv(conv) {}
+        Solution(cref rho, cref Uf, cref Pf, cref U, cref  P, bool conv)
+            : rho(rho), Uf(Uf), Pf(Pf), U(U), P(P), conv(conv) {}
     };
 
     /// @brief Решить задачу Римана о распаде разрыва
