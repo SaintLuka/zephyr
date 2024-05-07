@@ -348,15 +348,17 @@ Distributor SmFluid::distributor() const {
             child_state.energy = parent(U).get_pstate().energy + 
                                     0.5 * (parent(U).v - child_state.velocity).squaredNorm() + 
                                         (parent(U).rho / child_state.density) * (
-                                            (parent(U).v).dot(parent(U).d_dx.velocity) * dr.x() +
-                                            (parent(U).v).dot(parent(U).d_dy.velocity) * dr.y() + 
-                                            (parent(U).v).dot(parent(U).d_dz.velocity) * dr.z() + 
-                                            (parent(U).d_dx.pressure - rhoe.dR * parent(U).d_dx.density) / rhoe.dE  * dr.x() + 
-                                            (parent(U).d_dy.pressure - rhoe.dR * parent(U).d_dy.density) / rhoe.dE  * dr.y() +
-                                            (parent(U).d_dz.pressure - rhoe.dR * parent(U).d_dz.density) / rhoe.dE  * dr.z()
+                                            // (parent(U).v).dot(parent(U).d_dx.velocity) * dr.x() +
+                                            // (parent(U).v).dot(parent(U).d_dy.velocity) * dr.y() + 
+                                            // (parent(U).v).dot(parent(U).d_dz.velocity) * dr.z() + 
+                                            (parent(U).d_dx.pressure - rhoe.dR * parent(U).d_dx.density) / rhoe.dE * dr.x() + 
+                                            (parent(U).d_dy.pressure - rhoe.dR * parent(U).d_dy.density) / rhoe.dE * dr.y() +
+                                            (parent(U).d_dz.pressure - rhoe.dR * parent(U).d_dz.density) / rhoe.dE * dr.z()
                                         );
             
             child_state.pressure = m_eos.pressure_re(child_state.density, child_state.energy);
+            
+            child(U).set_state(child_state);
 
             std::cout << "PState\t" << child(U).get_pstate() << std::endl;
             std::cout << "QState\t" << QState(child(U).get_pstate()) << std::endl;
