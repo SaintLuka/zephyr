@@ -23,9 +23,9 @@ public:
 
     /// @brief Конструктор
     BlastWave(double Ms) : eos(1.4) {
+        pa = 1.0;
         ra = 1.225;
         va = Vector3d{0.0, 0.0, 0.0};
-        pa = 1.0;
 
         pS = pa * ( 1 + 2 * eos.gamma / ( eos.gamma + 1 ) * ( Ms * Ms  - 1) );
         rS = ra * ( eos.gamma + 1 ) * Ms * Ms / ( 2 + ( eos.gamma - 1 ) * Ms * Ms );
@@ -72,7 +72,7 @@ public:
     { 
         double ratio = x.norm() / x_jump;
         if (ratio < 1) 
-            return Vector3d{0.9 * V1 * x.x() / x.norm(), V1 * x.y() / x.norm(), 0};
+            return Vector3d{V1 * x.x() / x.norm(), V1 * x.y() / x.norm(), 0};
         return va; 
     }
 

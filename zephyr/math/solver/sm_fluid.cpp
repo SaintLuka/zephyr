@@ -4,6 +4,7 @@
 #include <zephyr/math/cfd/models.h>
 #include <zephyr/math/cfd/limiter.h>
 
+
 namespace zephyr::math {
 
 using mesh::AmrStorage;
@@ -25,9 +26,23 @@ smf::PState get_half_sm(Cell &cell) {
     return cell(U).half;
 }
 
+void SmFluid::check_asserts(Mesh& mesh, std::string msg) {
+    mesh.for_each([&](Cell &cell) -> void {
+        if(!(cell(U).get_pstate().pressure >= 0 && cell(U).get_pstate().energy >= 0)) {
+            std::cout << msg << "\t" << cell(U).get_pstate() << std::endl;
+        }
+        if(!(cell(U).next.pressure >= 0 && cell(U).next.energy >= 0)) {
+            std::cout << msg << "\t" << cell(U).next << std::endl;
+        };
+        if(!(cell(U).half.pressure >= 0 && cell(U).half.energy >= 0)) {
+            std::cout << msg << "\t" << cell(U).half << std::endl;
+        };
+    });
+}
+
 SmFluid::SmFluid(const phys::Eos &eos, Fluxes flux) : m_eos(eos) {
     m_nf = NumFlux::create(flux);
-    m_CFL = 0.2;
+    m_CFL = 0.4;
     m_dt = std::numeric_limits<double>::max();
 }
 
@@ -42,44 +57,30 @@ void SmFluid::update(Mesh &mesh) {
     if (m_acc == 1) {
         fluxes(mesh);
     } else {
-        
-        mesh.for_each([this](Cell &cell) -> void {
-            assert(cell(U).get_pstate().pressure >= 0 && cell(U).get_pstate().energy >= 0);
-            assert(cell(U).next.pressure >= 0 && cell(U).next.energy >= 0);
-            assert(cell(U).half.pressure >= 0 && cell(U).half.energy >= 0);
-        });
+
+        check_asserts(mesh, "1");
 
         compute_grad(mesh, get_current_sm);
 
-        mesh.for_each([this](Cell &cell) -> void {
-            assert(cell(U).get_pstate().pressure >= 0 && cell(U).get_pstate().energy >= 0);
-            assert(cell(U).next.pressure >= 0 && cell(U).next.energy >= 0);
-            assert(cell(U).half.pressure >= 0 && cell(U).half.energy >= 0);
-        });
+        check_asserts(mesh, "2");
 
         fluxes_stage1(mesh);
 
-        mesh.for_each([this](Cell &cell) -> void {
-            assert(cell(U).get_pstate().pressure >= 0 && cell(U).get_pstate().energy >= 0);
-            assert(cell(U).next.pressure >= 0 && cell(U).next.energy >= 0);
-            assert(cell(U).half.pressure >= 0 && cell(U).half.energy >= 0);
-        });
+        check_asserts(mesh, "3");
 
         compute_grad(mesh, get_half_sm);
-        
-        mesh.for_each([this](Cell &cell) -> void {
-            assert(cell(U).get_pstate().pressure >= 0 && cell(U).get_pstate().energy >= 0);
-            assert(cell(U).next.pressure >= 0 && cell(U).next.energy >= 0);
-            assert(cell(U).half.pressure >= 0 && cell(U).half.energy >= 0);
-        });
+
+        check_asserts(mesh, "4");
         
         fluxes_stage2(mesh);
+
+        check_asserts(mesh, "5");
     }
 
     // Обновляем слои
     swap(mesh);
 
-    check_asserts(mesh);
+    check_asserts(mesh, "6");
 }
 
 double SmFluid::compute_dt(Mesh &mesh) {
@@ -151,32 +152,44 @@ void SmFluid::fluxes(Mesh &mesh) {
     });
 }
 
+PState boundary_value(const PState &zc, const Vector3d &normal, Boundary flag) {
+    if (flag != Boundary::WALL)
+        return zc;
+
+    PState zn(zc);
+    Vector3d Vn = normal * zc.velocity.dot(normal);
+    zn.velocity = zc.velocity - 2 * Vn;
+
+    return zn;
+}
+
 void SmFluid::compute_grad(Mesh &mesh, const std::function<smf::PState(Cell &)> &to_state)  {
     mesh.for_each([&to_state](Cell &cell) -> void {
-        auto grad = math::compute_grad_gauss<smf::PState>(cell, to_state);
-        cell(U).d_dx = grad[0];
-        cell(U).d_dy = grad[1];
-        cell(U).d_dz = grad[2];
+        // auto grad = math::compute_grad_gauss<smf::PState>(cell, to_state);
+        // cell(U).d_dx = grad[0];
+        // cell(U).d_dy = grad[1];
+        // cell(U).d_dz = grad[2];
+        auto grad = math::compute_gradient_LSM<smf::PState>(cell, to_state, boundary_value);
+        auto grad_lim = math::gradient_limiting<smf::PState>(cell, grad, to_state, boundary_value);
+        cell(U).d_dx = grad_lim[0];
+        cell(U).d_dy = grad_lim[1];
+        cell(U).d_dz = grad_lim[2];
     });
 }
 
 void SmFluid::fluxes_stage1(Mesh &mesh)  {
-    check_asserts(mesh);
     mesh.for_each([this](Cell &cell) -> void {
         QState qc(cell(U).get_pstate());
         qc.vec() -= 0.5 * m_dt / cell.volume() * calc_flux_extra(cell, true).vec();
         cell(U).half = PState(qc, m_eos);
-        assert(cell(U).half.pressure >= 0 && cell(U).half.energy >= 0);
     });
 }
 
 void SmFluid::fluxes_stage2(Mesh &mesh)  {
-    check_asserts(mesh);
     mesh.for_each([this](Cell &cell) -> void {
         QState qc(cell(U).get_pstate());
         qc.vec() -= m_dt / cell.volume() * calc_flux_extra(cell, false).vec();
         cell(U).next = PState(qc, m_eos);
-        assert(cell(U).next.pressure >= 0 && cell(U).next.energy >= 0);
     });
 }
 
@@ -196,9 +209,9 @@ smf::Flux SmFluid::calc_flux_extra(const Cell &cell, bool from_begin)  {
         // Примитивный вектор соседа
         PState p_neib = p_self;
         if (!face.is_boundary()) {
-            p_neib = face.neib()(U).half;
+            p_neib = face.neib(U).half;
             if (from_begin)
-                p_neib = face.neib()(U).get_pstate();
+                p_neib = face.neib(U).get_pstate();
         } else if (face.flag() == Boundary::WALL) {
             Vector3d Vn = normal * p_self.velocity.dot(normal);
             p_neib.velocity = p_self.velocity - 2 * Vn; // Vt - Vn = p_self.velocity - Vn - Vn
@@ -215,23 +228,38 @@ smf::Flux SmFluid::calc_flux_extra(const Cell &cell, bool from_begin)  {
 
         auto face_extra = FaceExtra::ATvL(
                 p_self, cell(U).d_dx, cell(U).d_dy, cell(U).d_dz,
-                p_neib, face.neib()(U).d_dx, face.neib()(U).d_dy, face.neib()(U).d_dz,
+                p_neib, face.neib(U).d_dx, face.neib(U).d_dy, face.neib(U).d_dz,
                 cell_c, neib_c, face_c);
 
         // рассчитываем расстояние на грани слева и справа
         PState p_minus = face_extra.m(p_self).in_local(normal);
         PState p_plus = face_extra.p(p_neib).in_local(normal);
 
-        // std::cout << p_neib << std::endl;
-        // std::cout << p_minus << std::endl;
-        // std::cout << p_plus << std::endl;     
+        // if (face.is_boundary()) {
+        //     if (face.flag() == Boundary::ZOE) {
+        //         p_plus = p_minus;
+        //     }
+        //     else if (face.flag() == Boundary::WALL) {
+        //         p_plus = p_minus;
+        //         Vector3d Vn = normal * p_minus.velocity.dot(normal);
+        //         p_plus.velocity = p_minus.velocity - 2 * Vn; // Vt - Vn = p_self.velocity - Vn - Vn
+        //     }
+        // }
 
         // пересчитываем энергию и температуру
         p_minus.energy = m_eos.energy_rp(p_minus.density, p_minus.pressure);
         p_plus.energy = m_eos.energy_rp(p_plus.density, p_plus.pressure);
 
-        assert(p_minus.pressure >= 0 && p_minus.energy >= 0);
-        assert(p_plus.pressure >= 0 && p_plus.energy >= 0);
+        if(!(p_minus.pressure >= 0 && p_minus.energy >= 0)) {
+            std::cout << p_self <<std::endl;
+            std::cout << p_neib << std::endl;
+            std::cout << p_minus << std::endl;
+        }
+        if(!(p_plus.pressure >= 0 && p_plus.energy >= 0)) {
+            std::cout << p_self <<std::endl;
+            std::cout << p_neib << std::endl;
+            std::cout << p_plus << std::endl;
+        }
 
         // if (face.flag() == Boundary::WALL) {
         //     Vector3d Vn = normal * p_minus.velocity.dot(normal);
@@ -252,9 +280,6 @@ smf::Flux SmFluid::calc_flux_extra(const Cell &cell, bool from_begin)  {
 void SmFluid::swap(Mesh &mesh) {
     size_t step = m_step;
     mesh.for_each([step](Cell &cell) -> void {
-        assert(cell(U).get_pstate().pressure >= 0 && cell(U).get_pstate().energy >= 0);
-        assert(cell(U).next.pressure >= 0 && cell(U).next.energy >= 0);
-        assert(cell(U).half.pressure >= 0 && cell(U).half.energy >= 0);
         cell(U).set_state(cell(U).next);
         cell(U).half = cell(U).next;
     });
@@ -294,15 +319,71 @@ Distributor SmFluid::distributor() const {
     Distributor distr;
 
     distr.split = [this](AmrStorage::Item &parent, mesh::Children &children) {
+
         for (auto &child: children) {
+
             Vector3d dr = child.center - parent.center;
-            PState child_state = parent(U).get_pstate().vec() +
-                                 parent(U).d_dx.vec() * dr.x() +
-                                 parent(U).d_dy.vec() * dr.y() +
-                                 parent(U).d_dz.vec() * dr.z();
-            child_state.energy = m_eos.energy_rp(child_state.density, child_state.pressure);
-            child(U).set_state(child_state);
+
+            // PState child_state = parent(U).get_pstate().vec() +
+            //                      parent(U).d_dx.vec() * dr.x() +
+            //                      parent(U).d_dy.vec() * dr.y() +
+            //                      parent(U).d_dz.vec() * dr.z(); 
+            // child_state.energy = m_eos.energy_rp(child_state.density, child_state.pressure);
+
+            PState child_state;
+            child_state.density = parent(U).rho +
+                                    parent(U).d_dx.density * dr.x() +
+                                    parent(U).d_dy.density * dr.y() +
+                                    parent(U).d_dz.density * dr.z(); 
+            
+            child_state.velocity = parent(U).v + 
+                                    (parent(U).rho / child_state.density) * (
+                                        parent(U).d_dx.velocity * dr.x() +
+                                        parent(U).d_dy.velocity * dr.y() +
+                                        parent(U).d_dz.velocity * dr.z()
+                                    );
+
+            zephyr::phys::dRdE rhoe = m_eos.pressure_re(parent(U).rho, parent(U).e, {.deriv = true});
+
+            child_state.energy = parent(U).get_pstate().energy + 
+                                    0.5 * (parent(U).v - child_state.velocity).squaredNorm() + 
+                                        (parent(U).rho / child_state.density) * (
+                                            (parent(U).v).dot(parent(U).d_dx.velocity) * dr.x() +
+                                            (parent(U).v).dot(parent(U).d_dy.velocity) * dr.y() + 
+                                            (parent(U).v).dot(parent(U).d_dz.velocity) * dr.z() + 
+                                            (parent(U).d_dx.pressure - rhoe.dR * parent(U).d_dx.density) / rhoe.dE  * dr.x() + 
+                                            (parent(U).d_dy.pressure - rhoe.dR * parent(U).d_dy.density) / rhoe.dE  * dr.y() +
+                                            (parent(U).d_dz.pressure - rhoe.dR * parent(U).d_dz.density) / rhoe.dE  * dr.z()
+                                        );
+            
+            child_state.pressure = m_eos.pressure_re(child_state.density, child_state.energy);
+
+            std::cout << "PState\t" << child(U).get_pstate() << std::endl;
+            std::cout << "QState\t" << QState(child(U).get_pstate()) << std::endl;
         }
+
+        QState Qp(parent(U).get_pstate());
+        double QiVi_mass(0);
+        Vector3d QiVi_momentum(0,0,0);
+        double QiVi_energy(0);
+
+        for (auto &child: children) {
+            QState Qc(child(U).get_pstate());
+            std::cout << "child center\t" << child.center << std::endl;
+            std::cout << "child volume\t" << child.volume() << std::endl;
+            QiVi_mass += Qc.mass * child.volume();
+            QiVi_momentum += Qc.momentum * child.volume();
+            QiVi_energy += Qc.energy * child.volume();
+        }
+
+        std::cout << "parent center\t" << parent.center << std::endl;
+        std::cout << "parent's volume\t" << parent.volume() << std::endl;
+        std::cout << "parent's PState\t" << parent(U).get_pstate() << std::endl;
+        std::cout << "QpVp\t" << Qp.vec() * parent.volume() << std::endl;
+        std::cout << "Sum QiVi_mass\t" << QiVi_mass 
+                  << "\tSum QiVi_momentum\t" << QiVi_momentum 
+                  << "\tSum QiVi_energy\t" << QiVi_energy << std::endl;
+        std::cout << "---------------------------------------------------------------------" << std::endl;
     };
 
     distr.merge = [this](mesh::Children &children, AmrStorage::Item &parent) {
@@ -317,19 +398,7 @@ Distributor SmFluid::distributor() const {
     return distr;
 }
 
-void SmFluid::check_asserts(Mesh &mesh, std::string msg) {
-    std::cout << msg << std::endl; 
-    mesh.for_each([this](Cell &cell) -> void {
-        assert(cell(U).get_pstate().pressure >= 0 && cell(U).get_pstate().energy >= 0);
-        assert(cell(U).next.pressure >= 0 && cell(U).next.energy >= 0);
-        assert(cell(U).half.pressure >= 0 && cell(U).half.energy >= 0);
-    });
-    std::cout << "OK" << std::endl;
-}
-
 void SmFluid::set_flags(Mesh &mesh) {
-
-    check_asserts(mesh);
 
     compute_grad(mesh, get_current_sm);
 
@@ -342,9 +411,15 @@ void SmFluid::set_flags(Mesh &mesh) {
             }
 
             // проверяем большой перепад давлений
-            if (abs(face.neib()(U).p - p) >= 0.1 * p) {
-                need_split = true;
-                break;
+            PState t = face.neib(U).get_pstate() - cell(U).get_pstate();
+            if (abs(t.density) >= 0.5 * abs(cell(U).rho) ||
+                abs(t.pressure) >= 0.5 * abs(cell(U).p) ||
+                abs(t.energy) >= 0.5 * abs(cell(U).e)) {
+                    std::cout << "need split\t" << std::endl;
+                    std::cout << "t\t" << t << std::endl;
+                    std::cout << "pstate\t" << cell(U).get_pstate() << std::endl;
+                    need_split = true;
+                    break;
             }
         }
         if (need_split) {
@@ -353,8 +428,6 @@ void SmFluid::set_flags(Mesh &mesh) {
             cell.set_flag(-1);
         }
     }
-
-    check_asserts(mesh);
 }
 
-}
+};

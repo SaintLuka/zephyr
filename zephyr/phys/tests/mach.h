@@ -19,22 +19,25 @@ public:
     double pL, pR;  ///< Давление
     double eL, eR;  ///< Внутренняя энергия
 
+    /// Double Mach  Reflection of a Strong Shock
+    /// Woodward and Colella
+
     /// @brief Конструктор
     Mach(double Ms=1.2) : eos(1.4) {
         // @formatter:off
-        pR = 1.0;
+        pR = 1.01325;
         rR = 1.225;
         uR = 0;
         
-        pL = pR * ( 1 + 2 * eos.gamma / ( eos.gamma + 1 ) * ( Ms * Ms  - 1) );
+        pL = pR * (2 * eos.gamma * Ms * Ms  - eos.gamma + 1) / (eos.gamma + 1) ;
         rL = rR * ( eos.gamma + 1 ) * Ms * Ms / ( 2 + ( eos.gamma - 1 ) * Ms * Ms );
-        uL = 2 / Ms * std::sqrt( eos.gamma * pR * rR ) * ( Ms * Ms - 1 ) / (eos.gamma + 1 ); 
+        uL = 2 / Ms * std::sqrt( eos.gamma * pR / rR ) * ( Ms * Ms - 1 ) / (eos.gamma + 1 ); 
 
         eL = eos.energy_rp(rL, pL);
         eR = eos.energy_rp(rR, pR);
 
-        x_jump = 0.2;
-        finish = 0.4;
+        x_jump = 0.1;
+        finish = 0.5;
         // @formatter:on
     }
 
@@ -51,10 +54,10 @@ public:
     std::string get_name() const { return "Mach";}
 
     /// @brief Левая граница области
-    double xmin() const { return 0.49; }
+    double xmin() const { return 0.0; }
 
     /// @brief Правая граница области
-    double xmax() const { return 0.7; }
+    double xmax() const { return 0.5; }
 
     /// @brief Конечный момент времени
     double max_time() const { return finish; }
@@ -66,16 +69,16 @@ public:
     double get_x_jump() const { return x_jump; }
 
     /// @brief Начальная плотность
-    double density(const double &x) const { return (x > 0.19) && (x < x_jump) ? rL : rR; }
+    double density(const double &x) const { return x < x_jump ? rL : rR; }
 
     /// @brief Начальная скорость
-    Vector3d velocity(const double &x) const { return { (x > 0.19) && (x < x_jump) ? uL : uR, 0.0, 0.0}; }
+    Vector3d velocity(const double &x) const { return { x < x_jump ? uL : uR, 0.0, 0.0}; }
 
     /// @brief Начальное давление
-    double pressure(const double &x) const { return (x > 0.19 ) && (x < x_jump) ? pL : pR; }
+    double pressure(const double &x) const { return x < x_jump ? pL : pR; }
 
     /// @brief Начальная внутренняя энергия
-    double energy(const double &x) const { return (x > 0.19) && (x < x_jump) ? eL : eR; }
+    double energy(const double &x) const { return x < x_jump ? eL : eR; }
 
     /// @brief Начальная плотность
     double density(const Vector3d &r) const { return density(r.x()); }

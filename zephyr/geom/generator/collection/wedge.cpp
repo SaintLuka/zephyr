@@ -14,15 +14,15 @@ namespace zephyr::geom::generator::collection {
 Wedge::Wedge(
         double xmin, double xmax,
         double ymin, double ymax,
-        double xw, double phi) :
+        double xw, double phi, 
+        Boundaries bounds) :
         BlockStructured(2),
         m_xmin(xmin), m_xmax(xmax),
         m_ymin(ymin), m_ymax(ymax),
         m_xw(xw), m_phi(phi),
-        m_bounds() {
+        m_bounds(bounds) {
 
     m_name = "collection.wedge";
-
     init_blocks();
 }
 

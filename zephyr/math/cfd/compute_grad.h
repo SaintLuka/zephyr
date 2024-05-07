@@ -81,6 +81,7 @@ std::array<T, 3> compute_gradient_LSM(Cell &cell,
     if (Fz.squaredNorm() < 1e-10 && abs(A(2, 2)) < 1e-10) {
         A(2, 2) = 1;
     }
+
     check_matrix(A, "A");
     check_matrix(Fx, "Fx");
     check_matrix(Fy, "Fy");

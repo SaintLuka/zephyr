@@ -15,12 +15,12 @@ namespace zephyr::geom::generator::collection {
 SemicircleCutout::SemicircleCutout(
         double xmin, double xmax,
         double ymin, double ymax,
-        double xc, double r) :
+        double xc, double r, Boundaries bounds) :
         BlockStructured(5),
         m_xmin(xmin), m_xmax(xmax),
         m_ymin(ymin), m_ymax(ymax),
         m_xc(xc), m_r(r),
-        m_bounds() {
+        m_bounds(bounds) {
 
     m_name = "collection.semicircle-cutout";
 

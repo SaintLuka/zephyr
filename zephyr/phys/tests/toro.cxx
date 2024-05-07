@@ -88,6 +88,16 @@ ToroTest::ToroTest(int num)
             x_jump = 0.5;
             finish = 2.0;
             break;
+        case 100:
+            rL = 1.0;
+            rR = 1.0;
+            uL = 2.0;
+            uR = -2.0;
+            pL = 0.1;
+            pR = 0.1;
+            x_jump = 0.5;
+            finish = 0.8;
+            break;
         default:
             throw std::runtime_error("Unknown Toro test (num > 7)");
     }

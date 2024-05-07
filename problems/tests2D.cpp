@@ -10,6 +10,7 @@
 #include <zephyr/phys/tests/sod.h>
 #include <zephyr/phys/tests/blast_wave.h>
 #include <zephyr/phys/tests/RiemannTest2D.h>
+#include <zephyr/phys/tests/toro.h>
 
 #include <zephyr/math/solver/riemann.h>
 #include <zephyr/phys/eos/stiffened_gas.h>
@@ -40,16 +41,18 @@ double get_e(AmrStorage::Item& cell) { return cell(U).e; }
 
 int main() {
     // Тестовая задача
-    // Mach test(1.2);
+    Mach test(1.7);
+    // ToroTest test(100);
     // SodTest test;
-    BlastWave test(4.5);
+    // BlastWave test(4.5);
     // RiemannTest2D test(6);
 
     // Уравнение состояния
     Eos& eos = test.eos;
 
     // Файл для записи
-    PvdFile pvd("mesh", "/mnt/d/blastfail");
+    PvdFile pvd("mesh", "/mnt/d/wedgeAMR"); //blastfail
+    pvd.unique_nodes = true;
 
     // Переменные для сохранения
     pvd.variables += {"rho", get_rho};
@@ -62,26 +65,28 @@ int main() {
                           return eos.sound_speed_rp(cell(U).rho, cell(U).p);
                       }};
 
-    Rectangle gen(-0.5, 0.5, -0.5, 0.5);
-    gen.set_ny(10);
-    gen.set_nx(10);
-    gen.set_boundaries({.left=Boundary::WALL, .right=Boundary::WALL,
-                        .bottom=Boundary::WALL, .top=Boundary::WALL});
+    // Rectangle gen(0.0, 1.0, 0.0, 0.1);
+    // gen.set_nx(20);
+    // gen.set_ny(10);
+    // gen.set_boundaries({.left=Boundary::ZOE, .right=Boundary::ZOE,
+    //                     .bottom=Boundary::ZOE, .top=Boundary::ZOE});
 
     // Часть области с регулярной сеткой
     auto fix_condition = [&test](const Vector3d& v) {
          return v.x() <= test.x_jump + 0.01 * (test.xmax() - test.xmin());
     };
 
-    // Wedge gen(0.0, 0.5, 0.0, 0.5, 0.2, 0.16667 * M_PI);
-    // gen.set_nx(25);
-    // // gen.set_fixed(fix_condition);
-    // gen.set_boundaries({.left=Boundary::ZOE, .right=Boundary::WALL,
-    //                    .bottom=Boundary::WALL, .top=Boundary::ZOE});
+    Wedge gen(0.0, 0.5, 0.0, 0.3, 0.2, 0.1389 * M_PI, 
+                {.left=Boundary::ZOE, .right=Boundary::ZOE,
+                .bottom=Boundary::WALL, .top=Boundary::ZOE});
+    gen.set_nx(25);
+    gen.set_fixed(fix_condition);
 
     // SemicircleCutout gen(0.49, 0.7, 0.0, 0.07, 0.6, 0.02);
-    // //SemicircleCutout gen(0.0, 1.0, 0.0, 0.3, 0.52, 0.1);
-    // gen.set_ny(10);
+    // SemicircleCutout gen(0.0, 0.21, 0.0, 0.07, 0.11, 0.02, 
+    //                      {.left=Boundary::ZOE, .right=Boundary::ZOE, 
+    //                       .bottom=Boundary::WALL, .top=Boundary::ZOE});
+    // gen.set_ny(20);
     // gen.set_fixed(fix_condition);
     // gen.set_boundaries({.left=Boundary::ZOE, .right=Boundary::ZOE,
     //                     .bottom=Boundary::WALL, .top=Boundary::ZOE});
@@ -92,8 +97,8 @@ int main() {
 
     // Создать решатель
     auto solver = zephyr::math::SmFluid(eos, Fluxes::HLLC);
-    solver.set_accuracy(2); // 2
-    solver.set_CFL(0.4);
+    solver.set_accuracy(2);
+    solver.set_CFL(0.9);
 
     mesh.set_max_level(5);
     mesh.set_distributor(solver.distributor());
@@ -102,7 +107,7 @@ int main() {
     double next_write = 0.0;
     size_t n_step = 0;
 
-    //solver.init_cells(mesh, test);
+    // solver.init_cells(mesh, test);
 
     for (int k = 0; k < mesh.max_level() + 3; ++k) {
         solver.init_cells(mesh, test);
@@ -111,6 +116,7 @@ int main() {
     }
 
     while (time <= 1.01 * test.max_time()) {
+
         std::cout << "\tStep: " << std::setw(6) << n_step << ";"
                   << "\tTime: " << std::setw(6) << std::setprecision(3) << time << "\n";
         if (time >= next_write) {
@@ -122,9 +128,7 @@ int main() {
         solver.update(mesh);
 
         solver.set_flags(mesh);
-        solver.check_asserts(mesh, "set flags");
         mesh.refine();
-        solver.check_asserts(mesh, "refine");
         
         n_step += 1;
         time = solver.get_time();

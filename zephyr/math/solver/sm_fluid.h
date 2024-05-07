@@ -80,7 +80,7 @@ public:
 
     void update(Mesh &mesh);
 
-    void check_asserts(Mesh &mesh, std::string msg="");
+    void check_asserts(Mesh &mesh, std::string msg);
 
     /// @brief Установить флаги адаптации
     void set_flags(Mesh& mesh);
