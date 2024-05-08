@@ -329,6 +329,7 @@ Distributor SmFluid::distributor() const {
             //                      parent(U).d_dy.vec() * dr.y() +
             //                      parent(U).d_dz.vec() * dr.z(); 
             // child_state.energy = m_eos.energy_rp(child_state.density, child_state.pressure);
+            // child(U).set_state(child_state);
 
             PState child_state;
             child_state.density = parent(U).rho +
@@ -345,29 +346,31 @@ Distributor SmFluid::distributor() const {
 
             zephyr::phys::dRdE rhoe = m_eos.pressure_re(parent(U).rho, parent(U).e, {.deriv = true});
 
-            child_state.energy = parent(U).get_pstate().energy + 
+            child_state.energy = parent(U).e + 
                                     0.5 * (parent(U).v - child_state.velocity).squaredNorm() + 
                                         (parent(U).rho / child_state.density) * (
-                                            // (parent(U).v).dot(parent(U).d_dx.velocity) * dr.x() +
-                                            // (parent(U).v).dot(parent(U).d_dy.velocity) * dr.y() + 
-                                            // (parent(U).v).dot(parent(U).d_dz.velocity) * dr.z() + 
+                                            (parent(U).v).dot(parent(U).d_dx.velocity) * dr.x() +
+                                            (parent(U).v).dot(parent(U).d_dy.velocity) * dr.y() + 
+                                            (parent(U).v).dot(parent(U).d_dz.velocity) * dr.z() + 
                                             (parent(U).d_dx.pressure - rhoe.dR * parent(U).d_dx.density) / rhoe.dE * dr.x() + 
                                             (parent(U).d_dy.pressure - rhoe.dR * parent(U).d_dy.density) / rhoe.dE * dr.y() +
                                             (parent(U).d_dz.pressure - rhoe.dR * parent(U).d_dz.density) / rhoe.dE * dr.z()
                                         );
             
             child_state.pressure = m_eos.pressure_re(child_state.density, child_state.energy);
-            
+
             child(U).set_state(child_state);
 
-            std::cout << "PState\t" << child(U).get_pstate() << std::endl;
-            std::cout << "QState\t" << QState(child(U).get_pstate()) << std::endl;
+            // std::cout << "PState\t" << child(U).get_pstate() << std::endl;
+            // std::cout << "QState\t" << QState(child(U).get_pstate()) << std::endl;
         }
 
         QState Qp(parent(U).get_pstate());
         double QiVi_mass(0);
         Vector3d QiVi_momentum(0,0,0);
         double QiVi_energy(0);
+
+        PState Pc;
 
         for (auto &child: children) {
             QState Qc(child(U).get_pstate());
@@ -376,6 +379,11 @@ Distributor SmFluid::distributor() const {
             QiVi_mass += Qc.mass * child.volume();
             QiVi_momentum += Qc.momentum * child.volume();
             QiVi_energy += Qc.energy * child.volume();
+
+            Pc.density += child(U).rho * child.volume();
+            Pc.pressure += child(U).p * child.volume();
+            Pc.velocity += child(U).v * child.volume();
+            Pc.energy += child(U).e * child.volume();
         }
 
         std::cout << "parent center\t" << parent.center << std::endl;
@@ -385,6 +393,7 @@ Distributor SmFluid::distributor() const {
         std::cout << "Sum QiVi_mass\t" << QiVi_mass 
                   << "\tSum QiVi_momentum\t" << QiVi_momentum 
                   << "\tSum QiVi_energy\t" << QiVi_energy << std::endl;
+        std::cout << QState(Pc) << std::endl;
         std::cout << "---------------------------------------------------------------------" << std::endl;
     };
 
@@ -414,9 +423,9 @@ void SmFluid::set_flags(Mesh &mesh) {
 
             // проверяем большой перепад давлений
             PState t = face.neib(U).get_pstate() - cell(U).get_pstate();
-            if (abs(t.density) >= 0.5 * abs(cell(U).rho) ||
-                abs(t.pressure) >= 0.5 * abs(cell(U).p) ||
-                abs(t.energy) >= 0.5 * abs(cell(U).e)) {
+            if (abs(t.density) >= 0.33 * abs(cell(U).rho) || abs(t.density) >= 0.33 * abs(cell(U).rho) ||
+                abs(t.pressure) >= 0.33 * abs(cell(U).p) ||
+                abs(t.energy) >= 0.33 * abs(cell(U).e)) {
                     std::cout << "need split\t" << std::endl;
                     std::cout << "t\t" << t << std::endl;
                     std::cout << "pstate\t" << cell(U).get_pstate() << std::endl;

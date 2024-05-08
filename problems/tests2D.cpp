@@ -100,7 +100,7 @@ int main() {
     solver.set_accuracy(2);
     solver.set_CFL(0.9);
 
-    mesh.set_max_level(5);
+    mesh.set_max_level(6);
     mesh.set_distributor(solver.distributor());
     
     double time = 0.0;
