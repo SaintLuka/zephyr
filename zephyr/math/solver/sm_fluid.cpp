@@ -29,12 +29,15 @@ smf::PState get_half_sm(Cell &cell) {
 void SmFluid::check_asserts(Mesh& mesh, std::string msg) {
     mesh.for_each([&](Cell &cell) -> void {
         if(!(cell(U).get_pstate().pressure >= 0 && cell(U).get_pstate().energy >= 0)) {
+            std::cout << cell.center() << std::endl;
             std::cout << msg << "\t" << cell(U).get_pstate() << std::endl;
         }
         if(!(cell(U).next.pressure >= 0 && cell(U).next.energy >= 0)) {
+            std::cout << cell.center() << std::endl;
             std::cout << msg << "\t" << cell(U).next << std::endl;
         };
         if(!(cell(U).half.pressure >= 0 && cell(U).half.energy >= 0)) {
+            std::cout << cell.center() << std::endl;
             std::cout << msg << "\t" << cell(U).half << std::endl;
         };
     });
@@ -235,16 +238,16 @@ smf::Flux SmFluid::calc_flux_extra(const Cell &cell, bool from_begin)  {
         PState p_minus = face_extra.m(p_self).in_local(normal);
         PState p_plus = face_extra.p(p_neib).in_local(normal);
 
-        // if (face.is_boundary()) {
-        //     if (face.flag() == Boundary::ZOE) {
-        //         p_plus = p_minus;
-        //     }
-        //     else if (face.flag() == Boundary::WALL) {
-        //         p_plus = p_minus;
-        //         Vector3d Vn = normal * p_minus.velocity.dot(normal);
-        //         p_plus.velocity = p_minus.velocity - 2 * Vn; // Vt - Vn = p_self.velocity - Vn - Vn
-        //     }
-        // }
+        if (face.is_boundary()) {
+            if (face.flag() == Boundary::ZOE) {
+                p_plus = p_minus;
+            }
+            else if (face.flag() == Boundary::WALL) {
+                p_plus = p_minus;
+                Vector3d Vn = normal * p_minus.velocity.dot(normal);
+                p_plus.velocity = p_minus.velocity - 2 * Vn; // Vt - Vn = p_self.velocity - Vn - Vn
+            }
+        }
 
         // пересчитываем энергию и температуру
         p_minus.energy = m_eos.energy_rp(p_minus.density, p_minus.pressure);
@@ -349,9 +352,6 @@ Distributor SmFluid::distributor() const {
             child_state.energy = parent(U).e + 
                                     0.5 * (parent(U).v - child_state.velocity).squaredNorm() + 
                                         (parent(U).rho / child_state.density) * (
-                                            (parent(U).v).dot(parent(U).d_dx.velocity) * dr.x() +
-                                            (parent(U).v).dot(parent(U).d_dy.velocity) * dr.y() + 
-                                            (parent(U).v).dot(parent(U).d_dz.velocity) * dr.z() + 
                                             (parent(U).d_dx.pressure - rhoe.dR * parent(U).d_dx.density) / rhoe.dE * dr.x() + 
                                             (parent(U).d_dy.pressure - rhoe.dR * parent(U).d_dy.density) / rhoe.dE * dr.y() +
                                             (parent(U).d_dz.pressure - rhoe.dR * parent(U).d_dz.density) / rhoe.dE * dr.z()
@@ -360,41 +360,8 @@ Distributor SmFluid::distributor() const {
             child_state.pressure = m_eos.pressure_re(child_state.density, child_state.energy);
 
             child(U).set_state(child_state);
-
-            // std::cout << "PState\t" << child(U).get_pstate() << std::endl;
-            // std::cout << "QState\t" << QState(child(U).get_pstate()) << std::endl;
         }
 
-        QState Qp(parent(U).get_pstate());
-        double QiVi_mass(0);
-        Vector3d QiVi_momentum(0,0,0);
-        double QiVi_energy(0);
-
-        PState Pc;
-
-        for (auto &child: children) {
-            QState Qc(child(U).get_pstate());
-            std::cout << "child center\t" << child.center << std::endl;
-            std::cout << "child volume\t" << child.volume() << std::endl;
-            QiVi_mass += Qc.mass * child.volume();
-            QiVi_momentum += Qc.momentum * child.volume();
-            QiVi_energy += Qc.energy * child.volume();
-
-            Pc.density += child(U).rho * child.volume();
-            Pc.pressure += child(U).p * child.volume();
-            Pc.velocity += child(U).v * child.volume();
-            Pc.energy += child(U).e * child.volume();
-        }
-
-        std::cout << "parent center\t" << parent.center << std::endl;
-        std::cout << "parent's volume\t" << parent.volume() << std::endl;
-        std::cout << "parent's PState\t" << parent(U).get_pstate() << std::endl;
-        std::cout << "QpVp\t" << Qp.vec() * parent.volume() << std::endl;
-        std::cout << "Sum QiVi_mass\t" << QiVi_mass 
-                  << "\tSum QiVi_momentum\t" << QiVi_momentum 
-                  << "\tSum QiVi_energy\t" << QiVi_energy << std::endl;
-        std::cout << QState(Pc) << std::endl;
-        std::cout << "---------------------------------------------------------------------" << std::endl;
     };
 
     distr.merge = [this](mesh::Children &children, AmrStorage::Item &parent) {
@@ -414,6 +381,10 @@ void SmFluid::set_flags(Mesh &mesh) {
     compute_grad(mesh, get_current_sm);
 
     for (auto cell: mesh) {
+        
+        if (cell.flag() == 2)
+            continue;
+
         double p = cell(U).p;
         bool need_split = false;
         for (auto face: cell.faces()) {
@@ -423,15 +394,12 @@ void SmFluid::set_flags(Mesh &mesh) {
 
             // проверяем большой перепад давлений
             PState t = face.neib(U).get_pstate() - cell(U).get_pstate();
-            if (abs(t.density) >= 0.33 * abs(cell(U).rho) || abs(t.density) >= 0.33 * abs(cell(U).rho) ||
-                abs(t.pressure) >= 0.33 * abs(cell(U).p) ||
-                abs(t.energy) >= 0.33 * abs(cell(U).e)) {
-                    std::cout << "need split\t" << std::endl;
-                    std::cout << "t\t" << t << std::endl;
-                    std::cout << "pstate\t" << cell(U).get_pstate() << std::endl;
+            if (abs(t.density) > 0.01 * abs(cell(U).rho) || 
+                abs(t.pressure) > 0.01 * abs(cell(U).p) ||
+                abs(t.energy) >  0.01 * abs(cell(U).e)) {
                     need_split = true;
                     break;
-            }
+                }
         }
         if (need_split) {
             cell.set_flag(1);

@@ -41,7 +41,7 @@ double get_e(AmrStorage::Item& cell) { return cell(U).e; }
 
 int main() {
     // Тестовая задача
-    Mach test(1.7);
+    Mach test(10);
     // ToroTest test(100);
     // SodTest test;
     // BlastWave test(4.5);
@@ -51,7 +51,7 @@ int main() {
     Eos& eos = test.eos;
 
     // Файл для записи
-    PvdFile pvd("mesh", "/mnt/d/wedgeAMR"); //blastfail
+    PvdFile pvd("mesh", "/mnt/d/wedgeAMR30"); //blastfail
     pvd.unique_nodes = true;
 
     // Переменные для сохранения
@@ -65,22 +65,23 @@ int main() {
                           return eos.sound_speed_rp(cell(U).rho, cell(U).p);
                       }};
 
-    // Rectangle gen(0.0, 1.0, 0.0, 0.1);
-    // gen.set_nx(20);
-    // gen.set_ny(10);
-    // gen.set_boundaries({.left=Boundary::ZOE, .right=Boundary::ZOE,
-    //                     .bottom=Boundary::ZOE, .top=Boundary::ZOE});
+    Rectangle gen(0.0, 4.0, 0.0, 1.0);
+    gen.set_nx(40);
+    gen.set_ny(10);
+    gen.set_boundaries({.left=Boundary::ZOE, .right=Boundary::ZOE,
+                        .bottom=Boundary::WALL, .top=Boundary::ZOE});
 
     // Часть области с регулярной сеткой
     auto fix_condition = [&test](const Vector3d& v) {
-         return v.x() <= test.x_jump + 0.01 * (test.xmax() - test.xmin());
+        return v.x() <= test.x_jump + 0.01 * (test.xmax() - test.xmin());
     };
 
-    Wedge gen(0.0, 0.5, 0.0, 0.3, 0.2, 0.1389 * M_PI, 
-                {.left=Boundary::ZOE, .right=Boundary::ZOE,
-                .bottom=Boundary::WALL, .top=Boundary::ZOE});
-    gen.set_nx(25);
-    gen.set_fixed(fix_condition);
+    // Wedge gen(0.0, 0.7, 0.0, 2.0, 0.2, 0.33333 * M_PI, 
+    //             {.left=Boundary::ZOE, .right=Boundary::ZOE,
+    //             .bottom=Boundary::WALL, .top=Boundary::ZOE});
+    // gen.set_nx(25);
+    // gen.set_fixed(fix_condition);
+
 
     // SemicircleCutout gen(0.49, 0.7, 0.0, 0.07, 0.6, 0.02);
     // SemicircleCutout gen(0.0, 0.21, 0.0, 0.07, 0.11, 0.02, 
@@ -97,10 +98,10 @@ int main() {
 
     // Создать решатель
     auto solver = zephyr::math::SmFluid(eos, Fluxes::HLLC);
-    solver.set_accuracy(2);
-    solver.set_CFL(0.9);
+    solver.set_accuracy(4);
+    solver.set_CFL(0.4);
 
-    mesh.set_max_level(6);
+    mesh.set_max_level(2);
     mesh.set_distributor(solver.distributor());
     
     double time = 0.0;
@@ -121,13 +122,14 @@ int main() {
                   << "\tTime: " << std::setw(6) << std::setprecision(3) << time << "\n";
         if (time >= next_write) {
             pvd.save(mesh, time);
-            next_write += test.max_time() / 400;
+            next_write += test.max_time() / 100;
         };
 
         // Обновляем слои
         solver.update(mesh);
 
         solver.set_flags(mesh);
+        
         mesh.refine();
         
         n_step += 1;
