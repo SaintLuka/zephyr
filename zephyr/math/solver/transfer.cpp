@@ -11,6 +11,30 @@ using mesh::AmrStorage;
 using namespace geom;
 using namespace mesh;
 
+inline bool CRP_type(Transfer::Method m) {
+    return m == Transfer::Method::CRP_V3 ||
+           m == Transfer::Method::CRP_V5 ||
+           m == Transfer::Method::CRP_S ||
+           m == Transfer::Method::CRP_N;
+}
+
+inline bool VOF_type(Transfer::Method m) {
+    return m == Transfer::Method::VOF ||
+           m == Transfer::Method::VOF_CRP;
+}
+
+inline bool MUSCL_type(Transfer::Method m) {
+    return m == Transfer::Method::MUSCLd ||
+           m == Transfer::Method::MUSCLn ||
+           m == Transfer::Method::MUSCLd_CRP ||
+           m == Transfer::Method::MUSCLn_CRP;
+}
+
+inline bool WENO_type(Transfer::Method m) {
+    return m == Transfer::Method::WENO ||
+           m == Transfer::Method::WENO_CRP;
+}
+
 static const Transfer::State U = Transfer::datatype();
 
 Transfer::State Transfer::datatype() {
@@ -24,8 +48,7 @@ Transfer::Transfer()
 
     m_dt  = 1.0e+300;
     m_CFL = 0.5;
-    m_ver = 1;
-    m_dir = Direction::ANY;
+    m_method = Method::VOF;
 }
 
 double Transfer::CFL() const {
@@ -36,28 +59,16 @@ void Transfer::set_CFL(double C) {
     m_CFL = std::max(0.0, std::min(C, 1.0));
 }
 
-void Transfer::set_version(int ver) {
-    m_ver = ver;
+void Transfer::Transfer::set_method(Transfer::Method method) {
+    m_method = method;
 }
 
-void Transfer::dir_splitting(bool flag) {
-    if (flag) {
-        m_dir = Direction::X;
-    }
-    else {
-        m_dir = Direction::ANY;
-    }
+double Transfer::get_dt() const {
+    return m_dt;
 }
 
-double Transfer::dt() const {
-    switch (m_dir) {
-        case Direction::X:
-            return 0.0001 * m_dt;
-        case Direction::Y:
-            return 0.9999 * m_dt;
-        default:
-            return m_dt;
-    }
+void Transfer::set_dt(double dt) {
+    m_dt = dt;
 }
 
 Vector3d Transfer::velocity(const Vector3d &c) const {
@@ -81,9 +92,30 @@ double Transfer::compute_dt(EuMesh &mesh) {
     return dt;
 }
 
+inline double sqr(double x) { return x * x; }
+
 // Функция знака
 inline double sign(double x) {
     return x > 0.0 ? 1.0 : (x < 0.0 ? -1.0 : 0.0);
+}
+
+// Функция Хевисайда
+inline double heav(double x) {
+    return x > 0.0 ? 1.0 : 0.0;
+}
+
+// гладкая функция знака
+inline double sign_s(double x) {
+    const double x0 = 0.1;
+    double xi = std::abs(x / x0);
+    return sign(x) * (1.0 - heav(1.0 - xi) * sqr(1.0 - xi));
+}
+
+// Гладкая функция Хевисайда
+inline double heav_s(double x) {
+    const double x0 = 0.05;
+    double xi = std::abs(x / x0);
+    return heav(x) * (1.0 - heav(1.0 - xi) * sqr(1.0 - xi));
 }
 
 // Помещает x внутрь отрезка [x_min, x_max]
@@ -120,10 +152,31 @@ double flux_2D(double a1, double a2, double S, double V1, double V2, double as, 
     return sign(vn) * between(F_min, gamma * as, F_max);
 }
 
-double face_fraction(double a1, double a2) {
+double face_fraction_v3(double a1, double a2) {
+    auto [a_min, a_max] = minmax(a1, a2);
+    double a_avg = 0.5 * (a1 + a2);
+    double a_s = a_avg + 0.5 * sign_s(2 * a_avg - 1) * (a_max - a_min);
+    return between(a_min, a_s, a_max);
+}
+
+double face_fraction_v5(double a1, double a2) {
+    auto [a_min, a_max] = minmax(a1, a2);
+    double a_avg = 0.5 * (a1 + a2);
+    double delta = 0.5 * std::abs(a2 - a1);
+
+    double L = 0.5 * (1.0 - sign_s(2.0 * a_avg - 1.0));
+    double G = 0.5 * (1.0 + sign_s(2.0 * a_avg - 1.0));
+
+    double a_s = L * a_avg * heav_s(a_avg - delta) +
+                 G * (1.0 - (1.0 - a_avg) * heav_s(1.0 - a_avg - delta));
+
+    return between(a_min, a_s, a_max);
+}
+
+// Формула Серёжкина
+double face_fraction_s(double a1, double a2) {
     auto [a_min, a_max] = minmax(a1, a2);
 
-    // Формула Серёжкина
     double a_sig = a_min / (1.0 - (a_max - a_min));
 
     // Случай a_min = 0, a_max = 1
@@ -134,9 +187,28 @@ double face_fraction(double a1, double a2) {
     return between(a_min, a_sig, a_max);
 }
 
+// n1, n2 --- нормали к интерфейсу
+// fn --- нормаль к грани
+// vn --- нормальная компонента скорости
+double face_fraction_n(double a1, double a2, const Vector3d& n1, const Vector3d& n2,
+                       const Vector3d& fn, double vn) {
+    auto [a_min, a_max] = minmax(a1, a2);
+
+    double a_ser = face_fraction_s(a1, a2);
+    double a_up = vn > 0.0 ? a1 : a2;
+
+    double cos = fn.dot(vn > 0.0 ? n1 : n2);
+    double xi = std::abs(cos);
+
+    double a_sig = xi * a_ser + (1.0 - xi) * a_up;
+
+    return between(a_min, a_sig, a_max);
+}
+
 void Transfer::fluxes_CRP(EuCell &cell, Direction dir) {
     auto &zc = cell(U);
     double a1 = zc.u1;
+    Vector3d n1 = cell(U).n;
 
     double fluxes = 0.0;
     for (auto &face: cell.faces(dir)) {
@@ -146,16 +218,32 @@ void Transfer::fluxes_CRP(EuCell &cell, Direction dir) {
 
         auto neib = face.neib();
         double a2 = neib(U).u1;
+        Vector3d n2 = neib(U).n;
 
-        double vs = velocity(face.center()).dot(face.normal());
+        Vector3d fn = face.normal();
+        double vn = velocity(face.center()).dot(fn);
 
-        double as = face_fraction(a1, a2);
+        double a_sig;
+        switch (m_method) {
+            case Method::CRP_V3:
+                a_sig = face_fraction_v3(a1, a2);
+                break;
+            case Method::CRP_V5:
+                a_sig = face_fraction_v5(a1, a2);
+                break;
+            case Method::CRP_N:
+                a_sig = face_fraction_n(a1, a2, n1, n2, fn, vn);
+                break;
+            default:
+                a_sig = face_fraction_s(a1, a2);
+                break;
+        }
 
         double S = face.area();
         double V1 = cell.volume();
         double V2 = neib.volume();
 
-        fluxes += flux_2D(a1, a2, S, V1, V2, as, vs, m_dt);
+        fluxes += flux_2D(a1, a2, S, V1, V2, a_sig, vn, m_dt);
     }
 
     zc.u2 = zc.u1 - fluxes / cell.volume();
@@ -222,7 +310,7 @@ void Transfer::fluxes_VOF(EuCell &cell, Direction dir) {
         Vector3d V2 = velocity(face.vs(1));
 
         // Расчет с расщеплением
-        if (m_dir != Direction::ANY) {
+        if (dir != Direction::ANY) {
             V1 = V1.dot(fn) * fn;
             V2 = V2.dot(fn) * fn;
         }
@@ -275,7 +363,7 @@ void Transfer::fluxes_MIX(EuCell &cell, Direction dir) {
         Vector3d V2 = velocity(face.vs(1));
 
         // Расчет с расщеплением
-        if (m_dir != Direction::ANY) {
+        if (dir != Direction::ANY) {
             V1 = V1.dot(fn) * fn;
             V2 = V2.dot(fn) * fn;
         }
@@ -308,40 +396,28 @@ void Transfer::fluxes_MIX(EuCell &cell, Direction dir) {
     zc.u2 = zc.u1 - fluxes / cell.volume();
 }
 
-void Transfer::update(EuMesh &mesh) {
-    switch (m_ver) {
-        case 1:
-            update_ver1(mesh);
-            break;
-        case 2:
-            update_ver2(mesh);
-            break;
-        case 3:
-            update_ver3(mesh);
-            break;
-        default:
-            throw std::runtime_error("Unknown update version");
+void Transfer::update(EuMesh &mesh, Direction dir) {
+    if (CRP_type(m_method)) {
+        update_CRP(mesh, dir);
+    }
+    else if (VOF_type(m_method)) {
+        update_VOF(mesh, dir);
+    }
+    else if (MUSCL_type(m_method)) {
+        update_MUSCL(mesh, dir);
+    }
+    else if (WENO_type(m_method)) {
+        update_WENO(mesh, dir);
+    }
+    else {
+        update_other(mesh, dir);
     }
 }
 
-void Transfer::update_dir() {
-    // Флаг Direction::ANY не трогаем,
-    // X и Y меняем местами
-
-    if (m_dir == Direction::X) {
-        m_dir = Direction::Y;
-    }
-    else if (m_dir == Direction::Y) {
-        m_dir = Direction::X;
-    }
-}
-
-void Transfer::update_ver1(EuMesh& mesh) {
-    m_dt = compute_dt(mesh);
-
+void Transfer::update_CRP(EuMesh& mesh, Direction dir) {
     // Считаем потоки
     for (auto cell: mesh) {
-        fluxes_CRP(cell, m_dir);
+        fluxes_CRP(cell, dir);
     }
 
     // Обновляем слои
@@ -351,17 +427,12 @@ void Transfer::update_ver1(EuMesh& mesh) {
     }
 
     update_interface(mesh);
-
-    update_dir();
 }
 
-void Transfer::update_ver2(EuMesh& mesh) {
-    // Определяем dt
-    m_dt = compute_dt(mesh);
-
+void Transfer::update_VOF(EuMesh& mesh, Direction dir) {
     // Считаем потоки
     for (auto cell: mesh) {
-        fluxes_VOF(cell, m_dir);
+        fluxes_VOF(cell, dir);
     }
 
     // Обновляем слои
@@ -371,17 +442,20 @@ void Transfer::update_ver2(EuMesh& mesh) {
     }
 
     update_interface(mesh);
-
-    update_dir();
 }
 
-void Transfer::update_ver3(EuMesh& mesh) {
-    // Определяем dt
-    m_dt = compute_dt(mesh);
+void Transfer::update_MUSCL(EuMesh& mesh, Direction dir) {
 
+}
+
+void Transfer::update_WENO(EuMesh& mesh, Direction dir) {
+
+}
+
+void Transfer::update_other(EuMesh& mesh, Direction dir) {
     // Считаем потоки
     for (auto cell: mesh) {
-        fluxes_MIX(cell, m_dir);
+        fluxes_MIX(cell, dir);
     }
 
     // Обновляем слои
@@ -390,9 +464,7 @@ void Transfer::update_ver3(EuMesh& mesh) {
         cell(U).u2 = 0.0;
     }
 
-    update_interface(mesh, 3);
-
-    update_dir();
+    update_interface(mesh);
 }
 
 void Transfer::update_interface(EuMesh& mesh, int smoothing) {
