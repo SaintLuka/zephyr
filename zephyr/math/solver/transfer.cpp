@@ -14,8 +14,9 @@ using namespace mesh;
 inline bool CRP_type(Transfer::Method m) {
     return m == Transfer::Method::CRP_V3 ||
            m == Transfer::Method::CRP_V5 ||
-           m == Transfer::Method::CRP_S ||
-           m == Transfer::Method::CRP_N;
+           m == Transfer::Method::CRP_SE ||
+           m == Transfer::Method::CRP_N1 ||
+           m == Transfer::Method::CRP_N2;
 }
 
 inline bool VOF_type(Transfer::Method m) {
@@ -190,8 +191,8 @@ double face_fraction_s(double a1, double a2) {
 // n1, n2 --- нормали к интерфейсу
 // fn --- нормаль к грани
 // vn --- нормальная компонента скорости
-double face_fraction_n(double a1, double a2, const Vector3d& n1, const Vector3d& n2,
-                       const Vector3d& fn, double vn) {
+double face_fraction_n1(double a1, double a2, const Vector3d& n1, const Vector3d& n2,
+                        const Vector3d& fn, double vn) {
     auto [a_min, a_max] = minmax(a1, a2);
 
     double a_ser = face_fraction_s(a1, a2);
@@ -201,6 +202,45 @@ double face_fraction_n(double a1, double a2, const Vector3d& n1, const Vector3d&
     double xi = std::abs(cos);
 
     double a_sig = xi * a_ser + (1.0 - xi) * a_up;
+
+    return between(a_min, a_sig, a_max);
+}
+
+double face_fraction_n2(EuCell& cell, EuCell& neib, EuFace& face, double vn) {
+    // Отрезок - грань
+    obj::segment seg{
+            .v1 = face.vs(0),
+            .v2 = face.vs(1)
+    };
+
+    // Реконструкция в ячейке
+    obj::plane plane{
+            .p = vn > 0.0 ? cell(U).p : neib(U).p,
+            .n = vn > 0.0 ? cell(U).n : neib(U).n
+    };
+
+    bool in1 = plane.under(seg.v1);
+    bool in2 = plane.under(seg.v2);
+
+    double a_sig;
+    if (in1 && in2) {
+        a_sig = 1.0;
+    }
+    else if (!in1 && !in2) {
+        a_sig = 0.0;
+    }
+    else {
+        Vector3d in = geom::intersection2D::find_fast(plane, seg);
+
+        if (in1) {
+            a_sig = (in - seg.v1).norm() / seg.length();
+        }
+        else {
+            a_sig = (in - seg.v2).norm() / seg.length();
+        }
+    }
+
+    auto [a_min, a_max] = minmax(cell(U).u1, neib(U).u1);
 
     return between(a_min, a_sig, a_max);
 }
@@ -231,8 +271,11 @@ void Transfer::fluxes_CRP(EuCell &cell, Direction dir) {
             case Method::CRP_V5:
                 a_sig = face_fraction_v5(a1, a2);
                 break;
-            case Method::CRP_N:
-                a_sig = face_fraction_n(a1, a2, n1, n2, fn, vn);
+            case Method::CRP_N1:
+                a_sig = face_fraction_n1(a1, a2, n1, n2, fn, vn);
+                break;
+            case Method::CRP_N2:
+                a_sig = face_fraction_n2(cell, neib, face, vn);
                 break;
             default:
                 a_sig = face_fraction_s(a1, a2);

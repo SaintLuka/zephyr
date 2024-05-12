@@ -21,6 +21,10 @@ struct segment {
     Vector3d tau() const {
         return v2 - v1;
     }
+
+    double length() const {
+        return (v2 - v1).norm();
+    }
 };
 
 /// @struct Прямая
@@ -56,6 +60,11 @@ struct plane {
     /// Нормаль n - правая при движении вдоль прямой.
     Vector3d get(double t) const {
         return {p.x() - n.y() * t, p.y() + n.x() * t, 0.0};
+    }
+
+    // Под плоскостью (n -- внешняя нормаль)
+    bool under(const Vector3d& v) {
+        return (v - p).dot(n) < 0.0;
     }
 };
 
@@ -93,6 +102,16 @@ Vector3d find_fast(const obj::segment& seg1, const obj::segment& seg2);
 /// @details Для параллельных линий, вероятнее всего, выдаст NAN
 /// Точка пересечения может лежать вне отрезка
 Vector3d find_fast(const obj::line& line, const obj::segment& seg);
+
+/// @brief Найти пересечение плоскости и отрезка без всяких вопросов
+/// @details Для параллельных, вероятнее всего, выдаст NAN
+/// Точка пересечения может лежать вне отрезка
+Vector3d find_fast(const obj::plane& plane, const obj::line& line);
+
+/// @brief Найти пересечение плоскости и отрезка без всяких вопросов
+/// @details Для параллельных, вероятнее всего, выдаст NAN
+/// Точка пересечения может лежать вне отрезка
+Vector3d find_fast(const obj::plane& plane, const obj::segment& seg);
 
 
 /// @brief Пересечение окружности и отрезка

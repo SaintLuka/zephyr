@@ -46,7 +46,6 @@ bool exist(const obj::plane& plane, const obj::segment& seg) {
 // Возвращает два параметра (t, s) пересечения
 // a(t) = b(s)
 Vector3d find_fast(const obj::line& line1, const obj::line& line2) {
-
     double det = cross2D(line1.tau, line2.tau);
     Vector3d b = line2.p - line1.p;
 
@@ -62,6 +61,15 @@ Vector3d find_fast(const obj::segment& seg1, const obj::segment& seg2) {
 
 Vector3d find_fast(const obj::line& line, const obj::segment& seg) {
     return find_fast(line, obj::line{seg.v2, seg.v2 - seg.v1});
+}
+
+Vector3d find_fast(const obj::plane& plane, const obj::line& line) {
+    double t = plane.n.dot(plane.p - line.p) / plane.n.dot(line.tau);
+    return line.get(t);
+}
+
+Vector3d find_fast(const obj::plane& plane, const obj::segment& seg) {
+    return find_fast(plane, obj::line{seg.v2, seg.v2 - seg.v1});
 }
 
 circle_segment_intersection find(

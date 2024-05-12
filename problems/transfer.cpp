@@ -101,11 +101,11 @@ int main() {
     pvd_scheme.variables += {"u",  get_u};
 
     // Использовать полигональную сетку
-    bool voronoi = false;
+    bool voronoi = true;
 
     // Геометрия области
     Rectangle rect(0.0, 1.0, 0.0, 0.7, voronoi);
-    rect.set_nx(100);
+    rect.set_nx(200);
     rect.set_boundaries({
         .left   = Boundary::ZOE, .right = Boundary::ZOE,
         .bottom = Boundary::ZOE, .top   = Boundary::ZOE});
@@ -118,11 +118,11 @@ int main() {
     bool splitting = false;
 
     // Настройки метода
-    solver.set_method(Solver::Method::CRP_N);
+    solver.set_method(Solver::Method::CRP_SE);
 
     // Настройки теста
     solver.init = Solver::Init::Disk;
-    solver.test = Solver::Test::Rotation;
+    solver.test = Solver::Test::Translation;
 
     // Создать сетку
     EuMesh mesh(U, &rect);
