@@ -12,7 +12,6 @@ using namespace geom;
 using namespace mesh;
 
 static const Transfer::State U = Transfer::datatype();
-
 Transfer::State Transfer::datatype() {
     return {};
 }
@@ -40,6 +39,13 @@ void Transfer::set_version(int ver) {
     m_ver = ver;
 }
 
+void Transfer::prep_ver4(EuMesh &mesh) {
+    compute_all_lambda(mesh);
+    double tau = compute_tau(mesh);
+    m_dt = tau;
+}
+
+
 void Transfer::dir_splitting(bool flag) {
     if (flag) {
         m_dir = Direction::X;
@@ -63,7 +69,6 @@ double Transfer::dt() const {
 Vector3d Transfer::velocity(const Vector3d &c) const {
     return Vector3d::UnitX();
 }
-
 double Transfer::compute_dt(EuCell &cell) {
     double max_area = 0.0;
     for (auto &face: cell.faces()) {
@@ -80,7 +85,24 @@ double Transfer::compute_dt(EuMesh &mesh) {
     }
     return dt;
 }
+double Transfer::compute_tau(EuMesh& mesh){
+    double tau = 1.0e+300;
+    for (auto &cell: mesh) {
+        tau = std::min({tau, abs(1/cell(U).lambda_alpha),abs(1/cell(U).lambda_beta)});
+    }
+    return  tau * m_CFL;
+}
+void Transfer::compute_all_lambda(EuMesh& mesh){
+    for (auto &cell: mesh) {
+        auto  diff_alpha = (cell.vs<-1,1>() + cell.vs<1,1>()) - (cell.vs<-1,-1>() + cell.vs<1,-1>());
+        double temp_alpha = velocity(cell.center()).x() * diff_alpha.y() - velocity(cell.center()).y() * diff_alpha.x();
+        cell(U).lambda_alpha  = temp_alpha / (2*cell.volume());
 
+        auto  diff_beta = (cell.vs<1,-1>() + cell.vs<1,1>()) - (cell.vs<-1,-1>() + cell.vs<-1,1>());
+        double temp_beta= velocity(cell.center()).y() * diff_beta.x() - velocity(cell.center()).x() * diff_beta.y();
+        cell(U).lambda_beta  = temp_beta / (2*cell.volume());
+    }
+}
 // Функция знака
 inline double sign(double x) {
     return x > 0.0 ? 1.0 : (x < 0.0 ? -1.0 : 0.0);
@@ -311,19 +333,21 @@ void Transfer::fluxes_MIX(EuCell &cell, Direction dir) {
 void Transfer::update(EuMesh &mesh) {
     switch (m_ver) {
         case 1:
-            update_ver1(mesh);
+            update_ver1(mesh);// CRP
             break;
         case 2:
-            update_ver2(mesh);
+            update_ver2(mesh);// VOF
             break;
         case 3:
-            update_ver3(mesh);
+            update_ver3(mesh); //VOF+ CRP
+            break;
+        case 4:
+            update_ver4(mesh);
             break;
         default:
             throw std::runtime_error("Unknown update version");
     }
 }
-
 void Transfer::update_dir() {
     // Флаг Direction::ANY не трогаем,
     // X и Y меняем местами
@@ -394,6 +418,117 @@ void Transfer::update_ver3(EuMesh& mesh) {
 
     update_dir();
 }
+void  Transfer::compte_flow_value(EuCell& cell, int target, bool inverse, double lambda){
+    if (!inverse) cell(U).flow_u[target ] = 2* cell(U).u2  - cell(U).flow_u_tmp[target+2];
+    else  cell(U).flow_u[target +2 ] = 2* cell(U).u2  - cell(U).flow_u_tmp[target];
+    if (mnt){
+        double q_m = (cell(U).u2 - cell(U).u1)*2/m_dt + lambda*(cell(U).flow_u_tmp[target] - cell(U).flow_u_tmp[target+2]);
+        double min_ = std::min({cell(U).flow_u_tmp[target], cell(U).u1,cell(U).flow_u_tmp[target+2]}) + m_dt*q_m;
+        double max_ = std::max({cell(U).flow_u_tmp[target], cell(U).u1,cell(U).flow_u_tmp[target+2]}) + m_dt*q_m;
+        if (inverse)  target = target+2;
+        if  (cell(U).flow_u[target]< min_)
+            cell(U).flow_u[target] = min_;
+        else if (cell(U).flow_u[target] >  max_)
+            cell(U).flow_u[target] = max_;
+    }
+}
+
+void Transfer::update_ver4(EuMesh& mesh) {
+    //m_dt = compute_dt(mesh);
+    //std::cout << "tau" <<  tau << "\n";
+    // 1 фаза\n
+    for (auto cell: mesh) {
+        auto  p_2_1 = cell.vs<+1, 1>() - cell.vs<+1, -1>();
+        auto  p_3_4 = cell.vs<-1, 1>() - cell.vs<-1, -1>();
+        auto  p_2_3 =  cell.vs<+1, 1>() - cell.vs<-1, 1>();
+        auto  p_1_4 =  cell.vs<+1, -1>() - cell.vs<-1, -1>();
+        double f =  -((velocity(cell.vs<+1, 0>() )).x()* cell(U).flow_u[0]*p_2_1.y() -
+                (velocity(cell.vs<+1, 0>() )).y() *cell(U).flow_u[0]*p_2_1.x()-
+                (velocity(cell.vs<-1, 0>() )).x()*cell(U).flow_u[2]*p_3_4.y()+
+                (velocity(cell.vs<-1, 0>() )).y()*cell(U).flow_u[2]*p_3_4.x())-
+                (-(velocity(cell.vs<0, 1>() )).x()*cell(U).flow_u[1]*p_2_3.y()+
+                (velocity(cell.vs<0, 1>() )).y()*cell(U).flow_u[1]*p_2_3.x()+
+                (velocity(cell.vs<0, -1>() )).x()*cell(U).flow_u[3]*p_1_4.y()-
+                (velocity(cell.vs<0, -1>() )).y()*cell(U).flow_u[3]*p_1_4.x()
+                );
+        cell(U).u2 = 0.5 * m_dt * f/  cell.volume() + cell(U).u1; // посчитали  консервативную переменную на n+1/2 слое
+        //cell(U).u2 = between(0,cell(U).u2,1);
+        // здесь под u1  подразумевается значение f на слое n
+    }
+
+    // 2 фаза
+    for (int i = 0; i < mesh.nx(); ++i) {
+        for (int j = 0; j < mesh.ny(); ++j) {
+            auto cell = mesh(i, j);
+            if (cell(U).lambda_alpha > 0 and  mesh(i+1, j).data(U).lambda_alpha > 0){
+                compte_flow_value(cell,0, false, cell(U).lambda_alpha );
+                mesh(i+1, j).data(U).flow_u[2] = cell(U).flow_u[0];
+            }
+            else if(cell(U).lambda_alpha < 0 and  mesh(i+1, j).data(U).lambda_alpha < 0 ){
+                auto cell_right = mesh(i+1, j);
+                compte_flow_value(cell_right,0, true, cell_right(U).lambda_alpha );
+                cell(U).flow_u[0] = cell_right(U).flow_u[2];
+            }
+            else {
+                std::cout << "Sonic point via alpha" << "\n";
+            }
+            if (cell(U).lambda_beta > 0 and  mesh(i, j+1).data(U).lambda_beta > 0){
+                compte_flow_value(cell,1, false, cell(U).lambda_beta );
+                mesh(i, j+1).data(U).flow_u[3] = cell(U).flow_u[1];
+            }
+            else if(cell(U).lambda_beta < 0 and  mesh(i, j+1).data(U).lambda_beta < 0 ){
+                auto cell_top = mesh(i, j+1);
+                compte_flow_value(cell_top,1, true, cell_top(U).lambda_beta );
+                cell(U).flow_u[1] = cell_top(U).flow_u[3];
+            }
+            else {
+                std::cout << "Sonic point via beta" << "\n";
+            }
+        }
+    }
+    //3 фаза
+    for (auto cell: mesh) {
+        auto  p_2_1 = cell.vs<+1, 1>() - cell.vs<+1, -1>();
+        auto  p_3_4 = cell.vs<-1, 1>() - cell.vs<-1, -1>();
+        auto  p_2_3 =  cell.vs<+1, 1>() - cell.vs<-1, 1>();
+        auto  p_1_4 =  cell.vs<+1, -1>() - cell.vs<-1, -1>();
+        double f =  -((velocity(cell.vs<+1, 0>() )).x()* cell(U).flow_u[0]*p_2_1.y() -
+                      (velocity(cell.vs<+1, 0>() )).y() *cell(U).flow_u[0]*p_2_1.x()-
+                      (velocity(cell.vs<-1, 0>() )).x()*cell(U).flow_u[2]*p_3_4.y()+
+                      (velocity(cell.vs<-1, 0>() )).y()*cell(U).flow_u[2]*p_3_4.x())-
+                    (-(velocity(cell.vs<0, 1>() )).x()*cell(U).flow_u[1]*p_2_3.y()+
+                     (velocity(cell.vs<0, 1>() )).y()*cell(U).flow_u[1]*p_2_3.x()+
+                     (velocity(cell.vs<0, -1>() )).x()*cell(U).flow_u[3]*p_1_4.y()-
+                     (velocity(cell.vs<0, -1>() )).y()*cell(U).flow_u[3]*p_1_4.x()
+                    );
+        cell(U).u1 = 0.5 * m_dt * f/  cell.volume() + cell(U).u2;
+        //cell(U).flow_u[1] = between(0,cell(U).u1,1);
+    }
+    //4 фаза склейка границы
+
+
+    // Обновляем слои
+    for (auto cell: mesh) {
+        //cell(U).u1 = between(0.0, cell(U).u1, 1.0);
+        for (int i =0;i<4;i++){
+            /*
+            if (cell(U).u1 ==0)
+                cell(U).flow_u[i]= 0;
+                */
+            cell(U).flow_u_tmp[i] = cell(U).flow_u[i];
+        }
+        //cell(U).u1 = between(0.0, cell(U).u1, 1.0);
+
+        //for ( int i =0;i<4;i++)
+            //cell(U).flow_u[i] = between(0.0, cell(U).flow_u[i], 1.0);
+
+        //cell(U).u2 = 0.0;
+    }
+
+    update_interface(mesh, 3);
+
+    //update_dir();
+}
 
 void Transfer::update_interface(EuMesh& mesh, int smoothing) {
     interface.update(mesh, smoothing);
@@ -419,6 +554,10 @@ void Transfer::set_flags(EuMesh& mesh) {
             cell.set_flag(-1);
         }
     }
+}
+
+void Transfer::set_mnt(bool flag){
+    mnt = flag;
 }
 
 Distributor Transfer::distributor() const {
