@@ -21,12 +21,24 @@ public:
     /// @brief Расширенный вектор состояния на котором решается задача
     struct State {
         double u1, u2;  ///< Объемные доли
+        double lambda_alpha, lambda_beta;
+        double flow_u[4];
+        double flow_u_tmp[4];
         Vector3d n;     ///< Внешняя нормаль поверхности
         Vector3d p;     ///< Базисная точка поверхности
     };
+    /*
+    struct CabareState{
+        double lambda_alpha, lambda_beta , u1, u2; // u2 - temporary u1 on semilayer
+        double flow_u[4];
+        Vector3d n;     ///< Внешняя нормаль поверхности
+        Vector3d p;     ///< Базисная точка поверхности
+    };
+     */
 
     /// @brief Получить экземпляр расширенного вектора состояния
     static State datatype();
+    //static CabareState datactype();
 
     /// @brief Конструктор класса, по умолчанию CFL = 0.5
     Transfer();
@@ -39,6 +51,8 @@ public:
 
     /// @brief Версия функции update
     void set_version(int ver);
+
+    void set_mnt(bool flag);
 
     /// @brief Использовать расщепление по направлениям
     void dir_splitting(bool flag);
@@ -64,6 +78,8 @@ public:
     /// @brief Установить флаги адаптации
     void set_flags(EuMesh& mesh);
 
+    void prep_ver4(EuMesh& mesh);
+
     /// @brief Распределитель данных при адаптации
     Distributor distributor() const;
 
@@ -81,12 +97,20 @@ protected:
     /// условия Куранта (для всех ячеек)
     double compute_dt(EuMesh& mesh);
 
+    double compute_tau(EuMesh& mesh);
+
+    void  compute_all_lambda(EuMesh& mesh);
+
+    void  compte_flow_value(EuCell& cell, int target, bool inverse, double lambda);
 
     void update_ver1(EuMesh& mesh);
 
     void update_ver2(EuMesh& mesh);
 
     void update_ver3(EuMesh& mesh);
+
+    void update_ver4(EuMesh& mesh);
+
 
     /// @brief Потоки по схеме CRP
     void fluxes_CRP(EuCell& cell, Direction dir = Direction::ANY);
@@ -102,6 +126,7 @@ protected:
 
     double m_dt;      ///< Шаг интегрирования
     double m_CFL;     ///< Число Куранта
+    bool mnt;
     int    m_ver;     ///< Версия функции update
     Direction m_dir;  ///< Направление на текущем шаге
 
