@@ -84,7 +84,8 @@ void Wedge::init_blocks() {
     right->set_boundary(m_bounds.right);
     bottom->set_boundary(m_bounds.bottom);
     top->set_boundary(m_bounds.top);
-    wedge->set_boundary(m_bounds.bottom);
+    // wedge->set_boundary(m_bounds.bottom);
+    wedge->set_boundary(Boundary::WALL);
 
     // Генератор сетки
     m_blocks[0] = {v1, v2, v4, v5};

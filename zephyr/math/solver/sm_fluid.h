@@ -119,7 +119,7 @@ private:
 
     void fluxes_stage2(Mesh &mesh);
 
-    smf::Flux calc_flux_extra(const Cell &cell, bool from_begin);
+    smf::Flux calc_flux_extra(Cell &cell, bool from_begin);
 
 public:
 

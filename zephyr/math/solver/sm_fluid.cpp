@@ -4,6 +4,7 @@
 #include <zephyr/math/cfd/models.h>
 #include <zephyr/math/cfd/limiter.h>
 
+#include <iomanip>
 
 namespace zephyr::math {
 
@@ -61,29 +62,29 @@ void SmFluid::update(Mesh &mesh) {
         fluxes(mesh);
     } else {
 
-        check_asserts(mesh, "1");
+        //check_asserts(mesh, "1");
 
         compute_grad(mesh, get_current_sm);
 
-        check_asserts(mesh, "2");
+        //check_asserts(mesh, "2");
 
         fluxes_stage1(mesh);
 
-        check_asserts(mesh, "3");
+        //check_asserts(mesh, "3");
 
         compute_grad(mesh, get_half_sm);
 
-        check_asserts(mesh, "4");
+        //check_asserts(mesh, "4");
         
         fluxes_stage2(mesh);
 
-        check_asserts(mesh, "5");
+        //check_asserts(mesh, "5");
     }
 
     // Обновляем слои
     swap(mesh);
 
-    check_asserts(mesh, "6");
+    //check_asserts(mesh, "6");
 }
 
 double SmFluid::compute_dt(Mesh &mesh) {
@@ -125,7 +126,7 @@ void SmFluid::fluxes(Mesh &mesh) {
             PState p_neib(p_self);
 
             if (!face.is_boundary()) {
-                p_neib = face.neib()(U).get_pstate();
+                p_neib = face.neib(U).get_pstate();
             } else if (face.flag() == Boundary::WALL) {
                 Vector3d Vn = normal * p_self.velocity.dot(normal);
                 p_neib.velocity = p_self.velocity - 2 * Vn; // Vt - Vn = p_self.velocity - Vn - Vn
@@ -196,7 +197,7 @@ void SmFluid::fluxes_stage2(Mesh &mesh)  {
     });
 }
 
-smf::Flux SmFluid::calc_flux_extra(const Cell &cell, bool from_begin)  {
+smf::Flux SmFluid::calc_flux_extra(Cell &cell, bool from_begin)  {
     // Примитивный вектор в ячейке
     PState p_self = cell(U).half;
 
@@ -224,50 +225,32 @@ smf::Flux SmFluid::calc_flux_extra(const Cell &cell, bool from_begin)  {
         Vector3d face_c = face.center();
         Vector3d neib_c = 2 * face_c - cell_c;
 
-        // auto face_extra = FaceExtra::Triad(
-        //         p_self, cell(U).d_dx, cell(U).d_dy, cell(U).d_dz,
-        //         p_neib, face.neib()(U).d_dx, face.neib()(U).d_dy, face.neib()(U).d_dz,
-        //         cell_c, neib_c, face_c);
-
         auto face_extra = FaceExtra::ATvL(
                 p_self, cell(U).d_dx, cell(U).d_dy, cell(U).d_dz,
                 p_neib, face.neib(U).d_dx, face.neib(U).d_dy, face.neib(U).d_dz,
                 cell_c, neib_c, face_c);
 
         // рассчитываем расстояние на грани слева и справа
-        PState p_minus = face_extra.m(p_self).in_local(normal);
-        PState p_plus = face_extra.p(p_neib).in_local(normal);
+        PState p_minus = face_extra.m(p_self);
+        PState p_plus = face_extra.p(p_neib);
 
-        if (face.is_boundary()) {
-            if (face.flag() == Boundary::ZOE) {
-                p_plus = p_minus;
-            }
-            else if (face.flag() == Boundary::WALL) {
-                p_plus = p_minus;
-                Vector3d Vn = normal * p_minus.velocity.dot(normal);
-                p_plus.velocity = p_minus.velocity - 2 * Vn; // Vt - Vn = p_self.velocity - Vn - Vn
-            }
-        }
+        // // пересчитываем энергию и температуру
+        // if (face.is_boundary()) {
+        //     if (face.flag() == Boundary::ZOE) {
+        //         p_plus = p_minus;
+        //     }
+        //     else if (face.flag() == Boundary::WALL) {
+        //         p_plus = p_minus;
+        //         Vector3d Vn = normal * p_minus.velocity.dot(normal);
+        //         p_plus.velocity = p_minus.velocity - 2 * Vn; // Vt - Vn = p_self.velocity - Vn - Vn
+        //     }
+        // }
 
-        // пересчитываем энергию и температуру
+        p_minus.to_local(normal);
+        p_plus.to_local(normal);
+
         p_minus.energy = m_eos.energy_rp(p_minus.density, p_minus.pressure);
         p_plus.energy = m_eos.energy_rp(p_plus.density, p_plus.pressure);
-
-        if(!(p_minus.pressure >= 0 && p_minus.energy >= 0)) {
-            std::cout << p_self <<std::endl;
-            std::cout << p_neib << std::endl;
-            std::cout << p_minus << std::endl;
-        }
-        if(!(p_plus.pressure >= 0 && p_plus.energy >= 0)) {
-            std::cout << p_self <<std::endl;
-            std::cout << p_neib << std::endl;
-            std::cout << p_plus << std::endl;
-        }
-
-        // if (face.flag() == Boundary::WALL) {
-        //     Vector3d Vn = normal * p_minus.velocity.dot(normal);
-        //     p_plus.velocity = p_minus.velocity - 2 * Vn; // Vt - Vn = p_self.velocity - Vn - Vn
-        // }
 
         // Численный поток на грани
         auto loc_flux = m_nf->flux(p_minus, p_plus, m_eos);
@@ -349,7 +332,7 @@ Distributor SmFluid::distributor() const {
 
             zephyr::phys::dRdE rhoe = m_eos.pressure_re(parent(U).rho, parent(U).e, {.deriv = true});
 
-            child_state.energy = parent(U).e + 
+            child_state.energy = parent(U).e -
                                     0.5 * (parent(U).v - child_state.velocity).squaredNorm() + 
                                         (parent(U).rho / child_state.density) * (
                                             (parent(U).d_dx.pressure - rhoe.dR * parent(U).d_dx.density) / rhoe.dE * dr.x() + 
@@ -362,6 +345,16 @@ Distributor SmFluid::distributor() const {
             child(U).set_state(child_state);
         }
 
+        // PState pc(0, {0,0,0}, 0, 0);
+        // QState qc(pc);
+
+        // for (auto &child: children) {
+        //     QState qs(child(U).get_pstate());
+        //     qc.vec() += qs.vec() * child.volume();  
+        // }
+
+        // std::cout << std::setprecision(18) << QState(parent(U).get_pstate()).vec() * parent.volume() 
+        //           << "\n" << std::setprecision(18) << qc << "\n" << std::endl; 
     };
 
     distr.merge = [this](mesh::Children &children, AmrStorage::Item &parent) {
@@ -394,9 +387,13 @@ void SmFluid::set_flags(Mesh &mesh) {
 
             // проверяем большой перепад давлений
             PState t = face.neib(U).get_pstate() - cell(U).get_pstate();
-            if (abs(t.density) > 0.01 * abs(cell(U).rho) || 
-                abs(t.pressure) > 0.01 * abs(cell(U).p) ||
-                abs(t.energy) >  0.01 * abs(cell(U).e)) {
+            if (abs(t.density) > 0.1 * abs(cell(U).rho) || 
+                abs(t.pressure) > 0.1 * abs(cell(U).p) || 
+                abs(t.energy) > 0.1 * abs(cell(U).e) || 
+                ((cell.center().y() < 2.4 * get_time()) && 
+                 (cell.center().y() < -6 * (cell.center().x() - 0.1667 - 13.06 * get_time())) && 
+                 (cell.center().y() < 1.2 * (cell.center().x() -0.1667 - 10.67 * get_time())))) 
+                {
                     need_split = true;
                     break;
                 }

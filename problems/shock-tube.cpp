@@ -152,7 +152,6 @@ int main () {
     // Инициализация начальных условий
     setup_initial(mesh, u0, u3, P0, P3, rho0, rho3, cell_size_x, eos);
 
-
     // Создать решатель
     auto solver = zephyr::math::SmFluid(eos);
 

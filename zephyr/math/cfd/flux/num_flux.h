@@ -15,6 +15,8 @@ enum class Fluxes {
     HLL,
     HLLC,
     HLLC2,
+    HLLC_central,
+    HLLC_LM,
     RUSANOV,
     RUSANOV2
 };

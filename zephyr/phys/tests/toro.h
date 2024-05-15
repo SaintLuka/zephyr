@@ -19,6 +19,7 @@ public:
     double finish;  ///< Конечный момент времени
     double rL, rR;  ///< Плотность
     double uL, uR;  ///< Скорость
+    double vL = 0.0, vR = 0.0;
     double pL, pR;  ///< Давление
     double eL, eR;  ///< Внутренняя энергия
 
@@ -51,7 +52,7 @@ public:
     double density(const double &x) const { return x < x_jump ? rL : rR; }
 
     /// @brief Начальная скорость
-    Vector3d velocity(const double &x) const { return {x < x_jump ? uL : uR, 0.0, 0.0}; }
+    Vector3d velocity(const double &x) const { return (x < x_jump) ? Vector3d(uL, vL, 0.0) : Vector3d(uR, vR, 0.0); }
 
     /// @brief Начальное давление
     double pressure(const double &x) const { return x < x_jump ? pL : pR; }
