@@ -1,9 +1,11 @@
-/// @file Тестирование ENO/WENO реконструкции
+/// @file Тестирование WENO реконструкции
 
 #include <zephyr/geom/generator/strip.h>
 #include <zephyr/geom/generator/rectangle.h>
 
 #include <zephyr/mesh/mesh.h>
+
+#include <zephyr/math/calc/weno.h>
 
 #include <zephyr/utils/matplotlib.h>
 
@@ -12,6 +14,8 @@ using generator::Strip;
 using generator::Rectangle;
 
 using namespace zephyr::mesh;
+
+using zephyr::math::WENO5;
 
 namespace plt = zephyr::utils::matplotlib;
 
@@ -44,7 +48,7 @@ void test_1D(TestFunc test) {
     _D1_ U{};
 
     Strip gen(0.0, 1.0, Strip::Type::UNIFORM);
-    gen.set_nx(23);
+    gen.set_nx(54);
 
     EuMesh cells(U, gen);
 
@@ -106,6 +110,16 @@ void test_1D(TestFunc test) {
 
         plt::plot(xs, slopes, {{"linestyle", "solid"}, {"color", "green"}, {"linewidth", "1.0"}});
 
+        // WENO
+        WENO5 weno {
+            cells(i - 2, 0)(U).u,
+            cells(i - 1, 0)(U).u,
+            cells(i - 0, 0)(U).u,
+            cells(i + 1, 0)(U).u,
+            cells(i + 2, 0)(U).u
+        };
+
+        plt::plot({x1, x2}, {weno.m(), weno.p()}, {{"linestyle", "solid"}, {"color", "orange"}, {"linewidth", "1.0"}});
     }
 
     plt::tight_layout();
@@ -115,14 +129,12 @@ void test_1D(TestFunc test) {
 
 
 int main() {
-
-    //TestFunc test = TestFunc::Step();
-    //TestFunc test = TestFunc::Parabola();
     //TestFunc test = TestFunc::Smooth();
+    //TestFunc test = TestFunc::Parabola();
+    //TestFunc test = TestFunc::Step();
     TestFunc test = TestFunc::Hardcore();
 
     test_1D(test);
-
 
     return 0;
 }

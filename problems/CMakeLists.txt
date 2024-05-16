@@ -9,7 +9,7 @@ set(R_TESTER    1)
 set(SHOCK_TUBE  1)
 set(MM_R_TESTER 1)
 set(MM_2D_TESTS 1)
-set(WENO        0)
+set(WENO        1)
 
 
 if (SHOCK_TUBE)

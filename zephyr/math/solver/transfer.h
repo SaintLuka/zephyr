@@ -21,6 +21,8 @@ public:
     /// @brief Расширенный вектор состояния на котором решается задача
     struct State {
         double u1, u2;  ///< Объемные доли
+        double du_dx;   ///< Производная
+        double du_dy;   ///< Производная
         Vector3d n;     ///< Внешняя нормаль поверхности
         Vector3d p;     ///< Базисная точка поверхности
     };
@@ -112,6 +114,8 @@ protected:
     /// условия Куранта (для одной ячейки)
     double compute_dt(EuCell& cell);
 
+    void compute_slopes(EuMesh& mesh);
+
 
     void update_CRP(EuMesh& mesh, Direction dir);
 
@@ -123,14 +127,15 @@ protected:
 
     void update_other(EuMesh& mesh, Direction dir);
 
+
     /// @brief Потоки по схеме CRP
     void fluxes_CRP(EuCell& cell, Direction dir = Direction::ANY);
 
     /// @brief Потоки по аналогу VOF
     void fluxes_VOF(EuCell& cell, Direction dir = Direction::ANY);
 
-    /// @brief Потоки по схеме CRP, но a_sig выбирается по аналогу VOF
-    void fluxes_MIX(EuCell& cell, Direction dir = Direction::ANY);
+    /// @brief Потоки по схеме MUSCL
+    void fluxes_MUSCL(EuCell& cell, Direction dir = Direction::ANY);
 
 
 protected:
