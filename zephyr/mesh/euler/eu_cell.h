@@ -214,6 +214,13 @@ public:
         return m_it->vertices[idx];
     }
 
+    /// @brief Оператор доступа по индексам отображения
+    /// @tparam i, j, k in {-1, 0, +1}
+    template <int i, int j, int k = -1>
+    inline const Vector3d &vs() const {
+        return m_it->vertices.vs<i, j, k>();
+    }
+
     /// @brief Скорпировать вершины в полигон (двумерные ячейки)
     /// Для нелинейных AMR-ячеек возвращает до 8 граней.
     inline geom::Polygon polygon() const {
