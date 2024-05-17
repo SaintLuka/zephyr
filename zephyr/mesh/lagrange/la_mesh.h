@@ -24,7 +24,7 @@ public:
 
     template<class U, class V>
     LaMesh(const U &u, const V &v, Generator *gen)
-            : m_cells(u), m_nodes(v) {
+            : m_cells(u, 0), m_nodes(v, 0) {
         initialize(gen->make());
     }
 

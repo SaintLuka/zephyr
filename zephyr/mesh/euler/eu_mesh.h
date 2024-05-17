@@ -21,19 +21,19 @@ public:
 
     template<class T>
     EuMesh(const T &val, Generator *gen)
-            : m_locals(val), m_aliens(val) {
+            : m_locals(val, 0), m_aliens(val, 0) {
         initialize(gen->make());
     }
 
     template<class T>
     EuMesh(const T &val, Generator &gen)
-            : m_locals(val), m_aliens(val) {
+            : m_locals(val, 0), m_aliens(val, 0) {
         initialize(gen.make());
     }
 
     template <class T>
     EuMesh(const T&val, const Grid& grid)
-            : m_locals(val), m_aliens(val) {
+            : m_locals(val, 0), m_aliens(val, 0) {
         initialize(grid);
     }
 

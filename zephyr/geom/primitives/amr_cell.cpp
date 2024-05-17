@@ -211,7 +211,7 @@ double AmrCell::approx_vol_fraction(const std::function<double(const Vector3d &)
             if (inside(center)) {
                 sum += count;
             }
-            return sum / (3.0 * count);
+            return count < 1 ? 0.0 : sum / (3.0 * count);
         }
     }
     else {

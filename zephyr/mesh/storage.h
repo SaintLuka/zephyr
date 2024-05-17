@@ -23,9 +23,16 @@ template <class Geom>
 class Storage {
 public:
 
+    /// @brief Пустое и бессмысленное хранилище
+    Storage() {
+        m_size = 0;
+        m_itemsize = int(sizeof(Geom));
+        m_data = {};
+    };
+
     /// @brief Хранилище без указания типа для хранения,
     /// содержит только геометрию
-    Storage(int size = 0) {
+    Storage(int size) {
         m_size = std::max(0, size);
         m_itemsize = int(sizeof(Geom));
         m_data.resize(m_size * m_itemsize);
@@ -36,7 +43,7 @@ public:
     /// используется только для выделения достаточного количества памяти.
     /// @warning Не устанавливает значения в хранилище
     template<class U>
-    explicit Storage(const U &, int size = 0) {
+    explicit Storage(const U &, int size) {
         m_size = std::max(0, size);
         m_itemsize = int(sizeof(Geom) + sizeof(U));
         m_data.resize(m_size * m_itemsize);

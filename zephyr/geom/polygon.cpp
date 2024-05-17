@@ -572,6 +572,8 @@ double Polygon::disk_clip_area(const Vector3d& c, double R) const {
     obj::circle circle{c, R};
 
     double res = 0.0;
+    int inside = 0;   // число граней полностью внутри
+    int outside = 0;  // число граней полностью снаружи
     for (int i = 0; i < size(); ++i) {
         const auto &v1 = vs[i];
         const auto &v2 = vs[(i + 1) % size()];
@@ -592,6 +594,7 @@ double Polygon::disk_clip_area(const Vector3d& c, double R) const {
                 if (sec.t2 < 0.0) {
                     // t1 < t2 < 0.0
                     part = outer(v1, v2);
+                    ++outside;
                 }
                 else if (sec.t2 < 1.0) {
                     // t1 < 0.0 < t2 < 1.0
@@ -600,6 +603,7 @@ double Polygon::disk_clip_area(const Vector3d& c, double R) const {
                 else {
                     // t1 < 0.0 < 1.0 < t2
                     part = inner(v1, v2);
+                    ++inside;
                 }
             }
             else if (sec.t1 < 1.0) {
@@ -615,14 +619,25 @@ double Polygon::disk_clip_area(const Vector3d& c, double R) const {
             else {
                 // 1.0 < t1 < t2
                 part = outer(v1, v2);
+                ++outside;
             }
         }
         else {
             // Нет пересечений
             part = outer(v1, v2);
+            ++outside;
         }
 
         res += 0.5 * part;
+    }
+
+    double S = this->area();
+    res = std::max(0.0, std::min(res, S));
+    if (outside == this->size()) {
+        return 0.0;
+    }
+    if (inside == this->size()) {
+        return S;
     }
     return res;
 }

@@ -15,7 +15,7 @@ inline double cross(const Vector3d& v1, const Vector3d& v2) {
 void InterfaceRecovery::compute_normal(EuCell &cell) const {
     double uc = cell(a);
 
-    if (uc < 1.0e-8 || uc > 1.0 - 1.0e-8) {
+    if (uc < 1.0e-12 || uc > 1.0 - 1.0e-12) {
         cell(n) = Vector3d::Zero();
         return;
     }
@@ -112,7 +112,7 @@ void InterfaceRecovery::update(EuMesh &mesh, int smoothing) const {
 AmrStorage InterfaceRecovery::body(EuMesh& mesh) const {
     int count = 0;
     for (auto cell: mesh) {
-        if (cell(a) < 1.0e-8) {
+        if (cell(a) < 1.0e-12) {
             continue;
         }
         ++count;
@@ -122,14 +122,26 @@ AmrStorage InterfaceRecovery::body(EuMesh& mesh) const {
 
     count = 0;
     for (auto cell: mesh) {
-        if (cell(a) < 1.0e-8) {
+        if (cell(a) < 1.0e-12) {
             continue;
         }
 
-        if (cell(a) < 1.0 - 1.0e-8) {
-            auto poly = cell.polygon();
-            auto part = poly.clip(cell(p), cell(n));
-            cells[count] = AmrCell(part);
+        if (cell(a) < 1.0 - 1.0e-12) {
+            if (cell(n).isZero()) {
+                double d = 0.5 * std::sqrt(cell(a) * cell.volume());
+                Quad quad = {
+                        cell(p) + Vector3d{-d, -d, 0.0},
+                        cell(p) + Vector3d{+d, -d, 0.0},
+                        cell(p) + Vector3d{-d, +d, 0.0},
+                        cell(p) + Vector3d{+d, +d, 0.0},
+                };
+                cells[count] = AmrCell(quad);
+            }
+            else {
+                auto poly = cell.polygon();
+                auto part = poly.clip(cell(p), cell(n));
+                cells[count] = AmrCell(part);
+            }
         }
         else {
             cells[count] = cell.geom();
