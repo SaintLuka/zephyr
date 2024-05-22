@@ -2,15 +2,18 @@
 
 #include <zephyr/geom/generator/collection/wedge.h>
 #include <zephyr/geom/generator/collection/semicircle_cutout.h>
+#include <zephyr/geom/generator/collection/plane_with_hole.h>
+#include <zephyr/geom/generator/cuboid.h>
 
 #include <zephyr/math/cfd/fluxes.h>
 #include <zephyr/math/cfd/models.h>
-#include <zephyr/phys/tests/shock-in-a-box.h>
 #include <zephyr/phys/tests/mach.h>
 #include <zephyr/phys/tests/sod.h>
-#include <zephyr/phys/tests/blast_wave.h>
+#include <zephyr/phys/tests/sedov.h>
 #include <zephyr/phys/tests/RiemannTest2D.h>
 #include <zephyr/phys/tests/toro.h>
+#include <zephyr/phys/tests/supersonic_flow_around_cylinder.h>
+
 
 #include <zephyr/math/solver/riemann.h>
 #include <zephyr/phys/eos/stiffened_gas.h>
@@ -18,7 +21,9 @@
 
 using zephyr::geom::generator::collection::Wedge;
 using zephyr::geom::generator::collection::SemicircleCutout;
+using zephyr::geom::generator::collection::PlaneWithHole;
 using zephyr::geom::generator::Rectangle;
+using zephyr::geom::generator::Cuboid;
 
 using namespace zephyr::phys;
 using namespace zephyr::math;
@@ -40,18 +45,23 @@ double get_e(AmrStorage::Item& cell) { return cell(U).e; }
 
 
 int main() {
+
+    threads::on(16);
+
     // Тестовая задача
     // Mach test(2.81);
-    ToroTest test(100);
+    // ToroTest test(1);
     // SodTest test;
-    // BlastWave test(4.5);
+    // BlastWaveInBox test(4.5);
     // RiemannTest2D test(6);
+    // SuperSonicFlowAroundCylinder test;
+    SedovBlast test;
 
     // Уравнение состояния
     Eos& eos = test.eos;
 
     // Файл для записи
-    PvdFile pvd("mesh", "/mnt/d/Quirk`s HLLC-LM"); //blastfail
+    PvdFile pvd("mesh", "/mnt/d/sedov"); //blastfail
     pvd.unique_nodes = true;
 
     // Переменные для сохранения
@@ -64,13 +74,11 @@ int main() {
                       [&eos](AmrStorage::Item& cell) -> double {
                           return eos.sound_speed_rp(cell(U).rho, cell(U).p);
                       }};
-
     
-
-    Rectangle gen(0.0, 400.0, 0.0, 20.0);
-    gen.set_nx(400);
-    gen.set_ny(20);
-    gen.set_boundaries({.left=Boundary::ZOE, .right=Boundary::ZOE,
+    Rectangle gen(test.xmin(), test.xmax(), test.ymin(), test.ymax());
+    gen.set_nx(25);
+    gen.set_ny(25);
+    gen.set_boundaries({.left=Boundary::WALL, .right=Boundary::WALL,
                         .bottom=Boundary::WALL, .top=Boundary::WALL});
 
     // // Часть области с регулярной сеткой
@@ -85,39 +93,46 @@ int main() {
     // gen.set_nx(40);
     // gen.set_fixed(fix_condition);
 
+    // PlaneWithHole gen(test.xmin(), test.xmax(), test.ymin(), test.ymax(), 
+    //                   0.3, 0.5 * (test.ymin() + test.ymax()), 0.1, 
+    //                   {.left   = Boundary::ZOE, .right  = Boundary::ZOE,    
+    //                    .bottom = Boundary::ZOE, .top    = Boundary::ZOE,
+    //                    .hole   = Boundary::WALL});
+    // gen.set_nx(30);
 
-    //SemicircleCutout gen(0.49, 0.7, 0.0, 0.07, 0.6, 0.02);
-    // SemicircleCutout gen(0.0, 0.21, 0.0, 0.07, 0.11, 0.02, 
-    //                      {.left=Boundary::ZOE, .right=Boundary::ZOE, 
-    //                       .bottom=Boundary::WALL, .top=Boundary::ZOE});
-    // gen.set_ny(10);
-    // gen.set_fixed(fix_condition);
-    // gen.set_boundaries({.left=Boundary::ZOE, .right=Boundary::ZOE,
-    //                     .bottom=Boundary::WALL, .top=Boundary::ZOE});
+    // Cuboid gen(test.xmin(), test.xmax(), 
+    //            test.ymin(), test.ymax(), 
+    //            test.zmin(), test.zmax());
+    // gen.set_boundaries({.left   = Boundary::ZOE, .right  = Boundary::ZOE,
+    //                     .bottom = Boundary::ZOE, .top    = Boundary::ZOE,
+    //                     .back   = Boundary::ZOE, .front  = Boundary::ZOE});
+    // gen.set_nx(30);
+    // gen.set_ny(30);
+    // gen.set_nz(30);
 
     // Создать сетку
     EuMesh mesh(U, &gen);
     int n_cells = mesh.n_cells();
 
     // Создать решатель
-    auto solver = zephyr::math::SmFluid(eos, Fluxes::HLLC_LM);
+    auto solver = zephyr::math::SmFluid(eos, Fluxes::HLLC);
     solver.set_accuracy(2);
-    solver.set_CFL(0.4);
+    solver.set_CFL(0.01);
 
-    // mesh.set_max_level(3);
-    // mesh.set_distributor(solver.distributor());
+    mesh.set_max_level(5);
+    mesh.set_distributor(solver.distributor());
     
     double time = 0.0;
     double next_write = 0.0;
     size_t n_step = 0;
 
-    solver.init_cells(mesh, test);
+    // solver.init_cells(mesh, test);
 
-    // for (int k = 0; k < mesh.max_level() + 3; ++k) {
-    //     solver.init_cells(mesh, test);
-    //     solver.set_flags(mesh);
-    //     mesh.refine();
-    // }
+    for (int k = 0; k < mesh.max_level() + 3; ++k) {
+        solver.init_cells(mesh, test);
+        solver.set_flags(mesh);
+        mesh.refine();
+    }
 
     while (time <= 1.01 * test.max_time()) {
 
@@ -125,15 +140,22 @@ int main() {
                   << "\tTime: " << std::setw(6) << std::setprecision(3) << time << "\n";
         if (time >= next_write) {
             pvd.save(mesh, time);
-            next_write += test.max_time() / 100;
+            next_write += test.max_time() / 1000;
         };
 
         // Обновляем слои
         solver.update(mesh);
+        solver.set_flags(mesh);
+        mesh.refine();
 
-        // solver.set_flags(mesh);
-        
-        // mesh.refine();
+        // for (auto &cell : mesh) {
+        //     if (cell.center().x() < test.get_x_jump()) {
+        //         cell(U).p = 1.0;
+        //         cell(U).v = Vector3d(sqrt(1.4) * 3.0, 0, 0);
+        //         cell(U).rho = 1.0;
+        //         cell(U).e = eos.energy_rp(cell(U).rho, cell(U).p);
+        //     }
+        // }
         
         n_step += 1;
         time = solver.get_time();
@@ -142,6 +164,8 @@ int main() {
     auto fprint = [](const std::string &name, double value) {
         std::cout << name << ": " << value << '\n';
     };
+
+    threads::off();
 
     return 0;
 }

@@ -15,10 +15,10 @@ public:
 
     /// @brief Флаги граничных условий
     struct Boundaries {
-        Boundary left   = Boundary::WALL;
-        Boundary right  = Boundary::WALL;
-        Boundary bottom = Boundary::WALL;
-        Boundary top    = Boundary::WALL;
+        Boundary left   = Boundary::ZOE;
+        Boundary right  = Boundary::ZOE;
+        Boundary bottom = Boundary::ZOE;
+        Boundary top    = Boundary::ZOE;
         Boundary hole   = Boundary::WALL;
     };
 
@@ -31,7 +31,7 @@ public:
     /// @param xmin, xmax, ymin, ymax Границы прямоугольника
     /// @param xc, yc, r Центр и радиус отверстия
     PlaneWithHole(double xmin, double xmax, double ymin, double ymax,
-                  double xc, double yc, double r);
+                  double xc, double yc, double r, Boundaries bounds);
 
     /// @brief Создать указатель на класс
     template <class... Args>
@@ -69,6 +69,7 @@ private:
 
     // Куча параметров
     // Базисные вершины для струтурированных блоков
+
     BaseVertex::Ptr v1, v2, v3, v4;
     BaseVertex::Ptr v5, v6, v7, v8;
     BaseVertex::Ptr v9, v10, v11, v12;

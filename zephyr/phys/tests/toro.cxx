@@ -1,15 +1,9 @@
 #include <zephyr/phys/tests/toro.h>
-#include <random>
-#include <iostream>
 
 namespace zephyr {
 namespace phys {
 
 ToroTest::ToroTest(int num) : eos(1.4) {
-
-    std::random_device rd;  // Will be used to obtain a seed for the random number engine
-    std::mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
-    std::uniform_real_distribution<> dis(-0.0005, 0.0005);
 
     switch (num) {
         case 1:
@@ -92,38 +86,6 @@ ToroTest::ToroTest(int num) : eos(1.4) {
             pR = 1.0;
             x_jump = 0.5;
             finish = 2.0;
-            break;
-        case 100:
-            // Mach 6 case
-            rL = 216.0 / 41.0;
-            rR = 1.0;
-            uL = 35.0 / 36.0 * std::sqrt(35.0);
-            uR = 0.0;
-            pL = 251.0 / 6.0;
-            pR = 1.0;
-
-            // Artificial numerical noise is introduced to all primitive
-            // variables in the initial state to trigger the instability
-
-            rL += dis(gen);
-            std::cout << dis(gen) << std::endl;
-            rR += dis(gen); 
-            std::cout << dis(gen) << std::endl;
-            uL += dis(gen);
-            std::cout << dis(gen) << std::endl;
-            uR += dis(gen);
-            std::cout << dis(gen) << std::endl;
-            vL += dis(gen);
-            std::cout << dis(gen) << std::endl;
-            vR += dis(gen);
-            std::cout << dis(gen) << std::endl;
-            pL += dis(gen);
-            std::cout << dis(gen) << std::endl;
-            pR += dis(gen);
-            std::cout << dis(gen) << std::endl;
-
-            x_jump = 5.0;
-            finish = 50.0;
             break;
         default:
             throw std::runtime_error("Unknown Toro test (num > 7)");

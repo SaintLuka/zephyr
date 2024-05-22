@@ -5,12 +5,6 @@
 #include <zephyr/math/cfd/limiter.h>
 #include <zephyr/phys/eos/eos.h>
 #include <boost/format.hpp>
-#include <zephyr/phys/tests/classic_test.h>
-#include <zephyr/phys/tests/blast_wave.h>
-#include <zephyr/phys/tests/shock-in-a-box.h>
-#include <zephyr/phys/tests/mach.h>
-#include <zephyr/phys/tests/RiemannTest2D.h>
-#include <zephyr/math/solver/riemann.h>
 #include <zephyr/math/cfd/fluxes.h>
 
 namespace zephyr::math {

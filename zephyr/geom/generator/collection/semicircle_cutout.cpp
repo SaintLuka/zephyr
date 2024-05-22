@@ -78,7 +78,7 @@ void SemicircleCutout::init_blocks() {
     assert(yc < m_ymax);
 
 
-    // Задаем базисные вершины для струтурированных блоков
+    // Задаем базисные вершины для структурированных блоков
     v1 = BaseVertex::create(m_xmin, m_ymin, true);
     v2 = BaseVertex::create(x1,     m_ymin, false);
     v3 = BaseVertex::create(x2,     m_ymin, true);

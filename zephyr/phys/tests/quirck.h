@@ -3,13 +3,15 @@
 #include <zephyr/geom/vector.h>
 #include <zephyr/phys/eos/ideal_gas.h>
 #include <zephyr/phys/tests/classic_test.h>
+#include <random>
+#include <iostream>
 
 namespace zephyr::phys {
 
 using zephyr::geom::Vector3d;
 
 /// @class Классический одномерный тест Сода
-class Mach : public ClassicTest {
+class Quirck : public ClassicTest {
 public:
     IdealGas eos;   ///< Используемый УрС
     double x_jump;  ///< Положение разрыва
@@ -23,7 +25,7 @@ public:
     /// Woodward and Colella
 
     /// @brief Конструктор
-    Mach(double Ms=10) : eos(1.4) {
+    Quirck(double Ms=10) : eos(1.4) {
         // @formatter:off
         pR = 1.0;
         rR = 1.4;
@@ -38,8 +40,8 @@ public:
 
         // x_jump = 0.1666;
         // finish = 0.25;
-        x_jump = 0.2;
-        finish = 0.5; // 0.06;
+        x_jump = 0.09;
+        finish = 0.06;
         // @formatter:on
     }
 
@@ -60,13 +62,13 @@ public:
 
     /// @brief Правая граница области
     // double xmax() const { return 4.0; }
-    double xmax() const { return 1.0; } // 0.21; }
+    double xmax() const { return 0.21; }
 
     /// @brief 
     double ymin() const { return 0.0; }
 
     /// @brief  
-    double ymax() const {return 0.8; } //  1.0; }
+    double ymax() const {return 1.0; }
 
     /// @brief Конечный момент времени
     double max_time() const { return finish; }
@@ -123,9 +125,50 @@ public:
     // /// @brief Начальная внутренняя энергия
     // double energy(const Vector3d &r) const { return energy(r.x()); }
 
-    ~Mach() override = default;
+    ~Quirck() override = default;
 
 };
 
 }
 
+
+
+/*
+
+    std::random_device rd;  // Will be used to obtain a seed for the random number engine
+    std::mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
+    std::uniform_real_distribution<> dis(-0.0005, 0.0005);
+
+    // Mach 6 case
+    rL = 216.0 / 41.0;
+    rR = 1.0;
+    uL = 35.0 / 36.0 * std::sqrt(35.0);
+    uR = 0.0;
+    pL = 251.0 / 6.0;
+    pR = 1.0;
+
+    // Artificial numerical noise is introduced to all primitive
+    // variables in the initial state to trigger the instability
+
+    rL += dis(gen);
+    std::cout << dis(gen) << std::endl;
+    rR += dis(gen); 
+    std::cout << dis(gen) << std::endl;
+    uL += dis(gen);
+    std::cout << dis(gen) << std::endl;
+    uR += dis(gen);
+    std::cout << dis(gen) << std::endl;
+    vL += dis(gen);
+    std::cout << dis(gen) << std::endl;
+    vR += dis(gen);
+    std::cout << dis(gen) << std::endl;
+    pL += dis(gen);
+    std::cout << dis(gen) << std::endl;
+    pR += dis(gen);
+    std::cout << dis(gen) << std::endl;
+
+    x_jump = 5.0;
+    finish = 50.0;
+    break;
+
+*/

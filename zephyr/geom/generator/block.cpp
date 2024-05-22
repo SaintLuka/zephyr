@@ -127,6 +127,9 @@ int Block::vertex_index(BaseVertex::Ref v) const {
 int Block::face_index(BaseVertex::Ref v1, BaseVertex::Ref v2) const {
     int idx = vertex_index(v1);
 
+    auto i = m_base_vertices[next(idx)];
+    auto j = m_base_vertices[prev(idx)];
+
     if (v2 == m_base_vertices[next(idx)]) {
         return idx;
     }

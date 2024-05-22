@@ -234,18 +234,6 @@ smf::Flux SmFluid::calc_flux_extra(Cell &cell, bool from_begin)  {
         PState p_minus = face_extra.m(p_self);
         PState p_plus = face_extra.p(p_neib);
 
-        // // пересчитываем энергию и температуру
-        // if (face.is_boundary()) {
-        //     if (face.flag() == Boundary::ZOE) {
-        //         p_plus = p_minus;
-        //     }
-        //     else if (face.flag() == Boundary::WALL) {
-        //         p_plus = p_minus;
-        //         Vector3d Vn = normal * p_minus.velocity.dot(normal);
-        //         p_plus.velocity = p_minus.velocity - 2 * Vn; // Vt - Vn = p_self.velocity - Vn - Vn
-        //     }
-        // }
-
         p_minus.to_local(normal);
         p_plus.to_local(normal);
 
@@ -389,10 +377,7 @@ void SmFluid::set_flags(Mesh &mesh) {
             PState t = face.neib(U).get_pstate() - cell(U).get_pstate();
             if (abs(t.density) > 0.1 * abs(cell(U).rho) || 
                 abs(t.pressure) > 0.1 * abs(cell(U).p) || 
-                abs(t.energy) > 0.1 * abs(cell(U).e) || 
-                ((cell.center().y() < 2.4 * get_time()) && 
-                 (cell.center().y() < -6 * (cell.center().x() - 0.1667 - 13.06 * get_time())) && 
-                 (cell.center().y() < 1.2 * (cell.center().x() -0.1667 - 10.67 * get_time())))) 
+                abs(t.energy) > 0.1 * abs(cell(U).e))
                 {
                     need_split = true;
                     break;
