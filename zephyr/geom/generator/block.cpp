@@ -500,6 +500,9 @@ double Block::smooth() {
                 else {
                     Curve *boundary = vertex->boundary();
 
+                    // bug for PlaneWithHole
+                    // vertex->boundary() is 0
+
                     avg += adjacent[0]->v1 / 2.0;
                     for (int n = 1; n < int(adjacent.size()) - 1; ++n) {
                         avg += boundary->projection(adjacent[n]->v1);
