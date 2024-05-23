@@ -46,7 +46,7 @@ void SmFluid::check_asserts(Mesh& mesh, std::string msg) {
 
 SmFluid::SmFluid(const phys::Eos &eos, Fluxes flux) : m_eos(eos) {
     m_nf = NumFlux::create(flux);
-    m_CFL = 0.4;
+    m_CFL = 0.9;
     m_dt = std::numeric_limits<double>::max();
 }
 
@@ -62,29 +62,18 @@ void SmFluid::update(Mesh &mesh) {
         fluxes(mesh);
     } else {
 
-        //check_asserts(mesh, "1");
-
         compute_grad(mesh, get_current_sm);
-
-        //check_asserts(mesh, "2");
 
         fluxes_stage1(mesh);
 
-        //check_asserts(mesh, "3");
-
         compute_grad(mesh, get_half_sm);
-
-        //check_asserts(mesh, "4");
         
         fluxes_stage2(mesh);
-
-        //check_asserts(mesh, "5");
     }
 
     // Обновляем слои
     swap(mesh);
 
-    //check_asserts(mesh, "6");
 }
 
 double SmFluid::compute_dt(Mesh &mesh) {
