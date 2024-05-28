@@ -1,8 +1,8 @@
-set(MPITEST   0)
-set(RANGE     1)
+set(MPITEST   1)
+set(RANGE     0)
 set(STOPWATCH 0)
 set(THREADS   0)
-set(VECTORS   1)
+set(VECTORS   0)
 
 
 if (MPITEST)

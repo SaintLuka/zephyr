@@ -51,8 +51,8 @@ void setup_geometry(AmrStorage &cells, const Statistics &count, const Distributo
 /// соответствующие методы адаптации (с MPI и без тредов)
 template<int dim>
 void setup_geometry(AmrStorage &locals, AmrStorage &aliens, int rank,
-                    const Statistics<dim> &count, const DataDistributor& op) {
-    setup_geometry_partial<dim>(locals, aliens, rank, count, op, 0, count.n_cells);
+                    const Statistics &count, const Distributor& op) {
+//    setup_geometry_partial<dim>(locals, aliens, rank, count, op, 0, count.n_cells);
 }
 
 #ifdef ZEPHYR_ENABLE_MULTITHREADING

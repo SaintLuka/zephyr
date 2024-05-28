@@ -175,7 +175,7 @@ int check_connectivity(AmrStorage &locals, int ic, AmrStorage& aliens) {
 
 int EuMesh::check_base() {
     if (m_locals.empty()) {
-        if (mpi::is_single()) {
+        if (mpi::single()) {
             std::cout << "\tEmpty storage\n";
             return -1;
         } else {
@@ -248,7 +248,7 @@ int EuMesh::check_base() {
 
 int EuMesh::check_refined() {
     if (m_locals.empty()) {
-        if (mpi::is_single()) {
+        if (mpi::single()) {
             std::cout << "\tEmpty storage\n";
             return -1;
         } else {

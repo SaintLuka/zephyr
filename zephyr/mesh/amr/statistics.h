@@ -95,7 +95,7 @@ struct Statistics {
     /// @brief Выводит статистику
     void print() const {
         mpi::for_each([this]() {
-            if (!mpi::is_single()) {
+            if (!mpi::single()) {
                 std::cout << "rank " << mpi::rank() << "\n";
             }
             std::cout << "Apply statistic:\n";

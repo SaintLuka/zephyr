@@ -5,10 +5,11 @@
 /// алгоритмов и комментарии к функциям предназначены исключительно для разработчиков.
 
 #pragma once
+#if 0
 
 #include <zephyr/mesh/amr/common.h>
 
-namespace zephyr { namespace mesh { namespace amr {
+namespace zephyr::mesh::amr {
 
 #ifdef ZEPHYR_ENABLE_MPI
 /// @brief Функция вызывается перед непосредственным связыванием соседей.
@@ -207,6 +208,5 @@ void link_aliens<0>(
 }
 #endif
 
-} // namespace amr
-} // namespace mesh
-} // namespace zephyr
+} // namespace zephyr::mesh::amr
+#endif

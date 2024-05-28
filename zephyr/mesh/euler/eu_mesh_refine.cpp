@@ -66,14 +66,14 @@ void EuMesh::refine() {
     static Stopwatch full;
 
     // Для однопроцессорной версии при пустой сетке сразу выход
-    if (mpi::is_single() && m_locals.empty()) {
+    if (mpi::single() && m_locals.empty()) {
         throw std::runtime_error("EuMesh::refine() error: Empty mesh");
     }
 
     full.resume();
 
     balance.resume();
-    if (mpi::is_single()) {
+    if (mpi::single()) {
 #if FAST_BALANCING
         amr::balance_flags_fast(m_locals, m_max_level);
 #else
@@ -86,7 +86,7 @@ void EuMesh::refine() {
     balance.stop();
 
     apply.resume();
-    if (mpi::is_single()) {
+    if (mpi::single()) {
         amr::apply(m_locals, distributor);
     }
     else {
