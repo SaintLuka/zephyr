@@ -364,9 +364,8 @@ void SmFluid::set_flags(Mesh &mesh) {
 
             // проверяем большой перепад давлений
             PState t = face.neib(U).get_pstate() - cell(U).get_pstate();
-            if (abs(t.density) > 0.1 * abs(cell(U).rho) || 
-                abs(t.pressure) > 0.1 * abs(cell(U).p) || 
-                abs(t.energy) > 0.1 * abs(cell(U).e))
+            if (abs(t.density) > 0.2 * abs(cell(U).rho) || // 0.1
+                abs(t.pressure) > 0.5 * abs(cell(U).p))    // 0.3
                 {
                     need_split = true;
                     break;

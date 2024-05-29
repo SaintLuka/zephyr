@@ -80,7 +80,7 @@ int main () {
     std::cout << "Running with " << std::thread::hardware_concurrency() << std::endl;
     threads::on(std::thread::hardware_concurrency());
 
-    int initials = 2;
+    int initials = 3;
     // 0 - 4.2.1 Постановка задачи                                      Таблица 3
     // 1 - 4.2.2 Эффективная ударная адиабата канала с препятствиями    Таблица 4
     // 2 - 4.2.4 Течение газа в сильно загромождённых каналах           Таблица 5
@@ -125,11 +125,16 @@ int main () {
             h = 13.6;
             L = 4.0;
             l = 0.2;
+        case 3:
+            H = 20.0;
+            h = 13.6;
+            L = 4.0;
+            l = 0.25;
         default:
             break;
     }
 
-    int N = 40; // кол-во преград
+    int N = 75; // кол-во преград
     double const xmin = 0.0;
     double const xmax = N * L;
     double const ymin = 0.0;
@@ -140,7 +145,7 @@ int main () {
     double D0 = u3; // Скорость распространения ударной волны
 
     // кол-во начальных ячеек по x
-    int nx_cells = N * 5; // для 2ого случая
+    int nx_cells = 2 * N; // для 2ого случая
 
     // сек
     double time = 0;
@@ -149,7 +154,7 @@ int main () {
     //шаг
     int n_step = 0;
 
-    PvdFile pvd("tube", "/mnt/c/tube-2");
+    PvdFile pvd("tube", "/mnt/c/tube75");
     pvd.unique_nodes = true;
 
     //EOS
@@ -184,7 +189,7 @@ int main () {
     solver.set_accuracy(2);
     solver.set_CFL(0.4);
 
-    mesh.set_max_level(2);
+    mesh.set_max_level(3);
     mesh.set_distributor(solver.distributor());
 
     for (int k = 0; k < mesh.max_level() + 1; ++k) {
@@ -225,7 +230,7 @@ int main () {
         solver.update(mesh);
 
         // TODO
-        G0 += 1.25 * D0 * solver.get_m_dt();
+        G0 += 1.4 * D0 * solver.get_m_dt();
 
         if (G - G0 < L) {
 

@@ -8,7 +8,6 @@ namespace zephyr::phys {
 
 using zephyr::geom::Vector3d;
 
-/// @class Классический одномерный тест Сода
 class Mach : public ClassicTest {
 public:
     IdealGas eos;   ///< Используемый УрС
@@ -19,14 +18,11 @@ public:
     double pL, pR;  ///< Давление
     double eL, eR;  ///< Внутренняя энергия
 
-    /// Double Mach  Reflection of a Strong Shock
-    /// Woodward and Colella
-
     /// @brief Конструктор
-    Mach(double Ms=10) : eos(1.4) {
+    Mach(double Ms=10, double x_jump=0.1, double finish=1.0) : eos(1.4), x_jump(x_jump), finish(finish) {
         // @formatter:off
         pR = 1.0;
-        rR = 1.4;
+        rR = 1.0;
         uR = 0;
         
         pL = pR * (2 * eos.gamma * Ms * Ms  - eos.gamma + 1) / (eos.gamma + 1) ;
@@ -35,11 +31,6 @@ public:
 
         eL = eos.energy_rp(rL, pL);
         eR = eos.energy_rp(rR, pR);
-
-        // x_jump = 0.1666;
-        // finish = 0.25;
-        x_jump = 0.2;
-        finish = 0.5; // 0.06;
         // @formatter:on
     }
 
@@ -59,14 +50,13 @@ public:
     double xmin() const { return 0.0; }
 
     /// @brief Правая граница области
-    // double xmax() const { return 4.0; }
-    double xmax() const { return 1.0; } // 0.21; }
+    double xmax() const { return 1.0; }
 
     /// @brief 
     double ymin() const { return 0.0; }
 
     /// @brief  
-    double ymax() const {return 0.8; } //  1.0; }
+    double ymax() const {return 1.0; }
 
     /// @brief Конечный момент времени
     double max_time() const { return finish; }
@@ -81,47 +71,29 @@ public:
     // double density(const Vector3d &r) const { return r.y() > (r.x() - x_jump) * 1.7321 ? rL : rR; }
     double density(const Vector3d &r) const { return r.x() < x_jump ? rL : rR; }
 
-    /// @brief Начальная внутренняя энергия
-    // double energy(const Vector3d &r) const { return r.y() > (r.x() - x_jump) * 1.7321 ? eL : eR; }
-    double energy(const Vector3d &r) const { return r.x() < x_jump ? eL : eR; }
-    
     /// @brief Начальное давление
     // double pressure(const Vector3d &r) const { return r.y() > (r.x() - x_jump) * 1.7321 ? pL : pR; }
     double pressure(const Vector3d &r) const { return r.x() < x_jump ? pL : pR; }
 
     /// @brief Начальная скорость
     // Vector3d velocity(const Vector3d &r) const { return r.y() > (r.x() - x_jump) * 1.7321 ? Vector3d(uL * 0.86602540378, - 0.5 * uL, 0) : Vector3d(0,0,0); }
-    Vector3d velocity(const Vector3d &r) const { return r.x() < x_jump ? Vector3d(uL, 0, 0) : Vector3d(0,0,0); }
+    Vector3d velocity(const Vector3d &r) const { return { r.x() < x_jump ? uL : uR, 0, 0}; }
+    
+    /// @brief Начальная внутренняя энергия
+    // double energy(const Vector3d &r) const { return r.y() > (r.x() - x_jump) * 1.7321 ? eL : eR; }
+    double energy(const Vector3d &r) const { return r.x() < x_jump ? eL : eR; }
 
-    double density(const double &x) const { }
-    Vector3d velocity(const double &x) const { }
-    double pressure(const double &x) const { }
-    double energy(const double &x) const { }
+    /// @brief Начальная плотность
+    double density(const double &x) const { return x < x_jump ? rL : rR; }
 
+    /// @brief Начальная скорость
+    Vector3d velocity(const double &x) const { return { x < x_jump ? uL : uR, 0, 0}; }
 
-    // /// @brief Начальная плотность
-    // double density(const double &x) const { return x < x_jump ? rL : rR; }
+    /// @brief Начальное давление
+    double pressure(const double &x) const { return x < x_jump ? pL : pR; }
 
-    // /// @brief Начальная скорость
-    // Vector3d velocity(const double &x) const { return { x < x_jump ? uL : uR, 0.0, 0.0}; }
-
-    // /// @brief Начальное давление
-    // double pressure(const double &x) const { return x < x_jump ? pL : pR; }
-
-    // /// @brief Начальная внутренняя энергия
-    // double energy(const double &x) const { return x < x_jump ? eL : eR; }
-
-    // /// @brief Начальная плотность
-    // double density(const Vector3d &r) const { return density(r.x()); }
-
-    // /// @brief Начальная скорость
-    // Vector3d velocity(const Vector3d &r) const { return velocity(r.x()); }
-
-    // /// @brief Начальное давление
-    // double pressure(const Vector3d &r) const { return pressure(r.x()); }
-
-    // /// @brief Начальная внутренняя энергия
-    // double energy(const Vector3d &r) const { return energy(r.x()); }
+    /// @brief Начальная внутренняя энергия
+    double energy(const double &x) const { return x < x_jump ? eL : eR; }
 
     ~Mach() override = default;
 

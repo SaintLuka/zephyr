@@ -9,9 +9,9 @@
 namespace zephyr::geom::generator::collection {
 
 /// @class PlaneWithHole. Генератор для создания сетки внутри прямоугольника с отверстием.
-class PlaneWithHole : public BlockStructured {
+class PlaneWithCube : public BlockStructured {
 public:
-    using Ptr = std::shared_ptr<PlaneWithHole>;
+    using Ptr = std::shared_ptr<PlaneWithCube>;
 
     /// @brief Флаги граничных условий
     struct Boundaries {
@@ -24,19 +24,19 @@ public:
 
 #ifdef ZEPHYR_ENABLE_YAML
     /// @brief Конструктор класса по кофигу
-    explicit PlaneWithHole(YAML::Node config);
+    explicit PlaneWithCube(YAML::Node config);
 #endif
 
     /// @brief Конструктор класса
     /// @param xmin, xmax, ymin, ymax Границы прямоугольника
     /// @param xc, yc, r Центр и радиус отверстия
-    PlaneWithHole(double xmin, double xmax, double ymin, double ymax,
+    PlaneWithCube(double xmin, double xmax, double ymin, double ymax,
                   double xc, double yc, double r);
 
     /// @brief Создать указатель на класс
     template <class... Args>
-    static PlaneWithHole::Ptr create(Args&&... args){
-        return std::make_shared<PlaneWithHole>(std::forward<Args>(args)...);
+    static PlaneWithCube::Ptr create(Args&&... args){
+        return std::make_shared<PlaneWithCube>(std::forward<Args>(args)...);
     }
 
     /// @brief Установить желаемое число ячеек сетки по оси Ox
@@ -74,10 +74,14 @@ private:
     BaseVertex::Ptr v5, v6, v7, v8;
     BaseVertex::Ptr v9, v10, v11, v12;
     BaseVertex::Ptr v13, v14, v15, v16;
-    BaseVertex::Ptr v17, v18, v19, v20;
+    BaseVertex::Ptr v17, v18, v19;
 
     // Ограничивающие кривые области
-    Curve::Ptr circle;
+    Curve::Ptr cube_side1;
+    Curve::Ptr cube_side2;
+    Curve::Ptr cube_side3;
+    Curve::Ptr cube_side4;
+
     Curve::Ptr left;
     Curve::Ptr right;
     Curve::Ptr bottom;

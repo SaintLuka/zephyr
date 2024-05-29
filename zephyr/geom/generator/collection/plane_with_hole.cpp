@@ -78,13 +78,12 @@ PlaneWithHole::PlaneWithHole(
         double xmin, double xmax,
         double ymin, double ymax,
         double xc, double yc,
-        double r, Boundaries bounds) :
+        double r) :
         BlockStructured(4), //12
         m_xmin(xmin), m_xmax(xmax),
         m_ymin(ymin), m_ymax(ymax),
         m_xc(xc), m_yc(yc),
-        m_r(r), m_xi(2.0),
-        m_bounds(bounds) {
+        m_r(r), m_xi(2.0) {
 
     m_name = "collection.plane-with-hole";
 
@@ -330,6 +329,12 @@ void PlaneWithHole::init_blocks() {
     right  = Plane::create(v3, v5);
     bottom = Plane::create(v1, v3);
     top    = Plane::create(v5, v7);
+
+    left->set_boundary(m_bounds.left);
+    right->set_boundary(m_bounds.right);
+    bottom->set_boundary(m_bounds.bottom);
+    top->set_boundary(m_bounds.top);
+    circle->set_boundary(m_bounds.hole);
 
     // Генератор сетки
     m_blocks[0] = {v1, v2, v7, v8};

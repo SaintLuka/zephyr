@@ -3,6 +3,7 @@
 #include <zephyr/geom/generator/collection/wedge.h>
 #include <zephyr/geom/generator/collection/semicircle_cutout.h>
 #include <zephyr/geom/generator/collection/plane_with_hole.h>
+#include <zephyr/geom/generator/collection/plane_with_cube.h>
 #include <zephyr/geom/generator/cuboid.h>
 
 #include <zephyr/math/cfd/fluxes.h>
@@ -22,6 +23,7 @@
 using zephyr::geom::generator::collection::Wedge;
 using zephyr::geom::generator::collection::SemicircleCutout;
 using zephyr::geom::generator::collection::PlaneWithHole;
+using zephyr::geom::generator::collection::PlaneWithCube;
 using zephyr::geom::generator::Rectangle;
 using zephyr::geom::generator::Cuboid;
 
@@ -49,19 +51,18 @@ int main() {
     threads::on(16);
 
     // Тестовая задача
-    // Mach test(2.81);
+    Mach test(2.85, 0.375, 0.5);
     // ToroTest test(1);
     // SodTest test;
-    // BlastWaveInBox test(4.5);
     // RiemannTest2D test(6);
-    SuperSonicFlowAroundCylinder test;
-    // SedovBlast test;
+    // SuperSonicFlowAroundCylinder test(3);
+    // SedovBlast test(4.5, 0.5);
 
     // Уравнение состояния
     Eos& eos = test.eos;
 
     // Файл для записи
-    PvdFile pvd("mesh", "/mnt/c/supersonic"); //blastfail
+    PvdFile pvd("mesh", "/mnt/c/cube_plane"); //blastfail
     pvd.unique_nodes = true;
 
     // Переменные для сохранения
@@ -76,15 +77,18 @@ int main() {
                       }};
     
     // Rectangle gen(test.xmin(), test.xmax(), test.ymin(), test.ymax());
-    // gen.set_nx(25);
-    // gen.set_ny(25);
-    // gen.set_boundaries({.left=Boundary::ZOE, .right=Boundary::ZOE,
-    //                     .bottom=Boundary::ZOE, .top=Boundary::ZOE});
+    // gen.set_nx(4);
+    // gen.set_ny(4);
+    // gen.set_boundaries({.left=Boundary::WALL, .right=Boundary::WALL,
+    //                     .bottom=Boundary::WALL, .top=Boundary::WALL});
 
     // Часть области с регулярной сеткой
     auto fix_condition = [&test](const Vector3d& v) {
-        return v.x() <= test.x_jump + 0.1 * (test.xmax() - test.xmin());
+        return v.x() <= test.x_jump + 0.01 * (test.xmax() - test.xmin());
     };
+
+    PlaneWithCube gen(0, 2.2, 0, 3.2, 0.7, 1.6, 0.3);
+    gen.set_nx(20);
 
     // Wedge gen(0.0, 3.0, 0.0, 1.0, 0.1666, 0.0, 
     //             {.left=Boundary::ZOE, .right=Boundary::ZOE,
@@ -92,13 +96,12 @@ int main() {
     // gen.set_nx(40);
     // gen.set_fixed(fix_condition);
 
-    PlaneWithHole gen(test.xmin(), test.xmax(), test.ymin(), test.ymax(), 
-                      0.5, 0.5 * (test.ymin() + test.ymax()), 0.1, 
-                      {.left   = Boundary::ZOE, .right  = Boundary::ZOE,    
-                       .bottom = Boundary::ZOE, .top    = Boundary::ZOE,
-                       .hole   = Boundary::WALL});
-    gen.set_nx(20);
-    gen.set_fixed(fix_condition);
+    // PlaneWithHole gen(test.xmin(), test.xmax(), test.ymin(), test.ymax(), 
+    //                   0.3, 0.5 * (test.ymin() + test.ymax()), 0.1);
+    // gen.set_boundaries({.left   = Boundary::ZOE, .right  = Boundary::ZOE,    
+    //                     .bottom = Boundary::ZOE, .top    = Boundary::ZOE,
+    //                     .hole   = Boundary::WALL});
+    // gen.set_nx(20);
 
     // Cuboid gen(test.xmin(), test.xmax(), 
     //            test.ymin(), test.ymax(), 
@@ -119,8 +122,8 @@ int main() {
     solver.set_accuracy(2);
     solver.set_CFL(0.4);
 
-    // mesh.set_max_level(2);
-    // mesh.set_distributor(solver.distributor());
+    //mesh.set_max_level(5);
+    //mesh.set_distributor(solver.distributor());
     
     double time = 0.0;
     double next_write = 0.0;
@@ -134,30 +137,20 @@ int main() {
     //     mesh.refine();
     // }
 
-    while (time <= 1.01 * test.max_time()) {
+    // while (time <= 1.01 * test.max_time()) {
+    while (1) {
 
         std::cout << "\tStep: " << std::setw(6) << n_step << ";"
                   << "\tTime: " << std::setw(6) << std::setprecision(3) << time << "\n";
         if (time >= next_write) {
-            // pvd.save(mesh, time);
-            next_write += test.max_time() / 1000;
+            pvd.save(mesh, time);
+            next_write += test.max_time() / 100;
         };
-
-        pvd.save(mesh, time);
 
         // Обновляем слои
         solver.update(mesh);
-        // solver.set_flags(mesh);
-        // mesh.refine();
-
-        // for (auto &cell : mesh) {
-        //     if (cell.center().x() < test.get_x_jump()) {
-        //         cell(U).p = 1.0;
-        //         cell(U).v = Vector3d(sqrt(1.4) * 3.0, 0, 0);
-        //         cell(U).rho = 1.0;
-        //         cell(U).e = eos.energy_rp(cell(U).rho, cell(U).p);
-        //     }
-        // }
+        solver.set_flags(mesh);
+        mesh.refine();
         
         n_step += 1;
         time = solver.get_time();
