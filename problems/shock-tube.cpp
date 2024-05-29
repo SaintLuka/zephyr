@@ -209,11 +209,9 @@ int main () {
     // Инициализация граничных условий
     setup_boundary(mesh, G, h, L, l);
 
-    //while (time <= 1.01 * max_time) {
-
     pvd.save(mesh, time);
 
-    while (G0 <= xmax) {
+    while (1) {
 
         std::cout << "\tStep: " << std::setw(6) << n_step << ";"
                   << "\tTime: " << std::setw(6) << std::setprecision(3) << time << "\n";
@@ -227,7 +225,7 @@ int main () {
         solver.update(mesh);
 
         // TODO
-        G0 += 1.5 * D0 * solver.get_m_dt();
+        G0 += 1.25 * D0 * solver.get_m_dt();
 
         if (G - G0 < L) {
 

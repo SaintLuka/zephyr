@@ -14,10 +14,10 @@ public:
     IdealGas eos;   ///< Используемый УрС
     double finish;  ///< Конечный момент времени
     double rho;  ///< Плотность
-    double u, v;  ///< Скорость
+    double ul, ur;  ///< Скорость
     double p;  ///< Давление
     double e;  ///< Внутренняя энергия
-    double x_jump;
+    double x_jump = 0.1;
 
     // Bow shock resulting from a supersonic flow around a stationary cylinder 
     // tends to suffer from the carbuncle phenomenon
@@ -27,8 +27,8 @@ public:
     SuperSonicFlowAroundCylinder(double Ms=3) : eos(1.4) {
         // @formatter:off
         rho = 1;
-        u = sqrt(1.4) * Ms;
-        v = 0;
+        ul = sqrt(1.4) * Ms;
+        ur = 0;
         p = 1;
 
         finish = 10;
@@ -38,7 +38,7 @@ public:
     std::string get_name() const { return "Supersonic flow around cylinder";}
 
     /// @brief get_x_jump
-    double get_x_jump() { return xmin() + (xmax() - xmin()) * 0.05; }
+    double get_x_jump() { return x_jump; } // return xmin() + (xmax() - xmin()) * 0.1;
 
     /// @brief Левая граница области
     double xmin() const { return 0.0; }
@@ -58,6 +58,9 @@ public:
     ///@brief Получить используемый УрС
     const Eos& get_eos() const { return eos; }
 
+    /// @brief x_jump 
+    double get_x_jump() const { return x_jump; }
+
     /// @brief Начальная плотность
     double density(const double &x) const { return rho; }
     double density(const Vector3d &r) const { return rho; }
@@ -71,10 +74,9 @@ public:
     double pressure(const Vector3d &r) const { return p; }
 
     /// @brief Начальная скорость
-    Vector3d velocity(const double &x) const { return Vector3d(u,v,0); }
-    Vector3d velocity(const Vector3d &r) const { return Vector3d(u,v,0); }
+    Vector3d velocity(const double &x) const { return Vector3d(x < get_x_jump() ? ul : ur, 0, 0); }
+    Vector3d velocity(const Vector3d &r) const { return Vector3d(r.x() < get_x_jump() ? ul : ur, 0, 0); }
 
-    double get_x_jump() const { return 0; }
 
     ~SuperSonicFlowAroundCylinder() override = default;
 

@@ -54,14 +54,14 @@ int main() {
     // SodTest test;
     // BlastWaveInBox test(4.5);
     // RiemannTest2D test(6);
-    // SuperSonicFlowAroundCylinder test;
-    SedovBlast test;
+    SuperSonicFlowAroundCylinder test;
+    // SedovBlast test;
 
     // Уравнение состояния
     Eos& eos = test.eos;
 
     // Файл для записи
-    PvdFile pvd("mesh", "/mnt/d/sedov"); //blastfail
+    PvdFile pvd("mesh", "/mnt/c/supersonic"); //blastfail
     pvd.unique_nodes = true;
 
     // Переменные для сохранения
@@ -75,17 +75,16 @@ int main() {
                           return eos.sound_speed_rp(cell(U).rho, cell(U).p);
                       }};
     
-    Rectangle gen(test.xmin(), test.xmax(), test.ymin(), test.ymax());
-    gen.set_nx(25);
-    gen.set_ny(25);
-    gen.set_boundaries({.left=Boundary::WALL, .right=Boundary::WALL,
-                        .bottom=Boundary::WALL, .top=Boundary::WALL});
+    // Rectangle gen(test.xmin(), test.xmax(), test.ymin(), test.ymax());
+    // gen.set_nx(25);
+    // gen.set_ny(25);
+    // gen.set_boundaries({.left=Boundary::ZOE, .right=Boundary::ZOE,
+    //                     .bottom=Boundary::ZOE, .top=Boundary::ZOE});
 
-    // // Часть области с регулярной сеткой
-    // auto fix_condition = [&test](const Vector3d& v) {
-    //     // return v.x() <= test.x_jump + 0.01 * (test.xmax() - test.xmin());
-    //     return v.x() <= 0.09;
-    // };
+    // Часть области с регулярной сеткой
+    auto fix_condition = [&test](const Vector3d& v) {
+        return v.x() <= test.x_jump + 0.1 * (test.xmax() - test.xmin());
+    };
 
     // Wedge gen(0.0, 3.0, 0.0, 1.0, 0.1666, 0.0, 
     //             {.left=Boundary::ZOE, .right=Boundary::ZOE,
@@ -93,12 +92,13 @@ int main() {
     // gen.set_nx(40);
     // gen.set_fixed(fix_condition);
 
-    // PlaneWithHole gen(test.xmin(), test.xmax(), test.ymin(), test.ymax(), 
-    //                   0.3, 0.5 * (test.ymin() + test.ymax()), 0.1, 
-    //                   {.left   = Boundary::ZOE, .right  = Boundary::ZOE,    
-    //                    .bottom = Boundary::ZOE, .top    = Boundary::ZOE,
-    //                    .hole   = Boundary::WALL});
-    // gen.set_nx(30);
+    PlaneWithHole gen(test.xmin(), test.xmax(), test.ymin(), test.ymax(), 
+                      0.5, 0.5 * (test.ymin() + test.ymax()), 0.1, 
+                      {.left   = Boundary::ZOE, .right  = Boundary::ZOE,    
+                       .bottom = Boundary::ZOE, .top    = Boundary::ZOE,
+                       .hole   = Boundary::WALL});
+    gen.set_nx(20);
+    gen.set_fixed(fix_condition);
 
     // Cuboid gen(test.xmin(), test.xmax(), 
     //            test.ymin(), test.ymax(), 
@@ -117,36 +117,38 @@ int main() {
     // Создать решатель
     auto solver = zephyr::math::SmFluid(eos, Fluxes::HLLC);
     solver.set_accuracy(2);
-    solver.set_CFL(0.01);
+    solver.set_CFL(0.4);
 
-    mesh.set_max_level(5);
-    mesh.set_distributor(solver.distributor());
+    // mesh.set_max_level(2);
+    // mesh.set_distributor(solver.distributor());
     
     double time = 0.0;
     double next_write = 0.0;
     size_t n_step = 0;
 
-    // solver.init_cells(mesh, test);
+    solver.init_cells(mesh, test);
 
-    for (int k = 0; k < mesh.max_level() + 3; ++k) {
-        solver.init_cells(mesh, test);
-        solver.set_flags(mesh);
-        mesh.refine();
-    }
+    // for (int k = 0; k < mesh.max_level() + 3; ++k) {
+    //     solver.init_cells(mesh, test);
+    //     solver.set_flags(mesh);
+    //     mesh.refine();
+    // }
 
     while (time <= 1.01 * test.max_time()) {
 
         std::cout << "\tStep: " << std::setw(6) << n_step << ";"
                   << "\tTime: " << std::setw(6) << std::setprecision(3) << time << "\n";
         if (time >= next_write) {
-            pvd.save(mesh, time);
+            // pvd.save(mesh, time);
             next_write += test.max_time() / 1000;
         };
 
+        pvd.save(mesh, time);
+
         // Обновляем слои
         solver.update(mesh);
-        solver.set_flags(mesh);
-        mesh.refine();
+        // solver.set_flags(mesh);
+        // mesh.refine();
 
         // for (auto &cell : mesh) {
         //     if (cell.center().x() < test.get_x_jump()) {
