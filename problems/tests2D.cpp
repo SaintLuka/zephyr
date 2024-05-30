@@ -62,7 +62,7 @@ int main() {
     Eos& eos = test.eos;
 
     // Файл для записи
-    PvdFile pvd("mesh", "/mnt/c/cube_plane"); //blastfail
+    PvdFile pvd("mesh", "/mnt/c/cube_plane2"); //blastfail
     pvd.unique_nodes = true;
 
     // Переменные для сохранения

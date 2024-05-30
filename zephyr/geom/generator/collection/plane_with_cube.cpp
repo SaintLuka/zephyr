@@ -33,22 +33,22 @@ PlaneWithCube::PlaneWithCube(
 void PlaneWithCube::set_nx(int Nx) {
 
     // TODO
-    m_blocks[0].set_size(v1, v7, 4);
-    m_blocks[0].set_size(v1, v5, 10);
+    m_blocks[0].set_size(v1, v7, 8);
+    m_blocks[0].set_size(v1, v5, 20);
 
-    m_blocks[1].set_size(v1, v2, 4);
+    m_blocks[1].set_size(v1, v2, 8);
 
-    m_blocks[2].set_size(v2, v3, 4);
+    m_blocks[2].set_size(v2, v3, 8);
 
-    m_blocks[3].set_size(v3, v10, 4);
+    m_blocks[3].set_size(v3, v10, 8);
 
-    m_blocks[4].set_size(v10, v16, 4);
+    m_blocks[4].set_size(v10, v16, 8);
 
-    m_blocks[5].set_size(v15, v16, 4);
+    m_blocks[5].set_size(v15, v16, 8);
 
-    m_blocks[6].set_size(v14, v15, 4);
+    m_blocks[6].set_size(v14, v15, 8);
 
-    m_blocks[7].set_size(v7, v14, 4);
+    m_blocks[7].set_size(v7, v14, 8);
 }
 
 
