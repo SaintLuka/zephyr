@@ -51,7 +51,7 @@ int main() {
     threads::on(16);
 
     // Тестовая задача
-    Mach test(2.85, 0.375, 0.5);
+    Mach test(2.85, 1.275, 0.5);
     // ToroTest test(1);
     // SodTest test;
     // RiemannTest2D test(6);
@@ -87,8 +87,9 @@ int main() {
         return v.x() <= test.x_jump + 0.01 * (test.xmax() - test.xmin());
     };
 
-    PlaneWithCube gen(0, 2.2, 0, 3.2, 0.7, 1.6, 0.3);
-    gen.set_nx(20);
+    //PlaneWithCube gen(0, 2.2, 0, 3.2, 0.7, 1.6, 0.3); // в статье // 1.375
+    PlaneWithCube gen(0, 3.2, 0, 3.2, 1.6, 1.6, 0.3);
+    gen.set_nx(-1);
 
     // Wedge gen(0.0, 3.0, 0.0, 1.0, 0.1666, 0.0, 
     //             {.left=Boundary::ZOE, .right=Boundary::ZOE,
@@ -122,23 +123,22 @@ int main() {
     solver.set_accuracy(2);
     solver.set_CFL(0.4);
 
-    //mesh.set_max_level(5);
-    //mesh.set_distributor(solver.distributor());
+    mesh.set_max_level(5);
+    mesh.set_distributor(solver.distributor());
     
     double time = 0.0;
     double next_write = 0.0;
     size_t n_step = 0;
 
-    solver.init_cells(mesh, test);
+    // solver.init_cells(mesh, test);
 
-    // for (int k = 0; k < mesh.max_level() + 3; ++k) {
-    //     solver.init_cells(mesh, test);
-    //     solver.set_flags(mesh);
-    //     mesh.refine();
-    // }
+    for (int k = 0; k < mesh.max_level() + 3; ++k) {
+        solver.init_cells(mesh, test);
+        solver.set_flags(mesh);
+        mesh.refine();
+    }
 
-    // while (time <= 1.01 * test.max_time()) {
-    while (1) {
+    while (time <= 1.01 * test.max_time()) {
 
         std::cout << "\tStep: " << std::setw(6) << n_step << ";"
                   << "\tTime: " << std::setw(6) << std::setprecision(3) << time << "\n";
