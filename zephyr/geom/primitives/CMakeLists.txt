@@ -9,7 +9,7 @@ set(ZEPHYR_GEOM_PRIMITIVES_SRC
 )
 
 install(FILES
-        ${CMAKE_CURRENT_SOURCE_DIR}/base.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/decomposition.h
         ${CMAKE_CURRENT_SOURCE_DIR}/adjacent.h
         ${CMAKE_CURRENT_SOURCE_DIR}/boundary.h
         ${CMAKE_CURRENT_SOURCE_DIR}/bface.h

@@ -1,4 +1,3 @@
-#include <Vector3d>
 #include <iostream>
 #include <cmath>
 #include <limits>
@@ -6,10 +5,9 @@
 #include <algorithm>
 #include <stdexcept>
 
-#include <zephyr/network/decomposition/ORB/transform.h>
+#include <zephyr/mesh/decomp/orb/transform.h>
 
-
-namespace zephyr { namespace network { namespace decomposition {
+namespace zephyr::mesh::decomp {
 
 const std::vector<std::string> Transform::available = {
         // Одномерная декартова декомпозиция
@@ -31,55 +29,55 @@ const std::vector<std::string> Transform::available = {
         // "RP", "PR",
 };
 
-const double s = 0.0; // std::sin(1.0/129.0);
-const double c = 1.0; // std::cos(1.0/129.0);
-
 Vector3d rotate(const Vector3d& v) {
+    const double s = 0.0; // std::sin(1.0/129.0);
+    const double c = 1.0; // std::cos(1.0/129.0);
+
     return {
-            c * c * v.x + c * s * v.z + s * v.y,
-            -c * s * v.x - s * s * v.z + c * v.y,
-            c * v.z - s * v.x
+            c * c * v.x() + c * s * v.z() + s * v.y(),
+            -c * s * v.x() - s * s * v.z() + c * v.y(),
+            c * v.z() - s * v.x()
     };
 }
 
-Vector3d map_xy(const Vector3d& v) { return rotate({v.x, v.z, v.y}); }
+Vector3d map_xy(const Vector3d& v) { return rotate({v.x(), v.y(), v.z()}); }
 
-Vector3d map_xz(const Vector3d& v) { return rotate({v.x, v.z, v.y}); }
+Vector3d map_xz(const Vector3d& v) { return rotate({v.x(), v.z(), v.y()}); }
 
-Vector3d map_yx(const Vector3d& v) { return rotate({v.y, v.x, v.z}); }
+Vector3d map_yx(const Vector3d& v) { return rotate({v.y(), v.x(), v.z()}); }
 
-Vector3d map_yz(const Vector3d& v) { return rotate({v.y, v.z, v.x}); }
+Vector3d map_yz(const Vector3d& v) { return rotate({v.y(), v.z(), v.x()}); }
 
-Vector3d map_zx(const Vector3d& v) { return rotate({v.z, v.x, v.y}); }
+Vector3d map_zx(const Vector3d& v) { return rotate({v.z(), v.x(), v.y()}); }
 
-Vector3d map_zy(const Vector3d& v) { return rotate({v.z, v.y, v.x}); }
+Vector3d map_zy(const Vector3d& v) { return rotate({v.z(), v.y(), v.x()}); }
 
 Vector3d map_rp(const Vector3d& v) {
-    return {std::sqrt(v.x * v.x + v.y * v.y), std::atan2(v.y, v.x), v.z};
+    return {std::sqrt(v.x() * v.x() + v.y() * v.y()), std::atan2(v.y(), v.x()), v.z()};
 }
 
 Vector3d map_pr(const Vector3d& v) {
-    return {std::atan2(v.y, v.x), std::sqrt(v.x * v.x + v.y * v.y), v.z};
+    return {std::atan2(v.y(), v.x()), std::sqrt(v.x() * v.x() + v.y() * v.y()), v.z()};
 }
 
-Vector3d inv_xy(const Vector3d& v) { return {v.x, v.y, v.z}; }
+Vector3d inv_xy(const Vector3d& v) { return {v.x(), v.y(), v.z()}; }
 
-Vector3d inv_xz(const Vector3d& v) { return {v.x, v.z, v.y}; }
+Vector3d inv_xz(const Vector3d& v) { return {v.x(), v.z(), v.y()}; }
 
-Vector3d inv_yx(const Vector3d& v) { return {v.y, v.x, v.z}; }
+Vector3d inv_yx(const Vector3d& v) { return {v.y(), v.x(), v.z()}; }
 
-Vector3d inv_yz(const Vector3d& v) { return {v.z, v.x, v.y}; }
+Vector3d inv_yz(const Vector3d& v) { return {v.z(), v.x(), v.y()}; }
 
-Vector3d inv_zx(const Vector3d& v) { return {v.y, v.z, v.x}; }
+Vector3d inv_zx(const Vector3d& v) { return {v.y(), v.z(), v.x()}; }
 
-Vector3d inv_zy(const Vector3d& v) { return {v.z, v.y, v.x}; }
+Vector3d inv_zy(const Vector3d& v) { return {v.z(), v.y(), v.x()}; }
 
 Vector3d inv_rp(const Vector3d& v) {
-    return {v.x * std::cos(v.y), v.x * std::sin(v.y), v.z};
+    return {v.x() * std::cos(v.y()), v.x() * std::sin(v.y()), v.z()};
 }
 
 Vector3d inv_pr(const Vector3d& v) {
-    return {v.y * std::cos(v.x), v.y * std::sin(v.x), v.z};
+    return {v.y() * std::cos(v.x()), v.y() * std::sin(v.x()), v.z()};
 }
 
 Limits::Limits() {
@@ -139,6 +137,14 @@ void Limits::set_angle(int axes) {
     min[axes] = -M_PI;
     max[axes] = +M_PI;
 }
+
+Transform::Transform() {
+    m_type = "XY";
+    m_limits = Limits();
+    m_mapping = map_xy;
+    m_inverse = inv_xy;
+}
+
 Transform::Transform(const std::string& type) {
     auto it = std::find(available.begin(), available.end(), type);
     size_t idx = std::distance(available.begin(), it);
@@ -211,19 +217,17 @@ void Transform::check() {
         Vector3d vec1 = t.mapping(vec0);
         Vector3d vec2 = t.inverse(vec1);
 
-        double err = std::fabs(vec2.x - vec0.x) +
-                     std::fabs(vec2.y - vec0.y) +
-                     std::fabs(vec2.z - vec0.z);
+        double err = std::fabs(vec2.x() - vec0.x() ) +
+                     std::fabs(vec2.y() - vec0.y() ) +
+                     std::fabs(vec2.z() - vec0.z() );
 
         if (err > 1.0e-13) {
-            std::cerr << "vec0: (" << vec0.x << ", " << vec0.y << ", " << vec0.z << ")\n";
-            std::cerr << "vec1: (" << vec1.x << ", " << vec1.y << ", " << vec1.z << ")\n";
-            std::cerr << "vec2: (" << vec2.x << ", " << vec2.y << ", " << vec2.z << ")\n";
+            std::cerr << "vec0: (" << vec0.x()  << ", " << vec0.y()  << ", " << vec0.z()  << ")\n";
+            std::cerr << "vec1: (" << vec1.x()  << ", " << vec1.y()  << ", " << vec1.z()  << ")\n";
+            std::cerr << "vec2: (" << vec2.x()  << ", " << vec2.y()  << ", " << vec2.z()  << ")\n";
             throw std::runtime_error("Wrong transformation for '" + type + "'");
         }
     }
 }
 
-} // decomposition
-} // network
-} // zephyr
+} // namespace zephyr::mesh::decomp

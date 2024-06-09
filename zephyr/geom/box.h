@@ -12,6 +12,9 @@ public:
 
     Vector3d vmin, vmax;
 
+    /// @brief Инициализирует NAN
+    Box();
+
     Box(const Vector3d& _vmin, const Vector3d& _vmax);
 
     Vector3d center() const;
@@ -19,6 +22,12 @@ public:
     Vector3d size() const;
     
     double diameter() const;
+
+    /// @brief Площадь для двумерного Box
+    double area() const;
+
+    /// @brief Объем для трехмерного Box
+    double volume() const;
 
     bool inside(const Vector3d& p) const;
 

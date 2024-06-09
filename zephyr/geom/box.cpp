@@ -1,12 +1,18 @@
 #include <zephyr/geom/box.h>
 
 
-namespace zephyr { namespace geom {
+namespace zephyr::geom {
 
+Box::Box()
+    : vmin{NAN, NAN, NAN},
+      vmax{NAN, NAN, NAN} {
+
+}
 
 Box::Box(const Vector3d &_vmin, const Vector3d &_vmax)
-        : vmin(_vmin), vmax(_vmax) {}
+    : vmin(_vmin), vmax(_vmax) {
 
+}
 
 Vector3d Box::center() const {
     return 0.5 * (vmin + vmax);
@@ -18,6 +24,14 @@ Vector3d Box::size() const {
 
 double Box::diameter() const {
     return (vmax - vmin).norm();
+}
+
+double Box::area() const {
+    return (vmax[0] - vmin[0]) * (vmax[1] - vmin[1]);
+}
+
+double Box::volume() const {
+    return (vmax[0] - vmin[0]) * (vmax[1] - vmin[1]) * (vmax[2] - vmin[2]);
 }
 
 bool Box::inside(const Vector3d& p) const {
@@ -67,5 +81,4 @@ Vector3d QuasiRandom2D::get() {
     return res;
 }
 
-} // zephyr
-} // geom
+} // namespace zephyr::geom

@@ -1,9 +1,18 @@
-set(MPITEST   1)
-set(RANGE     0)
-set(STOPWATCH 0)
-set(THREADS   0)
-set(VECTORS   0)
+set(BALANCING  1)
+set(MPITEST    1)
+set(RANGE      0)
+set(STOPWATCH  0)
+set(THREADS    0)
+set(VECTORS    0)
 
+
+if (BALANCING)
+    message(STATUS "Build load-balancing test")
+    add_executable(balancing balancing.cpp)
+    target_include_directories(balancing PUBLIC zephyr)
+    target_link_libraries(balancing PUBLIC zephyr)
+    install(TARGETS balancing DESTINATION tests)
+endif()
 
 if (MPITEST)
     message(STATUS "Build mpi test")

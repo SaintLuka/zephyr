@@ -1,8 +1,6 @@
 #include <iostream>
 #include <zephyr/utils/mpi.h>
 
-#include <zephyr/mesh/euler/eu_mesh.h>
-
 using zephyr::utils::mpi;
 
 int main() {

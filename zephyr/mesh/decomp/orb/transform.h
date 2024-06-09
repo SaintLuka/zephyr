@@ -1,14 +1,12 @@
 #pragma once
 
 #include <string>
-#include <Vector3d>
 
-#include <zephyr/data/type/Vector3d.h>
+#include <zephyr/geom/vector.h>
 
-namespace zephyr { namespace network { namespace decomposition {
+namespace zephyr::mesh::decomp {
 
-using zephyr::data::Vector3d;
-
+using zephyr::geom::Vector3d;
 
 /// @brief Пределы отображения
 class Limits {
@@ -40,6 +38,9 @@ public:
 /// @brief Преобразование координат в прямоугольник
 struct Transform {
 public:
+    /// @brief Конструктор по умолчанию "XYZ"
+    Transform();
+
     /// @brief Конструктор по типу декомпозиции
     explicit Transform(const std::string &type);
 
@@ -83,6 +84,4 @@ private:
     map_function m_inverse;
 };
 
-} // decomposition
-} // network
-} // zephyr
+} // namespace zephyr::mesh::decomp

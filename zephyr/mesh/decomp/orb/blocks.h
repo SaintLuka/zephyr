@@ -3,10 +3,12 @@
 #include <array>
 #include <memory>
 
-#include <zephyr/data/type/Vector3d.h>
-#include <zephyr/network/decomposition/ORB/transform.h>
+#include <zephyr/geom/box.h>
+#include <zephyr/mesh/decomp/orb/transform.h>
 
-namespace zephyr { namespace network { namespace decomposition {
+namespace zephyr::mesh::decomp {
+
+using zephyr::geom::Box;
 
 struct barrier {
     double val;
@@ -23,22 +25,35 @@ struct barrier {
 
 class Blocks {
 public:
+    /// @brief Тривиальный конструктор.
+    /// Создает единственный блок на всё пространство.
+    Blocks();
 
-    /// @brief Конструктор с полным или частичным заданием размеров декомозиции.
-    /// Для одномерного разбиения достаточно указать n_proc.
-    /// Для двумерного разбиения требуется указать n_proc и n_proc_1.
-    /// Для трехмерного разбиения требуется указать n_proc, n_proc_1 и n_proc_2.
+    /// @brief Конструктор с автоматической декомпозицией по размерам области.
+    /// Подбирается так, чтобы блоки были близки к квадратам/кубам.
+    /// @param domain Вычислительная область
     /// @param type Тип декомпозиции
-    /// @param n_proc Полное число блоков
-    /// @param n_proc_1, n_proc_2, n_proc_3 Число блоков вдоль осей, порядок
-    /// соответствует порядку переменных в типе декомпозиции. В качестве
-    /// неопределенных значений следует использовать отрицательные числа.
-    Blocks(const std::string& type, size_t n_proc,
-            int n_proc_1, int n_proc_2, int n_proc_3);
+    /// @param size Общее число блоков ( > 0 )
+    Blocks(const Box& domain, const std::string& type, int size);
 
-    // Автоматический конструктор по геометрическим размерам.
-    // Внимание: не работает с полярным разбиением.
-    Blocks(const std::string& type, size_t n_proc, const Vector3d& sizes);
+    /// @brief Конструктор с автоматической декомпозицией по размерам области.
+    /// Подбирается так, чтобы блоки были близки к квадратам/кубам.
+    /// @param domain Вычислительная область
+    /// @param type Тип декомпозиции
+    /// @param size Общее число блоков. Для одномерной декомпозиции можно
+    /// указать size = -1, в этом случае параметр nx определяет размер
+    /// @param nx Число блоков по первой координате
+    Blocks(const Box& domain, const std::string& type, int size, int nx);
+
+    /// @brief Конструктор с автоматической декомпозицией по размерам области.
+    /// Подбирается так, чтобы блоки были близки к квадратам/кубам.
+    /// @param domain Вычислительная область
+    /// @param type Тип декомпозиции
+    /// @param size Общее число блоков. Для двумерной декомпозиции можно
+    /// указать size = -1, в этом случае параметр ny определяет размер
+    /// @param nx Число блоков по первой координате
+    Blocks(const Box& domain, const std::string& type, int size,
+            const std::vector<int>& ny);
 
     /// @brief Прямое отображение
     Vector3d mapping(const Vector3d& ) const;
@@ -57,20 +72,16 @@ public:
     int rank(const Vector3d& v) const;
 
     /// @brief Общее число блоков
-    size_t size() const;
+    int size() const;
 
     /// @brief Число блоков в колонке
-    size_t size(int i) const;
+    int size(int i) const;
 
     /// @brief Число блоков в колонке и строке
-    size_t size(int i, int j) const;
+    int size(int i, int j) const;
 
     /// @brief Центр блока
     Vector3d center(int rank) const;
-
-    /// @brief Находится ли точка v с процесса my_rank в R-окрестности
-    /// процесса neib_rank
-    bool is_near(int my_rank, int neib_rank, const Vector3d& v, double R);
 
     /// @brief Балансировка нагрузки
     void balancing_simple(const std::vector<double>& loads, double alpha);
@@ -85,17 +96,20 @@ public:
     void info() const;
 
 private:
+    /// @brief Инициализировать единичный блок
+    void init_single();
+
     /// @brief Проинициализировать массивы m_nx, m_ny, m_nz
     /// @details Одномерная декомпозиция
-    void init_sizes_1D();
+    void init_sizes_1D(int nx);
 
     /// @brief Проинициализировать массивы m_nx, m_ny, m_nz
     /// @details Двумерная декомпозиция
-    void init_sizes_2D(int n_proc_1);
+    void init_sizes_2D(const std::vector<int>& ny);
 
     /// @brief Проинициализировать массивы m_nx, m_ny, m_nz
     /// @details Трехмерная декомпозиция
-    void init_sizes_3D(int n_proc_1, int n_proc_2);
+    void init_sizes_3D(const std::vector<std::vector<int>>& nz);
 
     /// @brief Проинициализировать пределы
     void init_limits();
@@ -132,11 +146,11 @@ private:
     /// @brief Отображение в кубоид
     Transform m_map;
 
-    /// @brief Границы кубоида
-    Vector3d m_vmin, m_vmax;
+    /// @brief Кубоид
+    Box m_box;
 
     /// @brief Число блоков
-    size_t m_size;
+    int m_size;
     int m_nx;
     std::vector<int> m_ny;
     std::vector<std::vector<int>> m_nz;
@@ -165,6 +179,4 @@ private:
     std::vector<std::vector<std::vector<double>>> m_z_loads;
 };
 
-} // decomposition
-} // network
-} // zephyr
+} // namespace zephyr::mesh::decomp

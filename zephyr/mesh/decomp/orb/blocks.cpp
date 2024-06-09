@@ -1,61 +1,84 @@
-#include <Vector3d>
 #include <iostream>
 #include <algorithm>
+#include <numeric>
 
-#include <zephyr/network/mpi/network.h>
+#include <zephyr/mesh/decomp/orb/blocks.h>
 
-#include <zephyr/network/decomposition/ORB/blocks.h>
+namespace zephyr::mesh::decomp {
 
-namespace zephyr { namespace network { namespace decomposition {
+static const double inf = std::numeric_limits<double>::infinity();
 
-Blocks::Blocks(const std::string& type, size_t n_proc,
-       int n_proc_1, int n_proc_2, int n_proc_3)
-       : m_ready(false), m_map(type), m_size(n_proc) {
+// Декомпозиция прямоугольника на size блоков,
+// по оси x задано nx блоков
+std::vector<int> decomp(int size, int n_x) {
+    int N_YZ = size / n_x;
+    int big_count = size - n_x * N_YZ;
 
-    switch (m_map.dimension()) {
-        case 1:
-            init_sizes_1D();
-            break;
-        case 2:
-            init_sizes_2D(n_proc_1);
-            break;
-        case 3:
-            init_sizes_3D(n_proc_1, n_proc_2);
-            break;
-        default:
-            throw std::runtime_error("Странная декомпозиция с размерностью > 3");
+    std::vector<int> n_y(n_x);
+    for (int i = 0; i < n_x; ++i) {
+        n_y[i] = N_YZ;
     }
 
-    init_limits();
-    init_indices();
-    init_coords();
-    init_widths();
-    init_loads();
+    int counter = 0;
+    int beg = (n_x - big_count) / 2;
+    while (counter < big_count) {
+        n_y[beg + counter] += 1;
+        counter += 1;
+    }
+
+    int check_sum = std::accumulate(n_y.begin(), n_y.end(), 0);
+    if (check_sum != size) {
+        throw std::runtime_error("Something wrong in Blocks constructor");
+    }
+
+    return n_y;
 }
 
-Blocks::Blocks(const std::string& type, size_t n_proc, const Vector3d& sizes)
-        : m_ready(false), m_map(type), m_size(n_proc) {
+// Декомпозиция прямоугольника [Lx, Ly] на size блоков
+std::vector<int> decomp(double Lx, double Ly, int size) {
+    double H = std::sqrt((Lx * Ly) / size);
+    int nx = static_cast<int>(std::round(Lx / H ));
+    nx = std::min(std::max(1, nx), size);
+    return decomp(size, nx);
+}
 
-    auto dim = m_map.dimension();
+Blocks::Blocks()
+    : m_box(Vector3d{-inf, -inf, -inf},
+            Vector3d{+inf, +inf, +inf}) {
 
-    if (dim == 1) {
-        init_sizes_1D();
+    init_single();
+}
+
+Blocks::Blocks(const Box& domain, const std::string& type, int size)
+    : m_ready(false), m_box(domain), m_map(type), m_size(size) {
+
+    if (m_map.dimension() == 1) {
+        init_sizes_1D(m_size);
     }
-    else if (dim == 2) {
-        Vector3d L = m_map(sizes);
-        int n_proc_1 = static_cast<int>(std::round(L.x * std::sqrt(m_size / (L.x * L.y))));
-        n_proc_1 = std::min(std::max(1, n_proc_1), int(m_size));
-        init_sizes_2D(n_proc_1);
+    else if (m_map.dimension() == 2) {
+        Vector3d L = m_map(m_box.size());
+        std::vector<int> n_y = decomp(L.x(), L.y(), size);
+        init_sizes_2D(n_y);
     }
-    else if (dim == 3) {
-        Vector3d L = m_map(sizes);
-        int n_proc_1 = static_cast<int>(std::round(L.x * std::cbrt(m_size / (L.x * L.y * L.z))));
-        n_proc_1 = std::min(std::max(1, n_proc_1), int(m_size));
+    else if (m_map.dimension() == 3) {
+        Vector3d L = m_map(m_box.size());
+        double H = std::cbrt((L.x() * L.y() * L.z()) / m_size);
+        int nx = static_cast<int>(std::round(L.x() / H ));
+        nx = std::min(std::max(1, nx), m_size);
 
-        int n_proc_2 = static_cast<int>(std::round(L.y * std::cbrt(m_size / (L.x * L.y * L.z))));
-        n_proc_2 = std::min(std::max(1, n_proc_2), int(m_size));
-
-        init_sizes_3D(n_proc_1, n_proc_2);
+        std::vector<int> nYZ = decomp(size, nx);
+        std::vector<std::vector<int>> nz(nx);
+        for (int i = 0; i < nx; ++i) {
+            nz[i] = decomp(L.y(), L.z(), nYZ[i]);
+        }
+        int check_sum = 0;
+        for (auto& r: nz) {
+            check_sum += std::accumulate(r.begin(), r.end(), 0);
+        }
+        if (check_sum != size) {
+            throw std::runtime_error("Something wrong in Blocks constructor");
+        }
+        init_sizes_3D(nz);
     }
     else {
         throw std::runtime_error("Странная декомпозиция с размерностью > 3");
@@ -66,6 +89,93 @@ Blocks::Blocks(const std::string& type, size_t n_proc, const Vector3d& sizes)
     init_coords();
     init_widths();
     init_loads();
+    setup_bounds(domain.vmin, domain.vmax);
+}
+
+Blocks::Blocks(const Box& domain, const std::string& type, int size, int nx)
+        : m_ready(false), m_box(domain), m_map(type), m_size(size) {
+
+    if (m_map.dimension() == 1) {
+        if (size < 0) {
+            m_size = nx;
+        }
+        init_sizes_1D(m_size);
+    }
+    else if (m_map.dimension() == 2) {
+        std::vector<int> n_y = decomp(size, nx);
+        init_sizes_2D(n_y);
+    }
+    else if (m_map.dimension() == 3) {
+        std::vector<int> nYZ = decomp(size, nx);
+        std::vector<std::vector<int>> nz(nx);
+        for (int i = 0; i < nx; ++i) {
+            Vector3d L = m_map(m_box.size());
+            nz[i] = decomp(L.y(), L.z(), nYZ[i]);
+        }
+        int check_sum = 0;
+        for (auto& r: nz) {
+            check_sum += std::accumulate(r.begin(), r.end(), 0);
+        }
+        if (check_sum != size) {
+            throw std::runtime_error("Something wrong in Blocks constructor");
+        }
+        init_sizes_3D(nz);
+    }
+    else {
+        throw std::runtime_error("Странная декомпозиция с размерностью > 3");
+    }
+
+    init_limits();
+    init_indices();
+    init_coords();
+    init_widths();
+    init_loads();
+    setup_bounds(domain.vmin, domain.vmax);
+}
+
+Blocks::Blocks(const Box& domain, const std::string& type, int size,
+               const std::vector<int>& ny)
+    : m_ready(false), m_box(domain), m_map(type), m_size(size) {
+
+    if (m_map.dimension() == 1) {
+        init_sizes_1D(m_size);
+    }
+    else if (m_map.dimension() == 2) {
+        if (size < 0) {
+            m_size = std::accumulate(ny.begin(), ny.end(), 0);
+        }
+        init_sizes_2D(ny);
+    }
+    else if (m_map.dimension() == 3) {
+        Vector3d L = m_map(m_box.size());
+        int nx = ny.size();
+        std::vector<std::vector<int>> nz(nx);
+        for (int i = 0; i < nx; ++i) {
+            nz[i] = decomp(L.y(), L.z(), ny[i]);
+        }
+
+        int check_size = 0;
+        for (auto& r: nz) {
+            check_size += std::accumulate(r.begin(), r.end(), 0);
+        }
+        if (size < 0) {
+            m_size = check_size;
+        }
+        else if (check_size != size) {
+            throw std::runtime_error("Something wrong in Blocks constructor");
+        }
+        init_sizes_3D(nz);
+    }
+    else {
+        throw std::runtime_error("Странная декомпозиция с размерностью > 3");
+    }
+
+    init_limits();
+    init_indices();
+    init_coords();
+    init_widths();
+    init_loads();
+    setup_bounds(domain.vmin, domain.vmax);
 }
 
 void Blocks::readiness() const {
@@ -83,7 +193,7 @@ Vector3d Blocks::inverse(const Vector3d& vec) const {
 }
 
 // Коэффициент расширения области
-const double EC = 0.01;
+const double EC = 0.0;
 
 void Blocks::setup_bounds(Vector3d vmin, Vector3d vmax) {
     vmin = m_map(vmin);
@@ -97,8 +207,8 @@ void Blocks::setup_bounds(Vector3d vmin, Vector3d vmax) {
         }
 
         double dv = std::abs(vmax[d] - vmin[d]);
-        m_vmin[d] = vmin[d] - EC * dv;
-        m_vmax[d] = vmax[d] + EC * dv;
+        m_box.vmin[d] = vmin[d] - EC * dv;
+        m_box.vmax[d] = vmax[d] + EC * dv;
     }
 
     init_coords();
@@ -118,23 +228,23 @@ void Blocks::update_bounds(const Vector3d &vmin, const Vector3d &vmax) {
         }
 
         double dv = std::abs(vmax[d] - vmin[d]);
-        m_vmin[d] = vmin[d] - EC * dv;
-        m_vmax[d] = vmax[d] + EC * dv;
+        m_box.vmin[d] = vmin[d] - EC * dv;
+        m_box.vmax[d] = vmax[d] + EC * dv;
     }
 
     if (dim > 0) {
-        m_x_coords.front() = m_vmin.x;
-        m_x_coords.back()  = m_vmax.x;
+        m_x_coords.front() = m_box.vmin.x();
+        m_x_coords.back()  = m_box.vmax.x();
 
         if (dim > 1) {
             for (int i = 0; i < m_nx; ++i) {
-                m_y_coords[i].front() = m_vmin.y;
-                m_y_coords[i].back()  = m_vmax.y;
+                m_y_coords[i].front() = m_box.vmin.y();
+                m_y_coords[i].back()  = m_box.vmax.y();
 
                 if (dim > 2) {
                     for (int j = 0; j < m_ny[i]; ++j) {
-                        m_z_coords[i][j].front() = m_vmin.z;
-                        m_z_coords[i][j].back()  = m_vmax.z;
+                        m_z_coords[i][j].front() = m_box.vmin.z();
+                        m_z_coords[i][j].back()  = m_box.vmax.z();
                     }
                 }
             }
@@ -151,21 +261,21 @@ int Blocks::rank(const Vector3d& v) const {
 
     int i = 0;
     for (; i < m_nx - 1; ++i) {
-        if (vec.x < m_x_coords[i + 1]) {
+        if (vec.x() < m_x_coords[i + 1]) {
             break;
         }
     }
 
     int j = 0;
     for (; j < m_ny[i] - 1; ++j) {
-        if (vec.y < m_y_coords[i][j + 1]) {
+        if (vec.y() < m_y_coords[i][j + 1]) {
             break;
         }
     }
 
     int k = 0;
     for (; k < m_nz[i][j] + 1; ++k) {
-        if (vec.z < m_z_coords[i][j][k + 1]) {
+        if (vec.z() < m_z_coords[i][j][k + 1]) {
             break;
         }
     }
@@ -173,19 +283,19 @@ int Blocks::rank(const Vector3d& v) const {
     return m_ranks[i][j][k];
 }
 
-size_t Blocks::size() const {
+int Blocks::size() const {
     return m_size;
 }
 
-size_t Blocks::size(int i) const {
-    size_t res = 0;
+int Blocks::size(int i) const {
+    int res = 0;
     for (int j = 0; j < m_ny[i]; ++j) {
         res += m_nz[i][j];
     }
     return res;
 }
 
-size_t Blocks::size(int i, int j) const {
+int Blocks::size(int i, int j) const {
     return m_nz[i][j];
 }
 
@@ -197,12 +307,12 @@ Vector3d Blocks::center(int rank) const {
     auto dim = m_map.dimension();
 
     Vector3d c = {0.0, 0.0, 0.0};
-    c.x = m_nx > 1 ? (m_x_coords[i] + m_x_coords[j]) / 2.0 : 0.0;
+    c.x() = m_nx > 1 ? (m_x_coords[i] + m_x_coords[j]) / 2.0 : 0.0;
     if (dim > 1) {
-        c.y = m_ny[i] > 1 ? (m_y_coords[i][j] + m_y_coords[i][j + 1]) / 2.0 : 0.0;
+        c.y() = m_ny[i] > 1 ? (m_y_coords[i][j] + m_y_coords[i][j + 1]) / 2.0 : 0.0;
 
         if (dim > 2) {
-            c.z = m_nz[i][j] > 1 ? (m_z_coords[i][j][k] + m_z_coords[i][j][k + 1]) / 2.0 : 0.0;
+            c.z() = m_nz[i][j] > 1 ? (m_z_coords[i][j][k] + m_z_coords[i][j][k + 1]) / 2.0 : 0.0;
         }
     }
 
@@ -221,22 +331,22 @@ std::vector<std::vector<Vector3d>> Blocks::lines() const {
         const int M = 50;
         for (int k = 0; k < M; ++k) {
             Vector3d v;
-            if (std::isinf(v1.x) || std::isinf(v2.x)) {
-                double xi1 = std::atan(v1.x);
-                double xi2 = std::atan(v2.x);
-                v.x = std::tan(xi1 + ((xi2 - xi1) * k) / (M - 1));
+            if (std::isinf(v1.x()) || std::isinf(v2.x())) {
+                double xi1 = std::atan(v1.x());
+                double xi2 = std::atan(v2.x());
+                v.x() = std::tan(xi1 + ((xi2 - xi1) * k) / (M - 1));
             }
             else {
-                v.x = v1.x + ((v2.x - v1.x) * k) / M;
+                v.x() = v1.x() + ((v2.x() - v1.x()) * k) / M;
             }
 
-            if (std::isinf(v1.y) || std::isinf(v2.y)) {
-                double xi1 = std::atan(v1.y);
-                double xi2 = std::atan(v2.y);
-                v.y = std::tan(xi1 + ((xi2 - xi1) * k) / (M - 1));
+            if (std::isinf(v1.y()) || std::isinf(v2.y())) {
+                double xi1 = std::atan(v1.y());
+                double xi2 = std::atan(v2.y());
+                v.y() = std::tan(xi1 + ((xi2 - xi1) * k) / (M - 1));
             }
             else {
-                v.y = v1.y + ((v2.y - v1.y) * k) / M;
+                v.y() = v1.y() + ((v2.y() - v1.y()) * k) / M;
             }
             line.push_back(m_map.inverse(v));
         }
@@ -289,23 +399,6 @@ void Blocks::set_loads(const std::vector<double>& loads) {
         }
         m_x_loads[i] = load_x / count;
     }
-}
-
-bool Blocks::is_near(int m, int neib_rank, const Vector3d &v, double R) {
-    Vector3d c = m_map(v);
-
-    int i = m_i[neib_rank];
-    int j = m_j[neib_rank];
-    int k = m_k[neib_rank];
-
-    if (m_x_coords[i] - R <= c.x && c.x < m_x_coords[i + 1] + R) {
-        if (m_y_coords[i][j] - R <= c.y && c.y < m_y_coords[i][j + 1] + R) {
-            if (m_z_coords[i][j][k] - R <= c.z && c.z < m_z_coords[i][j][k + 1] + R) {
-                return true;
-            }
-        }
-    }
-    return false;
 }
 
 void Blocks::move_simple(
@@ -376,8 +469,6 @@ void Blocks::move_newton(
         const std::vector<double>& loads,
         const std::vector<double>& widths,
         std::vector<barrier>& coords) {
-
-    zephyr::network::mpi::Network& net = zephyr::network::mpi::main();
 
     int n_blocks = int(loads.size());
 
@@ -493,8 +584,57 @@ void Blocks::balancing_newton(const std::vector<double>& loads, double alpha) {
     init_widths();
 }
 
-void Blocks::init_sizes_1D() {
-    m_nx = m_size;
+void Blocks::init_single() {
+    m_ready = true;
+
+    if (m_box.size().x() == 0.0) {
+        m_box.vmin.x() = -inf;
+        m_box.vmax.x() = +inf;
+    }
+    if (m_box.size().y() == 0.0) {
+        m_box.vmin.y() = -inf;
+        m_box.vmax.y() = +inf;
+    }
+    if (m_box.size().z() == 0.0) {
+        m_box.vmin.z() = -inf;
+        m_box.vmax.z() = +inf;
+    }
+
+    m_map = Transform();
+
+    m_size = 1;
+    m_nx = 1;
+    m_ny = {1};
+    m_nz = {{1}};
+
+    m_i = {0};
+    m_j = {0};
+    m_k = {0};
+
+    m_ranks = {{{0}}};
+
+    m_x_coords = {m_box.vmin.x(), m_box.vmax.x()};
+    m_y_coords = {{m_box.vmin.y(), m_box.vmax.y()}};
+    m_z_coords = {{{m_box.vmin.z(), m_box.vmax.z()}}};
+
+    m_x_widths = {m_box.size().x()};
+    m_y_widths = {{m_box.size().y()}};
+    m_z_widths = {{{m_box.size().z()}}};
+
+    m_x_loads = {0.0};
+    m_y_loads = {{0.0}};
+    m_z_loads = {{{0.0}}};
+}
+
+void Blocks::init_sizes_1D(int nx) {
+    if (nx != m_size) {
+        std::string message = "Blocks::init_sizes_1D error: Wrong 1D decomposition";
+        std::cerr << message << "\n";
+        throw std::runtime_error(message);
+    }
+
+    m_nx = nx;
+
     m_ny.resize(m_nx);
     m_nz.resize(m_nx);
     for (int i = 0; i < m_nx; ++i) {
@@ -506,31 +646,19 @@ void Blocks::init_sizes_1D() {
     }
 }
 
-void Blocks::init_sizes_2D(int n_proc_1) {
-    if (n_proc_1 < 1) {
-        std::string message = "Для двумерной декомпозиции необходимо указать n_proc_1";
+void Blocks::init_sizes_2D(const std::vector<int>& ny) {
+    int checkout_sum = std::accumulate(ny.begin(), ny.end(), 0);
+    if (checkout_sum != m_size) {
+        std::string message = "Blocks::init_sizes_2D error: Wrong 2D decomposition";
         std::cerr << message << "\n";
         throw std::runtime_error(message);
     }
-    if (n_proc_1 >= m_size) {
-        n_proc_1 = m_size;
-    }
-    int n_proc_2 = m_size / n_proc_1;
 
-    int big_count = m_size - n_proc_1 * n_proc_2;
+    m_nx = ny.size();
 
-    m_nx = n_proc_1;
     m_ny.resize(m_nx);
-    m_nz.resize(m_nx);
     for (int i = 0; i < m_nx; ++i) {
-        m_ny[i] = n_proc_2;
-    }
-
-    int counter = 0;
-    int beg = (m_nx - big_count) / 2;
-    while (counter < big_count) {
-        m_ny[beg + counter] += 1;
-        counter += 1;
+        m_ny[i] = ny[i];
     }
 
     m_nz.resize(m_nx);
@@ -542,79 +670,28 @@ void Blocks::init_sizes_2D(int n_proc_1) {
     }
 }
 
-void Blocks::init_sizes_3D(int n_proc_1, int n_proc_2) {
-    if (n_proc_1 < 1 || n_proc_2 < 1) {
-        std::string message = "Для трехмерной декомпозиции необходимо указать n_proc_1 и n_proc_2";
+void Blocks::init_sizes_3D(const std::vector<std::vector<int>>& nz) {
+    int size = 0;
+    for(auto& r: nz) {
+        size += std::accumulate(r.begin(), r.end(), 0);
+    }
+    if (size != m_size) {
+        std::string message = "Blocks::init_sizes_3D error: Wrong 3D decomposition";
         std::cerr << message << "\n";
         throw std::runtime_error(message);
     }
 
-    // Уменьшим значения n_proc_1, n_proc_2
-    if (n_proc_1 * n_proc_2 > m_size) {
-        int counter = 0;
-        while (n_proc_1 * n_proc_2 > m_size) {
-            if (n_proc_1 > 1) {
-                n_proc_1 -= (counter + 1) % 2;
-            }
-            if (n_proc_2 > 1) {
-                n_proc_2 -= counter % 2;
-            }
-            ++counter;
-        }
-    }
-
-    int n_proc_12 = n_proc_1 * n_proc_2;
-
-    int n_proc_3 = m_size / n_proc_12;
-
-    int big_count = m_size - n_proc_12 * n_proc_3;
-
-    m_nx = n_proc_1;
+    m_nz = nz;
+    m_nx = nz.size();
     m_ny.resize(m_nx);
-    m_nz.resize(m_nx);
     for (int i = 0; i < m_nx; ++i) {
-        m_ny[i] = n_proc_2;
-        m_nz[i].resize(m_ny[i]);
-        for (int j = 0; j < m_ny[i]; ++j) {
-            m_nz[i][j] = n_proc_3;
-        }
-    }
-
-    struct Index {
-        int i, j;
-
-        Index(int _i, int _j) : i(_i), j(_j) {}
-
-        double abs(const int &n_proc_1, const int &n_proc_2) const {
-            double x = i - 0.5 * (n_proc_1 - 1.0);
-            double y = j - 0.5 * (n_proc_2 - 1.0);
-            return x * x + y * y;
-        }
-    };
-
-    std::vector<Index> indices;
-    indices.reserve(n_proc_12);
-    for (int i = 0; i < n_proc_1; ++i) {
-        for (int j = 0; j < n_proc_2; ++j) {
-            indices.emplace_back(Index(i, j));
-        }
-    }
-
-    // Сортируем двумерные индексы в квадрате n_proc_1 x n_proc_2
-    // по убыванию от центра области ( 0.5 n_proc_1, 0.5 n_proc_2 )
-    std::sort(indices.begin(), indices.end(),
-              [n_proc_1, n_proc_2](const Index &idx1, const Index &idx2) {
-                  return idx1.abs(n_proc_1, n_proc_2) < idx2.abs(n_proc_1, n_proc_2);
-              });
-
-    for (int counter = 0; counter < big_count; ++counter) {
-        m_nz[indices[counter].i][indices[counter].j] += 1;
+        m_ny[i] = nz[i].size();
     }
 }
 
 void Blocks::init_limits() {
-    m_vmin = m_map.limits().min;
-    m_vmax = m_map.limits().max;
+    m_box.vmin = m_map.limits().min;
+    m_box.vmax = m_map.limits().max;
 }
 
 void Blocks::init_indices() {
@@ -641,42 +718,42 @@ void Blocks::init_indices() {
 void Blocks::init_coords() {
     m_x_coords.resize(m_nx + 1);
     if (m_nx == 1) {
-        m_x_coords[0] = m_map.limits().min.x;
-        m_x_coords[1] = m_map.limits().max.x;
+        m_x_coords[0] = m_map.limits().min.x();
+        m_x_coords[1] = m_map.limits().max.x();
     }
     else {
         // Тут небольшая поправочка на EC, поскольку используется
         // расширенная область (больше domain на долю EC)
-        double dx = (m_vmax.x - m_vmin.x) * EC / (1 + 2 * EC);
-        double xi = (m_vmax.x - m_vmin.x - 2 * dx) / m_size;
+        double dx = m_box.size().x() * EC / (1 + 2 * EC);
+        double xi = (m_box.size().x() - 2 * dx) / m_size;
 
-        m_x_coords[0] = m_vmin.x + dx;
+        m_x_coords[0] = m_box.vmin.x() + dx;
         for (int i = 1; i < m_nx; ++i) {
             m_x_coords[i] = m_x_coords[i - 1] + xi * size(i - 1);
         }
-        m_x_coords[0] = m_vmin.x;
-        m_x_coords[m_nx] = m_vmax.x;
+        m_x_coords[0] = m_box.vmin.x();
+        m_x_coords[m_nx] = m_box.vmax.x();
     }
 
     m_y_coords.resize(m_nx);
     for (int i = 0; i < m_nx; ++i) {
         m_y_coords[i].resize(m_ny[i] + 1);
         if (m_ny[i] == 1) {
-            m_y_coords[i][0] = m_map.limits().min.y;
-            m_y_coords[i][1] = m_map.limits().max.y;
+            m_y_coords[i][0] = m_map.limits().min.y();
+            m_y_coords[i][1] = m_map.limits().max.y();
         }
         else {
             // Тут небольшая поправочка на EC, поскольку используется
             // расширенная область (больше domain на долю EC)
-            double dy = (m_vmax.y - m_vmin.y) * EC / (1 + 2 * EC);
-            double xi = (m_vmax.y - m_vmin.y - 2 * dy) / size(i);
+            double dy = m_box.size().y() * EC / (1 + 2 * EC);
+            double xi = (m_box.size().y() - 2 * dy) / size(i);
 
-            m_y_coords[i][0] = m_vmin.y + dy;
+            m_y_coords[i][0] = m_box.vmin.y() + dy;
             for (int j = 1; j < m_ny[i]; ++j) {
                 m_y_coords[i][j] = m_y_coords[i][j - 1] + xi * size(i, j - 1);
             }
-            m_y_coords[i][0] = m_vmin.y;
-            m_y_coords[i][m_ny[i]] = m_vmax.y;
+            m_y_coords[i][0] = m_box.vmin.y();
+            m_y_coords[i][m_ny[i]] = m_box.vmax.y();
         }
     }
 
@@ -686,19 +763,19 @@ void Blocks::init_coords() {
         for (int j = 0; j < m_ny[i]; ++j) {
             m_z_coords[i][j].resize(m_nz[i][j] + 1);
             if (m_nz[i][j] == 1) {
-                m_z_coords[i][j][0] = m_map.limits().min.z;
-                m_z_coords[i][j][1] = m_map.limits().max.z;
+                m_z_coords[i][j][0] = m_map.limits().min.z();
+                m_z_coords[i][j][1] = m_map.limits().max.z();
             }
             else {
                 // Тут небольшая поправочка на EC, поскольку используется
                 // расширенная область (больше domain на долю EC)
-                double dz = (m_vmax.z - m_vmin.z) * EC / (1 + 2 * EC);
+                double dz = m_box.size().z() * EC / (1 + 2 * EC);
 
-                m_z_coords[i][j][0] = m_vmin.z;
+                m_z_coords[i][j][0] = m_box.vmin.z();
                 for (int k = 1; k < m_nz[i][j]; ++k) {
-                    m_z_coords[i][j][k] = m_vmin.z + dz + ((m_vmax.z - m_vmin.z - 2 * dz) * k) / m_nz[i][j];
+                    m_z_coords[i][j][k] = m_box.vmin.z() + dz + ((m_box.size().z() - 2 * dz) * k) / m_nz[i][j];
                 }
-                m_z_coords[i][j][m_nz[i][j]] = m_vmax.z;
+                m_z_coords[i][j][m_nz[i][j]] = m_box.vmax.z();
             }
         }
     }
@@ -827,6 +904,4 @@ void Blocks::info() const {
     }
 }
 
-} // decomposition
-} // network
-} // zephyr
+} // namespace zephyr::mesh::decomp

@@ -3,7 +3,7 @@
 #include <zephyr/geom/primitives/side.h>
 #include <zephyr/geom/primitives/amr_cell.h>
 #include <zephyr/geom/primitives/bfaces.h>
-#include <zephyr/geom/primitives/base.h>
+#include <zephyr/geom/primitives/decomposition.h>
 #include <zephyr/mesh/euler/eu_mesh.h>
 
 namespace zephyr { namespace mesh {
