@@ -37,8 +37,8 @@ int check_connectivity(AmrStorage &locals, int ic, AmrStorage& aliens) {
 
         if (adj.rank == mpi::rank()) {
             // Локальная ячейка
-            if (adj.ghost >= 0) {
-                std::cout << "\tadjacent.ghost >= 0\n";
+            if (adj.alien >= 0) {
+                std::cout << "\tadjacent.alien >= 0\n";
                 cell.print_info();
                 return -1;
             }
@@ -56,13 +56,13 @@ int check_connectivity(AmrStorage &locals, int ic, AmrStorage& aliens) {
         }
         else {
             // Удаленная ячейка
-            if (adj.ghost < 0 || adj.ghost >= aliens.size()) {
+            if (adj.alien < 0 || adj.alien >= aliens.size()) {
                 std::cout << "\tRemote neighbor out of range\n";
                 cell.print_info();
                 return -1;
             }
 
-            neib_ptr = &aliens[adj.ghost];
+            neib_ptr = &aliens[adj.alien];
         }
 
         if (!neib_ptr || neib_ptr->is_undefined()) {
@@ -134,8 +134,8 @@ int check_connectivity(AmrStorage &locals, int ic, AmrStorage& aliens) {
             }
             if (adj.rank == mpi::rank()) {
                 // Локальный сосед
-                if (nface.adjacent.ghost >= 0) {
-                    std::cout << "\tWrong connection (ghost >= 0)\n";
+                if (nface.adjacent.alien >= 0) {
+                    std::cout << "\tWrong connection (alien >= 0)\n";
                     std::cout << "\tCurrent cell:\n";
                     cell.print_info();
                     std::cout << "\tNeighbor:\n";
@@ -145,8 +145,8 @@ int check_connectivity(AmrStorage &locals, int ic, AmrStorage& aliens) {
             }
             else {
                 // Удаленный сосед
-                if (nface.adjacent.ghost < 0 ||
-                    nface.adjacent.ghost >= aliens.size()) {
+                if (nface.adjacent.alien < 0 ||
+                    nface.adjacent.alien >= aliens.size()) {
                     std::cout << "\tWrong connection\n";
                     std::cout << "\tCurrent cell:\n";
                     cell.print_info();

@@ -112,7 +112,7 @@ MovNode GNode::bnode() const {
     for (int idx: m_neibs) {
         bnode.neibs[counter].rank = 0;
         bnode.neibs[counter].index = idx;
-        bnode.neibs[counter].ghost = -1;
+        bnode.neibs[counter].alien = -1;
         ++counter;
     }
     return bnode;
@@ -439,10 +439,10 @@ AmrCell Grid::amr_cell(int idx) const {
         cell.faces[Side::B].adjacent.rank = 0;
         cell.faces[Side::T].adjacent.rank = 0;
 
-        cell.faces[Side::L].adjacent.ghost = -1;
-        cell.faces[Side::R].adjacent.ghost = -1;
-        cell.faces[Side::B].adjacent.ghost = -1;
-        cell.faces[Side::T].adjacent.ghost = -1;
+        cell.faces[Side::L].adjacent.alien = -1;
+        cell.faces[Side::R].adjacent.alien = -1;
+        cell.faces[Side::B].adjacent.alien = -1;
+        cell.faces[Side::T].adjacent.alien = -1;
 
         cell.faces[Side::L].adjacent.index = gcell.adjacent({v1, v3});
         cell.faces[Side::R].adjacent.index = gcell.adjacent({v2, v4});
@@ -490,12 +490,12 @@ AmrCell Grid::amr_cell(int idx) const {
         cell.faces[Side::X].adjacent.rank = 0;
         cell.faces[Side::F].adjacent.rank = 0;
 
-        cell.faces[Side::L].adjacent.ghost = -1;
-        cell.faces[Side::R].adjacent.ghost = -1;
-        cell.faces[Side::B].adjacent.ghost = -1;
-        cell.faces[Side::T].adjacent.ghost = -1;
-        cell.faces[Side::X].adjacent.ghost = -1;
-        cell.faces[Side::F].adjacent.ghost = -1;
+        cell.faces[Side::L].adjacent.alien = -1;
+        cell.faces[Side::R].adjacent.alien = -1;
+        cell.faces[Side::B].adjacent.alien = -1;
+        cell.faces[Side::T].adjacent.alien = -1;
+        cell.faces[Side::X].adjacent.alien = -1;
+        cell.faces[Side::F].adjacent.alien = -1;
 
         cell.faces[Side::L].adjacent.index = gcell.adjacent({v0, v4, v2, v6});
         cell.faces[Side::R].adjacent.index = gcell.adjacent({v5, v1, v3, v7});
@@ -535,7 +535,7 @@ AmrCell Grid::amr_cell(int idx) const {
 
             cell.faces[i].boundary = gcell.boundary({v1, v2});
             cell.faces[i].adjacent.rank = 0;
-            cell.faces[i].adjacent.ghost = -1;
+            cell.faces[i].adjacent.alien = -1;
             cell.faces[i].adjacent.index = gcell.adjacent({v1, v2});
         }
 
@@ -579,7 +579,7 @@ MovCell Grid::mov_cell(int idx) const {
 
             cell.faces[i].boundary = gcell.boundary({v1, v2});
             cell.faces[i].adjacent.rank = 0;
-            cell.faces[i].adjacent.ghost = -1;
+            cell.faces[i].adjacent.alien = -1;
             cell.faces[i].adjacent.index = gcell.adjacent({v1, v2});
         }
 

@@ -18,8 +18,8 @@ AmrStorage::Iterator safe_iterator(AmrStorage &locals, AmrStorage &aliens, int i
 }
 
 AmrStorage::Iterator safe_iterator(AmrStorage &locals, AmrStorage &aliens, const Adjacent &adj) {
-    if (adj.ghost >= 0) {
-        return aliens.iterator(adj.ghost);
+    if (adj.alien >= 0) {
+        return aliens.iterator(adj.alien);
     }
     else {
         if (adj.index < locals.size()) {
@@ -65,8 +65,8 @@ const Byte* EuCell::neib_data(const BFace& face) const {
     }
     const auto &adj = face.adjacent;
 
-    if (adj.ghost >= 0) {
-        return m_aliens.data_at(adj.ghost);
+    if (adj.alien >= 0) {
+        return m_aliens.data_at(adj.alien);
     } else if (adj.index < m_locals.size()) {
         return m_locals.data_at(adj.index);
     } else {
@@ -92,7 +92,7 @@ void EuCell::print_neibs_info() const {
 
         std::cout << "\tNeighbor through the " << side_to_string(geom::Side(i % 6)) << " face (" << i / 6 << "):\n";
 
-        if (face.adjacent.ghost > std::numeric_limits<int>::max()) {
+        if (face.adjacent.alien > std::numeric_limits<int>::max()) {
             // Локальная ячейка
             if (face.adjacent.index >= m_locals.size()) {
                 std::cout << "print_cell_info: Wrong connection #1 (It's acceptable for some intermediate refinement stages)";
@@ -104,11 +104,11 @@ void EuCell::print_neibs_info() const {
         }
         else {
             // Удаленная ячейка
-            if (face.adjacent.ghost >= m_aliens.size()) {
+            if (face.adjacent.alien >= m_aliens.size()) {
                 std::cout << "print_cell_info: Wrong connection #2 (It's acceptable for some intermediate refinement stages)";
             }
             else {
-                auto& neib = m_aliens[face.adjacent.ghost];
+                auto& neib = m_aliens[face.adjacent.alien];
                 neib.print_info();
             }
         }

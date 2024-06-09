@@ -151,13 +151,13 @@ AmrCell get_parent(AmrStorage &locals, AmrStorage &aliens,
         if (some_face.boundary != Boundary::ORDINARY &&
             some_face.boundary != Boundary::PERIODIC) {
             parent.faces[side].adjacent.rank = rank;
-            parent.faces[side].adjacent.ghost = -1;
+            parent.faces[side].adjacent.alien = -1;
             continue;
         }
 
         auto some_neib_rank = some_face.adjacent.rank;
         auto some_neib_index = some_face.adjacent.index;
-        auto some_neib_ghost = some_face.adjacent.ghost;
+        auto some_neib_ghost = some_face.adjacent.alien;
 #if SCRUTINY
         if (some_neib_rank == rank && some_neib_index >= locals.size()) {
             std::cout << "Child has no local neighbor through the " <<
@@ -187,14 +187,14 @@ AmrCell get_parent(AmrStorage &locals, AmrStorage &aliens,
                 child.print_info();
                 throw std::runtime_error("Child has no local neighbor (coarse_cell) #2");
             }
-            if (adj.rank != rank && adj.ghost >= aliens.size()) {
+            if (adj.rank != rank && adj.alien >= aliens.size()) {
                 std::cout << "Child has no remote neighbor through the " <<
                           side_to_string(side % 6) << " side #2\n";
                 child.print_info();
                 throw std::runtime_error("Child has no remote neighbor (coarse_cell) #2");
             }
 
-            auto& neib = adj.rank == rank ? locals[adj.index] : aliens[adj.ghost];
+            auto& neib = adj.rank == rank ? locals[adj.index] : aliens[adj.alien];
 
             auto neib_wanted_lvl = neib.level + neib.flag;
             if (neib_wanted_lvl != some_neib_wanted_lvl) {
@@ -207,7 +207,7 @@ AmrCell get_parent(AmrStorage &locals, AmrStorage &aliens,
         if (some_neib_wanted_lvl <= parent.level) {
             parent.faces[side].adjacent.rank = some_neib_rank;
             parent.faces[side].adjacent.index = some_neib_index;
-            parent.faces[side].adjacent.ghost = some_neib_ghost;
+            parent.faces[side].adjacent.alien = some_neib_ghost;
             continue;
         }
 
@@ -249,7 +249,7 @@ AmrCell get_parent(AmrStorage &locals, AmrStorage &aliens,
                 if ((pfaces[i] - cfaces[j]).norm() < eps) {
                     parent.faces[side + 6*j].adjacent.rank = child_face.adjacent.rank;
                     parent.faces[side + 6*j].adjacent.index = child_face.adjacent.index;
-                    parent.faces[side + 6*j].adjacent.ghost = child_face.adjacent.ghost;
+                    parent.faces[side + 6*j].adjacent.alien = child_face.adjacent.alien;
                     break;
                 }
             }

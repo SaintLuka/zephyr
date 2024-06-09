@@ -59,6 +59,17 @@ public:
                     m_data.size() * sizeof(Byte));
     }
 
+    /// @brief Конструктор копирования хранилища
+    Storage& operator=(const Storage &src) {
+        m_size = src.m_size;
+        m_itemsize = src.m_itemsize;
+        m_data.resize(src.m_data.size());
+
+        std::memcpy(m_data.data(), src.m_data.data(),
+                    m_data.size() * sizeof(Byte));
+        return *this;
+    }
+
     /// @brief Конструктор перемещения хранилища
     Storage(Storage &&src)
         : m_size(src.m_size),
@@ -122,6 +133,16 @@ public:
         inline Item& operator=(const Geom& g) {
             Geom::operator=(g);
             return *this;
+        }
+
+        /// @brief Указатель на начало элемента
+        inline Byte* ptr() {
+            return reinterpret_cast<Byte *>(this);
+        }
+
+        /// @brief Указатель на начало элемента
+        inline const Byte* ptr() const {
+            return reinterpret_cast<Byte *>(this);
         }
 
         /// @brief Указатель на данные элемента

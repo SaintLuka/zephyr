@@ -40,7 +40,7 @@ void PolyCell::print_info() const {
         std::cout << "\t\t\t\tnormal:     " << face.normal.transpose() << "\n";
         std::cout << "\t\t\t\tadj.rank:   " << face.adjacent.rank << "\n";
         std::cout << "\t\t\t\tadj.index:  " << face.adjacent.index << "\n";
-        std::cout << "\t\t\t\tadj.ghost:  " << face.adjacent.ghost << "\n";
+        std::cout << "\t\t\t\tadj.alien:  " << face.adjacent.alien << "\n";
     }
 }
 

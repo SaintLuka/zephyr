@@ -15,7 +15,7 @@ namespace zephyr::mesh::amr {
 /// @brief Функция вызывается перед непосредственным связыванием соседей.
 /// У ячеек выставляются параметры element.rank и element.index, также
 /// если ячейка имеет сосдеда на другом процессе, то выставляется
-/// face.adjacent.ghost = base_id (соседа на другом процессе). После
+/// face.adjacent.alien = base_id (соседа на другом процессе). После
 /// пересылки соседи находятся по base_id. Функция выполняется для части
 /// ячеек в хранилище.
 void before_exchange_partial(
@@ -41,11 +41,11 @@ void before_exchange_partial(
             }
 
             // Соседняя ячейка на другом процессе
-            scrutiny_check(face1.adjacent.ghost < aliens.size(), "face1.adjacent.ghost > aliens.size()")
+            scrutiny_check(face1.adjacent.alien < aliens.size(), "face1.adjacent.alien > aliens.size()")
 
-            auto neib = aliens[face1.adjacent.ghost];
+            auto neib = aliens[face1.adjacent.alien];
 
-            face1.adjacent.ghost = neib.b_idx;
+            face1.adjacent.alien = neib.b_idx;
         }
     }
 }
@@ -78,7 +78,7 @@ void before_exchange(AmrStorage& locals, AmrStorage& aliens, int rank, ThreadPoo
 #endif
 
 /// @brief Функция для поиска и связывания ячеек между двумя процессами.
-/// Соседи ищутся по base_id, который указан в face.adjacent.ghost.
+/// Соседи ищутся по base_id, который указан в face.adjacent.alien.
 template <int dim>
 void find_neighbors_partial(
         AmrStorage& locals,
@@ -97,12 +97,12 @@ void find_neighbors_partial(
             if (face1.is_undefined() or face1.is_boundary()) continue;
 
             // Локальный сосед, пропускаем
-            if (face1.adjacent.ghost > std::numeric_limits<int>::max()) {
+            if (face1.adjacent.alien > std::numeric_limits<int>::max()) {
                 continue;
             }
 
             // Теперь попытаемся найти alien с таким base_id
-            auto base_id = face1.adjacent.ghost;
+            auto base_id = face1.adjacent.alien;
 
             // Центр грани
             auto fc1 = face_center<dim>(face1, cell[vertices]);
@@ -125,7 +125,7 @@ void find_neighbors_partial(
                     if (distance(fc1, fc2) < 1.0e-5 * cell[size]) {
                         face1.adjacent.rank = neib[element].rank;
                         face1.adjacent.index = neib[element].index;
-                        face1.adjacent.ghost = in;
+                        face1.adjacent.alien = in;
 
                         found = true;
                         break;

@@ -22,7 +22,7 @@ void change_adjacent_one(AmrStorage::Item& cell, AmrStorage& cells) {
             continue;
         }
 
-        if (face.adjacent.ghost < 0) {
+        if (face.adjacent.alien < 0) {
             // Локальный сосед
 #if SCRUTINY
             int n_cells = cells.size();

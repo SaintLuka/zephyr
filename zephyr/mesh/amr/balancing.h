@@ -77,12 +77,12 @@ public:
                     throw std::runtime_error("Vicinity::setup error #11");
                 }
             } else {
-                if (adj.ghost >= aliens.size()) {
+                if (adj.alien >= aliens.size()) {
                     throw std::runtime_error("Vicinity::setup error #2");
                 }
             }
 #endif
-            AmrCell& neib = adj.rank == cell.rank ? locals[adj.index] : aliens[adj.ghost];
+            AmrCell& neib = adj.rank == cell.rank ? locals[adj.index] : aliens[adj.alien];
 
             neib_levels[neib_count] = neib.level;
             neib_flags[neib_count] = &neib.flag;

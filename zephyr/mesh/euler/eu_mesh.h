@@ -1,5 +1,6 @@
 #pragma once
 
+#include <zephyr/utils/mpi.h>
 #include <zephyr/utils/threads.h>
 
 #include <zephyr/geom/grid.h>
@@ -11,13 +12,26 @@
 #include <zephyr/mesh/euler/eu_face.h>
 #include <zephyr/mesh/euler/eu_cell.h>
 
+#include <zephyr/mesh/euler/tourist_agency.h>
+#include <zephyr/mesh/euler/migration_service.h>
+
+#include <zephyr/mesh/decomp/ORB.h>
+
 namespace zephyr::mesh {
 
 using zephyr::utils::threads;
 using namespace zephyr::geom;
 
+using zephyr::mesh::decomp::Decomposition;
+using zephyr::mesh::decomp::ORB;
+
 class EuMesh {
 public:
+    template<class T>
+    EuMesh(const T &val)
+            : m_locals(val, 0), m_aliens(val, 0) {
+
+    }
 
     template<class T>
     EuMesh(const T &val, Generator *gen)
@@ -88,12 +102,14 @@ public:
     /// с флагами amr.flag ячеек.
     void refine();
 
+    /// @brief Параллелизация по тредам
     template<int n_tasks_per_thread = 10, class Func, class... Args>
     void for_each(Func &&func, Args&&... args) {
         threads::for_each<n_tasks_per_thread>(begin(), end(),
                 std::forward<Func>(func), std::forward<Args>(args)...);
     }
 
+    /// @brief Параллельно по тредам посчитать минимум
     template<int n_tasks_per_thread = 10, class Func,
             class Value = typename std::result_of<Func(EuCell&)>::type>
     auto min(const Value &init, Func &&func)
@@ -101,12 +117,32 @@ public:
         return threads::min<n_tasks_per_thread>(begin(), end(), init, std::forward<Func>(func));
     }
 
+    /// @brief Параллельно по тредам посчитать минимум
     template<int n_tasks_per_thread = 10, class Func,
             class Value = typename std::result_of<Func(EuCell&)>::type>
     auto min(Func &&func)
     -> typename std::enable_if<std::is_arithmetic<Value>::value, Value>::type {
         return threads::min<n_tasks_per_thread>(begin(), end(), std::forward<Func>(func));
     }
+
+    /// @brief Ссылка на декомпозицию
+    const Decomposition& decomp() const { return *m_decomp; }
+
+    /// @brief Добавить ORB декомпозицию сетки
+    /// @param update Сразу перераспределить ячейки
+    void add_decomposition(const decomp::ORB& orb, bool update=true);
+
+    /// @brief Перераспределить ячейки между процессами в соответствии с рангом,
+    /// который выдает функция m_decomp::rank().
+    /// До вызова redistribute распределенная сетка должна быть согласована
+    /// и после вызова остается согласованной (массивы locals и aliens
+    /// корректно связаны).
+    void redistribute();
+
+    /// @brief Обмен данными между процессами, в массивы aliens записываются
+    /// данные с других процессов
+    void exchange();
+
 
     /// @brief Найти описывающий параллелепипед (Bounding box)
     geom::Box bbox();
@@ -146,11 +182,29 @@ private:
     /// функций адаптации, выполняется один раз после создания хранилища.
     void init_amr();
 
+    /// @brief Перераспределить ячейки между процессами, в соответствии
+    /// со значениями, которые выдает m_decomp
+    void migrate();
+
+    /// @brief Собрать обменные слои (aliens и сопутствующие члены),
+    /// не обязательно с пересылкой актуальных данных
+    void build_aliens();
+
+
     int m_max_level = 0;
     Distributor distributor;
 
-    AmrStorage m_locals;
-    AmrStorage m_aliens;
+    AmrStorage m_locals;  ///< Локальные ячейки
+    AmrStorage m_aliens;  ///< Ячейки с других процессов
+
+    /// @brief Все данные, связанные с обменными слоями
+    TouristAgency    m_tourism;
+
+    /// @brief Метод декомпозиции
+    Decomposition::Ptr m_decomp = nullptr;
+
+    /// @brief Все данные, связанные с пересылкой ячеек
+    MigrationService m_migration;
 
     /// @brief Массив уникальных узлов. Используется в редких алгоритмах,
     /// по умолчанию пустой, заполняются при вызове функции collect_nodes().

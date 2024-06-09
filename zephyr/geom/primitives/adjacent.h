@@ -7,7 +7,7 @@ namespace zephyr::geom {
 ///               local neib           remote neib
 ///    rank  :    == this.rank    |    != this.rank
 ///    index :    < locals.size   |    < decomposition(rank).locals.size
-///    ghost :    < 0             |    < aliens.size
+///    alien :    < 0             |    < aliens.size
 struct Adjacent {
 
     /// @brief Ранг процесса, на котором находится смежная ячейка
@@ -19,14 +19,14 @@ struct Adjacent {
     int index = -1;
 
     /// @brief Индекс смежной ячейки в массиве aliens.
-    int ghost = -1;
+    int alien = -1;
 
     /// @brief Конструктор по-умолчанию.
     Adjacent() = default;
 
     /// @brief Оператор сравнения
     bool operator!=(const Adjacent& adj) const {
-        return adj.rank != rank || adj.index != index || adj.ghost != ghost;
+        return adj.rank != rank || adj.index != index || adj.alien != alien;
     }
 };
 

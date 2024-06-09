@@ -41,14 +41,14 @@ void retain_cell(AmrCell& cell, AmrStorage &locals, AmrStorage& aliens) {
             cell.print_info();
             throw std::runtime_error("AmrCell has no local neighbor (retain_cell)");
         }
-        if (adj.rank != rank && adj.ghost >= aliens.size()) {
+        if (adj.rank != rank && adj.alien >= aliens.size()) {
             std::cout << "AmrCell has no remote neighbor through the " <<
                 side_to_string(side % 6) << " side\n";
             cell.print_info();
             throw std::runtime_error("AmrCell has no remote neighbor (retain_cell)");
         }
 #endif
-        const AmrCell& neib = (adj.rank == rank ? locals[adj.index] : aliens[adj.ghost]);
+        const AmrCell& neib = (adj.rank == rank ? locals[adj.index] : aliens[adj.alien]);
         auto lvl_n = neib.level;
 
         if (lvl_c == lvl_n) {

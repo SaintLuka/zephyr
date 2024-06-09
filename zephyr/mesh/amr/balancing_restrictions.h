@@ -83,7 +83,7 @@ void check_flags(AmrStorage& locals, AmrStorage& aliens, int max_level) {
             auto &adj = face.adjacent;
 
             auto& neib = adj.rank == cell.rank ?
-                        locals[adj.index] : aliens[adj.ghost];
+                        locals[adj.index] : aliens[adj.alien];
 
             int neib_wanted_lvl = neib.level + neib.flag;
             if (std::abs(cell_wanted_lvl - neib_wanted_lvl) > 1) {

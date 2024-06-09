@@ -60,7 +60,7 @@ std::array<AmrCell, CpC(dim)> get_children(AmrCell &cell) {
         for (int s = 0; s < FpC(dim); ++s) {
             child.faces[s].adjacent.rank = cell.rank;
             child.faces[s].adjacent.index = cell.index;
-            child.faces[s].adjacent.ghost = -1;
+            child.faces[s].adjacent.alien = -1;
         }
     }
 
@@ -186,11 +186,11 @@ void refine_cell(AmrStorage::Item& parent, AmrStorage &locals, AmrStorage &alien
             else {
                 // Удаленная ячейка
 #if SCRUTINY
-                if (adj.ghost >= aliens.size()) {
-                    throw std::runtime_error("adjacent.ghost out of range (refine_cell)");
+                if (adj.alien >= aliens.size()) {
+                    throw std::runtime_error("adjacent.alien out of range (refine_cell)");
                 }
 #endif
-                auto& neib = aliens[adj.ghost];
+                auto& neib = aliens[adj.alien];
                 nei_wanted_lvl = neib.level + neib.flag;
             }
 
