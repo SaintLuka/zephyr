@@ -51,7 +51,7 @@ public:
     double density(const double &x) const { return x < x_jump ? rL : rR; }
 
     /// @brief Начальная скорость
-    Vector3d velocity(const double &x) const { return {x < x_jump ? uL : uR, 0.0, 0.0}; }
+    Vector3d velocity(const double &x) const { return { x < x_jump ? uL : uR, 0.0, 0.0}; }
 
     /// @brief Начальное давление
     double pressure(const double &x) const { return x < x_jump ? pL : pR; }

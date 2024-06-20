@@ -79,18 +79,18 @@ PlaneWithHole::PlaneWithHole(
         double ymin, double ymax,
         double xc, double yc,
         double r) :
-        BlockStructured(12),
+        BlockStructured(4), //12
         m_xmin(xmin), m_xmax(xmax),
         m_ymin(ymin), m_ymax(ymax),
         m_xc(xc), m_yc(yc),
-        m_r(r), m_xi(2.0),
-        m_bounds() {
+        m_r(r), m_xi(2.0) {
 
     m_name = "collection.plane-with-hole";
 
     init_blocks();
 }
 
+/*
 void PlaneWithHole::set_nx(int Nx) {
     // Характерный размер ячейки
     double DX = (m_xmax - m_xmin) / Nx;
@@ -148,19 +148,61 @@ void PlaneWithHole::set_nx(int Nx) {
     m_blocks[2].set_size(v3, v4, Nx2);
     m_blocks[10].set_size(v18, v19, np);
 
-    m_blocks[0].set_size(v1, v5, Ny1);
+    m_blocks[0].set_size(v1, v5, Ny1); 
     m_blocks[3].set_size(v5, v13, np);
     m_blocks[9].set_size(v13, v17, Ny2);
     m_blocks[8].set_size(v8, v16, np);
 
     m_blocks[4].set_size(v6, v9, nr);
 }
+*/
 
+void PlaneWithHole::set_nx(int Nx) {
+
+    double H = m_ymax - m_ymin;
+    double H1 = m_yc - m_ymin;
+    double H2 = m_ymax - m_yc;
+    
+    double L = m_xmax - m_xmin;
+    double L1 = m_xc - m_xmin;
+    double L2 = m_xmax - m_xc;
+
+    double a1 = std::atan(H1 / L1);
+    double a2 = std::atan(H2 / L1);
+    double a3 = std::atan(H1 / L2);
+    double a4 = std::atan(H2 / L2); 
+
+    int N1 = (int)(Nx * L1 / L2);
+    int N2 = Nx - N1;
+
+    int Ny = (int)(Nx * H / L); 
+
+    double xi1 = L1 / m_r; // Соотношение "окружностей"
+    int Nr1 = (int)(std::log(xi1) / std::log(1.0 + a1 / N1));
+    int Nr2 = (int)(std::log(xi1) / std::log(1.0 + a2 / N1));
+
+    double xi2 = L2 / m_r;
+    int Nr3 = (int)(std::log(xi2) / std::log(1.0 + a3 / N2));
+    int Nr4 = (int)(std::log(xi2) / std::log(1.0 + a4 / N2)); 
+
+    m_blocks[0].set_size(v2, v1, Nr1);
+    m_blocks[0].set_size(v2, v8, Ny);
+
+    m_blocks[1].set_size(v3, v4, Nr3);
+    m_blocks[1].set_size(v1, v3, Ny);
+
+    m_blocks[2].set_size(v6, v5, Nr4);
+    m_blocks[2].set_size(v4, v6, Ny);
+
+    m_blocks[3].set_size(v7, v8, Nr2);
+    m_blocks[3].set_size(v5, v7, Ny);
+}
 
 void PlaneWithHole::set_boundaries(Boundaries bounds) {
     m_bounds = bounds;
 }
 
+/*
 void PlaneWithHole::init_blocks() {
     check_params();
 
@@ -169,7 +211,7 @@ void PlaneWithHole::init_blocks() {
     double x_r = m_xc + xi * m_r;
     double y_b = m_yc - xi * m_r;
     double y_t = m_yc + xi * m_r;
-
+    
     double a = m_r / std::sqrt(2.0);
 
     // Задаем базисные вершины для струтурированных блоков
@@ -258,7 +300,65 @@ void PlaneWithHole::init_blocks() {
     // Точность сглаживания (необязательно)
     set_accuracy(1.0e-5);
 }
+*/
 
+void PlaneWithHole::init_blocks() {
+    check_params();
+
+    v1 = BaseVertex::create(m_xmin, m_ymin, true);
+    v3 = BaseVertex::create(m_xmax, m_ymin, true);
+    v5 = BaseVertex::create(m_xmax, m_ymax, true);
+    v7 = BaseVertex::create(m_xmin, m_ymax, true);
+
+    v2 = BaseVertex::create(m_xc - m_r * std::sin(M_PI / 5.0), 
+                            m_yc - m_r * std::cos(M_PI / 5.0), 
+                            true);
+    v4 = BaseVertex::create(m_xc + m_r * std::sin(M_PI / 3.0),
+                            m_yc - m_r * std::cos(M_PI / 3.0),
+                            true);
+    v6 = BaseVertex::create(m_xc + m_r * std::sin(M_PI / 3.0),
+                            m_yc + m_r * std::cos(M_PI / 3.0), 
+                            true);
+    v8 = BaseVertex::create(m_xc - m_r * std::sin(M_PI / 5.0),
+                            m_yc + m_r * std::cos(M_PI / 5.0), 
+                            true);
+
+    // Ограничивающие прямые области
+    circle = Circle::create(m_r, {m_xc, m_yc, 0.0});
+    left   = Plane::create(v1, v7);
+    right  = Plane::create(v3, v5);
+    bottom = Plane::create(v1, v3);
+    top    = Plane::create(v5, v7);
+
+    left->set_boundary(m_bounds.left);
+    right->set_boundary(m_bounds.right);
+    bottom->set_boundary(m_bounds.bottom);
+    top->set_boundary(m_bounds.top);
+    circle->set_boundary(m_bounds.hole);
+
+    // Генератор сетки
+    m_blocks[0] = {v1, v2, v7, v8};
+    m_blocks[0].set_boundary(v1, v7, left);
+    m_blocks[0].set_boundary(v2, v8, circle);
+
+    m_blocks[1] = {v1, v3, v2, v4};
+    m_blocks[1].set_boundary(v1, v3, bottom);
+    m_blocks[1].set_boundary(v2, v4, circle);
+
+    m_blocks[2] = {v3, v4, v6, v5};
+    m_blocks[2].set_boundary(v3, v5, right);
+    m_blocks[2].set_boundary(v4, v6, circle);
+
+    m_blocks[3] = {v5, v6, v7, v8};
+    m_blocks[3].set_boundary(v5, v7, top);
+    m_blocks[3].set_boundary(v6, v8, circle);
+
+    // Необходимо связать блоки
+    link();
+
+    // Точность сглаживания (необязательно)
+    set_accuracy(1.0e-5);
+}
 
 Box PlaneWithHole::bbox() const {
     Vector3d vmin(m_xmin, m_ymin, 0.0);

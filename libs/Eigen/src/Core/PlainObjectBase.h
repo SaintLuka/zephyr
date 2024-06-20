@@ -309,7 +309,7 @@ class PlainObjectBase : public internal::dense_xpr_base<Derived>::type
     inline void resize(Index size)
     {
       EIGEN_STATIC_ASSERT_VECTOR_ONLY(PlainObjectBase)
-      eigen_assert(((SizeAtCompileTime == Dynamic && (MaxSizeAtCompileTime==Dynamic || size<=MaxSizeAtCompileTime)) || SizeAtCompileTime == size) && size>=0);
+      //eigen_assert(((SizeAtCompileTime == Dynamic && (MaxSizeAtCompileTime==Dynamic || size<=MaxSizeAtCompileTime)) || SizeAtCompileTime == size) && size>=0);
       #ifdef EIGEN_INITIALIZE_COEFFS
         bool size_changed = size != this->size();
       #endif

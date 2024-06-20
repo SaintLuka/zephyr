@@ -91,8 +91,8 @@ double vanAlbada2(double r) {
 
 double vanAlbada2(double a, double b) {
     if (a * b <= 0.0) { return 0.0; }
-
-    return 2.0 * a * b / (sqr(a) + sqr(b));
+    double eps = 10e-6;
+    return (2.0 * a * b + eps) / (sqr(a) + sqr(b) + eps);
 }
 
 double CHARM(double r) {

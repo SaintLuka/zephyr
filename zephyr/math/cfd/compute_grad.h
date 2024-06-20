@@ -22,7 +22,6 @@ void check_matrix(const Matrix<double, row, col> &m, const std::string &name) {
 template<class T>
 std::array<T, 3> compute_grad_gauss(Cell &cell, const std::function<T(Cell &)> &to_state) {
     std::array<T, 3> z_xyz;
-
     T zc = to_state(cell);
 
     for (auto &face: cell.faces()) {
@@ -30,7 +29,6 @@ std::array<T, 3> compute_grad_gauss(Cell &cell, const std::function<T(Cell &)> &
         T zn = to_state(neib);
 
         Eigen::Vector3d S = face.normal() * face.area();
-
         double d1 = abs(1 / (face.center() - cell.center()).dot(face.normal()));
         double d2 = abs(1 / (face.center() - neib.center()).dot(face.normal()));
         double a1 = d1 / (d1 + d2), a2 = d2 / (d1 + d2);
@@ -83,6 +81,7 @@ std::array<T, 3> compute_gradient_LSM(Cell &cell,
     if (Fz.squaredNorm() < 1e-10 && abs(A(2, 2)) < 1e-10) {
         A(2, 2) = 1;
     }
+
     check_matrix(A, "A");
     check_matrix(Fx, "Fx");
     check_matrix(Fy, "Fy");

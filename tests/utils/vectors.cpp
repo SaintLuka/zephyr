@@ -146,7 +146,7 @@ protected:
 
 template <typename container>
 std::ostream& operator<<(std::ostream& os, const Vector<container>& vec) {
-    std::cout << std::fixed << std::setprecision(3);
+    std::cout << std::fixed << std::setprecision(6);
     std::cout << "{ ";
     for (int i = 0; i < vec.size() - 1; ++i) {
         os << std::setw(6) << vec[i] << ", ";

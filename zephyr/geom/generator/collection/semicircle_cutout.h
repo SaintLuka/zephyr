@@ -27,7 +27,7 @@ public:
     /// @param xc -- Центр выреза
     /// @param r -- Радиус выреза
     SemicircleCutout(double xmin, double xmax, double ymin, double ymax,
-                  double xc, double r);
+                  double xc, double r, Boundaries bounds);
 
     /// @brief Создать указатель на класс
     template <class... Args>

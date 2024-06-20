@@ -27,7 +27,7 @@ public:
     /// @param xw -- Положение клина
     /// @param phi -- Угол наклона
     Wedge(double xmin, double xmax, double ymin, double ymax,
-                  double xw, double phi);
+                  double xw, double phi, Boundaries bounds);
 
     /// @brief Создать указатель на класс
     template <class... Args>

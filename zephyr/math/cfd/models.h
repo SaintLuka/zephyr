@@ -25,7 +25,7 @@ struct PState {
     double pressure;
     double energy;
 
-    PState() : density(0), velocity(0), pressure(0), energy(0)
+    PState() : density(0), velocity(0,0,0), pressure(0), energy(0)
     {}
 
     PState(const double &density, const Vector3d &velocity,
@@ -46,6 +46,20 @@ struct PState {
     [[nodiscard]] PState in_global(const Vector3d &normal) const;
 
     friend std::ostream &operator<<(std::ostream &os, const PState &state);
+
+    PState operator+(const PState &state) {
+        return PState(this->density + state.density, 
+                      this->velocity + state.velocity,
+                      this->pressure + state.pressure,
+                      this->energy + state.energy);
+    }
+
+    PState operator-(const PState &state) {
+        return PState(this->density - state.density, 
+                      this->velocity - state.velocity,
+                      this->pressure - state.pressure,
+                      this->energy - state.energy);
+    }
 
     VECTORIZE(PState)
 };

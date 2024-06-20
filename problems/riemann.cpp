@@ -10,9 +10,11 @@ using zephyr::geom::generator::collection::SemicircleCutout;
 #include <zephyr/math/cfd/models.h>
 #include <zephyr/phys/tests/sod.h>
 #include <zephyr/phys/tests/toro.h>
+#include <zephyr/phys/tests/shu_osher.h>
 
 #include <zephyr/math/solver/riemann.h>
 #include <zephyr/phys/eos/stiffened_gas.h>
+#include <zephyr/math/solver/sm_fluid.h>
 
 using namespace zephyr::phys;
 using namespace zephyr::math;
@@ -20,39 +22,29 @@ using namespace zephyr::math::smf;
 
 using zephyr::math::RiemannSolver;
 
-struct _U_ {
-    double rho1, rho2;
-    Vector3d v1, v2;
-    double p1, p2;
-    double e1, e2;
-};
 
 // Для быстрого доступа по типу
-_U_ U;
+SmFluid::State U;
 
 /// Переменные для сохранения
-double get_rho(AmrStorage::Item& cell) { return cell(U).rho1; }
-
-double get_u(AmrStorage::Item& cell) { return cell(U).v1.x(); }
-
-double get_v(AmrStorage::Item& cell) { return cell(U).v1.y(); }
-
-double get_w(AmrStorage::Item& cell) { return cell(U).v1.z(); }
-
-double get_p(AmrStorage::Item& cell) { return cell(U).p1; }
-
-double get_e(AmrStorage::Item& cell) { return cell(U).e1; }
+double get_rho(AmrStorage::Item& cell) { return cell(U).rho; }
+double get_u(AmrStorage::Item& cell) { return cell(U).v.x(); }
+double get_v(AmrStorage::Item& cell) { return cell(U).v.y(); }
+double get_w(AmrStorage::Item& cell) { return cell(U).v.z(); }
+double get_p(AmrStorage::Item& cell) { return cell(U).p; }
+double get_e(AmrStorage::Item& cell) { return cell(U).e; }
 
 
 int main() {
     // Тестовая задача
-    //SodTest test;
-    ToroTest test(3);
+    SodTest test;
+    // ToroTest test(2);
     // test.inverse();
+    // ShuOsherTest test;
 
     // Уравнение состояния
     Eos& eos = test.eos;
-    //StiffenedGas eos(1.367, 0.113, 0.273);
+    // StiffenedGas eos(1.367, 0.113, 0.273);
     StiffenedGas sg = eos.stiffened_gas(1.0, 1.0);
 
     // Состояния слева и справа в тесте
@@ -64,10 +56,10 @@ int main() {
               test.pressure(Ox), test.energy(Ox));
 
     // Точное решение задачи Римана
-    RiemannSolver exact(zL, zR, sg, test.x_jump);
+    RiemannSolver exact(zL, zR, sg, test.get_x_jump());
 
     // Файл для записи
-    PvdFile pvd("mesh", "output");
+    PvdFile pvd("mesh", "/mnt/d/test"); 
 
     // Переменные для сохранения
     pvd.variables += {"rho", get_rho};
@@ -95,7 +87,7 @@ int main() {
                       }};
     pvd.variables += {"c",
                       [&eos](AmrStorage::Item& cell) -> double {
-                          return eos.sound_speed_rp(cell(U).rho1, cell(U).p1);
+                          return eos.sound_speed_rp(cell(U).rho, cell(U).p);
                       }};
     pvd.variables += {"c_exact",
                       [&exact, &time](const AmrStorage::Item &cell) -> double {
@@ -103,14 +95,14 @@ int main() {
                       }};
 
     // Часть области с регулярной сеткой
-    auto fix_condition = [&test](const Vector3d& v) {
-        return v.x() <= test.x_jump + 0.01 * (test.xmax() - test.xmin());
-    };
+    // auto fix_condition = [&test](const Vector3d& v) {
+    //     return v.x() <= test.x_jump + 0.01 * (test.xmax() - test.xmin());
+    // };
 
     // Создаем одномерную сетку
-    //Strip gen(test.xmin(), test.xmax());
-    //int n_cells = 5000;
-    //gen.set_size(n_cells);
+    Strip gen(test.xmin(), test.xmax());
+    int n_cells = 10;
+    gen.set_size(n_cells);
 
     //Wedge gen(0.40, 0.9, 0.0, 0.20, 0.6, 0.1 * M_PI);
     //gen.set_nx(200);
@@ -118,154 +110,60 @@ int main() {
     //gen.set_boundaries({.left=Boundary::ZOE, .right=Boundary::WALL,
     //                    .bottom=Boundary::WALL, .top=Boundary::ZOE});
 
-    SemicircleCutout gen(0.49, 0.7, 0.0, 0.07, 0.6, 0.02);
-    gen.set_ny(50);
-    gen.set_fixed(fix_condition);
-    gen.set_boundaries({.left=Boundary::ZOE, .right=Boundary::ZOE,
-                        .bottom=Boundary::WALL, .top=Boundary::ZOE});
+    // SemicircleCutout gen(0.49, 0.7, 0.0, 0.07, 0.6, 0.02);
+    // gen.set_ny(10);
+    // gen.set_fixed(fix_condition);
+    // gen.set_boundaries({.left=Boundary::ZOE, .right=Boundary::ZOE,
+    //                     .bottom=Boundary::WALL, .top=Boundary::ZOE});
 
     // Создать сетку
     EuMesh mesh(U, &gen);
-    int n_cells = mesh.n_cells();
+    //int n_cells = mesh.n_cells();
 
-    // Заполняем начальные данные
-    for (auto cell: mesh) {
-        cell(U).rho1 = test.density(cell.center());
-        cell(U).v1   = test.velocity(cell.center());
-        cell(U).p1   = test.pressure(cell.center());
-        cell(U).e1   = eos.energy_rp(cell(U).rho1, cell(U).p1);
+    // Создать решатель
+    auto solver = zephyr::math::SmFluid(eos, Fluxes::GODUNOV);
+
+    solver.init_cells(mesh, test);
+    solver.set_accuracy(2);
+    
+    mesh.set_max_level(3);
+    mesh.set_distributor(solver.distributor());
+
+    for (int k = 0; k < mesh.max_level() + 3; ++k) {
+        solver.init_cells(mesh, test);
+        solver.set_flags(mesh);
+        mesh.refine();
     }
 
     // Число Куранта
-    double CFL = 0.5;
-
-    // Функция вычисления потока
-    // NumFlux::Ptr nf = CIR1::create();
-       NumFlux::Ptr nf = HLLC::create();
-    // NumFlux::Ptr nf = Rusanov::create();
-    // NumFlux::Ptr nf = Godunov::create();
-    // NumFlux::Ptr nf = HLL::create();
+    double CFL = 0.9;
+    solver.set_CFL(CFL);
 
     double next_write = 0.0;
     size_t n_step = 0;
 
     while (time <= 1.01 * test.max_time()) {
+
         if (time >= next_write) {
             std::cout << "\tStep: " << std::setw(6) << n_step << ";"
-                      << "\t\tTime: " << std::setw(8) << std::setprecision(3) << time << "\n";
+                      << "\tTime: " << std::setw(6) << std::setprecision(3) << time << "\n";
             pvd.save(mesh, time);
             next_write += test.max_time() / 100;
         }
 
-        // Определяем dt
-        double dt = std::numeric_limits<double>::max();
-        for (auto& cell: mesh) {
-            // скорость звука
-            double c = eos.sound_speed_rp(cell(U).rho1, cell(U).p1);
-            for (auto &face: cell.faces()) {
-                // Нормальная составляющая скорости
-                double vn = cell(U).v1.dot(face.normal());
-
-                // Максимальное по модулю СЗ
-                double lambda = std::max(std::abs(vn + c), std::abs(vn - c));
-
-                // Условие КФЛ
-                dt = std::min(dt, cell.volume() / face.area() / lambda);
-            }
-        }
-        dt *= CFL;
-
-        // Расчет по некоторой схеме
-        for (auto& cell: mesh) {
-            // Примитивный вектор в ячейке
-            PState zc(cell(U).rho1, cell(U).v1, cell(U).p1, cell(U).e1);
-
-            // Консервативный вектор в ячейке
-            QState qc(zc);
-
-            // Переменная для потока
-            Flux flux;
-            for (auto &face: cell.faces()) {
-                // Внешняя нормаль
-                auto &normal = face.normal();
-
-                // Примитивный вектор соседа
-                PState zn(zc);
-
-                if (!face.is_boundary()) {
-                    auto neib = face.neib();
-                    zn.density = neib(U).rho1;
-                    zn.velocity = neib(U).v1;
-                    zn.pressure = neib(U).p1;
-                    zn.energy = neib(U).e1;
-                }
-                else if (face.flag() == Boundary::WALL) {
-                    Vector3d Vn = normal * zc.velocity.dot(normal);
-                    zn.velocity = zc.velocity - 2.0 * Vn;
-                }
-
-                // Значение на грани со стороны ячейки
-                PState zm = zc.in_local(normal);
-
-                // Значение на грани со стороны соседа
-                PState zp = zn.in_local(normal);
-
-                // Численный поток на грани
-                auto loc_flux = nf->flux(zm, zp, eos);
-                loc_flux.to_global(normal);
-
-                // Суммируем поток
-                flux.vec() += loc_flux.vec() * face.area();
-            }
-
-            // Новое значение в ячейке (консервативные переменные)
-            QState Qc = qc.vec() - dt * flux.vec() / cell.volume();
-
-            // Новое значение примитивных переменных
-            PState Zc(Qc, eos);
-
-            cell(U).rho2 = Zc.density;
-            cell(U).v2   = Zc.velocity;
-            cell(U).p2   = Zc.pressure;
-            cell(U).e2   = Zc.energy;
-        }
-
         // Обновляем слои
-        for (auto& cell: mesh) {
-            std::swap(cell(U).rho1, cell(U).rho2);
-            std::swap(cell(U).v1, cell(U).v2);
-            std::swap(cell(U).p1, cell(U).p2);
-            std::swap(cell(U).e1, cell(U).e2);
-        }
+        solver.update(mesh);
+
+        solver.set_flags(mesh);
+        mesh.refine();
 
         n_step += 1;
-        time += dt;
-    }
-    
-    CsvFile::save("results.csv", mesh, 5, pvd.variables);
-
-    // расчёт ошибок
-    double rho_err = 0.0, u_err = 0.0, p_err = 0.0, e_err = 0.0, c_err = 0.0;
-    time = test.max_time();
-    for (auto cell: mesh) {
-        double x = cell.center().x();
-        rho_err += abs(cell(U).rho1 - exact.density(x, time));
-        u_err += abs(cell(U).v1.x() - exact.velocity(x, time));
-        p_err += abs(cell(U).p1 - exact.pressure(x, time));
-        e_err += abs(cell(U).e1 - exact.energy(x, time));
-        c_err += abs(eos.sound_speed_rp(cell(U).rho1, cell(U).p1) - exact.sound_speed(x, time));
+        time = solver.get_time();
     }
 
     auto fprint = [](const std::string &name, double value) {
         std::cout << name << ": " << value << '\n';
     };
-
-    std::cout << "Mean average errors:\n";
-    fprint("\tdensity error     ", rho_err / n_cells);
-    fprint("\tu error           ", u_err / n_cells);
-    fprint("\tpressure error    ", p_err / n_cells);
-    fprint("\tenergy error      ", e_err / n_cells);
-    fprint("\tsound speed error ", c_err / n_cells);
 
     return 0;
 }

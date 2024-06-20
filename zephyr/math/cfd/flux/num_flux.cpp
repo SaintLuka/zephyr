@@ -22,6 +22,10 @@ NumFlux::Ptr NumFlux::create(Fluxes flux) {
             return Rusanov::create();
         case Fluxes::RUSANOV2:
             return Rusanov2::create();
+        case Fluxes::HLLC_central:
+            return HLLC_central::create();
+        case Fluxes::HLLC_LM:
+            return HLLC_LM::create();
         default:
             throw std::runtime_error("Unknown numerical flux");
     }

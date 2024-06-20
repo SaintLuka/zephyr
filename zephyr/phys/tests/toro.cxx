@@ -3,8 +3,7 @@
 namespace zephyr {
 namespace phys {
 
-ToroTest::ToroTest(int num)
-        : eos(1.4) {
+ToroTest::ToroTest(int num) : eos(1.4) {
 
     switch (num) {
         case 1:

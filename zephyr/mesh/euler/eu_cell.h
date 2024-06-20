@@ -11,6 +11,7 @@ namespace zephyr::mesh {
 
 using zephyr::geom::Adjacent;
 using zephyr::geom::Vector3d;
+using zephyr::geom::Vector2d;
 
 /// @brief Ячейка (итератор для доступа к элементам класса EuMesh)
 /// @details Копирует функции AmrStorage::Item, а также добавляет

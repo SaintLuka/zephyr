@@ -457,8 +457,8 @@ void test2(double phi1, double phi2, double alpha1, double alpha2) {
 }
 
 int main() {
-    //test1(0.01 * M_PI, 0.51 * M_PI, 0.12, 0.1);
-    test2(0.0, NAN, 0.22, 0.0);
+    test1(0.01 * M_PI, 0.51 * M_PI, 0.12, 0.1);
+    //test2(0.0, NAN, 0.22, 0.0);
 
     return 0;
 }
