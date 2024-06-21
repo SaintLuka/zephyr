@@ -15,7 +15,9 @@ public:
 
     AmrStorage m_border;
 
+#ifdef ZEPHYR_ENABLE_MPI
     std::vector<MPI_Status> m_status;
+#endif
 };
 
 } // namespace zephyr::mesh

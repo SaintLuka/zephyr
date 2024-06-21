@@ -1,14 +1,14 @@
 #pragma once
 
-#include <zephyr/geom/vector.h>
 #include <zephyr/phys/eos/ideal_gas.h>
+#include <zephyr/phys/tests/test_1D.h>
 
-namespace zephyr { namespace phys {
+namespace zephyr::phys {
 
 /// @brief Тест Шу-Ошера 
 /// C.-W. Shu and S. Osher. Efficient Implementation of Essentially 
 /// Non-oscillatory Shock-Capturing Schemes, II (1988)
-class ShuOsherTest {
+class ShuOsherTest : public Test1D {
 public:
 
     /// @brief Начальные данные
@@ -24,37 +24,64 @@ public:
         epsilon = 0.2;
     }
 
+    /// @brief Получить название теста
+    std::string get_name() const { return "Shu Osher"; };
+
     /// @brief Используемое уравнение состояния
-    IdealGas& eos() { return m_eos; }
+    const Eos& get_eos() const final { return m_eos; }
 
     /// @brief Левая граница области
-    double xmin() const { return -5.0; }
+    double xmin() const final { return -5.0; }
 
     /// @brief Правая граница области
-    double xmax() const { return +5.0; }
+    double xmax() const final { return +5.0; }
 
     /// @brief Конечный момент времени
-    double max_time() const { return 2.0; }
+    double max_time() const final { return 2.0; }
+
+    /// @brief Получить положение разрыва
+    double get_x_jump() const final { return x_jump; };
 
 
     /// @brief Начальная плотность
-    double density(const Vector3d &r) const {
-        return r.x() < x_jump ? rL : rR + epsilon * std::sin(5.0 * r.x());
+    double density(double x) const final {
+        return x < x_jump ? rL : rR + epsilon * std::sin(5.0 * x);
     }
 
     /// @brief Начальная скорость
-    Vector3d velocity(const Vector3d &r) const {
-        return {r.x() < x_jump ? uL : uR, 0.0, 0.0};
+    Vector3d velocity(double x) const final {
+        return {x < x_jump ? uL : uR, 0.0, 0.0};
     }
 
     /// @brief Начальное давление
-    double pressure(const Vector3d &r) const {
-        return r.x() < x_jump ? pL : pR;;
+    double pressure(double x) const final {
+        return x < x_jump ? pL : pR;;
     }
 
     /// @brief Начальная внутренняя энергия
-    double energy(const Vector3d &r) const {
-        return m_eos.energy_rp(density(r), pressure(r));
+    double energy(double x) const final {
+        return m_eos.energy_rp(density(x), pressure(x));
+    }
+
+
+    /// @brief Начальная плотность
+    double density(const Vector3d& r) const final {
+        return density(r.x());
+    }
+
+    /// @brief Начальная скорость
+    Vector3d velocity(const Vector3d& r) const final {
+        return velocity(r.x());
+    }
+
+    /// @brief Начальное давление
+    double pressure(const Vector3d& r) const final {
+        return pressure(r.x());
+    }
+
+    /// @brief Начальная внутренняя энергия
+    double energy(const Vector3d& r) const final {
+        return energy(r.x());
     }
 
 private:
@@ -67,5 +94,4 @@ private:
     const double x_jump = -4.0;
 };
 
-}
-}
+} // namespace zephyr::phys

@@ -56,21 +56,21 @@ public:
     explicit SmFluid(const phys::Eos &eos, Fluxes flux = Fluxes::HLLC);
 
     /// @brief Число Куранта
-    [[nodiscard]] double CFL() const;
+    double CFL() const;
 
     /// @brief Установить число Куранта
     void set_CFL(double CFL);
 
     void set_acc(int acc);
 
-    [[nodiscard]] double get_time() const;
+    double get_time() const;
 
-    [[nodiscard]] size_t get_step() const;
+    size_t get_step() const;
 
-    [[nodiscard]] std::string get_flux_name() const;
+    std::string get_flux_name() const;
 
     /// @brief Шаг интегрирования на предыдущем вызове update()
-    [[nodiscard]] double dt() const;
+    double dt() const;
 
     void update(Mesh &mesh);
 
@@ -94,10 +94,6 @@ public:
             cell(U).p = test.pressure(cell.center());
             cell(U).e = m_eos.energy_rp(cell(U).rho, cell(U).p);
         }
-    }
-
-    double get_m_dt() {
-        return m_dt;
     }
 
 private:

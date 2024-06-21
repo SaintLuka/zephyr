@@ -78,7 +78,10 @@ std::array<T, 3> compute_gradient_LSM(Cell &cell,
         Fz += weight * dF * dr.z();
     }
 
-    if (Fz.squaredNorm() < 1e-10 && abs(A(2, 2)) < 1e-10) {
+    if (std::abs(A(1, 1)) < 1e-14) {
+        A(1, 1) = 1;
+    }
+    if (std::abs(A(2, 2)) < 1e-14) {
         A(2, 2) = 1;
     }
 
@@ -140,7 +143,10 @@ std::array<T, 3> gradient_limiting(Cell &cell, const std::array<T, 3> &grad,
         Fz += weight * dF_lim * dr.z();
     }
 
-    if (Fz.squaredNorm() < 1e-10 && abs(A(2, 2)) < 1e-10) {
+    if (std::abs(A(1, 1)) < 1e-14) {
+        A(1, 1) = 1;
+    }
+    if (std::abs(A(2, 2)) < 1e-14) {
         A(2, 2) = 1;
     }
     check_matrix(A, "A");

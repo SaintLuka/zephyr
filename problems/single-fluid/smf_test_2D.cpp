@@ -1,4 +1,4 @@
-#include "fast.h"
+#include "problems/fast.h"
 
 #include <zephyr/geom/generator/collection/wedge.h>
 #include <zephyr/geom/generator/collection/semicircle_cutout.h>
@@ -8,7 +8,7 @@
 
 #include <zephyr/math/cfd/fluxes.h>
 #include <zephyr/math/cfd/models.h>
-#include <zephyr/phys/tests/mach.h>
+#include <zephyr/phys/tests/quirck.h>
 #include <zephyr/phys/tests/sod.h>
 #include <zephyr/phys/tests/sedov.h>
 #include <zephyr/phys/tests/RiemannTest2D.h>
@@ -51,7 +51,7 @@ int main() {
     threads::on(16);
 
     // Тестовая задача
-    Mach test(2.85, 1.275, 0.5);
+    QuirckTest test(2.85, 1.275, 0.5);
     // ToroTest test(1);
     // SodTest test;
     // RiemannTest2D test(6);
@@ -62,7 +62,7 @@ int main() {
     Eos& eos = test.eos;
 
     // Файл для записи
-    PvdFile pvd("mesh", "/mnt/c/cube_plane2"); //blastfail
+    PvdFile pvd("mesh", "output/cube_plane2"); //blastfail
     pvd.unique_nodes = true;
 
     // Переменные для сохранения

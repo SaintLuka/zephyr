@@ -43,7 +43,7 @@ int main() {
     ShuOsherTest test;
 
     // Уравнение состояния
-    Eos& eos = test.eos();
+    auto& eos = test.get_eos();
 
     // Создаем одномерную сетку
     Strip gen(test.xmin(), test.xmax());

@@ -259,6 +259,9 @@ public:
     /// @brief Приложение однопроцессорное?
     static constexpr bool single() { return true; }
 
+    /// @brief Сеть коммуникаций
+    inline static constexpr bool comm() { return false; };
+
     /// @brief Блокирует все процессы данной сети, пока они не достигнут
     /// данного вызова.
     static void barrier() { };

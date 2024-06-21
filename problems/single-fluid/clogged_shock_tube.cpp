@@ -1,14 +1,28 @@
-/// @file Решение задачи распространения ударных волн в протяженных каналах с препятствиями
-/// Используется схема SmFluid
+/// @file Распространение ударных волн в протяженных каналах с препятствиями
+/// Используется решатель SmFluid
 
-#include "fast.h"
-#include <zephyr/math/solver/sm_fluid.h>
+#include <iostream>
+#include <iomanip>
+
+#include <zephyr/geom/generator/rectangle.h>
+#include <zephyr/mesh/mesh.h>
+
+#include <zephyr/utils/threads.h>
+#include <zephyr/io/pvd_file.h>
+
 #include <zephyr/phys/eos/ideal_gas.h>
 #include <zephyr/math/cfd/fluxes.h>
+#include <zephyr/math/solver/sm_fluid.h>
 
+using namespace zephyr::mesh;
 using namespace zephyr::phys;
 using namespace zephyr::math;
 using namespace zephyr::math::smf;
+using namespace zephyr::io;
+
+using generator::Rectangle;
+using zephyr::utils::threads;
+
 
 struct _U_ : public SmFluid::State {
     bool inside;
@@ -26,7 +40,6 @@ double get_e(AmrStorage::Item& cell) { return cell(U).e; }
 double get_inside(AmrStorage::Item& cell) { return double(cell(U).inside); }
 
 void setup_initial(EuMesh &mesh, double u0, double u3, double P0, double P3, double rho0, double rho3, double l, IdealGas &eos) {
-
     for (auto &cell: mesh) {
         // Инициализация
         if (cell.center().x() > l) {
@@ -46,17 +59,12 @@ void setup_initial(EuMesh &mesh, double u0, double u3, double P0, double P3, dou
     }
 }
 
-/// @brief 
 /// @param G правая граница 
 void setup_boundary(EuMesh &mesh, double G, double h, double L, double l) {
-
     for (auto &cell: mesh) {
-        if ((cell.center().x() < G) && (cell.center().y() < h) && (std::fmod(cell.center().x(), L) < l)) {
-            cell(U).inside = false;
-        } 
-        else {
-            cell(U).inside = true;
-        }
+        cell(U).inside = !((cell.center().x() < G) &&
+                           (cell.center().y() < h) &&
+                           (std::fmod(cell.center().x(), L) < l));
     }
     
     for (auto &cell: mesh) {
@@ -76,9 +84,7 @@ void setup_boundary(EuMesh &mesh, double G, double h, double L, double l) {
 }
 
 int main () {
-
-    std::cout << "Running with " << std::thread::hardware_concurrency() << std::endl;
-    threads::on(std::thread::hardware_concurrency());
+    threads::on();
 
     int initials = 3;
     // 0 - 4.2.1 Постановка задачи                                      Таблица 3
@@ -106,8 +112,7 @@ int main () {
 
     // м
     double H, h, L, l;
-    switch (initials)
-    {
+    switch (initials) {
         case 0:
             H = 10.0; 
             h = 5.0;
@@ -125,13 +130,15 @@ int main () {
             h = 13.6;
             L = 4.0;
             l = 0.2;
+            break;
         case 3:
             H = 20.0;
             h = 13.6;
             L = 4.0;
             l = 0.25;
-        default:
             break;
+        default:
+            throw std::runtime_error("Wrong initials");
     }
 
     int N = 75; // кол-во преград
@@ -140,9 +147,9 @@ int main () {
     double const ymin = 0.0;
     double const ymax = H;
 
-    double G0 = 0.0; // положение бегущей волны 
+    double G0 = 0.0;    // положение бегущей волны
     double G = 0.5 * L; // правая граница расчетной области
-    double D0 = u3; // Скорость распространения ударной волны
+    double D0 = u3;     // Скорость распространения ударной волны
 
     // кол-во начальных ячеек по x
     int nx_cells = 2 * N; // для 2ого случая
@@ -154,10 +161,10 @@ int main () {
     //шаг
     int n_step = 0;
 
-    PvdFile pvd("tube", "/mnt/c/tube75");
+    PvdFile pvd("tube", "output");
     pvd.unique_nodes = true;
 
-    //EOS
+    // EOS
     IdealGas eos("Air");
 
     // Переменные для сохранения
@@ -179,7 +186,7 @@ int main () {
     Rectangle rect(xmin, xmax, ymin, ymax);
     rect.set_nx(nx_cells);
     rect.set_boundaries({
-        .left   = Boundary::ZOE, .right = Boundary::ZOE,
+        .left   = Boundary::ZOE,  .right = Boundary::ZOE,
         .bottom = Boundary::WALL, .top   = Boundary::WALL});
 
     EuMesh mesh(U, &rect);
@@ -214,26 +221,22 @@ int main () {
     // Инициализация граничных условий
     setup_boundary(mesh, G, h, L, l);
 
-    pvd.save(mesh, time);
-
-    while (1) {
-
-        std::cout << "\tStep: " << std::setw(6) << n_step << ";"
-                  << "\tTime: " << std::setw(6) << std::setprecision(3) << time << "\n";
-
+    while (time < 1.0e200) {
         if (time >= next_write) {
+            std::cout << "\tStep: " << std::setw(6) << n_step << ";"
+                      << "\tTime: " << std::setw(6) << std::setprecision(3) << time << "\n";
+
             pvd.save(mesh, time);
             next_write += 0.01;
-        };
+        }
 
         // Обновляем слои
         solver.update(mesh);
 
         // TODO
-        G0 += 1.4 * D0 * solver.get_m_dt();
+        G0 += 1.4 * D0 * solver.dt();
 
         if (G - G0 < L) {
-
             G += L;
 
             // обновить сетку
@@ -258,12 +261,6 @@ int main () {
         n_step += 1;
         time = solver.get_time();
     }
-
-    auto fprint = [](const std::string &name, double value) {
-        std::cout << name << ": " << value << '\n';
-    };
-
-    threads::off();
 
     return 0;
 }

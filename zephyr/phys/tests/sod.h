@@ -2,14 +2,14 @@
 
 #include <zephyr/geom/vector.h>
 #include <zephyr/phys/eos/ideal_gas.h>
-#include <zephyr/phys/tests/classic_test.h>
+#include <zephyr/phys/tests/test_1D.h>
 
 namespace zephyr::phys {
 
 using zephyr::geom::Vector3d;
 
 /// @class Классический одномерный тест Сода
-class SodTest : public ClassicTest {
+class SodTest : public Test1D {
 public:
     IdealGas eos;   ///< Используемый УрС
     double x_jump;  ///< Положение разрыва
@@ -43,47 +43,64 @@ public:
         uR *= -1.0;
     }
 
-    std::string get_name() const { return "SodTest";}
+    std::string get_name() const final { return "SodTest";}
 
     /// @brief Левая граница области
-    double xmin() const { return 0.0; }
+    double xmin() const final { return 0.0; }
 
     /// @brief Правая граница области
-    double xmax() const { return 1.0; }
+    double xmax() const final { return 1.0; }
 
     /// @brief Конечный момент времени
-    double max_time() const { return finish; }
+    double max_time() const final { return finish; }
 
     ///@brief Получить используемый УрС
-    const Eos& get_eos() const { return eos; }
+    const Eos& get_eos() const final { return eos; }
 
     ///@brief Получить положение разрыва
-    double get_x_jump() const { return x_jump; }
-
-    /// @brief Начальная плотность
-    double density(const double &x) const { return x < x_jump ? rL : rR; }
-
-    /// @brief Начальная скорость
-    Vector3d velocity(const double &x) const { return {x < x_jump ? uL : uR, 0.0, 0.0}; }
-
-    /// @brief Начальное давление
-    double pressure(const double &x) const { return x < x_jump ? pL : pR; }
-
-    /// @brief Начальная внутренняя энергия
-    double energy(const double &x) const { return x < x_jump ? eL : eR; }
+    double get_x_jump() const final { return x_jump; }
 
 
     /// @brief Начальная плотность
-    double density(const Vector3d &r) const { return density(r.x()); }
+    double density(double x) const final {
+        return x < x_jump ? rL : rR;
+    }
 
     /// @brief Начальная скорость
-    Vector3d velocity(const Vector3d &r) const { return velocity(r.x()); }
+    Vector3d velocity(double x) const final {
+        return {x < x_jump ? uL : uR, 0.0, 0.0};
+    }
 
     /// @brief Начальное давление
-    double pressure(const Vector3d &r) const { return pressure(r.x()); }
+    double pressure(double x) const final {
+        return x < x_jump ? pL : pR;
+    }
 
     /// @brief Начальная внутренняя энергия
-    double energy(const Vector3d &r) const { return energy(r.x()); }
+    double energy(double x) const final {
+        return x < x_jump ? eL : eR;
+    }
+
+
+    /// @brief Начальная плотность
+    double density(const Vector3d& r) const final {
+        return density(r.x());
+    }
+
+    /// @brief Начальная скорость
+    Vector3d velocity(const Vector3d& r) const final {
+        return velocity(r.x());
+    }
+
+    /// @brief Начальное давление
+    double pressure(const Vector3d& r) const final {
+        return pressure(r.x());
+    }
+
+    /// @brief Начальная внутренняя энергия
+    double energy(const Vector3d& r) const final {
+        return energy(r.x());
+    }
 
     ~SodTest() override = default;
 

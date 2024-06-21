@@ -2,14 +2,14 @@
 
 #include <zephyr/geom/vector.h>
 #include <zephyr/phys/eos/ideal_gas.h>
-#include <zephyr/phys/tests/classic_test.h>
+#include <zephyr/phys/tests/test_1D.h>
 
 namespace zephyr::phys {
 
 using zephyr::geom::Vector3d;
 
 /// @class Классический одномерный тест Сода
-class SuperSonicFlowAroundCylinder : public ClassicTest {
+class SuperSonicFlowAroundCylinder : public Test1D {
 public:
     IdealGas eos;   ///< Используемый УрС
     double finish;  ///< Конечный момент времени

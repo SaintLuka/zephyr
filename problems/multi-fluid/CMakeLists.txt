@@ -1,0 +1,18 @@
+set(MM_R_TESTER 1)
+set(MM_2D_TESTS 1)
+
+if (MM_R_TESTER)
+    message(STATUS "Build MmRiemann tester")
+    add_executable(mm_r_tester mm_riemann_tester.cpp)
+    target_include_directories(mm_r_tester PUBLIC zephyr)
+    target_link_libraries(mm_r_tester PUBLIC zephyr)
+    install(TARGETS mm_r_tester DESTINATION problems/multi-fluid)
+endif()
+
+if (MM_2D_TESTS)
+    message(STATUS "Build MM 2D tests")
+    add_executable(mm_2d_tests mm_2d_tests.cpp)
+    target_include_directories(mm_2d_tests PUBLIC zephyr)
+    target_link_libraries(mm_2d_tests PUBLIC zephyr)
+    install(TARGETS mm_2d_tests DESTINATION problems/multi-fluid)
+endif()

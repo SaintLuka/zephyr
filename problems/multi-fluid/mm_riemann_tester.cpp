@@ -1,4 +1,4 @@
-#include "fast.h"
+#include "problems/fast.h"
 #include <zephyr/math/cfd/face_extra.h>
 #include <zephyr/math/solver/mm_fluid.h>
 
@@ -7,7 +7,7 @@
 #include <zephyr/math/cfd/models.h>
 #include <zephyr/phys/tests/sod.h>
 #include <zephyr/phys/tests/toro.h>
-#include <zephyr/phys/tests/classic_test.h>
+#include <zephyr/phys/tests/test_1D.h>
 
 #include <zephyr/math/solver/riemann.h>
 #include <zephyr/phys/eos/stiffened_gas.h>

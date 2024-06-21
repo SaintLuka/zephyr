@@ -1,13 +1,14 @@
-#include "fast.h"
+#include "problems/fast.h"
 #include <zephyr/math/cfd/face_extra.h>
 #include <zephyr/math/solver/mm_fluid.h>
 
 #include <fstream>
 #include <zephyr/math/cfd/fluxes.h>
 #include <zephyr/math/cfd/models.h>
-#include <zephyr/phys/tests/classic_test.h>
+#include <zephyr/phys/tests/test_1D.h>
 
 #include <zephyr/math/solver/riemann.h>
+#include <zephyr/phys/eos/ideal_gas.h>
 #include <zephyr/phys/eos/stiffened_gas.h>
 #include <zephyr/phys/eos/mie_gruneisen.h>
 #include <filesystem>

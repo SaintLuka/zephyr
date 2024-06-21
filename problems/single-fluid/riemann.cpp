@@ -1,4 +1,4 @@
-#include "fast.h"
+#include "problems/fast.h"
 
 #include <zephyr/geom/generator/collection/wedge.h>
 #include <zephyr/geom/generator/collection/semicircle_cutout.h>
@@ -59,7 +59,7 @@ int main() {
     RiemannSolver exact(zL, zR, sg, test.get_x_jump());
 
     // Файл для записи
-    PvdFile pvd("mesh", "/mnt/d/test"); 
+    PvdFile pvd("mesh", "output/test");
 
     // Переменные для сохранения
     pvd.variables += {"rho", get_rho};
@@ -121,7 +121,7 @@ int main() {
     //int n_cells = mesh.n_cells();
 
     // Создать решатель
-    auto solver = zephyr::math::SmFluid(eos, Fluxes::GODUNOV);
+    auto solver = zephyr::math::SmFluid(eos, Fluxes::HLL);
 
     solver.init_cells(mesh, test);
     solver.set_accuracy(2);

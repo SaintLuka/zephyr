@@ -1,7 +1,6 @@
 #include <zephyr/phys/tests/toro.h>
 
-namespace zephyr {
-namespace phys {
+namespace zephyr::phys {
 
 ToroTest::ToroTest(int num) : eos(1.4) {
 
@@ -104,5 +103,4 @@ void ToroTest::inverse() {
     uR *= -1.0;
 }
 
-} // phys
-} // zephyr
+} // namespace zephyr::phys
