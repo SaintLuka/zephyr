@@ -1,14 +1,17 @@
 #pragma once
 
 #include <zephyr/geom/vector.h>
+#include <zephyr/geom/primitives/boundary.h>
+#include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/phys/eos/ideal_gas.h>
 
-namespace zephyr {
-namespace phys {
+namespace zephyr::phys {
 
 using zephyr::geom::Vector3d;
+using zephyr::geom::Boundary;
+using zephyr::geom::generator::Rectangle;
 
-class RiemannTest2D {
+class Test2D {
 public:
 
     IdealGas eos;   ///< Используемый УрС
@@ -23,9 +26,11 @@ public:
     double p1, p2, p3, p4;  ///< Давление
     double e1, e2, e3, e4;  ///< Внутренняя энергия
 
+    Rectangle m_gen;        ///< Сеточный генератора
+
 
     /// @brief Конструктор
-    explicit RiemannTest2D (int testCase) : eos(1.4) {
+    explicit Test2D (int testCase) : eos(1.4) {
         switch (testCase)
         {
         case 1: {
@@ -66,39 +71,38 @@ public:
             p1 = 1;     p2 = 1;     p3 = 1;     p4 = 1;
             finish = 0.3;
             break; 
-        case 8:
+        case 7:
             r1 = 0.5197; r2 = 1.0; r3 = 0.8; r4 = 1.0;
             p1 = 0.4; p2 = 1.0; p3 = 1.0; p4 = 1.0;
             u1 = 0.1; u2 = -0.6259; u3 = 0.1; u4 = 0.1;
             v1 = 0.1; v2 = 0.1; v3 = 0.1; v4 = -0.6259;
             finish = 0.25;
             break;
-        case 9:
+        case 8:
             r1 = 1.0; r2 = 2.0; r3 = 1.039; r4 = 0.5197;
             p1 = 1.0; p2 = 1.0; p3 = 0.4; p4 = 0.4;
             u1 = 0.0; u2 = 0.0; u3 = 0.0; u4 = 0.0;
             v1 = 0.3; v2 = -0.3; v3 = -0.8133; v4 = -0.259;
             break;
+        default:
+            throw std::runtime_error("Unknown Test");
         }
-
 
         y_jump = 0.5;
         x_jump = 0.5;
+
+        m_gen = Rectangle(0.0, 1.0, 0.0, 1.0);
+        m_gen.set_boundaries({.left=Boundary::ZOE, .right=Boundary::ZOE,
+                              .bottom=Boundary::ZOE, .top=Boundary::ZOE});
     };
 
+    /// @brief Название теста
     std::string get_name() const { return "2D Riemann Test";}
 
-    /// @brief Левая граница области
-    double xmin() const { return 0.0; }
-
-    /// @brief Правая граница области
-    double xmax() const { return 1.0; }
-
-    /// @brief Левая граница области
-    double ymin() const { return 0.0; }
-
-    /// @brief Правая граница области
-    double ymax() const { return 1.0; }
+    /// @brief Сеточный генератор
+    Rectangle generator() const {
+        return m_gen;
+    }
 
     /// @brief Конечный момент времени
     double max_time() const { return finish; }
@@ -106,14 +110,9 @@ public:
     ///@brief Получить используемый УрС
     const Eos& get_eos() const { return eos; }
 
-    ///@brief Получить положение разрыва
-    double get_x_jump() const { return x_jump; }
-
-    ///@brief Получить положение разрыва
-    double get_y_jump() const { return y_jump; }
 
     /// @brief Начальная плотность
-    double density(const Vector3d &vec) const { 
+    double density(const Vector3d &vec) const {
         if (vec.x() >= x_jump && vec.y() >= y_jump)
             return r1;
         if (vec.x() <= x_jump && vec.y() >= y_jump)
@@ -153,8 +152,7 @@ public:
         return eos.energy_rp(density(r), pressure(r));
     };
 
-    ~RiemannTest2D() = default;
+    ~Test2D() = default;
 };
 
-}
-}
+} // namespace zephyr::phys

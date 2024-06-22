@@ -60,6 +60,11 @@ Rectangle::Rectangle(YAML::Node config)
 }
 #endif
 
+Rectangle::Rectangle()
+    : Rectangle(0.0, 1.0, 0.0, 1.0, false) {
+    set_boundaries(Boundaries{});
+}
+
 Rectangle::Rectangle(double xmin, double xmax, double ymin, double ymax, bool voronoi) :
         Generator("rectangle"),
         m_nx(0),

@@ -25,6 +25,9 @@ public:
     explicit Rectangle(YAML::Node config);
 #endif
 
+    /// @brief Единичный квадрат из одной ячейки
+    Rectangle();
+
     /// @brief Конструктор класса
     /// @param xmin, xmax Границы прямоугольника по оси x
     /// @param ymin, ymax Границы прямоугольника по оси y

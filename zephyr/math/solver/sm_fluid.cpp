@@ -347,6 +347,9 @@ Distributor SmFluid::distributor() const {
 }
 
 void SmFluid::set_flags(Mesh &mesh) {
+    if (!mesh.is_adaptive()) {
+        return;
+    }
 
     compute_grad(mesh, get_current_sm);
 

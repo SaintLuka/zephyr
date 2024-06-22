@@ -63,3 +63,28 @@ class CsvFile:
         indices = np.array(indices)
 
         return res_variables, indices
+
+
+    def as2D(self):
+        """
+        Интерпретировать данные как двумерные массивы на структурированной сетке
+        Необходимо наличие массивов 'x' и 'y' в данных.
+        Добавляет новые переменные xmin, xmax, ymin, ymax
+        """
+        if not (hasattr(self, 'x') and hasattr(self, 'y')):
+            raise 'Read arrays "x" and "y" from .csv'
+
+        ny = np.argmax(self.x > self.x[0])
+        nx = self.x.size // ny
+
+        for i, var in enumerate(self.variables):
+            setattr(self, var, getattr(self, var).reshape((nx, ny)))
+
+        dx = (self.x[-1, 0] - self.x[0, 0]) / (nx - 1)
+        dy = (self.y[0, -1] - self.y[0, 0]) / (ny - 1)
+
+        self.xmin = 1.0e-6 * np.round(1.0e6 * (self.x[0, 0] - 0.5 * dx))
+        self.ymin = 1.0e-6 * np.round(1.0e6 * (self.y[0, 0] - 0.5 * dy))
+        self.xmax = 1.0e-6 * np.round(1.0e6 * (self.x[-1, -1] + 0.5 * dx))
+        self.ymax = 1.0e-6 * np.round(1.0e6 * (self.y[-1, -1] + 0.5 * dy))
+

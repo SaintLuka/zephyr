@@ -1,6 +1,7 @@
 set(ZEPHYR_PYTHON_FILES
         csv.py
-        plot1D.py)
+        plot1D.py
+        plot2D.py)
 
 file(COPY
         ${ZEPHYR_PYTHON_FILES}

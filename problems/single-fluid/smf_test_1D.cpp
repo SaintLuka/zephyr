@@ -15,7 +15,6 @@
 #include <zephyr/math/solver/sm_fluid.h>
 
 #include <zephyr/io/pvd_file.h>
-#include <zephyr/io/vtu_file.h>
 #include <zephyr/io/csv_file.h>
 
 using namespace zephyr::io;
@@ -104,13 +103,10 @@ int main() {
 
     // Создать решатель
     SmFluid solver(eos, Fluxes::HLLC);
+    solver.set_CFL(0.9);
     solver.set_accuracy(2);
 
     solver.init_cells(mesh, test);
-
-    // Число Куранта
-    double CFL = 0.9;
-    solver.set_CFL(CFL);
 
     double next_write = 0.0;
     size_t n_step = 0;

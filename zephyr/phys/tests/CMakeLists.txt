@@ -9,7 +9,7 @@ install(FILES
         test_1D.h
         sedov.h
         quirck.h
-        RiemannTest2D.h
+        test_2D.h
         quirck.h
         supersonic_flow_around_cylinder.h
         DESTINATION
