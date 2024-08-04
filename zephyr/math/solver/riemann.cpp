@@ -2,8 +2,7 @@
 
 #include <zephyr/math/solver/riemann.h>
 
-namespace zephyr {
-namespace math {
+namespace zephyr::math {
 
 using namespace zephyr::phys;
 using namespace smf;
@@ -619,5 +618,8 @@ double RiemannSolver::energy(double x, double t) const {
     return eos_energy(rho, p, g, p0, e0);
 }
 
-} // namespace math
-} // namespace zephyr
+double RiemannSolver::fraction(double x, double t) const {
+    return x < x_jump + U * t ? 1.0 : 0.0;
+}
+
+} // namespace zephyr::math

@@ -1120,10 +1120,10 @@ int main() {
 //    Bubble2DStatic(800, 1, "output_bubble_static_test");
 //    AirWithSF62D(100, 2, "sf6");
 //    RiemannTesterWithSolverVertical(100, 1, "output_1");
-    vertical_instability_adaptive(20, "vertical_instability_adaptive2"); // вот этот считается
+//    vertical_instability_adaptive(20, "vertical_instability_adaptive2"); // вот этот считается
 //    vertical_instability_static(20, 2, "vertical_instability_static");
 //    EjectaProblem(2, "ejecta_problem2");
-    vertical_instability_adaptive2(10, "vertical_instability_sf6_air3"); // вот этот новый и не хочет
+//    vertical_instability_adaptive2(10, "vertical_instability_sf6_air3"); // вот этот новый и не хочет
 
 //    Vector3d dr = Vector3d{0.00897937, 0.00620062, 0} - Vector3d{0.00898125, 0.00619875, 0};
 //    std::cout << dr.x() * 99.9063 + dr.y() * (29.2343) << '\n';

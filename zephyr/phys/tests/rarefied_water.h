@@ -2,15 +2,17 @@
 
 #include <zephyr/geom/vector.h>
 #include <zephyr/phys/eos/ideal_gas.h>
+#include <zephyr/phys/eos/stiffened_gas.h>
 #include <zephyr/phys/tests/test_1D.h>
 
 namespace zephyr::phys {
 
 using zephyr::geom::Vector3d;
 
-class QuirckTest : public Test1D {
+class RarefiedWater : public Test1D {
 public:
-    IdealGas::Ptr eos;   ///< Используемый УрС
+    StiffenedGas::Ptr water;  ///< УрС воды
+    IdealGas::Ptr     air;    ///< УрС газа
 
     double x_jump;  ///< Положение разрыва
     double finish;  ///< Конечный момент времени
@@ -20,25 +22,24 @@ public:
     double eL, eR;  ///< Внутренняя энергия
 
     /// @brief Конструктор
-    QuirckTest(double Ms=10, double x_jump=0.1, double finish=0.1) : x_jump(x_jump), finish(finish) {
-        double gamma = 1.4;
-        eos = IdealGas::create(gamma);
+    RarefiedWater() {
+        water = StiffenedGas::create("Water");
+        air   = IdealGas::create("Air");
 
-        // @formatter:off
-        pR = 1.0;
-        rR = 1.0;
-        uR = 0;
+        double T = 300.0;
 
-        /// Double Mach  Reflection of a Strong Shock
-        /// Woodward and Colella ????
-        
-        pL = pR * (2 * gamma * Ms * Ms  - gamma + 1) / (gamma + 1) ;
-        rL = rR * ( gamma + 1 ) * Ms * Ms / ( 2 + ( gamma - 1 ) * Ms * Ms );
-        uL = 2 / Ms * std::sqrt( gamma * pR / rR ) * ( Ms * Ms - 1 ) / (gamma + 1 );
+        rL = 0.9_g_cm3;
+        uL = 0.0;
+        pL = water->pressure_rt(rL, T);
+        eL = water->energy_rp(rL, pL);
 
-        eL = eos->energy_rp(rL, pL);
-        eR = eos->energy_rp(rR, pR);
-        // @formatter:on
+        rR = 1.16_kg_m3;
+        uR = 0.0;
+        pR = air->pressure_rt(rR, T);
+        eR = air->energy_rp(rR, pR);
+
+        x_jump = 0.9_cm;
+        finish = 5.0_us;
     }
 
     /// @brief Симметрично отразить начальные условия
@@ -51,19 +52,19 @@ public:
         uR *= -1.0;
     }
 
-    std::string get_name() const final { return "QuirckTest";}
+    std::string get_name() const final { return "Rarefied water";}
 
     /// @brief Левая граница области
     double xmin() const final { return 0.0; }
 
     /// @brief Правая граница области
-    double xmax() const final { return 1.5; }
+    double xmax() const final { return 1.0_cm; }
 
     /// @brief Конечный момент времени
     double max_time() const final { return finish; }
 
     ///@brief Получить используемый УрС
-    Eos::Ptr get_eos() const final { return eos; }
+    Eos::Ptr get_eos() const final { return get_eos(-1.0); }
 
     ///@brief Получить положение разрыва
     double get_x_jump() const final { return x_jump; }
@@ -89,6 +90,11 @@ public:
         return x < x_jump ? eL : eR;
     }
 
+    /// @brief Версия для многоматериальных
+    Eos::Ptr get_eos(double x) const final {
+        return x < x_jump ? (Eos::Ptr) water : (Eos::Ptr) air;
+    }
+
 
     /// @brief Начальная плотность
     double density(const Vector3d& r) const final {
@@ -110,7 +116,12 @@ public:
         return energy(r.x());
     }
 
-    ~QuirckTest() final = default;
+    /// @brief Версия для многоматериальных
+    Eos::Ptr get_eos(const Vector3d &r) const {
+        return get_eos(r.x());
+    }
+
+    ~RarefiedWater() final = default;
 
 };
 

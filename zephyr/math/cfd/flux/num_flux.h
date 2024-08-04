@@ -9,38 +9,40 @@
 namespace zephyr::math {
 
 enum class Fluxes {
-    CIR1,
-    CIR2,
     GODUNOV,
+    RUSANOV,
     HLL,
     HLLC,
-    HLLC2,
-    HLLC_central,
+    HLLC_C,
     HLLC_LM,
-    RUSANOV,
-    RUSANOV2
+    CIR1,
+    CIR2
 };
 
 /// @brief Абстрактный класс для вычисления численного потока
 class NumFlux {
 public:
-    using Ptr = std::unique_ptr<NumFlux>;
+    using Ptr = std::shared_ptr<NumFlux>;
 
     /// @brief Создать нужный класс по enum
     static NumFlux::Ptr create(Fluxes flux);
 
-    /// @brief Численный поток для классической задачи
-    [[nodiscard]] virtual smf::Flux flux(const smf::PState& zL, const smf::PState& zR, const phys::Eos& eos) const {
-        throw std::runtime_error("NumFlux::flux(PState...) is not implemented");
-    }
-
-    [[nodiscard]] virtual mmf::Flux mm_flux(const mmf::PState& zL, const mmf::PState& zR, const phys::Materials& mixture) const {
-        throw std::runtime_error("MmNumFlux::mm_flux(PState...) is not implemented");
-    }
-
-    [[nodiscard]] virtual std::string get_name() const { return "Flux"; }
-
+    /// @brief Виртуальный деструктор
     virtual ~NumFlux() = default;
+
+    /// @brief Название расчетного метода
+    virtual std::string get_name() const { return "Flux"; }
+
+    /// @brief Численный поток для одноматериальной задачи
+    virtual smf::Flux flux(const smf::PState& zL, const smf::PState& zR, const phys::Eos& eos) const {
+        throw std::runtime_error("NumFlux::flux(smf::PState...) is not implemented");
+    }
+
+    /// @brief Численный поток для многоматериальной задачи
+    virtual mmf::Flux flux(const mmf::PState& zL, const mmf::PState& zR, const phys::Materials& mixture) const {
+        throw std::runtime_error("NumFlux::flux(mmf::PState...) is not implemented");
+    }
+
 };
 
-}
+} // namespace zephyr::math

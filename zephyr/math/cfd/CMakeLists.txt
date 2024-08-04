@@ -12,6 +12,6 @@ install(FILES
         rotate.h
         limiter.h
         face_extra.h
-        compute_grad.h
+    gradient.h
         DESTINATION
         include/${PROJECT_NAME}/math/cfd)

@@ -107,6 +107,9 @@ public:
     /// @brief Энергия от координаты и времени
     double energy(double x, double t) const;
 
+    /// @brief Характеристическая функция левой части области
+    double fraction(double x, double t) const;
+
 private:
     /// @brief Решение задачи Римана,
     /// инициализирует все поля класса

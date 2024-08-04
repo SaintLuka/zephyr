@@ -14,46 +14,52 @@ using zephyr::mesh::Mesh;
 using zephyr::mesh::Distributor;
 using zephyr::geom::Vector3d;
 
+using namespace smf;
+
+/// @class Single-Material Fluid.
+/// @brief Класс решатель классической одноматериальной газодинамики
 class SmFluid {
 public:
 
     /// @brief Расширенный вектор состояния на котором решается задача
     struct State {
-        double rho; ///< плотность
-        Vector3d v; ///< скорость
-        double p; ///< давление
-        double e; ///< энергия
-        smf::PState half, next;
-        smf::PState d_dx, d_dy, d_dz;
+        double density;     ///< плотность
+        Vector3d velocity;  ///< скорость
+        double pressure;    ///< давление
+        double energy;      ///< энергия
 
-        [[nodiscard]] smf::PState get_pstate() const {
-            return smf::PState(rho, v, p, e);
+        PState half;        ///< Состояние на полушаге
+        PState next;        ///< Состояние на следующем шаге
+
+        /// @brief Градиент вектора состояния
+        PState d_dx, d_dy, d_dz;
+
+        /// @brief Собрать вектор состояния на предыдущем шаге
+        smf::PState get_state() const {
+            return smf::PState(density, velocity, pressure, energy);
         }
 
+        /// @brief Установить вектор состояния на предыдущем шаге
         void set_state(const smf::PState &pstate) {
-            rho = pstate.density;
-            v = pstate.velocity;
-            p = pstate.pressure;
-            e = pstate.energy;
+            density  = pstate.density;
+            velocity = pstate.velocity;
+            pressure = pstate.pressure;
+            energy   = pstate.energy;
         }
     };
 
-    friend std::ostream &operator<<(std::ostream &os, const State &state) {
-        os << boost::format(
-                "State1: density: %1%, velocity: {%2%, %3%, %4%}, pressure: %5%, energy: %6%\n") %
-              state.rho % state.v.x() % state.v.y() % state.v.z() % state.p;
-        os << boost::format(
-                "State2: density: %1%, velocity: {%2%, %3%, %4%}, pressure: %5%, energy: %6%\n") %
-              state.next.density % state.next.velocity.x() % state.next.velocity.y() % state.next.velocity.z() %
-              state.next.pressure % state.next.energy;
-        return os;
-    }
-
     /// @brief Получить экземпляр расширенного вектора состояния
-    [[nodiscard]] static State datatype();
+    static State datatype();
+
+    /// @brief В поток вывода
+    friend std::ostream &operator<<(std::ostream &os, const State &state);
+
 
     /// @brief Конструктор класса
-    explicit SmFluid(const phys::Eos &eos, Fluxes flux = Fluxes::HLLC);
+    explicit SmFluid(const phys::Eos &eos);
+
+    /// @brief Декструктор
+    ~SmFluid() = default;
 
     /// @brief Число Куранта
     double CFL() const;
@@ -61,7 +67,11 @@ public:
     /// @brief Установить число Куранта
     void set_CFL(double CFL);
 
+    /// @brief Установить порядок точности
     void set_acc(int acc);
+
+    /// @brief Установить метод
+    void set_method(Fluxes method);
 
     double get_time() const;
 
@@ -73,8 +83,6 @@ public:
     double dt() const;
 
     void update(Mesh &mesh);
-
-    void check_asserts(Mesh &mesh, std::string msg);
 
     /// @brief Установить флаги адаптации
     void set_flags(Mesh& mesh);
@@ -89,17 +97,17 @@ public:
         static const SmFluid::State U = SmFluid::datatype();
         // Заполняем начальные данные
         for (auto cell: mesh) {
-            cell(U).rho = test.density(cell.center());
-            cell(U).v = test.velocity(cell.center());
-            cell(U).p = test.pressure(cell.center());
-            cell(U).e = m_eos.energy_rp(cell(U).rho, cell(U).p);
+            cell(U).density  = test.density(cell.center());
+            cell(U).velocity = test.velocity(cell.center());
+            cell(U).pressure = test.pressure(cell.center());
+            cell(U).energy   = m_eos.energy_rp(cell(U).density, cell(U).pressure);
         }
     }
 
 private:
     /// @brief Посчитать шаг интегрирования по времени с учетом
     /// условия Куранта
-    double compute_dt(Mesh &mesh);
+    void compute_dt(Mesh &mesh);
 
     /// @brief Расчёт потоков
     void fluxes(Mesh &mesh);
@@ -107,26 +115,27 @@ private:
     /// @brief Обновление ячеек
     void swap(Mesh &mesh);
 
-    void compute_grad(Mesh &mesh,  const std::function<smf::PState(Cell &)> &to_state);
+    void compute_grad(Mesh &mesh,  const std::function<smf::PState(Cell &)> &get_state);
 
     void fluxes_stage1(Mesh &mesh);
 
     void fluxes_stage2(Mesh &mesh);
 
-    smf::Flux calc_flux_extra(Cell &cell, bool from_begin);
-
-public:
-
-    ~SmFluid() = default;
-
 protected:
-    const phys::Eos &m_eos;
-    NumFlux::Ptr m_nf; ///< Метод расчёта потока
-    int m_acc = 1;
-    double m_time = 0.0; ///< Прошедшее время
-    size_t m_step = 0; ///< Количество шагов расчёта
-    double m_CFL; ///< Число Куранта
-    double m_dt; ///< Шаг интегрирования
+    const phys::Eos &m_eos;  ///< Уравнение состояния
+    NumFlux::Ptr m_nf;       ///< Метод расчёта потока
+    int m_acc = 1;           ///< Порядок точности
+    double m_CFL;            ///< Число Куранта
+    double m_dt;             ///< Шаг интегрирования
+
+    double m_time = 0.0;     ///< Прошедшее время
+    size_t m_step = 0;       ///< Количество шагов расчёта
 };
 
-} // namespace zephyr
+std::ostream &operator<<(std::ostream &os, const SmFluid::State &state) {
+    os << "State1: " << state.get_state() << "\n";
+    os << "State2: " << state.half << "\n";
+    return os;
+}
+
+} // namespace zephyr::math

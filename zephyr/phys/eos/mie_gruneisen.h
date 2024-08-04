@@ -36,7 +36,7 @@ public:
                           const Options& options = {}) const final;
 
     /// @brief Вспомогательная функция, удобна для задания начальных условий.
-    double pressure_rt(double density, double temperature,
+    dRdT pressure_rt(double density, double temperature,
                        const Options& options = {}) const final;
 
     /// @brief Вспомогательная функция, удобна для задания начальных условий

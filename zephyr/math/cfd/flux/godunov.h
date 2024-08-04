@@ -7,28 +7,30 @@ namespace zephyr::math {
 /// @brief Вычисление потока методом Годунова
 class Godunov : public NumFlux{
 public:
+    /// @brief Умный указатель на класс
+    using Ptr = std::shared_ptr<Godunov>;
 
-    Godunov() = default;
-
-    template<class ...Args>
-    inline static std::unique_ptr<Godunov> create(Args &&... args) {
-        return std::unique_ptr<Godunov>(new Godunov(std::forward<Args>(args)...));
+    /// @brief Создать умный указатель
+    inline static Godunov::Ptr create() {
+        return std::make_shared<Godunov>();
     }
 
-    [[nodiscard]] std::string get_name() const override { return "Godunov"; }
+    /// @brief Имя метода
+    std::string get_name() const final { return "Godunov"; }
 
-    /// @brief Поток как решение задачи о распаде разрыва
+
+    /// @brief Статическая одноматериальная версия
     static smf::Flux calc_flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos);
 
-    /// @brief Поток как решение задачи о распаде разрыва
-    [[nodiscard]] smf::Flux flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) const final;
+    /// @brief Одноматериальная версия
+    smf::Flux flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) const final;
 
-    /// @brief Поток как решение задачи о распаде разрыва
-    static mmf::Flux calc_mm_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture);
 
-    /// @brief Поток как решение задачи о распаде разрыва
-    [[nodiscard]] mmf::Flux
-    mm_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) const final;
+    /// @brief Статическая многоматериальная версия
+    static mmf::Flux calc_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture);
+
+    /// @brief Многоматериальная версия
+    mmf::Flux flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) const final;
 };
 
 }

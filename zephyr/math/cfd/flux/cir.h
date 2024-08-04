@@ -2,25 +2,28 @@
 
 #include <zephyr/math/cfd/flux/num_flux.h>
 
-namespace zephyr {
-namespace math {
+namespace zephyr::math {
 
 /// @brief Вычисление потока по схеме Куранта-Изаксона-Риса,
 /// классическая схема
 class CIR1 : public NumFlux {
 public:
+    /// @brief Умный указатель на класс
+    using Ptr = std::shared_ptr<CIR1>;
 
-    CIR1() = default;
-
-    template<class ...Args>
-    inline static std::unique_ptr<CIR1> create(Args &&... args) {
-        return std::unique_ptr<CIR1>(new CIR1(std::forward<Args>(args)...));
+    /// @brief Создать умный указатель
+    inline static CIR1::Ptr create() {
+        return std::make_shared<CIR1>();
     }
 
-    std::string get_name() const override {return "CIR1"; }
+    /// @brief Имя метода
+    std::string get_name() const final { return "CIR1"; }
 
+
+    /// @brief Статическая одноматериальная версия
     static smf::Flux calc_flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos);
 
+    /// @brief Одноматериальная версия
     smf::Flux flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) const final;
 
 };
@@ -29,21 +32,24 @@ public:
 /// схема без использования производных от уравнений состояния
 class CIR2 : public NumFlux {
 public:
+    /// @brief Умный указатель на класс
+    using Ptr = std::shared_ptr<CIR2>;
 
-    CIR2() = default;
-
-    template<class ...Args>
-    inline static std::unique_ptr<CIR2> create(Args &&... args) {
-        return std::unique_ptr<CIR2>(new CIR2(std::forward<Args>(args)...));
+    /// @brief Создать умный указатель
+    inline static CIR2::Ptr create() {
+        return std::make_shared<CIR2>();
     }
 
-    std::string get_name() const override {return "CIR2"; }
+    /// @brief Имя метода
+    std::string get_name() const final { return "CIR2"; }
 
+
+    /// @brief Статическая одноматериальная версия
     static smf::Flux calc_flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos);
 
+    /// @brief Одноматериальная версия
     smf::Flux flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) const final;
 
 };
 
-}
-}
+} // namespace zephyr::math

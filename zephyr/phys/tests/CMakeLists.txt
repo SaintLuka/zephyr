@@ -11,6 +11,7 @@ install(FILES
         quirck.h
         test_2D.h
         quirck.h
+        rarefied_water.h
         supersonic_flow_around_cylinder.h
         DESTINATION
         include/${PROJECT_NAME}/phys/tests)

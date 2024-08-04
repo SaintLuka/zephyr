@@ -82,15 +82,15 @@ double StrangeGas::energy_rp(double rho, double P, const Options& options) const
     return eps_0 + (P_fix(P) + gamma * P0) / ((gamma - 1.0) * rho);
 }
 /*
-double StrangeGas::sound_speed_re(double rho, double eps, const Options& options) const {
-    return std::sqrt(gamma * (gamma - 1.0) * ((eps - eps_0) - P0 / rho));
+double StrangeGas::sound_speed_re(double density, double eps, const Options& options) const {
+    return std::sqrt(gamma * (gamma - 1.0) * ((eps - eps_0) - P0 / density));
 }
 
-double StrangeGas::sound_speed_rp(double rho, double P, const Options& options) const {
-    return std::sqrt(gamma * (P + P0) / rho);
+double StrangeGas::sound_speed_rp(double density, double P, const Options& options) const {
+    return std::sqrt(gamma * (P + P0) / density);
 }
 */
-double StrangeGas::pressure_rt(double rho, double T, const Options& options) const {
+dRdT StrangeGas::pressure_rt(double rho, double T, const Options& options) const {
     return P_inv((gamma - 1.0) * Cv * rho * (T - T0) - P0);
 }
 
@@ -119,7 +119,7 @@ dPdT StrangeGas::energy_pt(double P, double T, const Options& options) const {
 }
 
 /*
-StiffenedGas StrangeGas::stiffened_gas(double rho, double P, const Options& options) const {
+StiffenedGas StrangeGas::stiffened_gas(double density, double P, const Options& options) const {
     return StiffenedGas(gamma, P0, eps_0, Cv, T0);
 }
 */

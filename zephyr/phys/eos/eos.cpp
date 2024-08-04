@@ -4,14 +4,18 @@
 #include <zephyr/phys/eos/eos.h>
 #include <zephyr/phys/eos/stiffened_gas.h>
 
-namespace zephyr { namespace phys {
+namespace zephyr::phys {
 
 dRdE Eos::pressure_re(double rho, double eps, const Options& options) const {
     throw std::runtime_error("pressure_re is not implemented");
 }
 
-double Eos::energy_rp(double rho, double P, const Options& options) const {
-    throw std::runtime_error("energy_rp is not implemented");
+dRdT Eos::pressure_rt(double rho, double T, const Options& options) const {
+    throw std::runtime_error("pressure_rt is not implemented");
+}
+
+dRdT Eos::energy_rt(double rho, double T, const Options& options) const {
+    throw std::runtime_error("energy_rt is not implemented");
 }
 
 double Eos::sound_speed_re(double rho, double eps, const Options& options) const {
@@ -28,8 +32,8 @@ double Eos::sound_speed_rp(double rho, double P, const Options& options) const {
     return sound_speed_re(rho, eps);
 }
 
-double Eos::pressure_rt(double rho, double T, const Options& options) const {
-    throw std::runtime_error("pressure_rt is not implemented");
+double Eos::energy_rp(double rho, double P, const Options& options) const {
+    throw std::runtime_error("energy_rp is not implemented");
 }
 
 double Eos::temperature_rp(double rho, double P, const Options& options) const {
@@ -59,5 +63,4 @@ double Eos::min_pressure() const {
     throw std::runtime_error("min_pressure is not implemented");
 }
 
-}
-}
+} // namespace zephyr::phys

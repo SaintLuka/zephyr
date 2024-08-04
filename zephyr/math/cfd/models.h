@@ -20,31 +20,44 @@ struct QState;
 
 /// @brief Примитивный вектор состояния
 struct PState {
-    double density;
-    Vector3d velocity;
-    double pressure;
-    double energy;
+    double   density;  ///< Плотность
+    Vector3d velocity; ///< Скорость
+    double   pressure; ///< Давление
+    double   energy;   ///< Удельная внутренняя энергия (доп)
 
-    PState() : density(0), velocity(0,0,0), pressure(0), energy(0)
-    {}
+    /// @brief Инициализация нулями
+    PState();
 
+    /// @brief Инициализация с полным заданием параметров
     PState(const double &density, const Vector3d &velocity,
            const double &pressure, const double &energy);
 
+    /// @brief Инициализация из консервативного вектора состояния,
+    /// давление определяется с использованием УрС.
     PState(const QState &q, const phys::Eos &eos);
 
     /// @brief Переводит вектор состояния в локальную систему координат
     void to_local(const Vector3d &normal);
 
     /// @brief Возвращает вектор состояния в локальной системе координат
-    [[nodiscard]] PState in_local(const Vector3d &normal) const;
+    PState in_local(const Vector3d &normal) const;
 
     /// @brief Переводит вектор состояния в глобальную систему координат
     void to_global(const Vector3d &normal);
 
     /// @brief Возвращает вектор состояния в глобальной системе координат
-    [[nodiscard]] PState in_global(const Vector3d &normal) const;
+    PState in_global(const Vector3d &normal) const;
 
+
+    // Короткий доступ к полям
+    inline const double& rho() const { return density; }
+    inline const double& u() const { return velocity.x(); }
+    inline const double& v() const { return velocity.y(); }
+    inline const double& w() const { return velocity.z(); }
+    inline const double& P() const { return pressure; }
+    inline const double& e() const { return energy; }
+
+    /// @brief В поток вывода
     friend std::ostream &operator<<(std::ostream &os, const PState &state);
 
     PState operator+(const PState &state) {
@@ -66,66 +79,69 @@ struct PState {
 
 /// @brief Консервативный вектор состояния
 struct QState {
-    double mass;
-    geom::Vector3d momentum;
-    double energy;
+    double   mass;      ///< Плотность
+    Vector3d momentum;  ///< Плотность импульса:       rho * v
+    double   energy;    ///< Плотность полной энергии: rho * (e + 0.5 * v^2)
 
+    /// @brief Инициализация с полным заданием параметров
     QState(const double &mass, const Vector3d &momentum, const double &energy);
 
+    /// @brief Преобразование из примитивного вектора состояния
     explicit QState(const PState &z);
 
     /// @brief Переводит вектор состояния в локальную систему координат
     void to_local(const Vector3d &normal);
 
     /// @brief Возвращает вектор состояния в локальной системе координат
-    [[nodiscard]] QState in_local(const Vector3d &normal) const;
+    QState in_local(const Vector3d &normal) const;
 
     /// @brief Переводит вектор состояния в глобальную систему координат
     void to_global(const Vector3d &normal);
 
     /// @brief Возвращает вектор состояния в глобальной системе координат
-    [[nodiscard]] QState in_global(const Vector3d &normal) const;
+    QState in_global(const Vector3d &normal) const;
 
+    /// @brief В поток вывода
     friend std::ostream &operator<<(std::ostream &os, const QState &state);
 
     VECTORIZE(QState)
 };
 
-/**
- * @brief Вектор потока
- * @code
- *  mass = rho * u;
- *  momentum.x() = rho * u^2 + p;
- *  momentum.y() = rho * u * v;
- *  momentum.z() = rho * u * w;
- *  energy = u * (E + p);
- * @endcode
- */
+/// @brief Вектор потока
+/// @code
+///   mass = rho * u;
+///   momentum.x() = rho * u^2 + P;
+///   momentum.y() = rho * u * v;
+///   momentum.z() = rho * u * w;
+///   energy = u * (rho * (e + 0.5 * velocity^2) + P);
+/// @endcode
 struct Flux {
-    double mass; ///< rho * u
-    Vector3d momentum;
-    double energy; ///< u * (rho * (E + 0.5 * velocity^2) + p)
+    double   mass;      ///< Плотность потока массы
+    Vector3d momentum;  ///< Плотность потока импульса
+    double   energy;    ///< Плотность потока энергии
 
     /// @brief Нулевой поток
     Flux();
 
+    /// @brief Инициализация с полным заданием параметров
     Flux(double mass, const Vector3d &momentum, double energy);
 
     /// @brief Дифференциальный поток по вектору примитивных переменных
-    explicit Flux(const PState &state);
+    explicit Flux(const PState &z);
 
     /// @brief Переводит вектор потока в локальную систему координат
     void to_local(const Vector3d &normal);
 
     /// @brief Возвращает вектор потока в локальной системе координат
-    [[nodiscard]] Flux in_local(const Vector3d &normal) const;
+    Flux in_local(const Vector3d &normal) const;
 
     /// @brief Переводит вектор потока в глобальную систему координат
     void to_global(const Vector3d &normal);
 
     /// @brief Возвращает вектор потока в глобальной системе координат
-    [[nodiscard]] Flux in_global(const Vector3d &normal) const;
+    Flux in_global(const Vector3d &normal) const;
 
+    /// @brief В поток вывода
     friend std::ostream &operator<<(std::ostream &os, const Flux &flux);
 
     VECTORIZE(Flux)
@@ -137,80 +153,100 @@ struct Flux {
 namespace mmf {
 
 using zephyr::phys::Fractions;
-using zephyr::phys::FractionsFlux;
+using zephyr::phys::ScalarSet;
 
 struct QState;
 
 /// @brief Примитивный многоматериальный вектор состояния
+/// Используется в модели равновесной по скорости, давлению
+/// и температуре (P-V-T модель).
 struct PState {
-    double density;
-    Vector3d velocity;
-    double pressure;
-    double temperature;
-    double energy;
-    Fractions mass_frac;
+    double    density;      ///< Плотность смеси
+    Vector3d  velocity;     ///< Равновесная корость
+    double    pressure;     ///< Равновесное давление
+    double    energy;       ///< Внутренняя энергия смеси (доп)
+    double    temperature;  ///< Равновесная температура (доп)
+    Fractions mass_frac;    ///< Массовые доли компонент
+    Fractions vol_frac;     ///< Объемные доли компонент (доп)
 
+    /// @brief Инициализация нулями
     PState();
 
-//    PState(const double &pressure, const double &temperature, const Vector3d &velocity,
-//           const std::vector<Component> &components);
+    /// @brief Инициализация с полным заданием параметров
+    PState(double density, const Vector3d &velocity, double pressure, double energy,
+           const Fractions &mass_frac, double temperature, const Fractions& vol_frac);
 
-    PState(const double &density, const Vector3d &velocity,
-           const double &pressure, const double &energy, const double &temperature, const Fractions &mass_frac);
-
+    /// @brief Инициализация из консервативного вектора состояния,
+    /// давление определяется с использованием уравнения состояния смеси
+    /// Параметры P0, T0 используются в качестве начальных приближений
     PState(const QState &q, const phys::Materials &mixture, double P0 = 1e3, double T0 = 200.0);
 
-    [[nodiscard]] std::vector<double> get_densities() const;
-
-    [[nodiscard]] std::vector<double> get_energies() const;
 
     /// @brief Переводит вектор состояния в локальную систему координат
     void to_local(const Vector3d &normal);
 
     /// @brief Возвращает вектор состояния в локальной системе координат
-    [[nodiscard]] PState in_local(const Vector3d &normal) const;
+    PState in_local(const Vector3d &normal) const;
 
     /// @brief Переводит вектор состояния в глобальную систему координат
     void to_global(const Vector3d &normal);
 
-    [[nodiscard]] smf::PState to_smf() const;
-
     /// @brief Возвращает вектор состояния в глобальной системе координат
-    [[nodiscard]] PState in_global(const Vector3d &normal) const;
+    PState in_global(const Vector3d &normal) const;
 
-    void sync_temperature_energy_rp(const phys::Materials &mixture, const phys::Options& options = {});
+    // Короткий доступ к полям
+    inline const double& rho() const { return density; }
+    inline const double& u() const { return velocity.x(); }
+    inline const double& v() const { return velocity.y(); }
+    inline const double& w() const { return velocity.z(); }
+    inline const double& P() const { return pressure; }
+    inline const double& T() const { return temperature; }
+    inline const double& e() const { return energy; }
+    inline const Fractions& alpha() const { return vol_frac; }
+    inline const Fractions& beta() const { return mass_frac; }
 
+    /// @brief Преобразование в одноматериальный вектор состояния
+    smf::PState to_smf() const;
+
+    bool is_bad() const;
+
+    ScalarSet densities() const;
+
+    ScalarSet energies() const;
+
+    /// @brief В поток вывода
     friend std::ostream &operator<<(std::ostream &os, const PState &state);
-
-    [[nodiscard]] bool is_bad() const;
 
     VECTORIZE(PState)
 };
 
 /// @brief Консервативный многоматериальный вектор состояния
 struct QState {
-    double mass;
-    Vector3d momentum;
-    double energy;
-    FractionsFlux mass_frac;
+    double    mass;       ///< Плотность
+    Vector3d  momentum;   ///< Плотность импульса:       rho * v
+    double    energy;     ///< Плотность полной энергии: rho * (e + 0.5 * v^2)
+    ScalarSet mass_frac;  ///< Плотности компонент:      rho * beta_i
 
-    QState() : mass(0), momentum(0, 0, 0), energy(0), mass_frac() {}
+    /// @brief Инициализация нулями
+    QState();
 
-    QState(const double &mass, const Vector3d &momentum, const double &energy, const FractionsFlux &mass_frac);
+    /// @brief Инициализация с полным заданием параметров
+    QState(double mass, const Vector3d &momentum, double energy, const ScalarSet &mass_frac);
 
-    explicit QState(const PState &state);
+    /// @brief Преобразование из примитивного вектора состояния
+    explicit QState(const PState &z);
 
     /// @brief Переводит вектор состояния в локальную систему координат
     void to_local(const Vector3d &normal);
 
     /// @brief Возвращает вектор состояния в локальной системе координат
-    [[nodiscard]] QState in_local(const Vector3d &normal) const;
+    QState in_local(const Vector3d &normal) const;
 
     /// @brief Переводит вектор состояния в глобальную систему координат
     void to_global(const Vector3d &normal);
 
     /// @brief Возвращает вектор состояния в глобальной системе координат
-    [[nodiscard]] QState in_global(const Vector3d &normal) const;
+    QState in_global(const Vector3d &normal) const;
 
     friend std::ostream &operator<<(std::ostream &os, const QState &state);
 
@@ -231,27 +267,27 @@ struct Flux {
     double mass; ///< rho * u
     Vector3d momentum;
     double energy; ///< u * (rho * (E + 0.5 * velocity^2) + p)
-    FractionsFlux mass_frac;
+    ScalarSet mass_frac;
 
     /// @brief Нулевой поток
     Flux();
 
-    Flux(double mass, const Vector3d &momentum, double energy, const FractionsFlux &mass_frac);
+    Flux(double mass, const Vector3d &momentum, double energy, const ScalarSet &mass_frac);
 
     /// @brief Дифференциальный поток по вектору примитивных переменных
-    explicit Flux(const PState &state);
+    explicit Flux(const PState &z);
 
     /// @brief Переводит вектор потока в локальную систему координат
     void to_local(const Vector3d &normal);
 
     /// @brief Возвращает вектор потока в локальной системе координат
-    [[nodiscard]] Flux in_local(const Vector3d &normal) const;
+    Flux in_local(const Vector3d &normal) const;
 
     /// @brief Переводит вектор потока в глобальную систему координат
     void to_global(const Vector3d &normal);
 
     /// @brief Возвращает вектор потока в глобальной системе координат
-    [[nodiscard]] Flux in_global(const Vector3d &normal) const;
+    Flux in_global(const Vector3d &normal) const;
 
     friend std::ostream &operator<<(std::ostream &os, const Flux &flux);
 
@@ -262,4 +298,4 @@ struct Flux {
 
 } // namespace mmf
 
-} // namespace zephyr
+} // namespace zephyr::math

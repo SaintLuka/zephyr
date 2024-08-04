@@ -1,5 +1,15 @@
-set(MM_R_TESTER 1)
-set(MM_2D_TESTS 1)
+set(MM_R_TESTER 0)
+set(MM_2D_TESTS 0)
+
+set(MMF_TEST_1D        1)
+
+if (MMF_TEST_1D)
+    message(STATUS "Build 1D multi fluid test")
+    add_executable(mmf-test-1D mmf_test_1D.cpp)
+    target_link_directories(mmf-test-1D PUBLIC zephyr)
+    target_link_libraries(mmf-test-1D PUBLIC zephyr)
+    install(TARGETS mmf-test-1D DESTINATION problems/multi-fluid)
+endif()
 
 if (MM_R_TESTER)
     message(STATUS "Build MmRiemann tester")

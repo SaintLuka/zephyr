@@ -44,8 +44,8 @@ Fractions::Fractions(const std::array<double, max_size> &arr) : m_data(arr) {
     normalize();
 }
 
-Fractions::Fractions(const FractionsFlux &frac_flux) {
-    std::copy(frac_flux.m_data.begin(), frac_flux.m_data.end(), m_data.begin());
+Fractions::Fractions(const ScalarSet &scalars) {
+    std::copy(scalars.m_data.begin(), scalars.m_data.end(), m_data.begin());
 
     normalize();
 }
@@ -107,29 +107,7 @@ int Fractions::index() const {
 }
 
 void Fractions::normalize() {
-    double sub = 0.0;
-    for (auto &v: m_data) {
-        sub += abs(v);
-    }
-
-    double sum = 0;
-    for (auto &v: m_data) {
-        if (v < 0) {
-            if (-1e-5 * sub < v)
-                v = 0;
-            else {
-                std::cerr << "mass_frac[i] < 0: " << *this;
-//                exit(1);
-                throw std::runtime_error("mass_frac[i] < 0");
-            }
-        } else
-            sum += v;
-    }
-
-    for (int i = 0; i < max_size; ++i) {
-        m_data[i] /= sum;
-    }
-    cutoff(1e-12);
+    cutoff(1e-14);
 }
 
 void Fractions::cutoff(double eps) {
@@ -137,7 +115,7 @@ void Fractions::cutoff(double eps) {
     for (int i = 0; i < max_size; ++i) {
         if (m_data[i] < eps) {
             m_data[i] = 0.0;
-        } else if (m_data[i] > 1.0 - eps) {
+        } else if (m_data[i] > 1.0) {
             m_data[i] = 1.0;
         }
         sum += m_data[i];
@@ -148,45 +126,38 @@ void Fractions::cutoff(double eps) {
 }
 
 bool Fractions::empty() const {
-    for (auto &v: m_data)
-        if (v > 1e-8)
+    for (auto &v: m_data) {
+        if (v > 1e-14) {
             return false;
+        }
+    }
 
     return true;
 }
 
-size_t Fractions::get_size() const {
-    return max_size;
-}
-
-void Fractions::fix() {
-    for (auto &v: m_data)
-        if (v < 0)
-            v = 0;
-        else if (v > 1)
-            v = 1;
-
-    normalize();
-}
-
 std::ostream &operator<<(std::ostream &os, const Fractions &frac) {
     os << "{";
-    for (int i = 0; i < frac.get_size() - 1; ++i) {
+    for (int i = 0; i < Fractions::size() - 1; ++i) {
         os << frac[i] << ", ";
     }
-    os << frac[frac.get_size() - 1] << "}";
+    os << frac[Fractions::size()  - 1] << "}";
     return os;
 }
 
-FractionsFlux::FractionsFlux() {
-    m_data.fill(0);
+ScalarSet::ScalarSet() {
+    m_data.fill(0.0);
 }
 
-FractionsFlux::FractionsFlux(const Fractions &frac) : m_data(frac.get_data()) {}
+ScalarSet::ScalarSet(double val) {
+    m_data.fill(val);
+}
 
-FractionsFlux::FractionsFlux(const std::vector<double> &vec) {
+ScalarSet::ScalarSet(const Fractions &frac)
+    : m_data(frac.data_ref()) {}
+
+ScalarSet::ScalarSet(const std::vector<double> &vec) {
     if (vec.size() > Fractions::max_size) {
-        throw std::runtime_error("When construct FractionsFlux got vec.size() > Fractions::max_size (" +
+        throw std::runtime_error("When construct ScalarSet got vec.size() > Fractions::max_size (" +
                                  std::to_string(vec.size()) + " > " + std::to_string(Fractions::max_size));
     }
 
@@ -198,27 +169,21 @@ FractionsFlux::FractionsFlux(const std::vector<double> &vec) {
     }
 }
 
-bool FractionsFlux::has(int idx) const {
-    if (idx > m_data.size())
-        return false;
-    return m_data[idx] > 0.0;
-}
-
-double &FractionsFlux::operator[](size_t idx) {
+double &ScalarSet::operator[](size_t idx) {
     return m_data[idx];
 }
 
-const double &FractionsFlux::operator[](size_t idx) const {
+const double &ScalarSet::operator[](size_t idx) const {
     return m_data[idx];
 }
 
-std::ostream &operator<<(std::ostream &os, const FractionsFlux &frac) {
+std::ostream &operator<<(std::ostream &os, const ScalarSet &frac) {
     os << "{";
-    for (int i = 0; i < frac.get_size() - 1; ++i) {
+    for (int i = 0; i < Fractions::size() - 1; ++i) {
         os << frac.m_data[i] << ", ";
     }
-    os << frac.m_data[frac.get_size() - 1] << "}";
+    os << frac.m_data[Fractions::size() - 1] << "}";
     return os;
 }
 
-} // namespace zephyr
+} // namespace zephyr::phys

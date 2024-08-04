@@ -21,7 +21,7 @@ smf::Flux CIR1::calc_flux(const smf::PState &zL, const smf::PState &zR, const ph
     using namespace smf;
 
     // Состояние на грани
-    PState zE = 0.5 * (zL.vec() + zR.vec());
+    PState zE = 0.5 * (zL.arr() + zR.arr());
 
     // Согласуем состояние на грани
     zE.energy = eos.energy_rp(zE.density, zE.pressure);
@@ -130,7 +130,7 @@ smf::Flux CIR2::calc_flux(const smf::PState &zL, const smf::PState &zR, const ph
     using namespace smf;
 
     // Состояние на грани
-    PState zE = 0.5 * (zL.vec() + zR.vec());
+    PState zE = 0.5 * (zL.arr() + zR.arr());
 
     // Согласуем состояние на грани
     zE.energy = eos.energy_rp(zE.density, zE.pressure);
@@ -220,9 +220,9 @@ smf::Flux CIR2::calc_flux(const smf::PState &zL, const smf::PState &zR, const ph
 
 #ifdef ZEPHYR_ENABLE_EIGEN
     Vector6d qL, qR;
-    qL.segment(0, 5) = _qL.vec();
+    qL.segment(0, 5) = _qL.arr();
     qL[5] = zL.pressure;
-    qR.segment(0, 5) = _qR.vec();
+    qR.segment(0, 5) = _qR.arr();
     qR[5] = zR.pressure;
 
     Flux fL(zL);   // Дифференциальный поток слева
@@ -236,4 +236,4 @@ smf::Flux CIR2::calc_flux(const smf::PState &zL, const smf::PState &zR, const ph
 #endif
 }
 
-} // namespace zephyr
+} // namespace zephyr::math

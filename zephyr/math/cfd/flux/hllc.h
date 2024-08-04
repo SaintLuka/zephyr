@@ -4,89 +4,78 @@
 
 namespace zephyr::math {
 
-///@brief Вычисление потока методом HLLC с использованием формул для каждой величины отдельно
+///@brief Вычисление потока методом HLLC
 class HLLC : public NumFlux {
 public:
+    /// @brief Умный указатель на класс
+    using Ptr = std::shared_ptr<HLLC>;
 
-    HLLC() = default;
-
-    template<class ...Args>
-    inline static std::unique_ptr<HLLC> create(Args &&... args) {
-        return std::unique_ptr<HLLC>(new HLLC(std::forward<Args>(args)...));
+    /// @brief Создать умный указатель
+    inline static HLLC::Ptr create() {
+        return std::make_shared<HLLC>();
     }
 
-    [[nodiscard]] std::string get_name() const override { return "HLLC"; }
+    /// @brief Имя метода
+    std::string get_name() const final { return "HLLC"; }
 
+
+    /// @brief Статическая одноматериальная версия
     static smf::Flux calc_flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos);
 
-    [[nodiscard]] smf::Flux flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) const final;
+    /// @brief Одноматериальная версия
+    smf::Flux flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) const final;
 
-    [[nodiscard]] mmf::Flux
-    mm_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) const override;
-};
 
-/// @brief Оптимизированный расчёт потока по методу HLLC
-class HLLC2 : public NumFlux {
-public:
+    /// @brief Статическая многоматериальная версия
+    static mmf::Flux calc_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture);
 
-    HLLC2() = default;
-
-    template<class ...Args>
-    inline static std::unique_ptr<HLLC2> create(Args &&... args) {
-        return std::unique_ptr<HLLC2>(new HLLC2(std::forward<Args>(args)...));
-    }
-
-    [[nodiscard]] std::string get_name() const override { return "HLLC2"; }
-
-    static smf::Flux calc_flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos);
-
-    [[nodiscard]] smf::Flux flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) const final;
-
-    [[nodiscard]] mmf::Flux
-    mm_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) const override;
+    /// @brief Многоматериальная версия
+    mmf::Flux flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) const final;
 };
 
 /// @brief Central formulation of the HLLC flux
-class HLLC_central : public NumFlux {
+class HLLC_C : public NumFlux {
 public:
+    /// @brief Умный указатель на класс
+    using Ptr = std::shared_ptr<HLLC_C>;
 
-    HLLC_central() = default;
-
-    template<class ...Args>
-    inline static std::unique_ptr<HLLC_central> create(Args &&... args) {
-        return std::unique_ptr<HLLC_central>(new HLLC_central(std::forward<Args>(args)...));
+    /// @brief Создать умный указатель
+    inline static HLLC_C::Ptr create() {
+        return std::make_shared<HLLC_C>();
     }
 
-    [[nodiscard]] std::string get_name() const override { return "HLLC_central"; }
+    /// @brief Имя метода
+    std::string get_name() const final { return "HLLC_C"; }
 
+
+    /// @brief Статическая одноматериальная версия
     static smf::Flux calc_flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos);
 
-    [[nodiscard]] smf::Flux flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) const final;
+    /// @brief Одноматериальная версия
+    smf::Flux flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) const final;
 
-    [[nodiscard]] mmf::Flux
-    mm_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) const override;
 };
 
 /// @brief HLLC-LM flux with low Mach number correction
 class HLLC_LM : public NumFlux {
 public:
+    /// @brief Умный указатель на класс
+    using Ptr = std::shared_ptr<HLLC_LM>;
 
-    HLLC_LM() = default;
-
-    template<class ...Args>
-    inline static std::unique_ptr<HLLC_LM> create(Args &&... args) {
-        return std::unique_ptr<HLLC_LM>(new HLLC_LM(std::forward<Args>(args)...));
+    /// @brief Создать умный указатель
+    inline static HLLC_LM::Ptr create() {
+        return std::make_shared<HLLC_LM>();
     }
 
-    [[nodiscard]] std::string get_name() const override { return "HLLC_LM"; }
+    /// @brief Имя метода
+    std::string get_name() const final { return "HLLC_LM"; }
 
+
+    /// @brief Статическая одноматериальная версия
     static smf::Flux calc_flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos);
 
-    [[nodiscard]] smf::Flux flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) const final;
-
-    [[nodiscard]] mmf::Flux
-    mm_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) const override;
+    /// @brief Одноматериальная версия
+    smf::Flux flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) const final;
 };
 
-
-}
+} // namespace zephyr::math

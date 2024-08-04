@@ -218,6 +218,10 @@ double Materials::min_pressure(const Fractions &beta) const {
     return P_min;
 }
 
+double smooth_max(double a, double b, double delta) {
+    return 0.5 * (a + b + std::sqrt(sqr(a - b) + sqr(delta)));
+}
+
 PairPT Materials::find_PT(double rho, double eps,
                           const Fractions &beta, const Options &options) const {
 
@@ -226,7 +230,7 @@ PairPT Materials::find_PT(double rho, double eps,
 
     double vol = 1.0 / rho;
     double P = std::isnan(options.P0) ? 1.0e5 : options.P0;
-    double T = std::isnan(options.T0) ? temperature_rp(rho, P, beta) : options.T0;
+    double T = std::isnan(options.T0) ? 300.0 : options.T0;
 
     double P_min = min_pressure(beta);
     if (P < P_min)

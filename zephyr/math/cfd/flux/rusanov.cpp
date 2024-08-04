@@ -2,7 +2,6 @@
 
 #include <zephyr/geom/vector.h>
 #include <zephyr/math/cfd/flux/rusanov.h>
-#include <boost/format.hpp>
 
 namespace zephyr::math {
 
@@ -13,114 +12,80 @@ smf::Flux Rusanov::flux(const smf::PState &zL, const smf::PState &zR, const phys
 smf::Flux Rusanov::calc_flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) {
     using namespace smf;
 
-    // Состояние на грани
-    PState zE = 0.5 * (zL.vec() + zR.vec());
+    // Нормальные скорости слева и справа
+    const double& u_L = zL.velocity.x();
+    const double& u_R = zR.velocity.x();
 
-    // Согласуем состояние на грани
-    zE.energy = eos.energy_rp(zE.density, zE.pressure);
+    // Скорость звука слева и справа
+    double c_L = eos.sound_speed_rp(zL.density, zL.pressure);
+    double c_R = eos.sound_speed_rp(zR.density, zR.pressure);
 
-    double rho = zE.density;
-    double u = zE.velocity.x();
-    double p = zE.pressure;
-
-    double c = eos.sound_speed_rp(rho, p);
-
-    // Максимальное собственное значение
-    double max_lambda = std::abs(u) + c;
-
-    QState qL(zL); // Консервативный вектор слева
-    QState qR(zR); // Консервативный вектор справа
-
-    Flux fL(zL);   // Дифференциальный поток слева
-    Flux fR(zR);   // Дифференциальный поток справа
-
-    Flux res = 0.5 * (fL.vec() + fR.vec()) + 0.5 * max_lambda * (qL.vec() - qR.vec());
-
-    return res;
-}
-
-smf::Flux Rusanov2::flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) const {
-    return calc_flux(zL, zR, eos);
-}
-
-smf::Flux Rusanov2::calc_flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) {
-    using namespace smf;
-
-    double rho1 = zL.density, rho2 = zR.density;
-    double u1 = zL.velocity.x(), u2 = zR.velocity.x();
-    double p1 = zL.pressure, p2 = zR.pressure;
-
-    double c1 = eos.sound_speed_rp(rho1, p1), c2 = eos.sound_speed_rp(rho2, p2);
+    // Оценки скоростей расходящихся волн
+    double S_L = std::min({u_L - c_L, u_R - c_R, 0.0});
+    double S_R = std::max({u_L + c_L, u_R + c_R, 0.0});
 
     // Максимальное собственное значение
-    double max_lambda = std::max(std::abs(u1) + c1, std::abs(u2) + c2);
+    double S = std::max(std::abs(S_L), S_R);
 
-    QState qL(zL); // Консервативный вектор слева
-    QState qR(zR); // Консервативный вектор справа
+    QState Q_L(zL); // Консервативный вектор слева
+    QState Q_R(zR); // Консервативный вектор справа
 
-    Flux fL(zL);   // Дифференциальный поток слева
-    Flux fR(zR);   // Дифференциальный поток справа
+    Flux F_L(zL);   // Дифференциальный поток слева
+    Flux F_R(zR);   // Дифференциальный поток справа
 
-    Flux res = 0.5 * (fL.vec() + fR.vec()) + 0.5 * max_lambda * (qL.vec() - qR.vec());
+    Flux F = 0.5 * (F_L.vec() + F_R.vec()) + 0.5 * S * (Q_L.vec() - Q_R.vec());
 
-    return res;
+    return F;
 }
 
-mmf::Flux Rusanov2::mm_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) const {
-    return calc_mm_flux(zL, zR, mixture);
+mmf::Flux Rusanov::flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) const {
+    return calc_flux(zL, zR, mixture);
 }
 
-mmf::Flux Rusanov2::calc_mm_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) {
+mmf::Flux Rusanov::calc_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) {
     using namespace mmf;
 
-    double rho1 = zL.density, rho2 = zR.density;
-    double u1 = zL.velocity.x(), u2 = zR.velocity.x();
-    double p1 = zL.pressure, p2 = zR.pressure;
+    // Нормальные скорости слева и справа
+    const double &u_L = zL.velocity.x();
+    const double &u_R = zR.velocity.x();
 
-    double c1 = mixture.sound_speed_rp(rho1, p1, zL.mass_frac, {.T0 = zL.temperature});
-    double c2 = mixture.sound_speed_rp(rho2, p2, zR.mass_frac, {.T0 = zR.temperature});
-    if(std::isnan(c1)) {
-        c1 = 0;
-        if(abs(p1) > 1e-3){
-            std::cerr << "Can't find sound speed for state: " << zL << "\n";
-        }
+    // Скорость звука слева и справа
+    double c_L = mixture.sound_speed_rp(zL.density, zL.pressure,
+                                        zL.mass_frac, {.T0 = zL.temperature});
+    double c_R = mixture.sound_speed_rp(zR.density, zR.pressure,
+                                        zR.mass_frac, {.T0 = zR.temperature});
+
+    if (std::isnan(c_L) || std::isnan(c_R)) {
+        std::cerr << "Rusanov::calc_mm_flux error #1\n";
+        std::cerr << "Can't find sound speed for state: " << zL << "\n";
+        std::cerr << "Can't find sound speed for state: " << zR << "\n";
+        throw std::runtime_error("Rusanov::calc_mm_flux error #1");
     }
-    if(std::isnan(c2)) {
-        c1 = 0;
-        if(abs(p2) > 1e-3){
-            std::cerr << "Can't find sound speed for state: " << zR << "\n";
-        }
-    }
+
+    // Оценки скоростей расходящихся волн
+    double S_L = std::min({u_L - c_L, u_R - c_R, 0.0});
+    double S_R = std::max({u_L + c_L, u_R + c_R, 0.0});
 
     // Максимальное собственное значение
-    double max_lambda = std::max(std::abs(u1) + c1, std::abs(u2) + c2);
+    double S = std::max(std::abs(S_L), S_R);
 
-    QState qL(zL); // Консервативный вектор слева
-    QState qR(zR); // Консервативный вектор справа
+    QState Q_L(zL); // Консервативный вектор слева
+    QState Q_R(zR); // Консервативный вектор справа
 
-    Flux fL(zL);   // Дифференциальный поток слева
-    Flux fR(zR);   // Дифференциальный поток справа
+    Flux F_L(zL);   // Дифференциальный поток слева
+    Flux F_R(zR);   // Дифференциальный поток справа
 
-    Flux flux = 0.5 * (fL.vec() + fR.vec()) + 0.5 * max_lambda * (qL.vec() - qR.vec());
+    Flux F = 0.5 * (F_L.vec() + F_R.vec()) + 0.5 * S * (Q_L.vec() - Q_R.vec());
 
-    if (flux.is_bad()) {
-        std::cerr << "calc Rusanov2 flux\n";
-        std::cerr << "zL: " << zL << "\nzR: " << zR << "\n";
-        std::cerr << "c1: " << c1 << " c2: " << c2 << '\n';
-        std::cerr << "Flux: " << flux << "\n";
-//        std::cerr << "Code for debug:\n";
-//        std::cerr << boost::format("PState zL(%1%, {%2%, %3%, %4%}, %5%, %6%, %7%, %8%);\n") %
-//                     zL.density % zL.velocity.x() % zL.velocity.y() % zL.velocity.z() % zL.pressure %
-//                     zL.energy % zL.temperature % zL.mass_frac;
-//        std::cerr << boost::format("PState zR(%1%, {%2%, %3%, %4%}, %5%, %6%, %7%, %8%);\n") %
-//                     zR.density % zR.velocity.x() % zR.velocity.y() % zR.velocity.z() % zR.pressure %
-//                     zR.energy % zR.temperature % zR.mass_frac;
-        exit(1);
-        throw std::runtime_error("Bad Rusanov2 flux");
+    if (F.is_bad()) {
+        std::cerr << "Rusanov::calc_mm_flux error #2\n";
+        std::cerr << "  zL: " << zL << "; c_L: " << c_L << "\n";
+        std::cerr << "  zR: " << zR << "; c_R: " << c_R << "\n";
+        std::cerr << "  Flux: " << F << "\n";
+        throw std::runtime_error("Rusanov::calc_mm_flux error #2");
     }
 
-    return flux;
+    return F;
 }
 
-
-} // namespace zephyr
+} // namespace zephyr::math

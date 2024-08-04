@@ -1,6 +1,6 @@
 #include <zephyr/math/solver/mm_fluid.h>
 #include <zephyr/math/cfd/face_extra.h>
-#include <zephyr/math/cfd/compute_grad.h>
+#include <zephyr/math/cfd/gradient.h>
 #include <zephyr/math/cfd/models.h>
 
 namespace zephyr::math {
@@ -137,7 +137,7 @@ void MmFluid::fluxes(Mesh &mesh) {
             PState zp = p_neib.in_local(normal);
 
             // Численный поток на грани
-            auto loc_flux = m_nf->mm_flux(zm, zp, mixture);
+            auto loc_flux = m_nf->flux(zm, zp, mixture);
             if (loc_flux.is_bad()) {
                 std::cerr << "Step: " << m_step << '\n';
                 std::cerr << "Bad flux for " << cell.b_idx() << " and " << face.neib().b_idx() << '\n';
@@ -146,11 +146,11 @@ void MmFluid::fluxes(Mesh &mesh) {
             loc_flux.to_global(normal);
 
             // Суммируем поток
-            flux.vec() += loc_flux.vec() * face.area();
+            flux.arr() += loc_flux.arr() * face.area();
         }
 
         // Новое значение в ячейке (консервативные переменные)
-        QState q_self2 = q_self.vec() - m_dt * flux.vec() / cell.volume();
+        QState q_self2 = q_self.arr() - m_dt * flux.arr() / cell.volume();
         q_self2.momentum.y() -= m_dt * g * p_self.density;
 
         // Новое значение примитивных переменных
@@ -190,27 +190,19 @@ PState boundary_value(const PState &zc, const Vector3d &normal, Boundary flag) {
 }
 
 void MmFluid::compute_grad(Mesh &mesh, const std::function<mmf::PState(Cell &)> &to_state) {
-    if (dim > 1) {
-        mesh.for_each([&to_state](Cell &cell) -> void {
-            auto grad = math::compute_gradient_LSM<mmf::PState>(cell, to_state, boundary_value);
-            auto grad_lim = math::gradient_limiting<mmf::PState>(cell, grad, to_state, boundary_value);
-            cell(U).d_dx = grad_lim[0];
-            cell(U).d_dy = grad_lim[1];
-            cell(U).d_dz = grad_lim[2];
-        });
-    } else {
-        mesh.for_each([&to_state](Cell &cell) -> void {
-            auto grad = math::compute_gradient_LSM_1D<mmf::PState>(cell, to_state, boundary_value);
-            auto grad_lim = math::gradient_limiting_1D<mmf::PState>(cell, grad, to_state, boundary_value);
-            cell(U).d_dx = grad_lim;
-        });
-    }
+    mesh.for_each([&to_state](Cell &cell) -> void {
+        auto grad = math::gradient::LSM<mmf::PState>(cell, to_state, boundary_value);
+        auto grad_lim = math::gradient::limiting<mmf::PState>(cell, grad, to_state, boundary_value);
+        cell(U).d_dx = grad_lim[0];
+        cell(U).d_dy = grad_lim[1];
+        cell(U).d_dz = grad_lim[2];
+    });
 }
 
 void MmFluid::fluxes_stage1(Mesh &mesh) {
     mesh.for_each([this](Cell &cell) -> void {
         QState qc(cell(U).get_pstate());
-        qc.vec() -= 0.5 * m_dt / cell.volume() * calc_flux_extra(cell, true).vec();
+        qc.arr() -= 0.5 * m_dt / cell.volume() * calc_flux_extra(cell, true).arr();
         qc.momentum.y() -= m_dt * g * cell(U).rho;
         cell(U).half = PState(qc, mixture, cell(U).p, cell(U).t);
         check_state(cell(U).half, qc, cell(U).get_pstate(), "fluxes_stage1", cell.b_idx());
@@ -220,7 +212,7 @@ void MmFluid::fluxes_stage1(Mesh &mesh) {
 void MmFluid::fluxes_stage2(Mesh &mesh) {
     mesh.for_each([this](Cell &cell) -> void {
         QState qc(cell(U).get_pstate());
-        qc.vec() -= m_dt / cell.volume() * calc_flux_extra(cell, false).vec();
+        qc.arr() -= m_dt / cell.volume() * calc_flux_extra(cell, false).arr();
         qc.momentum.y() -= m_dt * g * cell(U).half.density;
         cell(U).next = PState(qc, mixture, cell(U).half.pressure, cell(U).half.temperature);
         check_state(cell(U).next, qc, cell(U).half, "fluxes_stage2", cell.b_idx());
@@ -265,25 +257,25 @@ mmf::Flux MmFluid::calc_flux_extra(Cell &cell, bool from_begin) {
 
         /*
         Vector3d dr = face.center() - cell.center();
-        PState p_minus = p_self.vec() +
-                         cell(U).d_dx.vec() * dr.x() +
-                         cell(U).d_dy.vec() * dr.y() +
-                         cell(U).d_dz.vec() * dr.z();
+        PState p_minus = p_self.arr() +
+                         cell(U).d_dx.arr() * dr.x() +
+                         cell(U).d_dy.arr() * dr.y() +
+                         cell(U).d_dz.arr() * dr.z();
 
         dr = face.center() - neib_c;
         PState p_plus = p_minus;
         if (!face.is_boundary())
-            p_plus = face.neib()(U).get_pstate().vec() +
-                     face.neib()(U).d_dx.vec() * dr.x() +
-                     face.neib()(U).d_dy.vec() * dr.y() +
-                     face.neib()(U).d_dz.vec() * dr.z();
+            p_plus = face.neib()(U).get_state().arr() +
+                     face.neib()(U).d_dx.arr() * dr.x() +
+                     face.neib()(U).d_dy.arr() * dr.y() +
+                     face.neib()(U).d_dz.arr() * dr.z();
         p_plus.to_local(normal);
         p_minus.to_local(normal);
         */
 
         // исправляем возможные нефизичные значения массовых долей
-        p_minus.mass_frac.fix();
-        p_plus.mass_frac.fix();
+        p_minus.mass_frac.normalize();
+        p_plus.mass_frac.normalize();
 
         if (face.flag() == Boundary::WALL) {
             Vector3d Vn = normal * p_minus.velocity.dot(normal);
@@ -320,11 +312,11 @@ mmf::Flux MmFluid::calc_flux_extra(Cell &cell, bool from_begin) {
         }
 
         // Численный поток на грани
-        auto loc_flux = m_nf->mm_flux(p_minus, p_plus, mixture);
+        auto loc_flux = m_nf->flux(p_minus, p_plus, mixture);
         loc_flux.to_global(normal);
 
         // Суммируем поток
-        flux.vec() += loc_flux.vec() * face.area();
+        flux.arr() += loc_flux.arr() * face.area();
     }
 
     return flux;
@@ -379,20 +371,20 @@ Distributor MmFluid::distributor() const {
     distr.split = [this](AmrStorage::Item &parent, mesh::Children &children) {
         for (auto &child: children) {
             Vector3d dr = child.center - parent.center;
-//            PState child_state = parent(U).get_pstate().vec() +
-//                                 parent(U).d_dx.vec() * dr.x() +
-//                                 parent(U).d_dy.vec() * dr.y() +
-//                                 parent(U).d_dz.vec() * dr.z();
+//            PState child_state = parent(U).get_state().arr() +
+//                                 parent(U).d_dx.arr() * dr.x() +
+//                                 parent(U).d_dy.arr() * dr.y() +
+//                                 parent(U).d_dz.arr() * dr.z();
 //            child_state.mass_frac.fix();
 //            child_state.sync_temperature_energy_rp(mixture, {.T0 = parent(U).t});
 //            child(U).set_state(child_state);
-            PState shift = parent(U).d_dx.vec() * dr.x() +
-                           parent(U).d_dy.vec() * dr.y() +
-                           parent(U).d_dz.vec() * dr.z();
+            PState shift = parent(U).d_dx.arr() * dr.x() +
+                           parent(U).d_dy.arr() * dr.y() +
+                           parent(U).d_dz.arr() * dr.z();
             child(U).rho = parent(U).rho + shift.density;
             child(U).v = parent(U).v + parent(U).rho / child(U).rho * shift.velocity;
-            child(U).mass_frac = parent(U).mass_frac.vec() + parent(U).rho / child(U).rho * shift.mass_frac.vec();
-            child(U).mass_frac.fix();
+            child(U).mass_frac = parent(U).mass_frac.arr() + parent(U).rho / child(U).rho * shift.mass_frac.arr();
+            child(U).mass_frac.normalize();
             child(U).e = parent(U).e + (parent(U).v - child(U).v).squaredNorm() / 2 + parent(U).rho / child(U).rho * shift.energy;
             child(U).p = mixture.pressure_re(child(U).rho, child(U).e, child(U).mass_frac, {.P0 = parent(U).p, .T0 = parent(U).t});
             child(U).t = mixture.temperature_rp(child(U).rho, child(U).p, child(U).mass_frac, {.T0 = parent(U).t});
@@ -415,11 +407,11 @@ Distributor MmFluid::distributor() const {
         QState sum;
         double mean_p = 0.0, mean_t = 0.0;
         for (auto &child: children) {
-            sum.vec() += QState(child(U).get_pstate()).vec() * child.volume();
+            sum.arr() += QState(child(U).get_pstate()).arr() * child.volume();
             mean_p += child(U).p * child.volume();
             mean_t += child(U).t * child.volume();
         }
-        sum.vec() /= parent.volume();
+        sum.arr() /= parent.volume();
         mean_p /= parent.volume();
         mean_t /= parent.volume();
         for (auto &b: sum.mass_frac.m_data)
@@ -427,7 +419,7 @@ Distributor MmFluid::distributor() const {
                 b = 0;
         PState state(sum, mixture, mean_p, mean_t);
         parent(U).set_state(state);
-//        auto [t, e] = mixture.temperature_energy_rp(parent(U).rho, parent(U).p, parent(U).mass_frac, {.T0 = mean_t});
+//        auto [t, e] = mixture.temperature_energy_rp(parent(U).density, parent(U).p, parent(U).mass_frac, {.T0 = mean_t});
 //        parent(U).e = e;
 //        parent(U).t = t;
         if (parent(U).is_bad1()) {

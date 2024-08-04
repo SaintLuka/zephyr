@@ -9,6 +9,10 @@ namespace zephyr::math {
 
 using phys::Eos;
 
+smf::Flux Godunov::flux(const smf::PState &zL, const smf::PState &zR, const Eos &eos) const {
+    return calc_flux(zL, zR, eos);
+}
+
 smf::Flux Godunov::calc_flux(const smf::PState &zL, const smf::PState &zR, const Eos &eos) {
     auto sol = RiemannSolver::solve(zL, zR,
                                     eos.stiffened_gas(zL.density, zL.pressure),
@@ -27,11 +31,11 @@ smf::Flux Godunov::calc_flux(const smf::PState &zL, const smf::PState &zR, const
     return flux;
 }
 
-smf::Flux Godunov::flux(const smf::PState &zL, const smf::PState &zR, const Eos &eos) const {
-    return calc_flux(zL, zR, eos);
+mmf::Flux Godunov::flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) const {
+    return calc_flux(zL, zR, mixture);
 }
 
-mmf::Flux Godunov::calc_mm_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) {
+mmf::Flux Godunov::calc_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) {
     bool zL_bad = std::isinf(zL.density) || std::isnan(zL.density) ||
                   std::isinf(zL.velocity.x()) || std::isnan(zL.velocity.x()) ||
                   std::isinf(zL.velocity.y()) || std::isnan(zL.velocity.y()) ||
@@ -66,13 +70,13 @@ mmf::Flux Godunov::calc_mm_flux(const mmf::PState &zL, const mmf::PState &zR, co
     if (sol.U >= 0) {
         Vector3d v(sol.Uf, zL.velocity.y(), zL.velocity.z());
         auto [temperature, energy] = mixture.temperature_energy_rp(sol.rho, sol.Pf, zL.mass_frac, {.T0=zL.temperature});
-        mmf::PState z(sol.rho, v, sol.Pf, energy, temperature, zL.mass_frac);
+        mmf::PState z(sol.rho, v, sol.Pf, energy, zL.mass_frac, temperature, mmf::Fractions::NaN());
 
         flux = mmf::Flux(z);
     } else {
         Vector3d v(sol.Uf, zR.velocity.y(), zR.velocity.z());
         auto [temperature, energy] = mixture.temperature_energy_rp(sol.rho, sol.Pf, zR.mass_frac, {.T0=zR.temperature});
-        mmf::PState z(sol.rho, v, sol.Pf, energy, temperature, zR.mass_frac);
+        mmf::PState z(sol.rho, v, sol.Pf, energy, zR.mass_frac, temperature, mmf::Fractions::NaN());
 
         flux = mmf::Flux(z);
     }
@@ -97,8 +101,4 @@ mmf::Flux Godunov::calc_mm_flux(const mmf::PState &zL, const mmf::PState &zR, co
     return flux;
 }
 
-mmf::Flux Godunov::mm_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) const {
-    return calc_mm_flux(zL, zR, mixture);
-}
-
-} // namespace zephyr
+} // namespace zephyr::math

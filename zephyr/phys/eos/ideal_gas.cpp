@@ -5,7 +5,7 @@
 #include <zephyr/phys/eos/ideal_gas.h>
 #include <zephyr/phys/eos/stiffened_gas.h>
 
-namespace zephyr { namespace phys {
+namespace zephyr::phys {
 
 IdealGas::IdealGas(double gamma, double Cv)
     : gamma(gamma), Cv(Cv) { }
@@ -28,8 +28,22 @@ dRdE IdealGas::pressure_re(double rho, double eps, const Options& options) const
     return res;
 }
 
-double IdealGas::energy_rp(double rho, double P, const Options& options) const {
-    return P / ((gamma - 1.0) * rho);
+dRdT IdealGas::pressure_rt(double rho, double T, const Options& options) const {
+    dRdT P = (gamma - 1.0) * Cv * rho * T;
+    if (options.deriv) {
+        P.dR = (gamma - 1.0) * Cv * T;
+        P.dT = (gamma - 1.0) * Cv * rho;
+    }
+    return P;
+}
+
+dRdT IdealGas::energy_rt(double rho, double T, const Options& options) const {
+    dRdT e = Cv * T;
+    if (options.deriv) {
+        e.dR = 0.0;
+        e.dT = Cv;
+    }
+    return e;
 }
 
 double IdealGas::sound_speed_re(double rho, double eps, const Options& options) const {
@@ -40,8 +54,8 @@ double IdealGas::sound_speed_rp(double rho, double P, const Options& options) co
     return std::sqrt(gamma * P / rho);
 }
 
-double IdealGas::pressure_rt(double rho, double T, const Options& options) const {
-    return (gamma - 1.0) * Cv * rho * T;
+double IdealGas::energy_rp(double rho, double P, const Options& options) const {
+    return P / ((gamma - 1.0) * rho);
 }
 
 double IdealGas::temperature_rp(double rho, double P, const Options& options) const {
@@ -74,5 +88,4 @@ double IdealGas::min_pressure() const {
     return 0.0;
 }
 
-}
-}
+} // namespace zephyr::phys

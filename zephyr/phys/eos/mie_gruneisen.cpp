@@ -51,7 +51,7 @@ double MieGruneisen::sound_speed_rp(double rho, double P, const Options& options
     return std::sqrt(std::max(c2, 1.0e-6));
 }
 
-double MieGruneisen::pressure_rt(double rho, double T, const Options& options) const {
+dRdT MieGruneisen::pressure_rt(double rho, double T, const Options& options) const {
     double P_c = cold_pressure(rho);
     return P_c + Gr * Cv * rho * (T - T0);
 }

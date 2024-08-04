@@ -7,28 +7,34 @@
 
 namespace zephyr::phys {
 
-struct FractionsFlux;
+struct ScalarSet;
 
 /// @brief Вектор массовых или объемных концентраций
 struct Fractions {
     /// @brief Максимальное число компонент
-    static const int max_size = 5;
+    static const int max_size = 3;
 
-    /// @brief Конструктор по умолчанию
+    /// @brief Массив данных
+    std::array<double, max_size> m_data{};
+
+
+    /// @brief Инициализация нулями
     Fractions();
 
     /// @brief Конструктор со списком инициализации
     Fractions(std::initializer_list<double> list);
 
-    /// @brief Конструктор из вектора
+    /// @brief Конструктор из std::vector
     explicit Fractions(const std::vector<double> &vec);
 
+    /// @brief Конструктор из std::array
     explicit Fractions(const std::array<double, max_size> &arr);
 
-    explicit Fractions(const FractionsFlux &frac_flux);
+    /// @brief Конструктор из набора скаляров
+    explicit Fractions(const ScalarSet &scalars);
 
     /// @brief Содержит компоненту с индексом idx
-    [[nodiscard]] bool has(int idx) const;
+    bool has(int idx) const;
 
     /// @brief Оператор доступа по индексу
     double &operator[](int idx);
@@ -44,32 +50,27 @@ struct Fractions {
 
     /// @brief Возвращает true (чистое вещество), если массив содержит
     /// единственную концентрацию больше нуля, в остальных случаях false.
-    [[nodiscard]] bool is_pure() const;
-
-    [[nodiscard]] std::array<double, Fractions::max_size> get_data() const {
-        return m_data;
-    }
+    bool is_pure() const;
 
     /// @brief Если массив содержит единственную концентрацию,
     /// отличную от нуля, тогда возвращается индекс ненулевого элемента.
     /// Иначе значение -1.
-    [[nodiscard]] int index() const;
+    int index() const;
 
     /// @brief Нормализовать концентрации (сумма равна единице)
     void normalize();
 
-    /// @brief Удалить концентрации меньше 0 и большие 1 и затем нормализовать
-    void fix();
-
     /// @brief Обрезать маленькие (< eps) и близкие к единице ( > 1 - eps)
     /// концентрации, затем нормализовать концентрации
-    void cutoff(double eps = 1.0e-6);
+    void cutoff(double eps = 1.0e-12);
 
-    [[nodiscard]] bool empty() const;
+    /// @brief Не содержит концентраций
+    bool empty() const;
 
-    [[nodiscard]] size_t get_size() const;
-
-    std::array<double, max_size> m_data{};
+    /// @brief Ссылка на массив данных
+    const std::array<double, Fractions::max_size>& data_ref() const {
+        return m_data;
+    }
 
     VECTORIZE(Fractions)
 };
@@ -78,42 +79,22 @@ std::ostream &operator<<(std::ostream &os, const Fractions &frac);
 
 
 /// @brief Вектор потока величины нескольких веществ
-struct FractionsFlux {
+struct ScalarSet {
+    /// @brief Массив данных
+    std::array<double, Fractions::max_size> m_data{};
+
+
     /// @brief Конструктор по умолчанию
-    FractionsFlux();
+    ScalarSet();
+
+    /// @brief Установить значение
+    ScalarSet(double val);
 
     /// @brief Конструктор из Fractions
-    explicit FractionsFlux(const Fractions &frac);
+    explicit ScalarSet(const Fractions &frac);
 
     /// @brief Конструктор из вектора
-    explicit FractionsFlux(const std::vector<double> &vec);
-
-    /// @brief Содержит компоненту с индексом idx
-    [[nodiscard]] bool has(int idx) const;
-
-    template<typename T>
-    FractionsFlux &operator*=(const T &c) {
-        for (double &v: m_data)
-            v *= c;
-
-        return *this;
-    }
-
-    template<typename T>
-    FractionsFlux &operator/=(const T &c) {
-        for (double &v: m_data)
-            v /= c;
-
-        return *this;
-    }
-
-    [[nodiscard]] size_t get_size() const {
-        return m_data.size();
-    }
-
-    [[nodiscard]] const std::array<double, Fractions::max_size> &get_data() const {
-        return m_data;
-    }
+    explicit ScalarSet(const std::vector<double> &vec);
 
     /// @brief Оператор доступа по индексу
     double &operator[](size_t idx);
@@ -121,11 +102,38 @@ struct FractionsFlux {
     /// @brief Оператор доступа по индексу
     const double &operator[](size_t idx) const;
 
-    std::array<double, Fractions::max_size> m_data{};
+    template<typename T>
+    ScalarSet &operator*=(const T &c) {
+        for (double &v: m_data)
+            v *= c;
 
-    VECTORIZE(FractionsFlux)
+        return *this;
+    }
+
+    template<typename T>
+    ScalarSet &operator/=(const T &c) {
+        for (double &v: m_data)
+            v /= c;
+
+        return *this;
+    }
+
+    ScalarSet &operator+=(const ScalarSet &c) {
+        for (int i = 0; i < size(); ++i) {
+            m_data[i] += c[i];
+        }
+
+        return *this;
+    }
+
+    /// @brief Ссылка на массив данных
+    const std::array<double, Fractions::max_size> &data_ref() const {
+        return m_data;
+    }
+
+    VECTORIZE(ScalarSet)
 };
 
-std::ostream &operator<<(std::ostream &os, const FractionsFlux &frac);
+std::ostream &operator<<(std::ostream &os, const ScalarSet &frac);
 
 } // namespace zephyr

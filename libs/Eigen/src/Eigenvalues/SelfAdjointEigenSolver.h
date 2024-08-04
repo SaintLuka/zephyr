@@ -597,8 +597,8 @@ template<typename SolverType> struct direct_selfadjoint_eigenvalues<SolverType,3
     Scalar cos_theta = cos(theta);
     Scalar sin_theta = sin(theta);
     // roots are already sorted, since cos is monotonically decreasing on [0, pi]
-    roots(0) = c2_over_3 - rho*(cos_theta + s_sqrt3*sin_theta); // == 2*rho*cos(theta+2pi/3)
-    roots(1) = c2_over_3 - rho*(cos_theta - s_sqrt3*sin_theta); // == 2*rho*cos(theta+ pi/3)
+    roots(0) = c2_over_3 - rho*(cos_theta + s_sqrt3*sin_theta); // == 2*density*cos(theta+2pi/3)
+    roots(1) = c2_over_3 - rho*(cos_theta - s_sqrt3*sin_theta); // == 2*density*cos(theta+ pi/3)
     roots(2) = c2_over_3 + Scalar(2)*rho*cos_theta;
   }
 

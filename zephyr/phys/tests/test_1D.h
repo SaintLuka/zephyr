@@ -23,7 +23,7 @@ public:
     virtual double max_time() const = 0;
 
     /// @brief Получить используемый УрС
-    virtual const Eos& get_eos() const = 0;
+    virtual Eos::Ptr get_eos() const = 0;
 
     /// @brief Получить положение разрыва
     virtual double get_x_jump() const = 0;
@@ -42,7 +42,7 @@ public:
     virtual double energy(double x) const = 0;
 
     /// @brief Версия для многоматериальных
-    virtual const Eos& get_eos(double x) const {
+    virtual Eos::Ptr get_eos(double x) const {
         return get_eos();
     }
 
@@ -68,7 +68,7 @@ public:
     }
 
     /// @brief Версия для многоматериальных
-    virtual const Eos& get_eos(const Vector3d &r) const {
+    virtual Eos::Ptr get_eos(const Vector3d &r) const {
         return get_eos(r.x());
     }
 

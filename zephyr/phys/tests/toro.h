@@ -13,7 +13,9 @@ using zephyr::geom::Vector3d;
 class ToroTest : public Test1D {
 public:
 
-    IdealGas eos;   ///< Используемый УрС
+    IdealGas::Ptr eos_L;  ///< Используемый УрС
+    IdealGas::Ptr eos_R; ///< Используемый УрС
+
     double x_jump;  ///< Положение разрыва
     double finish;  ///< Конечный момент времени
     double rL, rR;  ///< Плотность
@@ -24,7 +26,7 @@ public:
 
     /// @brief Конструктор
     /// @param num Номер теста 1..7
-    explicit ToroTest(int num);
+    explicit ToroTest(int num, bool multimat = false);
 
     /// @brief Симметрично отразить начальные условия
     void inverse();
@@ -41,7 +43,9 @@ public:
     double max_time() const final { return finish; }
 
     ///@brief Получить используемый УрС
-    const Eos& get_eos() const final { return eos; }
+    Eos::Ptr get_eos() const final {
+        return eos_L;
+    }
 
     ///@brief Получить положение разрыва
     double get_x_jump() const final { return x_jump; }
@@ -67,6 +71,11 @@ public:
         return x < x_jump ? eL : eR;
     }
 
+    /// @brief Версия для многоматериальных
+    Eos::Ptr get_eos(double x) const final {
+        return x < x_jump ? eos_L : eos_R;
+    }
+
 
     /// @brief Начальная плотность
     double density(const Vector3d& r) const final {
@@ -86,6 +95,11 @@ public:
     /// @brief Начальная внутренняя энергия
     double energy(const Vector3d& r) const final {
         return energy(r.x());
+    }
+
+    /// @brief Версия для многоматериальных
+    Eos::Ptr get_eos(const Vector3d &r) const final {
+        return get_eos(r.x());
     }
 
     ~ToroTest() = default;

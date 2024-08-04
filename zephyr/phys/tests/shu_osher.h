@@ -12,7 +12,9 @@ class ShuOsherTest : public Test1D {
 public:
 
     /// @brief Начальные данные
-    ShuOsherTest() : m_eos(1.4) {
+    ShuOsherTest() {
+        m_eos = IdealGas::create(1.4);
+
         rL  = 27.0 / 7.0;
         uL = 4.0 * std::sqrt(35.0) / 9.0;
         pL = 31.0 / 3.0;
@@ -28,7 +30,7 @@ public:
     std::string get_name() const { return "Shu Osher"; };
 
     /// @brief Используемое уравнение состояния
-    const Eos& get_eos() const final { return m_eos; }
+    Eos::Ptr get_eos() const final { return m_eos; }
 
     /// @brief Левая граница области
     double xmin() const final { return -5.0; }
@@ -60,7 +62,7 @@ public:
 
     /// @brief Начальная внутренняя энергия
     double energy(double x) const final {
-        return m_eos.energy_rp(density(x), pressure(x));
+        return m_eos->energy_rp(density(x), pressure(x));
     }
 
 
@@ -85,7 +87,7 @@ public:
     }
 
 private:
-    IdealGas m_eos;
+    IdealGas::Ptr m_eos;
 
     double epsilon;
     double rL, uL, pL;

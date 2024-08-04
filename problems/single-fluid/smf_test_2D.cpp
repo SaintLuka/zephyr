@@ -28,11 +28,11 @@ using zephyr::utils::threads;
 SmFluid::State U;
 
 /// Переменные для сохранения
-double get_rho(AmrStorage::Item& cell) { return cell(U).rho; }
-double get_u(AmrStorage::Item& cell) { return cell(U).v.x(); }
-double get_v(AmrStorage::Item& cell) { return cell(U).v.y(); }
-double get_p(AmrStorage::Item& cell) { return cell(U).p; }
-double get_e(AmrStorage::Item& cell) { return cell(U).e; }
+double get_rho(AmrStorage::Item& cell) { return cell(U).density; }
+double get_u(AmrStorage::Item& cell) { return cell(U).velocity.x(); }
+double get_v(AmrStorage::Item& cell) { return cell(U).velocity.y(); }
+double get_p(AmrStorage::Item& cell) { return cell(U).pressure; }
+double get_e(AmrStorage::Item& cell) { return cell(U).energy; }
 
 
 int main() {
@@ -45,10 +45,10 @@ int main() {
     // Начальные данные
     auto init_cells = [&test](Mesh& mesh) {
         for (auto cell: mesh) {
-            cell(U).rho = test.density(cell.center());
-            cell(U).v   = test.velocity(cell.center());
-            cell(U).p   = test.pressure(cell.center());
-            cell(U).e   = test.energy(cell.center());
+            cell(U).density  = test.density(cell.center());
+            cell(U).velocity = test.velocity(cell.center());
+            cell(U).pressure = test.pressure(cell.center());
+            cell(U).energy   = test.energy(cell.center());
         }
     };
 

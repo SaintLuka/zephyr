@@ -34,6 +34,16 @@ typedef DiagonalMatrix<double, 5, 5> DiagMatrix5d; ///< Диагональная
 typedef DiagonalMatrix<double, 6, 6> DiagMatrix6d; ///< Диагональная Eigen матрица 6 x 6
 typedef DiagonalMatrix<double, 7, 7> DiagMatrix7d; ///< Диагональная Eigen матрица 7 x 7
 
+
+/// @brief Тип произвольного класса, приведенный к Eigen::Array
+template<class T>
+using ei_arr = Eigen::Array<double, sizeof(T) / sizeof(double), 1>;
+
+/// @brief Тип произвольного класса, приведенный к Eigen::Matrix
+template<class T>
+using ei_vec = Eigen::Matrix<double, sizeof(T) / sizeof(double), 1>;
+
+
 /// @brief Установить значения компоненты равными NAN
 inline void setNaN(Vector3d& vec) {
     vec.x() = vec.y() = vec.z() = NAN;

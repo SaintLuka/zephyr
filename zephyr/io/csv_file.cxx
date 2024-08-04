@@ -91,7 +91,7 @@ void CsvFile::save(
         return;
     }
 
-    int n_variables = int(variables.size()) - 1;
+    int n_variables = int(variables.size());
 
     file << std::scientific << std::setprecision(precision);
 

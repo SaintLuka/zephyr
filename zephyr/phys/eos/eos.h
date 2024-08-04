@@ -5,7 +5,7 @@
 #include <zephyr/phys/literals.h>
 #include <zephyr/phys/eos/types.h>
 
-namespace zephyr { namespace phys {
+namespace zephyr::phys {
 
 class StiffenedGas;
 
@@ -25,9 +25,14 @@ public:
     virtual dRdE pressure_re(double density, double energy,
                              const Options &options = {}) const;
 
-    /// @brief Формула необходима, если в качестве примитивной переменной
-    /// используется давление. Тогда формула позволяет вычислить энергию.
-    virtual double energy_rp(double density, double pressure,
+    /// @brief Вспомогательная функция, удобна для задания начальных условий.
+    /// Кроме того, используется в моделях с учетом теплопроводности.
+    virtual dRdT pressure_rt(double density, double temperature,
+                             const Options &options = {}) const;
+
+    /// @brief Вспомогательная функция, удобна для задания начальных условий.
+    /// Кроме того, используется в моделях с учетом теплопроводности.
+    virtual dRdT energy_rt(double density, double temperature,
                              const Options &options = {}) const;
 
     /// @brief Скорость звука от плотности и энергии
@@ -39,10 +44,10 @@ public:
     virtual double sound_speed_rp(double density, double pressure,
                                   const Options &options = {}) const;
 
-    /// @brief Вспомогательная функция, удобна для задания начальных условий.
-    /// Кроме того, используется в моделях с учетом теплопроводности.
-    virtual double pressure_rt(double density, double temperature,
-                               const Options &options = {}) const;
+    /// @brief Формула необходима, если в качестве примитивной переменной
+    /// используется давление. Тогда формула позволяет вычислить энергию.
+    virtual double energy_rp(double density, double pressure,
+                             const Options &options = {}) const;
 
     /// @brief Вспомогательная функция, удобна для задания начальных условий.
     virtual double temperature_rp(double density, double pressure,
@@ -79,5 +84,4 @@ public:
 
 };
 
-}
-}
+} // namespace zephyr::phys

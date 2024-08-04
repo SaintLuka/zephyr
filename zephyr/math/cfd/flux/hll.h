@@ -7,24 +7,31 @@ namespace zephyr::math {
 ///@brief Вычисление потока методом HLL с использованием формул для каждой величины отдельно
 class HLL : public NumFlux {
 public:
+    /// @brief Умный указатель на класс
+    using Ptr = std::shared_ptr<HLL>;
 
-    HLL() = default;
-
-    template<class ...Args>
-    inline static std::unique_ptr<HLL> create(Args &&... args) {
-        return std::make_unique<HLL>(std::forward<Args>(args)...);
+    /// @brief Создать умный указатель
+    inline static HLL::Ptr create() {
+        return std::make_shared<HLL>();
     }
 
-    [[nodiscard]] std::string get_name() const override { return "HLL"; }
+    /// @brief Имя метода
+    std::string get_name() const final { return "HLL"; }
 
+
+    /// @brief Статическая одноматериальная версия
     static smf::Flux calc_flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos);
 
-    [[nodiscard]] smf::Flux flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) const final;
+    /// @brief Одноматериальная версия
+    smf::Flux flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) const final;
 
-    [[nodiscard]] mmf::Flux
-    mm_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) const override;
 
-    static mmf::Flux calc_mm_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture);
+    /// @brief Статическая многоматериальная версия
+    static mmf::Flux calc_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture);
+
+    /// @brief Многоматериальная версия
+    mmf::Flux flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) const final;
 
 };
-}
+
+} // namespace zephyr::math

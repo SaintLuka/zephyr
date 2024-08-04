@@ -6,13 +6,11 @@
 #include <zephyr/geom/generator/strip.h>
 #include <zephyr/mesh/mesh.h>
 
-#include <zephyr/phys/tests/sod.h>
 #include <zephyr/phys/tests/toro.h>
-#include <zephyr/phys/tests/quirck.h>
-#include <zephyr/phys/tests/shu_osher.h>
+#include <zephyr/phys/tests/rarefied_water.h>
 
 #include <zephyr/math/solver/riemann.h>
-#include <zephyr/math/solver/sm_fluid.h>
+#include <zephyr/math/solver/mm_fluid.h>
 
 #include <zephyr/io/pvd_file.h>
 #include <zephyr/io/csv_file.h>
@@ -28,21 +26,26 @@ using zephyr::mesh::EuMesh;
 
 
 // Для быстрого доступа по типу
-SmFluid::State U;
+MmFluid::State U;
 
 /// Переменные для сохранения
-double get_rho(AmrStorage::Item& cell) { return cell(U).density; }
-double get_u(AmrStorage::Item& cell) { return cell(U).velocity.x(); }
-double get_p(AmrStorage::Item& cell) { return cell(U).pressure; }
-double get_e(AmrStorage::Item& cell) { return cell(U).energy; }
+double get_rho(AmrStorage::Item& cell) { return cell(U).rho; }
+double get_u(AmrStorage::Item& cell) { return cell(U).v.x(); }
+double get_p(AmrStorage::Item& cell) { return cell(U).p; }
+double get_e(AmrStorage::Item& cell) { return cell(U).e; }
+double get_T(AmrStorage::Item &cell) { return cell(U).t; }
+double get_frac1(AmrStorage::Item &cell) { return cell(U).mass_frac[0]; }
+double get_frac2(AmrStorage::Item &cell) { return cell(U).mass_frac[1]; }
+double get_c1(AmrStorage::Item &cell) { return cell(U).speeds[0]; }
+double get_c2(AmrStorage::Item &cell) { return cell(U).speeds[1]; }
+double get_rho1(AmrStorage::Item &cell) { return cell(U).densities[0]; }
+double get_rho2(AmrStorage::Item &cell) { return cell(U).densities[1]; }
 
 
 int main() {
     // Тестовая задача
-    //SodTest test;
-    ToroTest test(1);
-    //QuirckTest test;
-    //ShuOsherTest test;
+    //RarefiedWater test;
+    ToroTest test(4, true);
 
     // Состояния слева и справа в тесте
     double Ox = 100.0;
@@ -52,11 +55,18 @@ int main() {
     PState zR(test.density(Ox), test.velocity(Ox),
               test.pressure(Ox), test.energy(Ox));
 
+    // Вытащим УрС
+    Eos::Ptr eos_L = test.get_eos(-Ox);
+    Eos::Ptr eos_R = test.get_eos(+Ox);
+
+    Materials mixture;
+    mixture += eos_L;
+    mixture += eos_R;
+
     // Точное решение задачи Римана
-    // (если есть, не для всех одномерных тестов)
-    auto& eos = *test.get_eos();
-    StiffenedGas sg = eos.stiffened_gas(zL.density, zL.pressure);
-    RiemannSolver exact(zL, zR, sg, test.get_x_jump());
+    StiffenedGas sgL = eos_L->stiffened_gas(zL.density, zL.pressure);
+    StiffenedGas sgR = eos_R->stiffened_gas(zR.density, zR.pressure);
+    RiemannSolver exact(zL, zR, sgL, sgR, test.get_x_jump());
 
     // Файл для записи
     PvdFile pvd("test1D", "output");
@@ -66,6 +76,11 @@ int main() {
     pvd.variables += {"u", get_u};
     pvd.variables += {"p", get_p};
     pvd.variables += {"e", get_e};
+    pvd.variables += {"T", get_T};
+    pvd.variables += {"b1", get_frac1};
+    pvd.variables += {"b2", get_frac2};
+    pvd.variables += {"rho1", get_rho1};
+    pvd.variables += {"rho2", get_rho2};
 
     double curr_time = 0.0;
 
@@ -85,13 +100,13 @@ int main() {
                       [&exact, &curr_time](const AmrStorage::Item &cell) -> double {
                           return exact.energy(cell.center.x(), curr_time);
                       }};
-    pvd.variables += {"c",
-                      [&eos](AmrStorage::Item& cell) -> double {
-                          return eos.sound_speed_rp(cell(U).density, cell(U).pressure);
-                      }};
     pvd.variables += {"c_exact",
                       [&exact, &curr_time](const AmrStorage::Item &cell) -> double {
                           return exact.sound_speed(cell.center.x(), curr_time);
+                      }};
+    pvd.variables += {"b_exact",
+                      [&exact, &curr_time](const AmrStorage::Item &cell) -> double {
+                          return exact.fraction(cell.center.x(), curr_time);
                       }};
 
     // Создаем одномерную сетку
@@ -102,12 +117,21 @@ int main() {
     EuMesh mesh(U, &gen);
 
     // Создать решатель
-    SmFluid solver(eos);
-    solver.set_CFL(0.7);
-    solver.set_accuracy(2);
-    solver.set_method(Fluxes::HLLC);
+    MmFluid solver(mixture, Fluxes::HLL);
+    solver.set_CFL(0.9);
+    solver.set_acc(1);
 
-    solver.init_cells(mesh, test);
+    for (auto cell: mesh) {
+        cell(U).rho = test.density(cell.center());
+        cell(U).v = test.velocity(cell.center());
+        cell(U).p = test.pressure(cell.center());
+        cell(U).e = test.energy(cell.center());
+
+        cell(U).mass_frac[0] = cell.x() < test.x_jump ? 1.0 : 0.0;
+        cell(U).mass_frac[1] = cell.x() < test.x_jump ? 0.0 : 1.0;
+
+        cell(U).t = test.get_eos(cell.x())->temperature_rp(cell(U).rho, cell(U).p);
+    }
 
     double next_write = 0.0;
     size_t n_step = 0;
@@ -117,7 +141,7 @@ int main() {
             std::cout << "\tStep: " << std::setw(6) << n_step << ";"
                       << "\tTime: " << std::setw(6) << std::setprecision(3) << curr_time << "\n";
             pvd.save(mesh, curr_time);
-            next_write += test.max_time() / 100;
+            next_write += test.max_time() / 200;
         }
 
         // Обновляем слои
@@ -132,30 +156,26 @@ int main() {
     csv.save(mesh);
 
     // Расчёт ошибок
-    double r_err = 0.0, u_err = 0.0, p_err = 0.0, e_err = 0.0, c_err = 0.0;
-    double r_avg = 0.0, u_avg = 0.0, p_avg = 0.0, e_avg = 0.0, c_avg = 0.0;
+    double r_err = 0.0, u_err = 0.0, p_err = 0.0, e_err = 0.0;
+    double r_avg = 0.0, u_avg = 0.0, p_avg = 0.0, e_avg = 0.0;
     for (auto cell: mesh) {
         double x = cell.center().x();
         double V = cell.volume();
 
-        r_err += V * std::abs(cell(U).density      - exact.density(x, curr_time));
-        u_err += V * std::abs(cell(U).velocity.x() - exact.velocity(x, curr_time));
-        p_err += V * std::abs(cell(U).pressure     - exact.pressure(x, curr_time));
-        e_err += V * std::abs(cell(U).energy       - exact.energy(x, curr_time));
-        c_err += V * std::abs(eos.sound_speed_rp(cell(U).density, cell(U).pressure) -
-                              exact.sound_speed(x, curr_time));
+        r_err += V * std::abs(cell(U).rho   - exact.density(x, curr_time));
+        u_err += V * std::abs(cell(U).v.x() - exact.velocity(x, curr_time));
+        p_err += V * std::abs(cell(U).p     - exact.pressure(x, curr_time));
+        e_err += V * std::abs(cell(U).e     - exact.energy(x, curr_time));
 
-        r_avg += V * std::abs(cell(U).density     );
-        u_avg += V * std::abs(cell(U).velocity.x());
-        p_avg += V * std::abs(cell(U).pressure    );
-        e_avg += V * std::abs(cell(U).energy      );
-        c_avg += V * std::abs(eos.sound_speed_rp(cell(U).density, cell(U).pressure));
+        r_avg += V * std::abs(cell(U).rho  );
+        u_avg += V * std::abs(cell(U).v.x());
+        p_avg += V * std::abs(cell(U).p    );
+        e_avg += V * std::abs(cell(U).e    );
     }
     r_err /= r_avg;
     u_err /= u_avg;
     p_err /= p_avg;
     e_err /= e_avg;
-    c_err /= c_avg;
 
     std::cout << "\nMean errors\n";
     std::cout << std::scientific << std::setprecision(4);
@@ -163,7 +183,6 @@ int main() {
     std::cout << "    Velocity:    " << u_err << "\n";
     std::cout << "    Pressure:    " << p_err << "\n";
     std::cout << "    Energy:      " << e_err << "\n";
-    std::cout << "    Sound Speed: " << c_err << "\n";
 
     return 0;
 }

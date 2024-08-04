@@ -28,9 +28,13 @@ public:
     dRdE pressure_re(double density, double energy,
                      const Options& options = {}) const final;
 
-    /// @brief Основная формула. Энергия от плотности и давления
-    double energy_rp(double density, double pressure,
-                     const Options& = {}) const final;
+    /// @brief Вспомогательная функция, удобна для задания начальных условий.
+    dRdT pressure_rt(double density, double temperature,
+                     const Options& options = {}) const final;
+
+    /// @brief Вспомогательная функция, удобна для задания начальных условий.
+    dRdT energy_rt(double density, double temperature,
+                   const Options& options = {}) const final;
 
     /// @brief Скорость звука от плотности и энергии
     double sound_speed_re(double density, double energy,
@@ -40,9 +44,9 @@ public:
     double sound_speed_rp(double density, double pressure,
                           const Options& options = {}) const final;
 
-    /// @brief Вспомогательная функция, удобна для задания начальных условий.
-    double pressure_rt(double density, double temperature,
-                       const Options& options = {}) const final;
+    /// @brief Основная формула. Энергия от плотности и давления
+    double energy_rp(double density, double pressure,
+                     const Options& = {}) const final;
 
     /// @brief Вспомогательная функция, удобна для задания начальных условий
     double temperature_rp(double density, double pressure,

@@ -3,7 +3,7 @@
 #include <cmath>
 #include <zephyr/phys/fractions.h>
 
-namespace zephyr { namespace phys {
+namespace zephyr::phys {
 
 /// @brief Термодинамическая величина +
 /// производные по плотности и энергии
@@ -14,6 +14,21 @@ struct dRdE {
 
     dRdE(double value, double dR = NAN, double dE = NAN)
         : val(value), dR(dR), dE(dE) { }
+
+    operator double() const {
+        return val;
+    };
+};
+
+/// @brief Термодинамическая величина +
+/// производные по плотности и температуре
+struct dRdT {
+    double val = NAN;
+    double dR = NAN;
+    double dT = NAN;
+
+    dRdT(double value, double dR = NAN, double dT = NAN)
+            : val(value), dR(dR), dT(dT) { }
 
     operator double() const {
         return val;
@@ -56,5 +71,4 @@ struct Options {
     double* vols = nullptr;
 };
 
-}
-}
+} // namespace zephyr::phys

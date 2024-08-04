@@ -71,6 +71,9 @@ public:
     /// @brief Доступ к вершине грани
     const Vector3d& vs(int idx) const;
 
+    /// @brief Точка симметричная относительно грани
+    Vector3d symm_point(const Vector3d& p) const;
+
 
     inline const geom::Adjacent &adjacent() const {
         return m_face->adjacent;

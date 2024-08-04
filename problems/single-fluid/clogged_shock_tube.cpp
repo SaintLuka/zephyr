@@ -31,31 +31,30 @@ struct _U_ : public SmFluid::State {
 _U_ U;
 
 /// Переменные для сохранения
-double get_rho(AmrStorage::Item& cell) { return cell(U).rho; }
-double get_u(AmrStorage::Item& cell) { return cell(U).v.x(); }
-double get_v(AmrStorage::Item& cell) { return cell(U).v.y(); }
-double get_w(AmrStorage::Item& cell) { return cell(U).v.z(); }
-double get_p(AmrStorage::Item& cell) { return cell(U).p; }
-double get_e(AmrStorage::Item& cell) { return cell(U).e; }
+double get_rho(AmrStorage::Item& cell) { return cell(U).density; }
+double get_u(AmrStorage::Item& cell) { return cell(U).velocity.x(); }
+double get_v(AmrStorage::Item& cell) { return cell(U).velocity.y(); }
+double get_w(AmrStorage::Item& cell) { return cell(U).velocity.z(); }
+double get_p(AmrStorage::Item& cell) { return cell(U).pressure; }
+double get_e(AmrStorage::Item& cell) { return cell(U).energy; }
 double get_inside(AmrStorage::Item& cell) { return double(cell(U).inside); }
 
 void setup_initial(EuMesh &mesh, double u0, double u3, double P0, double P3, double rho0, double rho3, double l, IdealGas &eos) {
     for (auto &cell: mesh) {
         // Инициализация
         if (cell.center().x() > l) {
-            cell(U).v.x() = u0;
-            cell(U).v.y() = 0;
-            cell(U).rho = 1.0 / eos.volume_pt(P0, 20.0_C);
-            cell(U).p = P0; 
-            cell(U).e = eos.energy_rp(cell(U).rho, cell(U).p);
+            cell(U).velocity.x() = u0;
+            cell(U).velocity.y() = 0;
+            cell(U).density = 1.0 / eos.volume_pt(P0, 20.0_C);
+            cell(U).pressure = P0;
         }
         else {
-            cell(U).v.x() = u3;
-            cell(U).v.y() = 0;
-            cell(U).rho = 1.0 / eos.volume_pt(P3, 20.0_C);
-            cell(U).p = P3; 
-            cell(U).e = eos.energy_rp(cell(U).rho, cell(U).p);
+            cell(U).velocity.x() = u3;
+            cell(U).velocity.y() = 0;
+            cell(U).density = 1.0 / eos.volume_pt(P3, 20.0_C);
+            cell(U).pressure = P3;
         }
+        cell(U).energy = eos.energy_rp(cell(U).density, cell(U).pressure);
     }
 }
 
@@ -175,11 +174,11 @@ int main () {
     pvd.variables += {"inside", get_inside};
     pvd.variables += {"c",
                       [&eos](AmrStorage::Item& cell) -> double {
-                          return eos.sound_speed_rp(cell(U).rho, cell(U).p);
+                          return eos.sound_speed_rp(cell(U).density, cell(U).pressure);
                       }};
     pvd.variables += {"mach", 
                       [&eos](AmrStorage::Item& cell) -> double {
-                          return abs(cell(U).v.x() / eos.sound_speed_rp(cell(U).rho, cell(U).p));
+                          return abs(cell(U).velocity.x() / eos.sound_speed_rp(cell(U).density, cell(U).pressure));
                       }};
 
     // Создаем сетку

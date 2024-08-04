@@ -31,7 +31,7 @@ public:
     using types = boost::variant<int, double, size_t, long long,
             math::mmf::PState, math::mmf::QState, math::mmf::Flux,
             math::smf::PState, math::smf::QState, math::smf::Flux,
-            phys::Fractions, phys::FractionsFlux>;
+            phys::Fractions, phys::ScalarSet>;
 
     Logger();
 

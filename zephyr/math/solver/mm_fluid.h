@@ -49,7 +49,7 @@ public:
         }
 
         [[nodiscard]] mmf::PState get_pstate() const {
-            return mmf::PState(rho, v, p, e, t, mass_frac);
+            return mmf::PState(rho, v, p, e, mass_frac, t, mmf::Fractions::NaN());
         }
 
         void set_state(const mmf::PState &pstate) {

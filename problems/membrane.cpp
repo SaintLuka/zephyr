@@ -58,7 +58,7 @@ int main() {
     PvdFile pvd("mesh", "output");
 
     // Переменные для сохранения
-    pvd.variables += {"density", get_rho};
+    pvd.variables += {"rho", get_rho};
     pvd.variables += {"velocity.x", get_u};
     pvd.variables += {"velocity.y", get_v};
     pvd.variables += {"|velocity|", get_V};

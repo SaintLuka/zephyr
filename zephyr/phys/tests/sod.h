@@ -11,7 +11,8 @@ using zephyr::geom::Vector3d;
 /// @class Классический одномерный тест Сода
 class SodTest : public Test1D {
 public:
-    IdealGas eos;   ///< Используемый УрС
+    IdealGas::Ptr eos;   ///< Используемый УрС
+
     double x_jump;  ///< Положение разрыва
     double finish;  ///< Конечный момент времени
     double rL, rR;  ///< Плотность
@@ -20,13 +21,15 @@ public:
     double eL, eR;  ///< Внутренняя энергия
 
     /// @brief Конструктор
-    SodTest() : eos(1.4) {
+    SodTest() {
+        eos = IdealGas::create(1.4);
+
         // @formatter:off
         rL = 1.0; rR = 0.125;
         pL = 1.0; pR = 0.1;
         uL = 0.0; uR = 0.0;
-        eL = eos.energy_rp(rL, pL);
-        eR = eos.energy_rp(rR, pR);
+        eL = eos->energy_rp(rL, pL);
+        eR = eos->energy_rp(rR, pR);
 
         x_jump = 0.5;
         finish = 0.2;
@@ -55,7 +58,7 @@ public:
     double max_time() const final { return finish; }
 
     ///@brief Получить используемый УрС
-    const Eos& get_eos() const final { return eos; }
+    Eos::Ptr get_eos() const final { return eos; }
 
     ///@brief Получить положение разрыва
     double get_x_jump() const final { return x_jump; }

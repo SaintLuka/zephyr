@@ -57,6 +57,10 @@ const Vector3d& EuFace::vs(int idx) const {
     return m_cell.vs(m_face->vertices[idx]);
 }
 
+Vector3d EuFace::symm_point(const Vector3d& p) const {
+    return p + 2.0 * (m_face->center - p).dot(m_face->normal) * m_face->normal;
+}
+
 EuFaces::EuFaces(const EuCell& cell, Direction dir)
     : m_cell(cell), m_dir(dir) {
 

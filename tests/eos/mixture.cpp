@@ -263,7 +263,7 @@ int main() {
     Materials mixture;
     mixture += IdealGas::create("Air");
     mixture += StiffenedGas::create("Water2");
-    mixture += MieGruneisen::create("Cu");
+    mixture += StiffenedGas::create("Copper");
 
     std::cout << "Mixture:\n";
     std::cout << "\tMaterial[0]: IdealGas(\"Air\")\n";
@@ -289,13 +289,13 @@ int main() {
     std::cout << "\nTest mixture (explicit)\n";
     test_explicit(mixture, alpha, P_test, T_test);
 
-    std::cout << "\nTest mixture (implicit, (rho, p))\n";
+    std::cout << "\nTest mixture (implicit, (density, p))\n";
     test_implicit_rp(mixture, beta, rho_test, P_test);
 
-    std::cout << "\nTest mixture (implicit, (rho, T))\n";
+    std::cout << "\nTest mixture (implicit, (density, T))\n";
     test_implicit_rt(mixture, beta, rho_test, T_test);
 
-    std::cout << "\nTest mixture (implicit, (rho, e))\n";
+    std::cout << "\nTest mixture (implicit, (density, e))\n";
     test_implicit_re(mixture, beta, rho_test, eps_test);
 
     return 0;

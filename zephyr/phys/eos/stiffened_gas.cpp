@@ -27,10 +27,11 @@ StiffenedGas::StiffenedGas(const std::string &name) {
     }
     else if (name == "Water") {
         gamma = 4.4;
-        Cv    = 1400.0_J_kgK; // 4160.0_J_kgK
+        //Cv    = 1400.0_J_kgK;
+        Cv    = 4160.0_J_kgK;
         P0    = 600.0_MPa;
         eps_0 = 0.0;
-        T0    = 221.3;
+        T0    = 257.572115385;
     }
     else if (name == "Water2") {
         gamma = 3.0;
@@ -59,6 +60,24 @@ dRdE StiffenedGas::pressure_re(double rho, double eps, const Options& options) c
     return res;
 }
 
+dRdT StiffenedGas::pressure_rt(double rho, double T, const Options& options) const {
+    dRdT P = (gamma - 1.0) * Cv * rho * (T - T0) - P0;
+    if (options.deriv) {
+        P.dR = (gamma - 1.0) * Cv * (T - T0);
+        P.dT = (gamma - 1.0) * Cv * rho;
+    }
+    return P;
+}
+
+dRdT StiffenedGas::energy_rt(double rho, double T, const Options& options) const {
+    dRdT e = eps_0 + Cv * (T - T0) + P0 / rho;
+    if (options.deriv) {
+        e.dR = -P0 / (rho * rho);
+        e.dT = Cv;
+    }
+    return e;
+}
+
 double StiffenedGas::energy_rp(double rho, double P, const Options& options) const {
     return eps_0 + (P + gamma * P0) / ((gamma - 1.0) * rho);
 }
@@ -69,10 +88,6 @@ double StiffenedGas::sound_speed_re(double rho, double eps, const Options& optio
 
 double StiffenedGas::sound_speed_rp(double rho, double P, const Options& options) const {
     return std::sqrt(gamma * (P + P0) / rho);
-}
-
-double StiffenedGas::pressure_rt(double rho, double T, const Options& options) const {
-    return (gamma - 1.0) * Cv * rho * (T - T0) - P0;
 }
 
 double StiffenedGas::temperature_rp(double rho, double P, const Options& options) const {
@@ -107,4 +122,4 @@ double StiffenedGas::min_pressure() const {
     return -P0;
 }
 
-}
+} // namespace zephyr::phys

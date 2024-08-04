@@ -30,6 +30,7 @@ void test_eos(Eos& eos, double T, double rho) {
             {P1,  eos.pressure_rt(rho, T)},
             {rho, 1.0 / eos.volume_pt(P1, T)},
             {eps, eos.energy_pt(P1, T)},
+            {eps, eos.energy_rt(P1, T)},
             {T,   eos.temperature_rp(rho, P1)}
     };
 
@@ -42,14 +43,16 @@ void test_eos(Eos& eos, double T, double rho) {
     // Выражения с производными
     auto P = eos.pressure_re(rho, eps, {.deriv = true});
     auto V = eos.volume_pt(P, T, {.deriv = true});
-    auto E = eos.energy_pt(P, T, {.deriv = true});
+    auto E1 = eos.energy_pt(P, T, {.deriv = true});
+    auto E2 = eos.energy_rt(rho, T, {.deriv = true});
+
 
     // Проверка скорости звука
     double c = std::sqrt(P.dR + P.val * P.dE / (rho * rho));
 
     ErrorList err2 = {
             {c, eos.sound_speed_rp(rho, P)},
-            {c, eos.sound_speed_re(rho, E)}
+            {c, eos.sound_speed_re(rho, E1)}
     };
 
     if (err2.is_ok(1.0e-14)) {
@@ -62,11 +65,11 @@ void test_eos(Eos& eos, double T, double rho) {
     StiffenedGas sg = eos.stiffened_gas(rho, P);
 
     ErrorList err3 = {
-            {c,    sg.sound_speed_re(rho, E)},
+            {c,    sg.sound_speed_re(rho, E1)},
             {c,    sg.sound_speed_rp(rho, P)},
-            {P,    sg.pressure_re(rho, E)},
-            {P.dR, sg.pressure_re(rho, E, {.deriv = true}).dR},
-            {P.dE, sg.pressure_re(rho, E, {.deriv = true}).dE}
+            {P,    sg.pressure_re(rho, E1)},
+            {P.dR, sg.pressure_re(rho, E1, {.deriv = true}).dR},
+            {P.dE, sg.pressure_re(rho, E1, {.deriv = true}).dE}
     };
 
     if (err3.is_ok(1.0e-13)) {
@@ -114,13 +117,25 @@ void test_eos(Eos& eos, double T, double rho) {
                 return eos.energy_pt(P, x);
             }, T, dT);
 
+    double dEdR_t = derivative<1, 4>(
+            [&](double x) -> double {
+                return eos.energy_rt(x, T);
+            }, rho, dR);
+
+    double dEdT_r = derivative<1, 4>(
+            [&](double x) -> double {
+                return eos.energy_rt(rho, x);
+            }, T, dT);
+
     ErrorList err4 = {
-            {P.dR, dPdR_e},
-            {P.dE, dPdE_r},
-            {V.dP, dVdP_t},
-            {V.dT, dVdT_p},
-            {E.dP, dEdP_t},
-            {E.dT, dEdT_p},
+            {P.dR,  dPdR_e},
+            {P.dE,  dPdE_r},
+            {V.dP,  dVdP_t},
+            {V.dT,  dVdT_p},
+            {E1.dP, dEdP_t},
+            {E1.dT, dEdT_p},
+            {E2.dR, dEdR_t},
+            {E2.dT, dEdT_r},
     };
 
     if (err4.is_ok(1.0e-8)) {
@@ -137,10 +152,6 @@ int main() {
     std::cout << "IdealGas(\"Air\")\n";
     IdealGas eos1("Air");
     test_eos(eos1, 145.0_C, 1.3_kg_m3);
-
-    std::cout << "\nStrangeGas(\"Air\")\n";
-    StrangeGas eos5("Air");
-    test_eos(eos5, 145.0_C, 1.3_kg_m3);
 
     std::cout << "\nStiffenedGas(\"Water2\")\n";
     StiffenedGas eos2("Water2");
