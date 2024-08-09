@@ -20,18 +20,34 @@ SmFluid::State SmFluid::datatype() {
     return {};
 }
 
-smf::PState get_current_sm(Cell &cell) {
-    return cell(U).get_state();
-}
-
 SmFluid::SmFluid(const phys::Eos &eos) : m_eos(eos) {
     m_nf = HLLC::create();
-    m_CFL = 0.9;
+    m_CFL = 0.7;
     m_dt = std::numeric_limits<double>::max();
 }
 
+void SmFluid::set_CFL(double CFL) {
+    m_CFL = std::max(0.0, std::min(CFL, 1.0));
+}
+
 void SmFluid::set_accuracy(int acc) {
-    m_acc = std::min(std::max(1, acc), 2);    // 1 или 2
+    m_acc = std::min(std::max(1, acc), 2);  // 1 или 2
+}
+
+void SmFluid::set_method(Fluxes method) {
+    m_nf = NumFlux::create(method);
+}
+
+double SmFluid::CFL() const {
+    return m_CFL;
+}
+
+double SmFluid::dt() const {
+    return m_dt;
+}
+
+smf::PState get_current_sm(Cell &cell) {
+    return cell(U).get_state();
 }
 
 PState boundary_value(const PState &zc, const Vector3d &normal, Boundary flag) {
@@ -63,9 +79,6 @@ void SmFluid::update(Mesh &mesh) {
 
     // Обновляем слои
     swap(mesh);
-
-    m_step += 1;
-    m_time += m_dt;
 }
 
 void SmFluid::compute_dt(Mesh &mesh) {
@@ -190,25 +203,14 @@ void SmFluid::fluxes_stage1(Mesh &mesh)  {
             // Интерполяция на грань со стороны ячейки
             PState zm = face_extra.m(z_c);
 
-            // Интерполяция на грань со стороны соседа
-            PState zp;
-            if (!face.is_boundary()) {
-                zp = face_extra.p(z_n);
-            }
-            else {
-                zp = boundary_value(zm, normal, face.flag());
-            }
-
             // Восстанавливаем после интерполяции
             zm.energy = m_eos.energy_rp(zm.density, zm.pressure);
-            zp.energy = m_eos.energy_rp(zp.density, zp.pressure);
 
             // Переводим в локальную систему координат
             zm.to_local(normal);
-            zp.to_local(normal);
 
             // Численный поток на грани
-            Flux loc_flux = m_nf->flux(zm, zp, m_eos);
+            Flux loc_flux(zm);
             loc_flux.to_global(normal);
 
             // Суммируем поток
@@ -270,18 +272,20 @@ void SmFluid::fluxes_stage2(Mesh &mesh)  {
             // Интерполяция на грань со стороны ячейки
             PState zm = face_extra.m(z_ch);
 
+            // Восстанавливаем после интерполяции
+            zm.energy = m_eos.energy_rp(zm.density, zm.pressure);
+
             // Интерполяция на грань со стороны соседа
             PState zp;
             if (!face.is_boundary()) {
                 zp = face_extra.p(z_nh);
+
+                // Восстанавливаем после интерполяции
+                zp.energy = m_eos.energy_rp(zp.density, zp.pressure);
             }
             else {
                 zp = boundary_value(zm, normal, face.flag());
             }
-
-            // Восстанавливаем после интерполяции
-            zm.energy = m_eos.energy_rp(zm.density, zm.pressure);
-            zp.energy = m_eos.energy_rp(zp.density, zp.pressure);
 
             // Переводим в локальную систему координат
             zm.to_local(normal);
@@ -307,38 +311,6 @@ void SmFluid::swap(Mesh &mesh) {
     mesh.for_each([](Cell &cell) {
         cell(U).set_state(cell(U).next);
     });
-}
-
-void SmFluid::set_CFL(double CFL) {
-    m_CFL = std::max(0.0, std::min(CFL, 1.0));
-}
-
-double SmFluid::dt() const {
-    return m_dt;
-}
-
-double SmFluid::CFL() const {
-    return m_CFL;
-}
-
-double SmFluid::get_time() const {
-    return m_time;
-}
-
-size_t SmFluid::get_step() const {
-    return m_step;
-}
-
-std::string SmFluid::get_flux_name() const {
-    return m_nf->get_name();
-}
-
-void SmFluid::set_acc(int acc) {
-    m_acc = acc;
-}
-
-void SmFluid::set_method(Fluxes method) {
-    m_nf = NumFlux::create(method);
 }
 
 Distributor SmFluid::distributor() const {

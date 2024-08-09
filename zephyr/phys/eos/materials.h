@@ -59,17 +59,6 @@ public:
     double energy_rp(double density, double pressure, const Fractions& beta,
                      const Options& options = {}) const;
 
-    /// @brief Найти внутреннюю температуру и энергию смеси
-    /// @param density Смесевая плотность
-    /// @param pressure Равновесное давление
-    /// @param beta Массовые концентрации компонент
-    /// @param options В качестве опции целесообразно передавать начальное
-    /// приближение для температуры.
-    /// @details Решается методом итераций Ньютона по одному уравнению.
-    /// Для смеси StiffenedGas точное решение получается за одну итерацию.
-    std::pair<double, double> temperature_energy_rp(double density, double pressure, const Fractions& beta,
-                     const Options& options = {}) const;
-
     /// @brief Смесевая скорость звука
     /// @param density Смесевая плотность
     /// @param energy Внутренняя энергия смеси
@@ -119,7 +108,8 @@ public:
     /// @details Быстрая функция, т.к. удельный объем выражается в явном виде
     /// Очевидно, вычислительная сложность увеличивается, если в одном из
     /// уравнений состояния плотность считается неявно (частая ситуация).
-    dPdT volume_pt(double pressure, double temperature, const Fractions& beta) const;
+    dPdT volume_pt(double pressure, double temperature,
+                   const Fractions& beta, const Options& = {}) const;
 
     /// @brief Смесевая энергия
     /// @param pressure Равновесная плотность смеси
@@ -128,7 +118,8 @@ public:
     /// @details Быстрая функция, т.к. смесевая энергия выражается в явном виде.
     /// Очевидно, вычислительная сложность увеличиывется, если в одном из
     /// уравнений состояния энергия считается неявно (частая ситуация).
-    dPdT energy_pt(double pressure, double temperature, const Fractions& beta) const;
+    dPdT energy_pt(double pressure, double temperature,
+                   const Fractions& beta, const Options& = {}) const;
 
     /// @brief Аппроксимация смеси двучленным уравнением состояния
     /// @param density Смесевая плотность
@@ -146,18 +137,34 @@ public:
     /// (максимальное из минимальных давлений)
     double min_pressure(const Fractions& beta) const;
 
-/// @brief Найти равновесные температуру и давление смеси
-/// @param options В качестве опций целесообразно передавать начальные
-/// приближения для температуры и давления.
-/// @details Решается метом итераций Ньютона по паре уравнений.
-PairPT find_PT(double density, double energy, const Fractions& beta,
-               const Options& options = {}) const;
+    /// @brief Найти равновесные температуру и давление смеси
+    /// @param options В качестве опций целесообразно передавать начальные
+    /// приближения для температуры и давления.
+    /// @details Решается метом итераций Ньютона по паре уравнений.
+    PairPT find_PT(double density, double energy,
+                   const Fractions& beta, const Options& options = {}) const;
+
+    /// @brief Найти равновесные температуру и внутреннюю энергию смеси
+    /// @param options В качестве опций целесообразно передавать начальные
+    /// приближение для температуры.
+    PairET find_ET(double density, double pressure,
+                   const Fractions& beta, const Options& options = {}) const;
 
 protected:
 
+    /// @brief Обновить объемные доли (alpha) на новом приближении
+    /// итерационного алгоритма
+    /// @param rho Плотность смеси
+    /// @param P Давление (близкое к равновесию)
+    /// @param T Температура (близкая к равновесию)
+    /// @param beta Массовые концентрации
+    /// @param alpha Объемные доли, содержат приближение и обновляютя
+    void update_alpha(double rho, double P, double T,
+                      const Fractions& beta, Fractions& alpha) const;
+
     /// @brief Скорость звука от равновесных температуры и давления
     double sound_speed_pt(double pressure, double temperature,
-                          const Fractions& beta) const;
+                          const Fractions& beta, const Options& = {}) const;
 
     /// @brief Массив материалов
     std::vector<Eos::Ptr> m_materials;

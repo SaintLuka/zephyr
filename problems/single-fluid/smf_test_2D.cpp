@@ -54,6 +54,7 @@ int main() {
 
     // Файл для записи
     PvdFile pvd("test2D", "output");
+    pvd.unique_nodes = true;
 
     // Переменные для сохранения
     pvd.variables += {"rho", get_rho};
@@ -71,9 +72,10 @@ int main() {
     EuMesh mesh(U, &gen);
 
     // Создать решатель
-    SmFluid solver(test.get_eos(), Fluxes::HLLC);
+    SmFluid solver(test.get_eos());
     solver.set_accuracy(2);
-    solver.set_CFL(0.4);
+    solver.set_CFL(0.5);
+    solver.set_method(Fluxes::HLLC);
 
     // Сеточная адаптация
     mesh.set_max_level(0);
@@ -103,9 +105,9 @@ int main() {
         solver.update(mesh);
         solver.set_flags(mesh);
         mesh.refine();
-        
+
+        curr_time += solver.dt();
         n_step += 1;
-        curr_time = solver.get_time();
     }
 
     // Сохранить данные как текст

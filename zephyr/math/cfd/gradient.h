@@ -61,14 +61,16 @@ std::array<T, 3> LSM(Cell &cell,
     Matrix3d A = Matrix3d::Zero();
     for (auto &face: cell.faces()) {
         T zn;
+        Vector3d dr;
         if (!face.is_boundary()) {
             auto neib = face.neib();
             zn = get_state(neib);
+            dr = neib.center() - cell.center();
         } else {
             zn = boundary_value(zc, face.normal(), face.flag());
+            dr = face.symm_point(cell.center()) - cell.center();
         }
 
-        Vector3d dr = 2.0 * (face.center() - cell.center());
         double weight = face.area() / dr.squaredNorm();
 
         A += weight * dr * dr.transpose();

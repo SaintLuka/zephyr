@@ -174,12 +174,15 @@ struct PState {
 
     /// @brief Инициализация с полным заданием параметров
     PState(double density, const Vector3d &velocity, double pressure, double energy,
-           const Fractions &mass_frac, double temperature, const Fractions& vol_frac);
+           double temperature, const Fractions &mass_frac, const Fractions& vol_frac);
 
     /// @brief Инициализация из консервативного вектора состояния,
-    /// давление определяется с использованием уравнения состояния смеси
-    /// Параметры P0, T0 используются в качестве начальных приближений
-    PState(const QState &q, const phys::Materials &mixture, double P0 = 1e3, double T0 = 200.0);
+    /// давление, температура и объемные доли определяются из уравнения
+    /// состояния смеси (PT - замыкание).
+    /// В качестве начальных приближений в следует передавать начальные
+    /// приближения для давления (P0), температуры (T0) и объемных долей (alpha).
+    PState(const QState &q, const phys::Materials &mixture,
+           double P0, double T0, const Fractions& alpha);
 
 
     /// @brief Переводит вектор состояния в локальную систему координат
@@ -208,6 +211,12 @@ struct PState {
     /// @brief Преобразование в одноматериальный вектор состояния
     smf::PState to_smf() const;
 
+    /// @brief Обновить значения, полученные путем интерполяции.
+    /// Восстанавливает согласованность состояния (термодинамических величин).
+    /// Нормализует концентрации, выставляет согласованные значения
+    /// для энергии и температуры (вычисляются по плотности и давлению)
+    void interpolation_update(const phys::Materials& mixture);
+
     bool is_bad() const;
 
     ScalarSet densities() const;
@@ -225,7 +234,7 @@ struct QState {
     double    mass;       ///< Плотность
     Vector3d  momentum;   ///< Плотность импульса:       rho * v
     double    energy;     ///< Плотность полной энергии: rho * (e + 0.5 * v^2)
-    ScalarSet mass_frac;  ///< Плотности компонент:      rho * beta_i
+    ScalarSet comp_mass;  ///< Плотности компонент:      rho * beta_i
 
     /// @brief Инициализация нулями
     QState();

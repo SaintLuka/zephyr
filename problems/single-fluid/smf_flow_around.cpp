@@ -48,8 +48,7 @@ double get_e(AmrStorage::Item& cell) { return cell(U).e; }
 
 
 int main() {
-
-    threads::on(16);
+    threads::on();
 
     // Тестовая задача
     //QuirckTest test(2.85, 1.275, 0.5);

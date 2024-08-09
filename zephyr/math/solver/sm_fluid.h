@@ -1,10 +1,7 @@
 #pragma once
 
-#include <cmath>
 #include <zephyr/mesh/mesh.h>
-#include <zephyr/math/cfd/limiter.h>
 #include <zephyr/phys/eos/eos.h>
-#include <boost/format.hpp>
 #include <zephyr/math/cfd/fluxes.h>
 
 namespace zephyr::math {
@@ -23,10 +20,10 @@ public:
 
     /// @brief Расширенный вектор состояния на котором решается задача
     struct State {
-        double density;     ///< плотность
-        Vector3d velocity;  ///< скорость
-        double pressure;    ///< давление
-        double energy;      ///< энергия
+        double density;     ///< Плотность
+        Vector3d velocity;  ///< Скорость
+        double pressure;    ///< Давление
+        double energy;      ///< Энергия
 
         PState half;        ///< Состояние на полушаге
         PState next;        ///< Состояние на следующем шаге
@@ -35,16 +32,16 @@ public:
         PState d_dx, d_dy, d_dz;
 
         /// @brief Собрать вектор состояния на предыдущем шаге
-        smf::PState get_state() const {
-            return smf::PState(density, velocity, pressure, energy);
+        PState get_state() const {
+            return PState(density, velocity, pressure, energy);
         }
 
         /// @brief Установить вектор состояния на предыдущем шаге
-        void set_state(const smf::PState &pstate) {
-            density  = pstate.density;
-            velocity = pstate.velocity;
-            pressure = pstate.pressure;
-            energy   = pstate.energy;
+        void set_state(const PState &z) {
+            density  = z.density;
+            velocity = z.velocity;
+            pressure = z.pressure;
+            energy   = z.energy;
         }
     };
 
@@ -61,27 +58,22 @@ public:
     /// @brief Декструктор
     ~SmFluid() = default;
 
-    /// @brief Число Куранта
-    double CFL() const;
-
     /// @brief Установить число Куранта
     void set_CFL(double CFL);
 
-    /// @brief Установить порядок точности
-    void set_acc(int acc);
+    /// @brief Задать точность метода (1 или 2)
+    void set_accuracy(int acc);
 
     /// @brief Установить метод
     void set_method(Fluxes method);
 
-    double get_time() const;
-
-    size_t get_step() const;
-
-    std::string get_flux_name() const;
+    /// @brief Число Куранта
+    double CFL() const;
 
     /// @brief Шаг интегрирования на предыдущем вызове update()
     double dt() const;
 
+    /// @brief Выполнить шаг интегрирования по времени
     void update(Mesh &mesh);
 
     /// @brief Установить флаги адаптации
@@ -89,20 +81,6 @@ public:
 
     /// @brief Распределитель данных при адаптации
     Distributor distributor() const;
-
-    void set_accuracy(int acc);
-
-    template<typename Test>
-    void init_cells(Mesh &mesh, const Test &test) {
-        static const SmFluid::State U = SmFluid::datatype();
-        // Заполняем начальные данные
-        for (auto cell: mesh) {
-            cell(U).density  = test.density(cell.center());
-            cell(U).velocity = test.velocity(cell.center());
-            cell(U).pressure = test.pressure(cell.center());
-            cell(U).energy   = m_eos.energy_rp(cell(U).density, cell(U).pressure);
-        }
-    }
 
 private:
     /// @brief Посчитать шаг интегрирования по времени с учетом
@@ -115,10 +93,13 @@ private:
     /// @brief Обновление ячеек
     void swap(Mesh &mesh);
 
+    /// @brief Вычислить производные
     void compute_grad(Mesh &mesh,  const std::function<smf::PState(Cell &)> &get_state);
 
+    /// @brief Вычислить потоки на стадии предиктора
     void fluxes_stage1(Mesh &mesh);
 
+    /// @brief Вычислить потоки на стадии корректора
     void fluxes_stage2(Mesh &mesh);
 
 protected:
@@ -127,9 +108,6 @@ protected:
     int m_acc = 1;           ///< Порядок точности
     double m_CFL;            ///< Число Куранта
     double m_dt;             ///< Шаг интегрирования
-
-    double m_time = 0.0;     ///< Прошедшее время
-    size_t m_step = 0;       ///< Количество шагов расчёта
 };
 
 std::ostream &operator<<(std::ostream &os, const SmFluid::State &state) {

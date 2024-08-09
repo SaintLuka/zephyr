@@ -52,6 +52,9 @@ struct Fractions {
     /// единственную концентрацию больше нуля, в остальных случаях false.
     bool is_pure() const;
 
+    /// @brief Установить чистый материал с номером idx
+    void set_pure(int idx);
+
     /// @brief Если массив содержит единственную концентрацию,
     /// отличную от нуля, тогда возвращается индекс ненулевого элемента.
     /// Иначе значение -1.
@@ -66,6 +69,12 @@ struct Fractions {
 
     /// @brief Не содержит концентраций
     bool empty() const;
+
+    /// @brief Указатель на данные
+    double* data() { return m_data.data(); }
+
+    /// @brief Константный указатель на данные
+    const double* data() const { return m_data.data(); }
 
     /// @brief Ссылка на массив данных
     const std::array<double, Fractions::max_size>& data_ref() const {

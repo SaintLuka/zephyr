@@ -18,7 +18,7 @@
 using namespace zephyr::io;
 using namespace zephyr::phys;
 using namespace zephyr::math;
-using namespace zephyr::math::smf;
+using namespace zephyr::math::mmf;
 
 using zephyr::mesh::generator::Strip;
 using zephyr::math::RiemannSolver;
@@ -29,31 +29,29 @@ using zephyr::mesh::EuMesh;
 MmFluid::State U;
 
 /// Переменные для сохранения
-double get_rho(AmrStorage::Item& cell) { return cell(U).rho; }
-double get_u(AmrStorage::Item& cell) { return cell(U).v.x(); }
-double get_p(AmrStorage::Item& cell) { return cell(U).p; }
-double get_e(AmrStorage::Item& cell) { return cell(U).e; }
-double get_T(AmrStorage::Item &cell) { return cell(U).t; }
-double get_frac1(AmrStorage::Item &cell) { return cell(U).mass_frac[0]; }
-double get_frac2(AmrStorage::Item &cell) { return cell(U).mass_frac[1]; }
-double get_c1(AmrStorage::Item &cell) { return cell(U).speeds[0]; }
-double get_c2(AmrStorage::Item &cell) { return cell(U).speeds[1]; }
-double get_rho1(AmrStorage::Item &cell) { return cell(U).densities[0]; }
-double get_rho2(AmrStorage::Item &cell) { return cell(U).densities[1]; }
+double get_rho(AmrStorage::Item& cell) { return cell(U).density; }
+double get_u(AmrStorage::Item& cell) { return cell(U).velocity.x(); }
+double get_p(AmrStorage::Item& cell) { return cell(U).pressure; }
+double get_e(AmrStorage::Item& cell) { return cell(U).energy; }
+double get_T(AmrStorage::Item &cell) { return cell(U).temperature; }
+double get_mfrac1(AmrStorage::Item &cell) { return cell(U).mass_frac[0]; }
+double get_mfrac2(AmrStorage::Item &cell) { return cell(U).mass_frac[1]; }
+double get_vfrac1(AmrStorage::Item &cell) { return cell(U).vol_frac[0]; }
+double get_vfrac2(AmrStorage::Item &cell) { return cell(U).vol_frac[1]; }
 
 
 int main() {
     // Тестовая задача
     //RarefiedWater test;
-    ToroTest test(4, true);
+    ToroTest test(2, true);
 
-    // Состояния слева и справа в тесте
+    // Чистые состояния слева и справа в тесте
     double Ox = 100.0;
-    PState zL(test.density(-Ox), test.velocity(-Ox),
-              test.pressure(-Ox), test.energy(-Ox));
+    smf::PState zL(test.density(-Ox), test.velocity(-Ox),
+                   test.pressure(-Ox), test.energy(-Ox));
 
-    PState zR(test.density(Ox), test.velocity(Ox),
-              test.pressure(Ox), test.energy(Ox));
+    smf::PState zR(test.density(Ox), test.velocity(Ox),
+                   test.pressure(Ox), test.energy(Ox));
 
     // Вытащим УрС
     Eos::Ptr eos_L = test.get_eos(-Ox);
@@ -77,10 +75,10 @@ int main() {
     pvd.variables += {"p", get_p};
     pvd.variables += {"e", get_e};
     pvd.variables += {"T", get_T};
-    pvd.variables += {"b1", get_frac1};
-    pvd.variables += {"b2", get_frac2};
-    pvd.variables += {"rho1", get_rho1};
-    pvd.variables += {"rho2", get_rho2};
+    pvd.variables += {"b1", get_mfrac1};
+    pvd.variables += {"b2", get_mfrac2};
+    pvd.variables += {"a1", get_vfrac1};
+    pvd.variables += {"a2", get_vfrac2};
 
     double curr_time = 0.0;
 
@@ -111,26 +109,31 @@ int main() {
 
     // Создаем одномерную сетку
     Strip gen(test.xmin(), test.xmax());
-    gen.set_size(500);
+    gen.set_size(5000);
 
     // Создать сетку
     EuMesh mesh(U, &gen);
 
     // Создать решатель
-    MmFluid solver(mixture, Fluxes::HLL);
-    solver.set_CFL(0.9);
-    solver.set_acc(1);
+    MmFluid solver(mixture);
+    solver.set_CFL(0.7);
+    solver.set_accuracy(2);
+    solver.set_method(Fluxes::HLLC);
 
     for (auto cell: mesh) {
-        cell(U).rho = test.density(cell.center());
-        cell(U).v = test.velocity(cell.center());
-        cell(U).p = test.pressure(cell.center());
-        cell(U).e = test.energy(cell.center());
+        cell(U).density = test.density(cell.center());
+        cell(U).velocity = test.velocity(cell.center());
+        cell(U).pressure = test.pressure(cell.center());
+        cell(U).energy = test.energy(cell.center());
 
         cell(U).mass_frac[0] = cell.x() < test.x_jump ? 1.0 : 0.0;
         cell(U).mass_frac[1] = cell.x() < test.x_jump ? 0.0 : 1.0;
 
-        cell(U).t = test.get_eos(cell.x())->temperature_rp(cell(U).rho, cell(U).p);
+        cell(U).vol_frac[0] = cell.x() < test.x_jump ? 1.0 : 0.0;
+        cell(U).vol_frac[1] = cell.x() < test.x_jump ? 0.0 : 1.0;
+
+        cell(U).temperature = mixture.temperature_rp(
+                cell(U).density, cell(U).pressure, cell(U).mass_frac);
     }
 
     double next_write = 0.0;
@@ -147,8 +150,8 @@ int main() {
         // Обновляем слои
         solver.update(mesh);
 
+        curr_time += solver.dt();
         n_step += 1;
-        curr_time = solver.get_time();
     }
 
     // Сохранить данные как текст
@@ -162,15 +165,15 @@ int main() {
         double x = cell.center().x();
         double V = cell.volume();
 
-        r_err += V * std::abs(cell(U).rho   - exact.density(x, curr_time));
-        u_err += V * std::abs(cell(U).v.x() - exact.velocity(x, curr_time));
-        p_err += V * std::abs(cell(U).p     - exact.pressure(x, curr_time));
-        e_err += V * std::abs(cell(U).e     - exact.energy(x, curr_time));
+        r_err += V * std::abs(cell(U).density      - exact.density(x, curr_time));
+        u_err += V * std::abs(cell(U).velocity.x() - exact.velocity(x, curr_time));
+        p_err += V * std::abs(cell(U).pressure     - exact.pressure(x, curr_time));
+        e_err += V * std::abs(cell(U).energy       - exact.energy(x, curr_time));
 
-        r_avg += V * std::abs(cell(U).rho  );
-        u_avg += V * std::abs(cell(U).v.x());
-        p_avg += V * std::abs(cell(U).p    );
-        e_avg += V * std::abs(cell(U).e    );
+        r_avg += V * std::abs(cell(U).density     );
+        u_avg += V * std::abs(cell(U).velocity.x());
+        p_avg += V * std::abs(cell(U).pressure    );
+        e_avg += V * std::abs(cell(U).energy      );
     }
     r_err /= r_avg;
     u_err /= u_avg;

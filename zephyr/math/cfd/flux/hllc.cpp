@@ -104,10 +104,12 @@ mmf::Flux HLLC::calc_flux(const mmf::PState &zL, const mmf::PState &zR, const ph
     const double &P_R = zR.pressure;
 
     // Скорость звука слева и справа
-    double c_L = mixture.sound_speed_rp(zL.density, zL.pressure,
-                                        zL.mass_frac, {.T0 = zL.temperature});
-    double c_R = mixture.sound_speed_rp(zR.density, zR.pressure,
-                                        zR.mass_frac, {.T0 = zR.temperature});
+    Fractions a_L = zL.alpha();
+    double c_L = mixture.sound_speed_rp(zL.density, zL.pressure, zL.mass_frac,
+                                        {.T0 = zL.T(), .alpha = &a_L});
+    Fractions a_R = zR.alpha();
+    double c_R = mixture.sound_speed_rp(zR.density, zR.pressure, zR.mass_frac,
+                                        {.T0 = zR.T(), .alpha = &a_R});
 
     // Оценки скоростей расходящихся волн
     double S_L = std::min({u_L - c_L, u_R - c_R, 0.0});
@@ -129,7 +131,7 @@ mmf::Flux HLLC::calc_flux(const mmf::PState &zL, const mmf::PState &zR, const ph
         double e_sL = zL.energy + 0.5 * sqr(S_C - u_L) + P_L * (S_C - u_L) / (rho_L * (S_L - u_L));
 
         // Вектор состояния слева от контактного разрыва
-        PState z_sL(rho_sL, {S_C, zL.v(), zL.w()}, P_C, e_sL, zL.beta(), NAN, Fractions::NaN());
+        PState z_sL(rho_sL, {S_C, zL.v(), zL.w()}, P_C, e_sL, NAN, zL.beta(), Fractions::NaN());
 
         // Консервативный вектор слева от контактного разрыва
         QState Q_sL(z_sL);
@@ -146,7 +148,7 @@ mmf::Flux HLLC::calc_flux(const mmf::PState &zL, const mmf::PState &zR, const ph
         double e_sR = zR.energy + 0.5 * sqr(S_C - u_R) + P_R * (S_C - u_R) / (rho_R * (S_R - u_R));
 
         // Вектор состояния слева от контактного разрыва
-        PState z_sR(rho_sR, {S_C, zR.v(), zR.w()}, P_C, e_sR, zR.beta(), NAN, Fractions::NaN());
+        PState z_sR(rho_sR, {S_C, zR.v(), zR.w()}, P_C, e_sR, NAN, zR.beta(), Fractions::NaN());
 
         // Консервативный вектор слева от контактного разрыва
         QState Q_sR(z_sR);

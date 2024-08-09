@@ -44,6 +44,16 @@ int main() {
     //QuirckTest test;
     //ShuOsherTest test;
 
+    // Начальные данные
+    auto init_cells = [&test](Mesh& mesh) {
+        for (auto cell: mesh) {
+            cell(U).density  = test.density (cell.center());
+            cell(U).velocity = test.velocity(cell.center());
+            cell(U).pressure = test.pressure(cell.center());
+            cell(U).energy   = test.energy  (cell.center());
+        }
+    };
+
     // Состояния слева и справа в тесте
     double Ox = 100.0;
     PState zL(test.density(-Ox), test.velocity(-Ox),
@@ -107,7 +117,7 @@ int main() {
     solver.set_accuracy(2);
     solver.set_method(Fluxes::HLLC);
 
-    solver.init_cells(mesh, test);
+    init_cells(mesh);
 
     double next_write = 0.0;
     size_t n_step = 0;
@@ -123,8 +133,8 @@ int main() {
         // Обновляем слои
         solver.update(mesh);
 
+        curr_time += solver.dt();
         n_step += 1;
-        curr_time = solver.get_time();
     }
 
     // Сохранить данные как текст

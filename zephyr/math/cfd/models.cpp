@@ -159,8 +159,8 @@ PState::PState()
       vol_frac() { }
 
 PState::PState(double density, const Vector3d &velocity, double pressure,
-        double energy, const Fractions &mass_frac,
-        double temperature, const Fractions& vol_frac)
+        double energy, double temperature,
+        const Fractions &mass_frac, const Fractions& vol_frac)
     : density(density),
       velocity(velocity),
       pressure(pressure),
@@ -170,17 +170,23 @@ PState::PState(double density, const Vector3d &velocity, double pressure,
       vol_frac(vol_frac) {
 }
 
-PState::PState(const QState &q, const phys::Materials &mixture, double P0, double T0) {
-    mass_frac = Fractions(q.mass_frac);
+PState::PState(const QState &q, const phys::Materials &mixture,
+               double P0, double T0, const Fractions& alpha) {
 
-    density = q.mass;
-    velocity = q.momentum / density;
-    energy = q.energy / density - 0.5 * velocity.squaredNorm();
-    pressure = mixture.pressure_re(density, energy, mass_frac, {.P0=P0, .T0=T0});
-    if (std::isnan(pressure)) {
-        pressure = mixture.pressure_re(density, energy, mass_frac, {.P0=-P0, .T0=T0});
-    }
-    temperature = mixture.temperature_rp(density, pressure, mass_frac, {.T0=T0});
+    density   = q.mass;
+    velocity  = q.momentum / density;
+    energy    = q.energy / density - 0.5 * velocity.squaredNorm();
+
+    mass_frac = q.comp_mass.arr() / density;
+    mass_frac.normalize();
+
+    vol_frac  = alpha;
+
+    // в том числе обновляет vol_frac
+    auto PT = mixture.find_PT(density, energy, mass_frac,
+                              {.P0=P0, .T0=T0, .alpha=&vol_frac});
+    pressure    = PT.P;
+    temperature = PT.T;
 }
 
 void PState::to_local(const Vector3d &normal) {
@@ -233,6 +239,18 @@ smf::PState PState::to_smf() const {
     return {density, velocity, pressure, energy};
 }
 
+void PState::interpolation_update(const phys::Materials& mixture) {
+    // Нормализуем после интерполяции
+    mass_frac.normalize();
+    vol_frac.normalize();
+
+    // Восстанавливаем совместность после интерполяции
+    auto pair = mixture.find_ET(density, pressure, mass_frac,
+                                {.T0 = temperature, .alpha = &vol_frac});
+    energy      = pair.e;
+    temperature = pair.T;
+}
+
 bool PState::is_bad() const {
     return std::isinf(density) || std::isnan(density) ||
            std::isinf(velocity.x()) || std::isnan(velocity.x()) ||
@@ -250,7 +268,7 @@ QState::QState()
     : mass(0.0),
       momentum({0.0, 0.0, 0.0}),
       energy(0.0),
-      mass_frac() {
+      comp_mass() {
 
 }
 
@@ -258,17 +276,15 @@ QState::QState(double mass, const Vector3d &momentum, double energy, const Scala
     : mass(mass),
       momentum(momentum),
       energy(energy),
-      mass_frac(mass_frac) {
+      comp_mass(mass_frac) {
 
 }
 
 QState::QState(const PState &z) {
-    mass_frac = ScalarSet(z.mass_frac);
-    mass_frac *= z.density;
-
-    mass = z.density;
-    momentum = z.density * z.velocity;
-    energy = z.density * (z.energy + 0.5 * z.velocity.squaredNorm());
+    mass      = z.density;
+    momentum  = z.density * z.velocity;
+    energy    = z.density * (z.energy + 0.5 * z.velocity.squaredNorm());
+    comp_mass = z.density * z.mass_frac.arr();
 }
 
 void QState::to_local(const Vector3d &normal) {
@@ -296,7 +312,7 @@ std::ostream &operator<<(std::ostream &os, const QState &state) {
           state.mass %
           state.momentum.x() % state.momentum.y() % state.momentum.z() %
           state.energy %
-          state.mass_frac;
+          state.comp_mass;
     return os;
 }
 
@@ -309,10 +325,8 @@ Flux::Flux()
 }
 
 Flux::Flux(const PState &z) {
-    mass_frac = ScalarSet(z.mass_frac);
-    mass_frac *= z.density * z.velocity.x();
-
-    mass = z.density * z.velocity.x();
+    mass         = z.density * z.velocity.x();
+    mass_frac    = z.density * z.velocity.x() * z.mass_frac.arr();
     momentum.x() = z.density * z.velocity.x() * z.velocity.x() + z.pressure;
     momentum.y() = z.density * z.velocity.x() * z.velocity.y();
     momentum.z() = z.density * z.velocity.x() * z.velocity.z();

@@ -88,6 +88,15 @@ bool Fractions::is_pure() const {
     return pure;
 }
 
+void Fractions::set_pure(int idx) {
+    for (int i = 0; i < Fractions::max_size; ++i) {
+        m_data[i] = 0.0;
+    }
+    if (0 <= idx && idx < Fractions::max_size) {
+        m_data[idx] = 1.0;
+    }
+}
+
 int Fractions::index() const {
     int idx = -1;
     for (int i = 0; i < max_size; ++i) {

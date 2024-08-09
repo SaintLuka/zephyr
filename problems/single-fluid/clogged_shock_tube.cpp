@@ -154,7 +154,7 @@ int main () {
     int nx_cells = 2 * N; // для 2ого случая
 
     // сек
-    double time = 0;
+    double curr_time = 0;
     double next_write = 0;
 
     //шаг
@@ -191,9 +191,10 @@ int main () {
     EuMesh mesh(U, &rect);
 
     // Создать решатель
-    auto solver = zephyr::math::SmFluid(eos, Fluxes::HLLC);
+    auto solver = SmFluid(eos);
     solver.set_accuracy(2);
     solver.set_CFL(0.4);
+    solver.set_method(Fluxes::HLLC);
 
     mesh.set_max_level(3);
     mesh.set_distributor(solver.distributor());
@@ -220,12 +221,12 @@ int main () {
     // Инициализация граничных условий
     setup_boundary(mesh, G, h, L, l);
 
-    while (time < 1.0e200) {
-        if (time >= next_write) {
+    while (curr_time < 1.0e200) {
+        if (curr_time >= next_write) {
             std::cout << "\tStep: " << std::setw(6) << n_step << ";"
-                      << "\tTime: " << std::setw(6) << std::setprecision(3) << time << "\n";
+                      << "\tTime: " << std::setw(6) << std::setprecision(3) << curr_time << "\n";
 
-            pvd.save(mesh, time);
+            pvd.save(mesh, curr_time);
             next_write += 0.01;
         }
 
@@ -256,9 +257,9 @@ int main () {
 
             setup_boundary(mesh, G, h, L, l);
         }
-        
+
+        curr_time += solver.dt();
         n_step += 1;
-        time = solver.get_time();
     }
 
     return 0;

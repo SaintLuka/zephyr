@@ -69,14 +69,14 @@ mmf::Flux Godunov::calc_flux(const mmf::PState &zL, const mmf::PState &zR, const
     mmf::Flux flux;
     if (sol.U >= 0) {
         Vector3d v(sol.Uf, zL.velocity.y(), zL.velocity.z());
-        auto [temperature, energy] = mixture.temperature_energy_rp(sol.rho, sol.Pf, zL.mass_frac, {.T0=zL.temperature});
-        mmf::PState z(sol.rho, v, sol.Pf, energy, zL.mass_frac, temperature, mmf::Fractions::NaN());
+        auto [energy, temperature] = mixture.find_ET(sol.rho, sol.Pf, zL.mass_frac, {.T0=zL.temperature});
+        mmf::PState z(sol.rho, v, sol.Pf, energy, temperature, zL.mass_frac, mmf::Fractions::NaN());
 
         flux = mmf::Flux(z);
     } else {
         Vector3d v(sol.Uf, zR.velocity.y(), zR.velocity.z());
-        auto [temperature, energy] = mixture.temperature_energy_rp(sol.rho, sol.Pf, zR.mass_frac, {.T0=zR.temperature});
-        mmf::PState z(sol.rho, v, sol.Pf, energy, zR.mass_frac, temperature, mmf::Fractions::NaN());
+        auto [energy, temperature] = mixture.find_ET(sol.rho, sol.Pf, zR.mass_frac, {.T0=zR.temperature});
+        mmf::PState z(sol.rho, v, sol.Pf, energy, temperature, zR.mass_frac, mmf::Fractions::NaN());
 
         flux = mmf::Flux(z);
     }
