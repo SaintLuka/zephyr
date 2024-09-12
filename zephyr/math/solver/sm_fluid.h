@@ -56,7 +56,7 @@ public:
 
 
     /// @brief Конструктор класса
-    explicit SmFluid(const phys::Eos &eos);
+    explicit SmFluid(const phys::Eos &eos, Fluxes flux = Fluxes::HLLC);
 
     /// @brief Декструктор
     ~SmFluid() = default;

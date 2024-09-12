@@ -24,8 +24,19 @@ smf::PState get_current_sm(Cell &cell) {
     return cell(U).get_state();
 }
 
-SmFluid::SmFluid(const phys::Eos &eos) : m_eos(eos) {
-    m_nf = HLLC::create();
+SmFluid::SmFluid(const phys::Eos &eos, Fluxes flux) : m_eos(eos) {
+    switch(flux){
+        case Fluxes::HLLC:
+            m_nf = HLLC::create();
+        case Fluxes::HLL:
+            m_nf = HLL::create();
+        case Fluxes::GODUNOV:
+            m_nf = Godunov::create();
+        case Fluxes::RUSANOV:
+            m_nf = Rusanov::create();
+        default:
+            m_nf = HLLC::create();
+    }
     m_CFL = 0.9;
     m_dt = std::numeric_limits<double>::max();
 }
