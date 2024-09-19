@@ -3,10 +3,12 @@
 #include <zephyr/geom/vector.h>
 #include <zephyr/phys/eos/ideal_gas.h>
 #include <zephyr/phys/tests/test_1D.h>
+#include <zephyr/phys/tests/test_2D.h>
 
 namespace zephyr::phys {
 
 using zephyr::geom::Vector3d;
+using zephyr::geom::generator::Rectangle;
 
 /// @class Набор тестов на распад разрыва из монографии Торо (глава 10) и (4.3.3 Numerical Tests)
 /// E.F. Toro. Riemann Solvers and Numerical Methods for Fluid Dynamics.
@@ -103,6 +105,68 @@ public:
     }
 
     ~ToroTest() = default;
+};
+
+
+/// @class Тесты Торо, повернутые на угол
+class ToroTest2D {
+public:
+    ToroTest test1D;
+    double angle;
+    Rectangle m_gen;
+
+    /// @brief Конструктор
+    /// @param num Номер теста 1..7
+    explicit ToroTest2D(int num, double angle, bool multimat = false)
+        : test1D(num, multimat), angle(angle) {
+        m_gen = Rectangle(-5.0, 5.0, -5.0, 5.0);
+        m_gen.set_boundaries({.left=Boundary::ZOE, .right=Boundary::ZOE,
+                              .bottom=Boundary::ZOE, .top=Boundary::ZOE});
+    }
+
+    Rectangle generator() const {
+        return m_gen;
+    }
+
+    /// @brief Конечный момент времени
+    double max_time() const { return 5.0 * test1D.finish; }
+
+    ///@brief Получить используемый УрС
+    const Eos& get_eos() const { return *test1D.eos_L; }
+
+    ///@brief Получить положение разрыва
+    double get_x_jump() const { return test1D.x_jump; }
+
+    Vector3d rotate(const Vector3d& r) const {
+        Vector3d res = {
+                +std::cos(angle) * r.x() + std::sin(angle) * r.y(),
+                -std::sin(angle) * r.x() + std::cos(angle) * r.y(),
+                0.0
+        };
+        return res;
+    }
+
+    /// @brief Начальная плотность
+    double density(const Vector3d &r) const {
+        return test1D.density(rotate(r));
+    }
+
+    /// @brief Начальное давление
+    double pressure(const Vector3d &r) const {
+        return test1D.pressure(rotate(r));
+    }
+
+    /// @brief Начальная скорость
+    Vector3d velocity(const Vector3d &r) const {
+        return test1D.velocity(rotate(r));
+    }
+
+    /// @brief Начальная внутренняя энергия
+    double energy(const Vector3d &r) const {
+        return test1D.energy(rotate(r));
+    }
+
+    ~ToroTest2D() = default;
 };
 
 } // namespace zephyr::phys

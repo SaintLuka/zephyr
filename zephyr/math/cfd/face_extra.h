@@ -8,6 +8,9 @@
 namespace zephyr::math {
 
 template<class T>
+class FaceExtraDirect;
+
+template<class T>
 class FaceExtraSimple;
 
 template<class T>
@@ -36,6 +39,24 @@ static inline std::array<double, SizeOf<T>()> &arr(T &vec) {
 template<class T>
 static inline const std::array<double, SizeOf<T>()> &arr(const T &vec) {
     return reinterpret_cast<const std::array<double, SizeOf<T>()> &>(vec);
+}
+
+/// @brief Создание простого экстраполятора
+/// @param uc Значение в данной ячейке
+/// @param ucx, ucy, ucz Производные в данной ячейке
+/// @param un Значение в смежной ячейке
+/// @param unx, uny, unz Производные в смежной ячейке
+/// @param cell_c Центр данной ячейки
+/// @param neib_c Центр смежной ячейки
+/// @param face_c Центр грани
+template<class T>
+inline FaceExtraDirect<T> Direct(const T &uc, const T &ucx, const T &ucy, const T &ucz,
+                                 const T &un, const T &unx, const T &uny, const T &unz,
+                                 const Vector3d &cell_c, const Vector3d &neib_c,
+                                 const Vector3d &face_c) {
+    return FaceExtraDirect<T>(arr(uc), arr(ucx), arr(ucy), arr(ucz),
+                              arr(un), arr(unx), arr(uny), arr(unz),
+                              cell_c, neib_c, face_c);
 }
 
 /// @brief Создание простого экстраполятора
@@ -96,6 +117,73 @@ inline FaceExtraTriad<T> Triad(const T &uc, const T &ucx, const T &ucy, const T 
 
 } // namespace FaceExtra
 
+/// @brief Простой перенос по градиенту
+template<class T>
+class FaceExtraDirect {
+public:
+    static const int N = FaceExtra::SizeOf<T>();
+    using Array = std::array<double, N>;
+
+    /// @brief Создание простого экстраполятора
+    /// @param uc Значение в данной ячейке
+    /// @param ucx, ucy, ucz Производные в данной ячейке
+    /// @param un Значение в смежной ячейке
+    /// @param unx, uny, unz Производные в смежной ячейке
+    /// @param cell_c Центр данной ячейки
+    /// @param neib_c Центр смежной ячейки
+    /// @param face_c Центр грани
+    FaceExtraDirect(const Array &uc, const Array &ucx, const Array &ucy, const Array &ucz,
+                    const Array &un, const Array &unx, const Array &uny, const Array &unz,
+                    const Vector3d &cell_c, const Vector3d &neib_c,
+                    const Vector3d &face_c) {
+
+        Vector3d dr_c = face_c - cell_c;
+        Vector3d dr_n = face_c - neib_c;
+
+        for (int i = 0; i < N; ++i) {
+            u_c[i] = uc[i];
+            u_n[i] = un[i];
+            du_c[i] = ucx[i] * dr_c.x() + ucy[i] * dr_c.y() + unz[i] * dr_c.z();
+            du_n[i] = unx[i] * dr_n.x() + uny[i] * dr_n.y() + unz[i] * dr_n.z();
+        }
+    }
+
+    /// @brief Экстраполяция величины ul на внутреннюю сторону грани
+    T m(const T &_ul) const {
+        T _um;
+
+        auto &ul = FaceExtra::arr(_ul);
+        auto &um = FaceExtra::arr(_um);
+
+        for (int i = 0; i < N; ++i) {
+            um[i] = ul[i] + du_c[i];
+            //um[i] = std::max(std::min(u_c[i], u_n[i]), std::min(um[i], std::max(u_c[i], u_n[i])));
+        }
+
+        return _um;
+    }
+
+    /// @brief Экстраполяция величины ur на внешнюю сторону грани
+    T p(const T &_ur) const {
+        T _up;
+
+        auto &ur = FaceExtra::arr(_ur);
+        auto &up = FaceExtra::arr(_up);
+
+        for (int i = 0; i < N; ++i) {
+            up[i] = ur[i] + du_n[i];
+            //up[i] = std::max(std::min(u_c[i], u_n[i]), std::min(up[i], std::max(u_c[i], u_n[i])));
+        }
+
+        return _up;
+    }
+
+private:
+
+    /// Параметры экстраполяции
+    Array u_c, u_n;
+    Array du_c, du_n;
+};
 
 /// @brief Простая экстраполяция для схем второго порядка
 template<class T>

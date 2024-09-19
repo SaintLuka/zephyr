@@ -113,22 +113,27 @@ int main() {
 
     // Создать решатель
     SmFluid solver(eos);
-    solver.set_CFL(0.7);
+    solver.set_CFL(0.5);
     solver.set_accuracy(2);
+    solver.set_limiter("minmod");
     solver.set_method(Fluxes::HLLC);
 
     init_cells(mesh);
 
+    double end_time = test.max_time();
     double next_write = 0.0;
     size_t n_step = 0;
 
-    while (curr_time <= 1.01 * test.max_time()) {
+    while (curr_time < end_time) {
         if (curr_time >= next_write) {
             std::cout << "\tStep: " << std::setw(6) << n_step << ";"
                       << "\tTime: " << std::setw(6) << std::setprecision(3) << curr_time << "\n";
             pvd.save(mesh, curr_time);
-            next_write += test.max_time() / 100;
+            next_write += end_time / 100;
         }
+
+        // Точное завершение в end_time
+        solver.set_max_dt(end_time - curr_time);
 
         // Обновляем слои
         solver.update(mesh);
@@ -136,6 +141,7 @@ int main() {
         curr_time += solver.dt();
         n_step += 1;
     }
+    pvd.save(mesh, curr_time);
 
     // Сохранить данные как текст
     CsvFile csv("test1D.csv", 8, pvd.variables);

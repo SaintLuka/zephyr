@@ -7,6 +7,7 @@
 
 #include <zephyr/phys/tests/test_2D.h>
 #include <zephyr/phys/tests/sedov.h>
+#include <zephyr/phys/tests/toro.h>
 
 #include <zephyr/math/solver/sm_fluid.h>
 
@@ -36,20 +37,44 @@ double get_e(AmrStorage::Item& cell) { return cell(U).energy; }
 
 
 int main() {
-    threads::on();
+    threads::on(6);
 
     // Тестовая задача
-    Test2D test(6);
+    //Test2D test(6);
     //SedovBlast test;
+
+    ToroTest2D test(1, 0.3 * M_PI);
 
     // Начальные данные
     auto init_cells = [&test](Mesh& mesh) {
-        for (auto cell: mesh) {
-            cell(U).density  = test.density(cell.center());
-            cell(U).velocity = test.velocity(cell.center());
-            cell(U).pressure = test.pressure(cell.center());
-            cell(U).energy   = test.energy(cell.center());
-        }
+        mesh.for_each([&](Cell& cell) {
+            using zephyr::geom::Quad;
+            Quad quad = ((SqQuad&) cell.geom().vertices).reduce();
+            double V = cell.volume();
+
+            int n = 20;
+
+            double R = quad.integrate_low([&](const Vector3d& v) -> double {
+                return test.density(v);
+            }, n) / V;
+            double RU = quad.integrate_low([&](const Vector3d& v) -> double {
+                return test.density(v) * test.velocity(v).x();
+            }, n) / V;
+            double RV = quad.integrate_low([&](const Vector3d& v) -> double {
+                return test.density(v) * test.velocity(v).y();
+            }, n) / V;
+            double RW = quad.integrate_low([&](const Vector3d& v) -> double {
+                return test.density(v) * test.velocity(v).z();
+            }, n) / V;
+            double RE = quad.integrate_low([&](const Vector3d& v) -> double {
+                return test.density(v) * test.energy(v);
+            }, n) / V;
+
+            cell(U).density  = R;
+            cell(U).velocity = Vector3d{RU / R, RV / R, RW / R};
+            cell(U).energy   = RE / R;
+            cell(U).pressure = test.get_eos().pressure_re(R, RE / R);
+        });
     };
 
     // Файл для записи
@@ -66,7 +91,7 @@ int main() {
     // Генератор сетки (с граничными условиями)
     // дает тест, число ячеек можно настроить
     Rectangle gen = test.generator();
-    gen.set_nx(300);
+    gen.set_nx(800);
 
     // Создать сетку
     EuMesh mesh(U, &gen);
@@ -75,6 +100,7 @@ int main() {
     SmFluid solver(test.get_eos());
     solver.set_accuracy(2);
     solver.set_CFL(0.5);
+    solver.set_limiter("Koren");
     solver.set_method(Fluxes::HLLC);
 
     // Сеточная адаптация

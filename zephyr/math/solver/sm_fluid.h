@@ -3,6 +3,7 @@
 #include <zephyr/mesh/mesh.h>
 #include <zephyr/phys/eos/eos.h>
 #include <zephyr/math/cfd/fluxes.h>
+#include <zephyr/math/cfd/limiter.h>
 
 namespace zephyr::math {
 
@@ -67,11 +68,17 @@ public:
     /// @brief Установить метод
     void set_method(Fluxes method);
 
+    /// @brief Установить ограничитель градиента
+    void set_limiter(const std::string& limiter);
+
     /// @brief Число Куранта
     double CFL() const;
 
     /// @brief Шаг интегрирования на предыдущем вызове update()
     double dt() const;
+
+    /// @brief Установить шаг интегрирования по времени
+    void set_max_dt(double dt);
 
     /// @brief Выполнить шаг интегрирования по времени
     void update(Mesh &mesh);
@@ -106,8 +113,10 @@ protected:
     const phys::Eos &m_eos;  ///< Уравнение состояния
     NumFlux::Ptr m_nf;       ///< Метод расчёта потока
     int m_acc = 1;           ///< Порядок точности
-    double m_CFL;            ///< Число Куранта
+    Limiter m_limiter;       ///< Ограничитель градиента
+    double m_CFL = 0.5;      ///< Число Куранта
     double m_dt;             ///< Шаг интегрирования
+    double m_max_dt=1.e300;  ///< Максимальный шаг интегрирования
 };
 
 std::ostream &operator<<(std::ostream &os, const SmFluid::State &state) {

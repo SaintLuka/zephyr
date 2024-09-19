@@ -156,13 +156,13 @@ void MmFluid::fluxes(Mesh &mesh) {
 void MmFluid::compute_grad(Mesh &mesh, const std::function<mmf::PState(Cell &)> &get_state)  {
     mesh.for_each([&get_state](Cell &cell) -> void {
         // auto grad = compute_grad_gauss<mmf::PState>(cell, get_state);
-        auto grad = gradient::LSM<mmf::PState>(cell, get_state, boundary_value);
+        auto grad = gradient::LSM_orig<mmf::PState>(cell, get_state, boundary_value);
 
         //auto lim_grad = gradient::limiting<mmf::PState>(cell, grad, get_state, boundary_value);
 
-        cell(U).d_dx = grad[0];
-        cell(U).d_dy = grad[1];
-        cell(U).d_dz = grad[2];
+        cell(U).d_dx = grad.x;
+        cell(U).d_dy = grad.y;
+        cell(U).d_dz = grad.z;
     });
 }
 

@@ -2,7 +2,7 @@
 
 #include <string>
 
-namespace zephyr { namespace math {
+namespace zephyr::math {
 
 /// @brief Класс-функтор, предоставляет функционал ограничителей
 /// наклонов/потоков для скалярных и векторных функций
@@ -109,10 +109,6 @@ double smart(double a, double b);
 double superbee(double r);
 double superbee(double a, double b);
 
-double atvl(double r);
-double atvl(double a, double b);
-
 }
 
-} // math
-} // zephyr
+} // namespace zephyr::math

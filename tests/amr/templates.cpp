@@ -452,9 +452,9 @@ int main() {
 
             EuMesh mesh = get_template(k, h);
 
-            set_data(mesh, test_linear_func, test_linear_grad);
+            //set_data(mesh, test_linear_func, test_linear_grad);
             //set_data(mesh, test_x_func, test_x_grad);
-            //set_data(mesh, test_y_func, test_y_grad);
+            set_data(mesh, test_y_func, test_y_grad);
             //set_data(mesh, test_x_sq_func, test_x_sq_grad);
             //set_data(mesh, test_y_sq_func, test_y_sq_grad);
             //set_data(mesh, test_arb_func, test_arb_grad);

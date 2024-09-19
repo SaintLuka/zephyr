@@ -22,8 +22,10 @@ SmFluid::State SmFluid::datatype() {
 
 SmFluid::SmFluid(const phys::Eos &eos) : m_eos(eos) {
     m_nf = HLLC::create();
-    m_CFL = 0.7;
-    m_dt = std::numeric_limits<double>::max();
+    m_CFL = 0.5;
+    m_limiter = Limiter("van Albada");
+    m_dt = NAN;
+    m_max_dt = std::numeric_limits<double>::max();
 }
 
 void SmFluid::set_CFL(double CFL) {
@@ -38,12 +40,20 @@ void SmFluid::set_method(Fluxes method) {
     m_nf = NumFlux::create(method);
 }
 
+void SmFluid::set_limiter(const std::string& lim) {
+    m_limiter = Limiter(lim);
+}
+
 double SmFluid::CFL() const {
     return m_CFL;
 }
 
 double SmFluid::dt() const {
     return m_dt;
+}
+
+void SmFluid::set_max_dt(double dt) {
+    m_max_dt = dt;
 }
 
 smf::PState get_current_sm(Cell &cell) {
@@ -102,7 +112,7 @@ void SmFluid::compute_dt(Mesh &mesh) {
         return dt;
     });
 
-    m_dt = m_CFL * dt;
+    m_dt = std::min(m_CFL * dt, m_max_dt);
 }
 
 void SmFluid::fluxes(Mesh &mesh) {
@@ -150,15 +160,15 @@ void SmFluid::fluxes(Mesh &mesh) {
 }
 
 void SmFluid::compute_grad(Mesh &mesh, const std::function<smf::PState(Cell &)> &get_state)  {
-    mesh.for_each([&get_state](Cell &cell) -> void {
-        // auto grad = compute_grad_gauss<smf::PState>(cell, get_state);
-        auto grad = gradient::LSM<smf::PState>(cell, get_state, boundary_value);
+    mesh.for_each([this, &get_state](Cell &cell) {
+        //auto grad = gradient::gauss<smf::PState>(cell, get_state, boundary_value);
+        auto grad = gradient::LSM_orig<smf::PState>(cell, get_state, boundary_value);
 
-        //auto lim_grad = gradient::limiting<smf::PState>(cell, grad, get_state, boundary_value);
+        //grad = gradient::limiting_orig<smf::PState>(cell, m_limiter, grad, get_state, boundary_value);
 
-        cell(U).d_dx = grad[0];
-        cell(U).d_dy = grad[1];
-        cell(U).d_dz = grad[2];
+        cell(U).d_dx = grad.x;
+        cell(U).d_dy = grad.y;
+        cell(U).d_dz = grad.z;
     });
 }
 
@@ -202,6 +212,15 @@ void SmFluid::fluxes_stage1(Mesh &mesh)  {
 
             // Интерполяция на грань со стороны ячейки
             PState zm = face_extra.m(z_c);
+
+            if (false && zm.pressure < 0.0) {
+                std::cout << "Predictor\n";
+                std::cout << "cell.id: " << cell.b_idx() << "\n";
+                std::cout << "  P: " << cell(U).pressure << "\n";
+                std::cout << "  dP/dx: " << cell(U).d_dx.pressure << "\n";
+                std::cout << "  P-: " << cell(U).pressure + cell(U).d_dx.pressure * (cell.vs<-1, 0>() - cell.center()).x() << "\n";
+                std::cout << "  P+: " << cell(U).pressure + cell(U).d_dx.pressure * (cell.vs<+1, 0>() - cell.center()).x() << "\n";
+            }
 
             // Восстанавливаем после интерполяции
             zm.energy = m_eos.energy_rp(zm.density, zm.pressure);
@@ -285,6 +304,27 @@ void SmFluid::fluxes_stage2(Mesh &mesh)  {
             }
             else {
                 zp = boundary_value(zm, normal, face.flag());
+            }
+            if (false && zm.pressure < 0.0 || zp.pressure < 0.0) {
+                std::cout << "Corrector\n";
+                std::cout << "h: " << (neib.center() - cell.center()).norm() << "\n";
+                std::cout << "dxl: " << (cell.vs<-1, 0>() - cell.center()).x() << "\n";
+                std::cout << "dxr: " << (cell.vs<+1, 0>() - cell.center()).x() << "\n";
+
+                std::cout << "cell.id: " << cell.b_idx() << "\n";
+                std::cout << "  P: " << cell(U).half.pressure << "\n";
+                std::cout << "  dP/dx: " << cell(U).d_dx.pressure << "\n";
+                std::cout << "  Pl: " << cell(U).half.pressure + cell(U).d_dx.pressure * (cell.vs<-1, 0>() - cell.center()).x() << "\n";
+                std::cout << "  Pr: " << cell(U).half.pressure + cell(U).d_dx.pressure * (cell.vs<+1, 0>() - cell.center()).x() << "\n";
+
+                std::cout << "neib.id: " << neib.b_idx() << "\n";
+                std::cout << "  P: " << neib(U).half.pressure << "\n";
+                std::cout << "  dP/dx: " << neib(U).d_dx.pressure << "\n";
+                std::cout << "  Pl: " << neib(U).half.pressure + neib(U).d_dx.pressure * (neib.vs<-1, 0>() - neib.center()).x() << "\n";
+                std::cout << "  Pr: " << neib(U).half.pressure + neib(U).d_dx.pressure * (neib.vs<+1, 0>() - neib.center()).x() << "\n";
+
+                std::cout << "zm: " << zm << "\n";
+                std::cout << "zp: " << zp << "\n";
             }
 
             // Переводим в локальную систему координат
@@ -417,4 +457,4 @@ void SmFluid::set_flags(Mesh &mesh) {
     }
 }
 
-};
+} // namespace zephyr::math

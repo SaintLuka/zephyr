@@ -8,7 +8,7 @@
 #include <zephyr/math/cfd/limiter.h>
 #include <cmath>
 
-namespace zephyr { namespace math {
+namespace zephyr::math {
 
 namespace limiters {
 
@@ -304,5 +304,4 @@ void Limiter::check() {
     }
 }
 
-} // namespace math
-} // namespace zephyr
+} // namespace zephyr::math
