@@ -135,6 +135,13 @@ public:
     static void all_to_all(const std::vector<T>& send, std::vector<T>& recv);
 
     /// @}
+
+
+    template <class T>
+    static void send(const std::vector<T>& send, int dest, int tag);
+
+    template <class T>
+    static void recv(const std::vector<T>& recv, int size, int source, int tag);
 };
 
 template <class F>
@@ -215,6 +222,17 @@ template <class T>
 void mpi::all_to_all(const std::vector<T>& send, std::vector<T>& recv) {
     recv.resize(size());
     MPI_Alltoall(send.data(), 1, mpi_type<T>(), recv.data(), 1, mpi_type<T>(), comm());
+}
+
+template <class T>
+void mpi::send(const std::vector<T>& send, int dest, int tag) {
+    MPI_Send(send.data(), send.size() * sizeof(T), MPI_CHAR, dest, tag, comm());
+}
+
+template <class T>
+void mpi::recv(const std::vector<T>& recv, int size, int source, int tag) {
+    recv.resize(size);
+    MPI_Recv(recv.data(), size, MPI_CHAR, source, tag, MPI_Comm comm, MPI_Status *status);
 }
 
 template <>

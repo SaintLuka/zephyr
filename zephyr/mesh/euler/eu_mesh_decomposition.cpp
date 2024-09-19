@@ -86,13 +86,13 @@ void EuMesh::migrate() {
 }
 
 void EuMesh::build_aliens() {
+    int size = mpi::size();
     int rank = mpi::rank();
-
     // Выделяем память
     // [!] думаю, нужно перенести этот код, чтобы он выполнялся единожды
-    m_tourism.m_border_indices.resize(rank);
-    m_tourism.m_count_to_send.resize(rank);
-    m_tourism.m_send_offsets.resize(rank, 0);
+    m_tourism.m_border_indices.resize(size);
+    m_tourism.m_count_to_send.resize(size);
+    m_tourism.m_send_offsets.resize(size, 0);
 
     // Заполняем m_border_indices
     for (auto& cell: m_locals) {
@@ -106,14 +106,22 @@ void EuMesh::build_aliens() {
     }
 
     // Заполняем m_count_to_send
-    for(int r = 0; r < rank; ++r)
+    for(int r = 0; r < size; ++r)
         m_tourism.m_count_to_send[r] = m_tourism.m_border_indices[r].size();
     // Заполняем m_send_offsets
-    for(int r = 1; r < rank; ++r)
+    for(int r = 1; r < size; ++r)
         m_tourism.m_send_offsets[r] = m_tourism.m_send_offsets[r - 1] + m_tourism.m_count_to_send[r - 1];
 
+    // Отправляем m_count_to_send, получаем m_count_to_recv
+    // [!] хардкодово...
+    int TAG = 0;
+    for(int r = 0; r < size; ++r)
+        if(r != rank) mpi::send({m_tourism.m_count_to_send[r]}, r, TAG);
+    for(int r = 0; r < size; ++r)
+        if(r != rank) mpi::recv({m_tourism.m_count_to_recv[r]}, sizeof(int), r, TAG);
+
     // Заполняем m_border
-    int border_size = m_tourism.m_send_offsets[rank - 1] + m_tourism.m_count_to_send[rank - 1];
+    int border_size = m_tourism.m_send_offsets[size - 1] + m_tourism.m_count_to_send[size - 1];
     m_tourism.m_border.resize(border_size);
 
     int temp_border_it = 0;
