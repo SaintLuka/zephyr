@@ -39,7 +39,7 @@ void EuMesh::redistribute() {
         // Важные поля
         cell.rank;
         cell.index;
-
+// [?] почему после migrate()?
         for (auto& face: cell.faces) {
             // Часть граней пустые, там резервное место
             if (face.is_undefined()) {
@@ -74,17 +74,48 @@ void EuMesh::redistribute() {
 
 
     migrate();
-    build_aliens(); // [?] почему после migrate()?
+    build_aliens();
 }
 
 void EuMesh::exchange() {
 
 }
 
-void EuMesh::migrate() {
-
+// [!] хардкодная рандомная функция реранка
+void rerank(zephyr::geom::AmrCell& cell){
+    int size = mpi::size();
+    cell.rank = cell.index % size;
 }
 
+void EuMesh::migrate() {
+    int size = mpi::size();
+    int rank = mpi::rank();
+
+    std::vector<int> m_i(size, 0);
+    // По некоторому правилу определяется новый rank для всех ячеек из массива locals
+    for (auto& cell: m_locals){
+        rerank(cell);
+        // Подсчитываем число ячеек, которые должны быть перемещены с данного процесса на другие
+        ++m_i[cell.rank];
+    }
+
+    // [?] Надеюсь, это правильно
+    std::vector<int> m = mpi::all_gather(m_i);
+
+    // Переиндексируем локальные ячейки
+    std::vector<int> m_sum(size, 0);
+    for(int i = 0; i < rank - 1; ++i)
+        for(int s = 0; s < size; ++s)
+            m_sum[s] += m[s][i];
+
+    for (auto& cell: m_locals)
+        cell.index = m_sum[cell.rank]++;
+
+    // ... //
+}
+
+/// @brief 
+/// Заполняет m_tourism
 void EuMesh::build_aliens() {
     int size = mpi::size();
     int rank = mpi::rank();
@@ -93,6 +124,7 @@ void EuMesh::build_aliens() {
     m_tourism.m_border_indices.resize(size);
     m_tourism.m_count_to_send.resize(size);
     m_tourism.m_send_offsets.resize(size, 0);
+    m_tourism.m_recv_offsets.resize(size, 0);
 
     // Заполняем m_border_indices
     for (auto& cell: m_locals) {
@@ -112,13 +144,17 @@ void EuMesh::build_aliens() {
     for(int r = 1; r < size; ++r)
         m_tourism.m_send_offsets[r] = m_tourism.m_send_offsets[r - 1] + m_tourism.m_count_to_send[r - 1];
 
-    // Отправляем m_count_to_send, получаем m_count_to_recv
-    // [!] хардкодово...
+    // Отправляем m_count_to_send -> получаем m_count_to_recv
+    // [!] хардкодово... (лишний раз создаю вектор)
     int TAG = 0;
     for(int r = 0; r < size; ++r)
         if(r != rank) mpi::send({m_tourism.m_count_to_send[r]}, r, TAG);
     for(int r = 0; r < size; ++r)
         if(r != rank) mpi::recv({m_tourism.m_count_to_recv[r]}, sizeof(int), r, TAG);
+
+    // Заполняем m_recv_offsets
+    for(int r = 1; r < size; ++r)
+        m_tourism.m_recv_offsets[r] = m_tourism.m_recv_offsets[r - 1] + m_tourism.m_count_to_recv[r - 1];
 
     // Заполняем m_border
     int border_size = m_tourism.m_send_offsets[size - 1] + m_tourism.m_count_to_send[size - 1];
