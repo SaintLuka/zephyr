@@ -139,9 +139,71 @@ Grad<State> LSM_orig(Cell &cell,
     }
 
     // Матрица A безразмерная, коэффициенты порядка единиц
-    if (std::abs(A(2, 2)) < 1e-12) {
+    if (std::abs(A(2, 2)) < 1e-8) {
         A(2, 2) = 1.0; // Случай 2D
-        if (std::abs(A(1, 1)) < 1e-12) {
+        if (std::abs(A(1, 1)) < 1e-8) {
+            A(1, 1) = 1.0; // Случай 1D
+        }
+    }
+
+    Matrix3d B = A.inverse();
+
+    Grad<State> grad;
+    grad.x_arr() = B(0, 0) * Fx + B(0, 1) * Fy + B(0, 2) * Fz;
+    grad.y_arr() = B(1, 0) * Fx + B(1, 1) * Fy + B(1, 2) * Fz;
+    grad.z_arr() = B(2, 0) * Fx + B(2, 1) * Fy + B(2, 2) * Fz;
+    return grad;
+}
+
+/// @brief Метод наименьших квадратов (улучшенная AMR версия)
+template<class State>
+Grad<State> LSM(Cell &cell,
+                     const GetState<State> &get_state,
+                     const GetBoundary<State> &boundary_value) {
+    using Array = ei_vec<State>;
+
+    // Делает матрицу A безразмерной
+    double w0 = cell.dim() < 3 ? 1.0 : 1.0 / cell.size();
+
+    State zc = get_state(cell);
+    Vector3d cell_c = cell.center();
+
+    Array Fx = Array::Zero();
+    Array Fy = Array::Zero();
+    Array Fz = Array::Zero();
+    Matrix3d A = Matrix3d::Zero();
+
+    for (auto &face: cell.faces()) {
+        const Vector3d &normal = face.normal();
+
+        State zn;
+        Vector3d dr;
+        if (!face.is_boundary()) {
+            auto neib = face.neib();
+            zn = get_state(neib);
+            dr = neib.center() - cell_c;
+        } else {
+            zn = boundary_value(zc, normal, face.flag());
+            dr = face.symm_point(cell_c) - cell_c;
+        }
+
+        Vector3d drn = dr.dot(normal) * normal;
+
+        double w = w0 * face.area() / std::pow(drn.norm(), 3);
+
+        A += w * drn * dr.transpose();
+
+        Array dF = (Array &) zn - (Array &) zc;
+
+        Fx += w * dF * drn.x();
+        Fy += w * dF * drn.y();
+        Fz += w * dF * drn.z();
+    }
+
+    // Матрица A безразмерная, коэффициенты порядка единиц
+    if (std::abs(A(2, 2)) < 1e-8) {
+        A(2, 2) = 1.0; // Случай 2D
+        if (std::abs(A(1, 1)) < 1e-8) {
             A(1, 1) = 1.0; // Случай 1D
         }
     }
@@ -201,9 +263,76 @@ Grad<State> limiting_orig(Cell &cell, const Limiter& limiter,
     }
 
     // Матрица A безразмерная, коэффициенты порядка единиц
-    if (std::abs(A(2, 2)) < 1e-12) {
+    if (std::abs(A(2, 2)) < 1e-8) {
         A(2, 2) = 1.0; // Случай 2D
-        if (std::abs(A(1, 1)) < 1e-12) {
+        if (std::abs(A(1, 1)) < 1e-8) {
+            A(1, 1) = 1.0; // Случай 1D
+        }
+    }
+
+    Matrix3d B = A.inverse();
+
+    Grad<State> lim_grad;
+    lim_grad.x_arr() = B(0, 0) * Fx + B(0, 1) * Fy + B(0, 2) * Fz;
+    lim_grad.y_arr() = B(1, 0) * Fx + B(1, 1) * Fy + B(1, 2) * Fz;
+    lim_grad.z_arr() = B(2, 0) * Fx + B(2, 1) * Fy + B(2, 2) * Fz;
+    return lim_grad;
+}
+
+/// @brief Ограничитель градиента (улучшенная AMR версия)
+template<class State>
+Grad<State> limiting(Cell &cell, const Limiter& limiter,
+                          const Grad<State> &grad,
+                          const GetState<State> &get_state,
+                          const GetBoundary<State> &boundary_value) {
+    using Array = ei_arr<State>;
+
+    // Делает матрицу A безразмерной
+    double w0 = cell.dim() < 3 ? 1.0 : 1.0 / cell.size();
+
+    State zc = get_state(cell);
+    Vector3d cell_c = cell.center();
+
+    Array Fx = Array::Zero();
+    Array Fy = Array::Zero();
+    Array Fz = Array::Zero();
+
+    Matrix3d A = Matrix3d::Zero();
+    for (auto &face: cell.faces()) {
+        const Vector3d &normal = face.normal();
+
+        State zn;
+        Vector3d dr;
+        if (!face.is_boundary()) {
+            auto neib = face.neib();
+            zn = get_state(neib);
+            dr = neib.center() - cell_c;
+        } else {
+            zn = boundary_value(zc, normal, face.flag());
+            dr = face.symm_point(cell_c) - cell_c;
+        }
+
+        Vector3d drn = dr.dot(normal) * normal;
+
+        double w = w0 * face.area() / std::pow(drn.norm() , 3);
+
+        A += w * drn * dr.transpose();
+
+        Array dF_p = (Array &) zn - (Array &) zc;
+        Array du_n = grad.x_arr() * dr.x() + grad.y_arr() * dr.y() + grad.z_arr() * dr.z();
+        Array dF_m = 2.0 * du_n - dF_p;
+
+        Array dF_lim = limiter(dF_m, dF_p) * dF_p;
+
+        Fx += w * dF_lim * drn.x();
+        Fy += w * dF_lim * drn.y();
+        Fz += w * dF_lim * drn.z();
+    }
+
+    // Матрица A безразмерная, коэффициенты порядка единиц
+    if (std::abs(A(2, 2)) < 1e-8) {
+        A(2, 2) = 1.0; // Случай 2D
+        if (std::abs(A(1, 1)) < 1e-8) {
             A(1, 1) = 1.0; // Случай 1D
         }
     }

@@ -2,7 +2,7 @@
 
 #include <zephyr/phys/eos/eos.h>
 
-namespace zephyr { namespace phys {
+namespace zephyr::phys {
 
 /// @brief Создание указателя на базовый класс Eos
 /// @brief Уравнение состояния идеального газа
@@ -10,6 +10,8 @@ class IdealGas : public Eos {
 public:
     double gamma;
     double Cv;
+
+    using Ptr = std::shared_ptr<IdealGas>;
 
     /// @brief Конструктор с заданием параметров
     explicit IdealGas(double gamma = 1.4, double Cv = 1.0);
@@ -19,7 +21,7 @@ public:
 
     /// @brief Создание указателя на базовый класс Eos
     template<typename... Args>
-    static Eos::Ptr create(Args &&... args) {
+    static IdealGas::Ptr create(Args &&... args) {
         return std::make_shared<IdealGas>(std::forward<Args>(args)...);
     };
 
@@ -74,5 +76,4 @@ public:
 
 };
 
-}
-}
+} // namespace zephyr::phys

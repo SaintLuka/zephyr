@@ -11,12 +11,12 @@ using zephyr::geom::Vector3d;
 /// @class Классический одномерный тест Сода
 class SuperSonicFlowAroundCylinder : public Test1D {
 public:
-    IdealGas eos;   ///< Используемый УрС
+    Eos::Ptr eos;   ///< Используемый УрС
     double finish;  ///< Конечный момент времени
-    double rho;  ///< Плотность
-    double u, v;  ///< Скорость
-    double p;  ///< Давление
-    double e;  ///< Внутренняя энергия
+    double rho;     ///< Плотность
+    double u, v;    ///< Скорость
+    double p;       ///< Давление
+    double e;       ///< Внутренняя энергия
     double x_jump = 0;
 
     // Bow shock resulting from a supersonic flow around a stationary cylinder 
@@ -24,15 +24,15 @@ public:
     // Peery and Imlay, 1988
 
     /// @brief Конструктор
-    SuperSonicFlowAroundCylinder(double Ms=3) : eos(1.4) {
-        // @formatter:off
+    SuperSonicFlowAroundCylinder(double Ms=3) {
+        eos = IdealGas::create(1.4);
+
         rho = 1;
         u = sqrt(1.4) * Ms;
         v = 0;
         p = 1;
 
         finish = 10;
-        // @formatter:on
     }
 
     std::string get_name() const { return "Supersonic flow around cylinder";}
@@ -56,15 +56,15 @@ public:
     double get_x_jump() const { return x_jump; }
 
     ///@brief Получить используемый УрС
-    const Eos& get_eos() const { return eos; }
+    Eos::Ptr get_eos() const { return eos; }
 
     /// @brief Начальная плотность
     double density(const double &x) const { return rho; }
     double density(const Vector3d &r) const { return rho; }
 
     /// @brief Начальная внутренняя энергия
-    double energy(const double &x) const { return eos.energy_rp(rho, p); }
-    double energy(const Vector3d &r) const { return eos.energy_rp(rho, p); }
+    double energy(const double &x) const { return eos->energy_rp(rho, p); }
+    double energy(const Vector3d &r) const { return eos->energy_rp(rho, p); }
     
     /// @brief Начальное давление
     double pressure(const double &x) const { return p; }

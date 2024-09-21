@@ -157,7 +157,6 @@ public:
 
         for (int i = 0; i < N; ++i) {
             um[i] = ul[i] + du_c[i];
-            //um[i] = std::max(std::min(u_c[i], u_n[i]), std::min(um[i], std::max(u_c[i], u_n[i])));
         }
 
         return _um;
@@ -172,13 +171,12 @@ public:
 
         for (int i = 0; i < N; ++i) {
             up[i] = ur[i] + du_n[i];
-            //up[i] = std::max(std::min(u_c[i], u_n[i]), std::min(up[i], std::max(u_c[i], u_n[i])));
         }
 
         return _up;
     }
 
-private:
+public:
 
     /// Параметры экстраполяции
     Array u_c, u_n;

@@ -64,6 +64,22 @@ class CsvFile:
 
         return res_variables, indices
 
+    def sort1D(self):
+        if not (hasattr(self, 'x')):
+            raise 'Read array "x" from .csv'
+
+        idx = np.argsort(self.x)
+        for i, var in enumerate(self.variables):
+            setattr(self, var, getattr(self, var)[idx])
+            
+        print('x.size1: ', self.x.size)
+            
+        arr, idx = np.unique(self.x, return_index=True)
+        for i, var in enumerate(self.variables):
+            setattr(self, var, getattr(self, var)[idx])
+            
+        print('x.size2: ', self.x.size)
+
 
     def as2D(self):
         """
@@ -74,11 +90,14 @@ class CsvFile:
         if not (hasattr(self, 'x') and hasattr(self, 'y')):
             raise 'Read arrays "x" and "y" from .csv'
 
+        print(self.x)
+
         ny = np.argmax(self.x > self.x[0])
         nx = self.x.size // ny
 
         for i, var in enumerate(self.variables):
             setattr(self, var, getattr(self, var).reshape((nx, ny)))
+      
 
         dx = (self.x[-1, 0] - self.x[0, 0]) / (nx - 1)
         dy = (self.y[0, -1] - self.y[0, 0]) / (ny - 1)

@@ -37,6 +37,16 @@ void Wedge::set_nx(int Nx) {
     // Положение клина на правой границе
     double m_yw = m_ymin + (m_xmax - m_xw) * std::tan(m_phi);
 
+    double L1 = std::abs(m_xw - m_xmin);
+    double L2 = std::sqrt(sqr(m_xmax - m_xw) + sqr(m_yw));
+    double L = L1 + L2;
+
+    // Какой-то подгон
+    int Nx2 = std::max(int(std::round(1.2 * L2 * Nx / L)), 1);
+    int Nx1 = std::max(Nx - Nx2, 1);
+    int Ny = std::max(int(std::round(0.9 * (m_ymax - m_ymin) *(Nx1 + Nx2)/ L)), 1);
+
+    /*
     // Площади блоков
     double S1 = (m_xw - m_xmin) * (m_ymax - m_ymin);
     double S2 = 0.5 * (m_xmax - m_xw) * (m_ymax - m_ymin + m_ymax - m_yw);
@@ -47,6 +57,7 @@ void Wedge::set_nx(int Nx) {
 
     int Nx1 = std::max(1, int(std::round(Ny * (m_xw - m_xmin) / (m_ymax - m_ymin))));
     int Nx2 = std::max(1, Nx - Nx1);
+     */
 
     // Нет необходимости устанавливать все размеры
     // у каждого блока, поскольку они связаны

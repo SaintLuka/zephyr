@@ -14,8 +14,7 @@ using zephyr::geom::generator::Rectangle;
 /// E.F. Toro. Riemann Solvers and Numerical Methods for Fluid Dynamics.
 class ToroTest : public Test1D {
 public:
-
-    IdealGas::Ptr eos_L;  ///< Используемый УрС
+    IdealGas::Ptr eos_L; ///< Используемый УрС
     IdealGas::Ptr eos_R; ///< Используемый УрС
 
     double x_jump;  ///< Положение разрыва
@@ -33,7 +32,7 @@ public:
     /// @brief Симметрично отразить начальные условия
     void inverse();
 
-    std::string get_name() const final { return "ToroTest";}
+    std::string name() const final { return "ToroTest";}
 
     /// @brief Левая граница области
     double xmin() const final { return 0.0; }
@@ -44,98 +43,58 @@ public:
     /// @brief Конечный момент времени
     double max_time() const final { return finish; }
 
-    ///@brief Получить используемый УрС
-    Eos::Ptr get_eos() const final {
-        return eos_L;
-    }
-
     ///@brief Получить положение разрыва
     double get_x_jump() const final { return x_jump; }
 
 
     /// @brief Начальная плотность
-    double density(double x) const final {
-        return x < x_jump ? rL : rR;
-    }
-
-    /// @brief Начальная скорость
-    Vector3d velocity(double x) const final {
-        return { x < x_jump ? uL : uR, 0.0, 0.0};
-    }
-
-    /// @brief Начальное давление
-    double pressure(double x) const final {
-        return x < x_jump ? pL : pR;
-    }
-
-    /// @brief Начальная внутренняя энергия
-    double energy(double x) const final {
-        return x < x_jump ? eL : eR;
-    }
-
-    /// @brief Версия для многоматериальных
-    Eos::Ptr get_eos(double x) const final {
-        return x < x_jump ? eos_L : eos_R;
-    }
-
-
-    /// @brief Начальная плотность
     double density(const Vector3d& r) const final {
-        return density(r.x());
+        return r.x() < x_jump ? rL : rR;
     }
 
     /// @brief Начальная скорость
     Vector3d velocity(const Vector3d& r) const final {
-        return velocity(r.x());
+        return { r.x() < x_jump ? uL : uR, 0.0, 0.0};
     }
 
     /// @brief Начальное давление
     double pressure(const Vector3d& r) const final {
-        return pressure(r.x());
+        return r.x() < x_jump ? pL : pR;
     }
 
     /// @brief Начальная внутренняя энергия
     double energy(const Vector3d& r) const final {
-        return energy(r.x());
+        return r.x() < x_jump ? eL : eR;
     }
 
-    /// @brief Версия для многоматериальных
-    Eos::Ptr get_eos(const Vector3d &r) const final {
-        return get_eos(r.x());
+    /// @brief Уравнение состояния
+    Eos::Ptr get_eos(const Vector3d& r) const final {
+        return r.x() < x_jump ? eos_L : eos_R;
     }
-
-    ~ToroTest() = default;
 };
 
 
 /// @class Тесты Торо, повернутые на угол
+/// Распад разрыва под углом.
 class ToroTest2D {
 public:
-    ToroTest test1D;
-    double angle;
-    Rectangle m_gen;
+    ToroTest  test1D;
+    double    angle;
+    Rectangle generator;
 
     /// @brief Конструктор
     /// @param num Номер теста 1..7
     explicit ToroTest2D(int num, double angle, bool multimat = false)
         : test1D(num, multimat), angle(angle) {
-        m_gen = Rectangle(-5.0, 5.0, -5.0, 5.0);
-        m_gen.set_boundaries({.left=Boundary::ZOE, .right=Boundary::ZOE,
-                              .bottom=Boundary::ZOE, .top=Boundary::ZOE});
+        generator = Rectangle(-5.0, 5.0, -5.0, 5.0, false);
+        generator.set_boundaries({.left=Boundary::ZOE, .right=Boundary::ZOE,
+                                  .bottom=Boundary::ZOE, .top=Boundary::ZOE});
     }
 
-    Rectangle generator() const {
-        return m_gen;
-    }
+    std::string name() const { return "2D Toro Test"; }
 
     /// @brief Конечный момент времени
     double max_time() const { return 5.0 * test1D.finish; }
-
-    ///@brief Получить используемый УрС
-    const Eos& get_eos() const { return *test1D.eos_L; }
-
-    ///@brief Получить положение разрыва
-    double get_x_jump() const { return test1D.x_jump; }
 
     Vector3d rotate(const Vector3d& r) const {
         Vector3d res = {
@@ -164,6 +123,10 @@ public:
     /// @brief Начальная внутренняя энергия
     double energy(const Vector3d &r) const {
         return test1D.energy(rotate(r));
+    }
+
+    Eos::Ptr get_eos(const Vector3d& r) const {
+        return test1D.get_eos(r);
     }
 
     ~ToroTest2D() = default;

@@ -43,7 +43,7 @@ int main() {
     ShuOsherTest test;
 
     // Уравнение состояния
-    auto& eos = *test.get_eos();
+    auto eos = test.get_eos({0.0, 0.0, 0.0});
 
     // Создаем одномерную сетку
     Strip gen(test.xmin(), test.xmax());
@@ -84,7 +84,7 @@ int main() {
         double dt = std::numeric_limits<double>::max();
         for (auto& cell: mesh) {
             // скорость звука
-            double c = eos.sound_speed_rp(cell(U).rho1, cell(U).p1);
+            double c = eos->sound_speed_rp(cell(U).rho1, cell(U).p1);
             for (auto &face: cell.faces()) {
                 // Нормальная составляющая скорости
                 double vn = cell(U).v1.dot(face.normal());
@@ -132,7 +132,7 @@ int main() {
                 zp.to_local(normal);
 
                 // Численный поток на грани
-                auto loc_flux = nf->flux(zm, zp, eos);
+                auto loc_flux = nf->flux(zm, zp, *eos);
                 loc_flux.to_global(normal);
 
                 // Суммируем поток
@@ -143,7 +143,7 @@ int main() {
             QState Qc = qc.vec() - dt * flux.vec() / cell.volume();
 
             // Новое значение примитивных переменных
-            PState Zc(Qc, eos);
+            PState Zc(Qc, *eos);
 
             cell(U).rho2 = Zc.density;
             cell(U).v2   = Zc.velocity;

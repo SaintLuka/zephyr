@@ -251,6 +251,78 @@ double AmrCell::volume_fraction(const std::function<double(const Vector3d &)> &i
     }
 }
 
+bool AmrCell::const_function(const std::function<double(const Vector3d&)>& func) const {
+    double value = func(center);
+    if (dim < 3) {
+        if (adaptive) {            
+            // Угловые точки
+            if (func(vertices.vs<-1, -1>()) != value) { return false; }
+            if (func(vertices.vs<-1, +1>()) != value) { return false; }               
+            if (func(vertices.vs<+1, +1>()) != value) { return false; }               
+            if (func(vertices.vs<+1, -1>()) != value) { return false; }
+
+            // Ребра
+            if (func(vertices.vs<0, -1>()) != value) { return false; }                
+            if (func(vertices.vs<0, +1>()) != value) { return false; }               
+            if (func(vertices.vs<-1, 0>()) != value) { return false; }               
+            if (func(vertices.vs<+1, 0>()) != value) { return false; }               
+
+            // Центр
+            return func(vertices.vs<0, 0>()) == value;
+        }
+        else {
+            // Не адаптивная ячейка
+            int i = 0;
+            for (; i < BVertices::max_count; ++i) {
+                if (vertices[i].hasNaN()) {
+                    // Дошли до конца
+                    return true;
+                } else {
+                    if (func(vertices[i]) != value) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+    }
+    else {
+        // Трехмерная ячейка
+        throw std::runtime_error("AmrCell::const_function #1");
+    }    
+}
+
+double AmrCell::integrate_low(const std::function<double(const Vector3d&)>& func, int n_points) const {
+    if (dim < 3) {
+        if (adaptive) {
+            if (linear) {
+                return vertices.as2D().reduce().integrate_low(func, n_points);
+            }
+            else {
+                return vertices.as2D().integrate_low(func, n_points);
+            }
+        }
+        else {
+            // Полигон
+            int count = vertices.count();
+            int N = n_points / count + 1;
+
+            double sum = 0.0;
+            for (int i = 0; i < count; ++i) {
+                int j = (i + 1) % count;
+                Triangle tri(center, vertices[i], vertices[j]);
+                sum += tri.integrate_low(func, N);
+            }
+
+            return sum;
+        }
+    }
+    else {
+        // Трехмерная ячейка
+        throw std::runtime_error("AmrCell::volume_fraction #1");
+    }
+}
+
 void AmrCell::mark_actual_nodes(int mark) {
     static_assert(BNodes::max_count == BVertices::max_count);
 

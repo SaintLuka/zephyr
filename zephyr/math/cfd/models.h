@@ -57,22 +57,17 @@ struct PState {
     inline const double& P() const { return pressure; }
     inline const double& e() const { return energy; }
 
+    // Квадрат модуля скорости
+    inline double v2() const { return velocity.squaredNorm(); }
+
+    // Полная удельная энергия
+    inline double E() const { return energy + 0.5 * v2(); }
+
+    // Проверить корректность
+    bool is_bad(const phys::Eos &eos);
+
     /// @brief В поток вывода
     friend std::ostream &operator<<(std::ostream &os, const PState &state);
-
-    PState operator+(const PState &state) {
-        return PState(this->density + state.density, 
-                      this->velocity + state.velocity,
-                      this->pressure + state.pressure,
-                      this->energy + state.energy);
-    }
-
-    PState operator-(const PState &state) {
-        return PState(this->density - state.density, 
-                      this->velocity - state.velocity,
-                      this->pressure - state.pressure,
-                      this->energy - state.energy);
-    }
 
     VECTORIZE(PState)
 };
@@ -82,6 +77,9 @@ struct QState {
     double   mass;      ///< Плотность
     Vector3d momentum;  ///< Плотность импульса:       rho * v
     double   energy;    ///< Плотность полной энергии: rho * (e + 0.5 * v^2)
+
+    /// @brief Инициализация нулями
+    QState();
 
     /// @brief Инициализация с полным заданием параметров
     QState(const double &mass, const Vector3d &momentum, const double &energy);

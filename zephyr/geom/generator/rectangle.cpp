@@ -166,7 +166,6 @@ void Rectangle::set_size(int N) {
         m_ny = int(std::round((m_ymax - m_ymin) / h));
     }
     compute_size();
-    std::cout << m_nx << " " << m_ny << " " << m_size << "\n";
 }
 
 void Rectangle::set_boundaries(Boundaries bounds) {

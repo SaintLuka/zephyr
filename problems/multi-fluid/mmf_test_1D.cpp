@@ -46,7 +46,7 @@ int main() {
     ToroTest test(2, true);
 
     // Чистые состояния слева и справа в тесте
-    double Ox = 100.0;
+    Vector3d Ox = {100.0, 0.0, 0.0};
     smf::PState zL(test.density(-Ox), test.velocity(-Ox),
                    test.pressure(-Ox), test.energy(-Ox));
 
@@ -55,7 +55,7 @@ int main() {
 
     // Вытащим УрС
     Eos::Ptr eos_L = test.get_eos(-Ox);
-    Eos::Ptr eos_R = test.get_eos(+Ox);
+    Eos::Ptr eos_R = test.get_eos( Ox);
 
     Materials mixture;
     mixture += eos_L;

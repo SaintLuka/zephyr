@@ -8,10 +8,11 @@ install(FILES
         toro.h
         test_1D.h
         sedov.h
-        quirck.h
+    shock_wave.h
         test_2D.h
-        quirck.h
+    shock_wave.h
         rarefied_water.h
+        richtmyer_meshkov.h
         supersonic_flow_around_cylinder.h
         DESTINATION
         include/${PROJECT_NAME}/phys/tests)

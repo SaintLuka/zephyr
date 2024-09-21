@@ -14,17 +14,17 @@ NumFlux::Ptr NumFlux::create(Fluxes flux) {
         case Fluxes::GODUNOV:
             return Godunov::create();
 
+        case Fluxes::RUSANOV:
+            return Rusanov::create();
+
         case Fluxes::HLL:
             return HLL::create();
 
         case Fluxes::HLLC:
             return HLLC::create();
 
-        case Fluxes::RUSANOV:
-            return Rusanov::create();
-
-        case Fluxes::HLLC_C:
-            return HLLC_C::create();
+        case Fluxes::HLLC_M:
+            return HLLC_M::create();
 
         case Fluxes::HLLC_LM:
             return HLLC_LM::create();

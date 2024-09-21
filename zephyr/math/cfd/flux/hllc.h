@@ -4,7 +4,10 @@
 
 namespace zephyr::math {
 
-///@brief Вычисление потока методом HLLC
+/// @brief Вычисление потока методом HLLC. 
+/// Используется симметричная формула, можно найти в работе.
+/// Nico Fleischmann, Stefan Adami, Nikolaus A.Adams. A shock-stable modification of the HLLC
+/// Riemann Solver with reduced numerical dissipation. Journal of Computational Physics, 2020.
 class HLLC : public NumFlux {
 public:
     /// @brief Умный указатель на класс
@@ -33,30 +36,9 @@ public:
     mmf::Flux flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) const final;
 };
 
-/// @brief Central formulation of the HLLC flux
-class HLLC_C : public NumFlux {
-public:
-    /// @brief Умный указатель на класс
-    using Ptr = std::shared_ptr<HLLC_C>;
-
-    /// @brief Создать умный указатель
-    inline static HLLC_C::Ptr create() {
-        return std::make_shared<HLLC_C>();
-    }
-
-    /// @brief Имя метода
-    std::string get_name() const final { return "HLLC_C"; }
-
-
-    /// @brief Статическая одноматериальная версия
-    static smf::Flux calc_flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos);
-
-    /// @brief Одноматериальная версия
-    smf::Flux flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) const final;
-
-};
-
 /// @brief HLLC-LM flux with low Mach number correction
+/// Nico Fleischmann, Stefan Adami, Nikolaus A.Adams. A shock-stable modification of the HLLC
+/// Riemann Solver with reduced numerical dissipation. Journal of Computational Physics, 2020.
 class HLLC_LM : public NumFlux {
 public:
     /// @brief Умный указатель на класс
@@ -68,7 +50,31 @@ public:
     }
 
     /// @brief Имя метода
-    std::string get_name() const final { return "HLLC_LM"; }
+    std::string get_name() const final { return "HLLC-LM"; }
+
+
+    /// @brief Статическая одноматериальная версия
+    static smf::Flux calc_flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos);
+
+    /// @brief Одноматериальная версия
+    smf::Flux flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) const final;
+};
+
+/// @brief HLLC-M flux (сглаживание тангенцальных компонент скорости)
+/// U.S. Vevek, B. Zang, T.H. New. A carbuncle cure for the HLLC scheme using a novel
+/// velocity-based sensor. Appl, Math. Mech. 2021. (есть ссылка на схему)
+class HLLC_M : public NumFlux {
+public:
+    /// @brief Умный указатель на класс
+    using Ptr = std::shared_ptr<HLLC_M>;
+
+    /// @brief Создать умный указатель
+    inline static HLLC_M::Ptr create() {
+        return std::make_shared<HLLC_M>();
+    }
+
+    /// @brief Имя метода
+    std::string get_name() const final { return "HLLC-M"; }
 
 
     /// @brief Статическая одноматериальная версия

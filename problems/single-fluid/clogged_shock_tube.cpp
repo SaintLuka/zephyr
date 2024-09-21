@@ -164,7 +164,7 @@ int main () {
     pvd.unique_nodes = true;
 
     // EOS
-    IdealGas eos("Air");
+    IdealGas::Ptr eos = IdealGas::create("Air");
 
     // Переменные для сохранения
     pvd.variables += {"rho", get_rho};
@@ -174,11 +174,11 @@ int main () {
     pvd.variables += {"inside", get_inside};
     pvd.variables += {"c",
                       [&eos](AmrStorage::Item& cell) -> double {
-                          return eos.sound_speed_rp(cell(U).density, cell(U).pressure);
+                          return eos->sound_speed_rp(cell(U).density, cell(U).pressure);
                       }};
     pvd.variables += {"mach", 
                       [&eos](AmrStorage::Item& cell) -> double {
-                          return abs(cell(U).velocity.x() / eos.sound_speed_rp(cell(U).density, cell(U).pressure));
+                          return abs(cell(U).velocity.x() / eos->sound_speed_rp(cell(U).density, cell(U).pressure));
                       }};
 
     // Создаем сетку
@@ -191,7 +191,7 @@ int main () {
     EuMesh mesh(U, &rect);
 
     // Создать решатель
-    auto solver = SmFluid(eos);
+    SmFluid solver(eos);
     solver.set_accuracy(2);
     solver.set_CFL(0.4);
     solver.set_method(Fluxes::HLLC);
@@ -201,7 +201,7 @@ int main () {
 
     for (int k = 0; k < mesh.max_level() + 1; ++k) {
 
-        setup_initial(mesh, u0, u3, P0, P3, rho0, rho3, l, eos);
+        setup_initial(mesh, u0, u3, P0, P3, rho0, rho3, l, *eos);
 
         for (auto &cell: mesh) {
             bool need_split = false;

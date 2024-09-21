@@ -10,7 +10,7 @@
 #include <zephyr/mesh/amr/balancing_fast.h>
 
 
-namespace zephyr { namespace mesh {
+namespace zephyr::mesh {
 
 using zephyr::utils::mpi;
 using zephyr::utils::Stopwatch;
@@ -107,5 +107,4 @@ void EuMesh::refine() {
 #endif
 }
 
-} // mesh
-} // zephyr
+} // namespace zephyr::mesh

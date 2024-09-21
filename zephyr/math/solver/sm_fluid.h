@@ -11,11 +11,12 @@ using zephyr::mesh::Cell;
 using zephyr::mesh::Mesh;
 using zephyr::mesh::Distributor;
 using zephyr::geom::Vector3d;
+using zephyr::phys::Eos;
 
 using namespace smf;
 
 /// @class Single-Material Fluid.
-/// @brief Класс решатель классической одноматериальной газодинамики
+/// @brief Решатель классической одноматериальной газодинамики
 class SmFluid {
 public:
 
@@ -24,7 +25,7 @@ public:
         double density;     ///< Плотность
         Vector3d velocity;  ///< Скорость
         double pressure;    ///< Давление
-        double energy;      ///< Энергия
+        double energy;      ///< Внутренняя энергия
 
         PState half;        ///< Состояние на полушаге
         PState next;        ///< Состояние на следующем шаге
@@ -54,7 +55,7 @@ public:
 
 
     /// @brief Конструктор класса
-    explicit SmFluid(const phys::Eos &eos);
+    explicit SmFluid(Eos::Ptr eos);
 
     /// @brief Декструктор
     ~SmFluid() = default;
@@ -87,7 +88,8 @@ public:
     void set_flags(Mesh& mesh);
 
     /// @brief Распределитель данных при адаптации
-    Distributor distributor() const;
+    /// @param type Тип "const" или "slope" переноса при разбиении
+    Distributor distributor(const std::string& type = "slope") const;
 
 private:
     /// @brief Посчитать шаг интегрирования по времени с учетом
@@ -110,7 +112,7 @@ private:
     void fluxes_stage2(Mesh &mesh);
 
 protected:
-    const phys::Eos &m_eos;  ///< Уравнение состояния
+    Eos::Ptr m_eos;          ///< Уравнение состояния
     NumFlux::Ptr m_nf;       ///< Метод расчёта потока
     int m_acc = 1;           ///< Порядок точности
     Limiter m_limiter;       ///< Ограничитель градиента

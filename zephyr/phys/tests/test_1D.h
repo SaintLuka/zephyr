@@ -11,7 +11,7 @@ using zephyr::geom::Vector3d;
 class Test1D {
 public:
     /// @brief Получить название теста
-    virtual std::string get_name() const = 0;
+    virtual std::string name() const = 0;
 
     /// @brief Левая граница области
     virtual double xmin() const = 0;
@@ -22,57 +22,26 @@ public:
     /// @brief Конечный момент времени
     virtual double max_time() const = 0;
 
-    /// @brief Получить используемый УрС
-    virtual Eos::Ptr get_eos() const = 0;
-
     /// @brief Получить положение разрыва
     virtual double get_x_jump() const = 0;
 
-
     /// @brief Начальная плотность
-    virtual double density(double x) const = 0;
+    virtual double density(const Vector3d &r) const = 0;
 
     /// @brief Начальная скорость
-    virtual Vector3d velocity(double x) const = 0;
+    virtual Vector3d velocity(const Vector3d &r) const = 0;
 
     /// @brief Начальное давление
-    virtual double pressure(double x) const = 0;
+    virtual double pressure(const Vector3d &r) const = 0;
 
     /// @brief Начальная внутренняя энергия
-    virtual double energy(double x) const = 0;
+    virtual double energy(const Vector3d &r) const = 0;
 
-    /// @brief Версия для многоматериальных
-    virtual Eos::Ptr get_eos(double x) const {
-        return get_eos();
-    }
-
-
-    /// @brief Начальная плотность
-    virtual double density(const Vector3d &r) const {
-        return density(r.x());
-    }
-
-    /// @brief Начальная скорость
-    virtual Vector3d velocity(const Vector3d &r) const {
-        return velocity(r.x());
-    }
-
-    /// @brief Начальное давление
-    virtual double pressure(const Vector3d &r) const {
-        return pressure(r.x());
-    }
-
-    /// @brief Начальная внутренняя энергия
-    virtual double energy(const Vector3d &r) const {
-        return energy(r.x());
-    }
-
-    /// @brief Версия для многоматериальных
-    virtual Eos::Ptr get_eos(const Vector3d &r) const {
-        return get_eos(r.x());
-    }
+    /// @brief Уравнение состояния
+    /// (для одноматериальных тестов не зависит от r)
+    virtual Eos::Ptr get_eos(const Vector3d &r) const = 0;
 
     virtual ~Test1D() = default;
 };
 
-}
+} // namespace zephyr::phys

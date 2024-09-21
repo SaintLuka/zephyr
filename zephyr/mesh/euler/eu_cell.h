@@ -259,6 +259,21 @@ public:
         return m_it->volume_fraction(inside, n_points);
     }
 
+    /// @brief Функция func является константой на ячейке?
+    /// @details Проверяется значение функции в узлах и в центре ячейки,
+    /// если все значения совпадают, то считается, что функция принимает
+    /// постоянное значение в пределах ячейки.
+    inline bool const_function(const std::function<double(const Vector3d&)>& func) const {
+        return m_it->const_function(func);
+    }
+
+    /// @brief Интеграл скалярной функции по ячейке
+    /// @param n Разбиение по сторонам
+    /// @details Сумма по барицентрам 2-го порядка (low accuracy order)
+    inline double integrate_low(const std::function<double(const Vector3d&)>& func, int n) const {
+        return m_it->integrate_low(func, n);
+    }
+
 
     // Функции для дебага
 

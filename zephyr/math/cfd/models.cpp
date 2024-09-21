@@ -49,11 +49,25 @@ PState PState::in_global(const Vector3d &normal) const {
     return z;
 }
 
+bool PState::is_bad(const phys::Eos &eos) {
+    if (std::isnan(density) || std::isnan(pressure) || std::isnan(energy)) {
+        return true;
+    }
+    return density <= 0.0 || pressure < eos.min_pressure();
+}
+
 std::ostream &operator<<(std::ostream &os, const PState &state) {
     os << "density: " << state.density << " velocity: {" << state.velocity.x() << ", " << state.velocity.y() << ", "
        << state.velocity.z() <<
        "} pressure: " << state.pressure << " energy: " << state.energy;
     return os;
+}
+
+QState::QState()
+    : mass(0.0),
+      momentum({0.0, 0.0, 0.0}),
+      energy(0.0) {
+
 }
 
 QState::QState(const double &mass, const Vector3d &momentum, const double &energy)

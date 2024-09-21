@@ -81,6 +81,17 @@ public:
     /// inside, погрешность определения объемной доли ~ 1/N.
     double volume_fraction(const std::function<double(const Vector3d &)> &inside, int n_points) const;
 
+    /// @brief Функция func является константой на ячейке?
+    /// @details Проверяется значение функции в узлах и в центре ячейки,
+    /// если все значения совпадают, то считается, что функция принимает
+    /// постоянное значение в пределах ячейки.
+    bool const_function(const std::function<double(const Vector3d&)>& func) const;
+
+    /// @brief Интеграл скалярной функции по ячейке
+    /// @param n Разбиение по сторонам
+    /// @details Сумма по барицентрам 2-го порядка (low accuracy order)
+    double integrate_low(const std::function<double(const Vector3d&)>& func, int n) const;
+
     /// @brief Помечает индексы в массиве nodes. Выставляет индексы актуальных
     /// вершин равными flag, для остальных вершин выставляет значение -1.
     /// Актуальными считаем вершины, на которые ссылаются грани.

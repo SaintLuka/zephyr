@@ -1,12 +1,7 @@
 set(CLOGGED_SHOCK_TUBE 1)
-
+set(SMF_FLOW_AROUND    1)
 set(SMF_TEST_1D        1)
 set(SMF_TEST_2D        1)
-
-#set(R_TESTER    1)
-#set(RIEMANN     1)
-#set(TESTS2D     1)
-
 
 if (CLOGGED_SHOCK_TUBE)
     message(STATUS "Build clogged shock tube test")
@@ -14,6 +9,14 @@ if (CLOGGED_SHOCK_TUBE)
     target_link_directories(clogged-shock-tube PUBLIC zephyr)
     target_link_libraries(clogged-shock-tube PUBLIC zephyr)
     install(TARGETS clogged-shock-tube DESTINATION problems/single-fluid)
+endif()
+
+if (SMF_FLOW_AROUND)
+    message(STATUS "Build single fluid flow around test")
+    add_executable(smf-flow-around smf_flow_around.cpp)
+    target_link_directories(smf-flow-around PUBLIC zephyr)
+    target_link_libraries(smf-flow-around PUBLIC zephyr)
+    install(TARGETS smf-flow-around DESTINATION problems/single-fluid)
 endif()
 
 if (SMF_TEST_1D)

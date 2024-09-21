@@ -9,6 +9,8 @@ namespace zephyr::phys {
 
 using zephyr::geom::Vector3d;
 
+/// @brief Тест с разреженной водой.
+/// Отрицательное начальное давление воды, контакт с газом.
 class RarefiedWater : public Test1D {
 public:
     StiffenedGas::Ptr water;  ///< УрС воды
@@ -52,7 +54,7 @@ public:
         uR *= -1.0;
     }
 
-    std::string get_name() const final { return "Rarefied water";}
+    std::string name() const final { return "Rarefied water";}
 
     /// @brief Левая граница области
     double xmin() const final { return 0.0; }
@@ -63,67 +65,34 @@ public:
     /// @brief Конечный момент времени
     double max_time() const final { return finish; }
 
-    ///@brief Получить используемый УрС
-    Eos::Ptr get_eos() const final { return get_eos(-1.0); }
-
     ///@brief Получить положение разрыва
     double get_x_jump() const final { return x_jump; }
 
 
     /// @brief Начальная плотность
-    double density(double x) const final {
-        return x < x_jump ? rL : rR;
-    }
-
-    /// @brief Начальная скорость
-    Vector3d velocity(double x) const final {
-        return { x < x_jump ? uL : uR, 0, 0};
-    }
-
-    /// @brief Начальное давление
-    double pressure(double x) const final {
-        return x < x_jump ? pL : pR;
-    }
-
-    /// @brief Начальная внутренняя энергия
-    double energy(double x) const final {
-        return x < x_jump ? eL : eR;
-    }
-
-    /// @brief Версия для многоматериальных
-    Eos::Ptr get_eos(double x) const final {
-        return x < x_jump ? (Eos::Ptr) water : (Eos::Ptr) air;
-    }
-
-
-    /// @brief Начальная плотность
     double density(const Vector3d& r) const final {
-        return density(r.x());
+        return r.x() < x_jump ? rL : rR;
     }
 
     /// @brief Начальная скорость
     Vector3d velocity(const Vector3d& r) const final {
-        return velocity(r.x());
+        return { r.x() < x_jump ? uL : uR, 0, 0};
     }
 
     /// @brief Начальное давление
     double pressure(const Vector3d& r) const final {
-        return pressure(r.x());
+        return r.x() < x_jump ? pL : pR;
     }
 
     /// @brief Начальная внутренняя энергия
     double energy(const Vector3d& r) const final {
-        return energy(r.x());
+        return r.x() < x_jump ? eL : eR;
     }
 
-    /// @brief Версия для многоматериальных
-    Eos::Ptr get_eos(const Vector3d &r) const {
-        return get_eos(r.x());
+    /// @brief Уравнение состояния
+    Eos::Ptr get_eos(const Vector3d& r) const final {
+        return r.x() < x_jump ? (Eos::Ptr) water : (Eos::Ptr) air;
     }
-
-    ~RarefiedWater() final = default;
-
 };
 
-}
-
+} // namespace zephyr::phys

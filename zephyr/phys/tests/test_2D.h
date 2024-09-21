@@ -11,14 +11,16 @@ using zephyr::geom::Vector3d;
 using zephyr::geom::Boundary;
 using zephyr::geom::generator::Rectangle;
 
+/// @brief Двумерный распад разрыва.
+/// Ссылка на статью???
 class Test2D {
 public:
 
-    IdealGas eos;   ///< Используемый УрС
-    double x_jump;  ///< Положение разрыва
-    double y_jump;
+    IdealGas::Ptr eos;  ///< Используемый УрС
+    double x_jump;      ///< Положение разрыва
+    double y_jump;      ///< Положение разрыва
 
-    double finish;  ///< Конечный момент времени
+    double finish;      ///< Конечный момент времени
     
     double r1, r2, r3, r4;  ///< Плотность
     double u1, u2, u3, u4;  ///< Скорость x
@@ -26,11 +28,13 @@ public:
     double p1, p2, p3, p4;  ///< Давление
     double e1, e2, e3, e4;  ///< Внутренняя энергия
 
-    Rectangle m_gen;        ///< Сеточный генератора
+    Rectangle generator;    ///< Сеточный генератор
 
 
     /// @brief Конструктор
-    explicit Test2D (int testCase) : eos(1.4) {
+    explicit Test2D (int testCase) {
+        eos = IdealGas::create(1.4);
+
         switch (testCase)
         {
         case 1: {
@@ -91,25 +95,16 @@ public:
         y_jump = 0.5;
         x_jump = 0.5;
 
-        m_gen = Rectangle(0.0, 1.0, 0.0, 1.0);
-        m_gen.set_boundaries({.left=Boundary::ZOE, .right=Boundary::ZOE,
-                              .bottom=Boundary::ZOE, .top=Boundary::ZOE});
+        generator = Rectangle(0.0, 1.0, 0.0, 1.0);
+        generator.set_boundaries({.left=Boundary::ZOE, .right=Boundary::ZOE,
+                                  .bottom=Boundary::ZOE, .top=Boundary::ZOE});
     };
 
     /// @brief Название теста
-    std::string get_name() const { return "2D Riemann Test";}
-
-    /// @brief Сеточный генератор
-    Rectangle generator() const {
-        return m_gen;
-    }
+    std::string name() const { return "2D Riemann Test";}
 
     /// @brief Конечный момент времени
     double max_time() const { return finish; }
-
-    ///@brief Получить используемый УрС
-    const Eos& get_eos() const { return eos; }
-
 
     /// @brief Начальная плотность
     double density(const Vector3d &vec) const {
@@ -149,8 +144,12 @@ public:
 
     /// @brief Начальная внутренняя энергия
     double energy(const Vector3d &r) const { 
-        return eos.energy_rp(density(r), pressure(r));
+        return eos->energy_rp(density(r), pressure(r));
     };
+
+    Eos::Ptr get_eos(const Vector3d& r) const {
+        return eos;
+    }
 
     ~Test2D() = default;
 };

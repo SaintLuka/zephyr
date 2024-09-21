@@ -13,7 +13,7 @@ enum class Fluxes {
     RUSANOV,
     HLL,
     HLLC,
-    HLLC_C,
+    HLLC_M,
     HLLC_LM,
     CIR1,
     CIR2

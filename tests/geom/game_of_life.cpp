@@ -55,7 +55,7 @@ void update(EuMesh& mesh) {
 }
 
 int main() {
-    PvdFile pvd("life", "/mnt/d/out");
+    PvdFile pvd("life", "out");
     pvd.variables += {"u", [](AmrStorage::Item& cell) -> double { return cell(U).u1; }};
 
     Rectangle rect(0.0, 1.0, 0.0, 1.0);

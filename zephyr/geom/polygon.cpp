@@ -714,6 +714,59 @@ Vector3d Polygon::disk_clip_normal(const Vector3d& c, double R) const {
     return {std::cos(phi), std::sin(phi), 0.0};
 }
 
+double Polygon::volume_fraction(
+        const std::function<bool(const Vector3d&)>& inside,
+        int n_points) const {
+    int n = std::max(n_points / size(), 1);
+    double res = 0.0;
+    for (int i = 0; i < size(); ++i) {
+        int j = (i + 1) % size();
+        Triangle tri(vs[i], vs[j], m_center);
+        res += tri.volume_fraction(inside, n) * tri.area();
+    }
+    return res / area();
+}
+
+double Polygon::integrate_low(const std::function<double(const Vector3d&)>& func, int n) const {
+    double res = 0.0;
+    for (int i = 0; i < size(); ++i) {
+        int j = (i + 1) % size();
+        Triangle tri(vs[i], vs[j], m_center);
+        res += tri.integrate_low(func, n);
+    }
+    return res;
+}
+
+double Polygon::integrate_mid(const std::function<double(const Vector3d&)>& func, int n) const {
+    double res = 0.0;
+    for (int i = 0; i < size(); ++i) {
+        int j = (i + 1) % size();
+        Triangle tri(vs[i], vs[j], m_center);
+        res += tri.integrate_mid(func, n);
+    }
+    return res;
+}
+
+double Polygon::integrate_high(const std::function<double(const Vector3d&)>& func, int n) const {
+    double res = 0.0;
+    for (int i = 0; i < size(); ++i) {
+        int j = (i + 1) % size();
+        Triangle tri(vs[i], vs[j], m_center);
+        res += tri.integrate_high(func, n);
+    }
+    return res;
+}
+
+double Polygon::integrate_extra(const std::function<double(const Vector3d&)>& func, int n) const {
+    double res = 0.0;
+    for (int i = 0; i < size(); ++i) {
+        int j = (i + 1) % size();
+        Triangle tri(vs[i], vs[j], m_center);
+        res += tri.integrate_extra(func, n);
+    }
+    return res;
+}
+
 std::ostream& operator<<(std::ostream& os, const Polygon& poly) {
     if (poly.empty()) {
         os << "{ }";

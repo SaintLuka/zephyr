@@ -493,7 +493,7 @@ int main() {
 
         plt::loglog(hs, gauss, {{"color", "blue"}, {"label", "Гаусс"}, {"marker", "o"}});
         plt::loglog(hs, lsm_old, {{"color", "green"}, {"label", "МНК"}, {"marker", "o"}});
-        plt::loglog(hs, lsm_new, {{"color", "orange"}, {"label", "МНК+"}, {"marker", "o"}});
+        plt::loglog(hs, lsm_new, {{"color", "orange"}, {"label", "сМНК"}, {"marker", "o"}});
 
         plt::legend();
 

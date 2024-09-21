@@ -4,8 +4,6 @@
 #include <zephyr/math/cfd/models.h>
 #include <zephyr/math/cfd/limiter.h>
 
-#include <iomanip>
-
 namespace zephyr::math {
 
 using namespace geom;
@@ -20,10 +18,10 @@ SmFluid::State SmFluid::datatype() {
     return {};
 }
 
-SmFluid::SmFluid(const phys::Eos &eos) : m_eos(eos) {
+SmFluid::SmFluid(Eos::Ptr eos) : m_eos(eos) {
     m_nf = HLLC::create();
     m_CFL = 0.5;
-    m_limiter = Limiter("van Albada");
+    m_limiter = Limiter("MC");
     m_dt = NAN;
     m_max_dt = std::numeric_limits<double>::max();
 }
@@ -56,7 +54,7 @@ void SmFluid::set_max_dt(double dt) {
     m_max_dt = dt;
 }
 
-smf::PState get_current_sm(Cell &cell) {
+PState get_current_sm(Cell &cell) {
     return cell(U).get_state();
 }
 
@@ -96,7 +94,7 @@ void SmFluid::compute_dt(Mesh &mesh) {
         double dt = std::numeric_limits<double>::infinity();
 
         // скорость звука
-        double c = m_eos.sound_speed_rp(cell(U).density, cell(U).pressure);
+        double c = m_eos->sound_speed_rp(cell(U).density, cell(U).pressure);
 
         for (auto &face: cell.faces()) {
             // Нормальная составляющая скорости
@@ -113,6 +111,18 @@ void SmFluid::compute_dt(Mesh &mesh) {
     });
 
     m_dt = std::min(m_CFL * dt, m_max_dt);
+}
+
+void SmFluid::compute_grad(Mesh &mesh, const std::function<smf::PState(Cell &)> &get_state)  {
+    mesh.for_each([this, &get_state](Cell &cell) {
+        //auto grad = gradient::gauss<smf::PState>(cell, get_state, boundary_value);
+        auto grad = gradient::LSM<smf::PState>(cell, get_state, boundary_value);
+        grad = gradient::limiting<smf::PState>(cell, m_limiter, grad, get_state, boundary_value);
+
+        cell(U).d_dx = grad.x;
+        cell(U).d_dy = grad.y;
+        cell(U).d_dz = grad.z;
+    });
 }
 
 void SmFluid::fluxes(Mesh &mesh) {
@@ -144,7 +154,7 @@ void SmFluid::fluxes(Mesh &mesh) {
             PState zp = z_n.in_local(normal);
 
             // Численный поток на грани
-            Flux loc_flux = m_nf->flux(zm, zp, m_eos);
+            Flux loc_flux = m_nf->flux(zm, zp, *m_eos);
             loc_flux.to_global(normal);
 
             // Суммируем поток
@@ -155,20 +165,7 @@ void SmFluid::fluxes(Mesh &mesh) {
         q_c.arr() -= (m_dt / cell.volume()) * flux.arr();
 
         // Новое значение примитивных переменных
-        cell(U).next = PState(q_c, m_eos);
-    });
-}
-
-void SmFluid::compute_grad(Mesh &mesh, const std::function<smf::PState(Cell &)> &get_state)  {
-    mesh.for_each([this, &get_state](Cell &cell) {
-        //auto grad = gradient::gauss<smf::PState>(cell, get_state, boundary_value);
-        auto grad = gradient::LSM_orig<smf::PState>(cell, get_state, boundary_value);
-
-        //grad = gradient::limiting_orig<smf::PState>(cell, m_limiter, grad, get_state, boundary_value);
-
-        cell(U).d_dx = grad.x;
-        cell(U).d_dy = grad.y;
-        cell(U).d_dz = grad.z;
+        cell(U).next = PState(q_c, *m_eos);
     });
 }
 
@@ -205,7 +202,7 @@ void SmFluid::fluxes_stage1(Mesh &mesh)  {
                 z_n = boundary_value(z_c, normal, face.flag());
             }
 
-            auto face_extra = FaceExtra::ATvL(
+            auto face_extra = FaceExtra::Direct(
                     z_c, cell(U).d_dx, cell(U).d_dy, cell(U).d_dz,
                     z_n, neib(U).d_dx, neib(U).d_dy, neib(U).d_dz,
                     cell_c, neib_c, face_c);
@@ -213,17 +210,11 @@ void SmFluid::fluxes_stage1(Mesh &mesh)  {
             // Интерполяция на грань со стороны ячейки
             PState zm = face_extra.m(z_c);
 
-            if (false && zm.pressure < 0.0) {
-                std::cout << "Predictor\n";
-                std::cout << "cell.id: " << cell.b_idx() << "\n";
-                std::cout << "  P: " << cell(U).pressure << "\n";
-                std::cout << "  dP/dx: " << cell(U).d_dx.pressure << "\n";
-                std::cout << "  P-: " << cell(U).pressure + cell(U).d_dx.pressure * (cell.vs<-1, 0>() - cell.center()).x() << "\n";
-                std::cout << "  P+: " << cell(U).pressure + cell(U).d_dx.pressure * (cell.vs<+1, 0>() - cell.center()).x() << "\n";
-            }
-
             // Восстанавливаем после интерполяции
-            zm.energy = m_eos.energy_rp(zm.density, zm.pressure);
+            zm.energy = m_eos->energy_rp(zm.density, zm.pressure);
+
+            // При некорректной интерполяции
+            if (zm.is_bad(*m_eos)) { zm = z_c; }
 
             // Переводим в локальную систему координат
             zm.to_local(normal);
@@ -240,7 +231,7 @@ void SmFluid::fluxes_stage1(Mesh &mesh)  {
         q_c.arr() -= (0.5 * m_dt / cell.volume()) * flux.arr();
 
         // Значение примитивных переменных на полушаге
-        cell(U).half = PState(q_c, m_eos);
+        cell(U).half = PState(q_c, *m_eos);
     });
 }
 
@@ -283,7 +274,7 @@ void SmFluid::fluxes_stage2(Mesh &mesh)  {
             }
 
             // Параметры интерполяции с предыдущего (!) слоя
-            auto face_extra = FaceExtra::ATvL(
+            auto face_extra = FaceExtra::Direct(
                     z_c, cell(U).d_dx, cell(U).d_dy, cell(U).d_dz,
                     z_n, neib(U).d_dx, neib(U).d_dy, neib(U).d_dz,
                     cell_c, neib_c, face_c);
@@ -292,7 +283,10 @@ void SmFluid::fluxes_stage2(Mesh &mesh)  {
             PState zm = face_extra.m(z_ch);
 
             // Восстанавливаем после интерполяции
-            zm.energy = m_eos.energy_rp(zm.density, zm.pressure);
+            zm.energy = m_eos->energy_rp(zm.density, zm.pressure);
+
+            // При некорректной интерполяции
+            if (zm.is_bad(*m_eos)) { zm = z_ch; }
 
             // Интерполяция на грань со стороны соседа
             PState zp;
@@ -300,31 +294,13 @@ void SmFluid::fluxes_stage2(Mesh &mesh)  {
                 zp = face_extra.p(z_nh);
 
                 // Восстанавливаем после интерполяции
-                zp.energy = m_eos.energy_rp(zp.density, zp.pressure);
+                zp.energy = m_eos->energy_rp(zp.density, zp.pressure);
+
+                // При некорректной интерполяции
+                if (zp.is_bad(*m_eos)) { zp = z_nh; }
             }
             else {
                 zp = boundary_value(zm, normal, face.flag());
-            }
-            if (false && zm.pressure < 0.0 || zp.pressure < 0.0) {
-                std::cout << "Corrector\n";
-                std::cout << "h: " << (neib.center() - cell.center()).norm() << "\n";
-                std::cout << "dxl: " << (cell.vs<-1, 0>() - cell.center()).x() << "\n";
-                std::cout << "dxr: " << (cell.vs<+1, 0>() - cell.center()).x() << "\n";
-
-                std::cout << "cell.id: " << cell.b_idx() << "\n";
-                std::cout << "  P: " << cell(U).half.pressure << "\n";
-                std::cout << "  dP/dx: " << cell(U).d_dx.pressure << "\n";
-                std::cout << "  Pl: " << cell(U).half.pressure + cell(U).d_dx.pressure * (cell.vs<-1, 0>() - cell.center()).x() << "\n";
-                std::cout << "  Pr: " << cell(U).half.pressure + cell(U).d_dx.pressure * (cell.vs<+1, 0>() - cell.center()).x() << "\n";
-
-                std::cout << "neib.id: " << neib.b_idx() << "\n";
-                std::cout << "  P: " << neib(U).half.pressure << "\n";
-                std::cout << "  dP/dx: " << neib(U).d_dx.pressure << "\n";
-                std::cout << "  Pl: " << neib(U).half.pressure + neib(U).d_dx.pressure * (neib.vs<-1, 0>() - neib.center()).x() << "\n";
-                std::cout << "  Pr: " << neib(U).half.pressure + neib(U).d_dx.pressure * (neib.vs<+1, 0>() - neib.center()).x() << "\n";
-
-                std::cout << "zm: " << zm << "\n";
-                std::cout << "zp: " << zp << "\n";
             }
 
             // Переводим в локальную систему координат
@@ -332,7 +308,7 @@ void SmFluid::fluxes_stage2(Mesh &mesh)  {
             zp.to_local(normal);
 
             // Численный поток на грани
-            auto loc_flux = m_nf->flux(zm, zp, m_eos);
+            auto loc_flux = m_nf->flux(zm, zp, *m_eos);
             loc_flux.to_global(normal);
 
             // Суммируем поток
@@ -342,8 +318,8 @@ void SmFluid::fluxes_stage2(Mesh &mesh)  {
         // Обновляем значение в ячейке (консервативные переменные)
         q_c.arr() -= (m_dt / cell.volume()) * flux.arr();
 
-        // Значение примитивных переменных на полушаге
-        cell(U).next = PState(q_c, m_eos);
+        // Значение примитивных переменных на новом слое
+        cell(U).next = PState(q_c, *m_eos);
     });
 }
 
@@ -353,70 +329,98 @@ void SmFluid::swap(Mesh &mesh) {
     });
 }
 
-Distributor SmFluid::distributor() const {
+Distributor SmFluid::distributor(const std::string& type) const {
+    if (type != "const" && type != "slope") {
+        throw std::runtime_error("SmFluid error: unknown distributor type '" + type + "'");
+    }
+    
+    using mesh::Children;
+    
     Distributor distr;
 
-    distr.split = [this](AmrStorage::Item &parent, mesh::Children &children) {
-
+    // Консервативное суммирование
+    distr.merge = [this](Children &children, AmrStorage::Item &parent) {
+        QState q_p;
         for (auto &child: children) {
+            QState q_ch(child(U).get_state());
+            q_p.arr() += q_ch.arr() * child.volume();
+        }
+        q_p.arr() /= parent.volume();
+        PState z_p(q_p, *m_eos);
+        parent(U).set_state(z_p);
+    };
 
+    // Снос копированием
+    auto split_const = [this](AmrStorage::Item &parent, Children &children) {
+        PState z_p = parent(U).get_state();
+        for (auto &child: children) {
+            child(U).set_state(z_p);
+        }
+    };
+    
+    // Снос по градиентам
+    auto split_slope = [this](AmrStorage::Item &parent, Children &children) {
+        PState z_p = parent(U).get_state();
+        PState& d_dx = parent(U).d_dx;
+        PState& d_dy = parent(U).d_dy;
+        PState& d_dz = parent(U).d_dz;
+
+        auto P = m_eos->pressure_re(z_p.density, z_p.energy, {.deriv = true});
+
+        Vector3d grad_e = {
+                (d_dx.pressure - P.dR * d_dx.density) / P.dE,
+                (d_dy.pressure - P.dR * d_dy.density) / P.dE,
+                (d_dz.pressure - P.dR * d_dz.density) / P.dE
+        };
+
+        bool bad_grad = false;
+        for (auto &child: children) {
             Vector3d dr = child.center - parent.center;
 
-            // PState child_state = parent(U).get_state().arr() +
-            //                      parent(U).d_dx.arr() * dr.x() +
-            //                      parent(U).d_dy.arr() * dr.y() +
-            //                      parent(U).d_dz.arr() * dr.z();
-            // child_state.energy = m_eos.energy_rp(child_state.density, child_state.pressure);
-            // child(U).set_state(child_state);
+            PState z_ch = parent(U).get_state();
 
-            PState child_state;
-            child_state.density = parent(U).density +
-                                    parent(U).d_dx.density * dr.x() +
-                                    parent(U).d_dy.density * dr.y() +
-                                    parent(U).d_dz.density * dr.z(); 
-            
-            child_state.velocity = parent(U).velocity +
-                                   (parent(U).density / child_state.density) * (
-                                        parent(U).d_dx.velocity * dr.x() +
-                                        parent(U).d_dy.velocity * dr.y() +
-                                        parent(U).d_dz.velocity * dr.z()
-                                    );
+            z_ch.density = z_p.density +
+                           d_dx.density * dr.x() +
+                           d_dy.density * dr.y() +
+                           d_dz.density * dr.z();
 
-            zephyr::phys::dRdE rhoe = m_eos.pressure_re(parent(U).density, parent(U).energy, {.deriv = true});
+            z_ch.velocity = z_p.velocity +
+                            (z_p.density / z_ch.density) * (
+                                    d_dx.velocity * dr.x() +
+                                    d_dy.velocity * dr.y() +
+                                    d_dz.velocity * dr.z()
+                            );
 
-            child_state.energy = parent(U).energy -
-                                    0.5 * (parent(U).velocity - child_state.velocity).squaredNorm() +
-                                 (parent(U).density / child_state.density) * (
-                                            (parent(U).d_dx.pressure - rhoe.dR * parent(U).d_dx.density) / rhoe.dE * dr.x() + 
-                                            (parent(U).d_dy.pressure - rhoe.dR * parent(U).d_dy.density) / rhoe.dE * dr.y() +
-                                            (parent(U).d_dz.pressure - rhoe.dR * parent(U).d_dz.density) / rhoe.dE * dr.z()
-                                        );
-            
-            child_state.pressure = m_eos.pressure_re(child_state.density, child_state.energy);
+            z_ch.energy = z_p.energy - 0.5 * (z_p.velocity - z_ch.velocity).squaredNorm() +
+                          (z_p.density / z_ch.density) * grad_e.dot(dr);
 
-            child(U).set_state(child_state);
+            z_ch.pressure = m_eos->pressure_re(z_ch.density, z_ch.energy);
+
+            if (z_ch.is_bad(*m_eos)) {
+                bad_grad = true;
+                break;
+            }
+
+            child(U).set_state(z_ch);
         }
 
-        // PState pc(0, {0,0,0}, 0, 0);
-        // QState qc(pc);
-
-        // for (auto &child: children) {
-        //     QState qs(child(U).get_state());
-        //     qc.arr() += qs.arr() * child.volume();
-        // }
-
-        // std::cout << std::setprecision(18) << QState(parent(U).get_state()).arr() * parent.volume()
-        //           << "\n" << std::setprecision(18) << qc << "\n" << std::endl; 
-    };
-
-    distr.merge = [this](mesh::Children &children, AmrStorage::Item &parent) {
-        PState sum;
-        for (auto &child: children) {
-            sum.arr() += child(U).get_state().arr() * child.volume();
+        // Не удалось сделать интерполяцию в одну из дочерних ячеек,
+        // выполняем простой перенос
+        if (bad_grad) {
+            for (auto &child: children) {
+                child(U).set_state(z_p);
+            }
         }
-        parent(U).set_state(sum.arr() / parent.volume());
-        parent(U).energy = m_eos.energy_rp(parent(U).density, parent(U).pressure);
     };
+    
+    if (type == "const") {
+        // Снос копированием
+        distr.split = split_const;
+    }
+    else {
+        // Снос по градиентам
+        distr.split = split_slope;
+    }
 
     return distr;
 }
@@ -426,33 +430,42 @@ void SmFluid::set_flags(Mesh &mesh) {
         return;
     }
 
+    
     compute_grad(mesh, get_current_sm);
 
-    for (auto cell: mesh) {
-        
-        if (cell.flag() == 2)
-            continue;
+    // Пороги (относительные) на разбиение
+    const double xi_dens = 0.05;
+    const double xi_pres = 0.05;
 
-        double p = cell(U).pressure;
-        bool need_split = false;
+    for (auto cell: mesh) {
+        //cell.set_flag(1); continue;
+        cell.set_flag(-1);
+
+        double dens = cell(U).density;
+        double pres = cell(U).pressure;
+
+        double dens_split = xi_dens * std::abs(dens);
+        double pres_split = xi_pres * std::abs(pres);
+
         for (auto face: cell.faces()) {
             if (face.is_boundary()) {
                 continue;
             }
 
-            // проверяем большой перепад давлений
-            PState t = face.neib(U).get_state() - cell(U).get_state();
-            if (abs(t.density) > 0.2 * abs(cell(U).density) || // 0.1
-                abs(t.pressure) > 0.5 * abs(cell(U).pressure))    // 0.3
-                {
-                    need_split = true;
-                    break;
-                }
-        }
-        if (need_split) {
-            cell.set_flag(1);
-        } else {
-            cell.set_flag(-1);
+            auto& zn = face.neib(U);
+
+            // Большой перепад плотностей или давлений
+            if (std::abs(zn.density  - dens) > dens_split ||
+                std::abs(zn.pressure - pres) > pres_split) {
+                cell.set_flag(1);
+                break;
+            }
+
+            // Пороги минимум в два раза меньше
+            if (std::abs(zn.density  - dens) > 0.4 * dens_split ||
+                std::abs(zn.pressure - pres) > 0.4 * pres_split) {
+                cell.set_flag(0);
+            }
         }
     }
 }

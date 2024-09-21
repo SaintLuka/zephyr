@@ -148,6 +148,34 @@ public:
     /// окружность пересекает многоугольник, нулевая нормаль в остальных случаях.
     Vector3d disk_clip_normal(const Vector3d& c, double R) const;
 
+    /// @brief Посчитать объемную долю, которая отсекается от ячейки некоторым
+    /// телом, точки которого определяются характеристической функцией inside
+    /// @param inside Характеристическая функция: true, если точка находится
+    /// внутри тела, иначе false
+    /// @param n_points Число тестовых точек, погрешность ~ 1/N.
+    double volume_fraction(const std::function<bool(const Vector3d&)>& inside,
+                           int n_points = 10000) const;
+
+    /// @brief Интеграл скалярной функции по полигону элементу
+    /// @param n Разбиение по сторонам
+    /// @details Сумма по барицентрам 2-го порядка (low accuracy order)
+    double integrate_low(const std::function<double(const Vector3d&)>& func, int n) const;
+
+    /// @brief Интеграл скалярной функции по треугольному элементу
+    /// @param n Разбиение по сторонам
+    /// @details Формула 3-го порядка по 6 узлам (middle accuracy order)
+    double integrate_mid(const std::function<double(const Vector3d&)>& func, int n) const;
+
+    /// @brief Интеграл скалярной функции по треугольному элементу
+    /// @param n Разбиение по сторонам
+    /// @details Формула 6-го порядка по 12 узлам (high accuracy order)
+    double integrate_high(const std::function<double(const Vector3d&)>& func, int n) const;
+
+    /// @brief Интеграл скалярной функции по треугольному элементу
+    /// @param n Разбиение по сторонам
+    /// @details Формула 13-го порядка по 37 узлам (extra-high  accuracy order)
+    double integrate_extra(const std::function<double(const Vector3d&)>& func, int n) const;
+
 protected:
     /// @brief Пересчитывает центр полигона
     void setup_center();
