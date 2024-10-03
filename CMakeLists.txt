@@ -11,7 +11,7 @@ if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-option(ZEPHYR_ENABLE_MPI      "Use MPI functions" OFF)
+option(ZEPHYR_ENABLE_MPI      "Use MPI functions" ON)
 option(ZEPHYR_ENABLE_YAML     "YAML support"      OFF)
 option(ZEPHYR_ENABLE_EIGEN    "Use Eigen library" ON)
 option(ZEPHYR_ENABLE_TESTS    "Build tests"       ON)

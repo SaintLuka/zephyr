@@ -59,8 +59,8 @@ int main() {
 
     // Сеточный генератор
     //Cuboid gen(0.0, 1.0, 0.0, 0.6, 0.0, 0.9);
-    Rectangle gen(0.0, 1.0, 0.0, 0.6);
-    gen.set_nx(200);
+    Rectangle gen(0.0, 1.0, 0.0, 1.0);
+    gen.set_nx(4);
 
     // Bounding Box для сетки
     Box domain = gen.bbox();
@@ -76,9 +76,7 @@ int main() {
     mesh.add_decomposition(orb, false);
 
     // Распределить ячейки))
-    mesh.redistribute();
-
-
+    mesh.redistribute();    
 
 
     // Дальше простая схема, ничего интересного
@@ -100,7 +98,8 @@ int main() {
 
     while(curr_time <= 1.0) {
         if (curr_time >= next_write) {
-            std::cout << "\tШаг: " << std::setw(6) << n_step << ";"
+            std::cout << "\tРанг: " << mpi::rank() << ";"
+                      << "\tШаг: " << std::setw(6) << n_step << ";"
                       << "\tВремя: " << std::setw(6) << std::setprecision(3) << curr_time << "\n";
             pvd.save(mesh.locals(), curr_time);
             next_write += 0.02;

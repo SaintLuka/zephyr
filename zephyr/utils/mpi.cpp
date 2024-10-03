@@ -4,6 +4,7 @@ namespace zephyr::utils {
 
 #ifdef ZEPHYR_ENABLE_MPI
 
+
 static int g_size = -1;
 static int g_rank = -1;
 

@@ -39,7 +39,7 @@ void EuMesh::redistribute() {
         // Важные поля
         cell.rank;
         cell.index;
-// [?] почему после migrate()?
+
         for (auto& face: cell.faces) {
             // Часть граней пустые, там резервное место
             if (face.is_undefined()) {
@@ -73,18 +73,12 @@ void EuMesh::redistribute() {
     }
 
 
-    migrate();
     build_aliens();
+    //migrate();
 }
 
 void EuMesh::exchange() {
 
-}
-
-// [!] хардкодная рандомная функция реранка
-void rerank(zephyr::geom::AmrCell& cell){
-    int size = mpi::size();
-    cell.rank = cell.index % size;
 }
 
 void EuMesh::migrate() {
@@ -94,19 +88,18 @@ void EuMesh::migrate() {
     std::vector<int> m_i(size, 0);
     // По некоторому правилу определяется новый rank для всех ячеек из массива locals
     for (auto& cell: m_locals){
-        rerank(cell);
+        m_decomp->rank(cell);
         // Подсчитываем число ячеек, которые должны быть перемещены с данного процесса на другие
         ++m_i[cell.rank];
     }
 
-    // [?] Надеюсь, это правильно
-    std::vector<int> m = mpi::all_gather(m_i);
+    std::vector<int> m = mpi::all_gather_vectors(m_i);
 
     // Переиндексируем локальные ячейки
     std::vector<int> m_sum(size, 0);
-    for(int i = 0; i < rank - 1; ++i)
+    for(int i = 0; i < rank; ++i)
         for(int s = 0; s < size; ++s)
-            m_sum[s] += m[s][i];
+            m_sum[s] += m[size * i + s];
 
     for (auto& cell: m_locals)
         cell.index = m_sum[cell.rank]++;
@@ -119,21 +112,21 @@ void EuMesh::migrate() {
 void EuMesh::build_aliens() {
     int size = mpi::size();
     int rank = mpi::rank();
+
     // Выделяем память
     // [!] думаю, нужно перенести этот код, чтобы он выполнялся единожды
-    m_tourism.m_border_indices.resize(size);
+    m_tourism.m_border_indices.resize(size, std::vector<int>());
     m_tourism.m_count_to_send.resize(size);
+    m_tourism.m_count_to_recv.resize(size);
     m_tourism.m_send_offsets.resize(size, 0);
     m_tourism.m_recv_offsets.resize(size, 0);
 
     // Заполняем m_border_indices
-    for (auto& cell: m_locals) {
-        for (auto& face: cell.faces) {
-            auto& border_indices = m_tourism.m_border_indices[face.adjacent.rank];
-            if(face.adjacent.rank != rank && (border_indices.empty() || border_indices.back() != cell.index)){
-                // [!?] вместо push_back лучше заранее зарезервировать память m_border_indices и использовать присвоение
-                m_tourism.m_border_indices[face.adjacent.rank].push_back(cell.index);
-            }
+    for (auto cell: *this) {
+        for (auto face: cell.faces()) {
+            auto& border_indices = m_tourism.m_border_indices[face.adjacent().rank];
+            if(face.adjacent().rank != rank && (border_indices.empty() || border_indices.back() != cell.geom().index))
+                border_indices.push_back(cell.geom().index);
         }
     }
 
@@ -145,12 +138,7 @@ void EuMesh::build_aliens() {
         m_tourism.m_send_offsets[r] = m_tourism.m_send_offsets[r - 1] + m_tourism.m_count_to_send[r - 1];
 
     // Отправляем m_count_to_send -> получаем m_count_to_recv
-    // [!] хардкодово... (лишний раз создаю вектор)
-    int TAG = 0;
-    for(int r = 0; r < size; ++r)
-        if(r != rank) mpi::send({m_tourism.m_count_to_send[r]}, r, TAG);
-    for(int r = 0; r < size; ++r)
-        if(r != rank) mpi::recv({m_tourism.m_count_to_recv[r]}, sizeof(int), r, TAG);
+    mpi::all_to_all(m_tourism.m_count_to_send, m_tourism.m_count_to_recv);
 
     // Заполняем m_recv_offsets
     for(int r = 1; r < size; ++r)
@@ -162,10 +150,16 @@ void EuMesh::build_aliens() {
 
     int temp_border_it = 0;
     for(auto& border_indices : m_tourism.m_border_indices)
-        for(auto& cell_index : border_indices)
-            m_tourism.m_border[temp_border_it++] = m_locals[cell_index];
+        for(auto cell_index : border_indices){
+            // [?]
+            m_tourism.m_border[temp_border_it] = (*this)[cell_index].geom();
+            
 
+            ++temp_border_it;
+        }
+    
     // [?] если m_border_indices[r].size() == m_count_to_send[r], то зачем второе вообще нужно?
 }
+
 
 } // namespace zephyr::mesh
