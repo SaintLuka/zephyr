@@ -166,9 +166,37 @@ void EuMesh::migrate() {
 	for(int i=0; i<size; ++i)
 		new_size += m[rank + size * i];
 	m_locals.resize(new_size);
-	
+	//printf("r:%d, ns:%d\n", rank, new_size);
 
+	std::vector<int> send_counts(size, 0);
+	for(int i=0; i<size; ++i)
+		send_counts[i] = m_i[i] * migrants.itemsize();
+	std::vector<int> send_displs(size, 0);
+	for(int i = 1; i < size; ++i)
+		send_displs[i] = send_displs[i - 1] + send_counts[i - 1];
+	std::vector<int> recv_counts(size, 0);
+	for(int i=0; i<size; ++i)
+		recv_counts[i] = m[rank + size * i] * migrants.itemsize();
+	std::vector<int> recv_displs(size, 0);
+	for(int i=1; i<size; ++i)
+		recv_displs[i] = recv_displs[i-1] + recv_counts[i-1];
+
+	//if(rank == 1){
+	//	for(int i=0; i<size; ++i)
+	//		printf("sc: %d | ", recv_counts[i]);
+	//}
 	
+	MPI_Alltoallv(
+		migrants.item(0).ptr(), send_counts.data(), send_displs.data(), MPI_BYTE, 
+		m_locals.item(0).ptr(), recv_counts.data(), recv_displs.data(), MPI_BYTE, 
+		mpi::comm()
+	);
+	//if(rank == 1){
+	//	for(int i=0; i<m_locals.size();++i)
+	//	printf("r:%d, i:%d | ", m_locals[i].rank, m_locals[i].index);
+	//	printf("\n");
+	//}
+
 	// ... //
 }
 
