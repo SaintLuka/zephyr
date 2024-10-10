@@ -125,10 +125,13 @@ void EuMesh::migrate() {
 	// Переиндексируем грани
 	for (auto& cell: m_locals){
 		for(auto& face: cell.faces){
-			face.adjacent.rank = m_locals[face.adjacent.index].rank;
-			face.adjacent.index = m_locals[face.adjacent.index].index;
+			if(face.adjacent.index >= 0){
+				face.adjacent.rank = m_locals[face.adjacent.index].rank;
+				face.adjacent.index = m_locals[face.adjacent.index].index;
+			}
 		}
 	}
+
 
 	// Для сортировки в migrants по ранку за О(n). m_i_sum[i] показывает с какого индекса в migrants ставить i-ранковую ячейку.
 	std::vector<int> m_i_sum(size, 0);
@@ -166,8 +169,8 @@ void EuMesh::migrate() {
 	for(int i=0; i<size; ++i)
 		new_size += m[rank + size * i];
 	m_locals.resize(new_size);
-	//printf("r:%d, ns:%d\n", rank, new_size);
 
+	// Считаем вспомогательные для отправки массивы
 	std::vector<int> send_counts(size, 0);
 	for(int i=0; i<size; ++i)
 		send_counts[i] = m_i[i] * migrants.itemsize();
@@ -180,24 +183,21 @@ void EuMesh::migrate() {
 	std::vector<int> recv_displs(size, 0);
 	for(int i=1; i<size; ++i)
 		recv_displs[i] = recv_displs[i-1] + recv_counts[i-1];
-
-	//if(rank == 1){
-	//	for(int i=0; i<size; ++i)
-	//		printf("sc: %d | ", recv_counts[i]);
-	//}
 	
+	// Отправляем всем процессам соостветствующие
 	MPI_Alltoallv(
 		migrants.item(0).ptr(), send_counts.data(), send_displs.data(), MPI_BYTE, 
 		m_locals.item(0).ptr(), recv_counts.data(), recv_displs.data(), MPI_BYTE, 
 		mpi::comm()
 	);
-	//if(rank == 1){
-	//	for(int i=0; i<m_locals.size();++i)
-	//	printf("r:%d, i:%d | ", m_locals[i].rank, m_locals[i].index);
-	//	printf("\n");
-	//}
 
-	// ... //
+	/*// DEBUG
+	if(rank == 1){
+		for(int i=0; i<m_locals.size();++i)
+		printf("r:%d, i:%d | ", m_locals[i].rank, m_locals[i].index);
+		printf("\n");
+	}
+	//*/
 }
 
 /// @brief 
