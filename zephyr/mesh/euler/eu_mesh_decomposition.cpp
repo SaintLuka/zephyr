@@ -16,149 +16,223 @@ namespace zephyr::mesh {
 using namespace zephyr::utils;
 
 void EuMesh::add_decomposition(const decomp::ORB& orb, bool update) {
-    m_decomp = std::make_shared<ORB>(orb);
+	m_decomp = std::make_shared<ORB>(orb);
 }
 
 void EuMesh::redistribute() {
-    // Следующий бессмысленный код для демонстрации
+	// Следующий бессмысленный код для демонстрации
+	/*
+	int r = mpi::rank();
 
-    int r = mpi::rank();
+	int s = mpi::size();
 
-    int s = mpi::size();
+	// MPI_COMM_WORLD покороче
+	mpi::comm();
 
-    // MPI_COMM_WORLD покороче
-    mpi::comm();
+	// Указатель на элемент хранилища
+	Byte * ptr = m_locals[10].ptr();
 
-    // Указатель на элемент хранилища
-    Byte * ptr = m_locals[10].ptr();
+	// Размер элемента хранилища в байтах
+	int is = m_locals.itemsize();
 
-    // Размер элемента хранилища в байтах
-    int is = m_locals.itemsize();
+	for (auto& cell: m_locals) {
+		// Важные поля
+		cell.rank;
+		cell.index;
 
-    for (auto& cell: m_locals) {
-        // Важные поля
-        cell.rank;
-        cell.index;
+		for (auto& face: cell.faces) {
+			// Часть граней пустые, там резервное место
+			if (face.is_undefined()) {
+				continue;
+			}
 
-        for (auto& face: cell.faces) {
-            // Часть граней пустые, там резервное место
-            if (face.is_undefined()) {
-                continue;
-            }
+			// Противоположный face.is_undefined()
+			face.is_actual();
 
-            // Противоположный face.is_undefined()
-            face.is_actual();
+			// Важные поля
+			face.adjacent.rank;
+			face.adjacent.index;
+			face.adjacent.alien;
 
-            // Важные поля
-            face.adjacent.rank;
-            face.adjacent.index;
-            face.adjacent.alien;
-
-        }
-    }
-
-
-    // Это вариант обхода как по распределенной сетке,
-    // там внутри итераторы сложнее зашиты
-    for (auto cell: *this) {
-        // К примеру, здесь пропускаются неактуальные грани.
-        for (auto face: cell.faces()) {
-
-            // Ещё здесь нельзя просто так получить  геометрические данные,
-            // для этого и нужно пользоваться итераторами по m_locals
-            cell.geom().rank = 10;
-
-            face.adjacent().rank;
-        }
-    }
+		}
+	}
 
 
-    build_aliens();
-    //migrate();
+	// Это вариант обхода как по распределенной сетке,
+	// там внутри итераторы сложнее зашиты
+	for (auto cell: *this) {
+		// К примеру, здесь пропускаются неактуальные грани.
+		for (auto face: cell.faces()) {
+
+			// Ещё здесь нельзя просто так получить  геометрические данные,
+			// для этого и нужно пользоваться итераторами по m_locals
+			cell.geom().rank = 10;
+
+			face.adjacent().rank;
+		}
+	}
+	*/
+
+	//build_aliens();
+	migrate();
 }
 
 void EuMesh::exchange() {
 
 }
 
+
 void EuMesh::migrate() {
-    int size = mpi::size();
-    int rank = mpi::rank();
+	int size = mpi::size();
+	int rank = mpi::rank();
 
-    std::vector<int> m_i(size, 0);
-    // По некоторому правилу определяется новый rank для всех ячеек из массива locals
-    for (auto& cell: m_locals){
-        m_decomp->rank(cell);
-        // Подсчитываем число ячеек, которые должны быть перемещены с данного процесса на другие
-        ++m_i[cell.rank];
-    }
+	std::vector<int> m_i(size, 0);
+	// По некоторому правилу определяется новый rank для всех ячеек из массива locals
+	for (auto& cell: m_locals){
+		// m_decomp->rank(cell);
 
-    std::vector<int> m = mpi::all_gather_vectors(m_i);
+		cell.rank = cell.index % size;
+		// Подсчитываем число ячеек, которые должны быть перемещены с данного процесса на другие
+		++m_i[cell.rank];
+	}
 
-    // Переиндексируем локальные ячейки
-    std::vector<int> m_sum(size, 0);
-    for(int i = 0; i < rank; ++i)
-        for(int s = 0; s < size; ++s)
-            m_sum[s] += m[size * i + s];
+	/* DEBUG
+	if(mpi::master()){
+		printf("rank %d : %d\n", rank, m_locals.size());
+		for(int i=0; i<size; ++i)
+			printf("m_%d: %d\n", i, m_i[i]);
+	}*/
 
-    for (auto& cell: m_locals)
-        cell.index = m_sum[cell.rank]++;
+	std::vector<int> m = mpi::all_gather_vectors(m_i);
 
-    // ... //
+	// Переиндексируем локальные ячейки
+	std::vector<int> m_sum(size, 0);
+	for(int i = 0; i < rank; ++i)
+		for(int s = 0; s < size; ++s)
+			m_sum[s] += m[size * i + s];
+
+	for (auto& cell: m_locals)
+		cell.index = m_sum[cell.rank]++; 
+
+	/* // DEBUG
+	if(mpi::master()){
+		for(int i=0; i<m_locals.size(); ++i)
+			printf("r:%d,i:%d | ", m_locals[i].rank, m_locals[i].index);
+		printf("\n");
+	}
+	*/
+
+	// Переиндексируем грани
+	for (auto& cell: m_locals){
+		for(auto& face: cell.faces){
+			face.adjacent.rank = m_locals[face.adjacent.index].rank;
+			face.adjacent.index = m_locals[face.adjacent.index].index;
+		}
+	}
+
+	// Для сортировки в migrants по ранку за О(n). m_i_sum[i] показывает с какого индекса в migrants ставить i-ранковую ячейку.
+	std::vector<int> m_i_sum(size, 0);
+	for(int i = 1; i < size; ++i)
+		m_i_sum[i] = m_i_sum[i - 1] + m_i[i - 1];
+
+	/*// DEBUG
+	if(mpi::master()){
+		for(int i=0; i<size; ++i)
+			printf("sum: %d\n", m_i_sum[i]);
+		printf("\n");
+	}
+	//*/
+	
+	// Заполняем migrants, сортиру по rank
+	auto& migrants = m_migration.m_migrants; 
+	// [?!] Просто migrants.resize(m_locals.size()); не получится, т.к. тогда неправильно задан itemsize
+	migrants = m_locals;
+	for (int i = 0; i < migrants.size(); ++i)
+		std::memcpy(migrants[m_i_sum[m_locals[i].rank]++].ptr(), m_locals[i].ptr(), migrants.itemsize());
+
+	/*// DEBUG
+	if(mpi::master()){
+		for(int i=0; i<m_locals.size(); ++i)
+			printf("r:%d,i:%d | ", m_locals[i].rank, m_locals[i].index);
+		printf("\n");
+		for(int i=0; i<migrants.size(); ++i)
+			printf("r:%d,i:%d | ", migrants[i].rank, migrants[i].index);
+		printf("\n");
+	}
+	//*/
+
+	// Меняем размер m_locals
+	int new_size = 0;
+	for(int i=0; i<size; ++i)
+		new_size += m[rank + size * i];
+	m_locals.resize(new_size);
+	
+
+	
+	// ... //
 }
 
 /// @brief 
 /// Заполняет m_tourism
 void EuMesh::build_aliens() {
-    int size = mpi::size();
-    int rank = mpi::rank();
+	int size = mpi::size();
+	int rank = mpi::rank();
 
-    // Выделяем память
-    // [!] думаю, нужно перенести этот код, чтобы он выполнялся единожды
-    m_tourism.m_border_indices.resize(size, std::vector<int>());
-    m_tourism.m_count_to_send.resize(size);
-    m_tourism.m_count_to_recv.resize(size);
-    m_tourism.m_send_offsets.resize(size, 0);
-    m_tourism.m_recv_offsets.resize(size, 0);
+	// Выделяем память
+	// [!] думаю, нужно перенести этот код, чтобы он выполнялся единожды
+	m_tourism.m_border_indices.resize(size, std::vector<int>());
+	m_tourism.m_count_to_send.resize(size);
+	m_tourism.m_count_to_recv.resize(size);
+	m_tourism.m_send_offsets.resize(size, 0);
+	m_tourism.m_recv_offsets.resize(size, 0);
 
-    // Заполняем m_border_indices
-    for (auto cell: *this) {
-        for (auto face: cell.faces()) {
-            auto& border_indices = m_tourism.m_border_indices[face.adjacent().rank];
-            if(face.adjacent().rank != rank && (border_indices.empty() || border_indices.back() != cell.geom().index))
-                border_indices.push_back(cell.geom().index);
-        }
-    }
+	// Заполняем m_border_indices
+	for (auto cell: *this) {
+		for (auto face: cell.faces()) {
+			auto& border_indices = m_tourism.m_border_indices[face.adjacent().rank];
+			if(face.adjacent().rank != rank && (border_indices.empty() || border_indices.back() != cell.geom().index))
+				border_indices.push_back(cell.geom().index);
+		}
+	}
 
-    // Заполняем m_count_to_send
-    for(int r = 0; r < size; ++r)
-        m_tourism.m_count_to_send[r] = m_tourism.m_border_indices[r].size();
-    // Заполняем m_send_offsets
-    for(int r = 1; r < size; ++r)
-        m_tourism.m_send_offsets[r] = m_tourism.m_send_offsets[r - 1] + m_tourism.m_count_to_send[r - 1];
+	if(mpi::master()){
+		auto& border_indices = m_tourism.m_border_indices[1];
+		for(int i=0; i<border_indices.size(); ++i)
+			printf("%d | ", border_indices[i]);
+		printf("\nend");
+	}
+	return;
 
-    // Отправляем m_count_to_send -> получаем m_count_to_recv
-    mpi::all_to_all(m_tourism.m_count_to_send, m_tourism.m_count_to_recv);
+	// Заполняем m_count_to_send
+	for(int r = 0; r < size; ++r)
+		m_tourism.m_count_to_send[r] = m_tourism.m_border_indices[r].size();
+	// Заполняем m_send_offsets
+	for(int r = 1; r < size; ++r)
+		m_tourism.m_send_offsets[r] = m_tourism.m_send_offsets[r - 1] + m_tourism.m_count_to_send[r - 1];
 
-    // Заполняем m_recv_offsets
-    for(int r = 1; r < size; ++r)
-        m_tourism.m_recv_offsets[r] = m_tourism.m_recv_offsets[r - 1] + m_tourism.m_count_to_recv[r - 1];
+	// Отправляем m_count_to_send -> получаем m_count_to_recv
+	mpi::all_to_all(m_tourism.m_count_to_send, m_tourism.m_count_to_recv);
 
-    // Заполняем m_border
-    int border_size = m_tourism.m_send_offsets[size - 1] + m_tourism.m_count_to_send[size - 1];
-    m_tourism.m_border.resize(border_size);
+	// Заполняем m_recv_offsets
+	for(int r = 1; r < size; ++r)
+		m_tourism.m_recv_offsets[r] = m_tourism.m_recv_offsets[r - 1] + m_tourism.m_count_to_recv[r - 1];
 
-    int temp_border_it = 0;
-    for(auto& border_indices : m_tourism.m_border_indices)
-        for(auto cell_index : border_indices){
-            // [?]
-            m_tourism.m_border[temp_border_it] = (*this)[cell_index].geom();
-            
+	// Заполняем m_border
+	int border_size = m_tourism.m_send_offsets[size - 1] + m_tourism.m_count_to_send[size - 1];
+	m_tourism.m_border.resize(border_size);
 
-            ++temp_border_it;
-        }
-    
-    // [?] если m_border_indices[r].size() == m_count_to_send[r], то зачем второе вообще нужно?
+	int temp_border_it = 0;
+	for(auto& border_indices : m_tourism.m_border_indices)
+		for(auto cell_index : border_indices){
+			// [?]
+			memcpy(m_tourism.m_border[temp_border_it].data(), m_locals[cell_index].data(), m_locals.itemsize());
+
+
+
+			++temp_border_it;
+		}
+	
+	// [?] если m_border_indices[r].size() == m_count_to_send[r], то зачем второе вообще нужно?
 }
 
 

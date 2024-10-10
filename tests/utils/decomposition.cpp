@@ -66,7 +66,7 @@ int main() {
     Box domain = gen.bbox();
 
     // Создаем сетку
-    EuMesh mesh(U, gen);
+    EuMesh mesh(U);
     if (mpi::master()) {
         mesh = EuMesh(U, gen);
     }
