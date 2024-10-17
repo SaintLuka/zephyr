@@ -73,8 +73,8 @@ void EuMesh::redistribute() {
 	}
 	*/
 
-	//build_aliens();
 	migrate();
+	build_aliens();
 }
 
 void EuMesh::exchange() {
@@ -91,10 +91,17 @@ void EuMesh::migrate() {
 	for (auto& cell: m_locals){
 		// m_decomp->rank(cell);
 
-		cell.rank = cell.index % size;
+		cell.rank = (cell.index / (6*6/2)) * 2 + (cell.index % (6)) / 3;
 		// Подсчитываем число ячеек, которые должны быть перемещены с данного процесса на другие
 		++m_i[cell.rank];
 	}
+	
+	/* DEBUG
+	if(mpi::master()){
+		for (auto& cell: m_locals){
+			printf("i: %d, r: %d\n", cell.index, cell.rank);
+		}
+	}*/
 
 	/* DEBUG
 	if(mpi::master()){
@@ -132,7 +139,6 @@ void EuMesh::migrate() {
 		}
 	}
 
-
 	// Для сортировки в migrants по ранку за О(n). m_i_sum[i] показывает с какого индекса в migrants ставить i-ранковую ячейку.
 	std::vector<int> m_i_sum(size, 0);
 	for(int i = 1; i < size; ++i)
@@ -146,7 +152,7 @@ void EuMesh::migrate() {
 	}
 	//*/
 	
-	// Заполняем migrants, сортиру по rank
+	// Заполняем migrants, сортируем по rank
 	auto& migrants = m_migration.m_migrants; 
 	// [?!] Просто migrants.resize(m_locals.size()); не получится, т.к. тогда неправильно задан itemsize
 	migrants = m_locals;
@@ -192,7 +198,7 @@ void EuMesh::migrate() {
 	);
 
 	/*// DEBUG
-	if(rank == 1){
+	if(rank == 3){
 		for(int i=0; i<m_locals.size();++i)
 		printf("r:%d, i:%d | ", m_locals[i].rank, m_locals[i].index);
 		printf("\n");
@@ -223,14 +229,6 @@ void EuMesh::build_aliens() {
 		}
 	}
 
-	if(mpi::master()){
-		auto& border_indices = m_tourism.m_border_indices[1];
-		for(int i=0; i<border_indices.size(); ++i)
-			printf("%d | ", border_indices[i]);
-		printf("\nend");
-	}
-	return;
-
 	// Заполняем m_count_to_send
 	for(int r = 0; r < size; ++r)
 		m_tourism.m_count_to_send[r] = m_tourism.m_border_indices[r].size();
@@ -247,19 +245,74 @@ void EuMesh::build_aliens() {
 
 	// Заполняем m_border
 	int border_size = m_tourism.m_send_offsets[size - 1] + m_tourism.m_count_to_send[size - 1];
+	m_tourism.m_border = m_locals;
 	m_tourism.m_border.resize(border_size);
 
 	int temp_border_it = 0;
-	for(auto& border_indices : m_tourism.m_border_indices)
+	for(auto& border_indices : m_tourism.m_border_indices){
 		for(auto cell_index : border_indices){
 			// [?]
-			memcpy(m_tourism.m_border[temp_border_it].data(), m_locals[cell_index].data(), m_locals.itemsize());
-
-
+			memcpy(m_tourism.m_border[temp_border_it].ptr(), m_locals[cell_index].ptr(), m_locals.itemsize());
 
 			++temp_border_it;
 		}
+	}
+
+	m_aliens.resize(m_tourism.m_recv_offsets[size - 1] + m_tourism.m_count_to_recv[size - 1]);
+	return;
+
+	for(int i=0; i<size; ++i){
+		m_tourism.m_count_to_send[i] *= m_aliens.itemsize();
+		m_tourism.m_count_to_recv[i] *= m_aliens.itemsize();
+		m_tourism.m_send_offsets[i] *= m_aliens.itemsize();
+		m_tourism.m_recv_offsets[i] *= m_aliens.itemsize();
+	}
+
+	// Отправляем и получам в aliens
+	MPI_Alltoallv(
+		m_tourism.m_border.item(0).ptr(), m_tourism.m_count_to_send.data(), m_tourism.m_send_offsets.data(), MPI_BYTE, 
+		m_aliens.item(0).ptr(), m_tourism.m_count_to_recv.data(), m_tourism.m_recv_offsets.data(), MPI_BYTE, 
+		mpi::comm()
+	);
+
+	//for (auto cell: *this) {
+	//	for (auto face: cell.faces()){
+	//		if(face.adjacent().rank == rank)
+	//			face.adjacent().alien = -1;
+	//	}
+	//}
+
+	for(auto& cell : m_locals){
+		for(auto& face : cell.faces){
+			if(face.adjacent.rank == rank)
+				face.adjacent.alien = -1;
+		}
+	}
+
+	int i = 0;
+	for(auto& cell : m_aliens){
+		for(auto& face : cell.faces){
+			if(face.adjacent.rank == rank){
+				auto& curr_cell = m_locals[face.adjacent.index];
+				for(auto& l_face : curr_cell.faces)
+					if(l_face.adjacent.index == cell.index){
+						l_face.adjacent.index = -1;
+						l_face.adjacent.alien = i++;
+						break;
+					}
+			}
+		}
+	}
 	
+	//if(mpi::rank() == 0){
+	//	printf("I: %d\n", i);
+	//	//auto& border_indices = m_tourism.m_border_indices[1];
+	//	for(auto& cell : m_aliens)
+	//		printf("%d | ", cell.index);
+	//	printf("\nend");
+	//}
+	//return;
+
 	// [?] если m_border_indices[r].size() == m_count_to_send[r], то зачем второе вообще нужно?
 }
 

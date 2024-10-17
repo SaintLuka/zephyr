@@ -60,7 +60,7 @@ int main() {
     // Сеточный генератор
     //Cuboid gen(0.0, 1.0, 0.0, 0.6, 0.0, 0.9);
     Rectangle gen(0.0, 1.0, 0.0, 1.0);
-    gen.set_nx(256);
+    gen.set_nx(6);
 
     // Bounding Box для сетки
     Box domain = gen.bbox();
@@ -76,17 +76,29 @@ int main() {
     mesh.add_decomposition(orb, false);
 
     // Распределить ячейки))
-    mesh.redistribute();    
+    mesh.redistribute();
+
+    //for (auto& cell: mesh.locals()) {
+    //    if(mpi::rank()==1)
+    //        printf("i: %d\n", cell.index);
+    //}
+    //if(mpi::rank()==1)
+    //    printf("aliens: %d\n", mesh.aliens().size());
 
     // Дальше простая схема, ничего интересного
 
     // Начальные данные
     Vector3d vc = domain.center();
     double D = 0.1 * domain.diameter();
-    for (auto cell: mesh) {
+    for (auto& cell: mesh) {
+        if(mpi::rank()==0)
+            printf("i_m: %d\n", cell.geom().index);
         cell(U).u1 = (cell.center() - vc).norm() < D ? 1.0 : 0.0;
         cell(U).u2 = 0.0;
     }
+    mpi::finalize();
+    return 0;
+    
 
     // Число Куранта
     double CFL = 0.5;
@@ -116,6 +128,7 @@ int main() {
             dt = std::min(dt, dx / velocity(cell.center()).norm());
         }
         dt *= CFL;
+
 
         // Расчет по схеме upwind
         for (auto& cell: mesh) {
