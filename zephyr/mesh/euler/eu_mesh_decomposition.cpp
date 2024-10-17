@@ -78,7 +78,24 @@ void EuMesh::redistribute() {
 }
 
 void EuMesh::exchange() {
+	int size = mpi::size();
+	int rank = mpi::rank();
 
+	int temp_border_it = 0;
+	for(auto& border_indices : m_tourism.m_border_indices){
+		for(auto cell_index : border_indices){
+			// [?]
+			memcpy(m_tourism.m_border[temp_border_it].ptr(), m_locals[cell_index].ptr(), m_locals.itemsize());
+
+			++temp_border_it;
+		}
+	}
+
+	MPI_Alltoallv(
+		m_tourism.m_border.item(0).ptr(), m_tourism.m_count_to_send.data(), m_tourism.m_send_offsets.data(), MPI_BYTE, 
+		m_aliens.item(0).ptr(), m_tourism.m_count_to_recv.data(), m_tourism.m_recv_offsets.data(), MPI_BYTE, 
+		mpi::comm()
+	);
 }
 
 
@@ -90,8 +107,8 @@ void EuMesh::migrate() {
 	// По некоторому правилу определяется новый rank для всех ячеек из массива locals
 	for (auto& cell: m_locals){
 		// m_decomp->rank(cell);
-
-		cell.rank = (cell.index / (6*6/2)) * 2 + (cell.index % (6)) / 3;
+		
+		cell.rank = (cell.index / (m_nx*m_nx/2)) * 2 + (cell.index % (m_nx)) / (m_nx/2);
 		// Подсчитываем число ячеек, которые должны быть перемещены с данного процесса на другие
 		++m_i[cell.rank];
 	}
@@ -259,7 +276,6 @@ void EuMesh::build_aliens() {
 	}
 
 	m_aliens.resize(m_tourism.m_recv_offsets[size - 1] + m_tourism.m_count_to_recv[size - 1]);
-	return;
 
 	for(int i=0; i<size; ++i){
 		m_tourism.m_count_to_send[i] *= m_aliens.itemsize();
@@ -269,18 +285,7 @@ void EuMesh::build_aliens() {
 	}
 
 	// Отправляем и получам в aliens
-	MPI_Alltoallv(
-		m_tourism.m_border.item(0).ptr(), m_tourism.m_count_to_send.data(), m_tourism.m_send_offsets.data(), MPI_BYTE, 
-		m_aliens.item(0).ptr(), m_tourism.m_count_to_recv.data(), m_tourism.m_recv_offsets.data(), MPI_BYTE, 
-		mpi::comm()
-	);
-
-	//for (auto cell: *this) {
-	//	for (auto face: cell.faces()){
-	//		if(face.adjacent().rank == rank)
-	//			face.adjacent().alien = -1;
-	//	}
-	//}
+	exchange();
 
 	for(auto& cell : m_locals){
 		for(auto& face : cell.faces){
@@ -303,15 +308,6 @@ void EuMesh::build_aliens() {
 			}
 		}
 	}
-	
-	//if(mpi::rank() == 0){
-	//	printf("I: %d\n", i);
-	//	//auto& border_indices = m_tourism.m_border_indices[1];
-	//	for(auto& cell : m_aliens)
-	//		printf("%d | ", cell.index);
-	//	printf("\nend");
-	//}
-	//return;
 
 	// [?] если m_border_indices[r].size() == m_count_to_send[r], то зачем второе вообще нужно?
 }

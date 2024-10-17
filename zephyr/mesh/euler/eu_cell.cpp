@@ -5,7 +5,7 @@
 namespace zephyr::mesh {
 
 AmrStorage::Iterator safe_iterator(AmrStorage &locals, AmrStorage &aliens, int idx) {
-    if (idx < locals.size()) {
+    if (idx <= locals.size()) {
         return locals.iterator(idx);
     } else {
         idx -= locals.size();
