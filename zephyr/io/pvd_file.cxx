@@ -18,6 +18,11 @@ namespace fs = std::filesystem;
 Network& dummy_net = ::zephyr::network::network::dummy;
 #endif
 
+#ifdef ZEPHYR_ENABLE_MPI
+#include "zephyr/utils/mpi.h"
+using namespace zephyr::utils;
+#endif
+
 inline bool is_big_endian() {
     union {
         uint32_t i;
@@ -166,11 +171,21 @@ void PvdFile::save(CellStorage& cells, NodeStorage& nodes, double timestep) {
         throw std::runtime_error("PvdFile::save() error: You need to open PvdFile");
     }
     VtuFile::save(get_filename(), cells, nodes, variables, filter);
+#ifdef ZEPHYR_ENABLE_MPI
+    if(mpi::master())
+#endif
     update_pvd(timestep);
 }
 
 std::string PvdFile::get_filename() const {
-    std::string filename = m_fullname + "_" + std::to_string(m_counter);
+    std::string filename = m_fullname;
+
+#ifdef ZEPHYR_ENABLE_MPI
+    filename += "_" + std::to_string(mpi::rank());
+#endif
+
+    filename += "_" + std::to_string(m_counter);
+
 #ifdef ZEPHYR_ENABLE_DISTRIBUTED
     if (&net != &dummy_net) {
         filename += ".pt" + std::to_string(net.rank());
@@ -195,8 +210,16 @@ void PvdFile::update_pvd(double timestep) {
     ofs.seekg(m_pos, std::ios::beg);
 
     ofs << std::scientific << std::setprecision(15);
+
+#ifdef ZEPHYR_ENABLE_MPI
+    for(int r = 0; r < mpi::size(); ++r){
+        ofs << "        <DataSet timestep=\"" << timestep << "\" part=\"" << r << "\" file=\""
+                << m_filename << "_" << r << "_" << m_counter << ".vtu" << "\"/>\n";
+    }
+#elif
     ofs << "        <DataSet timestep=\"" << timestep << "\" part=\"0\" file=\""
             << m_filename << "_" << m_counter << ".vtu" << "\"/>\n";
+#endif
 
     m_pos = ofs.tellg();
 

@@ -60,7 +60,7 @@ int main() {
     // Сеточный генератор
     //Cuboid gen(0.0, 1.0, 0.0, 0.6, 0.0, 0.9);
     Rectangle gen(0.0, 1.0, 0.0, 1.0);
-    gen.set_nx(64);
+    gen.set_nx(256);
 
     // Bounding Box для сетки
     Box domain = gen.bbox();
@@ -79,7 +79,6 @@ int main() {
     mesh.redistribute();
 
     // Дальше простая схема, ничего интересного
-
     // Начальные данные
     Vector3d vc = domain.center();
     double D = 0.1 * domain.diameter();
@@ -104,8 +103,7 @@ int main() {
             std::cout << "\tРанг: " << mpi::rank() << ";"
                       << "\tШаг: " << std::setw(6) << n_step << ";"
                       << "\tВремя: " << std::setw(6) << std::setprecision(3) << curr_time << "\n";
-            if(mpi::rank() == 2)
-                pvd.save(mesh.locals(), curr_time);
+            pvd.save(mesh.locals(), curr_time);
             next_write += 0.02;
         }
 
