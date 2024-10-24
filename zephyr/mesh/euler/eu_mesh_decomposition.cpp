@@ -108,7 +108,9 @@ void EuMesh::migrate() {
 	for (auto& cell: m_locals){
 		// m_decomp->rank(cell);
 		
-		cell.rank = (cell.index / (m_nx*m_nx/2)) * 2 + (cell.index % (m_nx)) / (m_nx/2);
+		cell.rank = m_decomp->rank(cell);
+
+		// cell.rank = (cell.index / (m_nx*m_nx/2)) * 2 + (cell.index % (m_nx)) / (m_nx/2);
 		// Подсчитываем число ячеек, которые должны быть перемещены с данного процесса на другие
 		++m_i[cell.rank];
 	}
