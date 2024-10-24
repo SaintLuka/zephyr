@@ -19,16 +19,16 @@ IdealGas::IdealGas(const std::string &name) {
     }
 }
 
-dRdE IdealGas::pressure_re(double rho, double eps, const Options& options) const {
-    dRdE res {(gamma - 1.0) * rho * eps };
+dRdE IdealGas::pressure_re(double rho, double e, const Options& options) const {
+    dRdE res {(gamma - 1.0) * rho * e };
     if (options.deriv) {
-        res.dR = (gamma - 1.0) * eps;
+        res.dR = (gamma - 1.0) * e;
         res.dE = (gamma - 1.0) * rho;
     }
     return res;
 }
 
-dRdT IdealGas::pressure_rt(double rho, double T, const Options& options) const {
+dRdT IdealGas::pressure_rT(double rho, double T, const Options& options) const {
     dRdT P = (gamma - 1.0) * Cv * rho * T;
     if (options.deriv) {
         P.dR = (gamma - 1.0) * Cv * T;
@@ -37,7 +37,7 @@ dRdT IdealGas::pressure_rt(double rho, double T, const Options& options) const {
     return P;
 }
 
-dRdT IdealGas::energy_rt(double rho, double T, const Options& options) const {
+dRdT IdealGas::energy_rT(double rho, double T, const Options& options) const {
     dRdT e = Cv * T;
     if (options.deriv) {
         e.dR = 0.0;
@@ -46,23 +46,23 @@ dRdT IdealGas::energy_rt(double rho, double T, const Options& options) const {
     return e;
 }
 
-double IdealGas::sound_speed_re(double rho, double eps, const Options& options) const {
-    return std::sqrt(gamma * (gamma - 1.0) * eps);
+double IdealGas::sound_speed_re(double rho, double e, const Options& options) const {
+    return std::sqrt(gamma * (gamma - 1.0) * e);
 }
 
-double IdealGas::sound_speed_rp(double rho, double P, const Options& options) const {
+double IdealGas::sound_speed_rP(double rho, double P, const Options& options) const {
     return std::sqrt(gamma * P / rho);
 }
 
-double IdealGas::energy_rp(double rho, double P, const Options& options) const {
+double IdealGas::energy_rP(double rho, double P, const Options& options) const {
     return P / ((gamma - 1.0) * rho);
 }
 
-double IdealGas::temperature_rp(double rho, double P, const Options& options) const {
+double IdealGas::temperature_rP(double rho, double P, const Options& options) const {
     return P / ((gamma - 1.0) * Cv * rho);
 }
 
-dPdT IdealGas::volume_pt(double P, double T, const Options& options) const {
+dPdT IdealGas::volume_PT(double P, double T, const Options& options) const {
     dPdT res{((gamma - 1.0) * Cv * T) / P};
     if (options.deriv) {
         res.dP = -res.val / P;
@@ -71,7 +71,7 @@ dPdT IdealGas::volume_pt(double P, double T, const Options& options) const {
     return res;
 }
 
-dPdT IdealGas::energy_pt(double P, double T, const Options& options) const {
+dPdT IdealGas::energy_PT(double P, double T, const Options& options) const {
     dPdT res{Cv * T};
     if (options.deriv) {
         res.dP = 0.0;
@@ -86,6 +86,10 @@ StiffenedGas IdealGas::stiffened_gas(double rho, double P, const Options& option
 
 double IdealGas::min_pressure() const {
     return 0.0;
+}
+
+void IdealGas::adjust_cv(double rho, double P, double T) {
+    Cv = P / ((gamma - 1.0) * Cv * rho);
 }
 
 } // namespace zephyr::phys

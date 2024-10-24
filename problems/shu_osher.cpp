@@ -84,7 +84,7 @@ int main() {
         double dt = std::numeric_limits<double>::max();
         for (auto& cell: mesh) {
             // скорость звука
-            double c = eos->sound_speed_rp(cell(U).rho1, cell(U).p1);
+            double c = eos->sound_speed_rP(cell(U).rho1, cell(U).p1);
             for (auto &face: cell.faces()) {
                 // Нормальная составляющая скорости
                 double vn = cell(U).v1.dot(face.normal());

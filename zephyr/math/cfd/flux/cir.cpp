@@ -24,7 +24,7 @@ smf::Flux CIR1::calc_flux(const smf::PState &zL, const smf::PState &zR, const ph
     PState zE = 0.5 * (zL.arr() + zR.arr());
 
     // Согласуем состояние на грани
-    zE.energy = eos.energy_rp(zE.density, zE.pressure);
+    zE.energy = eos.energy_rP(zE.density, zE.pressure);
 
     auto P = eos.pressure_re(zE.density, zE.energy, {.deriv = true});
 
@@ -43,7 +43,7 @@ smf::Flux CIR1::calc_flux(const smf::PState &zL, const smf::PState &zR, const ph
 
     double E = rho * (eps + 0.5 * q2);
 
-    double c = eos.sound_speed_rp(rho, p);
+    double c = eos.sound_speed_rP(rho, p);
     double c2 = sqr(c);
 
     double h = (E + p) / rho; // энтальпия
@@ -133,7 +133,7 @@ smf::Flux CIR2::calc_flux(const smf::PState &zL, const smf::PState &zR, const ph
     PState zE = 0.5 * (zL.arr() + zR.arr());
 
     // Согласуем состояние на грани
-    zE.energy = eos.energy_rp(zE.density, zE.pressure);
+    zE.energy = eos.energy_rP(zE.density, zE.pressure);
 
     double rho = zE.density;
     double u = zE.velocity.x();
@@ -150,7 +150,7 @@ smf::Flux CIR2::calc_flux(const smf::PState &zL, const smf::PState &zR, const ph
 
     double E = rho * (eps + 0.5 * q2);
 
-    double c = eos.sound_speed_rp(rho, p);
+    double c = eos.sound_speed_rP(rho, p);
     double c2 = sqr(c);
 
     double h = (E + p) / rho;

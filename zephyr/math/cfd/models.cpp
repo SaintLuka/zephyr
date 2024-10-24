@@ -2,6 +2,7 @@
 #include <boost/format.hpp>
 #include <stdexcept>
 #include <iostream>
+#include <iomanip>
 
 namespace zephyr::math {
 
@@ -23,7 +24,7 @@ PState::PState(const double &density, const Vector3d &velocity,
 }
 
 PState::PState(const QState &q, const phys::Eos &eos) {
-    density = q.mass;
+    density = q.density;
     velocity = q.momentum / density;
     energy = q.energy / density - 0.5 * velocity.squaredNorm();
     pressure = eos.pressure_re(density, energy);
@@ -49,6 +50,10 @@ PState PState::in_global(const Vector3d &normal) const {
     return z;
 }
 
+void PState::inverse() {
+    velocity.x() = -velocity.x();
+}
+
 bool PState::is_bad(const phys::Eos &eos) {
     if (std::isnan(density) || std::isnan(pressure) || std::isnan(energy)) {
         return true;
@@ -57,27 +62,27 @@ bool PState::is_bad(const phys::Eos &eos) {
 }
 
 std::ostream &operator<<(std::ostream &os, const PState &state) {
-    os << "density: " << state.density << " velocity: {" << state.velocity.x() << ", " << state.velocity.y() << ", "
-       << state.velocity.z() <<
-       "} pressure: " << state.pressure << " energy: " << state.energy;
+    os << boost::format("ρ: %.5f,  v: {%+.5e, %+.5e, %+.5e},  P: %+.5e,  e: %+.5e") %
+          state.density % state.velocity.x() % state.velocity.y() % state.velocity.z() %
+          state.pressure % state.energy;
     return os;
 }
 
 QState::QState()
-    : mass(0.0),
+    : density(0.0),
       momentum({0.0, 0.0, 0.0}),
       energy(0.0) {
 
 }
 
 QState::QState(const double &mass, const Vector3d &momentum, const double &energy)
-    : mass(mass),
+    : density(mass),
       momentum(momentum),
       energy(energy) {
 }
 
 QState::QState(const PState &z) {
-    mass = z.density;
+    density = z.density;
     momentum = z.density * z.velocity;
     energy = z.density * (z.energy + 0.5 * z.velocity.squaredNorm());
 }
@@ -103,9 +108,8 @@ QState QState::in_global(const Vector3d &normal) const {
 }
 
 std::ostream &operator<<(std::ostream &os, const QState &state) {
-    os << "mass: " << state.mass <<
-       " momentum: {" << state.momentum.x() << ", " << state.momentum.y() << ", " << state.momentum.z() <<
-       "} energy: " << state.energy;
+    os << boost::format("ρ: %.5f,  ρv: {%+.5e, %+.5e, %+.5e},  ρE: %+.5e") %
+          state.density % state.momentum.x() % state.momentum.y() % state.momentum.z() % state.energy;
     return os;
 }
 
@@ -152,9 +156,8 @@ Flux Flux::in_global(const Vector3d &normal) const {
 }
 
 std::ostream &operator<<(std::ostream &os, const Flux &flux) {
-    os << "mass: " << flux.mass <<
-       " momentum: {" << flux.momentum.x() << ", " << flux.momentum.y() << ", " << flux.momentum.z() <<
-       "} energy: " << flux.energy;
+    os << boost::format("ρ: %+.5f,  ρv: {%+.5e, %+.5e, %+.5e},  ρE: %+.5e") %
+          flux.mass % flux.momentum.x() % flux.momentum.y() % flux.momentum.z() % flux.energy;
     return os;
 }
 
@@ -187,11 +190,11 @@ PState::PState(double density, const Vector3d &velocity, double pressure,
 PState::PState(const QState &q, const phys::Materials &mixture,
                double P0, double T0, const Fractions& alpha) {
 
-    density   = q.mass;
+    density   = q.density;
     velocity  = q.momentum / density;
     energy    = q.energy / density - 0.5 * velocity.squaredNorm();
 
-    mass_frac = q.comp_mass.arr() / density;
+    mass_frac = q.mass_frac.arr() / density;
     mass_frac.normalize();
 
     vol_frac  = alpha;
@@ -223,43 +226,42 @@ PState PState::in_global(const Vector3d &normal) const {
     return z;
 }
 
+void PState::inverse() {
+    velocity.x() = -velocity.x();
+}
+
 std::ostream &operator<<(std::ostream &os, const PState &state) {
     os << boost::format(
-            "density: %1%, velocity: {%2%, %3%, %4%}, pressure: %5%, temperature: %6%, energy: %7%, mass_frac: %8%") %
-          state.density % state.velocity.x() % state.velocity.y() % state.velocity.z() % state.pressure %
-          state.temperature % state.energy % state.mass_frac;
+            "ρ: %.5f,  v: {%+.5e, %+.5e, %+.5e},  P: %+.5e,  e: %+.5e,  T: %+.5e,  ") %
+          state.density % state.velocity.x() % state.velocity.y() % state.velocity.z() %
+          state.pressure % state.energy % state.temperature;
+    os << boost::format("β: %1%,  α: %2%") % state.mass_frac % state.vol_frac;
     return os;
 }
 
-ScalarSet PState::densities() const {
-    ScalarSet densities;
-    for (size_t i = 0; i < Fractions::size(); i++) {
-        densities[i] = density * mass_frac[i];
-    }
-
-    return densities;
+double PState::true_density(int idx) const {
+    return mass_frac[idx] * density / vol_frac[idx];
 }
 
-ScalarSet PState::energies() const {
-    ScalarSet energies;
-    for (size_t i = 0; i < Fractions::size(); i++) {
-        energies[i] = energy * mass_frac[i];
-    }
-
-    return energies;
+double PState::true_energy(const Materials& mixture, int idx) const {
+    return mixture[idx].energy_PT(pressure, temperature, {.deriv = false});
 }
 
 smf::PState PState::to_smf() const {
     return {density, velocity, pressure, energy};
 }
 
-void PState::interpolation_update(const phys::Materials& mixture) {
+smf::PState PState::extract(const Materials& mixture, int idx) const {
+    return smf::PState(true_density(idx), velocity, pressure, true_energy(mixture, idx));
+}
+
+void PState::interpolation_update(const Materials& mixture) {
     // Нормализуем после интерполяции
     mass_frac.normalize();
     vol_frac.normalize();
 
     // Восстанавливаем совместность после интерполяции
-    auto pair = mixture.find_ET(density, pressure, mass_frac,
+    auto pair = mixture.find_eT(density, pressure, mass_frac,
                                 {.T0 = temperature, .alpha = &vol_frac});
     energy      = pair.e;
     temperature = pair.T;
@@ -279,26 +281,26 @@ bool PState::is_bad() const {
 
 
 QState::QState()
-    : mass(0.0),
+    : density(0.0),
       momentum({0.0, 0.0, 0.0}),
       energy(0.0),
-      comp_mass() {
+      mass_frac() {
 
 }
 
 QState::QState(double mass, const Vector3d &momentum, double energy, const ScalarSet &mass_frac)
-    : mass(mass),
+    : density(mass),
       momentum(momentum),
       energy(energy),
-      comp_mass(mass_frac) {
+      mass_frac(mass_frac) {
 
 }
 
 QState::QState(const PState &z) {
-    mass      = z.density;
+    density      = z.density;
     momentum  = z.density * z.velocity;
     energy    = z.density * (z.energy + 0.5 * z.velocity.squaredNorm());
-    comp_mass = z.density * z.mass_frac.arr();
+    mass_frac = z.density * z.mass_frac.arr();
 }
 
 void QState::to_local(const Vector3d &normal) {
@@ -322,16 +324,16 @@ QState QState::in_global(const Vector3d &normal) const {
 }
 
 std::ostream &operator<<(std::ostream &os, const QState &state) {
-    os << boost::format("mass: %1%, momentum: {%2%, %3%, %4%}, energy: %5%, mass_frac: %6%") %
-          state.mass %
+    os << boost::format("ρ: %.5f,  ρv: {%+.5e, %+.5e, %+.5e},  ρE: %+.5e,  ") %
+          state.density %
           state.momentum.x() % state.momentum.y() % state.momentum.z() %
-          state.energy %
-          state.comp_mass;
+          state.energy;
+    os << boost::format("ρβ: %1%") % state.mass_frac;
     return os;
 }
 
 Flux::Flux()
-    : mass(0.0),
+    : density(0.0),
       momentum({0.0, 0.0, 0.0}),
       energy(0.0),
       mass_frac() {
@@ -339,12 +341,19 @@ Flux::Flux()
 }
 
 Flux::Flux(const PState &z) {
-    mass         = z.density * z.velocity.x();
+    density         = z.density * z.velocity.x();
     mass_frac    = z.density * z.velocity.x() * z.mass_frac.arr();
     momentum.x() = z.density * z.velocity.x() * z.velocity.x() + z.pressure;
     momentum.y() = z.density * z.velocity.x() * z.velocity.y();
     momentum.z() = z.density * z.velocity.x() * z.velocity.z();
     energy = (z.density * (z.energy + 0.5 * z.velocity.squaredNorm()) + z.pressure) * z.velocity.x();
+}
+
+Flux::Flux(const smf::Flux& flux, int mat)
+    : density(flux.mass),
+      momentum(flux.momentum),
+      energy(flux.energy),
+      mass_frac(flux.mass, mat) {
 }
 
 void Flux::to_local(const Vector3d &normal) {
@@ -367,18 +376,27 @@ Flux Flux::in_global(const Vector3d &normal) const {
     return f;
 }
 
+void Flux::inverse() {
+    density = -density;
+    //momentum.x() = -momentum.x();
+    momentum.y() = -momentum.y();
+    momentum.z() = -momentum.z();
+    energy = -energy;
+    mass_frac.arr() *= -1.0;
+}
+
 std::ostream &operator<<(std::ostream &os, const Flux &flux) {
-    os << boost::format("mass: %1%, momentum: {%2%, %3%, %4%}, energy: %5%, mass_frac: %6%") %
-          flux.mass %
+    os << boost::format("ρ: %+.5f,  ρv: {%+.5e, %+.5e, %+.5e},  ρE: %+.5e,  ") %
+          flux.density %
           flux.momentum.x() % flux.momentum.y() % flux.momentum.z() %
-          flux.energy %
-          flux.mass_frac;
+          flux.energy;
+    os << boost::format("ρβ: %1%") % flux.mass_frac;
     return os;
 }
 
 Flux::Flux(double mass, const Vector3d &momentum,
         double energy, const ScalarSet &mass_frac)
-    : mass(mass),
+    : density(mass),
       momentum(momentum),
       energy(energy),
       mass_frac(mass_frac) {
@@ -386,7 +404,7 @@ Flux::Flux(double mass, const Vector3d &momentum,
 }
 
 bool Flux::is_bad() const {
-    return std::isinf(mass) || std::isnan(mass) ||
+    return std::isinf(density) || std::isnan(density) ||
            std::isinf(momentum.x()) || std::isnan(momentum.x()) ||
            std::isinf(momentum.y()) || std::isnan(momentum.y()) ||
            std::isinf(momentum.z()) || std::isnan(momentum.z()) ||

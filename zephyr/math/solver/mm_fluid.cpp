@@ -33,7 +33,15 @@ void MmFluid::set_accuracy(int acc) {
 }
 
 void MmFluid::set_method(Fluxes method) {
-    m_nf = NumFlux::create(method);
+    if (method == Fluxes::CRP) {
+        m_crp = true;
+
+        // По умолчанию для одноматериальных
+        m_nf = NumFlux::create(Fluxes::HLLC);
+    }
+    else {
+        m_nf = NumFlux::create(method);
+    }
 }
 
 void MmFluid::set_gravity(double g) {
@@ -88,7 +96,7 @@ void MmFluid::compute_dt(Mesh &mesh) {
         double dt = std::numeric_limits<double>::infinity();
 
         // скорость звука
-        double c = mixture.sound_speed_rp(
+        double c = mixture.sound_speed_rP(
                 cell(U).density, cell(U).pressure, cell(U).mass_frac,
                 {.T0=cell(U).temperature, .alpha=&cell(U).vol_frac});
 
@@ -109,10 +117,233 @@ void MmFluid::compute_dt(Mesh &mesh) {
     m_dt = m_CFL * dt;
 }
 
+using phys::Eos;
+
+struct Point {
+    double x, t;
+};
+
+struct Char {
+    double x, t, S;
+
+    Point& p() {
+        return (Point &) x;
+    }
+
+    double edge_t() const {
+        double ts = (S * t - x) / S;
+        if (ts <= 0.0) {
+            return std::numeric_limits<double>::infinity();
+        } else {
+            return ts;
+        }
+    }
+};
+
+// Пересечение характеристик, находятся только пересечения во времени дальше,
+// чем время обеих точек исходных характеристик. В обратном случае считается,
+// что характеристики пересекаются на бесконечности t = +inf.
+Point operator&(const Char& c1, const Char& c2) {
+    const double inf = std::numeric_limits<double>::infinity();
+
+    if (c1.S == c2.S) {
+        return {.x = 0.5 * (c1.x + c2.x), .t = inf};
+    }
+
+    double t = (c2.x - c1.x + c1.S * c1.t - c2.S * c2.t) / (c1.S - c2.S);
+
+    if (t <= std::max(c1.t, c2.t)) {
+        return {.x = 0.5 * (c1.x + c2.x), .t = inf};
+    }
+
+    double x = 0.5 * (c1.x + c2.x + c1.S * (t - c1.t) + c2.S * (t - c2.t));
+
+    return {.x = x, .t = t};
+}
+
+// Классическая задача для CRP. Только два материала в паре ячеек.
+// mixture -- список материалов
+// iA, iB -- индексы материалов.
+// zLA, zLB -- чистые состояния в ячейке слева.
+// zRB -- чистое состояние в ячейке справа.
+// delta > 0 -- отступ от грани контактной границы в левой ячейке.
+// dt -- шаг интегрирования
+Flux crp_flux(const smf::PState& zLA, const smf::PState& zLB, const smf::PState& zRB,
+              const Materials& mixture, int iA, int iB, double delta, double dt) {
+    auto &eosA = mixture[iA];
+    auto &eosB = mixture[iB];
+
+    smf::QState qLB(zLB);
+    smf::Flux   fLB(zLB);
+    smf::QState Q_R(zRB);
+    smf::Flux   F_R(zRB);
+
+    // Характеристики из HLL
+    auto[S_0L, S_0R, Q_s1, F_s1] = HLL::wave_config(eosB, qLB, fLB, Q_R, F_R);
+    Char C_0L = {.x = 0.0, .t = 0.0, .S = S_0L};
+    Char C_0R = {.x = 0.0, .t = 0.0, .S = S_0R};
+
+    // Первый поток через грань
+    Flux F1(F_s1, iB);
+
+    // Характеристика начального контакта
+    Char C_0 = {.x = -delta, .t = 0.0, .S = zLA.u()};
+
+    // Первое взаимодействие
+    Point O1 = C_0 & C_0L;
+
+    // Нет взаимодействия за dt
+    if (O1.t >= dt) {
+        return F1;
+    }
+
+    smf::QState Q_L(zLA);
+    smf::Flux   F_L(zLA);
+
+    // Пара характеристик из HLLC
+    auto[S_1L, S_1C, S_1R, Q_s2L, F_s2L, Q_s2R, F_s2R] = HLLC::wave_config(eosA, Q_L, F_L, eosB, Q_s1, F_s1);
+    Char C_1C = {.x = O1.x, .t = O1.t, S_1C};
+    Char C_1R = {.x = O1.x, .t = O1.t, S_1R};
+
+    double tau1 = C_1R.edge_t() / dt;
+    if (tau1 >= 1.0) {
+        return F1;
+    }
+
+    // Второй поток
+    Flux F2(F_s2R, iB);
+
+    // Второе взаимодействие
+    Point O2 = C_1R & C_0R;
+
+    if (O2.t < dt) {
+        std::cerr << "decrease CFL\n";
+    }
+
+    double tau2 = C_1C.edge_t() / dt;
+
+
+    if (tau2 >= 1.0) {
+        return tau1 * F1.arr() + (1.0 - tau1) * F2.arr();
+    }
+
+    Flux F3(F_s2L, iA);
+
+    /*
+    std::cout << "\t\tyep, tau1, tau2: " << tau1 << " " << tau2 << "\n";
+    std::cout << "\t   F1: " << F1 << "\n";
+    std::cout << "\t   F2: " << F2 << "\n";
+    std::cout << "\t   F3: " << F3 << "\n";
+    */
+
+    return tau1 * F1.arr() + (tau2 - tau1) * F2.arr() + (1.0 - tau2) * F3.arr();
+
+
+    /*
+    auto[S_2L, S_2R, Q_s3, F_s3] = HLL::wave_config(eosB, Q_s2R, F_s2R, Q_R, F_R);
+    Char C_2L = {.x = O2.x, .t = O1.t, S_2L};
+    Char C_2R = {.x = O2.x, .t = O1.t, S_2R};
+
+    Point O3 = C_1C & C_2L;
+
+    */
+}
+
+Flux MmFluid::calc_flux(const PState& zL, const PState& zR, double hL, double hR, double dt) {
+    if (!m_crp) {
+        return m_nf->flux(zL, zR, mixture);
+    }
+
+    // Единственный материал в обеих ячейках
+    int iL = zL.beta().index();
+    int iR = zR.beta().index();
+    if (iL >= 0 && iL == iR) {
+        // Одноматериальный поток
+        smf::Flux sm_flux = m_nf->flux(zL.to_smf(), zR.to_smf(), mixture[iL]);
+
+        // Преобразует одноматериальный в многоматериальный
+        return Flux(sm_flux, iL);
+    }
+
+    // Хотя бы одная ячейка чистая
+    if (iL >= 0 || iR >= 0) {
+        // В обеих ячейках чистый материал, но разный, решается "обычным" HLLC
+        if (iL >= 0 && iR >= 0) {
+            //std::cout << "SIMPLE\n";
+            // Интересная версия))
+            //auto flux = HLLC::calc_flux(zL, zR, mixture);
+            return HLLC::calc_flux(zL, zR, mixture);
+        }
+
+        // Одна ячейка смешаная, одна чистая, задача сводится к CRP
+
+        if (iR >= 0) {
+            // Справа чистая ячейка (классическая задача)
+            //std::cout << "CLASSIC\n";
+
+            auto[m1, m2] = zL.beta().pair();
+
+            int iB = iR;
+            int iA = m1 != iB ? m1 : m2;
+
+            auto zLA = zL.extract(mixture, iA);
+            auto zLB = zL.extract(mixture, iB);
+            auto zRB = zR.to_smf();
+
+            double delta = zL.vol_frac[iB] * hL;
+            auto flux = crp_flux(zLA, zLB, zRB, mixture, iA, iB, delta, dt);
+
+
+            return flux;
+        }
+        else {
+            // Слева чистая ячейка (iL >= 0), инвертированная задача
+            //std::cout << "INVERSE\n";
+
+            auto[m1, m2] = zR.beta().pair();
+
+            int iB = iL;
+            int iA = m1 != iB ? m1 : m2;
+
+            auto zLA = zR.extract(mixture, iA);
+            auto zLB = zR.extract(mixture, iB);
+            auto zRB = zL.to_smf();
+
+            double delta = zR.vol_frac[iB] * hR;
+
+            zLA.inverse();
+            zLB.inverse();
+            zRB.inverse();
+
+            auto flux = crp_flux(zLA, zLB, zRB, mixture, iA, iB, delta, dt);
+            flux.inverse();
+
+            return flux;
+        }
+
+        /*
+        std::cout << "\tzL: " << zL << "\n";
+        std::cout << "\tzR: " << zR << "\n";
+
+        std::cout << "\tiA, iB: " << iA << " " << iB << " " << delta << " " << dt << "\n";
+        std::cout << "\tzLA: " << zLA << "\n";
+        std::cout << "\tzLB: " << zLB << "\n";
+        std::cout << "\tzRB: " << zRB << "\n";
+        std::cout << "\tFlux: " << flux << "\n";
+         */
+    }
+    else {
+        std::cout << "TWO MIXED\n";
+        throw std::runtime_error("Not yet");
+    }
+}
+
 void MmFluid::fluxes(Mesh &mesh) {
     mesh.for_each([this](Cell &cell) {
         // Примитивный вектор в ячейке
         PState z_c = cell(U).get_state();
+
+        double V_c = cell.volume();
 
         // Консервативный вектор в ячейке
         QState q_c(z_c);
@@ -125,10 +356,13 @@ void MmFluid::fluxes(Mesh &mesh) {
 
             // Примитивный вектор соседа
             PState z_n;
+            double V_n;
             if (!face.is_boundary()) {
                 z_n = face.neib(U).get_state();
+                V_n = face.neib().volume();
             } else {
                 z_n = boundary_value(z_c, normal, face.flag());
+                V_n = V_c;
             }
 
             // Значение на грани со стороны ячейки
@@ -138,15 +372,19 @@ void MmFluid::fluxes(Mesh &mesh) {
             PState zp = z_n.in_local(normal);
 
             // Численный поток на грани
-            Flux loc_flux = m_nf->flux(zm, zp, mixture);
+            double S = face.area();
+            double hL = V_c / S;
+            double hR = V_n / S;
+
+            Flux loc_flux = calc_flux(zm, zp, hL, hR, m_dt);
             loc_flux.to_global(normal);
 
             // Суммируем поток
-            flux.arr() += loc_flux.arr() * face.area();
+            flux.arr() += loc_flux.arr() * S;
         }
 
         // Обновляем значение в ячейке (консервативные переменные)
-        q_c.arr() -= (m_dt / cell.volume()) * flux.arr();
+        q_c.arr() -= (m_dt / V_c) * flux.arr();
 
         // Новое значение примитивных переменных
         cell(U).next = PState(q_c, mixture, z_c.P(), z_c.T(), z_c.alpha());
@@ -323,7 +561,7 @@ Distributor MmFluid::distributor() const {
 //                                 parent(U).d_dy.arr() * dr.y() +
 //                                 parent(U).d_dz.arr() * dr.z();
 //            child_state.mass_frac.fix();
-//            child_state.sync_temperature_energy_rp(mixture, {.T0 = parent(U).t});
+//            child_state.sync_temperature_energy_rP(mixture, {.T0 = parent(U).t});
 //            child(U).set_state(child_state);
             PState shift = parent(U).d_dx.arr() * dr.x() +
                            parent(U).d_dy.arr() * dr.y() +
@@ -334,7 +572,7 @@ Distributor MmFluid::distributor() const {
             child(U).mass_frac.normalize();
             child(U).energy = parent(U).energy + (parent(U).velocity - child(U).velocity).squaredNorm() / 2 + parent(U).density / child(U).density * shift.energy;
             child(U).pressure = mixture.pressure_re(child(U).density, child(U).energy, child(U).mass_frac, {.P0 = parent(U).pressure, .T0 = parent(U).temperature});
-            child(U).temperature = mixture.temperature_rp(child(U).density, child(U).pressure, child(U).mass_frac, {.T0 = parent(U).temperature});
+            child(U).temperature = mixture.temperature_rP(child(U).density, child(U).pressure, child(U).mass_frac, {.T0 = parent(U).temperature});
             if (child(U).is_bad1()) {
                 std::cerr << "Failed to calc child PState in split\n";
                 std::cerr << "Parent PState: " << parent(U).get_state() << '\n';
@@ -361,12 +599,12 @@ Distributor MmFluid::distributor() const {
         sum.arr() /= parent.volume();
         mean_p /= parent.volume();
         mean_t /= parent.volume();
-        for (auto &b: sum.comp_mass.m_data)
+        for (auto &b: sum.mass_frac.m_data)
             if (b < 0)
                 b = 0;
         PState state(sum, mixture, mean_p, mean_t, Fractions::NaN());
         parent(U).set_state(state);
-//        auto [t, e] = mixture.temperature_energy_rp(parent(U).density, parent(U).p, parent(U).mass_frac, {.T0 = mean_t});
+//        auto [t, e] = mixture.temperature_energy_rP(parent(U).density, parent(U).p, parent(U).mass_frac, {.T0 = mean_t});
 //        parent(U).e = e;
 //        parent(U).t = t;
         if (parent(U).is_bad1()) {

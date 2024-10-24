@@ -17,8 +17,8 @@ smf::Flux Rusanov::calc_flux(const smf::PState &zL, const smf::PState &zR, const
     const double& u_R = zR.velocity.x();
 
     // Скорость звука слева и справа
-    double c_L = eos.sound_speed_rp(zL.density, zL.pressure);
-    double c_R = eos.sound_speed_rp(zR.density, zR.pressure);
+    double c_L = eos.sound_speed_rP(zL.density, zL.pressure);
+    double c_R = eos.sound_speed_rP(zR.density, zR.pressure);
 
     // Оценки скоростей расходящихся волн
     double S_L = std::min({u_L - c_L, u_R - c_R, 0.0});
@@ -51,10 +51,10 @@ mmf::Flux Rusanov::calc_flux(const mmf::PState &zL, const mmf::PState &zR, const
 
     // Скорость звука слева и справа
     Fractions a_L = zL.alpha();
-    double c_L = mixture.sound_speed_rp(zL.density, zL.pressure, zL.mass_frac,
+    double c_L = mixture.sound_speed_rP(zL.density, zL.pressure, zL.mass_frac,
                                         {.T0 = zL.T(), .alpha = &a_L});
     Fractions a_R = zR.alpha();
-    double c_R = mixture.sound_speed_rp(zR.density, zR.pressure, zR.mass_frac,
+    double c_R = mixture.sound_speed_rP(zR.density, zR.pressure, zR.mass_frac,
                                         {.T0 = zR.T(), .alpha = &a_R});
 
     if (std::isnan(c_L) || std::isnan(c_R)) {

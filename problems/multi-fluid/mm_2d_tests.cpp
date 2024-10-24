@@ -81,8 +81,8 @@ void RiemannTesterWithSolver2D(Fluxes flux, int n_cells = 10, int acc = 1, const
     double rho_in = 10, rho_out = 1;
     double p_in = 1e5, p_out = 1e4;
     double u_in = 0, u_out = 0;
-    double e_in = matL->energy_rp(rho_in, p_in), e_out = matR->energy_rp(rho_out, p_out);
-    double t_in = matL->temperature_rp(rho_in, p_in), t_out = matR->temperature_rp(rho_out, p_out);
+    double e_in = matL->energy_rP(rho_in, p_in), e_out = matR->energy_rP(rho_out, p_out);
+    double t_in = matL->temperature_rP(rho_in, p_in), t_out = matR->temperature_rP(rho_out, p_out);
     double x_min = 0.0, x_max = 1.0;
 
     Fractions mass_frac_in({1, 0});
@@ -188,8 +188,8 @@ void vertical_instability_adaptive(double g = 9.81, const std::string &filename 
     double rho_up = 100, rho_down = 20;
     double p_up = 1e4, p_down = 1e4;
     double v_up = 0, v_down = 0;
-    double e_up = mat_up->energy_rp(rho_up, p_up), e_down = mat_down->energy_rp(rho_down, p_down);
-    double t_up = mat_up->temperature_rp(rho_up, p_up), t_down = mat_down->temperature_rp(rho_down, p_down);
+    double e_up = mat_up->energy_rP(rho_up, p_up), e_down = mat_down->energy_rP(rho_down, p_down);
+    double t_up = mat_up->temperature_rP(rho_up, p_up), t_down = mat_down->temperature_rP(rho_down, p_down);
     double x_min = 0, x_max = 0.1;
     double y_min = 0.0, y_max = 0.8;
     double y_jump = 0.5 * (y_max - y_min);
@@ -412,8 +412,8 @@ void vertical_instability_adaptive2(double g = 9.81, const std::string &filename
                 z.velocity = {0, 0, 0};
                 z.pressure = p_jump;
 
-                z.temperature = mixture.temperature_rp(z.density, z.pressure, z.mass_frac);
-                z.energy = mixture.energy_pt(z.pressure, z.temperature, z.mass_frac);
+                z.temperature = mixture.temperature_rP(z.density, z.pressure, z.mass_frac);
+                z.energy = mixture.energy_PT(z.pressure, z.temperature, z.mass_frac);
                 if (z.temperature < 0) {
                     std::cerr << z << '\n';
                     return;
@@ -423,23 +423,23 @@ void vertical_instability_adaptive2(double g = 9.81, const std::string &filename
             } else {
                 if (vol_frac_up > 0.5) {
                     cell(U).set_state(PState(rho_up, {0, 0, 0}, p_up + (y_max - cell.center().y()) * rho_up * g, 1000, 300, mass_frac_up));
-                    cell(U).t = mat_up->temperature_rp(cell(U).rho, cell(U).p);
-                    cell(U).e = mat_up->energy_pt(cell(U).p, cell(U).t);
+                    cell(U).t = mat_up->temperature_rP(cell(U).rho, cell(U).p);
+                    cell(U).e = mat_up->energy_PT(cell(U).p, cell(U).t);
                 } else {
                     cell(U).set_state(PState(rho_down, {0, 0, 0}, p_jump + (y_jump - cell.center().y()) * rho_down * g, 1000, 300, mass_frac_down));
-                    cell(U).t = mat_down->temperature_rp(cell(U).rho, cell(U).p);
-                    cell(U).e = mat_down->energy_pt(cell(U).p, cell(U).t);
+                    cell(U).t = mat_down->temperature_rP(cell(U).rho, cell(U).p);
+                    cell(U).e = mat_down->energy_PT(cell(U).p, cell(U).t);
                 }
             }
             /*
             if (in_up(cell.center())) {
                 cell(U).set_state(PState(rho_up, {0, 0, 0}, p_up + (y_max - cell.center().y()) * rho_up * g, 1000, 300, mass_frac_up));
-                cell(U).t = mat_up->temperature_rp(cell(U).rho, cell(U).p);
-                cell(U).e = mat_up->energy_pt(cell(U).p, cell(U).t);
+                cell(U).t = mat_up->temperature_rP(cell(U).rho, cell(U).p);
+                cell(U).e = mat_up->energy_PT(cell(U).p, cell(U).t);
             } else {
                 cell(U).set_state(PState(rho_down, {0, 0, 0}, p_jump + (y_jump - cell.center().y()) * rho_down * g, 1000, 300, mass_frac_down));
-                cell(U).t = mat_down->temperature_rp(cell(U).rho, cell(U).p);
-                cell(U).e = mat_down->energy_pt(cell(U).p, cell(U).t);
+                cell(U).t = mat_down->temperature_rP(cell(U).rho, cell(U).p);
+                cell(U).e = mat_down->energy_PT(cell(U).p, cell(U).t);
             }
             */
         }
@@ -488,8 +488,8 @@ void kelvin_helmholtz_instability(int acc = 2, const std::string &filename = "ke
     double rho_up = 13, rho_down = 10;
     double p_up = 1e4, p_down = 1e4;
     double u_up = 10, u_down = -10;
-    double e_up = mat_up->energy_rp(rho_up, p_up), e_down = mat_down->energy_rp(rho_down, p_down);
-    double t_up = mat_up->temperature_rp(rho_up, p_up), t_down = mat_down->temperature_rp(rho_down, p_down);
+    double e_up = mat_up->energy_rP(rho_up, p_up), e_down = mat_down->energy_rP(rho_down, p_down);
+    double t_up = mat_up->temperature_rP(rho_up, p_up), t_down = mat_down->temperature_rP(rho_down, p_down);
     double x_min = 0, x_max = 0.2;
     double y_min = 0.0, y_max = 0.15;
     double L = x_max - x_min, H = y_max - y_min;
@@ -618,8 +618,8 @@ void Bubble2D(int n_cells, int acc = 2, const std::string &filename = "output") 
     double rho_wave = 1323.65_kg_m3, rho_water = 1000.0_kg_m3, rho_air = 1.0_kg_m3;
     double p_wave = 1.9e4_bar, p_water = 1.0_bar, p_air = 1.0_bar;
     double u_wave = 681.58_m_s, u_water = 0, u_air = 0;
-    double e_wave = water->energy_rp(rho_wave, p_wave), e_water = water->energy_rp(rho_water, p_water), e_air = air->energy_rp(rho_air, p_air);
-    double t_wave = water->temperature_rp(rho_wave, p_wave), t_water = water->temperature_rp(rho_water, p_water), t_air = air->temperature_rp(rho_air, p_air);
+    double e_wave = water->energy_rP(rho_wave, p_wave), e_water = water->energy_rP(rho_water, p_water), e_air = air->energy_rP(rho_air, p_air);
+    double t_wave = water->temperature_rP(rho_wave, p_wave), t_water = water->temperature_rP(rho_water, p_water), t_air = air->temperature_rP(rho_air, p_air);
 
     double x_min = 0.0_cm, x_max = 1.2_cm;
     double y_min = 0.6_cm, y_max = 1.2_cm;
@@ -770,8 +770,8 @@ void Bubble2DStatic(int n_cells, int acc = 2, const std::string &filename = "out
     double rho_wave = 1323.65_kg_m3, rho_water = 1000.0_kg_m3, rho_air = 1.0_kg_m3;
     double p_wave = 1.9e4_bar, p_water = 1.0_bar, p_air = 1.0_bar;
     double u_wave = 681.58_m_s, u_water = 0, u_air = 0;
-    double e_wave = water->energy_rp(rho_wave, p_wave), e_water = water->energy_rp(rho_water, p_water), e_air = air->energy_rp(rho_air, p_air);
-    double t_wave = water->temperature_rp(rho_wave, p_wave), t_water = water->temperature_rp(rho_water, p_water), t_air = air->temperature_rp(rho_air, p_air);
+    double e_wave = water->energy_rP(rho_wave, p_wave), e_water = water->energy_rP(rho_water, p_water), e_air = air->energy_rP(rho_air, p_air);
+    double t_wave = water->temperature_rP(rho_wave, p_wave), t_water = water->temperature_rP(rho_water, p_water), t_air = air->temperature_rP(rho_air, p_air);
 
     double x_min = 0.0_cm, x_max = 1.2_cm;
     double y_min = 0.6_cm, y_max = 1.2_cm;
@@ -851,8 +851,8 @@ void Bubble2DStatic(int n_cells, int acc = 2, const std::string &filename = "out
             z.velocity = z.mass_frac[0] * z1.velocity + z.mass_frac[1] * z2.velocity;
             z.pressure = z.mass_frac[0] * z1.pressure + z.mass_frac[1] * z2.pressure;
 
-            z.temperature = mixture.temperature_rp(z.density, z.pressure, z.mass_frac);
-            z.energy = mixture.energy_pt(z.pressure, z.temperature, z.mass_frac);
+            z.temperature = mixture.temperature_rP(z.density, z.pressure, z.mass_frac);
+            z.energy = mixture.energy_PT(z.pressure, z.temperature, z.mass_frac);
 
             cell(U).set_state(z);
         } else {
@@ -909,8 +909,8 @@ void AirWithSF62D(int n_cells = 25, int acc = 2, const std::string &filename = "
     double rho_wave = 1153.0_kg_m3, rho_air = 1667.0_kg_m3, rho_sf6 = 5805.0_kg_m3;
     double p_wave = 1.63256e5_bar, p_air = 0.96856e5_bar, p_sf6 = 0.96856e5_bar;
     double u_wave = 133.273_m_s, u_air = 0, u_sf6 = 0;
-    double e_wave = air->energy_rp(rho_wave, p_wave), e_air = air->energy_rp(rho_air, p_air), e_sf6 = sf6->energy_rp(rho_sf6, p_sf6);
-    double t_wave = air->temperature_rp(rho_wave, p_wave), t_air = air->temperature_rp(rho_air, p_air), t_sf6 = sf6->temperature_rp(rho_sf6, p_sf6);
+    double e_wave = air->energy_rP(rho_wave, p_wave), e_air = air->energy_rP(rho_air, p_air), e_sf6 = sf6->energy_rP(rho_sf6, p_sf6);
+    double t_wave = air->temperature_rP(rho_wave, p_wave), t_air = air->temperature_rP(rho_air, p_air), t_sf6 = sf6->temperature_rP(rho_sf6, p_sf6);
 
     double x_min = 0.0_m, x_max = 0.45_m;
     double y_min = 0.0_m, y_max = 0.2_m;
@@ -1017,8 +1017,8 @@ void EjectaProblem(int acc = 2, const std::string &filename = "output") {
     double rhoL = 11.4_g_cm3, rhoR = 1.0_kg_m3;
     double pL = 1.0_bar, pR = 1.0_bar;
     double uL = -1200.0_m_s, uR = -1200.0_m_s;
-    double eL = pb->energy_rp(rhoL, pL), eR = air->energy_rp(rhoR, pR);
-    double tL = pb->temperature_rp(rhoL, pL), tR = air->temperature_rp(rhoR, pR);
+    double eL = pb->energy_rP(rhoL, pL), eR = air->energy_rP(rhoR, pR);
+    double tL = pb->temperature_rP(rhoL, pL), tR = air->temperature_rP(rhoR, pR);
 
     double x_min = 0.0_cm, x_max = 1.6_cm;
     double y_min = 0.0_cm, y_max = 0.1_cm;

@@ -34,16 +34,19 @@ double get_u(AmrStorage::Item& cell) { return cell(U).velocity.x(); }
 double get_p(AmrStorage::Item& cell) { return cell(U).pressure; }
 double get_e(AmrStorage::Item& cell) { return cell(U).energy; }
 double get_T(AmrStorage::Item &cell) { return cell(U).temperature; }
+double get_cln(AmrStorage::Item &cell) { return cell(U).mass_frac.index(); }
 double get_mfrac1(AmrStorage::Item &cell) { return cell(U).mass_frac[0]; }
 double get_mfrac2(AmrStorage::Item &cell) { return cell(U).mass_frac[1]; }
 double get_vfrac1(AmrStorage::Item &cell) { return cell(U).vol_frac[0]; }
 double get_vfrac2(AmrStorage::Item &cell) { return cell(U).vol_frac[1]; }
+double get_rho1(AmrStorage::Item &cell) { return cell(U).get_state().true_density(0); }
+double get_rho2(AmrStorage::Item &cell) { return cell(U).get_state().true_density(1); }
 
 
 int main() {
     // Тестовая задача
     //RarefiedWater test;
-    ToroTest test(2, true);
+    ToroTest test(1, true, false);
 
     // Чистые состояния слева и справа в тесте
     Vector3d Ox = {100.0, 0.0, 0.0};
@@ -75,10 +78,13 @@ int main() {
     pvd.variables += {"p", get_p};
     pvd.variables += {"e", get_e};
     pvd.variables += {"T", get_T};
+    pvd.variables += {"cln", get_cln};
     pvd.variables += {"b1", get_mfrac1};
     pvd.variables += {"b2", get_mfrac2};
     pvd.variables += {"a1", get_vfrac1};
     pvd.variables += {"a2", get_vfrac2};
+    pvd.variables += {"rho1", get_rho1};
+    pvd.variables += {"rho2", get_rho2};
 
     double curr_time = 0.0;
 
@@ -109,16 +115,16 @@ int main() {
 
     // Создаем одномерную сетку
     Strip gen(test.xmin(), test.xmax());
-    gen.set_size(5000);
+    gen.set_size(1000);
 
     // Создать сетку
     EuMesh mesh(U, &gen);
 
     // Создать решатель
     MmFluid solver(mixture);
-    solver.set_CFL(0.7);
-    solver.set_accuracy(2);
-    solver.set_method(Fluxes::HLLC);
+    solver.set_CFL(0.5);
+    solver.set_accuracy(1);
+    solver.set_method(Fluxes::CRP);
 
     for (auto cell: mesh) {
         cell(U).density = test.density(cell.center());
@@ -132,14 +138,14 @@ int main() {
         cell(U).vol_frac[0] = cell.x() < test.x_jump ? 1.0 : 0.0;
         cell(U).vol_frac[1] = cell.x() < test.x_jump ? 0.0 : 1.0;
 
-        cell(U).temperature = mixture.temperature_rp(
+        cell(U).temperature = mixture.temperature_rP(
                 cell(U).density, cell(U).pressure, cell(U).mass_frac);
     }
 
-    double next_write = 0.0;
     size_t n_step = 0;
+    double next_write = 0.0;
 
-    while (curr_time <= 1.01 * test.max_time()) {
+    while (curr_time <= 1.01 * test.max_time() && n_step < 15000000000) {
         if (curr_time >= next_write) {
             std::cout << "\tStep: " << std::setw(6) << n_step << ";"
                       << "\tTime: " << std::setw(6) << std::setprecision(3) << curr_time << "\n";

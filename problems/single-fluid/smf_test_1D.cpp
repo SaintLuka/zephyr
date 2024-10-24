@@ -101,7 +101,7 @@ int main() {
                       }};
     pvd.variables += {"c",
                       [&eos](AmrStorage::Item& cell) -> double {
-                          return eos->sound_speed_rp(cell(U).density, cell(U).pressure);
+                          return eos->sound_speed_rP(cell(U).density, cell(U).pressure);
                       }};
     pvd.variables += {"c_exact",
                       [&exact, &curr_time](const AmrStorage::Item &cell) -> double {
@@ -191,14 +191,14 @@ int main() {
         u_err += V * std::abs(cell(U).velocity.x() - exact.velocity(x, curr_time));
         p_err += V * std::abs(cell(U).pressure     - exact.pressure(x, curr_time));
         e_err += V * std::abs(cell(U).energy       - exact.energy(x, curr_time));
-        c_err += V * std::abs(eos->sound_speed_rp(cell(U).density, cell(U).pressure) -
+        c_err += V * std::abs(eos->sound_speed_rP(cell(U).density, cell(U).pressure) -
                               exact.sound_speed(x, curr_time));
 
         r_avg += V * std::abs(cell(U).density     );
         u_avg += V * std::abs(cell(U).velocity.x());
         p_avg += V * std::abs(cell(U).pressure    );
         e_avg += V * std::abs(cell(U).energy      );
-        c_avg += V * std::abs(eos->sound_speed_rp(cell(U).density, cell(U).pressure));
+        c_avg += V * std::abs(eos->sound_speed_rP(cell(U).density, cell(U).pressure));
     }
     r_err /= r_avg;
     u_err /= u_avg;

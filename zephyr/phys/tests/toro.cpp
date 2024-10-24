@@ -2,7 +2,7 @@
 
 namespace zephyr::phys {
 
-ToroTest::ToroTest(int num, bool multimat) {
+ToroTest::ToroTest(int num, bool multimat, bool adjust_cv) {
     if (!multimat) {
         eos_L = IdealGas::create(1.4);
         eos_R = eos_L;
@@ -98,8 +98,13 @@ ToroTest::ToroTest(int num, bool multimat) {
             throw std::runtime_error("Unknown Toro test (num > 7)");
     }
 
-    eL = eos_L->energy_rp(rL, pL);
-    eR = eos_R->energy_rp(rR, pR);
+    if (multimat && adjust_cv) {
+        eos_L->adjust_cv(rL, pL, 1.0);
+        eos_R->adjust_cv(rR, pR, 1.0);
+    }
+
+    eL = eos_L->energy_rP(rL, pL);
+    eR = eos_R->energy_rP(rR, pR);
 }
 
 void ToroTest::inverse() {
@@ -110,6 +115,7 @@ void ToroTest::inverse() {
     uL *= -1.0;
     uR *= -1.0;
     std::swap(eos_L, eos_R);
+    x_jump = 1.0 - x_jump;
 }
 
 } // namespace zephyr::phys

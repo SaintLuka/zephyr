@@ -27,7 +27,7 @@ public:
 
     /// @brief Конструктор
     /// @param num Номер теста 1..7
-    explicit ToroTest(int num, bool multimat = false);
+    explicit ToroTest(int num, bool multimat = false, bool adjust_cv = true);
 
     /// @brief Симметрично отразить начальные условия
     void inverse();

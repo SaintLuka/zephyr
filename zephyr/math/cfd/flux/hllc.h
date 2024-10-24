@@ -21,12 +21,32 @@ public:
     /// @brief Имя метода
     std::string get_name() const final { return "HLLC"; }
 
+    /// @brief Волновая конфигурация
+    struct WaveConfig {
+        double S_L, S_C, S_R;  ///< Оценки СЗ
+        smf::QState QsL;       ///< Консервативный вектор в возмущенном регионе
+        smf::Flux   FsL;       ///< Вектор потока в возмущенном регионе
+        smf::QState QsR;
+        smf::Flux   FsR;
+    };
+
 
     /// @brief Статическая одноматериальная версия
     static smf::Flux calc_flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos);
 
     /// @brief Одноматериальная версия
     smf::Flux flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) const final;
+
+    /// @brief Волновая конфигурация
+    static WaveConfig wave_config(
+            const phys::Eos& eosL, const smf::PState& zL,
+            const phys::Eos& eosR, const smf::PState& zR);
+
+    /// @brief Волновая конфигурация
+    /// Потоки F_L/F_R не обязательно согласованы с Q_L/Q_R
+    static WaveConfig wave_config(
+            const phys::Eos& eosL, const smf::QState& Q_L, const smf::Flux& F_L,
+            const phys::Eos& eosR, const smf::QState& Q_R, const smf::Flux& F_R);
 
 
     /// @brief Статическая многоматериальная версия

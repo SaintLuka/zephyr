@@ -21,9 +21,9 @@ void test_mixture(Materials& mixture, Fractions& beta, double rho, double eps) {
     std::cout << std::scientific << std::setprecision(2);
 
     dRdE P = mixture.pressure_re(rho, eps, beta, {.deriv = true});
-    auto T = mixture.temperature_rp(rho, P, beta);
-    dPdT V = mixture.volume_pt(P, T, beta);
-    dPdT E = mixture.energy_pt(P, T, beta);
+    auto T = mixture.temperature_rP(rho, P, beta);
+    dPdT V = mixture.volume_PT(P, T, beta);
+    dPdT E = mixture.energy_PT(P, T, beta);
 
     double delta = 1.0e-5;
     double dR = delta * rho;
@@ -33,10 +33,10 @@ void test_mixture(Materials& mixture, Fractions& beta, double rho, double eps) {
 
     double dPdR_E = (mixture.pressure_re(rho + dR, eps, beta) - mixture.pressure_re(rho - dR, eps, beta)) / (2 * dR);
     double dPdE_R = (mixture.pressure_re(rho, eps + dE, beta) - mixture.pressure_re(rho, eps - dE, beta)) / (2 * dE);
-    double dVdP_T = (mixture.volume_pt(P + dP, T, beta) - mixture.volume_pt(P - dP, T, beta)) / (2 * dP);
-    double dVdT_P = (mixture.volume_pt(P, T + dT, beta) - mixture.volume_pt(P, T - dT, beta)) / (2 * dT);
-    double dEdP_T = (mixture.energy_pt(P + dP, T, beta) - mixture.energy_pt(P - dP, T, beta)) / (2 * dP);
-    double dEdT_P = (mixture.energy_pt(P, T + dT, beta) - mixture.energy_pt(P, T - dT, beta)) / (2 * dT);
+    double dVdP_T = (mixture.volume_PT(P + dP, T, beta) - mixture.volume_PT(P - dP, T, beta)) / (2 * dP);
+    double dVdT_P = (mixture.volume_PT(P, T + dT, beta) - mixture.volume_PT(P, T - dT, beta)) / (2 * dT);
+    double dEdP_T = (mixture.energy_PT(P + dP, T, beta) - mixture.energy_PT(P - dP, T, beta)) / (2 * dP);
+    double dEdT_P = (mixture.energy_PT(P, T + dT, beta) - mixture.energy_PT(P, T - dT, beta)) / (2 * dT);
 
     ErrorList err1 = {
             {eps,  E.val},    // Совпадают величины
@@ -77,7 +77,7 @@ void test_mixture(Materials& mixture, Fractions& beta, double rho, double eps) {
 
     double c1 = std::sqrt(P.dR + P.val * P.dE / (rho * rho));
     double c2 = mixture.sound_speed_re(rho, eps, beta);
-    double c3 = mixture.sound_speed_rp(rho, P.val, beta);
+    double c3 = mixture.sound_speed_rP(rho, P.val, beta);
     double c4 = sg.sound_speed_re(rho, eps);
 
     ErrorList err3 = {
@@ -159,8 +159,8 @@ void test_explicit(Materials& mixture, Fractions& alpha, double P, double T) {
     int n = mixture.size();
 
     for (int i = 0; i < n; ++i) {
-        info.rs[i] = 1.0 / mixture[i].volume_pt(P, T);
-        info.es[i] = mixture[i].energy_pt(P, T);
+        info.rs[i] = 1.0 / mixture[i].volume_PT(P, T);
+        info.es[i] = mixture[i].energy_PT(P, T);
     }
 
     info.rho = 0.0;
@@ -172,7 +172,7 @@ void test_explicit(Materials& mixture, Fractions& alpha, double P, double T) {
         info.beta[i] = alpha[i] * info.rs[i] / info.rho;
     }
 
-    info.eps = mixture.energy_pt(P, T, info.beta);
+    info.eps = mixture.energy_PT(P, T, info.beta);
 
     info.print(n);
 }
@@ -191,12 +191,12 @@ void test_implicit_rp(Materials& mixture, Fractions& beta, double rho, double P)
 
     int n = mixture.size();
 
-    info.T = mixture.temperature_rp(rho, P, beta);
-    info.eps = mixture.energy_pt(P, info.T, beta);
+    info.T = mixture.temperature_rP(rho, P, beta);
+    info.eps = mixture.energy_PT(P, info.T, beta);
 
     for (int i = 0; i < n; ++i) {
-        info.rs[i] = 1.0 / mixture[i].volume_pt(P, info.T);
-        info.es[i] = mixture[i].energy_pt(P, info.T);
+        info.rs[i] = 1.0 / mixture[i].volume_PT(P, info.T);
+        info.es[i] = mixture[i].energy_PT(P, info.T);
 
         info.alpha[i] = beta[i] * rho / info.rs[i];
     }
@@ -218,12 +218,12 @@ void test_implicit_rt(Materials& mixture, Fractions& beta, double rho, double T)
 
     int n = mixture.size();
 
-    info.P = mixture.pressure_rt(rho, T, beta);
-    info.eps = mixture.energy_pt(info.P, info.T, beta);
+    info.P = mixture.pressure_rT(rho, T, beta);
+    info.eps = mixture.energy_PT(info.P, info.T, beta);
 
     for (int i = 0; i < n; ++i) {
-        info.rs[i] = 1.0 / mixture[i].volume_pt(info.P, info.T);
-        info.es[i] = mixture[i].energy_pt(info.P, info.T);
+        info.rs[i] = 1.0 / mixture[i].volume_PT(info.P, info.T);
+        info.es[i] = mixture[i].energy_PT(info.P, info.T);
 
         info.alpha[i] = beta[i] * rho / info.rs[i];
     }
@@ -246,11 +246,11 @@ void test_implicit_re(Materials& mixture, Fractions& beta, double rho, double ep
     int n = mixture.size();
 
     info.P = mixture.pressure_re(rho, eps, beta);
-    info.T = mixture.temperature_rp(rho, info.P, beta);
+    info.T = mixture.temperature_rP(rho, info.P, beta);
 
     for (int i = 0; i < n; ++i) {
-        info.rs[i] = 1.0 / mixture[i].volume_pt(info.P, info.T);
-        info.es[i] = mixture[i].energy_pt(info.P, info.T);
+        info.rs[i] = 1.0 / mixture[i].volume_PT(info.P, info.T);
+        info.es[i] = mixture[i].energy_PT(info.P, info.T);
 
         info.alpha[i] = beta[i] * rho / info.rs[i];
     }
@@ -259,6 +259,7 @@ void test_implicit_re(Materials& mixture, Fractions& beta, double rho, double ep
 }
 
 int main() {
+#if 1
     // Смесь
     Materials mixture;
     mixture += IdealGas::create("Air");
@@ -289,7 +290,7 @@ int main() {
     std::cout << "\nTest mixture (explicit)\n";
     test_explicit(mixture, alpha, P_test, T_test);
 
-    std::cout << "\nTest mixture (implicit, (density, p))\n";
+    std::cout << "\nTest mixture (implicit, (density, P))\n";
     test_implicit_rp(mixture, beta, rho_test, P_test);
 
     std::cout << "\nTest mixture (implicit, (density, T))\n";
@@ -297,6 +298,57 @@ int main() {
 
     std::cout << "\nTest mixture (implicit, (density, e))\n";
     test_implicit_re(mixture, beta, rho_test, eps_test);
+
+#else
+
+    // Смесь
+    Materials mixture;
+    mixture += IdealGas::create("Air");
+    mixture += StiffenedGas::create("Water2");
+    mixture += StiffenedGas::create("Copper");
+
+    std::cout << "Mixture:\n";
+    std::cout << "\tMaterial[0]: IdealGas(\"Air\")\n";
+    std::cout << "\tMaterial[1]: StiffenedGas(\"Water2\")\n";
+    std::cout << "\tMaterial[2]: MieGruneisen(\"Cu\")\n";
+
+
+    // Параметры (не согласованы, и не обязаны)
+    double P_test = 90.0_MPa;
+    double T_test = 400.0_C;
+
+    // Объемные доли
+    Fractions alpha = {0.5, 0.3, 0.2};
+
+    ScalarSet vols = {mixture[0].volume_PT(P_test, T_test),
+                      mixture[1].volume_PT(P_test, T_test),
+                      mixture[2].volume_PT(P_test, T_test)};
+
+    ScalarSet rhos = {1.0 / vols[0], 1.0 / vols[1], 1.0 / vols[2]};
+
+    double rho_test = alpha[0] * rhos[0] + alpha[1] * rhos[1] + alpha[2] * rhos[2];
+
+    Fractions beta = alpha.arr() * rhos.arr() / rho_test;
+
+    double v_test = mixture.volume_PT(P_test, T_test, beta);
+    double e_test = mixture.energy_PT(P_test, T_test, beta);
+
+    Fractions alp1 = {0.1, 0.8, 0.1};
+    Fractions alp2 = {0.1, 0.8, 0.1};
+
+    std::cout << std::setprecision(15);
+
+    double P01 = mixture.pressure_re(rho_test, e_test, beta, {.alpha=&alp1});
+    double P02 = mixture.pressure_re2(rho_test, e_test, beta);
+
+    std::cout << "P0: " << P01 << "\n";
+    std::cout << "P0: " << P02 << "\n";
+
+    std::cout << alpha << "\n";
+    std::cout << alp1 << "\n";
+    std::cout << alp2 << "\n";
+
+#endif
 
     return 0;
 }

@@ -45,16 +45,16 @@ void setup_initial(EuMesh &mesh, double u0, double u3, double P0, double P3, dou
         if (cell.center().x() > l) {
             cell(U).velocity.x() = u0;
             cell(U).velocity.y() = 0;
-            cell(U).density = 1.0 / eos.volume_pt(P0, 20.0_C);
+            cell(U).density = 1.0 / eos.volume_PT(P0, 20.0_C);
             cell(U).pressure = P0;
         }
         else {
             cell(U).velocity.x() = u3;
             cell(U).velocity.y() = 0;
-            cell(U).density = 1.0 / eos.volume_pt(P3, 20.0_C);
+            cell(U).density = 1.0 / eos.volume_PT(P3, 20.0_C);
             cell(U).pressure = P3;
         }
-        cell(U).energy = eos.energy_rp(cell(U).density, cell(U).pressure);
+        cell(U).energy = eos.energy_rP(cell(U).density, cell(U).pressure);
     }
 }
 
@@ -174,11 +174,11 @@ int main () {
     pvd.variables += {"inside", get_inside};
     pvd.variables += {"c",
                       [&eos](AmrStorage::Item& cell) -> double {
-                          return eos->sound_speed_rp(cell(U).density, cell(U).pressure);
+                          return eos->sound_speed_rP(cell(U).density, cell(U).pressure);
                       }};
     pvd.variables += {"mach", 
                       [&eos](AmrStorage::Item& cell) -> double {
-                          return abs(cell(U).velocity.x() / eos->sound_speed_rp(cell(U).density, cell(U).pressure));
+                          return abs(cell(U).velocity.x() / eos->sound_speed_rP(cell(U).density, cell(U).pressure));
                       }};
 
     // Создаем сетку

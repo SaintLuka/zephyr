@@ -48,6 +48,9 @@ public:
     dRdE pressure_re(double density, double energy, const Fractions& beta,
                      const Options& options = {}) const;
 
+    dRdE pressure_re2(double density, double energy, const Fractions& beta,
+                     const Options& options = {}) const;
+
     /// @brief Найти внутреннюю энергию смеси
     /// @param density Смесевая плотность
     /// @param pressure Равновесное давление
@@ -56,7 +59,7 @@ public:
     /// приближение для температуры.
     /// @details Решается методом итераций Ньютона по одному уравнению.
     /// Для смеси StiffenedGas точное решение получается за одну итерацию.
-    double energy_rp(double density, double pressure, const Fractions& beta,
+    double energy_rP(double density, double pressure, const Fractions& beta,
                      const Options& options = {}) const;
 
     /// @brief Смесевая скорость звука
@@ -77,7 +80,7 @@ public:
     /// для температуры.
     /// @details Решается метом итераций Ньютона по одному уравнению.
     /// Для смеси StiffenedGas точное решение получается за одну итерацию.
-    double sound_speed_rp(double density, double pressure, const Fractions& beta,
+    double sound_speed_rP(double density, double pressure, const Fractions& beta,
                           const Options& options = {}) const;
 
     /// @brief Найти равновесное давление смеси
@@ -87,7 +90,7 @@ public:
     /// @param options В качестве опции можно передать начальное приближение
     /// для давления.
     /// @details Решается метом итераций Ньютона по одному уравнению.
-    double pressure_rt(double density, double temperature,
+    double pressure_rT(double density, double temperature,
                        const Fractions& beta, const Options& = {}) const;
 
     /// @brief Найти равновесную температуру смеси
@@ -98,7 +101,7 @@ public:
     /// для температуры.
     /// @details Решается метом итераций Ньютона по одному уравнению.
     /// Для смеси StiffenedGas точное решение получается за одну итерацию.
-    double temperature_rp(double density, double pressure,
+    double temperature_rP(double density, double pressure,
                           const Fractions& beta, const Options& options = {}) const;
 
     /// @brief Удельный объем смеси
@@ -108,7 +111,7 @@ public:
     /// @details Быстрая функция, т.к. удельный объем выражается в явном виде
     /// Очевидно, вычислительная сложность увеличивается, если в одном из
     /// уравнений состояния плотность считается неявно (частая ситуация).
-    dPdT volume_pt(double pressure, double temperature,
+    dPdT volume_PT(double pressure, double temperature,
                    const Fractions& beta, const Options& = {}) const;
 
     /// @brief Смесевая энергия
@@ -118,7 +121,7 @@ public:
     /// @details Быстрая функция, т.к. смесевая энергия выражается в явном виде.
     /// Очевидно, вычислительная сложность увеличиывется, если в одном из
     /// уравнений состояния энергия считается неявно (частая ситуация).
-    dPdT energy_pt(double pressure, double temperature,
+    dPdT energy_PT(double pressure, double temperature,
                    const Fractions& beta, const Options& = {}) const;
 
     /// @brief Аппроксимация смеси двучленным уравнением состояния
@@ -147,10 +150,25 @@ public:
     /// @brief Найти равновесные температуру и внутреннюю энергию смеси
     /// @param options В качестве опций целесообразно передавать начальные
     /// приближение для температуры.
-    PairET find_ET(double density, double pressure,
+    PairET find_eT(double density, double pressure,
                    const Fractions& beta, const Options& options = {}) const;
 
 protected:
+    /// Классическая, метод Ньютона, использует функции volume(P, T)
+    double pressure_rT_ver1(double density, double temperature,
+                            const Fractions& beta, const Options& = {}) const;
+
+    // Метод Ньютона, использует функции P(rho, T)
+    double pressure_rT_ver2(double density, double temperature,
+                            const Fractions& beta, const Options& = {}) const;
+
+    /// Классическая, метод Ньютона, использует функции
+    ///   volume(P, T), energy(P, T)
+    PairPT find_PT_ver1(double density, double energy,
+                        const Fractions& beta, const Options& options = {}) const;
+
+    PairPT find_PT_ver2(double density, double energy,
+                        const Fractions& beta, const Options& options = {}) const;
 
     /// @brief Обновить объемные доли (alpha) на новом приближении
     /// итерационного алгоритма
@@ -163,7 +181,7 @@ protected:
                       const Fractions& beta, Fractions& alpha) const;
 
     /// @brief Скорость звука от равновесных температуры и давления
-    double sound_speed_pt(double pressure, double temperature,
+    double sound_speed_PT(double pressure, double temperature,
                           const Fractions& beta, const Options& = {}) const;
 
     /// @brief Массив материалов

@@ -69,7 +69,7 @@ int main() {
     IdealGas eos("Air");
     double T0 = 20.0_C;
     double P0 = 1.0_bar;
-    double R0 = 1.0 / eos.volume_pt(P0, T0);
+    double R0 = 1.0 / eos.volume_PT(P0, T0);
 
     // Создаем одномерную сетку
     Rectangle rect(0.0, 4.0, -2.0, 4.0, true);
@@ -86,7 +86,7 @@ int main() {
         cell(U).rho1 = R0;
         cell(U).v1 = Vector3d(0.0, 0.0, 0.0);
         cell(U).p1 = P0;
-        cell(U).e1 = eos.energy_rp(cell(U).rho1, cell(U).p1);
+        cell(U).e1 = eos.energy_rP(cell(U).rho1, cell(U).p1);
     }
 
     // Число Куранта
@@ -123,7 +123,7 @@ int main() {
             double dt = 1.0e300;
 
             // скорость звука
-            double c = eos.sound_speed_rp(cell(U).rho1, cell(U).p1);
+            double c = eos.sound_speed_rP(cell(U).rho1, cell(U).p1);
             for (auto &face: cell.faces()) {
                 // Нормальная составляющая скорости
                 double vn = cell(U).v1.dot(face.normal());

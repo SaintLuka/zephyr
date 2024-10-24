@@ -5,7 +5,6 @@
 #include <zephyr/utils/error_list.h>
 
 #include <zephyr/phys/eos/ideal_gas.h>
-#include <zephyr/phys/eos/strange_gas.h>
 #include <zephyr/phys/eos/stiffened_gas.h>
 #include <zephyr/phys/eos/mie_gruneisen.h>
 
@@ -33,8 +32,8 @@ int main() {
     // Параметры (не согласованы, и не обязаны)
     double rho_test = 9.1_g_cm3;
     double P_test = 1.0e9;
-    double T_test = Cu->temperature_rp(rho_test, P_test);
-    double e_test = Cu->energy_rp(rho_test, P_test);
+    double T_test = Cu->temperature_rP(rho_test, P_test);
+    double e_test = Cu->energy_rP(rho_test, P_test);
 
     std::cout << "dens_mix: " << rho_test << "\n";
     std::cout << "energy_mix: " << e_test << "\n";

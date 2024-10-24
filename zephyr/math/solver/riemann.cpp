@@ -464,11 +464,11 @@ RiemannSolver::RiemannSolver(
 
     gL = eosL.gamma;
     p0L = eosL.P0;
-    e0L = eosL.eps_0;
+    e0L = eosL.e0;
 
     gR = eosR.gamma;
     p0R = eosR.P0;
-    e0R = eosR.eps_0;
+    e0R = eosR.e0;
 
     compute();
 }

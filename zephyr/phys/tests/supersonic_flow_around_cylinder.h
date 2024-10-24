@@ -63,8 +63,8 @@ public:
     double density(const Vector3d &r) const { return rho; }
 
     /// @brief Начальная внутренняя энергия
-    double energy(const double &x) const { return eos->energy_rp(rho, p); }
-    double energy(const Vector3d &r) const { return eos->energy_rp(rho, p); }
+    double energy(const double &x) const { return eos->energy_rP(rho, p); }
+    double energy(const Vector3d &r) const { return eos->energy_rP(rho, p); }
     
     /// @brief Начальное давление
     double pressure(const double &x) const { return p; }

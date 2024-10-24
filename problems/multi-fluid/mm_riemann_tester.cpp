@@ -93,8 +93,8 @@ RiemannTesterWithSolver(Fluxes flux, const MmTest &test, int n_cells = 10, int a
     double rhoL = test.rhoL, rhoR = test.rhoR;
     double pL = test.pL, pR = test.pR;
     double uL = test.uL, uR = test.uR;
-    double eL = test.matL->energy_rp(rhoL, pL), eR = test.matR->energy_rp(rhoR, pR);
-    double tL = test.matL->temperature_rp(rhoL, pL), tR = test.matR->temperature_rp(rhoR, pR);
+    double eL = test.matL->energy_rP(rhoL, pL), eR = test.matR->energy_rP(rhoR, pR);
+    double tL = test.matL->temperature_rP(rhoL, pL), tR = test.matR->temperature_rP(rhoR, pR);
     double x_min = test.x_min, x_max = test.x_max;
 
     Fractions mass_fracL({1, 0});
@@ -142,7 +142,7 @@ RiemannTesterWithSolver(Fluxes flux, const MmTest &test, int n_cells = 10, int a
                       }};
     pvd.variables += {"c",
                       [&mixture](AmrStorage::Item &cell) -> double {
-                          return mixture.sound_speed_rp(cell(U).rho, cell(U).p, cell(U).mass_frac);
+                          return mixture.sound_speed_rP(cell(U).rho, cell(U).p, cell(U).mass_frac);
                       }};
     pvd.variables += {"c_exact",
                       [&exact, &time](AmrStorage::Item &cell) -> double {
@@ -208,7 +208,7 @@ RiemannTesterWithSolver(Fluxes flux, const MmTest &test, int n_cells = 10, int a
         sum_err(u_err, cell(U).v.x(), exact.velocity(x, max_time));
         sum_err(p_err, cell(U).p, exact.pressure(x, max_time));
         sum_err(e_err, cell(U).e, exact.energy(x, max_time));
-        sum_err(c_err, mixture.sound_speed_rp(cell(U).rho, cell(U).p, cell(U).mass_frac), exact.sound_speed(x, max_time));
+        sum_err(c_err, mixture.sound_speed_rP(cell(U).rho, cell(U).p, cell(U).mass_frac), exact.sound_speed(x, max_time));
     }
     rho_err.first /= n_cells;
     rho_err.second /= n_cells;
@@ -253,8 +253,8 @@ void ImpactProblem(int n_cells = 500, int acc = 2, const std::string &filename =
     double rhoL = 11.4_g_cm3, rhoR = 1.0_kg_m3;
     double pL = 1.0_bar, pR = 1.0_bar;
     double uL = -1200.0_m_s, uR = -1200.0_m_s;
-    double eL = pb->energy_rp(rhoL, pL), eR = air->energy_rp(rhoR, pR);
-    double tL = pb->temperature_rp(rhoL, pL), tR = air->temperature_rp(rhoR, pR);
+    double eL = pb->energy_rP(rhoL, pL), eR = air->energy_rP(rhoR, pR);
+    double tL = pb->temperature_rP(rhoL, pL), tR = air->temperature_rP(rhoR, pR);
 
     Fractions mass_fracL({1, 0});
     Fractions mass_fracR({0, 1});
@@ -343,8 +343,8 @@ RiemannTesterWithSolverCSV(Fluxes flux, const MmTest &test, int n_cells = 10, in
     double rhoL = test.rhoL, rhoR = test.rhoR;
     double pL = test.pL, pR = test.pR;
     double uL = test.uL, uR = test.uR;
-    double eL = test.matL->energy_rp(rhoL, pL), eR = test.matR->energy_rp(rhoR, pR);
-    double tL = test.matL->temperature_rp(rhoL, pL), tR = test.matR->temperature_rp(rhoR, pR);
+    double eL = test.matL->energy_rP(rhoL, pL), eR = test.matR->energy_rP(rhoR, pR);
+    double tL = test.matL->temperature_rP(rhoL, pL), tR = test.matR->temperature_rP(rhoR, pR);
     double x_min = 0.0, x_max = 1.0;
 
     Fractions mass_fracL({1, 0});
@@ -392,7 +392,7 @@ RiemannTesterWithSolverCSV(Fluxes flux, const MmTest &test, int n_cells = 10, in
                       }};
     pvd.variables += {"c",
                       [&mixture](AmrStorage::Item &cell) -> double {
-                          return mixture.sound_speed_rp(cell(U).rho, cell(U).p, cell(U).mass_frac);
+                          return mixture.sound_speed_rP(cell(U).rho, cell(U).p, cell(U).mass_frac);
                       }};
     pvd.variables += {"c_exact",
                       [&exact, &time](AmrStorage::Item &cell) -> double {
@@ -445,7 +445,7 @@ RiemannTesterWithSolverCSV(Fluxes flux, const MmTest &test, int n_cells = 10, in
         sum_err(u_err, cell(U).v.x(), exact.velocity(x, max_time));
         sum_err(p_err, cell(U).p, exact.pressure(x, max_time));
         sum_err(e_err, cell(U).e, exact.energy(x, max_time));
-        sum_err(c_err, mixture.sound_speed_rp(cell(U).rho, cell(U).p, cell(U).mass_frac), exact.sound_speed(x, max_time));
+        sum_err(c_err, mixture.sound_speed_rP(cell(U).rho, cell(U).p, cell(U).mass_frac), exact.sound_speed(x, max_time));
     }
     rho_err.first /= n_cells;
     rho_err.second /= n_cells;
@@ -486,8 +486,8 @@ void ExactSolutionCSV(Fluxes flux, const MmTest &test, int n_cells = 10, const s
     double rhoL = test.rhoL, rhoR = test.rhoR;
     double pL = test.pL, pR = test.pR;
     double uL = test.uL, uR = test.uR;
-    double eL = test.matL->energy_rp(rhoL, pL), eR = test.matR->energy_rp(rhoR, pR);
-    double tL = test.matL->temperature_rp(rhoL, pL), tR = test.matR->temperature_rp(rhoR, pR);
+    double eL = test.matL->energy_rP(rhoL, pL), eR = test.matR->energy_rP(rhoR, pR);
+    double tL = test.matL->temperature_rP(rhoL, pL), tR = test.matR->temperature_rP(rhoR, pR);
     double x_min = 0.0, x_max = 1.0;
 
     Fractions mass_fracL({1, 0});
@@ -527,7 +527,7 @@ void ExactSolutionCSV(Fluxes flux, const MmTest &test, int n_cells = 10, const s
                       }};
     pvd.variables += {"c",
                       [&mixture](AmrStorage::Item &cell) -> double {
-                          return mixture.sound_speed_rp(cell(U).rho, cell(U).p, cell(U).mass_frac);
+                          return mixture.sound_speed_rP(cell(U).rho, cell(U).p, cell(U).mass_frac);
                       }};
     pvd.variables += {"c_exact",
                       [&exact, &time](AmrStorage::Item &cell) -> double {
@@ -647,10 +647,10 @@ void twoCellsFlux() {
 //    PState zR(812.511, {-140.59, -776.187, 0}, -3.79503e+08, 818268, 278.312, {1, 0, 0, 0, 0});
     PState zL(1244.18, {617.159, -0.254738, 0}, 1.32954 * 1e9, 938374, 547.107, {1, 0, 0, 0, 0});
     PState zR(1244.18, {617.159, 0.254738, 0}, 1.32954 * 1e9, 938374, 547.107, {1, 0, 0, 0, 0});
-    zL.energy = matL->energy_rp(zL.density, zL.pressure);
-    zL.temperature = matL->temperature_rp(zL.density, zL.pressure);
-    zR.energy = matR->energy_rp(zR.density, zR.pressure);
-    zR.temperature = matR->temperature_rp(zR.density, zR.pressure);
+    zL.energy = matL->energy_rP(zL.density, zL.pressure);
+    zL.temperature = matL->temperature_rP(zL.density, zL.pressure);
+    zR.energy = matR->energy_rP(zR.density, zR.pressure);
+    zR.temperature = matR->temperature_rP(zR.density, zR.pressure);
 
     std::cout << "ZL: " << zL << "\n" << "zR: " << zR << "\n";
 
@@ -772,7 +772,7 @@ Previous PState: density: 892.942, velocity: {988.304, -123.779, 0}, pressure: 1
     plt::show();
 
 //    p.pressure = mixture.pressure_re(density, energy, mass_frac, {.P0=P0, .T0=T0});
-//    p.temperature = mixture.temperature_rp(density, pressure, mass_frac, {.T0=T0});
+//    p.temperature = mixture.temperature_rP(density, pressure, mass_frac, {.T0=T0});
 }
 
 void find_PT2() {

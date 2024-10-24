@@ -16,6 +16,7 @@ using zephyr::mesh::Cell;
 using zephyr::mesh::Mesh;
 using zephyr::mesh::Distributor;
 using zephyr::geom::Vector3d;
+using zephyr::phys::Materials;
 
 using namespace zephyr::math::mmf;
 
@@ -124,17 +125,16 @@ private:
 
     void fluxes_stage2(Mesh &mesh);
 
+    Flux calc_flux(const PState& zL, const PState& zR, double hL, double hR, double dt);
+
 protected:
-    /// @brief Набор материалов (смесь)
-    phys::Materials mixture;
-
-    NumFlux::Ptr m_nf; ///< Метод расчёта потока
-    int m_acc = 1;     ///< Порядок точности
-    double m_CFL;      ///< Число Куранта
-    double m_g = 0.0;  ///< Ускорение свободного падения, направлено против oy
-    double m_dt;       ///< Шаг интегрирования
-
-    std::mutex out_mu{};
+    Materials mixture;  ///< Список материалов (смесь)
+    NumFlux::Ptr m_nf;  ///< Метод расчёта потока
+    int m_acc = 1;      ///< Порядок точности
+    double m_CFL;       ///< Число Куранта
+    double m_g = 0.0;   ///< Ускорение свободного падения, направлено против oy
+    double m_dt;        ///< Шаг интегрирования
+    bool m_crp;         ///< Композитная задача Римана
 };
 
 std::ostream &operator<<(std::ostream &os, const MmFluid::State &state) {

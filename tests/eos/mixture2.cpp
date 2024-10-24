@@ -52,13 +52,13 @@ int main() {
     double dens1 = 10100.0;
     double pres1 = -1.0e9;
     double vol1  = 1.0 / dens1;
-    double enrg1 = eos1->energy_rp(dens1, pres1);
-    double temp1 = eos1->temperature_rp(dens1, pres1);
+    double enrg1 = eos1->energy_rP(dens1, pres1);
+    double temp1 = eos1->temperature_rP(dens1, pres1);
     double dens2 = 5.0;
     double pres2 = 8.0e6;
     double vol2  = 1.0 / dens2;
-    double enrg2 = eos2->energy_rp(dens2, pres2);
-    double tempA = eos2->temperature_rp(dens2, pres2);
+    double enrg2 = eos2->energy_rP(dens2, pres2);
+    double tempA = eos2->temperature_rP(dens2, pres2);
 
     std::vector<double> mix_dens(x.size());
     std::vector<double> mix_energy(x.size());
@@ -81,12 +81,12 @@ int main() {
 
         Fractions beta = {beta1[i], beta2[i]};
         mix_pres[i] = mixture.pressure_re(mix_dens[i], mix_energy[i], beta);
-        mix_temp[i] = mixture.temperature_rp(mix_dens[i], mix_pres[i], beta);
+        mix_temp[i] = mixture.temperature_rP(mix_dens[i], mix_pres[i], beta);
 
         StiffenedGas gas = mixture.stiffened_gas(mix_dens[i], mix_pres[i], beta);
         mix_gamma[i] = gas.gamma;
         mix_p_min[i] = gas.min_pressure();
-        mix_e0[i] = gas.eps_0;
+        mix_e0[i] = gas.e0;
     }
 
     plt::figure_size(15.0, 8.0);

@@ -115,6 +115,44 @@ int Fractions::index() const {
     return idx;
 }
 
+int Fractions::count() const {
+    int idx = 0;
+    for (int i = 0; i < max_size; ++i) {
+        if (has(i)) {
+            idx = i;
+        }
+    }
+    return idx + 1;
+}
+
+int Fractions::nonzero() const {
+    int counter = 0;
+    for (int i = 0; i < max_size; ++i) {
+        if (has(i)) {
+            ++counter;
+        }
+    }
+    return counter;
+}
+
+std::array<int, 2> Fractions::pair() const {
+    int first = -1;
+    for (int i = 0; i < max_size; ++i) {
+        if (has(i)) {
+            if (first < 0) {
+                // Нашли первое вещество
+                first = i;
+            } else {
+                // Нашли второе вещество
+                return {first, i};
+            }
+        }
+    }
+    // Либо не нашли вещество,
+    // либо нашли только одно
+    return {-1, -1};
+}
+
 void Fractions::normalize() {
     cutoff(1e-14);
 }
@@ -159,6 +197,26 @@ ScalarSet::ScalarSet() {
 
 ScalarSet::ScalarSet(double val) {
     m_data.fill(val);
+}
+
+ScalarSet::ScalarSet(std::initializer_list<double> list) {
+    if (list.size() > Fractions::max_size) {
+        throw std::runtime_error("When construct ScalarSet got list.size() > Fractions::max_size (" +
+                                 std::to_string(list.size()) + " > " + std::to_string(Fractions::max_size));
+    }
+
+    int counter = 0;
+    for (auto &elem: list) {
+        m_data[counter++] = elem;
+    }
+    for (int i = counter; i < Fractions::max_size; ++i) {
+        m_data[i] = 0.0;
+    }
+}
+
+ScalarSet::ScalarSet(double val, int idx) {
+    m_data.fill(0.0);
+    m_data[idx] = val;
 }
 
 ScalarSet::ScalarSet(const Fractions &frac)

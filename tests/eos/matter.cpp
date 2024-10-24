@@ -8,9 +8,11 @@
 #include <zephyr/utils/error_list.h>
 
 #include <zephyr/phys/eos/ideal_gas.h>
-#include <zephyr/phys/eos/strange_gas.h>
 #include <zephyr/phys/eos/stiffened_gas.h>
 #include <zephyr/phys/eos/mie_gruneisen.h>
+
+#include <zephyr/utils/matplotlib.h>
+namespace plt = zephyr::utils::matplotlib;
 
 
 using namespace zephyr::phys;
@@ -19,19 +21,19 @@ using namespace zephyr::math;
 
 
 void test_eos(Eos& eos, double T, double rho) {
-    double P1 = eos.pressure_rt(rho, T);
-    double eps = eos.energy_rp(rho, P1);
+    double P1 = eos.pressure_rT(rho, T);
+    double eps = eos.energy_rP(rho, P1);
 
     // Проверка совместности
     ErrorList err1 = {
             {P1,  eos.pressure_re(rho, eps)},
             {P1,  eos.pressure_re(rho, eps)},
-            {eps, eos.energy_rp(rho, P1)},
-            {P1,  eos.pressure_rt(rho, T)},
-            {rho, 1.0 / eos.volume_pt(P1, T)},
-            {eps, eos.energy_pt(P1, T)},
-            {eps, eos.energy_rt(P1, T)},
-            {T,   eos.temperature_rp(rho, P1)}
+            {eps, eos.energy_rP(rho, P1)},
+            {P1,  eos.pressure_rT(rho, T)},
+            {rho, 1.0 / eos.volume_PT(P1, T)},
+            {eps, eos.energy_PT(P1, T)},
+            {eps, eos.energy_rT(P1, T)},
+            {T,   eos.temperature_rP(rho, P1)}
     };
 
     if (err1.is_ok(1.0e-14)) {
@@ -42,16 +44,16 @@ void test_eos(Eos& eos, double T, double rho) {
 
     // Выражения с производными
     auto P = eos.pressure_re(rho, eps, {.deriv = true});
-    auto V = eos.volume_pt(P, T, {.deriv = true});
-    auto E1 = eos.energy_pt(P, T, {.deriv = true});
-    auto E2 = eos.energy_rt(rho, T, {.deriv = true});
+    auto V = eos.volume_PT(P, T, {.deriv = true});
+    auto E1 = eos.energy_PT(P, T, {.deriv = true});
+    auto E2 = eos.energy_rT(rho, T, {.deriv = true});
 
 
     // Проверка скорости звука
     double c = std::sqrt(P.dR + P.val * P.dE / (rho * rho));
 
     ErrorList err2 = {
-            {c, eos.sound_speed_rp(rho, P)},
+            {c, eos.sound_speed_rP(rho, P)},
             {c, eos.sound_speed_re(rho, E1)}
     };
 
@@ -66,7 +68,7 @@ void test_eos(Eos& eos, double T, double rho) {
 
     ErrorList err3 = {
             {c,    sg.sound_speed_re(rho, E1)},
-            {c,    sg.sound_speed_rp(rho, P)},
+            {c,    sg.sound_speed_rP(rho, P)},
             {P,    sg.pressure_re(rho, E1)},
             {P.dR, sg.pressure_re(rho, E1, {.deriv = true}).dR},
             {P.dE, sg.pressure_re(rho, E1, {.deriv = true}).dE}
@@ -99,32 +101,32 @@ void test_eos(Eos& eos, double T, double rho) {
 
     double dVdP_t = derivative<1, 4>(
             [&](double x) -> double {
-                return eos.volume_pt(x, T);
+                return eos.volume_PT(x, T);
             }, P, dP);
 
     double dVdT_p = derivative<1, 4>(
             [&](double x) -> double {
-                return eos.volume_pt(P, x);
+                return eos.volume_PT(P, x);
             }, T, dT);
 
     double dEdP_t = derivative<1, 4>(
             [&](double x) -> double {
-                return eos.energy_pt(x, T);
+                return eos.energy_PT(x, T);
             }, P, dP);
 
     double dEdT_p = derivative<1, 4>(
             [&](double x) -> double {
-                return eos.energy_pt(P, x);
+                return eos.energy_PT(P, x);
             }, T, dT);
 
     double dEdR_t = derivative<1, 4>(
             [&](double x) -> double {
-                return eos.energy_rt(x, T);
+                return eos.energy_rT(x, T);
             }, rho, dR);
 
     double dEdT_r = derivative<1, 4>(
             [&](double x) -> double {
-                return eos.energy_rt(rho, x);
+                return eos.energy_rT(rho, x);
             }, T, dT);
 
     ErrorList err4 = {
@@ -147,8 +149,28 @@ void test_eos(Eos& eos, double T, double rho) {
 }
 
 int main() {
-    std::cout << std::scientific << std::setprecision(2);
+    std::cout << std::setprecision(16);
 
+    StiffenedGas sg("HeavyGas");
+
+    std::cout << sg.temperature_rP(4.0, 1.0) << "\n";
+
+    auto rho = zephyr::geom::linspace(100, 15000, 200);
+
+    for (auto T: {0.0, 300.0, 800.0}) {
+        std::vector<double> P1(rho.size());
+        for (int i = 0; i < rho.size(); ++i) {
+            P1[i] = sg.pressure_rT(rho[i], T);
+        }
+
+        plt::plot(rho, P1, {{"color", "blue"}, {"label", "T" + std::to_string(T)}});
+    }
+
+    plt::show();
+
+
+
+    /*
     std::cout << "IdealGas(\"Air\")\n";
     IdealGas eos1("Air");
     test_eos(eos1, 145.0_C, 1.3_kg_m3);
@@ -160,6 +182,7 @@ int main() {
     std::cout << "\nMieGruneisen(\"Cu\")\n";
     MieGruneisen eos3("Cu");
     test_eos(eos3, 470.0_C, 9.1_g_cm3);
+     */
 
     return 0;
 }

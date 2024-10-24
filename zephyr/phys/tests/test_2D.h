@@ -144,7 +144,7 @@ public:
 
     /// @brief Начальная внутренняя энергия
     double energy(const Vector3d &r) const { 
-        return eos->energy_rp(density(r), pressure(r));
+        return eos->energy_rP(density(r), pressure(r));
     };
 
     Eos::Ptr get_eos(const Vector3d& r) const {

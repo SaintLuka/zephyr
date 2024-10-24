@@ -74,7 +74,7 @@ public:
 
     /// @brief Начальная внутренняя энергия
     double energy(const Vector3d& r) const final {
-        return eos->energy_rp(density(r), pressure(r));
+        return eos->energy_rP(density(r), pressure(r));
     }
 
     /// @brief Уравнение состояния

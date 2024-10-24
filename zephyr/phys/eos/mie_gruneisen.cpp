@@ -6,7 +6,7 @@
 #include <zephyr/phys/eos/mie_gruneisen.h>
 #include <zephyr/phys/eos/stiffened_gas.h>
 
-namespace zephyr { namespace phys {
+namespace zephyr::phys {
 
 MieGruneisen::MieGruneisen(const std::string &name) {
     table_params(name);
@@ -20,10 +20,10 @@ double MieGruneisen::cold_energy(double rho) const {
     return B / (n * (n - 1.0)) * ((std::pow(v0 * rho, n) - 1.0 + n) / rho - n * v0);
 }
 
-dRdE MieGruneisen::pressure_re(double rho, double eps, const Options& options) const {
+dRdE MieGruneisen::pressure_re(double rho, double e, const Options& options) const {
     double P_c = cold_pressure(rho);
     double e_c = cold_energy(rho);
-    double P = P_c + Gr * rho * (eps - e_c);
+    double P = P_c + Gr * rho * (e - e_c);
     dRdE res{P};
     if (options.deriv) {
         res.dR = (P + B + (n - Gr - 1.0) * P_c) / rho;
@@ -32,31 +32,36 @@ dRdE MieGruneisen::pressure_re(double rho, double eps, const Options& options) c
     return res;
 }
 
-double MieGruneisen::energy_rp(double rho, double P, const Options& options) const {
+double MieGruneisen::energy_rP(double rho, double P, const Options& options) const {
     double P_c = cold_pressure(rho);
     double e_c = cold_energy(rho);
     return e_c + (P - P_c) / (Gr * rho);
 }
 
-double MieGruneisen::sound_speed_re(double rho, double eps, const Options& options) const {
+double MieGruneisen::sound_speed_re(double rho, double e, const Options& options) const {
     double P_c = cold_pressure(rho);
     double e_c = cold_energy(rho);
-    double c2 = Gr * (1.0 + Gr) * (eps - e_c) + (B + n * P_c) / rho;
+    double c2 = Gr * (1.0 + Gr) * (e - e_c) + (B + n * P_c) / rho;
     return std::sqrt(std::max(c2, 1.0e-6));
 }
 
-double MieGruneisen::sound_speed_rp(double rho, double P, const Options& options) const {
+double MieGruneisen::sound_speed_rP(double rho, double P, const Options& options) const {
     double P_c = cold_pressure(rho);
     double c2 = (B + (1.0 + Gr) * P + (n - Gr - 1.0) * P_c) / rho;
     return std::sqrt(std::max(c2, 1.0e-6));
 }
 
-dRdT MieGruneisen::pressure_rt(double rho, double T, const Options& options) const {
+dRdT MieGruneisen::pressure_rT(double rho, double T, const Options& options) const {
     double P_c = cold_pressure(rho);
     return P_c + Gr * Cv * rho * (T - T0);
 }
 
-double MieGruneisen::temperature_rp(double rho, double P, const Options& options) const {
+dRdT MieGruneisen::energy_rT(double rho, double T, const Options& options) const {
+    double e_c = cold_energy(rho);
+    return e_c + Cv * (T - T0);
+}
+
+double MieGruneisen::temperature_rP(double rho, double P, const Options& options) const {
     double P_c = cold_pressure(rho);
     return T0 + (P - P_c) / (Gr * Cv * rho);
 }
@@ -78,7 +83,7 @@ double solve(double A, double C, double nu, double x0) {
     return x;
 }
 
-dPdT MieGruneisen::volume_pt(double P, double T, const Options& options) const {
+dPdT MieGruneisen::volume_PT(double P, double T, const Options& options) const {
     if (P < min_pressure()) {
         return NAN;
     }
@@ -100,14 +105,14 @@ dPdT MieGruneisen::volume_pt(double P, double T, const Options& options) const {
     return res;
 }
 
-dPdT MieGruneisen::energy_pt(double P, double T, const Options& options) const {
+dPdT MieGruneisen::energy_PT(double P, double T, const Options& options) const {
     if (P < min_pressure()) {
         return NAN;
     }
 
-    dPdT vol = volume_pt(P, T, options);
+    dPdT vol = volume_PT(P, T, options);
     double rho = 1.0 / vol;
-    dPdT res{energy_rp(rho, P, options)};
+    dPdT res{energy_rP(rho, P, options)};
     if (options.deriv) {
         double mP_c = -cold_pressure(rho);
         res.dP = mP_c * vol.dP;
@@ -121,10 +126,10 @@ StiffenedGas MieGruneisen::stiffened_gas(double rho, double P, const Options& op
     double e_c = cold_energy(rho);
 
     double gamma = 1.0 + Gr;
-    double eps_0 = e_c + ((Gr - n) * P_c - B) / (Gr * rho);
+    double e_0 = e_c + ((Gr - n) * P_c - B) / (Gr * rho);
     double P0 = (B + (n - Gr - 1.0) * P_c) / gamma;
 
-    return StiffenedGas(gamma, P0, eps_0, NAN);
+    return StiffenedGas(gamma, P0, e_0, NAN);
 }
 
 double MieGruneisen::min_pressure() const {
@@ -238,7 +243,6 @@ void MieGruneisen::table_params(std::string name) {
         n  = 3.7;
         Gr = 2.77;
         Cv = 121.0;
-        T0 = 137.078_C;
     } else if (name == "Pd") {
         r0 = 11950.0;
         c0 = 3955.0;
@@ -320,5 +324,4 @@ void MieGruneisen::table_params(std::string name) {
     v0 = 1.0 / r0;
 }
 
-}
-}
+} // namespace zephyr::phys

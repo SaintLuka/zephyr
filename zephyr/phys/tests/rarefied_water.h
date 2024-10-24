@@ -32,13 +32,13 @@ public:
 
         rL = 0.9_g_cm3;
         uL = 0.0;
-        pL = water->pressure_rt(rL, T);
-        eL = water->energy_rp(rL, pL);
+        pL = water->pressure_rT(rL, T);
+        eL = water->energy_rP(rL, pL);
 
         rR = 1.16_kg_m3;
         uR = 0.0;
-        pR = air->pressure_rt(rR, T);
-        eR = air->energy_rp(rR, pR);
+        pR = air->pressure_rT(rR, T);
+        eR = air->energy_rP(rR, pR);
 
         x_jump = 0.9_cm;
         finish = 5.0_us;

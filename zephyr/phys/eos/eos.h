@@ -27,12 +27,12 @@ public:
 
     /// @brief Вспомогательная функция, удобна для задания начальных условий.
     /// Кроме того, используется в моделях с учетом теплопроводности.
-    virtual dRdT pressure_rt(double density, double temperature,
+    virtual dRdT pressure_rT(double density, double temperature,
                              const Options &options = {}) const;
 
     /// @brief Вспомогательная функция, удобна для задания начальных условий.
     /// Кроме того, используется в моделях с учетом теплопроводности.
-    virtual dRdT energy_rt(double density, double temperature,
+    virtual dRdT energy_rT(double density, double temperature,
                              const Options &options = {}) const;
 
     /// @brief Скорость звука от плотности и энергии
@@ -41,16 +41,16 @@ public:
 
     /// @details Скорость звука от плотности и давления. При известном значении
     /// энергии целесообразно использовать функцию Eos::sound_speed_re.
-    virtual double sound_speed_rp(double density, double pressure,
+    virtual double sound_speed_rP(double density, double pressure,
                                   const Options &options = {}) const;
 
     /// @brief Формула необходима, если в качестве примитивной переменной
     /// используется давление. Тогда формула позволяет вычислить энергию.
-    virtual double energy_rp(double density, double pressure,
+    virtual double energy_rP(double density, double pressure,
                              const Options &options = {}) const;
 
     /// @brief Вспомогательная функция, удобна для задания начальных условий.
-    virtual double temperature_rp(double density, double pressure,
+    virtual double temperature_rP(double density, double pressure,
                                   const Options &options = {}) const;
 
     /// @brief Удельный объем по давлению и температуре. Функция используется
@@ -58,7 +58,7 @@ public:
     /// @param options Для вычисления производных указать {.deriv = true},
     /// также некоторые УрС вычисляют плотность неявно, поэтому целесообразно
     /// передавать начальное приближение для плотности {.rho0 = }
-    virtual dPdT volume_pt(double pressure, double temperature,
+    virtual dPdT volume_PT(double pressure, double temperature,
                            const Options &options = {}) const;
 
     /// @brief Внутрення энергия по давлению и температуре. Функция
@@ -66,7 +66,7 @@ public:
     /// @param options Для вычисления производных указать {.deriv = true},
     /// также некоторые УрС внутри функции вычисляют плотность неявно, поэтому
     /// целесообразно передавать начальное приближение для плотности {.rho0 = }
-    virtual dPdT energy_pt(double pressure, double temperature,
+    virtual dPdT energy_PT(double pressure, double temperature,
                            const Options &options = {}) const;
 
     /// @brief Аппроксимация уравнения состояния двучленным уравнением
@@ -81,6 +81,11 @@ public:
     /// принимает отрицательные значения, квадрат скорости звука становится
     /// отрицательным). Может принимать отрицательные значения.
     virtual double min_pressure() const;
+
+    /// @brief Подгон теплоемкости Cv
+    /// @param rho_ref, P_ref, T_ref Референсные значения плотности, давления
+    /// и температуры.
+    virtual void adjust_cv(double rho_ref, double P_ref, double T_ref);
 
 };
 

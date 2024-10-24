@@ -48,6 +48,8 @@ struct PState {
     /// @brief Возвращает вектор состояния в глобальной системе координат
     PState in_global(const Vector3d &normal) const;
 
+    /// @brief Отражает систему координат
+    void inverse();
 
     // Короткий доступ к полям
     inline const double& rho() const { return density; }
@@ -74,7 +76,7 @@ struct PState {
 
 /// @brief Консервативный вектор состояния
 struct QState {
-    double   mass;      ///< Плотность
+    double   density;   ///< Плотность
     Vector3d momentum;  ///< Плотность импульса:       rho * v
     double   energy;    ///< Плотность полной энергии: rho * (e + 0.5 * v^2)
 
@@ -152,6 +154,7 @@ namespace mmf {
 
 using zephyr::phys::Fractions;
 using zephyr::phys::ScalarSet;
+using zephyr::phys::Materials;
 
 struct QState;
 
@@ -179,7 +182,7 @@ struct PState {
     /// состояния смеси (PT - замыкание).
     /// В качестве начальных приближений в следует передавать начальные
     /// приближения для давления (P0), температуры (T0) и объемных долей (alpha).
-    PState(const QState &q, const phys::Materials &mixture,
+    PState(const QState &q, const Materials &mixture,
            double P0, double T0, const Fractions& alpha);
 
 
@@ -195,6 +198,9 @@ struct PState {
     /// @brief Возвращает вектор состояния в глобальной системе координат
     PState in_global(const Vector3d &normal) const;
 
+    /// @brief Отражает систему координат
+    void inverse();
+
     // Короткий доступ к полям
     inline const double& rho() const { return density; }
     inline const double& u() const { return velocity.x(); }
@@ -206,8 +212,17 @@ struct PState {
     inline const Fractions& alpha() const { return vol_frac; }
     inline const Fractions& beta() const { return mass_frac; }
 
+    /// @brief Плотность компоненты
+    double true_density(int idx) const;
+
+    /// @brief Энергия компоненты energy(P, T)
+    double true_energy(const Materials& mixture, int idx) const;
+
     /// @brief Преобразование в одноматериальный вектор состояния
     smf::PState to_smf() const;
+
+    /// @brief Выделить чистую компоненту материала с индексом idx
+    smf::PState extract(const Materials& mixture, int idx) const;
 
     /// @brief Обновить значения, полученные путем интерполяции.
     /// Восстанавливает согласованность состояния (термодинамических величин).
@@ -217,10 +232,6 @@ struct PState {
 
     bool is_bad() const;
 
-    ScalarSet densities() const;
-
-    ScalarSet energies() const;
-
     /// @brief В поток вывода
     friend std::ostream &operator<<(std::ostream &os, const PState &state);
 
@@ -229,16 +240,16 @@ struct PState {
 
 /// @brief Консервативный многоматериальный вектор состояния
 struct QState {
-    double    mass;       ///< Плотность
+    double    density;    ///< Плотность
     Vector3d  momentum;   ///< Плотность импульса:       rho * v
     double    energy;     ///< Плотность полной энергии: rho * (e + 0.5 * v^2)
-    ScalarSet comp_mass;  ///< Плотности компонент:      rho * beta_i
+    ScalarSet mass_frac;  ///< Плотности компонент:      rho * beta_i
 
     /// @brief Инициализация нулями
     QState();
 
     /// @brief Инициализация с полным заданием параметров
-    QState(double mass, const Vector3d &momentum, double energy, const ScalarSet &mass_frac);
+    QState(double density, const Vector3d &momentum, double energy, const ScalarSet &mass_frac);
 
     /// @brief Преобразование из примитивного вектора состояния
     explicit QState(const PState &z);
@@ -260,21 +271,20 @@ struct QState {
     VECTORIZE(QState)
 };
 
-/**
- * @brief Многоматериальный вектор потока
- * @code
- *  mass = rho * u;
- *  momentum.x() = rho * u^2 + p;
- *  momentum.y() = rho * u * v;
- *  momentum.z() = rho * u * w;
- *  energy = u * (E + p);
- * @endcode
- */
+/// @brief Многоматериальный вектор потока
+/// @code
+///   mass         = rho * u;
+///   momentum.x   = rho * u^2 + P;
+///   momentum.y   = rho * u * v;
+///   momentum.z   = rho * u * w;
+///   energy       = u * (rho * E + P);
+///   mass_frac[i] = rho * u * beta[i];
+/// @endcode
 struct Flux {
-    double mass; ///< rho * u
-    Vector3d momentum;
-    double energy; ///< u * (rho * (E + 0.5 * velocity^2) + p)
-    ScalarSet mass_frac;
+    double    density;    ///< rho * u
+    Vector3d  momentum;
+    double    energy;     ///< u * (rho * (e + 0.5 * v^2) + P)
+    ScalarSet mass_frac;  ///< rho * u * beta_i
 
     /// @brief Нулевой поток
     Flux();
@@ -283,6 +293,10 @@ struct Flux {
 
     /// @brief Дифференциальный поток по вектору примитивных переменных
     explicit Flux(const PState &z);
+
+    /// @brief Преобразует одноматериальный поток материала с индексом mat
+    /// в многоматериальный
+    Flux(const smf::Flux& flux, int mat);
 
     /// @brief Переводит вектор потока в локальную систему координат
     void to_local(const Vector3d &normal);
@@ -295,6 +309,9 @@ struct Flux {
 
     /// @brief Возвращает вектор потока в глобальной системе координат
     Flux in_global(const Vector3d &normal) const;
+
+    /// @brief Отражает систему координат
+    void inverse();
 
     friend std::ostream &operator<<(std::ostream &os, const Flux &flux);
 

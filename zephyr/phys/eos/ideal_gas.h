@@ -31,11 +31,11 @@ public:
                      const Options& options = {}) const final;
 
     /// @brief Вспомогательная функция, удобна для задания начальных условий.
-    dRdT pressure_rt(double density, double temperature,
+    dRdT pressure_rT(double density, double temperature,
                      const Options& options = {}) const final;
 
     /// @brief Вспомогательная функция, удобна для задания начальных условий.
-    dRdT energy_rt(double density, double temperature,
+    dRdT energy_rT(double density, double temperature,
                    const Options& options = {}) const final;
 
     /// @brief Скорость звука от плотности и энергии
@@ -43,27 +43,27 @@ public:
                           const Options& options = {}) const final;
 
     /// @details Скорость звука от плотности и давления
-    double sound_speed_rp(double density, double pressure,
+    double sound_speed_rP(double density, double pressure,
                           const Options& options = {}) const final;
 
     /// @brief Основная формула. Энергия от плотности и давления
-    double energy_rp(double density, double pressure,
+    double energy_rP(double density, double pressure,
                      const Options& = {}) const final;
 
     /// @brief Вспомогательная функция, удобна для задания начальных условий
-    double temperature_rp(double density, double pressure,
+    double temperature_rP(double density, double pressure,
                           const Options& options = {}) const final;
 
     /// @brief Удельный объем по давлению и температуре. Функция используется
     /// в формулах для PT-замыкания.
     /// @param options Передать {.deriv = true}, если необходимы производные
-    dPdT volume_pt(double pressure, double temperature,
+    dPdT volume_PT(double pressure, double temperature,
                    const Options& options = {}) const final;
 
     /// @brief Внутренняя энергия по давлению и температуре. Функция
     /// используется в формулах для PT-замыкания.
     /// @param options Передать {.deriv = true}, если необходимы производные
-    dPdT energy_pt(double pressure, double temperature,
+    dPdT energy_PT(double pressure, double temperature,
                    const Options& options = {}) const final;
 
     /// @brief Аппроксимация уравнения состояния двучленным уравнением
@@ -73,6 +73,10 @@ public:
 
     /// @brief Минимальное значение давления, при котором УрС работает.
     virtual double min_pressure() const;
+
+    /// @brief Подгон теплоемкости Cv
+    virtual void adjust_cv(double density, double pressure,
+                           double temperature);
 
 };
 

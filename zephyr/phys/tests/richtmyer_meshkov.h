@@ -41,19 +41,19 @@ public:
         p0 = 1.0;
         r0 = 0.01;
         u0 = 0.0;
-        e0 = eosR->energy_rp(r0, p0);
+        e0 = eosR->energy_rP(r0, p0);
 
         // Перед фронтом УВ
         pR = 1.0;
         rR = 1.0;
         uR = 0.0;
-        eR = eosR->energy_rp(rR, pR);
+        eR = eosR->energy_rP(rR, pR);
 
         // За фронтом УВ
         pL = pR * (2 * gamma * Ms * Ms - gamma + 1) / (gamma + 1);
         rL = rR * (gamma + 1) * Ms * Ms / (2 + (gamma - 1) * Ms * Ms);
         uL = 2.0 / Ms * std::sqrt(gamma * pR / rR) * (Ms * Ms - 1) / (gamma + 1);
-        eL = eosL->energy_rp(rL, pL);
+        eL = eosL->energy_rP(rL, pL);
 
         x_jump = 0.5;
         x_contact = 1.0;

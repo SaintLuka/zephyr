@@ -28,8 +28,8 @@ public:
         rL = 1.0; rR = 0.125;
         pL = 1.0; pR = 0.1;
         uL = 0.0; uR = 0.0;
-        eL = eos->energy_rp(rL, pL);
-        eR = eos->energy_rp(rR, pR);
+        eL = eos->energy_rP(rL, pL);
+        eR = eos->energy_rP(rR, pR);
 
         x_jump = 0.5;
         finish = 0.2;

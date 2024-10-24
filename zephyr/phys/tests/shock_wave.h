@@ -38,8 +38,8 @@ public:
         rL = rR * ( gamma + 1 ) * Ms * Ms / ( 2 + ( gamma - 1 ) * Ms * Ms );
         uL = 2 / Ms * std::sqrt( gamma * pR / rR ) * ( Ms * Ms - 1 ) / (gamma + 1 );
 
-        eL = eos->energy_rp(rL, pL);
-        eR = eos->energy_rp(rR, pR);
+        eL = eos->energy_rP(rL, pL);
+        eR = eos->energy_rP(rR, pR);
     }
 
     /// @brief Симметрично отразить начальные условия

@@ -94,7 +94,7 @@ void SmFluid::compute_dt(Mesh &mesh) {
         double dt = std::numeric_limits<double>::infinity();
 
         // скорость звука
-        double c = m_eos->sound_speed_rp(cell(U).density, cell(U).pressure);
+        double c = m_eos->sound_speed_rP(cell(U).density, cell(U).pressure);
 
         for (auto &face: cell.faces()) {
             // Нормальная составляющая скорости
@@ -211,7 +211,7 @@ void SmFluid::fluxes_stage1(Mesh &mesh)  {
             PState zm = face_extra.m(z_c);
 
             // Восстанавливаем после интерполяции
-            zm.energy = m_eos->energy_rp(zm.density, zm.pressure);
+            zm.energy = m_eos->energy_rP(zm.density, zm.pressure);
 
             // При некорректной интерполяции
             if (zm.is_bad(*m_eos)) { zm = z_c; }
@@ -283,7 +283,7 @@ void SmFluid::fluxes_stage2(Mesh &mesh)  {
             PState zm = face_extra.m(z_ch);
 
             // Восстанавливаем после интерполяции
-            zm.energy = m_eos->energy_rp(zm.density, zm.pressure);
+            zm.energy = m_eos->energy_rP(zm.density, zm.pressure);
 
             // При некорректной интерполяции
             if (zm.is_bad(*m_eos)) { zm = z_ch; }
@@ -294,7 +294,7 @@ void SmFluid::fluxes_stage2(Mesh &mesh)  {
                 zp = face_extra.p(z_nh);
 
                 // Восстанавливаем после интерполяции
-                zp.energy = m_eos->energy_rp(zp.density, zp.pressure);
+                zp.energy = m_eos->energy_rP(zp.density, zp.pressure);
 
                 // При некорректной интерполяции
                 if (zp.is_bad(*m_eos)) { zp = z_nh; }

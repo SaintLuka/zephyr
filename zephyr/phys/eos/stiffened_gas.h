@@ -8,14 +8,14 @@ namespace zephyr::phys {
 class StiffenedGas : public Eos {
 public:
     double gamma;
-    double Cv;
     double P0;
-    double eps_0;
+    double e0;
+    double Cv;
     double T0;
 
     /// @brief Конструктор с заданием параметров
-    explicit StiffenedGas(double gamma, double p_inf = 0.0,
-                          double eps_0 = 0.0, double Cv = 1.0, double T0 = 0.0);
+    explicit StiffenedGas(double gamma, double P0 = 0.0,
+                          double e0 = 0.0, double Cv = 1.0, double T0 = 0.0);
 
     /// @brief Конструктор для известных материалов
     explicit StiffenedGas(const std::string &name);
@@ -32,11 +32,11 @@ public:
                      const Options& options = {}) const final;
 
     /// @brief Вспомогательная функция, удобна для задания начальных условий.
-    dRdT pressure_rt(double density, double temperature,
+    dRdT pressure_rT(double density, double temperature,
                        const Options& options = {}) const final;
 
     /// @brief Вспомогательная функция, удобна для задания начальных условий.
-    dRdT energy_rt(double density, double temperature,
+    dRdT energy_rT(double density, double temperature,
                    const Options& options = {}) const final;
 
     /// @brief Скорость звука от плотности и энергии
@@ -44,27 +44,27 @@ public:
                           const Options& options = {}) const final;
 
     /// @details Скорость звука от плотности и давления
-    double sound_speed_rp(double density, double pressure,
+    double sound_speed_rP(double density, double pressure,
                           const Options& options = {}) const final;
 
     /// @brief Основная формула. Энергия от плотности и давления
-    double energy_rp(double density, double pressure,
+    double energy_rP(double density, double pressure,
                      const Options& options = {}) const final;
 
     /// @brief Вспомогательная функция, удобна для задания начальных условий
-    double temperature_rp(double density, double pressure,
+    double temperature_rP(double density, double pressure,
                           const Options& options = {}) const final;
 
     /// @brief Удельный объем по давлению и температуре. Функция используется
     /// в формулах для PT-замыкания.
     /// @param options Передать {.deriv = true}, если необходимы производные
-    dPdT volume_pt(double pressure, double temperature,
+    dPdT volume_PT(double pressure, double temperature,
                    const Options& options = {}) const final;
 
     /// @brief Внутренняя энергия по давлению и температуре. Функция
     /// используется в формулах для PT-замыкания.
     /// @param options Передать {.deriv = true}, если необходимы производные
-    dPdT energy_pt(double pressure, double temperature,
+    dPdT energy_PT(double pressure, double temperature,
                    const Options& options = {}) const final;
 
     /// @brief Аппроксимация уравнения состояния двучленным уравнением

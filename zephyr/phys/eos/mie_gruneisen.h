@@ -24,7 +24,7 @@ public:
                      const Options& options = {}) const final;
 
     /// @brief Основная формула. Энергия от плотности и давления
-    double energy_rp(double density, double pressure,
+    double energy_rP(double density, double pressure,
                      const Options& options = {}) const final;
 
     /// @brief Скорость звука от плотности и энергии
@@ -32,15 +32,20 @@ public:
                           const Options& options = {}) const final;
 
     /// @details Скорость звука от плотности и давления
-    double sound_speed_rp(double density, double pressure,
+    double sound_speed_rP(double density, double pressure,
                           const Options& options = {}) const final;
 
     /// @brief Вспомогательная функция, удобна для задания начальных условий.
-    dRdT pressure_rt(double density, double temperature,
-                       const Options& options = {}) const final;
+    dRdT pressure_rT(double density, double temperature,
+                     const Options& options = {}) const final;
+
+    /// @brief Вспомогательная функция, удобна для задания начальных условий.
+    /// Кроме того, используется в моделях с учетом теплопроводности.
+    dRdT energy_rT(double density, double temperature,
+                   const Options &options = {}) const final;
 
     /// @brief Вспомогательная функция, удобна для задания начальных условий
-    double temperature_rp(double density, double pressure,
+    double temperature_rP(double density, double pressure,
                           const Options& options = {}) const final;
 
     /// @brief Удельный объем по давлению и температуре. Функция используется
@@ -48,7 +53,7 @@ public:
     /// @param options Для вычисления производных указать {.deriv = true},
     /// Данный УрС вычисляет плотность неявно, поэтому целесообразно
     /// передавать начальное приближение для плотности {.rho0 = }
-    dPdT volume_pt(double pressure, double temperature,
+    dPdT volume_PT(double pressure, double temperature,
                    const Options& options = {}) const final;
 
     /// @brief Внутренняя энергия по давлению и температуре. Функция
@@ -57,7 +62,7 @@ public:
     /// Для данного уравнения состояния в функции выполняется неявная процедура
     /// для нахождения плотнсти, поэтому целесообразно передавать начальное
     /// приближение для плотности {.rho0 = }
-    dPdT energy_pt(double pressure, double temperature,
+    dPdT energy_PT(double pressure, double temperature,
                    const Options& options = {}) const final;
 
     /// @brief Аппроксимация уравнения состояния двучленным уравнением
