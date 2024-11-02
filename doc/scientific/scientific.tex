@@ -1,0 +1,795 @@
+\documentclass[12pt]{report}
+\usepackage[left=20mm, top=20mm, right=20mm, bottom=20mm, nohead]{geometry}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8x]{inputenc}
+\usepackage[english, russian]{babel}
+\usepackage{graphicx}
+\usepackage{epstopdf}
+\usepackage{cite}
+\usepackage[english,russian]{babel}
+\usepackage{amssymb,amsmath,latexsym,enumerate}
+\usepackage{physics}
+\usepackage{array,longtable,lscape}
+\usepackage{graphicx}
+\usepackage{subfigure,epsfig}
+\usepackage{ulem}
+\usepackage[usenames]{color}
+\usepackage{titlesec}
+\usepackage{comment}
+\usepackage{arydshln}
+\usepackage{dashrule}
+\usepackage{setspace} 
+\usepackage{physics}
+\usepackage{indentfirst}
+
+
+\numberwithin{equation}{chapter}
+
+\newcommand{\eps}{\varepsilon}
+\newcommand{\ups}{\upsilon}
+\newcommand{\half}{\frac{1}{2}}
+
+\newcommand{\class}[1]{\texttt{\textcolor{cyan}{#1}}}
+\newcommand{\namespace}[1]{\texttt{\textcolor{blue}{#1}}}
+\newcommand{\file}[1]{\texttt{#1}}
+
+
+
+\begin{document}
+
+\renewcommand{\contentsname}{Научная документация}
+\tableofcontents
+
+\chapter{Уравнения состояния}
+
+
+\section{Краткие сведения из термодинамики}
+
+Каноническим уравнением состояния называется зависимость одного из четырех термодинамических потенциалов от пары своих естественных переменных:
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{ll}
+    $ U = U(S, \, V) \quad $ & --- внутренняя энергия, \\
+    $ H = H(S, \, P) \quad $ &--- энтальпия, \\
+    $ F = F(T, \, V) \quad $ &--- свободная энергия Гельмгольца,  \\
+    $ G = G(T, \, P) \quad $ &--- потенциал Гиббса,
+\end{tabular}
+\end{center}
+здесь $V$ --- объем, $T$ --- температура, $P$ --- давление.
+Имея выражение для одного из потенциалов в естественных переменных, можно получить выражение для любого другого потенциала в любых переменных, а также зависимость любой переменной от пары других.
+
+К примеру, пусть задано каноническое уравнение состояния $U(S, \, V)$, тогда из первого начала термодинамики следуют выражения для температуры и давления
+\begin{equation*}
+    dU = T \, dS - P \, dV \quad \Rightarrow \quad 
+    T(S, \, V) = \qty(\pdv{U}{S})_{V},
+    \quad
+    P(S, \, V) = \qty(\pdv{U}{V})_{S},
+\end{equation*}
+здесь индексы $_{V}$ и $_{S}$ при производных обозначают дифференцирование при постоянном объеме и энтропии соответственно.
+
+Далее термодинамиеские потенциалы нам не пригодятся, оставим их для физиков"=теоретиков. В расчетной практике нас интересуют более осязаемые удельные (отнесенные к массе) величины: удельный объем $\upsilon = 1 / \rho$, где $\rho$ --- плотность, удельная внутренняя энергия $e$, удельная энтропия $s$, в редких случаях удельная энтальпия $h$. В дальнейшем слово <<удельный>> в большинстве случаев будет опускаться. Величины $e$ и $h$ имеют размерность квадрата скорости.
+\smallskip
+
+Пусть у нас имеется <<практически каноническое>> уравнение состояния для удельной внутренней энергии $e = e(\rho, \, s)$. Для удельной внутренней энергии также справеливо первое начало термодинамики, которое можно записать в виде
+\begin{equation}\label{eq:first_law}
+    d e = T \, ds + \frac{P}{\rho^2} \, d\rho,
+\end{equation}
+отсюда можно получить формулы для давления и температуры в естественных переменных
+\begin{equation}\label{eq:P_and_T}
+    P(\rho, \, s) = \rho^2 \, \qty(\pdv{e}{\rho})_{s} 
+    \qquad \text{и} \qquad
+    T(\rho, \, s) = \qty(\pdv{e}{s})_{\rho}.
+\end{equation}
+Энтропию можно легко исключить из формул, для этого достаточно выразить $s \qty(\rho, \, e)$ из выражения для внутренней энергии и подставить в формулы \eqref{eq:P_and_T}. Таким образом, можно считать, что у нас имеются выражения $P \qty(\rho, \, e)$ и $T \qty(\rho, \, e)$.
+
+Другим важным парметром для газодинамики является скорость звука $c$. Квадарт скорости звука определяется в изоэнтропийном процессе
+\begin{equation}\label{eq:sound_speed_s}
+    c^2(\rho, \, s) = \qty(\pdv{P}{\rho})_{s},
+\end{equation}
+Поскольку в расчетах чаще используется зависимость без энтропии $P(\rho, \, e)$, выражение для скорости звука будет удобнее переписать в переменных $(\rho, \, e)$.
+Рассмотрим изоэнтропийный процесс, из первого начала \eqref{eq:first_law} следует, что вся внутренняя \textit{энергия идет на работу} $de = p \, d\rho / \rho^2$, запишем полный дифференциал давления в различных переменных:
+\begin{align*}
+    & dP(\rho, \, s) = \qty(\pdv{P}{\rho})_{s} \, d\rho = c^2 \, d \rho \\
+    & dP(\rho, \, e) = \qty(\pdv{P}{\rho})_{e} \, d \rho +
+    \qty(\pdv{P}{e})_{\rho} \, d e =
+    \qty[ \qty(\pdv{P}{\rho})_{e} + \frac{P}{\rho^2} \, \qty(\pdv{P}{e})_{\rho} ] \, d \rho
+\end{align*}
+откуда следует, что
+\begin{equation}\label{eq:sound_speed_re}
+    c^2(\rho, \, e) = \qty(\pdv{P}{\rho})_{e} + \frac{P}{\rho^2} \, \qty(\pdv{P}{e})_{\rho}.
+\end{equation}
+\medskip
+
+Возможна и обратная операция: имея классические формулы для уравнений состояния можно получить каноническое уравнение состояния. Рассмотрим идеальный газ. Хорошо известно калорическое уравнение состояния $e = c_v T$ и уравнение Менделеева -- Клапейрона:
+\begin{equation*}
+    P = \frac{R}{\mu} \rho T = \qty(\gamma - 1) c_v \rho \, T,
+\end{equation*}
+в формуле учтено, что $R = (\gamma - 1) \mu c_v$. В формулах выше используются следующие обозначения: $c_v$ --- удельная изохорная теплоемкость, $\gamma$ --- показатель адиабаты, $R$ --- универсальная газовая постоянная, $\mu$ --- молярная масса. Классический вид законов, используемый в газодинамике для описания идеальных газов
+\begin{equation*}
+    P(\rho, \, e) = \qty(\gamma - 1) \rho e, \qquad \qquad
+    e(\rho, \, T) = c_v T.
+\end{equation*}
+Теперь, обладая такими знаниями, попробуем восстановить вид канонического уравнения состояния $e(\rho, \, s)$. Как и ранее, пишем полный дифференциал внутренней энергии (= первое начало термодинамики)
+\begin{multline*}
+    de = 
+    T(\rho, \, e(\rho, \, s)) ds + 
+        \frac{P (\rho, \, e(\rho, \, s)) }{\rho^2} \, d\rho =
+    \frac{1}{c_v} \, e(\rho, s) \, ds + 
+        \frac{1}{\rho^2} (\gamma - 1) \, \rho \, e(\rho, \, s) \, d \rho = \\
+    e(\rho, \, s) \qty( d \frac{s}{c_v} + \qty(\gamma - 1) \, d \ln\rho ) =
+    e(\rho, \, s) \, d \qty(\frac{s}{c_v} + \ln \rho^{\gamma - 1} )
+\end{multline*}
+Далее разделяем переменные
+\begin{equation*}
+    \frac{de}{e(\rho, \, s)} = d \ln e =
+     d \qty(\frac{s}{c_v} + \ln \rho^{\gamma - 1} )
+\end{equation*}
+и после интегрирования получаем
+\begin{equation*}
+    e(\rho, \, s) = e_0 \qty(\frac{\rho}{\rho_0})^{\gamma - 1} \exp \qty(\frac{s}{c_v} )
+\end{equation*}
+--- это и есть каноническое уравнение состояния идеального газа. Физики-теоретики ту же формулу запишут в виде
+\begin{equation}
+    U(S, V, N) = \hat{c}_v k N \qty( \frac{N \Phi}{V} \exp\qty(\frac{S}{k N}) )^{\frac{1}{\hat{c}_v}},
+\end{equation}
+где $\hat{c}_V$ --- безразмерная теплоемкость при постоянном объеме, $N$ --- число частиц, $k$ --- постоянная больцмана и $\Phi$ --- некоторая константа.
+
+В умных книжках по газодинамике также часто упоминается энтропийная функция $\sigma(s)$, в которую включается множитель с энтропией, также расчетники не гнушаются возводить в непонятные степени размерные величины, поэтому не стоит удивляться, если вы найдете где-нибудь уравнение состояния идеального газа в следующем виде:
+\begin{equation*}
+    e \qty( \rho, \, s ) = \sigma \qty( s ) \, \rho^{\gamma - 1}, \qquad \sigma( s ) = C \exp\qty(\frac{s}{c_v}).
+\end{equation*}
+По большому счету в этом нет ничего страшного, в любом случае все константы исчезают при дифференцировании. Про энтропийную функцию нам обычно достаточно знать только то, что $\sigma'(s) = \sigma(s) / c_v$, что справедливо для идеальных газов и для двучленного уравнения состояния. В заключение выпишем формулы для некоторых часто используемых уравнений состояния.
+\bigskip
+
+\section{Простейшие УрС}
+
+\subsection{Идеальный газ (\class{IdealGas})}
+
+Простейшее уравнение состояния:
+\begin{equation}
+    \begin{aligned}
+    & p( \rho, \, e )  &=\;\;&     (\gamma - 1) \rho e,  \\
+    & c^2 ( \rho, \, p )  &=\;\;&     \gamma \,  \frac{p}{\rho}, \\
+    & \sigma(s)           &\sim\;\;&  \frac{p}{\rho^{\gamma}}, \\
+    & e( \rho, \, T )     &=\;\;&     c_v T, \\
+    & c^2 ( \rho, \, T )  &=\;\;&     \gamma \qty(\gamma - 1) c_v T. \\
+    \end{aligned}
+\end{equation}
+\bigskip
+
+
+\subsection{Двучленное уравнение состояния (\class{BiTerm})}
+
+\textbf{Двучленное уравнение состояния} является несложным обобщением уравнения состояния идеального газа:
+\begin{equation}
+    \begin{aligned}
+    & p( \rho, \, e )  &=\;\;&    \qty(\gamma - 1) \rho \qty(e - e_0) - \gamma p_{0},  \\
+    & c^2 ( \rho, \, p )  &=\;\;&    \gamma \frac{p + p_{0}}{\rho}, \\
+    & \sigma(s)           &\sim\;\;& \frac{p + p_0}{\rho^{\gamma}}, \\
+    & e( \rho, \, T )  &=\;\;&    c_v T + e_0 + \frac{p_0}{\rho},  \\
+    & c^2 ( \rho, \, T )  &=\;\;&    \gamma \qty(\gamma - 1) c_v T. \\
+    \end{aligned}
+\end{equation}
+
+В англоязычной литературе данное уравнение состояния именуется \textbf{\textit{<<Stiffened Gas>>}}. В русскоязычной литературе в обозначениях часто используются немного другие параметры, к которым можно перейти с помощью замены:
+\begin{equation}
+p_0 = \frac{\rho_0 c_0^2}{\gamma} \qquad e_0 = - \frac{c_0^2}{\gamma - 1}.
+\end{equation}
+Из этих обозначений видно, что параметр $e_0$ меньше нуля. В таких переменных формула давления будет выглядеть следующим образом:
+\begin{equation}
+p(\rho, \, e) = \qty( \gamma - 1) \rho e + c_0^2 \qty( \rho - \rho_0 ).
+\end{equation}
+Далее в книге будет использована запись с параметрами $e_0$ и $p_0$, хотя константа $e_0$ вообще не имеет значения в большинстве случаев. Двучленное уравнение состояния используется для моделирования процессов в воде, а также в металлах при высоких давлениях. Двучленное уравнение состояния переходит в уравнение состояния идеального газа при $p_0 = 0$ и $e_0 = 0$.
+\medskip
+  
+  
+
+\subsection{Ми--Грюнайзен (\class{MieGruneisen})}
+
+Аналогичное уравнение состояние было реализовано в классе \class{Monaghan} и в классе \class{Linear} (с параметром $n = 1$):
+\begin{equation}
+P_{ref} \qty(\ups) = \frac{B}{n} \qty[ \qty(\frac{\ups_0}{\ups})^{n} - 1],
+\end{equation}
+\begin{equation}
+e_{ref} \qty(\ups) = \frac{B}{n \qty(n - 1)} \qty( \qty[ \qty(\frac{\ups_0}{\ups})^{n} + n - 1] \ups - n \ups_0 ),
+\end{equation}
+здесь референсной является кривая холодного давления $P_{ref} (\ups)$, при этом референсная энергия получается путем интегрирования, то есть референсные давление и энергия связаны формулами:
+\begin{equation}
+    e'_{ref} \qty( \ups ) = - P_{ref} \qty( \ups ).
+\end{equation}
+Чтобы быстро считать производные
+\begin{equation}
+    P'_{ref} \qty( \ups ) = - \frac{n P_{ref} \qty( \ups ) + B}{\ups}.
+\end{equation}
+
+Основная формула
+\begin{equation}
+P \qty(\ups, \, e ) - P_{ref} \qty( \ups ) = \frac{\Gamma}{\ups} \qty( e - e_{ref} \qty( \rho ) ). 
+\end{equation}
+Производные, без необходимости больших повторных вычислений
+\begin{equation}
+\qty( \pdv{P}{\ups} )_{e} = - \frac{1}{\ups} (P + B + (n - \Gamma - 1) \cdot P_{ref} (\ups) ), \qquad
+\qty( \pdv{P}{e} )_{\ups} = \frac{\Gamma}{\ups}.
+\end{equation}
+Отсюда можно выразить скорость звука
+\begin{equation}
+c^2 \qty(\ups, \, P) = \ups \qty( B + \qty( 1 + \Gamma ) P + \qty( n - 1 - \Gamma ) P_{ref} \qty( \ups ) )
+\end{equation}
+Если скомбинировать $P$ и $P_{ref}$, то можно получить зависимость в другой паре переменных:
+\begin{equation}
+c^2(\ups, e) = \Gamma \qty( \Gamma + 1 ) \qty(e - e_{ref} \qty(\ups) ) + \ups \qty(B + \gamma P_{ref} \qty(\ups) ).
+\end{equation}
+
+Удельный объем $\ups \qty(P, \, T)$ удовлетворяет нелинейному уравнению
+\begin{equation}
+\ups \qty( P - P_{ref}(\ups) ) = \Gamma C_v \qty( T - T_0 ),
+\end{equation}
+Уравнение имеет следующий вид:
+\begin{equation}
+    A x - x^{-\nu} = C, \qquad \ups = \ups_0 x,
+\end{equation}
+константы
+\begin{equation}
+\nu = \gamma - 1, \qquad A = 1 + \frac{n P}{B}, \qquad C = \frac{n \Gamma C_v }{\ups_0 B} \qty(T - T_0),
+\end{equation}
+при положительных $A$ уравнение имеет единственное решение, при $A \le 0$ решение может не существовать или не быть единственным. Условие эквивалентно следующему: 
+\begin{equation}
+    P > P_{\min} = - B / n.
+\end{equation}
+Производные $\ups$ выражаются следующим образом:
+\begin{equation}
+    \qty(\pdv{\ups}{P})_{T} = - \frac{\ups}{D}, \qquad
+    \qty(\pdv{\ups}{T})_{P} = \frac{\Gamma C_v}{D}, \qquad
+    D = B + P + \qty(n - 1) P_{ref} \qty(\ups).
+\end{equation}
+
+Энергия от $(P, \, T)$ определяется после нахождения удельного объема, а производные:
+\begin{equation}
+    \qty(\pdv{e}{P})_{T} = - P_{ref} \qty( \ups ) \qty( \pdv{\ups}{P} )_T, \qquad
+    \qty(\pdv{e}{P})_{T} = C_v - P_{ref}c \qty( \ups ) \qty( \pdv{\ups}{T} )_P.
+\end{equation}
+\bigskip
+
+
+\begin{equation}
+P_{c} \qty(\ups) = \frac{B}{\gamma} \qty[ \qty(\frac{\ups_0}{\ups})^{\gamma} - 1], \qquad
+e_{c} \qty(\ups) = \frac{B}{\gamma \qty(\gamma - 1)} \qty( \qty[ \qty(\frac{\ups_0}{\ups})^{\gamma} + \gamma - 1] \ups - \gamma \ups_0 ),
+\end{equation}
+\begin{equation}
+P_{c} \qty(\rho) = \frac{B}{\gamma} \qty[ \qty(\frac{\rho}{\rho_0})^{\gamma} - 1], \qquad
+e_{c} \qty(\rho) = \frac{B}{\gamma \qty(\gamma - 1)} \qty( \qty[ \qty(\frac{\rho}{\rho_0})^{\gamma} + \gamma - 1 ] \frac{1}{\rho} - \gamma \frac{1}{\rho_0} ),
+\end{equation}
+
+Справедливы соотношения
+\begin{equation}
+    e'_{c} \qty( \ups ) = - P_{c} \qty( \ups ),
+    \qquad
+    e'_{c} \qty( \rho ) = \frac{1}{\rho^2} P_{c} \qty( \rho ),
+\end{equation}
+Чтобы быстро считать производные
+\begin{equation}
+    P'_{c} \qty( \ups ) = - \frac{\gamma P_{c} \qty( \ups ) + B}{\ups}, \qquad
+    P'_{c} \qty( \rho ) = \frac{\gamma P_{c} \qty( \rho ) + B}{\rho}.
+\end{equation}
+
+Основная формула
+\begin{equation}
+P \qty(\rho, \, e ) - P_{c} \qty( \rho ) = \Gamma \rho \qty( e - e_{c} \qty( \rho ) ). 
+\end{equation}
+Производные, без необходимости больших повторных вычислений
+\begin{equation}
+\qty( \pdv{P}{\rho} )_{e} = \frac{1}{\rho} \qty( P + B + \qty( \gamma - 1 - \Gamma ) P_{c} \qty( \rho ) ), \qquad
+\qty( \pdv{P}{e} )_{\rho} = \Gamma \rho.
+\end{equation}
+Отсюда можно выразить скорость звука
+\begin{equation}
+c^2 \qty(\rho, \, P) = \frac{1}{\rho} \qty( B + \qty( 1 + \Gamma ) P + \qty( \gamma - 1 - \Gamma ) P_{c} \qty( \rho ) )
+\end{equation}
+Если скомбинировать $P$ и $P_c$, то можно получить зависимость в другой паре переменных:
+\begin{equation}
+c^2(\rho, e) = \Gamma \qty( \Gamma + 1 ) \qty(e - e_c \qty(\rho ) ) + \frac{B + \gamma P_c \qty(\rho)}{\rho}.
+\end{equation}
+
+Удельный объем $\ups \qty(P, \, T)$ удовлетворяет нелинейному уравнению
+\begin{equation}
+\ups \qty( P - P_c(\ups) ) = \Gamma C_v \qty( T - T_0 ),
+\end{equation}
+Уравнение имеет следующий вид:
+\begin{equation}
+    A x - x^{-\nu} = C, \qquad \ups = \ups_0 x,
+\end{equation}
+константы
+\begin{equation}
+\nu = \gamma - 1, \qquad A = 1 + \frac{\gamma P}{B}, \qquad C = \frac{\gamma \Gamma C_v }{\ups_0 B} \qty(T - T_0),
+\end{equation}
+при положительных $A$ уравнение имеет единственное решение, при $A \le 0$ решение может не существовать или не быть единственным. Условие эквивалентно следующему: 
+\begin{equation}
+    P > P_{\min} = - B / \gamma.
+\end{equation}
+Производные $\ups$ выражаются следующим образом:
+\begin{equation}
+    \qty(\pdv{\ups}{P})_{T} = - \frac{\ups}{D}, \qquad
+    \qty(\pdv{\ups}{T})_{P} = \frac{\Gamma C_v}{D}, \qquad
+    D = B + P + \qty(\gamma - 1) P_c \qty(\ups).
+\end{equation}
+
+Энергия от $(P, \, T)$ определяется после нахождения удельного объема, а производные:
+\begin{equation}
+    \qty(\pdv{e}{P})_{T} = - P_c \qty( \ups ) \qty( \pdv{\ups}{P} )_T, \qquad
+    \qty(\pdv{e}{P})_{T} = C_v - P_c \qty( \ups ) \qty( \pdv{\ups}{T} )_P.
+\end{equation}
+
+Остались формулы для StiffenedGas.
+\newpage
+
+
+\subsection{Гюгонио (\class{HugoniotB})}
+
+Референсная кривая $P_{ref}(\ups)$ задается в виде адиабаты Гюгонио, где $\xi = \ups / \ups_0$:
+\begin{equation}\label{eq:hugoniot-b}
+P_{ref}( \xi ) = \left\{
+\begin{aligned}
+& \frac{B \cdot (1 - \xi)}{(1 - a(1 - \xi))^2}, \; &\xi < 1, \quad 
+&\text{-- <<сжатие>>}, \\
+& B \cdot \qty(1 - \xi), \; &\xi \ge 1, \quad 
+&\text{-- <<разгрузка>>}.
+\end{aligned}
+\right.
+\end{equation}
+при этом референсная кривая для энергии $e_{ref}(\ups)$ также должна быть задана в соответствии с ударной адиабатой:
+\begin{equation}
+e_{ref}(\ups) = \half \, P_{ref}(\ups) \qty( \ups_0 - \ups ).
+\end{equation}
+
+Здесь $B$ --- объемный модуль упругости (bulk modulus) при референсном удельном объеме $\ups_0$. Энергия и давление связаны по закону Ми--Грюнайзена:
+\begin{equation}
+\ups \cdot \qty( P - P_{ref}( \ups ) ) \;=\; \Gamma \cdot \qty( e - e_{ref}( \ups ) ).
+\end{equation}
+\smallskip
+
+\textbf{Процедура Уолша--Кристиана.}
+\smallskip
+
+Пусть референсная кривая $P( \ups )$ --- адиабата Гюгонио, тогда референсная температурная кривая $T( \ups )$ является решением следующего обыкновенного дифференциального уравнения \cite{Walsh55}:
+\begin{equation}\label{eq:walsh}
+T'(\ups) + \frac{\Gamma}{V_0} T( \ups ) = \frac{1}{C_v} f( \ups ) = \frac{1}{2 C_v} ( P'( \ups ) (\ups_0 - \ups) + P( \ups ) ).
+\end{equation}
+  
+Если перейти к безрамерной величине $\xi = \ups / \ups_0$, то получим задачу Коши  
+\begin{equation}
+T'(\xi) + \Gamma \, T(\xi) = \frac{V_0}{2C_v} ( P'(\xi) (1 - \xi) + P(\xi) ), \quad T(1) = T_0, \quad \xi = \ups / \ups_0,
+\end{equation}  
+решение которой выражается в виде интеграла.
+
+Применение процедуры Уолша--Кристиана для кривой \eqref{eq:hugoniot-b} при разгрузке $(\xi \ge 1)$ дает простое выражение для $T_{ref}(\ups)$:
+\begin{equation}
+T_{ref}( \xi ) = T_0 \cdot e^{\Gamma \qty(1 - \xi )}, \quad \xi \ge 1,
+\end{equation}
+
+При сжатии ($\xi < 1$) формула несколько усложняется:
+\begin{equation*}
+    T_{ref}( \xi ) = 
+    \left(
+        T_0 + \frac{B \ups_0}{2 a^2 C_v}
+        \Big[
+            3 - g + A \, e^{-\Gamma (1 - \xi)} - 
+            C \big( \mathrm{Ei}( g X ) - \mathrm{Ei}( g ) \big)
+        \Big]
+    \right) 
+    e^{\Gamma (1 - \xi)}
+\end{equation*}
+\begin{equation*}
+    g = \frac{\Gamma}{a}, \quad
+    X = 1 - a (1 - \xi), \quad
+    A = \frac{(4a - \Gamma)(1 - \xi) - 3 + g}{X^2}, \quad
+    C = \left( 2 - 4 g + g^2 \right) e^{-g}
+\end{equation*}
+\medskip
+
+Энергия и температура связаны по формуле, похожей на закон Ми--Грюнайзена:
+\begin{equation}
+e - e_{ref}(\ups) \;=\; C_v \cdot \qty( T - T_{ref}(\ups) ).
+\end{equation}
+\bigskip
+
+
+\subsection{Тейт (\class{Teit})}
+
+Референсная кривая $P_{ref}(\ups)$ задается из двух частей, давление на сжатие совпадает с формулой из раздела <<Ми--Грюнайзен>>, давление при растяжении совпадает с формулой из раздела <<Гюгонио>>:
+\begin{equation}\label{eq:teit}
+P_{ref}( \xi ) = \left\{
+\begin{aligned}
+& \frac{B}{n} \qty[ \qty(\frac{\ups_0}{\ups})^{n} - 1], \; &\ups < \ups_0, \quad 
+&\text{-- <<сжатие>>}, \\
+& B \cdot \qty(1 - \frac{\ups}{\ups_0}), \; &\ups \ge \ups_0, \quad 
+&\text{-- <<разгрузка>>}.
+\end{aligned}
+\right.
+\end{equation}
+
+\begin{equation}
+e_{ref}( \xi ) = \left\{
+\begin{aligned}
+& \frac{B}{n \qty(n - 1)} \qty( \qty[ \qty(\frac{\ups_0}{\ups})^{n} + n - 1] \ups - n \ups_0 ), \; &\ups < \ups_0, \quad 
+&\text{-- <<сжатие>>}, \\
+& \frac{B v_0}{2} \cdot \qty(1 - \frac{\ups}{\ups_0})^2, \; &\ups \ge \ups_0, \quad 
+&\text{-- <<разгрузка>>}.
+\end{aligned}
+\right.
+\end{equation}
+
+Референсные кривые удовлетворяют дифференциальному соотношению на всём диапазоне
+\begin{equation}
+    e'_{ref} \qty( \ups ) = - P_{ref} \qty( \ups ),
+\end{equation}
+кроме того, на участке разгрузки 
+\begin{equation}
+e_{ref}(\ups) = \half \, P_{ref}(\ups) \qty( \ups_0 - \ups ).
+\end{equation}
+
+Сейчас используется референсная температура в виде константы $T_{ref}(\ups) = T_0$, хотя можно было бы в области разгрузки сделать экспоненту:
+\begin{equation}
+T_{ref}( \xi ) = \left\{
+\begin{aligned}
+& T_0, \; &\ups < \ups_0, \quad 
+&\text{-- <<сжатие>>}, \\
+& T_0 \exp \qty[ \Gamma \qty(1 - \frac{\ups}{\ups_0}) ], \; &\ups \ge \ups_0, \quad 
+&\text{-- <<разгрузка>>}.
+\end{aligned}
+\right.
+\end{equation}
+
+
+\section{Уравнение состояния смеси}
+
+
+\section{Уравнение состояния смеси.}
+
+При заданых массовых концентрациях компонент $\beta$, уравнение состояния для смеси определяется следующим образом:
+\begin{equation}\label{eq:closure}
+\left\{
+\begin{aligned}
+&\ups = \ups^{\beta} \qty(P, \, T) = \sum_i \beta_i \ups_i \qty( P, \, T), \\
+&e = e^{\beta} \qty(P, \, T) = \sum_i \beta_i e_i \qty( P, \, T),
+\end{aligned}
+\right.
+\end{equation}
+здесь $\ups = 1 / \rho$ --- удельный объем, $\ups_i (P, \, T)$ и $e_i (P, \, T)$ уравнения состояния для отдельных компонент. В соответствии с уравнением \eqref{eq:closure} явным образом определяется только внутренняя энергия смеси $e \qty(P, \, T)$ и удельный объем смеси $\ups \qty(P, \, T)$, что эквивалентно заданию $\rho \qty( P, \, T)$.
+
+Численные схемы обычно требуют получение зависимостей от других переменных. Так, система уравнений гидродинамики вообще не включает температуру, поэтому исключение температуры из системы \eqref{eq:closure} является важной процедурой. Далее перечислены фукнции, необходимые для работы с большинством численных методик.
+\medskip
+
+1. Определить $P$ при известных $\ups$ (или $\rho$) и $T$:
+\begin{equation}
+P^{k+1} = P^{k} + \frac{\ups - \ups^{\beta}}{\ups^{\beta}_P }.
+\end{equation}
+
+2. Определить $T$ при известных $\ups$ (или $\rho$) и $P$:
+\begin{equation}
+T^{k+1} = T^{k} + \frac{\ups - \ups^{\beta}}{\ups^{\beta}_T}.
+\end{equation}
+
+В схемах выше используются ньютоновские итерации по первому уравнению системы \eqref{eq:closure}.
+\medskip
+
+3. Найти $P$ и $T$ при известных $\rho$ и $e$:
+\begin{equation}
+\begin{aligned}
+& \Delta = \ups^{\beta}_T \, e^{\beta}_P - \ups^{\beta}_P \, e^{\beta}_T, \\
+& P^{k+1} = P^{k} + \frac{ \qty( e - e^{\beta} ) \, \ups^{\beta}_T - \qty(\ups - \ups^{\beta}  ) \, e^{\beta}_{T} }{\Delta} & \\
+& T^{k+1} = T^{k} + \frac{\qty( \ups - \ups^{\beta} ) \, e^{\beta}_P - \qty(e - e^{\beta}  ) \, \ups^{\beta}_{P} }{\Delta}. 
+\end{aligned}
+\end{equation}
+
+В данном случае используются ньютоновские итерации по обоим уравнениям системы \eqref{eq:closure}.
+\medskip
+
+В итерационных формулах выше используются следующие обозначения: $\ups^{\beta}$ и $e^{\beta}$ обозначают удельный объем и внутреннюю энергию смеси от переменных $\qty(P, \, T)$, нижним индексом обозначаются производные смесевых величин по $P$ или $T$. К примеру:
+\begin{equation*}
+    \ups^{\beta}_P = \qty(\pdv{\ups^{\beta}}{P})_{T} = 
+    \sum_{i} \beta_i \qty(\pdv{\ups^{\beta}_i}{P})_{T}, \qquad e^{\beta}_T = \qty(\pdv{e^{\beta}}{T})_{P} = 
+    \sum_{i} \beta_i \qty(\pdv{e^{\beta}_i}{T})_{P}.
+\end{equation*}
+\medskip
+
+Кроме того, могут потребоваться производные:
+\begin{equation}
+    \qty(\pdv{p}{e})_{\ups} = \frac{\ups^{\beta}_T}{\Delta}, \qquad
+    \qty(\pdv{p}{\ups})_{e} = -\frac{e^{\beta}_T}{\Delta}.
+\end{equation}
+
+Формулы получаются после дифференцирования \eqref{eq:closure}. Производные в переменных $\qty( \rho, \, e)$:
+\begin{equation}
+    \qty(\pdv{p}{e})_{\rho} = \qty(\pdv{p}{e})_{\ups} =  \frac{\ups^{\beta}_T}{\Delta}, \qquad
+    \qty(\pdv{p}{\rho})_{e} = -\ups^2 \qty(\pdv{p}{\ups})_{e} = \ups^2 \frac{e^{\beta}_T}{\Delta}.
+\end{equation}
+
+Выражение для скорости звука:
+\begin{equation}\label{eq:pt_sound}
+    c^2 = \ups^2 \qty( p \qty(\pdv{p}{e})_{\ups} - \qty(\pdv{p}{\ups})_{e} ) =
+    \ups^2 \, \frac{ e^{\beta}_{T} + p \ups^{\beta}_T }{\Delta}.
+\end{equation}
+
+Константы двучленного уравнения состояния:
+\begin{equation}
+    P\qty(\rho, e) = \qty(\gamma - 1) \rho \qty(e - e_0) - \gamma P_0.
+\end{equation}
+\begin{equation}
+    \gamma = 1 + \ups \frac{\ups^{\beta}_T}{\Delta},
+    \qquad
+    e_0 = e - \ups \frac{e^{\beta}_T}{\ups^{\beta}_T},
+    \qquad
+    P_0 = \frac{1}{\gamma} \qty( \ups \frac{e^{\beta}_T}{\Delta} - P).
+\end{equation}
+
+Константы аппроксимации можно получить, если приравнять значения давления и первых производных при заданом состоянии $(\rho, \, e, \, P)$. Скорость звука определяется по первым производным, поэтому скорость звука, полученная по формуле \eqref{eq:pt_sound} будет сопадать со скоростью звука для двучленной аппроксимации (легко проверяется).
+\newpage
+
+
+
+
+\subsection{Схема 1.}
+
+При заданых массовых концентрациях компонент $\beta$, уравнение состояния для смеси определяется следующим образом:
+\begin{equation}\label{eq:closure}
+\left\{
+\begin{aligned}
+&\ups = \ups^{\beta} \qty(P, \, T) = \sum_i \beta_i \ups_i \qty( P, \, T), \\
+&e = e^{\beta} \qty(P, \, T) = \sum_i \beta_i e_i \qty( P, \, T),
+\end{aligned}
+\right.
+\end{equation}
+здесь $\ups = 1 / \rho$ --- удельный объем, $\ups_i (P, \, T)$ и $e_i (P, \, T)$ уравнения состояния для отдельных компонент. В соответствии с уравнением \eqref{eq:closure} явным образом определяется только внутренняя энергия смеси $e \qty(P, \, T)$ и удельный объем смеси $\ups \qty(P, \, T)$, что эквивалентно заданию $\rho \qty( P, \, T)$.
+
+Численные схемы обычно требуют получение зависимостей от других переменных. Так, система уравнений гидродинамики вообще не включает температуру, поэтому исключение температуры из системы \eqref{eq:closure} является важной процедурой. Далее перечислены фукнции, необходимые для работы с большинством численных методик.
+\medskip
+
+1. Определить $P$ при известных $\ups$ (или $\rho$) и $T$:
+\begin{equation}
+P^{k+1} = P^{k} + \frac{\ups - \ups^{\beta}}{\ups^{\beta}_P }.
+\end{equation}
+
+2. Определить $T$ при известных $\ups$ (или $\rho$) и $P$:
+\begin{equation}
+T^{k+1} = T^{k} + \frac{\ups - \ups^{\beta}}{\ups^{\beta}_T}.
+\end{equation}
+
+В схемах выше используются ньютоновские итерации по первому уравнению системы \eqref{eq:closure}.
+\medskip
+
+3. Найти $P$ и $T$ при известных $\rho$ и $e$:
+\begin{equation}
+\begin{aligned}
+& \Delta = \ups^{\beta}_T \, e^{\beta}_P - \ups^{\beta}_P \, e^{\beta}_T, \\
+& P^{k+1} = P^{k} + \frac{ \qty( e - e^{\beta} ) \, \ups^{\beta}_T - \qty(\ups - \ups^{\beta}  ) \, e^{\beta}_{T} }{\Delta} & \\
+& T^{k+1} = T^{k} + \frac{\qty( \ups - \ups^{\beta} ) \, e^{\beta}_P - \qty(e - e^{\beta}  ) \, \ups^{\beta}_{P} }{\Delta}. 
+\end{aligned}
+\end{equation}
+
+В данном случае используются ньютоновские итерации по обоим уравнениям системы \eqref{eq:closure}.
+\medskip
+
+В итерационных формулах выше используются следующие обозначения: $\ups^{\beta}$ и $e^{\beta}$ обозначают удельный объем и внутреннюю энергию смеси от переменных $\qty(P, \, T)$, нижним индексом обозначаются производные смесевых величин по $P$ или $T$. К примеру:
+\begin{equation*}
+    \ups^{\beta}_P = \qty(\pdv{\ups^{\beta}}{P})_{T} = 
+    \sum_{i} \beta_i \qty(\pdv{\ups^{\beta}_i}{P})_{T}, \qquad e^{\beta}_T = \qty(\pdv{e^{\beta}}{T})_{P} = 
+    \sum_{i} \beta_i \qty(\pdv{e^{\beta}_i}{T})_{P}.
+\end{equation*}
+\medskip
+
+Кроме того, могут потребоваться производные:
+\begin{equation}
+    \qty(\pdv{p}{e})_{\ups} = \frac{\ups^{\beta}_T}{\Delta}, \qquad
+    \qty(\pdv{p}{\ups})_{e} = -\frac{e^{\beta}_T}{\Delta}.
+\end{equation}
+
+Формулы получаются после дифференцирования \eqref{eq:closure}. Производные в переменных $\qty( \rho, \, e)$:
+\begin{equation}
+    \qty(\pdv{p}{e})_{\rho} = \qty(\pdv{p}{e})_{\ups} =  \frac{\ups^{\beta}_T}{\Delta}, \qquad
+    \qty(\pdv{p}{\rho})_{e} = -\ups^2 \qty(\pdv{p}{\ups})_{e} = \ups^2 \frac{e^{\beta}_T}{\Delta}.
+\end{equation}
+
+Выражение для скорости звука:
+\begin{equation}\label{eq:pt_sound}
+    c^2 = \ups^2 \qty( p \qty(\pdv{p}{e})_{\ups} - \qty(\pdv{p}{\ups})_{e} ) =
+    \ups^2 \, \frac{ e^{\beta}_{T} + p \ups^{\beta}_T }{\Delta}.
+\end{equation}
+
+Константы двучленного уравнения состояния:
+\begin{equation}
+    P\qty(\rho, e) = \qty(\gamma - 1) \rho \qty(e - e_0) - \gamma P_0.
+\end{equation}
+\begin{equation}
+    \gamma = 1 + \ups \frac{\ups^{\beta}_T}{\Delta},
+    \qquad
+    e_0 = e - \ups \frac{e^{\beta}_T}{\ups^{\beta}_T},
+    \qquad
+    P_0 = \frac{1}{\gamma} \qty( \ups \frac{e^{\beta}_T}{\Delta} - P).
+\end{equation}
+
+Константы аппроксимации можно получить, если приравнять значения давления и первых производных при заданом состоянии $(\rho, \, e, \, P)$. Скорость звука определяется по первым производным, поэтому скорость звука, полученная по формуле \eqref{eq:pt_sound} будет сопадать со скоростью звука для двучленной аппроксимации (легко проверяется).
+
+
+\subsection{Схема 2.}
+
+
+\subsubsection*{Начальное приближение}
+
+Если нет начального предположения. Если появилось вещество.
+
+\begin{equation}
+\alpha^{0}_i = \frac{\beta_i \ups_i^{0}}{\sum_i \beta_i \ups^{0}_i}.
+\end{equation}
+
+
+\subsubsection*{Алгоритм $P(\rho, \, T)$}
+
+Пусть известна равновесная температура $T$, плотность смеси $\rho$, а также массовые концентрации компонент $\beta_i$. Требуется определить объемные доли компонент $\alpha_i$ и найти равновесное давление $P$. Решается следующая система уравнений:
+\begin{equation}
+\forall i, j \quad 
+P^{i} \qty( \rho_i, \, T ) = P^{j} \qty( \rho_j, \, T), 
+\qquad
+\sum_{i} \alpha_i = 1,
+\end{equation}
+где $\rho_i = \beta_i \rho / \alpha_i$. Это система на $\alpha_i$, давления здесь вообще нет. Число независимых уравнений равно $m$ --- числу компонент. Если система уравнений имеет единственное решение, тогда каждое уравнение состояния $P^i(\rho_i, \, T)$ в результате выдаст одинаковое давление. Поскольку $\beta_i$ и $\rho$ известны, можно считать, что заданы функции $P^{i} \qty(\alpha_i, \, T) = P^{i}(\beta_i \rho / \alpha_i, \, T)$. Так систему и перепишем:
+\begin{equation}
+\forall i, j \quad 
+P^{i} \qty( \tfrac{\beta_i \rho}{\alpha_i}, \, T ) = P^{k} \qty( \tfrac{\beta_k \rho}{\alpha_k}, \, T), 
+\qquad
+\sum_{i} \alpha_i = 1,
+\end{equation}
+теперь отчетливо видно, что это система из $m$ уравнений на параметры $\alpha_i$. Будем решать систему методом Ньютона. Введем обозначения для частных производных:
+\begin{equation}
+P^{i}_{\alpha} = \pdv{P^{i}}{\alpha_i} = - \frac{\rho_i}{\alpha_i} \qty(\pdv{P^{i}}{\rho})_{T} = -\frac{\rho_i}{\alpha_i} P^{i}_{\rho}.
+\end{equation}
+
+Записываем метод Ньютона $\alpha_i \to \alpha_i + \Delta \alpha_i$. Пусть у нас имеется начальное приближение $\alpha^{0}_i$ такое, что уравнение $\sum_i \alpha^{0}_{i} = 1$ выполнено, тогда приращения на итерациях $\Delta \alpha_i$ должны удовлетворять условию $\sum_i \Delta \alpha_i = 0$. Другие уравнения:
+\begin{equation}
+P^{i} + P^{i}_{\alpha} \Delta \alpha_i = P^{j} + P^{j}_{\alpha} \Delta \alpha_j.
+\end{equation}
+Выразим отсюда $\Delta \alpha_i$, введем обозначение $\xi_i = - 1 / P^{i}_{\alpha}$:
+\begin{equation}
+\Delta \alpha_i = \xi_i \qty[P^{i} - \qty(P^{j} + P^{j}_{\alpha} \Delta \alpha_j ) ].
+\end{equation}
+Если посчитать сумму по $i$, то слева получится ноль, следовательно:
+\begin{equation}
+\sum_i \xi_i P^{i} - \sum_i \xi_i \cdot \qty[ P^{j} + P^{j}_{\alpha} \Delta \alpha_j] = 0,
+\end{equation}
+Введем обозначения $A_{\xi} = \sum_i \xi_i$, $B_{\xi} = \sum_i \xi_i P^{i}$, получится расчетная схема:
+\begin{equation}
+\Delta \alpha_i = \xi_i \cdot \qty( P^{i} \qty(\rho_i, \, T) - \frac{B_{\xi}}{A_{\xi}} ).
+\end{equation}
+Можно убедиться, что $\sum_i \Delta \alpha_i = 0$. 
+
+Подробная схема вычисления. На $k$-ой итерации имеются значения $\alpha^{k}_{i}$, при этом выполнено условие $\sum_i \alpha^{k}_{i} = 1$.
+\begin{equation}
+\rho_i = \frac{\beta_i \rho}{\alpha^{k}_i},
+\quad
+\xi_i = \frac{\alpha_i}{\rho_i P_{\rho}^{i} \qty( \rho_i, \, T)},
+\quad
+A_{\xi} = \sum_i \xi_i,
+\quad
+B_{\xi} = \sum_i \xi_i P^{i}  \qty( \rho_i, \, T).
+\end{equation}
+\begin{equation}
+\Delta \alpha_i = \xi_i \cdot \qty( P^{i} \qty(\rho_i, \, T) - \frac{B_{\xi}}{A_{\xi}} ).
+\end{equation}
+Затем мы $\Delta \alpha_i$ умножаем на некоторую константу $\chi$, такую, чтобы $\forall i \quad 0 < \alpha^{k}_i + \Delta \alpha_i < 1$. Подробнее расписать? После этого давление считается как среднее для всех компонент, при этом каждая компонента по факту одно и то же должна давать.
+
+\subsubsection*{Алгоритм $P(\rho, \, e)$ и $T(\rho, \, e)$}
+
+Пусть известны массовые концентрации компонент $\beta_i$, плотность смеси $\rho$ и внутренняя энергия смеси $e$. Требуется определить объемные доли компонент $\alpha_i$ и найти равновесные температуру $T$ и давление $P$. Будем решать следующую систему уравнений:
+\begin{equation}
+\forall i, j \quad 
+P^{i} \qty( \rho_i, \, T ) = P^{j} \qty( \rho_j, \, T), 
+\qquad
+\sum_{i} \alpha_i = 1,
+\qquad
+\sum_{i} \beta_i e^{i} \qty( \rho_i, \, T) = e.
+\end{equation}
+где $\rho_i = \beta_i \rho / \alpha_i$. Это система на $\alpha_i$ и $T$, давления здесь вообще нет. Число независимых уравнений равно $m + 1$. Если система уравнений имеет единственное решение, тогда каждое уравнение состояния $P^i(\rho_i, \, T)$ в результате выдаст одинаковое давление. Поскольку $\beta_i$ и $\rho$ известны, можно считать, что заданы функции 
+$$P^{i} \qty(\alpha_i, \, T) = P^{i}(\beta_i \rho / \alpha_i, \, T),
+\qquad
+e^{i} \qty(\alpha_i, \, T) = e^{i}(\beta_i \rho / \alpha_i, \, T).$$
+
+Помимо начального приближения $\alpha^{0}$ добавляется $T^{0}$. Последние два уравнения с суммами распишем по Ньютону:
+\begin{equation}
+\begin{aligned}
+&\sum_i \Delta \alpha_i = 0, \\
+&\sum_i \beta_i e^{i}_{\alpha} \Delta \alpha_i = e - e^{\beta} - e^{\beta}_{T} \Delta T,
+\end{aligned}
+\end{equation}
+где $e^{\beta}$ --- внутренняя энергия смеси как функция $(\rho, \, T)$:
+\begin{equation}
+e^{\beta} = \sum_i \beta_i e^{i} \qty(\rho_i, \, T), 
+\qquad
+e^{\beta}_T = \sum_i \beta_i e^{i}_T \qty(\rho_i, \, T).
+\end{equation}
+
+Пилим Ньютона для уравнений на давление:
+\begin{equation}
+P^{i} + P^{i}_{\alpha} \Delta \alpha_i + P^{i}_{T} \Delta T = P^{j} + P^{j}_{\alpha} \Delta \alpha_j + P^{j}_{T} \Delta T .
+\end{equation}
+
+Выразим отсюда $\Delta \alpha_i$:
+\begin{equation}
+\Delta \alpha_i = \frac{1}{P^{i}_{\alpha}} \qty[ P^{j} + P^{j}_{\alpha} \Delta \alpha_j + P^{j}_{T} \Delta T - P^{i} - P^{i}_T \Delta T],
+\end{equation}
+и добавим множитель:
+\begin{equation}
+\beta_i e^{i}_{\alpha} \Delta \alpha_i = \frac{\beta_i e^{i}_{\alpha}}{P^{i}_{\alpha}} \qty[P^{j} + P^{j}_{\alpha} \Delta \alpha_j + P^{j}_{T} \Delta T - P^{i} - P^{i}_T \Delta T ].
+\end{equation}
+Коэффициент перед скобкой обозначим как $\eta_i$:
+\begin{equation}
+\beta_i e^{i}_{\alpha} \Delta \alpha_i = \eta_i \qty[P^{j} + P^{j}_{\alpha} \Delta \alpha_j + P^{j}_{T} \Delta T - P^{i} - P^{i}_T \Delta T ].
+\end{equation}
+
+Просуммируем по $i$, слева получится выражение с энергиями:
+\begin{equation}
+e - e^{\beta} - e^{\beta}_{T} \Delta T = \qty( \Sigma_i \eta_i ) \qty[P^{j} + P^{j}_{\alpha} \Delta \alpha_j + P^{j}_{T} \Delta T] - \qty( \Sigma_i \eta_i P^{i} ) - \qty( \Sigma_i \eta_i P^{i}_T ) \Delta T.
+\end{equation}
+Введем обозначения для сумм в скобках:
+\begin{equation}
+\eta_i = \frac{\beta_i e^{i}_{\rho}}{P^{i}_{\rho}}, \qquad
+A_{\eta} = \sum_i \eta_i , \qquad
+B_{\eta} = \sum_i \eta_i P^{i}, \qquad
+C_{\eta} = \sum_i \eta_i P^{i}_T.
+\end{equation}
+
+Кажется, всё не так плохо.
+\begin{equation}
+e - e^{\beta} - e^{\beta}_{T} \Delta T = A_{\eta} \qty( P^{i} + P^{i}_{\alpha} \Delta \alpha_i + P^{i}_{T} \Delta T) - B_{\eta} - C_{\eta} \Delta T.
+\end{equation}
+
+Введем величину $\xi_i = - 1 / P^{i}_{\alpha}$, как и ранее. Умножим всё на $\xi_i$:
+\begin{equation}
+\xi_i \qty[ e - e^{\beta} - e^{\beta}_{T} \Delta T ] = A_{\eta} \qty[ \xi_i P^{i} - \Delta \alpha_i + \xi_i P^{i}_{T} \Delta T ] - \xi_i B_{\eta} - \xi_i C_{\eta} \Delta T.
+\end{equation}
+
+Теперь это всё нужно просуммировать по $i$ и учесть, что $\sum_i \Delta \alpha_i = 0$. Получается
+\begin{equation}
+\qty(\Sigma_i \xi_i) \qty[ e - e^{\beta} - e^{\beta}_{T} \Delta T ] = A_{\eta} \qty[ \qty( \Sigma_i \xi_i P^{i} ) + \qty( \Sigma_i \xi_i P^{i}_{T} ) \Delta T ] - \qty(\Sigma_i \xi_i) B_{\eta} - \qty(\Sigma_i \xi_i) C_{\eta} \Delta T.
+\end{equation}
+Вводим аналогичные обозначения для сумм в скобках:
+\begin{equation}
+\xi_i = \frac{\alpha_i}{\rho_i P^{i}_{\rho}}, \qquad
+A_{\xi} = \sum_i \xi_i , \qquad
+B_{\xi} = \sum_i \xi_i P^{i}, \qquad
+C_{\xi} = \sum_i \xi_i P^{i}_T.
+\end{equation}
+
+Ну ничего, уже почти всё:
+\begin{equation}
+A_{\xi} \qty[ e - e^{\beta} - e^{\beta}_{T} \Delta T ] = A_{\eta} \qty[ B_{\xi} + C_{\xi} \Delta T ] - A_{\xi} B_{\eta} - A_{\xi} C_{\eta} \Delta T.
+\end{equation}
+Очевидно, отсюда надо выразить $\Delta T$:
+\begin{equation}
+\Delta T = \frac{A_{\eta} B_{\xi} - A_{\xi} B_{\eta} - A_{\xi} \qty(e - e^{\beta} )}{A_{\xi} C_{\eta} - A_{\eta} C_{\xi} - A_{\xi} e^{\beta}_{T}}.
+\end{equation}
+
+
+Ололо, если немного откатиться
+\begin{equation}
+A_{\xi} \qty[ P^{i} + P^{i}_{\alpha} \Delta \alpha_i + P^{i}_{T} \Delta T ] = B_{\xi} + C_{\xi} \Delta T.
+\end{equation}
+
+\begin{equation}
+\Delta \alpha_i = \xi_i \cdot \qty( P^{i} - \frac{B_{\xi}}{A_{\xi}} + \qty(P^{i}_T - \frac{C_{\xi}}{A_{\xi}}) \Delta T ).
+\end{equation}
+\newpage
+
+
+\chapter{Классическая газодинамика}
+
+\section{Математическая модель}
+
+\section{Приближенные римановские решатели}
+
+\section{Интегрирование по времени}
+
+\chapter{Многоматериальная газодинамика. Равновесная PT-модель.}
+
+
+
+
+\end{document} 
