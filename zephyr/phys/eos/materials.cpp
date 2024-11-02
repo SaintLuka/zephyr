@@ -544,6 +544,12 @@ PairPT Materials::find_PT_ver2(double rho, double e, const Fractions &beta,
 
     double T = std::isnan(options.T0) ? 300.0 : options.T0;
 
+    if (std::abs( e - 138817.5871135001) < 1.0e-9 &&
+    std::abs(rho - 10099.999972318446) < 1.0e-9) {
+
+        std::cout <<"Hi\n";
+    }
+
     // Число материалов в задаче
     int n_fractions = beta.count();
 
@@ -559,71 +565,48 @@ PairPT Materials::find_PT_ver2(double rho, double e, const Fractions &beta,
     // Приращения объемных долей на итерациях
     ScalarSet delta;
 
-    // Индексы ненулевых материалов
-    std::vector<int> idx;
-    for (int i = 0; i < n_fractions; ++i) {
-        if (beta.has(i)) {
-            idx.push_back(i);
-        }
-    }
-
-    // Количество ненулевых
-    int nonzero = int(idx.size());
-
     double err = 1.0;
     int counter = 0;
     while (err > 1.0e-12 && counter < 30) {
-        // Заполняем матрицу и правые части
-        // TODO: Переписать с явными формулами?
-        VectorXd F = VectorXd::Zero(nonzero + 1);
-        MatrixXd A = MatrixXd::Zero(nonzero + 1, nonzero + 1);
+        // Расчет вспомогательных величин
+        double A_xi{0.0}, A_eta{0.0};
+        double B_xi{0.0}, B_eta{0.0};
+        double C_xi{0.0}, C_eta{0.0};
+        double e_beta{0.0}, e_beta_T{0.0};
+        for (int i = 0; i < n_fractions; ++i) {
+            if (beta.has(i)) {
+                double rho_i = (beta[i] / alpha[i]) * rho;
+                dRdT P_i = m_materials[i]->pressure_rT(rho_i, T, {.deriv=true});
+                dRdT e_i = m_materials[i]->energy_rT  (rho_i, T, {.deriv=true});
 
-        for (int m1 = 0; m1 < nonzero - 1; ++m1) {
-            int m2 = m1 + 1;
+                double xi = alpha[i] / (rho_i * P_i.dR);
+                double eta = beta[i] * e_i.dR / P_i.dR;
 
-            int i = idx[m1];
-            int j = idx[m2];
+                A_xi += xi;
+                B_xi += xi * P_i;
+                C_xi += xi * P_i.dT;
 
-            double rho_i = beta[i] * rho / alpha[i];
-            double rho_j = beta[j] * rho / alpha[j];
+                A_eta += eta;
+                B_eta += eta * P_i;
+                C_eta += eta * P_i.dT;
 
-            dRdT P_i = m_materials[i]->pressure_rT(rho_i, T, {.deriv=true});
-            dRdT P_j = m_materials[j]->pressure_rT(rho_j, T, {.deriv=true});
-
-            A(m1, m1) = + rho_i * P_i.dR / alpha[i];
-            A(m1, m2) = - rho_j * P_j.dR / alpha[j];
-            A(m1, nonzero) = P_j.dT - P_i.dT;
-
-            F(m1) = P_i.val - P_j.val;
+                e_beta += beta[i] * e_i.val;
+                e_beta_T += beta[i] * e_i.dT;
+            }
         }
 
-        for (int m1 = 0; m1 < nonzero; ++m1) {
-            A(nonzero - 1, m1) = 1.0;
+        // Всё четко лол
+        double dT = (A_eta * B_xi - A_xi * B_eta - A_xi * (e - e_beta)) /
+                (A_xi * C_eta - A_eta * C_xi - A_xi * e_beta_T);
+
+        for (int i = 0; i < n_fractions; ++i) {
+            if (beta.has(i)) {
+                double rho_i = (beta[i] / alpha[i]) * rho;
+                dRdT P_i = m_materials[i]->pressure_rT(rho_i, T, {.deriv=true});
+                double xi = alpha[i] / (rho_i * P_i.dR);
+                delta[i] = xi * (P_i - B_xi / A_xi + (P_i.dT - C_xi / A_xi) * dT);
+            }
         }
-        F(nonzero - 1) = 0.0;
-
-        F(nonzero) = e;
-        for (int m1 = 0; m1 < nonzero; ++m1) {
-
-            int i = idx[m1];
-
-            double rho_i = beta[i] * rho / alpha[i];
-            dRdT e_i = m_materials[i]->energy_rT(rho_i, T, {.deriv=true});
-
-            A(nonzero, m1) -= beta[i] * rho_i * e_i.dR / alpha[i];
-            A(nonzero, nonzero) += beta[i] * e_i.dT;
-
-            F(nonzero) -= beta[i] * e_i.val;
-        }
-
-        // Решение системки на приращения
-        VectorXd x = A.fullPivLu().solve(F);
-
-        // Переносим приращения
-        for (int i = 0; i < nonzero; ++i) {
-            delta[idx[i]] = x[i];
-        }
-        double dT = x[nonzero];
 
         // Поправляем условия, чтобы 0 < alpha_i + da_i < 1.
         // Найдем константу chi, потом умножим на неё.

@@ -53,12 +53,23 @@ double MieGruneisen::sound_speed_rP(double rho, double P, const Options& options
 
 dRdT MieGruneisen::pressure_rT(double rho, double T, const Options& options) const {
     double P_c = cold_pressure(rho);
-    return P_c + Gr * Cv * rho * (T - T0);
+    dRdT P = P_c + Gr * Cv * rho * (T - T0);
+    if (options.deriv) {
+        double dP_c = (B + n * P_c) / rho;
+        P.dR = dP_c + Gr * Cv * (T - T0);
+        P.dT = Gr * Cv * rho;
+    }
+    return P;
 }
 
 dRdT MieGruneisen::energy_rT(double rho, double T, const Options& options) const {
     double e_c = cold_energy(rho);
-    return e_c + Cv * (T - T0);
+    dRdT e = e_c + Cv * (T - T0);
+    if (options.deriv) {
+        e.dR = cold_pressure(rho) / (rho * rho);
+        e.dT = Cv;
+    }
+    return e;
 }
 
 double MieGruneisen::temperature_rP(double rho, double P, const Options& options) const {
