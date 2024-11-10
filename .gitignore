@@ -16,3 +16,5 @@ diplom
 *.pdf
 *.gz
 *.toc
+*.bbl
+*.blg
