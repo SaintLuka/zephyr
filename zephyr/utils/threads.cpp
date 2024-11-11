@@ -1,26 +1,38 @@
+#include <memory>
+#include <cmath>
+
+#include <zephyr/utils/mpi.h>
 #include <zephyr/utils/threads.h>
 
-#include <memory>
-
-namespace zephyr { namespace utils {
+namespace zephyr::utils {
 
 int threads::n_threads = 1;
 std::unique_ptr<ThreadPool> threads::pool = nullptr;
 
+int threads::recommended() {
+    int HC = int(std::thread::hardware_concurrency());
+    int n_tasks = zephyr::utils::mpi::n_tasks();
+
+    // Проблема не решена, округляю в большую сторону,
+    // как вариант разделить между процессами, чтобы все
+    // точно складывалось. Но как тогда балансировать?
+    int res = std::ceil(HC / double(n_tasks));
+
+    return res;
+}
+
 void threads::on() {
-    n_threads = int(std::thread::hardware_concurrency());
-    pool = std::make_unique<ThreadPool>(n_threads);
+    on(recommended());
 }
 
 void threads::on(int count) {
-    if (count < 1) {
-        n_threads = 1;
+    n_threads = std::max(1, std::min(count, recommended()));
+
+    if (n_threads < 2) {
+        pool = nullptr;
+    } else {
+        pool = std::make_unique<ThreadPool>(n_threads);
     }
-    else {
-        int HC = int(std::thread::hardware_concurrency());
-        n_threads = count < HC ? count : HC;
-    }
-    pool = std::make_unique<ThreadPool>(n_threads);
 }
 
 void threads::off() {
@@ -28,17 +40,12 @@ void threads::off() {
     pool = nullptr;
 }
 
-bool threads::is_on() {
+bool threads::active() {
     return n_threads > 1;
-}
-
-bool threads::is_off() {
-    return n_threads < 2;
 }
 
 int threads::count() {
     return n_threads;
 }
 
-} // utils
-} // zephyr
+} // namespace zephyr::utils

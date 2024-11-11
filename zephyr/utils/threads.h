@@ -16,8 +16,12 @@ static const int default_min_elements_per_task = 500;
 class threads {
 public:
 
-    /// @brief Включить многопоточность, будут использованы все
-    /// доступные ядра.
+    /// @brief Рекомендуемое число тредов, используется
+    /// по умолчанию при вызове on().
+    static int recommended();
+
+    /// @brief Включить многопоточность, будут использованы
+    /// все доступные ядра, см. recommended()
     static void on();
 
     /// @brief Включить треды
@@ -28,10 +32,7 @@ public:
     static void off();
 
     /// @brief Многопоточность включена?
-    static bool is_on();
-
-    /// @brief Многопоточность выключена?
-    static bool is_off();
+    static bool active();
 
     /// @brief Число тредов
     static int count();

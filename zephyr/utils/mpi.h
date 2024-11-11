@@ -39,6 +39,9 @@ public:
 
     /// @brief Число процессов
     static int size();
+    
+    /// @brief Число задач на узел
+    static int n_tasks();
 
     /// @brief Это мастер процесс?
     static bool master();
@@ -267,6 +270,9 @@ public:
 
     /// @brief Число процессов
     static constexpr int size() { return 1; };
+    
+    /// @brief Число задач на узел
+    static constexpr int n_tasks() { return 1; }
 
     /// @brief Это мастер процесс?
     static constexpr bool master() { return true; }

@@ -235,7 +235,7 @@ void setup_nodes(AmrStorage& cells, std::vector<Vector3d>& nodes) {
 
     // TODO: Есть только наметки, как это сделать параллельно
 
-    if (true || threads::is_off()) {
+    if (true || !threads::active()) {
         /// Последовательная версия работает за один проход по ячейкам
         nodes.reserve(nodes_estimation(cells.size(), cells[0].dim));
 

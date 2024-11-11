@@ -144,7 +144,7 @@ int main() {
     while (curr_time < test.max_time()) {
         if (curr_time >= next_write) {
             std::cout << "\tStep: " << std::setw(6) << n_step << ";"
-                      << "\tTime: " << std::setw(6) << std::setprecision(3) << curr_time << "\n";
+                      << "\tTime: " << std::setw(8) << std::setprecision(3) << curr_time << "\n";
 
             pvd.save(mesh, curr_time);
             next_write += test.max_time() / 200;
