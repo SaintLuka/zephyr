@@ -4,6 +4,7 @@
 #include <iomanip>
 
 #include <zephyr/utils/mpi.h>
+#include <zephyr/utils/stopwatch.h>
 
 #include <zephyr/io/pvd_file.h>
 
@@ -16,6 +17,7 @@
 
 using namespace zephyr::mesh;
 using zephyr::utils::mpi;
+using zephyr::utils::Stopwatch;
 using zephyr::io::PvdFile;
 using zephyr::geom::generator::Cuboid;
 using zephyr::geom::generator::Rectangle;
@@ -59,34 +61,26 @@ int main() {
 
     // Сеточный генератор
     //Cuboid gen(0.0, 1.0, 0.0, 0.6, 0.0, 0.9);
-    Rectangle gen(0.0, 1.0, 0.0, 0.6);
-    gen.set_nx(200);
+    Rectangle gen(0.0, 1.0, 0.0, 1.0);
+    gen.set_nx(257);
 
     // Bounding Box для сетки
     Box domain = gen.bbox();
 
     // Создаем сетку
     EuMesh mesh(U, gen);
-    if (mpi::master()) {
-        mesh = EuMesh(U, gen);
-    }
 
     // Добавляем декомпозицию
     ORB orb(domain, "XY", mpi::size());
-    mesh.add_decomposition(orb, false);
-
-    // Распределить ячейки))
-    mesh.redistribute();
-
-
-
+    mesh.add_decomposition(orb);
 
     // Дальше простая схема, ничего интересного
-
     // Начальные данные
     Vector3d vc = domain.center();
     double D = 0.1 * domain.diameter();
-    for (auto cell: mesh) {
+    for (auto& cell: mesh) {
+        //if(mpi::rank()==0)
+        //    printf("i_m: %d\n", cell.geom().index);
         cell(U).u1 = (cell.center() - vc).norm() < D ? 1.0 : 0.0;
         cell(U).u2 = 0.0;
     }
@@ -98,11 +92,14 @@ int main() {
     double curr_time = 0.0;
     double next_write = 0.0;
 
-    while(curr_time <= 1.0) {
+    Stopwatch elapsed(true);
+    while (curr_time <= 1.0) {
+        mesh.exchange();
+
         if (curr_time >= next_write) {
-            std::cout << "\tШаг: " << std::setw(6) << n_step << ";"
+            mpi::cout << "\tШаг: " << std::setw(6) << n_step << ";"
                       << "\tВремя: " << std::setw(6) << std::setprecision(3) << curr_time << "\n";
-            pvd.save(mesh.locals(), curr_time);
+            pvd.save(mesh, curr_time);
             next_write += 0.02;
         }
 
@@ -116,7 +113,7 @@ int main() {
             double dx = cell.volume() / max_area;
             dt = std::min(dt, dx / velocity(cell.center()).norm());
         }
-        dt *= CFL;
+        dt = mpi::min(CFL * dt);
 
         // Расчет по схеме upwind
         for (auto& cell: mesh) {
@@ -145,6 +142,10 @@ int main() {
         n_step += 1;
         curr_time += dt;
     }
+    elapsed.stop();
+
+    mpi::cout << "\nElapsed time:   " << elapsed.extended_time()
+              << " ( " << elapsed.milliseconds() << " ms)\n";
 
     mpi::finalize();
     return 0;

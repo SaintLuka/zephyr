@@ -8,14 +8,14 @@
 
 #ifdef ZEPHYR_ENABLE_MPI
 
-#include <mpi.h>
+#include <openmpi/mpi.h>
 
 // Нормальная параллельная версия обертки mpi
 
 namespace zephyr::utils {
 
 /// @brief Надо придумать, как это изящнее реализовать
-template <class T>
+template<class T>
 static MPI_Datatype mpi_type();
 
 /// @brief Статический класс. Упрощенная обертка для mpi.
@@ -63,11 +63,11 @@ public:
     /// mpi::cout << ... и сообщения выводил только мастер-процесс
     struct master_stream {
         template <class T>
-        std::ostream& operator<<(const T& val) {
+        master_stream& operator<<(const T& val) {
             if (mpi::master()) {
                 std::cout << val;
             }
-            return std::cout;
+            return *this;
         }
     };
 
@@ -127,6 +127,11 @@ public:
     /// записывает в массив и раздает этот массив всем процессам сети.
     template <class T>
     static void all_gather(const T& value, std::vector<T>& values);
+
+    /// @brief Коллективная операция. Собирает вектор величин value со всех процессов,
+    /// записывает в один общий массив и раздает этот массив всем процессам сети.
+    template <class T>
+    static std::vector<T> all_gather_vectors(const std::vector<T>& value);
 
     /// @brief Коллективная операция. Размеры буфферов send и recv совпадают
     /// и равны числу процессов. Каждая величина из send отправляется своему
@@ -212,6 +217,13 @@ void mpi::all_gather(const T& value, std::vector<T>& values) {
 }
 
 template <class T>
+std::vector<T> mpi::all_gather_vectors(const std::vector<T>& value) {
+    std::vector<T> values(size() * value.size());
+    MPI_Allgather(value.data(), value.size(), mpi_type<T>(), values.data(), value.size(), mpi_type<T>(), comm());
+    return values;
+}
+
+template <class T>
 void mpi::all_to_all(const std::vector<T>& send, std::vector<T>& recv) {
     recv.resize(size());
     MPI_Alltoall(send.data(), 1, mpi_type<T>(), recv.data(), 1, mpi_type<T>(), comm());
@@ -222,6 +234,9 @@ MPI_Datatype mpi_type<int>() { return MPI_INT; }
 
 template <>
 MPI_Datatype mpi_type<unsigned char>() { return MPI_BYTE; }
+
+template <>
+MPI_Datatype mpi_type<double>() { return MPI_DOUBLE; }
 
 } // namespace zephyr::utils
 

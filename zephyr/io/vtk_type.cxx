@@ -1,7 +1,7 @@
 #include <cstring>
 #include <zephyr/io/vtk_type.h>
 
-namespace zephyr { namespace io {
+namespace zephyr::io {
 
 VtkType::VtkType() {
     m_value = VtkType::Undefined;
@@ -160,5 +160,4 @@ std::ostream& operator<<(std::ostream& os, const VtkType& vtk_type) {
     return os;
 }
 
-} // namespace io
-} // namespace zephyr
+} // namespace zephyr::io

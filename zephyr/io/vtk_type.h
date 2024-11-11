@@ -3,7 +3,7 @@
 #include <string>
 #include <iostream>
 
-namespace zephyr { namespace io {
+namespace zephyr::io {
 
 /// @brief Простенький класс для хранения типа скаляра при сохранении VTU.
 /// Работает как класс перечисления.
@@ -95,6 +95,5 @@ private:
 /// @brief Оператор для вывода типа в поток
 std::ostream& operator<<(std::ostream& os, const VtkType& vtk_type);
 
-} // namespace io
-} // namespace zephyr
+} // namespace zephyr::io
 

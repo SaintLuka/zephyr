@@ -7,7 +7,7 @@
 
 #include <zephyr/io/vtu_file.h>
 
-namespace zephyr { namespace io {
+namespace zephyr::io {
 
 using namespace zephyr::geom;
 
@@ -940,5 +940,4 @@ void VtuFile::save(
     file.close();
 }
 
-} // io
-} // zephyr
+} // namespace zephyr::io

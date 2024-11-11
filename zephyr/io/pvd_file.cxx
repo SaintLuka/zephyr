@@ -5,18 +5,16 @@
 #include <zephyr/geom/primitives/mov_node.h>
 #include <zephyr/geom/primitives/mov_cell.h>
 #include <zephyr/geom/primitives/amr_cell.h>
+#include <zephyr/mesh/lagrange/la_mesh.h>
+
+#include <zephyr/utils/mpi.h>
 
 #include <zephyr/io/pvd_file.h>
 #include <zephyr/io/vtu_file.h>
-#include <zephyr/mesh/lagrange/la_mesh.h>
 
 namespace zephyr::io {
 
-namespace fs = std::filesystem;
-
-#ifdef ZEPHYR_ENABLE_DISTRIBUTED
-Network& dummy_net = ::zephyr::network::network::dummy;
-#endif
+using zephyr::utils::mpi;
 
 inline bool is_big_endian() {
     union {
@@ -28,48 +26,48 @@ inline bool is_big_endian() {
 }
 
 PvdFile::PvdFile()
-    : variables(), filter(), hex_only(true), m_counter(0)
-    , m_open(false)
-#ifdef ZEPHYR_ENABLE_DISTRIBUTED
-    , net(dummy_net)
-#endif
+    : variables(),
+      filter(),
+      hex_only(true),
+      unique_nodes(false),
+      m_open(false),
+      m_counter(0)
 {
-// #ifdef ZEPHYR_ENABLE_DISTRIBUTED
-    // if (network::network::main().size() > 1) {
-        // std::cerr << "Warning: MPI is enabled, but single process version of PvdFile constructor is used.\n";
-    // }
-// #endif
 }
 
-PvdFile::PvdFile(const std::string &filename, const std::string &directory)
-    : variables(), filter(), hex_only(true), m_counter(0)
-    , m_open(false)
-#ifdef ZEPHYR_ENABLE_DISTRIBUTED
-    , net(dummy_net)
-#endif
-{
-// #ifdef ZEPHYR_ENABLE_DISTRIBUTED
-    // if (network::network::main().size() > 1) {
-     // std::cerr << "Warning: MPI is enabled, but single process version of PvdFile constructor is used.\n";
-    // }
-// #endif
-    open(filename, directory);
+const std::string default_dir = "output";
+
+void PvdFile::open(const char* filename) {
+    open(std::string(filename), default_dir, !mpi::single());
 }
 
-#ifdef ZEPHYR_ENABLE_DISTRIBUTED
-PvdFile::PvdFile(Network& network)
-    : net(network), variables(), filter(), hex_only(false), m_counter(0)
-    , m_open(false) {
+void PvdFile::open(const char* filename, bool distributed) {
+    open(std::string(filename), default_dir, mpi::single() ? false : distributed);
 }
 
-PvdFile::PvdFile(Network& network, const std::string &filename, const std::string &directory)
-    : net(network), variables(), filter(), hex_only(false), m_counter(0)
-    , m_open(false) {
-    open(filename, directory);
+void PvdFile::open(const char* filename, const char* directory) {
+    open(std::string(filename), std::string(directory), !mpi::single());
 }
-#endif
 
-void PvdFile::open(const std::string& filename, const std::string& _directory) {
+void PvdFile::open(const char* filename, const char* directory, bool distributed) {
+    open(std::string(filename), std::string(directory), distributed);
+}
+
+void PvdFile::open(const std::string& filename) {
+    open(filename, default_dir, !mpi::single());
+}
+
+void PvdFile::open(const std::string& filename, bool distributed) {
+    open(filename, default_dir, mpi::single() ? false : distributed);
+}
+
+void PvdFile::open(const std::string& filename, const std::string& directory) {
+    open(filename, directory, !mpi::single());
+}
+
+void PvdFile::open(const std::string& filename, const std::string& _directory, bool distributed) {
+    namespace fs = std::filesystem;
+
     if (m_open) {
         return;
     }
@@ -96,13 +94,11 @@ void PvdFile::open(const std::string& filename, const std::string& _directory) {
     }
     m_fullname = (directory / filename).string();
 
-#ifdef ZEPHYR_ENABLE_DISTRIBUTED
-    // Не мастер процесс
-    if (&net != &dummy_net && !net.is_master()) {
-        m_open = true;
+    // Мастер-процесс пишет заголовок PVD
+    m_distributed = mpi::single() ? false : distributed;
+    if (m_distributed && !mpi::master()) {
         return;
     }
-#endif
 
     /// Откроем файл и запишем заголовок
     std::ofstream ofs;
@@ -142,17 +138,11 @@ void PvdFile::save(mesh::EuMesh& mesh, double timestep) {
 }
 
 void PvdFile::save(AmrStorage& elements, double timestep) {
-    if (!m_open) {
-        throw std::runtime_error("PvdFile::save() error: You need to open PvdFile");
-    }
     VtuFile::save(get_filename(), elements, variables, hex_only, filter);
     update_pvd(timestep);
 }
 
 void PvdFile::save(AmrStorage& elements, const std::vector<geom::Vector3d>& nodes, double timestep) {
-    if (!m_open) {
-        throw std::runtime_error("PvdFile::save() error: You need to open PvdFile");
-    }
     VtuFile::save(get_filename(), elements, nodes, variables, hex_only);
     update_pvd(timestep);
 }
@@ -162,27 +152,32 @@ void PvdFile::save(zephyr::mesh::LaMesh& mesh, double timestep) {
 }
 
 void PvdFile::save(CellStorage& cells, NodeStorage& nodes, double timestep) {
-    if (!m_open) {
-        throw std::runtime_error("PvdFile::save() error: You need to open PvdFile");
-    }
     VtuFile::save(get_filename(), cells, nodes, variables, filter);
     update_pvd(timestep);
 }
 
 std::string PvdFile::get_filename() const {
     std::string filename = m_fullname + "_" + std::to_string(m_counter);
-#ifdef ZEPHYR_ENABLE_DISTRIBUTED
-    if (&net != &dummy_net) {
-        filename += ".pt" + std::to_string(net.rank());
+
+    if (m_distributed) {
+        filename += ".pt" + mpi::srank();
     }
-#endif
+
     filename += ".vtu";
     return filename;
 }
 
 void PvdFile::update_pvd(double timestep) {
+    // Мастер-процесс пишет PVD
+    if (m_distributed && !mpi::master()) {
+        ++m_counter;
+        return;
+    }
+
     if (!m_open) {
-        throw std::runtime_error("You need to open PvdFile");
+        std::string message = "PvdFile::save() error: You need to open PvdFile";
+        std::cerr << message << "\n";
+        throw std::runtime_error(message);
     }
 
     std::fstream ofs;
@@ -195,8 +190,17 @@ void PvdFile::update_pvd(double timestep) {
     ofs.seekg(m_pos, std::ios::beg);
 
     ofs << std::scientific << std::setprecision(15);
-    ofs << "        <DataSet timestep=\"" << timestep << "\" part=\"0\" file=\""
+
+    if (m_distributed) {
+        for (int r = 0; r < mpi::size(); ++r) {
+            ofs << "        <DataSet timestep=\"" << timestep << "\" part=\"" << r << "\" file=\""
+                << m_filename << "_" << m_counter << ".pt" << r << ".vtu" << "\"/>\n";
+        }
+    }
+    else {
+        ofs << "        <DataSet timestep=\"" << timestep << "\" part=\"0\" file=\""
             << m_filename << "_" << m_counter << ".vtu" << "\"/>\n";
+    }
 
     m_pos = ofs.tellg();
 

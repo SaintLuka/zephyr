@@ -20,43 +20,72 @@
 namespace zephyr::mesh {
 
 using zephyr::utils::threads;
+using zephyr::utils::mpi;
 using namespace zephyr::geom;
 
 using zephyr::mesh::decomp::Decomposition;
 using zephyr::mesh::decomp::ORB;
 
+/// @class Класс для хранения распределенной эйлеровой сетки.
+/// Для сеток из четырехугольников и кубоидов допускается адаптация.
+// TODO: Стркуктурировать поля и методы класса
 class EuMesh {
 public:
-    template<class T>
-    EuMesh(const T &val)
-            : m_locals(val, 0), m_aliens(val, 0) {
-
-    }
-
+    /// @brief Конструктор сетки из генератора
+    /// @tparam T Тип данных для хранения в ячейках
+    /// @param gen Сеточный генератор
     template<class T>
     EuMesh(const T &val, Generator *gen)
             : m_locals(val, 0), m_aliens(val, 0) {
-        initialize(gen->make());
+        if (mpi::master()) {
+            initialize(gen->make());
+        }
     }
 
+    /// @brief Конструктор сетки из генератора
+    /// @tparam T Тип данных для хранения в ячейках
+    /// @param gen Сеточный генератор
+    template<class T>
+    EuMesh(const T &val, const std::shared_ptr<Generator>& gen)
+            : m_locals(val, 0), m_aliens(val, 0) {
+        if (mpi::master()) {
+            initialize(gen->make());
+        }
+    }
+
+    /// @brief Конструктор сетки из генератора
+    /// @tparam T Тип данных для хранения в ячейках
+    /// @param gen Сеточный генератор
     template<class T>
     EuMesh(const T &val, Generator &gen)
             : m_locals(val, 0), m_aliens(val, 0) {
-        initialize(gen.make());
+        if (mpi::master()) {
+            initialize(gen.make());
+        }
     }
 
+    /// @brief Можно сказать основной конструктор.
+    /// Преобразует сетку Grid в специализированную EuMesh
+    /// @tparam T Тип данных для хранения в ячейках
+    /// @param grid Сетка общего вида
     template <class T>
     EuMesh(const T&val, const Grid& grid)
             : m_locals(val, 0), m_aliens(val, 0) {
-        initialize(grid);
+        if (mpi::master()) {
+            initialize(grid);
+        }
     }
 
+    /// @brief Локальное количество ячеек
     inline int n_cells() { return m_locals.size(); }
 
+    /// @brief Итератор на начало локального массива ячеек
     EuCell begin() { return {m_locals, m_aliens, 0}; }
 
+    /// @brief Итератор на конец локального массива ячеек
     EuCell end() { return {m_locals, m_aliens, m_locals.size()}; }
 
+    /// @brief Доступ к локальной ячейке по индексу (idx < n_cells())
     EuCell operator[](int idx) {
         return {m_locals, m_aliens, idx};
     }
@@ -64,17 +93,23 @@ public:
     /// @brief Получить ячейку по нескольким индексам подразумевая,
     /// что сетка является структурированной. Индексы периодически
     /// замкнуты (допускаются отрицательные индексы и индексы сверх нормы)
+    /// @details Не актуально для распределенных сеток
     EuCell operator()(int i, int j);
 
     /// @brief Получить ячейку по нескольким индексам подразумевая,
     /// что сетка является структурированной. Индексы периодически
     /// замкнуты (допускаются отрицательные индексы и индексы сверх нормы)
+    /// @details Не актуально для распределенных сеток
     EuCell operator()(int i, int j, int k);
 
+    /// @brief Неявное преобразование в хранилище. Позволяет передавать
+    /// локальные ячейки в функции, которые работают с хранилищем.
     operator AmrStorage &() { return m_locals; }
 
+    /// @brief Локальные ячейки
     AmrStorage &locals() { return m_locals; }
 
+    /// @brief Ячейки с других процессов
     AmrStorage &aliens() { return m_aliens; }
 
 
@@ -212,7 +247,7 @@ private:
 
     /// @brief Структура сетки, если предполагается, что сетка декартова.
     bool structured = false;
-    int m_nx, m_ny, m_nz;
+    int m_nx = 1, m_ny = 1, m_nz = 1;
 };
 
 
