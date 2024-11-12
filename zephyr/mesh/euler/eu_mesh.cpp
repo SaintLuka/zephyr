@@ -53,7 +53,15 @@ geom::Box EuMesh::bbox() {
         }
     }
 
-    return geom::Box(vmin, vmax);
+    geom::Box box(vmin, vmax);
+
+#ifdef ZEPHYR_ENABLE_MPI
+    // Покомпонентный минимум/максимум
+    MPI_Allreduce(vmin.data(), box.vmin.data(), 3, MPI_DOUBLE, MPI_MIN, mpi::comm());
+    MPI_Allreduce(vmax.data(), box.vmax.data(), 3, MPI_DOUBLE, MPI_MAX, mpi::comm());
+#endif
+
+    return box;
 }
 
 bool EuMesh::has_nodes() const {

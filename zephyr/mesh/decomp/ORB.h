@@ -45,6 +45,12 @@ public:
            const std::vector<int>& ny,
            const params& p = {.newton=false, .mobility=0.1});
 
+    /// @brief Создать умный указатель
+    template <class... Args>
+    static ORB::Ptr create(Args&&... args){
+        return std::make_shared<ORB>(std::forward<Args>(args)...);
+    }
+
     /// @brief Определить ранг процесса, которому принадлежит точка v.
     /// На практике точка v обычно является положением центра ячейки
     int rank(const Vector3d& v) const;

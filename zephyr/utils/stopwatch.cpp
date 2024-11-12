@@ -3,7 +3,7 @@
 #include <zephyr/utils/stopwatch.h>
 #include <sstream>
 
-namespace zephyr { namespace utils {
+namespace zephyr::utils {
 
 Stopwatch::Stopwatch(bool run)
         : m_up(false), m_start(), m_elapsed(duration::zero()) {
@@ -95,5 +95,4 @@ std::string Stopwatch::extended_time() const {
     return ss.str();
 }
 
-} // utils
-} // zephyr
+} // namespace zephyr::utils

@@ -2,6 +2,7 @@ set(CLOGGED_SHOCK_TUBE 1)
 set(SMF_FLOW_AROUND    1)
 set(SMF_TEST_1D        1)
 set(SMF_TEST_2D        1)
+set(SMF_TEST_3D        1)
 
 if (CLOGGED_SHOCK_TUBE)
     message(STATUS "Build clogged shock tube test")
@@ -33,6 +34,14 @@ if (SMF_TEST_2D)
     target_link_directories(smf-test-2D PUBLIC zephyr)
     target_link_libraries(smf-test-2D PUBLIC zephyr)
     install(TARGETS smf-test-2D DESTINATION problems/single-fluid)
+endif()
+
+if (SMF_TEST_3D)
+    message(STATUS "Build 3D single fluid test")
+    add_executable(smf-test-3D smf_test_3D.cpp)
+    target_link_directories(smf-test-3D PUBLIC zephyr)
+    target_link_libraries(smf-test-3D PUBLIC zephyr)
+    install(TARGETS smf-test-3D DESTINATION problems/single-fluid)
 endif()
 
 

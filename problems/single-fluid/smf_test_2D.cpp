@@ -18,6 +18,10 @@
 #include <zephyr/io/pvd_file.h>
 #include <zephyr/io/csv_file.h>
 
+#include <zephyr/utils/mpi.h>
+#include <zephyr/utils/threads.h>
+#include <zephyr/utils/stopwatch.h>
+
 using namespace zephyr::io;
 using namespace zephyr::phys;
 using namespace zephyr::math;
@@ -26,7 +30,9 @@ using namespace zephyr::math::smf;
 using zephyr::mesh::generator::Rectangle;
 using zephyr::mesh::EuMesh;
 using zephyr::math::SmFluid;
+using zephyr::utils::mpi;
 using zephyr::utils::threads;
+using zephyr::utils::Stopwatch;
 
 
 // Для быстрого доступа по типу
@@ -114,10 +120,11 @@ int main() {
     // Генератор сетки (с граничными условиями) дает тест,
     // число ячеек можно задать
     Rectangle gen = test.generator;
-    gen.set_nx(50);
+    gen.set_nx(mpi::single() ? 50 : 500);
 
     // Создать сетку
     EuMesh mesh(U, &gen);
+    mesh.set_decomposition("XY");
 
     // Создать решатель
     SmFluid solver(eos);
@@ -127,7 +134,7 @@ int main() {
     solver.set_method(Fluxes::HLLC_M);
 
     // Сеточная адаптация
-    mesh.set_max_level(3);
+    mesh.set_max_level(mpi::single() ? 3 : 0);
     mesh.set_distributor(solver.distributor());
 
     for (int k = 0; k < mesh.max_level() + 3; ++k) {
@@ -141,9 +148,10 @@ int main() {
     double curr_time = 0.0;
     double next_write = 0.0;
 
+    Stopwatch elapsed(true);
     while (curr_time < test.max_time()) {
         if (curr_time >= next_write) {
-            std::cout << "\tStep: " << std::setw(6) << n_step << ";"
+            mpi::cout << "\tStep: " << std::setw(6) << n_step << ";"
                       << "\tTime: " << std::setw(8) << std::setprecision(3) << curr_time << "\n";
 
             pvd.save(mesh, curr_time);
@@ -161,10 +169,15 @@ int main() {
         n_step += 1;
     }
     pvd.save(mesh, curr_time);
+    elapsed.stop();
+
+    mpi::cout << "\nElapsed time:   " << elapsed.extended_time()
+              << " ( " << elapsed.milliseconds() << " ms)\n";
 
     // Сохранить данные как текст
     CsvFile csv("test2D.csv", 5, pvd.variables);
     csv.save(mesh);
 
+    mpi::finalize();
     return 0;
 }

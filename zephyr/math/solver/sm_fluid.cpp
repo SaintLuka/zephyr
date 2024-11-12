@@ -11,6 +11,7 @@ using namespace smf;
 
 using mesh::AmrStorage;
 using zephyr::utils::threads;
+using zephyr::utils::mpi;
 
 static const SmFluid::State U = SmFluid::datatype();
 
@@ -75,13 +76,16 @@ void SmFluid::update(Mesh &mesh) {
     compute_dt(mesh);
 
     if (m_acc == 1) {
+        mesh.exchange();
         fluxes(mesh);
     }
     else {
+        mesh.exchange();
         compute_grad(mesh, get_current_sm);
 
         fluxes_stage1(mesh);
-        
+
+        mesh.exchange();
         fluxes_stage2(mesh);
     }
 
@@ -110,7 +114,12 @@ void SmFluid::compute_dt(Mesh &mesh) {
         return dt;
     });
 
-    m_dt = std::min(m_CFL * dt, m_max_dt);
+    dt = std::min(m_CFL * dt, m_max_dt);
+    m_dt = mpi::min(dt);
+}
+
+void SmFluid::compute_grad(Mesh &mesh)  {
+    compute_grad(mesh, get_current_sm);
 }
 
 void SmFluid::compute_grad(Mesh &mesh, const std::function<smf::PState(Cell &)> &get_state)  {

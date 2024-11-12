@@ -72,7 +72,7 @@ int main() {
 
     // Добавляем декомпозицию
     ORB orb(domain, "XY", mpi::size());
-    mesh.add_decomposition(orb);
+    mesh.set_decomposition(orb);
 
     // Дальше простая схема, ничего интересного
     // Начальные данные

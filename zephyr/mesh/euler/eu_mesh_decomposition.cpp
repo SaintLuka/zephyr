@@ -15,7 +15,17 @@ namespace zephyr::mesh {
 
 using namespace zephyr::utils;
 
-void EuMesh::add_decomposition(const decomp::ORB& orb, bool update) {
+void EuMesh::set_decomposition(const std::string& type) {
+    if (mpi::single()) return;
+
+    auto domain = bbox();
+    m_decomp = ORB::create(domain, type, mpi::size());
+    redistribute();
+}
+
+void EuMesh::set_decomposition(const decomp::ORB& orb, bool update) {
+    if (mpi::single()) return;
+
 	m_decomp = std::make_shared<ORB>(orb);
 	if (update) {
         redistribute();
@@ -23,6 +33,8 @@ void EuMesh::add_decomposition(const decomp::ORB& orb, bool update) {
 }
 
 void EuMesh::redistribute() {
+    if (mpi::single()) return;
+
 	// Следующий бессмысленный код для демонстрации
 	/*
 	int r = mpi::rank();
@@ -81,6 +93,8 @@ void EuMesh::redistribute() {
 }
 
 void EuMesh::exchange() {
+    if (mpi::single()) return;
+
 #ifdef ZEPHYR_ENABLE_MPI
 	int size = mpi::size();
 	int rank = mpi::rank();
@@ -103,8 +117,9 @@ void EuMesh::exchange() {
 #endif
 }
 
-
 void EuMesh::migrate() {
+    if (mpi::single()) return;
+
 #ifdef ZEPHYR_ENABLE_MPI
 	int size = mpi::size();
 	int rank = mpi::rank();

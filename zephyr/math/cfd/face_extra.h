@@ -97,7 +97,7 @@ inline FaceExtraATvL<T> ATvL(const T &uc, const T &ucx, const T &ucy, const T &u
                             cell_c, neib_c, face_c);
 }
 
-/// @brief Создание экстраполятора типа ATvL
+/// @brief Создание экстраполятора типа Triad (?)
 /// @param uc Значение в данной ячейке
 /// @param ucx, ucy, ucz Производные в данной ячейке
 /// @param un Значение в смежной ячейке
@@ -107,12 +107,12 @@ inline FaceExtraATvL<T> ATvL(const T &uc, const T &ucx, const T &ucy, const T &u
 /// @param face_c Центр грани
 template<class T>
 inline FaceExtraTriad<T> Triad(const T &uc, const T &ucx, const T &ucy, const T &ucz,
-                             const T &un, const T &unx, const T &uny, const T &unz,
-                             const Vector3d &cell_c, const Vector3d &neib_c,
-                             const Vector3d &face_c) {
+                               const T &un, const T &unx, const T &uny, const T &unz,
+                               const Vector3d &cell_c, const Vector3d &neib_c,
+                               const Vector3d &face_c) {
     return FaceExtraTriad<T>(arr(uc), arr(ucx), arr(ucy), arr(ucz),
-                            arr(un), arr(unx), arr(uny), arr(unz),
-                            cell_c, neib_c, face_c);
+                             arr(un), arr(unx), arr(uny), arr(unz),
+                             cell_c, neib_c, face_c);
 }
 
 } // namespace FaceExtra
@@ -143,7 +143,7 @@ public:
         for (int i = 0; i < N; ++i) {
             u_c[i] = uc[i];
             u_n[i] = un[i];
-            du_c[i] = ucx[i] * dr_c.x() + ucy[i] * dr_c.y() + unz[i] * dr_c.z();
+            du_c[i] = ucx[i] * dr_c.x() + ucy[i] * dr_c.y() + ucz[i] * dr_c.z();
             du_n[i] = unx[i] * dr_n.x() + uny[i] * dr_n.y() + unz[i] * dr_n.z();
         }
     }
@@ -209,7 +209,7 @@ public:
         for (int i = 0; i < N; ++i) {
             u_c[i] = uc[i];
             u_n[i] = un[i];
-            du_c[i] = ucx[i] * dr.x() + ucy[i] * dr.y() + unz[i] * dr.z();
+            du_c[i] = ucx[i] * dr.x() + ucy[i] * dr.y() + ucz[i] * dr.z();
             du_n[i] = unx[i] * dr.x() + uny[i] * dr.y() + unz[i] * dr.z();
         }
     }
@@ -257,7 +257,9 @@ private:
 };
 
 /// @brief Класс для TVD экстраполяции на грань.
-/// Anderson, Thomas, van Leer
+/// Anderson W. K., Thomas J. L., Van Leer B.
+/// Comparison of finite volume flux vector splittings for the Euler equations.
+/// AIAA journal. – 1986. – Vol. 24. – no. 9. – С. 1453-1460.
 template<class T>
 class FaceExtraATvL {
 public:

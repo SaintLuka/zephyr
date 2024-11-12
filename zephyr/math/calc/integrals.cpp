@@ -54,6 +54,29 @@ double integrate_gauss(const std::function<double(double)>& f, double a, double 
     return 0.5 * h * res;
 }
 
+double integrate_gauss5(const std::function<double(double)>& f, double a, double b, int n) {
+    const double w0 = 128.0 / 225;
+    const double w1 = (322.0 + 13.0 * std::sqrt(70.0)) / 900.0;
+    const double w2 = (322.0 - 13.0 * std::sqrt(70.0)) / 900.0;
+    const double c1 = std::sqrt(5.0 - 2.0 * std::sqrt(10.0 / 7.0)) / 3.0;
+    const double c2 = std::sqrt(5.0 + 2.0 * std::sqrt(10.0 / 7.0)) / 3.0;
+
+    n = std::max(1, n);
+
+    double h = (b - a) / n;
+    double d1 = c1 * h;
+    double d2 = c2 * h;
+
+    double res = 0.0;
+    for (int i = 0; i < n; ++i) {
+        double x = a + (i + 0.5) * h;
+        res += w0 * f(x) +
+               w1 * (f(x - d1) + f(x + d1)) +
+               w2 * (f(x - d2) + f(x + d2));
+    }
+    return h * res;
+}
+
 /// n - число отрезков
 double integrate(const std::function<double(double)>& f,
         double a, double b, int n, IntMethod method) {
@@ -63,8 +86,10 @@ double integrate(const std::function<double(double)>& f,
             return integrate_trapz(f, a, b, n);
         case IntMethod::SIMPS:
             return integrate_simpson(f, a, b, n);
-        default:
+        case IntMethod::GAUSS:
             return integrate_gauss(f, a, b, n);
+        default:
+            return integrate_gauss5(f, a, b, n);
     }
 }
 

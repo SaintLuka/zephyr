@@ -91,7 +91,7 @@ public:
     /// @param type Тип "const" или "slope" переноса при разбиении
     Distributor distributor(const std::string& type = "slope") const;
 
-private:
+
     /// @brief Посчитать шаг интегрирования по времени с учетом
     /// условия Куранта
     void compute_dt(Mesh &mesh);
@@ -103,7 +103,10 @@ private:
     void swap(Mesh &mesh);
 
     /// @brief Вычислить производные
-    void compute_grad(Mesh &mesh,  const std::function<smf::PState(Cell &)> &get_state);
+    void compute_grad(Mesh &mesh);
+
+    /// @brief Вычислить производные
+    void compute_grad(Mesh &mesh, const std::function<smf::PState(Cell &)> &get_state);
 
     /// @brief Вычислить потоки на стадии предиктора
     void fluxes_stage1(Mesh &mesh);
