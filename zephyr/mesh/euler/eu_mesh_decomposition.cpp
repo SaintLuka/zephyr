@@ -319,7 +319,7 @@ void EuMesh::build_aliens() {
 		}
 	}
 
-	int i = 0;
+	int al_it = 0;
 	for(auto& cell : m_aliens){
 		for(auto& face : cell.faces){
 			if(face.adjacent.rank == rank){
@@ -327,11 +327,12 @@ void EuMesh::build_aliens() {
 				for(auto& l_face : curr_cell.faces)
 					if(l_face.adjacent.index == cell.index){
 						l_face.adjacent.index = -1;
-						l_face.adjacent.alien = i++;
+						l_face.adjacent.alien = al_it;
 						break;
 					}
 			}
 		}
+		++al_it;
 	}
 
 	// [?] если m_border_indices[r].size() == m_count_to_send[r], то зачем второе вообще нужно?
