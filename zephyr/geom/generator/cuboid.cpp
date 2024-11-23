@@ -7,7 +7,7 @@
 
 namespace zephyr::geom::generator {
 
-#ifdef ZEPHYR_ENABLE_YAML
+#ifdef ZEPHYR_YAML
 Cuboid::Cuboid(YAML::Node config)
     : Generator("cuboid"),
       m_xmin(0.0), m_xmax(1.0),

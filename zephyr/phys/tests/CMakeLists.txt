@@ -1,6 +1,6 @@
 set(ZEPHYR_PHYS_TESTS_SRC
         ${CMAKE_CURRENT_SOURCE_DIR}/toro.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/sedov3D.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/sedov_blast.cpp
         PARENT_SCOPE)
 
 install(FILES
@@ -9,7 +9,7 @@ install(FILES
         toro.h
         test_1D.h
         sedov.h
-        sedov3D.h
+        sedov_blast.h
         shock_wave.h
         test_2D.h
         rarefied_water.h

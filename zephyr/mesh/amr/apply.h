@@ -117,7 +117,7 @@ void apply<0>(AmrStorage &cells, const Distributor& op) {
     }
 }
 
-#ifdef ZEPHYR_ENABLE_MPI_PASS
+#ifdef ZEPHYR_MPI_PASS
 /// @brief Многопроцессорная версия функции, выполняет непостредственную
 /// адаптацию ячеек в хранилище в соответствии с флагами адапатции.
 /// Предполагается, что флаги адаптации сбалансированы.

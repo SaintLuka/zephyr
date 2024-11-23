@@ -6,7 +6,7 @@
 #include <zephyr/mesh/mesh.h>
 #include <zephyr/geom/generator/cuboid.h>
 
-#include <zephyr/phys/tests/sedov3D.h>
+#include <zephyr/phys/tests/sedov_blast.h>
 
 #include <zephyr/math/solver/sm_fluid.h>
 
@@ -46,12 +46,14 @@ void set_flags(Mesh &mesh) {
     if (!mesh.is_adaptive()) return;
 
     mesh.for_each([](Cell& cell) {
-        if (cell(U).density > 1.5) {
+        const double threshold = 1.5;
+
+        if (cell(U).density > threshold) {
             cell.set_flag(1);
             return;
         }
         for (auto face: cell.faces()) {
-            if (face.neib(U).density > 1.5) {
+            if (face.neib(U).density > threshold) {
                 cell.set_flag(1);
                 return;
             }
@@ -76,11 +78,12 @@ int main() {
 
     auto init_cells = [&](Mesh& mesh) {
         mesh.for_each([&](Cell& cell) {
-            Vector3d r = cell.center();
+            double r = cell.center().norm();
+            Vector3d n = cell.center() / r;
             cell(U).density  = test.density (r, t0);
-            cell(U).velocity = test.velocity(r, t0);
-            cell(U).energy   = test.energy  (r, t0);
-            cell(U).pressure = test.pressure(r, t0);
+            cell(U).velocity = test.velocity(r, t0) * n;
+            cell(U).pressure = std::max(test.pressure(r, t0), 1.0e-3);
+            cell(U).energy   = eos->energy_rP(cell(U).density, cell(U).pressure);
         });
     };
 
@@ -100,19 +103,19 @@ int main() {
     pvd.variables += {"e", get_e};
     pvd.variables += {"rho_exact",
                       [&test, &curr_time](const AmrStorage::Item &cell) -> double {
-                          return test.density(cell.center, curr_time);
+                          return test.density(cell.center.norm(), curr_time);
                       }};
     pvd.variables += {"v_exact",
                       [&test, &curr_time](const AmrStorage::Item &cell) -> double {
-                          return test.velocity(cell.center, curr_time).norm();
+                          return test.velocity(cell.center.norm(), curr_time);
                       }};
     pvd.variables += {"p_exact",
                       [&test, &curr_time](const AmrStorage::Item &cell) -> double {
-                          return test.pressure(cell.center, curr_time);
+                          return test.pressure(cell.center.norm(), curr_time);
                       }};
     pvd.variables += {"e_exact",
                       [&test, &curr_time](const AmrStorage::Item &cell) -> double {
-                          return test.energy(cell.center, curr_time);
+                          return test.energy(cell.center.norm(), curr_time);
                       }};
 
     // Генератор сетки (с граничными условиями) дает тест,

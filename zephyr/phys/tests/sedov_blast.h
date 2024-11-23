@@ -11,6 +11,7 @@ using zephyr::geom::Vector3d;
 /// Аналитическое решение из следующих источников:
 /// https://github.com/brantr/sedov_taylor
 /// https://en.wikipedia.org/wiki/Taylor%E2%80%93von_Neumann%E2%80%93Sedov_blast_wave
+/// Но многие обозначения изменены, узнается с трудом.
 class SedovBlast3D {
 public:
     IdealGas::Ptr eos;  ///< Используемый УрС
@@ -36,42 +37,39 @@ public:
     /// @brief Время, к которому УВ достигает радиус r
     double time_by_radius(double r) const;
 
+    /// @brief Квадрат скорости звука
+    double c_squared(double r, double t) const;
+
     /// @brief Плотность
-    double density(const Vector3d &r, double t) const;
+    double density(double r, double t) const;
+
+    /// @brief Модуль скорости
+    double velocity(double r, double t) const;
 
     /// @brief Давление
-    double pressure(const Vector3d &r, double t) const;
-
-    /// @brief Скорость
-    Vector3d velocity(const Vector3d &r, double t) const;
+    double pressure(double r, double t) const;
 
     /// @brief Внутренняя энергия
-    double energy(const Vector3d &r, double t) const;
+    double energy(double r, double t) const;
 
 protected:
     double gamma;  ///< Показатель адиабаты
     double rho0;   ///< Плотность в невозмущенной области
     double E;      ///< Энерговыделение
 
-    /// @brief Параметры решения
-    double v1, v2, v3, v4, v5;
-    double beta;
+    double beta;   ///< Параметр решения
 
-    double eta_V(double V) const;
-    double V_eta(double eta) const;
+    /// @brief Узлы сплайнов
+    std::vector<double> m_xi;
+    std::vector<double> m_Vs;
+    std::vector<double> m_Gs;
+    std::vector<double> m_Zs;
+    std::vector<double> m_Ps; // xi^2 * G(xi) * Z(xi)
 
     double V_xi(double xi) const;
-    double Z_xi(double xi, double V = NAN) const;
-    double G_xi(double eta, double V = NAN) const;
-
-    /// @brief Squared sound speed
-    double c_squared(double r, double t) const;
-
-    double rho(double r, double t) const;
-
-    double v(double r, double t) const;
-
-    double p(double r, double t) const;
+    double Z_xi(double xi) const;
+    double G_xi(double xi) const;
+    double P_xi(double xi) const;
 };
 
 } // namespace zephyr::phys

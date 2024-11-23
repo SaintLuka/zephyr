@@ -24,7 +24,7 @@ public:
         Boundary right = Boundary::ZOE;
     };
 
-#ifdef ZEPHYR_ENABLE_YAML
+#ifdef ZEPHYR_YAML
     /// @brief Конструктор класса по кофигу
     explicit Strip(YAML::Node config);
 #endif

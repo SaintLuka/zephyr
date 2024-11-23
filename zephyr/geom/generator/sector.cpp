@@ -9,7 +9,7 @@
 
 namespace zephyr::geom::generator {
 
-#ifdef ZEPHYR_ENABLE_YAML
+#ifdef ZEPHYR_YAML
 Sector::Sector(YAML::Node config)
         : Generator("sector"), m_r2(-1.0), m_r1(-1.0), m_angle(-1.0), m_hole(false),
         m_left_flag(Boundary::UNDEFINED), m_right_flag(Boundary::UNDEFINED),

@@ -111,7 +111,7 @@ struct CellsByLevel {
         serial_constructor(max_level);
     }
 
-#ifdef ZEPHYR_ENABLE_MULTITHREADING
+#ifdef ZEPHYR_MULTITHREADING
     /// @brief Многопоточный конструктор класса
     /// @details Каждый поток вызывает конструктор CellsByLevelPartial для
     /// части ячеек, затем полученные данные складываются в один массив

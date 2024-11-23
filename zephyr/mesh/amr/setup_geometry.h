@@ -46,7 +46,7 @@ void setup_geometry(AmrStorage &cells, const Statistics &count, const Distributo
             std::ref(aliens), 0, std::ref(op));
 }
 
-#ifdef ZEPHYR_ENABLE_MPI
+#ifdef ZEPHYR_MPI
 /// @brief Осуществляет проход по диапазону ячеек и вызывает для них
 /// соответствующие методы адаптации (с MPI и без тредов)
 template<int dim>
@@ -55,7 +55,7 @@ void setup_geometry(AmrStorage &locals, AmrStorage &aliens, int rank,
 //    setup_geometry_partial<dim>(locals, aliens, rank, count, op, 0, count.n_cells);
 }
 
-#ifdef ZEPHYR_ENABLE_MULTITHREADING
+#ifdef ZEPHYR_MULTITHREADING
 /// @brief Осуществляет проход по диапазону ячеек и вызывает для них
 /// соответствующие методы адаптации (с MPI и с тредами)
 template<int dim>

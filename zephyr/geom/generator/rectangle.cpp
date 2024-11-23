@@ -7,7 +7,7 @@
 
 namespace zephyr::geom::generator {
 
-#ifdef ZEPHYR_ENABLE_YAML
+#ifdef ZEPHYR_YAML
 Rectangle::Rectangle(YAML::Node config)
     : Generator("rectangle"),
       m_xmin(0.0), m_xmax(1.0), m_ymin(0.0), m_ymax(1.0), m_nx(0), m_ny(0),

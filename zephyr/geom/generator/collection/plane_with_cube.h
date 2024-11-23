@@ -22,7 +22,7 @@ public:
         Boundary hole   = Boundary::WALL;
     };
 
-#ifdef ZEPHYR_ENABLE_YAML
+#ifdef ZEPHYR_YAML
     /// @brief Конструктор класса по кофигу
     explicit PlaneWithCube(YAML::Node config);
 #endif

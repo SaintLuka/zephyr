@@ -4,7 +4,7 @@
 
 #include <zephyr/configuration.h>
 
-#ifdef ZEPHYR_ENABLE_EIGEN
+#ifdef ZEPHYR_EIGEN
 #include <Eigen/Dense>
 #else
 #include <zephyr/geom/eigen/interface.h>
@@ -12,7 +12,7 @@
 
 namespace zephyr::geom {
 
-#ifdef ZEPHYR_ENABLE_EIGEN
+#ifdef ZEPHYR_EIGEN
 using namespace Eigen;
 #endif
 

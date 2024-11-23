@@ -12,7 +12,7 @@
 
 namespace zephyr::geom::generator::collection {
 
-#ifdef ZEPHYR_ENABLE_YAML
+#ifdef ZEPHYR_YAML
 PlaneWithHole::PlaneWithHole(YAML::Node config) :
         Generator("collection.plane-with-hole"),
         blocks(12),

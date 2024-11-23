@@ -312,7 +312,7 @@ void balance_flags_slow(AmrStorage &locals, AmrStorage& aliens, int max_level) {
 #endif
 }
 
-#ifdef ZEPHYR_ENABLE_MPI_PASS
+#ifdef ZEPHYR_MPI_PASS
 
 /// @brief Простая версия функции балансировки флагов.
 /// @details Смотреть однопоточную версию.

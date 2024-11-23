@@ -11,7 +11,7 @@
 
 namespace zephyr::mesh::amr {
 
-#ifdef ZEPHYR_ENABLE_MPI
+#ifdef ZEPHYR_MPI
 /// @brief Функция вызывается перед непосредственным связыванием соседей.
 /// У ячеек выставляются параметры element.rank и element.index, также
 /// если ячейка имеет сосдеда на другом процессе, то выставляется
@@ -54,7 +54,7 @@ void before_exchange(AmrStorage& locals, AmrStorage& aliens, int rank) {
     before_exchange_partial(locals, aliens, rank, 0, locals.size());
 }
 
-#ifdef ZEPHYR_ENABLE_MULTITHREADING
+#ifdef ZEPHYR_MULTITHREADING
 void before_exchange(AmrStorage& locals, AmrStorage& aliens, int rank, ThreadPool& threads) {
     auto num_tasks = threads.size();
     if (num_tasks < 2) {
@@ -150,7 +150,7 @@ void find_neighbors(AmrStorage& locals, AmrStorage& aliens) {
     find_neighbors_partial<dim>(locals, aliens, 0, locals.size());
 }
 
-#ifdef ZEPHYR_ENABLE_MULTITHREADING
+#ifdef ZEPHYR_MULTITHREADING
 template <int dim>
 void find_neighbors(AmrStorage& locals, AmrStorage& aliens, ThreadPool& threads) {
     auto num_tasks = threads.size();

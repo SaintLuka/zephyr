@@ -1,12 +1,4 @@
-#list(APPEND TESTS crp_interface)
-#list(APPEND TESTS curves)
-#list(APPEND TESTS game_of_life)
-#list(APPEND TESTS maps_integral)
-#list(APPEND TESTS mesh_generator)
-#list(APPEND TESTS movable_mesh)
-#list(APPEND TESTS polygon_clip)
-#list(APPEND TESTS splines)
-#list(APPEND TESTS volume_fraction)
+#list(APPEND TESTS sedov)
 
 # Assume all files in direcory are tests
 if (ZEPHYR_TESTS_ALL)
@@ -21,12 +13,12 @@ if (ZEPHYR_TESTS_ALL)
 endif()
 
 if (TESTS)
-    message(STATUS "Build geom tests:  ${TESTS}")
+    message(STATUS "Build phys tests:  ${TESTS}")
 endif()
 
 foreach(test IN LISTS TESTS)
     add_executable(${test} ${test}.cpp)
     target_include_directories(${test} PUBLIC zephyr)
     target_link_libraries(${test} PUBLIC zephyr)
-    install(TARGETS ${test} DESTINATION tests/geom)
+    install(TARGETS ${test} DESTINATION tests/phys)
 endforeach()

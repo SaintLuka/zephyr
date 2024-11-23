@@ -20,7 +20,7 @@ public:
         Boundary top    = Boundary::WALL;
     };
 
-#ifdef ZEPHYR_ENABLE_YAML
+#ifdef ZEPHYR_YAML
     /// @brief Конструктор класса по кофигу
     explicit Rectangle(YAML::Node config);
 #endif

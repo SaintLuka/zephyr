@@ -21,7 +21,7 @@ public:
         Boundary front  = Boundary::WALL;
     };
 
-#ifdef ZEPHYR_ENABLE_YAML
+#ifdef ZEPHYR_YAML
     /// @brief Конструктор класса по кофигу
     explicit Cuboid(YAML::Node config);
 #endif

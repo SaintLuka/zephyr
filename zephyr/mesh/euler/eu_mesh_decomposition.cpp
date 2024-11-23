@@ -95,7 +95,7 @@ void EuMesh::redistribute() {
 void EuMesh::exchange() {
     if (mpi::single()) return;
 
-#ifdef ZEPHYR_ENABLE_MPI
+#ifdef ZEPHYR_MPI
 	int size = mpi::size();
 	int rank = mpi::rank();
 
@@ -120,7 +120,7 @@ void EuMesh::exchange() {
 void EuMesh::migrate() {
     if (mpi::single()) return;
 
-#ifdef ZEPHYR_ENABLE_MPI
+#ifdef ZEPHYR_MPI
 	int size = mpi::size();
 	int rank = mpi::rank();
 
@@ -250,7 +250,7 @@ void EuMesh::migrate() {
 /// @brief 
 /// Заполняет m_tourism
 void EuMesh::build_aliens() {
-#ifdef ZEPHYR_ENABLE_MPI
+#ifdef ZEPHYR_MPI
 	int size = mpi::size();
 	int rank = mpi::rank();
 

@@ -6,7 +6,7 @@
 
 #include <zephyr/configuration.h>
 
-#ifdef ZEPHYR_ENABLE_MPI
+#ifdef ZEPHYR_MPI
 
 #include <openmpi/mpi.h>
 

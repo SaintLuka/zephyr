@@ -18,7 +18,7 @@ Box Generator::bbox() const {
     throw std::runtime_error(message);
 }
 
-#ifdef ZEPHYR_ENABLE_YAML
+#ifdef ZEPHYR_YAML
 std::unique_ptr<Generator> Generator::create(YAML::Node config) {
     if (!config["type"]) {
         throw std::runtime_error("EuMesh config doesn't contain 'type'");

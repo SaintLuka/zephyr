@@ -175,7 +175,7 @@ struct SwapLists {
 #endif
     }
 
-#ifdef ZEPHYR_ENABLE_MULTITHREADING
+#ifdef ZEPHYR_MULTITHREADING
     /// @brief Устанавливает следующие позиции ячеек в многопоточном режиме
     /// @details После выполнения операции поле element.index у ячеек указывает
     /// на следующее положение ячейки в хранилище

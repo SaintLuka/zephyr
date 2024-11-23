@@ -218,7 +218,7 @@ smf::Flux CIR2::calc_flux(const smf::PState &zL, const smf::PState &zR, const ph
     QState _qL(zL); // Консервативный вектор слева
     QState _qR(zR); // Консервативный вектор справа
 
-#ifdef ZEPHYR_ENABLE_EIGEN
+#ifdef ZEPHYR_EIGEN
     Vector6d qL, qR;
     qL.segment(0, 5) = _qL.arr();
     qL[5] = zL.pressure;
