@@ -81,7 +81,8 @@ int main() {
     }
 
     // Различные варианты инициализации ORB декомпозиции
-    ORB orb(domain, "XY", -1, {2, 3, 4, 5, 1});
+    ORB orb(domain, "XY", mpi::size());
+    mesh.set_decomposition(orb);
     //decomp::ORB orb(domain, "YX", 13);
     //decomp::ORB orb(domain, "YX", 13, 3);
 
@@ -102,6 +103,7 @@ int main() {
 
         // Балансировка декомпозиции
         orb.balancing(ws);
+        mesh.redistribute();
     }
 
     mpi::finalize();

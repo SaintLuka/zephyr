@@ -128,7 +128,6 @@ void EuMesh::migrate() {
 	// По некоторому правилу определяется новый rank для всех ячеек из массива locals
 	for (auto& cell: m_locals){
 		// m_decomp->rank(cell);
-		
 		cell.rank = m_decomp->rank(cell);
 
 		// cell.rank = (cell.index / (m_nx*m_nx/2)) * 2 + (cell.index % (m_nx)) / (m_nx/2);
@@ -149,6 +148,7 @@ void EuMesh::migrate() {
 		for(int i=0; i<size; ++i)
 			printf("m_%d: %d\n", i, m_i[i]);
 	}*/
+
 
 	std::vector<int> m = mpi::all_gather_vectors(m_i);
 
@@ -302,7 +302,7 @@ void EuMesh::build_aliens() {
 
 	m_aliens.resize(m_tourism.m_recv_offsets[size - 1] + m_tourism.m_count_to_recv[size - 1]);
 
-	for(int i=0; i<size; ++i){
+	for(int i = 0; i < size; ++i){
 		m_tourism.m_count_to_send[i] *= m_aliens.itemsize();
 		m_tourism.m_count_to_recv[i] *= m_aliens.itemsize();
 		m_tourism.m_send_offsets[i] *= m_aliens.itemsize();
@@ -318,21 +318,23 @@ void EuMesh::build_aliens() {
 				face.adjacent.alien = -1;
 		}
 	}
-
+	
 	int al_it = 0;
 	for(auto& cell : m_aliens){
 		for(auto& face : cell.faces){
-			if(face.adjacent.rank == rank){
+			if(face.adjacent.index != -1 && face.adjacent.rank == rank){
 				auto& curr_cell = m_locals[face.adjacent.index];
-				for(auto& l_face : curr_cell.faces)
+				for(auto& l_face : curr_cell.faces){
 					if(l_face.adjacent.index == cell.index){
 						l_face.adjacent.index = -1;
 						l_face.adjacent.alien = al_it;
 						break;
 					}
+				}
 			}
 		}
 		++al_it;
+		//printf("it: %d\n aliens size: %d\n", al_it, m_aliens.size());
 	}
 
 	// [?] если m_border_indices[r].size() == m_count_to_send[r], то зачем второе вообще нужно?
