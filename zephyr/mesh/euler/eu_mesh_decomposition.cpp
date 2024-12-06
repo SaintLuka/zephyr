@@ -134,7 +134,7 @@ void EuMesh::migrate() {
 		// Подсчитываем число ячеек, которые должны быть перемещены с данного процесса на другие
 		++m_i[cell.rank];
 	}
-	
+
 	/* DEBUG
 	if(mpi::master()){
 		for (auto& cell: m_locals){
@@ -170,11 +170,16 @@ void EuMesh::migrate() {
 	*/
 
 	// Переиндексируем грани
+	// [!] Здесь была ошибка при повторном вызове migrate. Она заключалась в том, что face.rank должен смотреться и у alien
 	for (auto& cell: m_locals){
 		for(auto& face: cell.faces){
-			if(face.adjacent.index >= 0){
-				face.adjacent.rank = m_locals[face.adjacent.index].rank;
-				face.adjacent.index = m_locals[face.adjacent.index].index;
+			if(face.adjacent.alien != -1){
+				face.adjacent.rank = m_aliens[face.adjacent.alien].rank;
+			} else {
+				if(face.adjacent.index>=0){
+					face.adjacent.rank = m_locals[face.adjacent.index].rank;
+					face.adjacent.index = m_locals[face.adjacent.index].index;
+				}
 			}
 		}
 	}
@@ -232,7 +237,7 @@ void EuMesh::migrate() {
 	
 	// Отправляем всем процессам соостветствующие
 	MPI_Alltoallv(
-		migrants.item(0).ptr(), send_counts.data(), send_displs.data(), MPI_BYTE, 
+		migrants.item(0).ptr(), send_counts.data(), send_displs.data(), MPI_BYTE,
 		m_locals.item(0).ptr(), recv_counts.data(), recv_displs.data(), MPI_BYTE, 
 		mpi::comm()
 	);
@@ -254,6 +259,12 @@ void EuMesh::build_aliens() {
 	int size = mpi::size();
 	int rank = mpi::rank();
 
+	m_tourism.m_border_indices.clear();
+	m_tourism.m_count_to_send.clear();
+	m_tourism.m_count_to_recv.clear();
+	m_tourism.m_send_offsets.clear();
+	m_tourism.m_recv_offsets.clear();
+
 	// Выделяем память
 	// [!] думаю, нужно перенести этот код, чтобы он выполнялся единожды
 	m_tourism.m_border_indices.resize(size, std::vector<int>());
@@ -270,20 +281,22 @@ void EuMesh::build_aliens() {
 				border_indices.push_back(cell.geom().index);
 		}
 	}
-
+	
 	// Заполняем m_count_to_send
 	for(int r = 0; r < size; ++r)
 		m_tourism.m_count_to_send[r] = m_tourism.m_border_indices[r].size();
 	// Заполняем m_send_offsets
-	for(int r = 1; r < size; ++r)
+	for(int r = 1; r < size; ++r){
 		m_tourism.m_send_offsets[r] = m_tourism.m_send_offsets[r - 1] + m_tourism.m_count_to_send[r - 1];
+	}
 
 	// Отправляем m_count_to_send -> получаем m_count_to_recv
 	mpi::all_to_all(m_tourism.m_count_to_send, m_tourism.m_count_to_recv);
 
 	// Заполняем m_recv_offsets
-	for(int r = 1; r < size; ++r)
+	for(int r = 1; r < size; ++r){
 		m_tourism.m_recv_offsets[r] = m_tourism.m_recv_offsets[r - 1] + m_tourism.m_count_to_recv[r - 1];
+	}
 
 	// Заполняем m_border
 	int border_size = m_tourism.m_send_offsets[size - 1] + m_tourism.m_count_to_send[size - 1];
@@ -335,7 +348,7 @@ void EuMesh::build_aliens() {
 		}
 		++al_it;
 		//printf("it: %d\n aliens size: %d\n", al_it, m_aliens.size());
-	}
+	}		
 
 	// [?] если m_border_indices[r].size() == m_count_to_send[r], то зачем второе вообще нужно?
 #endif
