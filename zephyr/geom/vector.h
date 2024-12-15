@@ -61,6 +61,24 @@ inline std::vector<double> linspace(double t1, double t2, size_t N) {
     return res;
 }
 
+/// @brief Аналог meshgrid из numpy.
+inline std::tuple<std::vector<std::vector<double>>,
+                  std::vector<std::vector<double>>> meshgrid(
+        const std::vector<double>& x,
+        const std::vector<double>& y) {
+
+    std::vector<std::vector<double>> X(x.size(), std::vector<double>(y.size()));
+    std::vector<std::vector<double>> Y(x.size(), std::vector<double>(y.size()));
+
+    for (size_t i = 0; i < x.size(); ++i) {
+        for (size_t j = 0; j < y.size(); ++j) {
+            X[i][j] = x[i];
+            Y[i][j] = y[j];
+        }
+    }
+    return {X, Y};
+}
+
 /// @brief Аналог linspace из numpy.
 /// Создает равномерный массив из N точек на линии [v1, v2],
 /// концы включаются

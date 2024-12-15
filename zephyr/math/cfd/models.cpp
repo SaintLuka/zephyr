@@ -195,6 +195,7 @@ PState::PState(const QState &q, const phys::Materials &mixture,
     energy    = q.energy / density - 0.5 * velocity.squaredNorm();
 
     mass_frac = q.mass_frac.arr() / density;
+    mass_frac.cutoff(1.0e-12);
     mass_frac.normalize();
 
     vol_frac  = alpha;
@@ -202,6 +203,20 @@ PState::PState(const QState &q, const phys::Materials &mixture,
     // в том числе обновляет vol_frac
     auto PT = mixture.find_PT(density, energy, mass_frac,
                               {.P0=P0, .T0=T0, .alpha=&vol_frac});
+
+    // alpha и beta должны обращаться в ноль одновременно,
+    // иначе возникают невнятные косяки
+    for (int i = 0; i < vol_frac.size(); ++i) {
+        if (mass_frac.has(i) != vol_frac.has(i)) {
+            std::cout << "SOMETHING WONG: " << "\n";
+            if (!vol_frac.has(i)) {
+                mass_frac[i] = vol_frac[i] = 0.0;
+            }
+        }
+    }
+    mass_frac.normalize();
+    vol_frac.normalize();
+
     pressure    = PT.P;
     temperature = PT.T;
 }

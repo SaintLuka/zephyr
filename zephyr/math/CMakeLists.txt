@@ -11,6 +11,7 @@ set(ZEPHYR_MATH_SRC
     PARENT_SCOPE)
 
 install(FILES
+    funcs.h
     vectorization.h
     DESTINATION
     include/${PROJECT_NAME}/math)

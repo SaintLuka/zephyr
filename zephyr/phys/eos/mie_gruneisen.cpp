@@ -331,8 +331,9 @@ void MieGruneisen::table_params(std::string name) {
     }
     // @formatter:on
 
-    B = r0 * c0 * c0;
-    v0 = 1.0 / r0;
+    rho_0 = r0;
+    B = rho_0 * c0 * c0;
+    v0 = 1.0 / rho_0;
 }
 
 } // namespace zephyr::phys

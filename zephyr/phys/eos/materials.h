@@ -17,6 +17,10 @@ public:
     /// @brief Конструктор по умолчанию (пустой список)
     Materials() = default;
 
+    /// @brief Создать из списка инициалиации
+    Materials(const std::initializer_list<Eos::Ptr>& il)
+        : m_materials(il) { }
+
     /// @brief Число компонент
     int size() const;
 
@@ -159,8 +163,9 @@ protected:
                             const Fractions& beta, const Options& = {}) const;
 
     // Метод Ньютона, использует функции P(rho, T)
-    double pressure_rT_ver2(double density, double temperature,
-                            const Fractions& beta, const Options& = {}) const;
+    double pressure_rT_ver2(double density, double temperature, const
+                            Fractions& beta, const Options& = {},
+                            double eps = NAN) const;
 
     /// Классическая, метод Ньютона, использует функции
     ///   volume(P, T), energy(P, T)

@@ -1,5 +1,6 @@
 add_subdirectory(amr)
 add_subdirectory(eos)
 add_subdirectory(geom)
+add_subdirectory(math)
 add_subdirectory(phys)
 add_subdirectory(utils)

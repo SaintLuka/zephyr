@@ -456,9 +456,87 @@ void test2(double phi1, double phi2, double alpha1, double alpha2) {
     plt::show();
 }
 
+// Попытки аппроксимации
+void test3(double C) {
+    using namespace zephyr::geom;
+
+
+    // Тестовый многоугольник
+    Polygon cell = {
+            Vector3d{0.0, 0.0, 0.0},
+            Vector3d{1.0, 0.0, 0.0},
+            Vector3d{1.0, 1.0, 0.0},
+            Vector3d{0.0, 1.0, 0.0}
+    };
+    cell.sort();
+
+    Polygon part = {
+            Vector3d{1.0 - C, 0.0, 0.0},
+            Vector3d{1.0, 0.0, 0.0},
+            Vector3d{1.0, 1.0, 0.0},
+            Vector3d{1.0 - C, 1.0, 0.0}
+    };
+    part.sort();
+
+    // Просто визуализация того, что мы здесь будем считать
+    if (false) {
+        double cosn = std::cos(0.6);
+        double alpha = 0.85;
+
+        Vector3d n = {cosn, std::sqrt(1.0 - cosn * cosn), 0.0};
+        Vector3d p = cell.find_section(n, alpha);
+
+        double res = part.clip_area(p, n);
+
+        // чисто для визуализации
+        auto clip1 = cell.clip(p, n);
+        auto clip2 = part.clip(p, n);
+
+        // Строим многоугольник и сечение
+        plt::figure_size(6.0, 6.0);
+        plt::title("Поток через правую грань");
+        plt::set_aspect_equal();
+        plt::text(0.1, 0.8, "Объемная доля: " + std::to_string(alpha));
+        plt::text(0.1, 0.6, "Поток: " + std::to_string(res));
+        plt::plot(cell.xs(), cell.ys(), {{"color", "black"}});
+        plt::arrow(p.x(), p.y(), 0.1 * n.x(), 0.1 * n.y(), "k", "k", 0.05, 0.03);
+        plt::plot(part.xs(), part.ys(), {{"color",     "black"},
+                                         {"linestyle", "dashed"}});
+        plt::fill(clip1.xs(), clip1.ys(), {{"color", "#0000ff3f"}});
+        plt::fill(clip2.xs(), clip2.ys(), {{"color", "#00ff003f"}});
+
+        plt::show();
+    }
+
+    int nc = 200;
+    int nv = 100;
+    auto [cosn, vols] = meshgrid(
+            linspace(-1.0, 1.0, nc),
+            linspace(0.0, 1.0, nv));
+
+    std::vector<std::vector<double>> flux1(nc, std::vector<double>(nv));
+
+    for (int i = 0; i < nc; ++i) {
+        for (int j = 0; j < nv; ++j) {
+            double cos = cosn[i][j];
+            double vol = vols[i][j];
+
+            Vector3d n = {cos, std::sqrt(1.0 - cos * cos), 0.0};
+            Vector3d p = cell.find_section(n, vol);
+
+            flux1[i][j] = part.clip_area(p, n);
+        }
+    }
+
+    plt::plot_surface(cosn, vols, flux1, {{"cmap", "jet"}});
+    plt::show();
+}
+
 int main() {
-    test1(0.01 * M_PI, 0.51 * M_PI, 0.12, 0.1);
+    //test1(0.01 * M_PI, 0.51 * M_PI, 0.12, 0.1);
     //test2(0.0, NAN, 0.22, 0.0);
+
+    test3(0.17);
 
     return 0;
 }

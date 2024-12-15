@@ -196,17 +196,17 @@ int main() {
 
     // Создать решатель
     Solver solver;
-    solver.set_CFL(0.4);
+    solver.set_CFL(0.5);
     solver.set_mnt(true);
 
     // Расщепление по направлениям
     bool splitting = true;
 
     // Настройки метода
-    solver.set_method(Solver::Method::KABARE);
+    solver.set_method(Solver::Method::MUSCL_MC_CRP);
 
     // Настройки теста
-    BodySquare body;
+    BodyDisk body;
     solver.test = Solver::Test::Rotation;
 
     // Создать сетку

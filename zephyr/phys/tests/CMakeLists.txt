@@ -1,4 +1,5 @@
 set(ZEPHYR_PHYS_TESTS_SRC
+        ${CMAKE_CURRENT_SOURCE_DIR}/multimat_1D.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/toro.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/sedov_blast.cpp
         PARENT_SCOPE)
@@ -12,6 +13,7 @@ install(FILES
         sedov_blast.h
         shock_wave.h
         test_2D.h
+        multimat_1D.h
         rarefied_water.h
         richtmyer_meshkov.h
         supersonic_flow_around_cylinder.h

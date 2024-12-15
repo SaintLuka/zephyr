@@ -82,11 +82,20 @@ public:
     /// отрицательным). Может принимать отрицательные значения.
     virtual double min_pressure() const;
 
+    /// @brief Референсная плотность, значение используется в качестве
+    /// начального приближения в PT-замыкании.
+    double ref_density() const;
+
     /// @brief Подгон теплоемкости Cv
     /// @param rho_ref, P_ref, T_ref Референсные значения плотности, давления
     /// и температуры.
     virtual void adjust_cv(double rho_ref, double P_ref, double T_ref);
 
+protected:
+    /// @brief Референсная плотность при нормальных условиях.
+    /// Точное значение не нужно, значение используется в качестве
+    /// начального приближения в PT-замыкании.
+    double rho_0 = 1.0;
 };
 
 } // namespace zephyr::phys

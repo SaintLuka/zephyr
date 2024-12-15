@@ -20,6 +20,12 @@ using zephyr::phys::Materials;
 
 using namespace zephyr::math::mmf;
 
+enum class DirSplit {
+    NONE,    ///< Без расщепления
+    SIMPLE,  ///< Схема первого порядка
+    STRANG,  ///< Схема второго порядка (G. Strang 1968)
+};
+
 class MmFluid {
 public:
 
@@ -90,6 +96,9 @@ public:
     /// @brief Установить метод
     void set_method(Fluxes method);
 
+    /// @brief Установить метод расщепления по направлениям
+    void set_splitting(DirSplit splitting);
+
     /// @brief Задать ускорение свободного падения
     void set_gravity(double g);
 
@@ -99,6 +108,10 @@ public:
     /// @brief Шаг интегрирования на предыдущем вызове update()
     double dt() const;
 
+    /// @brief Установить максимальный шаг интегрирования по времени
+    void set_max_dt(double dt);
+
+    /// @brief Основная функция решателя, сделать шаг
     void update(Mesh &mesh);
 
     /// @brief Установить флаги адаптации
@@ -113,28 +126,33 @@ private:
     /// условия Куранта
     void compute_dt(Mesh &mesh);
 
+    /// @brief Проинтегрировать на шаг dt, вдоль направления dir
+    void integrate(Mesh &mesh, double dt, Direction dir = Direction::ANY);
+
     /// @brief Расчёт потоков
-    void fluxes(Mesh &mesh);
+    void fluxes(Mesh &mesh, double dt, Direction dir = Direction::ANY);
 
     /// @brief Обновление ячеек
     void swap(Mesh &mesh);
 
     void compute_grad(Mesh &mesh, const std::function<mmf::PState(Cell &)> &to_state);
 
-    void fluxes_stage1(Mesh &mesh);
+    void fluxes_stage1(Mesh &mesh, double dt, Direction dir = Direction::ANY);
 
-    void fluxes_stage2(Mesh &mesh);
+    void fluxes_stage2(Mesh &mesh, double dt, Direction dir = Direction::ANY);
 
     Flux calc_flux(const PState& zL, const PState& zR, double hL, double hR, double dt);
 
 protected:
     Materials mixture;  ///< Список материалов (смесь)
     NumFlux::Ptr m_nf;  ///< Метод расчёта потока
+    bool m_crp;         ///< Композитная задача Римана
+    DirSplit m_split;   ///< Расщепление по направлениям
     int m_acc = 1;      ///< Порядок точности
     double m_CFL;       ///< Число Куранта
     double m_g = 0.0;   ///< Ускорение свободного падения, направлено против oy
     double m_dt;        ///< Шаг интегрирования
-    bool m_crp;         ///< Композитная задача Римана
+    double m_max_dt;    ///< Максимальный шаг интегрирования
 };
 
 std::ostream &operator<<(std::ostream &os, const MmFluid::State &state) {

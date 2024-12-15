@@ -2,7 +2,7 @@
 
 #include <zephyr/phys/eos/eos.h>
 
-namespace zephyr { namespace phys {
+namespace zephyr::phys {
 
 /// @brief Непонятное уравнение состояния, какая-то смесь уравнений
 /// состояния Ми-Грюнайзена и Мурнагана, хорошо было бы найти исходник.
@@ -93,5 +93,4 @@ public:
     double Cv; ///< Теплоемкость при постоянном давлении
 };
 
-}
-}
+} // namespace zephyr::phys

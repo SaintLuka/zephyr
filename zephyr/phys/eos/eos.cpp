@@ -63,6 +63,10 @@ double Eos::min_pressure() const {
     throw std::runtime_error("min_pressure is not implemented");
 }
 
+double Eos::ref_density() const {
+    return rho_0;
+}
+
 void Eos::adjust_cv(double rho, double P, double T) {
     throw std::runtime_error("adjust_cv is not implemented");
 }

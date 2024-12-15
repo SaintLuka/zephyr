@@ -8,8 +8,8 @@ ToroTest::ToroTest(int num, bool multimat, bool adjust_cv) {
         eos_R = eos_L;
     }
     else {
-        eos_L = IdealGas::create(1.3);
-        eos_R = IdealGas::create(1.5);
+        eos_L = IdealGas::create(1.4);
+        eos_R = IdealGas::create(1.4);
     }
 
     switch (num) {

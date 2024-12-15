@@ -11,6 +11,10 @@ struct ScalarSet;
 
 /// @brief Вектор массовых или объемных концентраций
 struct Fractions {
+    /// @brief Меньшие объемные/массовые доли не различимы,
+    /// при вычитании из единицы остается единица. Около 5.5e-17
+    constexpr static const double minimal = std::numeric_limits<double>::epsilon() / 4;
+
     /// @brief Максимальное число компонент
     static const int max_size = 3;
 

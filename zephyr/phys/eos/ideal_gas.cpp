@@ -8,12 +8,21 @@
 namespace zephyr::phys {
 
 IdealGas::IdealGas(double gamma, double Cv)
-    : gamma(gamma), Cv(Cv) { }
+    : gamma(gamma), Cv(Cv) {
+
+    rho_0 = 1.0 / volume_PT(1.0e5, 300);
+}
 
 IdealGas::IdealGas(const std::string &name) {
     if (name == "Air") {
         gamma = 1.4;
-        Cv = 718.0_J_kgK;
+        Cv    = 718.0_J_kgK;
+        rho_0 = 1.25_kg_m3;
+    }
+    else if (name == "SF6") {
+        gamma = 1.1074;
+        Cv    = 567.0_J_kgK;
+        rho_0 = 6.17_kg_m3;
     } else {
         throw std::runtime_error("Unknown Ideal gas '" + name + "'");
     }

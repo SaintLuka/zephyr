@@ -193,7 +193,7 @@ double Materials::pressure_rT_ver1(double rho, double T, const Fractions &beta,
 }
 
 double Materials::pressure_rT_ver2(double rho, double T, const Fractions &beta,
-                              const Options &options) const {
+                              const Options &options, double eps) const {
 
     // Случай одного материала
     int idx = beta.index();
@@ -220,7 +220,8 @@ double Materials::pressure_rT_ver2(double rho, double T, const Fractions &beta,
 
     double err = 1.0;
     int counter = 0;
-    while (err > 1.0e-12 && counter < 30) {
+    eps = std::isnan(eps) ? 1.0e-12 : eps;
+    while (err > eps && counter < 30) {
         // Расчет вспомогательных величин
         double A_xi = 0.0;
         double B_xi = 0.0;
@@ -528,9 +529,6 @@ PairPT Materials::find_PT_ver1(double rho, double eps, const Fractions &beta,
 
 PairPT Materials::find_PT_ver2(double rho, double e, const Fractions &beta,
                                const Options &options) const {
-    using Eigen::VectorXd;
-    using Eigen::MatrixXd;
-
     // Случай одного материала
     int cln = beta.index();
     if (cln >= 0) {
@@ -544,12 +542,6 @@ PairPT Materials::find_PT_ver2(double rho, double e, const Fractions &beta,
 
     double T = std::isnan(options.T0) ? 300.0 : options.T0;
 
-    if (std::abs( e - 138817.5871135001) < 1.0e-9 &&
-    std::abs(rho - 10099.999972318446) < 1.0e-9) {
-
-        std::cout <<"Hi\n";
-    }
-
     // Число материалов в задаче
     int n_fractions = beta.count();
 
@@ -559,8 +551,36 @@ PairPT Materials::find_PT_ver2(double rho, double e, const Fractions &beta,
         if (beta.has(i) && alpha[i] == 0.0) {
             alpha[i] = 0.0001; // добавить материал
         }
+        if (beta.has(i)) {
+            alpha[i] = beta[i] / m_materials[i]->ref_density();
+        }
     }
     alpha.normalize();
+
+    /*
+    if (!std::isnan(options.T0)) {
+        if (options.alpha) {
+            *options.alpha = alpha;
+        }
+
+        for (int i = 0; i < n_fractions; ++i) {
+            if (beta[i] > 0.0 && alpha[i] == 0.0) {
+
+                std::cout << "OH NO\n";
+            }
+        }
+
+        for (int i = 0; i < n_fractions; ++i) {
+            if (beta.has(i)) {
+                alpha[i] = beta[i] / m_materials[i]->ref_density();
+            }
+        }
+
+        alpha.normalize();
+
+        double temp_P = pressure_rT_ver2(rho, T, beta, options, 0.001);
+    }
+     */
 
     // Приращения объемных долей на итерациях
     ScalarSet delta;
@@ -574,7 +594,7 @@ PairPT Materials::find_PT_ver2(double rho, double e, const Fractions &beta,
         double C_xi{0.0}, C_eta{0.0};
         double e_beta{0.0}, e_beta_T{0.0};
         for (int i = 0; i < n_fractions; ++i) {
-            if (beta.has(i)) {
+            if (alpha.has(i)) {
                 double rho_i = (beta[i] / alpha[i]) * rho;
                 dRdT P_i = m_materials[i]->pressure_rT(rho_i, T, {.deriv=true});
                 dRdT e_i = m_materials[i]->energy_rT  (rho_i, T, {.deriv=true});
@@ -600,7 +620,7 @@ PairPT Materials::find_PT_ver2(double rho, double e, const Fractions &beta,
                 (A_xi * C_eta - A_eta * C_xi - A_xi * e_beta_T);
 
         for (int i = 0; i < n_fractions; ++i) {
-            if (beta.has(i)) {
+            if (alpha.has(i)) {
                 double rho_i = (beta[i] / alpha[i]) * rho;
                 dRdT P_i = m_materials[i]->pressure_rT(rho_i, T, {.deriv=true});
                 double xi = alpha[i] / (rho_i * P_i.dR);
@@ -612,7 +632,7 @@ PairPT Materials::find_PT_ver2(double rho, double e, const Fractions &beta,
         // Найдем константу chi, потом умножим на неё.
         double chi = 1.0;
         for (int i = 0; i < n_fractions; ++i) {
-            if (beta.has(i)) {
+            if (alpha.has(i)) {
                 if (alpha[i] + delta[i] > 1.0) {
                     chi = std::min(chi, 0.95 * (1.0 - alpha[i]) / (delta[i]));
                 }
@@ -623,7 +643,7 @@ PairPT Materials::find_PT_ver2(double rho, double e, const Fractions &beta,
             }
         }
         for (int i = 0; i < n_fractions; ++i) {
-            if (beta.has(i)) {
+            if (alpha.has(i)) {
                 delta[i] *= chi;
             }
         }
@@ -631,11 +651,11 @@ PairPT Materials::find_PT_ver2(double rho, double e, const Fractions &beta,
 
         err = 0.0;
         for (int i = 0; i < n_fractions; ++i) {
-            if (beta.has(i)) {
+            if (alpha.has(i)) {
                 alpha[i] += delta[i];
                 err = std::max(err, std::abs(delta[i]));
 
-                assert(alpha[i] < 1.0);
+                assert(alpha[i] <= 1.0);
                 assert(alpha[i] > 0.0);
             }
         }
@@ -644,16 +664,17 @@ PairPT Materials::find_PT_ver2(double rho, double e, const Fractions &beta,
         ++counter;
     }
 
+    alpha.normalize();
+
     // Просто усредняем. На самом деле, если метод сошелся,
     // тогда все значения P_i равны
     double P = 0.0;
     for (int i = 0; i < n_fractions; ++i) {
-        if (beta.has(i)) {
+        if (alpha.has(i)) {
             double rho_i = (beta[i] / alpha[i]) * rho;
-            P += m_materials[i]->pressure_rT(rho_i, T);
+            P += alpha[i] * m_materials[i]->pressure_rT(rho_i, T);
         }
     }
-    P /= beta.nonzero();
 
     // Перенести объемные доли
     if (options.alpha) {

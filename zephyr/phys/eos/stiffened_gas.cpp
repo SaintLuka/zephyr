@@ -19,10 +19,12 @@ StiffenedGas::StiffenedGas(const std::string &name) {
     if (name == "Air") {
         gamma = 1.4;
         Cv    = 718.0_J_kgK;
+        rho_0 = 1.25_kg_m3;
     }
     else if (name == "SF6") {
         gamma = 1.1074;
         Cv    = 567.0_J_kgK;
+        rho_0 = 6.17_kg_m3;
     }
     else if (name == "Water") {
         gamma = 4.4;
@@ -30,18 +32,21 @@ StiffenedGas::StiffenedGas(const std::string &name) {
         P0    = 600.0_MPa;
         e0    = 0.0;
         T0    = 230.7; // 10^5 Па, 1000 кг/м^3, 0 °C
+        rho_0 = 1.0_g_cm3;
     }
     else if (name == "Water2") {
         gamma = 3.0;
         Cv    = 4160.0_J_kgK;
         P0    = 853.3_MPa;
         e0    = -1.148_MJ_kg;
+        rho_0 = 1.0_g_cm3;
     }
     else if (name == "Copper" || name == "Cu") {
         gamma = 4.0;
         Cv    = 384.0_J_kgK;
         P0    = 341.0;
         e0    = 0.0;
+        rho_0 = 8.96_g_cm3;
     }
     else if (name == "Lead" || name == "Pb") {
         // Из параметров для Mie-Gruneisen
@@ -51,30 +56,39 @@ StiffenedGas::StiffenedGas(const std::string &name) {
         P0    = 11.8_GPa;
         e0    = -1.42_MJ_kg;
         T0    = -2832.57;
+        rho_0 = 11.35_g_cm3;
     }
     else if (name == "Gas") {
         // Тестовый газ (аналог Air)
+        // Плотность rho_0 = 1.0, при (P = 1.0, T = 1.0)
         gamma = 1.4;
         Cv    = 2.5;
+        rho_0 = 1.0;
     }
     else if (name == "HeavyGas") {
         // Тестовый тяжелый газ (аналог SF6)
+        // Плотность rho_0 = 4.0, при (P = 1.0, T = 1.0)
         gamma = 1.1;
         Cv    = 2.5;
+        rho_0 = 4.0;
     }
     else if (name == "Liquid") {
         // Тестовая жидкость (аналог воды)
+        // Плотность rho_0 = 1000.0, при (P = 0.0, T = 1.0)
         gamma = 4.4;
         Cv    = 20.0;
         P0    = 6.8e4;
+        rho_0 = 1000.0;
     }
     else if (name == "Solid") {
         // Тестовый металл (аналог свинца)
+        // Плотность rho_0 = 12500, при (P = 0.0, T = 1.0)
         gamma = 3.8;
         Cv    = 0.5;
         P0    = 1.4e5;
         e0    = -15.0;
         T0    = -7.0;
+        rho_0 = 12500;
     }
     else {
         throw std::runtime_error("Unknown stiffened gas '" + std::string(name) + "'");

@@ -154,7 +154,7 @@ std::array<int, 2> Fractions::pair() const {
 }
 
 void Fractions::normalize() {
-    cutoff(1e-14);
+    cutoff(minimal);
 }
 
 void Fractions::cutoff(double eps) {
@@ -174,7 +174,7 @@ void Fractions::cutoff(double eps) {
 
 bool Fractions::empty() const {
     for (auto &v: m_data) {
-        if (v > 1e-14) {
+        if (v > minimal) {
             return false;
         }
     }

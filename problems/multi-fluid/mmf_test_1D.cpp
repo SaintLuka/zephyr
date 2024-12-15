@@ -8,6 +8,7 @@
 
 #include <zephyr/phys/tests/toro.h>
 #include <zephyr/phys/tests/rarefied_water.h>
+#include <zephyr/phys/tests/multimat_1D.h>
 
 #include <zephyr/math/solver/riemann.h>
 #include <zephyr/math/solver/mm_fluid.h>
@@ -46,7 +47,7 @@ double get_rho2(AmrStorage::Item &cell) { return cell(U).get_state().true_densit
 int main() {
     // Тестовая задача
     //RarefiedWater test;
-    ToroTest test(1, true, false);
+    Multimat1D test(1, 1, 0);
 
     // Чистые состояния слева и справа в тесте
     Vector3d Ox = {100.0, 0.0, 0.0};
@@ -73,12 +74,12 @@ int main() {
     PvdFile pvd("test1D", "output");
 
     // Переменные для сохранения
+    pvd.variables += {"cln", get_cln};
     pvd.variables += {"rho", get_rho};
     pvd.variables += {"u", get_u};
-    pvd.variables += {"p", get_p};
     pvd.variables += {"e", get_e};
+    pvd.variables += {"P", get_p};
     pvd.variables += {"T", get_T};
-    pvd.variables += {"cln", get_cln};
     pvd.variables += {"b1", get_mfrac1};
     pvd.variables += {"b2", get_mfrac2};
     pvd.variables += {"a1", get_vfrac1};
@@ -124,19 +125,20 @@ int main() {
     MmFluid solver(mixture);
     solver.set_CFL(0.5);
     solver.set_accuracy(1);
-    solver.set_method(Fluxes::CRP);
+    solver.set_method(Fluxes::HLLC);
 
     for (auto cell: mesh) {
-        cell(U).density = test.density(cell.center());
-        cell(U).velocity = test.velocity(cell.center());
-        cell(U).pressure = test.pressure(cell.center());
-        cell(U).energy = test.energy(cell.center());
+        Vector3d r = cell.center();
+        cell(U).density  = test.density(r);
+        cell(U).velocity = test.velocity(r);
+        cell(U).pressure = test.pressure(r);
+        cell(U).energy   = test.energy(r);
 
-        cell(U).mass_frac[0] = cell.x() < test.x_jump ? 1.0 : 0.0;
-        cell(U).mass_frac[1] = cell.x() < test.x_jump ? 0.0 : 1.0;
+        cell(U).mass_frac[0] = test.fraction(r, 0);
+        cell(U).mass_frac[1] = test.fraction(r, 1);
 
-        cell(U).vol_frac[0] = cell.x() < test.x_jump ? 1.0 : 0.0;
-        cell(U).vol_frac[1] = cell.x() < test.x_jump ? 0.0 : 1.0;
+        cell(U).vol_frac[0] = test.fraction(r, 0);
+        cell(U).vol_frac[1] = test.fraction(r, 1);
 
         cell(U).temperature = mixture.temperature_rP(
                 cell(U).density, cell(U).pressure, cell(U).mass_frac);
@@ -145,13 +147,18 @@ int main() {
     size_t n_step = 0;
     double next_write = 0.0;
 
-    while (curr_time <= 1.01 * test.max_time() && n_step < 15000000000) {
+    while (curr_time < test.max_time() && n_step < 15000000000) {
         if (curr_time >= next_write) {
             std::cout << "\tStep: " << std::setw(6) << n_step << ";"
                       << "\tTime: " << std::setw(6) << std::setprecision(3) << curr_time << "\n";
             pvd.save(mesh, curr_time);
-            next_write += test.max_time() / 200;
+            if (n_step < 3870000000000000000) {
+                next_write += test.max_time() / 200;
+            }
         }
+
+        // Точное завершение в end_time
+        solver.set_max_dt(test.max_time() - curr_time);
 
         // Обновляем слои
         solver.update(mesh);

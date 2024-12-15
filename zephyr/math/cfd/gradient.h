@@ -2,10 +2,16 @@
 
 #include <functional>
 #include <zephyr/geom/vector.h>
+#include <zephyr/mesh/cell.h>
 #include <zephyr/mesh/mesh.h>
 #include <zephyr/math/cfd/limiter.h>
 
 namespace zephyr::math::gradient {
+
+using zephyr::mesh::Cell;
+using zephyr::mesh::Boundary;
+
+using namespace geom;
 
 /// @brief Получить вектор состояния типа T из ячейки
 template <class T>

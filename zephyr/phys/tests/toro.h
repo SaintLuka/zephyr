@@ -2,6 +2,7 @@
 
 #include <zephyr/geom/vector.h>
 #include <zephyr/phys/eos/ideal_gas.h>
+#include <zephyr/phys/eos/stiffened_gas.h>
 #include <zephyr/phys/tests/test_1D.h>
 #include <zephyr/phys/tests/test_2D.h>
 
@@ -131,5 +132,6 @@ public:
 
     ~ToroTest2D() = default;
 };
+
 
 } // namespace zephyr::phys

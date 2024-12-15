@@ -28,7 +28,7 @@ public:
         water = StiffenedGas::create("Water");
         air   = IdealGas::create("Air");
 
-        double T = 300.0;
+        double T = 0.0_C;
 
         rL = 0.9_g_cm3;
         uL = 0.0;
@@ -92,6 +92,10 @@ public:
     /// @brief Уравнение состояния
     Eos::Ptr get_eos(const Vector3d& r) const final {
         return r.x() < x_jump ? (Eos::Ptr) water : (Eos::Ptr) air;
+    }
+
+    double fraction(const Vector3d& r, int mat) const {
+        return r.x() < x_jump ? (mat == 0 ? 1.0 : 0.0) : (mat == 1 ? 1.0 : 0.0);
     }
 };
 

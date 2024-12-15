@@ -83,7 +83,7 @@ private:
     void check_params() const final;
 
     ///@brief Соотношение сторон прямоугольника
-    const double aspect = 0.1;
+    const double aspect = 0.01;
 
     /// @brief Тип задания узлов сетки
     Type m_type;

@@ -2,6 +2,7 @@
 
 #include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/geom/interface_recovery.h>
+#include <zephyr/math/cfd/limiter.h>
 
 namespace zephyr::math {
 
@@ -56,6 +57,8 @@ public:
         MUSCLn,      ///< MUSCL с подсеточной реконструкцией
         MUSCLd_CRP,  ///< MUSCLd с CRP ограничением
         MUSCLn_CRP,  ///< MUSCLn с CRP ограничением
+        MUSCL_MC,    ///< MUSCL с лимитированым градиентом (MC)
+        MUSCL_MC_CRP,///< MUSCL_MC с CRP ограничением
 
         // Методики с WENO интерполяцией, допускают расщепление по
         // направлениям, не подходят для полигональной сетки
@@ -154,10 +157,11 @@ protected:
 
 protected:
 
-    double m_dt;      ///< Шаг интегрирования
-    double m_CFL;     ///< Число Куранта
-    Method m_method;  ///< Методика вычисления потоков
-    bool mnt;         ///< Монотонизация для схемы КАБАРЕ
+    double m_dt;       ///< Шаг интегрирования
+    double m_CFL;      ///< Число Куранта
+    Method m_method;   ///< Методика вычисления потоков
+    Limiter m_limiter; ///< Ограничитель для MUSCL_MC
+    bool mnt;          ///< Монотонизация для схемы КАБАРЕ
 
     InterfaceRecovery interface; ///< Реконструкция границы
 };
