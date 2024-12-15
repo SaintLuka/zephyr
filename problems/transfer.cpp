@@ -196,18 +196,18 @@ int main() {
 
     // Создать решатель
     Solver solver;
-    solver.set_CFL(0.5);
+    solver.set_CFL(0.05);
     solver.set_mnt(true);
 
     // Расщепление по направлениям
     bool splitting = true;
 
     // Настройки метода
-    solver.set_method(Solver::Method::MUSCL_MC_CRP);
+    solver.set_method(Solver::Method::CRP_N1);
 
     // Настройки теста
-    BodyDisk body;
-    solver.test = Solver::Test::Rotation;
+    BodySquare body;
+    solver.test = Solver::Test::Translation;
 
     // Создать сетку
     EuMesh mesh(U, &rect);

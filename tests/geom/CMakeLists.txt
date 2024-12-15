@@ -1,4 +1,4 @@
-#list(APPEND TESTS crp_interface)
+list(APPEND TESTS crp_interface)
 #list(APPEND TESTS curves)
 #list(APPEND TESTS game_of_life)
 #list(APPEND TESTS maps_integral)

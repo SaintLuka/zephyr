@@ -7,6 +7,7 @@
 #include <zephyr/geom/triangle.h>
 
 #include <zephyr/utils/matplotlib.h>
+#include <zephyr/math/funcs.h>
 
 using namespace zephyr::geom;
 namespace plt = zephyr::utils::matplotlib;
@@ -515,6 +516,8 @@ void test3(double C) {
             linspace(0.0, 1.0, nv));
 
     std::vector<std::vector<double>> flux1(nc, std::vector<double>(nv));
+    std::vector<std::vector<double>> flux2(nc, std::vector<double>(nv));
+    std::vector<std::vector<double>> error(nc, std::vector<double>(nv));
 
     for (int i = 0; i < nc; ++i) {
         for (int j = 0; j < nv; ++j) {
@@ -525,10 +528,19 @@ void test3(double C) {
             Vector3d p = cell.find_section(n, vol);
 
             flux1[i][j] = part.clip_area(p, n);
+
+            double a1 = vol;
+            double a2 = 0.5 *(1.0 - cos);
+            auto [a_min, a_max] = zephyr::math::minmax(a1, a2);
+            flux2[i][j] = C * a_min / (1.0 - a_max + a_min);
+
+            error[i][j] = flux2[i][j] - flux1[i][j];
         }
     }
 
     plt::plot_surface(cosn, vols, flux1, {{"cmap", "jet"}});
+    plt::plot_surface(cosn, vols, flux2, {{"cmap", "jet"}});
+    plt::plot_surface(cosn, vols, error, {{"cmap", "jet"}});
     plt::show();
 }
 
@@ -536,7 +548,7 @@ int main() {
     //test1(0.01 * M_PI, 0.51 * M_PI, 0.12, 0.1);
     //test2(0.0, NAN, 0.22, 0.0);
 
-    test3(0.17);
+    test3(0.5);
 
     return 0;
 }

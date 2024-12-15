@@ -225,6 +225,7 @@ static double face_fraction_s(double a1, double a2) {
 // vn --- нормальная компонента скорости
 double face_fraction_n1(double a1, double a2, const Vector3d& n1, const Vector3d& n2,
                         const Vector3d& fn, double vn) {
+    /*
     auto [a_min, a_max] = minmax(a1, a2);
 
     double a_ser = face_fraction_s(a1, a2);
@@ -236,6 +237,13 @@ double face_fraction_n1(double a1, double a2, const Vector3d& n1, const Vector3d
     double a_sig = xi * a_ser + (1.0 - xi) * a_up;
 
     return  between(a_sig, a_min, a_max);
+     */
+
+    double a = vn > 0.0 ? a1 : a2;
+    Vector3d n = vn > 0.0 ? n1 : n2;
+
+    double b = 0.5 * (1.0 - n.dot(fn));
+    return between(face_fraction_s(a, b), a1, a2);
 }
 
 double face_fraction_n2(EuCell& cell, EuCell& neib, EuFace& face, double vn) {
