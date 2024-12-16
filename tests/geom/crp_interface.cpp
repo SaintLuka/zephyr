@@ -457,6 +457,33 @@ void test2(double phi1, double phi2, double alpha1, double alpha2) {
     plt::show();
 }
 
+double compute(double alpha, double cosn, double C) {
+    using namespace zephyr::math;
+
+    auto[xi1, eta1] = minmax(std::abs(cosn), std::sqrt(1.0 - cosn * cosn));
+    auto[xi2, eta2] = minmax(C * std::abs(cosn), std::sqrt(1.0 - cosn * cosn));
+
+    double P1;
+    if (std::abs(2 * alpha - 1) < 1.0 - xi1 / eta1) {
+        P1 = (alpha - 0.5) * eta1;
+    } else {
+        P1 = sign(alpha - 0.5) * (0.5 * (xi1 + eta1) - std::sqrt((1.0 - 2.0 * std::abs(alpha - 0.5)) * xi1 * eta1));
+    }
+
+    double P2 = P1 + 0.5 * (C - 1.0) * cosn;
+
+    double a_sig;
+    if (std::abs(P2) <= 0.5 * (eta2 - xi2)) {
+        a_sig = 0.5 + P2 / eta2;
+    } else if (std::abs(P2) < 0.5 * (eta2 + xi2)) {
+        a_sig = heav(P2) - 0.5 * sign(P2) * std::pow(std::abs(P2) - 0.5 * (xi2 + eta2), 2) / (xi2 * eta2);
+    } else {
+        a_sig = heav(P2);
+    }
+
+    return C * a_sig;
+};
+
 // Попытки аппроксимации
 void test3(double C) {
     using namespace zephyr::geom;
@@ -481,13 +508,14 @@ void test3(double C) {
 
     // Просто визуализация того, что мы здесь будем считать
     if (false) {
-        double cosn = std::cos(0.6);
-        double alpha = 0.85;
+        double cosn = std::cos(M_PI / 4.0);
+        double alpha = 0.1;
 
         Vector3d n = {cosn, std::sqrt(1.0 - cosn * cosn), 0.0};
         Vector3d p = cell.find_section(n, alpha);
 
-        double res = part.clip_area(p, n);
+        double res1 = part.clip_area(p, n);
+        double res2 = compute(alpha, cosn, C);
 
         // чисто для визуализации
         auto clip1 = cell.clip(p, n);
@@ -498,7 +526,8 @@ void test3(double C) {
         plt::title("Поток через правую грань");
         plt::set_aspect_equal();
         plt::text(0.1, 0.8, "Объемная доля: " + std::to_string(alpha));
-        plt::text(0.1, 0.6, "Поток: " + std::to_string(res));
+        plt::text(0.1, 0.65, "Поток: " + std::to_string(res1));
+        plt::text(0.1, 0.50, "Поток: " + std::to_string(res2));
         plt::plot(cell.xs(), cell.ys(), {{"color", "black"}});
         plt::arrow(p.x(), p.y(), 0.1 * n.x(), 0.1 * n.y(), "k", "k", 0.05, 0.03);
         plt::plot(part.xs(), part.ys(), {{"color",     "black"},
@@ -529,10 +558,7 @@ void test3(double C) {
 
             flux1[i][j] = part.clip_area(p, n);
 
-            double a1 = vol;
-            double a2 = 0.5 *(1.0 - cos);
-            auto [a_min, a_max] = zephyr::math::minmax(a1, a2);
-            flux2[i][j] = C * a_min / (1.0 - a_max + a_min);
+            flux2[i][j] = compute(vol, cos, C);
 
             error[i][j] = flux2[i][j] - flux1[i][j];
         }
@@ -548,7 +574,7 @@ int main() {
     //test1(0.01 * M_PI, 0.51 * M_PI, 0.12, 0.1);
     //test2(0.0, NAN, 0.22, 0.0);
 
-    test3(0.5);
+    test3(0.4);
 
     return 0;
 }

@@ -196,7 +196,7 @@ int main() {
 
     // Создать решатель
     Solver solver;
-    solver.set_CFL(0.05);
+    solver.set_CFL(0.5);
     solver.set_mnt(true);
 
     // Расщепление по направлениям

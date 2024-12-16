@@ -220,30 +220,51 @@ static double face_fraction_s(double a1, double a2) {
     return  between(a_sig, a_min, a_max);
 }
 
+// По сути делает все VOF сечения, но это выписано в конечных формулах
+// alpha -- объемная доля в ячейке, из которой считается поток
+// cosn  -- косинус угла между нормалью к интерфейсу и нормалью к грани
+// C     -- "локальное" число Куранта. Объемная доля ячейки, которая
+// перетекает за время dt. C = dt * speed * area / volume.
+double a_sigma_vof(double alpha, double cosn, double C) {
+    auto[xi1, eta1] = minmax(std::abs(cosn), std::sqrt(1.0 - cosn * cosn));
+    auto[xi2, eta2] = minmax(C * std::abs(cosn), std::sqrt(1.0 - cosn * cosn));
+
+    double P1;
+    if (std::abs(2 * alpha - 1) <= 1.0 - xi1 / eta1) {
+        P1 = (alpha - 0.5) * eta1;
+    } else {
+        P1 = sign(alpha - 0.5) * (0.5 * (xi1 + eta1) -
+                std::sqrt((1.0 - std::abs(2.0 * alpha - 1.0)) * xi1 * eta1));
+    }
+
+    // Интересная аппроксимация
+    // P1 = (alpha - 0.5) * (eta1 + xi1 * (1.0 - std::sqrt(1.0 - std::abs(2.0 * alpha - 1.0))));
+
+    double P2 = P1 + 0.5 * (C - 1.0) * cosn;
+
+    if (std::abs(P2) <= 0.5 * (eta2 - xi2)) {
+        return 0.5 + P2 / eta2;
+    } else if (std::abs(P2) < 0.5 * (eta2 + xi2)) {
+        return heav(P2) - 0.5 * sign(P2) * std::pow(std::abs(P2) - 0.5 * (xi2 + eta2), 2) / (xi2 * eta2);
+    } else {
+        return heav(P2);
+    }
+}
+
 // n1, n2 --- нормали к интерфейсу
 // fn --- нормаль к грани
 // vn --- нормальная компонента скорости
-double face_fraction_n1(double a1, double a2, const Vector3d& n1, const Vector3d& n2,
-                        const Vector3d& fn, double vn) {
-    /*
-    auto [a_min, a_max] = minmax(a1, a2);
-
-    double a_ser = face_fraction_s(a1, a2);
-    double a_up = vn > 0.0 ? a1 : a2;
-
-    double cos = fn.dot(vn > 0.0 ? n1 : n2);
-    double xi = std::abs(cos);
-
-    double a_sig = xi * a_ser + (1.0 - xi) * a_up;
-
-    return  between(a_sig, a_min, a_max);
-     */
-
+double face_fraction_n1(
+        double a1, double a2, const Vector3d& n1, const Vector3d& n2,
+        const Vector3d& fn, double vn, double V1, double V2, double S, double dt) {
     double a = vn > 0.0 ? a1 : a2;
-    Vector3d n = vn > 0.0 ? n1 : n2;
+    double V = vn > 0.0 ? V1 : V2;
+    double cos = vn > 0.0 ? n1.dot(fn) : -n2.dot(fn);
 
-    double b = 0.5 * (1.0 - n.dot(fn));
-    return between(face_fraction_s(a, b), a1, a2);
+    double C = dt * std::abs(vn) * S / V;
+
+    double a_sig = a_sigma_vof(a, cos, C);
+    return between(a_sig, a1, a2);
 }
 
 double face_fraction_n2(EuCell& cell, EuCell& neib, EuFace& face, double vn) {
@@ -332,6 +353,10 @@ void Transfer::fluxes_CRP(EuCell &cell, Direction dir) {
         Vector3d fn = face.normal();
         double vn = velocity(face.center()).dot(fn);
 
+        double S = face.area();
+        double V1 = cell.volume();
+        double V2 = neib.volume();
+
         double a_sig;
         switch (m_method) {
             case Method::CRP_V3:
@@ -341,7 +366,7 @@ void Transfer::fluxes_CRP(EuCell &cell, Direction dir) {
                 a_sig = face_fraction_v5(a1, a2);
                 break;
             case Method::CRP_N1:
-                a_sig = face_fraction_n1(a1, a2, n1, n2, fn, vn);
+                a_sig = face_fraction_n1(a1, a2, n1, n2, fn, vn, V1, V2, S, m_dt);
                 break;
             case Method::CRP_N2:
                 a_sig = face_fraction_n2(cell, neib, face, vn);
@@ -350,10 +375,6 @@ void Transfer::fluxes_CRP(EuCell &cell, Direction dir) {
                 a_sig = face_fraction_s(a1, a2);
                 break;
         }
-
-        double S = face.area();
-        double V1 = cell.volume();
-        double V2 = neib.volume();
 
         fluxes += flux_2D(a1, a2, S, V1, V2, a_sig, vn, m_dt);
     }
@@ -431,10 +452,19 @@ void Transfer::fluxes_VOF(EuCell &cell, Direction dir) {
         // Типа upwind
         double Flux;
         if (vn > 0.0) {
+            // Для четырехугольных ячеек
+            // double C = std::abs(vn) * m_dt * face.area() / cell.volume();
+            // Flux = vn * m_dt * face.area() * a_sigma_vof(zc.u1, fn.dot(zc.n), C);
+
             Flux = +flux_VOF(zc.u1, zc.p, zc.n, cell, face, V1, V2, m_dt, fn);
         }
         else {
             auto zn = neib(U);
+
+            // Для четырехугольных ячеек
+            // double C = std::abs(vn) * m_dt * face.area() / neib.volume();
+            // Flux = vn * m_dt * face.area() * a_sigma_vof(zn.u1, -fn.dot(zn.n), C);
+
             Flux = -flux_VOF(zn.u1, zn.p, zn.n, neib, face, V1, V2, m_dt, -fn);
         }
 
