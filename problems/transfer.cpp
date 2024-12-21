@@ -166,11 +166,12 @@ int main() {
     pvd.variables += {"u",  get_u};
     pvd.variables += {"u2",  get_u2};
     pvd.variables += {"u3",  get_u3};
+    /*
     pvd.variables += {"fr",  get_fr};
     pvd.variables += {"ft",  get_ft};
     pvd.variables += {"fl",  get_fl};
     pvd.variables += {"fb",  get_fb};
-    /*
+     */
     pvd.variables += {"lvl", get_lvl};
     pvd.variables += {"n.x", normal_x};
     pvd.variables += {"n.y", normal_y};
@@ -180,7 +181,6 @@ int main() {
     pvd.variables += {"p.y", point_y};
     pvd.variables += {"over", get_over};
     pvd.variables += {"close", get_close};
-     */
 
     pvd_body.variables = pvd.variables;
 
@@ -196,7 +196,7 @@ int main() {
 
     // Создать решатель
     Solver solver;
-    solver.set_CFL(0.5);
+    solver.set_CFL(0.13);
     solver.set_mnt(true);
 
     // Расщепление по направлениям

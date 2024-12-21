@@ -2,6 +2,7 @@
 #include <zephyr/geom/primitives/bface.h>
 #include <zephyr/geom/polygon.h>
 #include <zephyr/geom/intersection.h>
+#include <zephyr/geom/sections.h>
 
 #include <zephyr/math/funcs.h>
 #include <zephyr/math/calc/weno.h>
@@ -219,12 +220,6 @@ static double face_fraction_s(double a1, double a2) {
 
     return  between(a_sig, a_min, a_max);
 }
-
-// По сути делает все VOF сечения, но это выписано в конечных формулах
-// alpha -- объемная доля в ячейке, из которой считается поток
-// cosn  -- косинус угла между нормалью к интерфейсу и нормалью к грани
-// C     -- "локальное" число Куранта. Объемная доля ячейки, которая
-// перетекает за время dt. C = dt * speed * area / volume.
 double a_sigma_vof(double alpha, double cosn, double C) {
     auto[xi1, eta1] = minmax(std::abs(cosn), std::sqrt(1.0 - cosn * cosn));
     auto[xi2, eta2] = minmax(C * std::abs(cosn), std::sqrt(1.0 - cosn * cosn));
@@ -263,7 +258,7 @@ double face_fraction_n1(
 
     double C = dt * std::abs(vn) * S / V;
 
-    double a_sig = a_sigma_vof(a, cos, C);
+    double a_sig = average_flux(a, cos, C);
     return between(a_sig, a1, a2);
 }
 
@@ -633,7 +628,8 @@ void Transfer::update_CRP(EuMesh& mesh, Direction dir) {
         cell(U).u2 = 0.0;
     }
 
-    update_interface(mesh);
+    // Без сглаживаний, чисто для реконструкции
+    update_interface(mesh, 0);
 }
 
 void Transfer::update_VOF(EuMesh& mesh, Direction dir) {

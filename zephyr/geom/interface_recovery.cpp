@@ -1,5 +1,7 @@
+#include <iomanip>
 #include <zephyr/utils/threads.h>
 
+#include <zephyr/geom/sections.h>
 #include <zephyr/geom/intersection.h>
 #include <zephyr/geom/interface_recovery.h>
 
@@ -28,8 +30,8 @@ void InterfaceRecovery::compute_normal(EuCell &cell) const {
 
         double un = face.neib(a);
 
-        Vector3d S = 0.5 * face.normal() * face.area();
-        cell(n) -= (uc + un) * S;
+        Vector3d S = face.normal() * face.area();
+        cell(n) -= face_fraction(uc, un) * S;
     }
 
     cell(n).normalize();

@@ -607,6 +607,8 @@ void contour(const std::vector<::std::vector<Numeric>> &x,
 
     PyDict_SetItemString(kwargs, "cmap", python_colormap_coolwarm);
 
+    PyDict_SetItemString(kwargs, "levels", PyInt_FromLong(20));
+
     for (std::map<std::string, std::string>::const_iterator it = keywords.begin();
          it != keywords.end(); ++it) {
         PyDict_SetItemString(kwargs, it->first.c_str(),

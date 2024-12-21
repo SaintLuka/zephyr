@@ -8,6 +8,7 @@
 
 #include <zephyr/utils/matplotlib.h>
 #include <zephyr/math/funcs.h>
+#include <zephyr/geom/sections.h>
 
 using namespace zephyr::geom;
 namespace plt = zephyr::utils::matplotlib;
@@ -393,7 +394,6 @@ void test2(double phi1, double phi2, double alpha1, double alpha2) {
         n2 = Vector3d::Zero();
     }
 
-
     auto[a1, b1] = cell_1.find_section(n1, alpha1);
     auto[a2, b2] = cell_2.find_section(n2, alpha2);
 
@@ -457,37 +457,9 @@ void test2(double phi1, double phi2, double alpha1, double alpha2) {
     plt::show();
 }
 
-double compute(double alpha, double cosn, double C) {
-    using namespace zephyr::math;
-
-    auto[xi1, eta1] = minmax(std::abs(cosn), std::sqrt(1.0 - cosn * cosn));
-    auto[xi2, eta2] = minmax(C * std::abs(cosn), std::sqrt(1.0 - cosn * cosn));
-
-    double P1;
-    if (std::abs(2 * alpha - 1) < 1.0 - xi1 / eta1) {
-        P1 = (alpha - 0.5) * eta1;
-    } else {
-        P1 = sign(alpha - 0.5) * (0.5 * (xi1 + eta1) - std::sqrt((1.0 - 2.0 * std::abs(alpha - 0.5)) * xi1 * eta1));
-    }
-
-    double P2 = P1 + 0.5 * (C - 1.0) * cosn;
-
-    double a_sig;
-    if (std::abs(P2) <= 0.5 * (eta2 - xi2)) {
-        a_sig = 0.5 + P2 / eta2;
-    } else if (std::abs(P2) < 0.5 * (eta2 + xi2)) {
-        a_sig = heav(P2) - 0.5 * sign(P2) * std::pow(std::abs(P2) - 0.5 * (xi2 + eta2), 2) / (xi2 * eta2);
-    } else {
-        a_sig = heav(P2);
-    }
-
-    return C * a_sig;
-};
-
 // Попытки аппроксимации
 void test3(double C) {
     using namespace zephyr::geom;
-
 
     // Тестовый многоугольник
     Polygon cell = {
@@ -507,15 +479,15 @@ void test3(double C) {
     part.sort();
 
     // Просто визуализация того, что мы здесь будем считать
-    if (false) {
-        double cosn = std::cos(M_PI / 4.0);
-        double alpha = 0.1;
+    if (true) {
+        double cosn = std::cos(0.1 * M_PI);
+        double alpha = 0.734;
 
         Vector3d n = {cosn, std::sqrt(1.0 - cosn * cosn), 0.0};
         Vector3d p = cell.find_section(n, alpha);
 
         double res1 = part.clip_area(p, n);
-        double res2 = compute(alpha, cosn, C);
+        double res2 = C * average_flux(alpha, cosn, C);
 
         // чисто для визуализации
         auto clip1 = cell.clip(p, n);
@@ -542,7 +514,7 @@ void test3(double C) {
     int nv = 100;
     auto [cosn, vols] = meshgrid(
             linspace(-1.0, 1.0, nc),
-            linspace(0.0, 1.0, nv));
+            linspace(1.0e-5, 1.0 - 1.0e-5, nv));
 
     std::vector<std::vector<double>> flux1(nc, std::vector<double>(nv));
     std::vector<std::vector<double>> flux2(nc, std::vector<double>(nv));
@@ -558,7 +530,7 @@ void test3(double C) {
 
             flux1[i][j] = part.clip_area(p, n);
 
-            flux2[i][j] = compute(vol, cos, C);
+            flux2[i][j] = C * average_flux(vol, cos, C);
 
             error[i][j] = flux2[i][j] - flux1[i][j];
         }
@@ -570,11 +542,166 @@ void test3(double C) {
     plt::show();
 }
 
+struct Inter {
+    double inter; // Доля пересечения
+    double cos;   // Косинус нормали к прямой
+};
+
+// Найти сечение в лоб методом дихотомии
+Inter face_fraction_direct(Polygon &cell, Polygon& neib, double a1, double a2) {
+    using namespace zephyr::math;
+
+    auto func = [](double a1, double a2, double cos) -> double {
+        Vector3d n = {cos, std::sqrt(1.0 - cos * cos), 0.0};
+        double p1 = find_section(n, a1);
+        double p2 = find_section(n, a2);
+        return p2 + cos - p1;
+    };
+
+    double cos_min = -1.0;
+    double cos_max = +1.0;
+
+    double f_min = func(a1, a2, cos_min);
+    double f_max = func(a1, a2, cos_max);
+
+    assert(f_min * f_max <= 0.0);
+
+    if (std::abs(f_min) < 1.0e-8) {
+        cos_max = cos_min;
+    }
+    if (std::abs(f_max) < 1.0e-8) {
+        cos_min = cos_max;
+    }
+
+    while (cos_max - cos_min > 1.0e-8) {
+        double cos = 0.5 * (cos_min + cos_max);
+        double f_avg = func(a1, a2, cos);
+
+        if (f_min * f_avg <= 0.0) {
+            cos_max = cos;
+            f_max = f_avg;
+        } else {
+            cos_min = cos;
+            f_min = f_avg;
+        }
+    }
+
+    double cos = 0.5 * sign(a1 - a2) * std::abs(cos_min + cos_max);
+
+    auto[a_min, a_max] = minmax(a1, a2);
+
+    double inter;
+    if (a_min == 0.0 && a_max == 1.0) {
+        inter = 0.5;
+    }
+    else if (a_min == 0.0) {
+        inter = 0.0;
+    }
+    else if (a_max == 1.0) {
+        inter = 1.0;
+    }
+    else {
+        Vector3d n = {cos, std::sqrt(1 - cos * cos), 0.0};
+
+        Vector3d p1 = cell.find_section(n, a1);
+        Vector3d p2 = neib.find_section(n, a2);
+
+        inter = between(p1.y() + (1 - p1.x()) * (p2.y() - p1.y()) / (p2.x() - p1.x()), 0.0, 1.0);
+    }
+
+    return {inter, cos};
+}
+
+// Интерфейс через пару ячеек
+void test4(double a1, double a2) {
+    using namespace zephyr::geom;
+    using namespace zephyr::math;
+
+    // Тестовый многоугольник
+    Polygon cell = {
+            Vector3d{0.0, 0.0, 0.0},
+            Vector3d{1.0, 0.0, 0.0},
+            Vector3d{1.0, 1.0, 0.0},
+            Vector3d{0.0, 1.0, 0.0}
+    };
+    cell.sort();
+    Polygon neib = {
+            Vector3d{1.0, 0.0, 0.0},
+            Vector3d{2.0, 0.0, 0.0},
+            Vector3d{2.0, 1.0, 0.0},
+            Vector3d{1.0, 1.0, 0.0}
+    };
+    neib.sort();
+
+    // Визуализация для пары параметров (a1, a2)
+    if (true) {
+        auto [inter1, cos1] = face_fraction_direct(cell, neib, a1, a2);
+
+        Vector3d n = {cos1, std::sqrt(1 - cos1 * cos1), 0.0};
+
+        Vector3d p1 = cell.find_section(n, a1);
+        Vector3d p2 = neib.find_section(n, a2);
+
+        auto clip1 = cell.clip(p1, n);
+        auto clip2 = neib.clip(p2, n);
+
+        double cos2 = face_fraction_cos(a1, a2);
+        double inter2 = face_fraction(a1, a2);
+
+        std::cout << "  Line cos:     " << cos1 << " " << cos2 << ";\terror: " << std::abs(cos1 - cos2) << "\n";
+        std::cout << "  Intersection: " << inter1 << " " << inter2 << ";\terror: " << std::abs(inter1 - inter2) << "\n";
+
+        // Строим многоугольник и сечение
+        plt::figure_size(10.0, 5.0);
+        plt::title("Интерфейс через пару");
+        plt::set_aspect_equal();
+        plt::plot(cell.xs(), cell.ys(), {{"color", "black"}});
+        plt::plot(neib.xs(), neib.ys(), {{"color", "black"}});
+
+        plt::plot({1.0}, {inter1}, {{"marker", "o"},
+                                    {"color",  "black"}});
+        plt::plot({1.0}, {inter2}, {{"marker", "."},
+                                    {"color",  "yellow"}});
+        plt::fill(clip1.xs(), clip1.ys(), {{"color", "#0000ff3f"}});
+        plt::fill(clip2.xs(), clip2.ys(), {{"color", "#00ff003f"}});
+
+        plt::tight_layout();
+        plt::show();
+    }
+
+    auto[V1, V2] = meshgrid(
+            linspace(0.0, 1.0, 100),
+            linspace(0.0, 1.0, 100)
+    );
+
+    decltype(V1) asig1(100, std::vector<double>(100));
+    decltype(V1) asig2(100, std::vector<double>(100));
+    decltype(V1) error(100, std::vector<double>(100));
+    for (int i = 0; i < 100; ++i) {
+        for (int j = 0; j < 100; ++j) {
+            asig1[i][j] = face_fraction_direct(cell, neib, V1[i][j], V2[i][j]).inter;
+            asig2[i][j] = face_fraction(V1[i][j], V2[i][j]);
+
+            //asig1[i][j] = face_fraction_direct(cell, neib, V1[i][j], V2[i][j]).cos;
+            //asig2[i][j] = face_fraction_cos(V1[i][j], V2[i][j]);
+
+            error[i][j] = std::abs(asig1[i][j] - asig2[i][j]);
+        }
+    }
+
+    plt::plot_surface(V1, V2, asig1, {{"cmap", "jet"}});
+    plt::plot_surface(V1, V2, asig2, {{"cmap", "jet"}});
+    plt::plot_surface(V1, V2, error, {{"cmap", "jet"}});
+    plt::show();
+}
+
 int main() {
     //test1(0.01 * M_PI, 0.51 * M_PI, 0.12, 0.1);
     //test2(0.0, NAN, 0.22, 0.0);
 
-    test3(0.4);
+    //test3(0.3);
+
+    test4(0.23, 0.45);
 
     return 0;
 }

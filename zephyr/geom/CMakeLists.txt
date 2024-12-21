@@ -10,6 +10,7 @@ set(ZEPHYR_GEOM_SRC
         ${CMAKE_CURRENT_SOURCE_DIR}/line.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/quad.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/cube.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/sections.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/triangle.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/polygon.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/grid.cpp
@@ -24,6 +25,7 @@ install(FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/line.h
         ${CMAKE_CURRENT_SOURCE_DIR}/quad.h
         ${CMAKE_CURRENT_SOURCE_DIR}/cube.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/sections.h
         ${CMAKE_CURRENT_SOURCE_DIR}/triangle.h
         ${CMAKE_CURRENT_SOURCE_DIR}/polygon.h
         ${CMAKE_CURRENT_SOURCE_DIR}/geom.h

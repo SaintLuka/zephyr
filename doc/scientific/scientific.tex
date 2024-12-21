@@ -24,6 +24,7 @@
 \newcommand{\eps}{\varepsilon}
 \newcommand{\ups}{\upsilon}
 \newcommand{\half}{\frac{1}{2}}
+\newcommand{\thalf}{\tfrac{1}{2}}
 \newcommand{\const}{\mathrm{const}}
 \newcommand{\class}[1]{\texttt{\textcolor{cyan}{#1}}}
 \newcommand{\namespace}[1]{\texttt{\textcolor{blue}{#1}}}
@@ -999,6 +1000,162 @@ e = e_{ref}(\rho) + c_v T_{ref}(\rho) \qty( \exp \qty( \tfrac{s - s_0}{c_v} ) - 
 
 
 \chapter{Приложения/утилиты}
+
+\section{Геометрия}
+
+\subsection{Сечения прямоугольников}
+
+Уравнение прямой на плоскости имеет вид: 
+\begin{equation*}
+\vb*{r}: \;\; \qty( \vb*{r}, \, \vb*{n} ) = p \qquad \text{или} \qquad
+\qty(\vb*{r} - \vb*{r}_0, \, \vb*{n} ) = 0.
+\end{equation*}
+Здесь $\vb*{n}$ --- нормаль к прямой, внешняя по отношению к полуплоскости $\qty(\vb*{r}, \, \vb*{n} ) < p$, которую будем называть областью \textit{под прямой}. Вектор $\vb*{r}_0$ --- произвольная точка на прямой. Параметр $p$ --- расстояние от центра координат до прямой со знаком, $p > 0$, если центр координат расположен под прямой, в обратном случае $p < 0$. Если уравнение задано в первой форме, то <<опорную>> точку на прямой всегда можно получить по формуле $\vb*{r}_0 = p \cdot \vb*{n}$.
+\smallskip
+
+Прямоугольник со сторонами $a$ и $b$ расположен в центре координат, то есть $|x| < \frac{a}{2}$, $|y| < \frac{b}{2}$. Требуется найти объемную долю $\alpha$, которую отсекает от него прямая $\qty( \vb*{r}, \, \vb*{n} ) = p$. То есть долю прямоугольника, которая располагается под прямой (Рис.~\ref{fig:sections-1}).
+\begin{equation*}
+\xi = \min \qty(a \cdot |n_x|, \, b \cdot |n_y| ), \qquad \eta = \max \qty(a \cdot |n_x|, \, b \cdot |n_y| ),
+\end{equation*}
+\begin{equation}\label{eq:sec_ap}
+\alpha(p) = \left\{
+\begin{aligned}
+&\half + \frac{p}{\eta}, \quad &&|p| \le \frac{\eta - \xi}{2}, \\
+&H(p) - \frac{\sgn(p)}{2\xi \eta} \qty( |p| - \frac{\xi + \eta}{2} )^2, \quad
+&&\frac{\eta - \xi}{2} < |p| < \frac{\eta + \xi}{2}, \\
+&H(p), \quad && \frac{\eta + \xi}{2} \le |p|.
+\end{aligned}
+\right.
+\end{equation}
+Здесь $H(p)$ --- функция Хевисайда. Последняя строка описывает случаи, когда прямая лежит вне прямоугольника. Очевидно, $\alpha( p \to - \infty) = 0$ и $\alpha (p \to \infty) = 1$.
+\smallskip
+
+Обратная функция $p(\alpha)$ позволяет найти прямую с нормалью $\vb*{n}$, которая проходит через прямоугольник $|x| < \frac{a}{2}$, $|y| < \frac{b}{2}$ и отсекает от него заданную объемную долю $\alpha$.
+\begin{equation*}
+\xi = \min \qty(a \cdot |n_x|, \, b \cdot |n_y| ), \qquad \eta = \max \qty(a \cdot |n_x|, \, b \cdot |n_y| ),
+\end{equation*}
+\begin{equation}\label{eq:sec_pa}
+p\qty(\alpha) =\left\{
+\begin{aligned}
+&\qty(\alpha - \half) \cdot \eta, \;\; &&\qty| 2 \alpha - 1| \le 1 - \frac{\xi}{\eta}, \\
+& \sgn \qty(\alpha - \half) \cdot \qty( \frac{\xi + \eta}{2} 
+- \sqrt{\qty(1 - \qty|2 \alpha - 1|) \, \xi \eta }), \;\; &&\qty| 2 \alpha - 1| > 1 - \frac{\xi}{\eta}.
+\end{aligned}
+\right.
+\end{equation}
+Функция $p(\alpha)$ удовлетворяет свойству симметрии:
+\begin{equation*}
+p(1 - \alpha) = - p(\alpha).
+\end{equation*}
+
+\begin{figure}[b]
+\begin{minipage}{0.21\linewidth}
+\includegraphics[height=4.5cm]{images/sections/cells1.pdf}
+\caption{\label{fig:sections-1}}
+\end{minipage}
+\begin{minipage}{0.49\linewidth}
+\includegraphics[height=4.5cm]{images/sections/cells2.pdf}
+\caption{\label{fig:sections-2}}
+\end{minipage}
+\begin{minipage}{0.27\linewidth}
+\includegraphics[height=4.5cm]{images/sections/cells3.pdf}
+\caption{\label{fig:sections-3}}
+\end{minipage}
+\end{figure}
+
+Через две квадратных ячейки с объемными долями $0 <\alpha_1, \, \alpha_2 < 1$ можно провести единственную прямую, которая отсекает заданные объемные доли (Рис.~\ref{fig:sections-2}). Доля грани $\alpha_{\sigma}$, которая отсекается этой прямой, равна:
+{\small
+\begin{equation}\label{eq:alphas_origin}
+\alpha_{\sigma} = \left\{
+\begin{aligned}
+&\frac{\alpha_{\min} + \alpha_{\max}}{2}, \quad 
+&&3 \alpha_{\min} \ge \alpha_{\max} \; \land \; \alpha_{\min} \ge 3 \alpha_{\max} - 2, \\
+&-2 \alpha_{\min} + 2 \sqrt{ \alpha_{\min} \cdot \qty( \alpha_{\min} + \alpha_{\max} )}, \quad 
+&&\alpha_{\max} \le \thalf \; \lor \; \alpha_{\min} \cdot \qty(1 - \alpha_{\max}) \ge \qty(\alpha_{\max} - \thalf)^2, \\
+&3 - 2\alpha_{\max} - 2 \sqrt{\qty(1 - \alpha_{\max}) \cdot \qty(2 - \alpha_{\min} - \alpha_{\max} )}, \quad 
+&&\alpha_{\min} \ge \thalf \; \lor \; \alpha_{\min} \cdot \qty(1 - \alpha_{\max}) \ge \qty(\alpha_{\min} - \thalf)^2, \\
+&\frac{\sqrt{\alpha_{\min}}}{\sqrt{1 - \alpha_{\max}} + 
+\sqrt{\alpha_{\min}}}, \quad 
+&&\text{иначе.}
+\end{aligned}
+\right.
+\end{equation}
+}
+
+\noindent Условия в формуле необходимо проверять последовательно сверху вниз. Формула справедлива также при $\alpha_{\min} = 0$ и $\alpha_{\max} = 1$, получаются значения $\alpha_{\sigma} = 0$ и $\alpha_{\sigma} = 1$ соответственно (последняя строка). Значение при $\alpha_{\min} = 0$, $\alpha_{\max} = 1$ не определено. Можно выбирать произвольным образом. В целом это не важно, поскольку нет необходимости восстанавливать интерфейс в заполненных или пустых ячейках.
+
+Как получена формула? Прямая, проходящая через две ячейки и отсекающая объемные доли $\alpha_1$ и $\alpha_2$, должна удовлетворять уравнению:
+\begin{equation*}
+p(\alpha_1) = p(\alpha_2) + \cos \varphi,
+\end{equation*}
+где $\varphi$ --- угол между внешней нормалью к прямой и вектором от центра ячейки с объемной долей $\alpha_1$ до центра ячейки с долей $\alpha_2$. Если рассмотреть все возможные конфигурации расположения прямой, то получим формулу \eqref{eq:alphas_origin}. Функция $\alpha_{\sigma} (\alpha_1, \, \alpha_2)$ имеет сложную структуру и кусочно задается в четырёх областях. Функция приведена на Рис.~\ref{fig:alphas}.
+
+Функцию  $\alpha_{\sigma} (\alpha_1, \, \alpha_2)$ следует применять при вычислении нормали к реконструированному интерфейсу в ячейке. Для этого нужно использовать метод Гаусса вычисления градиента объемных долей, при этом на грани брать $\alpha_{\sigma}$. После этого нормаль считается как нормализованный градиент объемной доли. При таком определении нормалей в квадратных ячейках, если реальная граница линейна, то она восстанавливается точно.
+\medskip
+
+\begin{figure}
+\centering
+\begin{minipage}{0.32\linewidth}
+\includegraphics[width=\linewidth]{images/sections/as1.png}
+\end{minipage}
+\hspace{2cm}
+\begin{minipage}{0.32\linewidth}
+\includegraphics[width=\linewidth]{images/sections/as2.png}
+\end{minipage}
+\caption{\centering Функция $\alpha_{\sigma} \qty( \alpha_1, \, \alpha_2 )$. На втором графике обозначены области кусочного задания функции. Каждая область --- строка в формуле \eqref{eq:alphas_origin}.}\label{fig:alphas}
+\end{figure}
+
+
+Однако, не стоит использовать $\alpha_{\sigma}$ напрямую при решении задачи переноса. Лучше взять скорректированное значение $\alpha_{\sigma}^{*}$, которое берется как доля вещества от части ячейки, которая переносится за один временной шаг (Рис.~\ref{fig:sections-3}). Пусть вещество \textbf{вытекает} (это важно) из ячейки через грань с внешней нормалью $\vb*{n}_f$, то есть нормальная скорость $v_n = (\vb*{v}, \, \vb*{n}_f) > 0$. Объемная доля вещества в ячейке равна $\alpha$, в ячейке проведена линейная реконструкция интерфейса и проведена нормаль к интерфейсу $\vb*{n}$. Определим косинус угла между $\vb*{n}$ и $\vb*{n}_f$, синус угла достаточно знать с точностью до модуля:
+\begin{equation*}
+\cos \varphi = \qty(\vb*{n}, \, \vb*{n}_f), \qquad |\sin \varphi| = \sqrt{1 - |\cos \varphi|^2}.
+\end{equation*}
+
+Введем также <<локальное число Куранта>>:
+$\quad C = \dfrac{\Delta t v_n S}{V} \le 1.$
+\newpage
+
+Тогда значение $\alpha_{\sigma}^{*}$ можно рассматривать как функцию трёх аргументов $\alpha^{*}_{\sigma} \qty( \alpha, \, \cos \varphi, \, C)$. Порядок вычисления $\alpha^{*}_{\sigma}$ следующий. Сначала определим несколько вспомогательных параметров $\xi_1$, $\eta_1$, $\xi_2$, $\eta_2$:
+\begin{equation*}
+\xi_{1} = \min \qty( | \cos \varphi |, |\sin \varphi| ),
+\quad
+\eta_{1} = \max \qty( | \cos \varphi |, |\sin \varphi| ),
+\end{equation*}
+\begin{equation*}
+\xi_{2} = \min \qty( C \cdot | \cos \varphi |, |\sin \varphi | ),
+\quad
+\eta_{2} = \max \qty( C \cdot | \cos \varphi |, |\sin \varphi | ),
+\end{equation*}
+
+Затем вычислим $p_1$ --- расстояние от центра ячейки до интерфейса:
+\begin{equation*}
+p_1 =\left\{
+\begin{aligned}
+&\qty(\alpha - \tfrac{1}{2}) \cdot \eta_1, \;\; &&\qty| 2 \alpha - 1| \le 1 - \frac{\xi_1}{\eta_1}, \\
+& \sgn \qty(\alpha - \tfrac{1}{2}) \cdot \qty( \frac{\xi_1 + \eta_1}{2} 
+- \sqrt{\qty(1 - \qty|2 \alpha - 1|) \, \xi_1 \eta_1 }), \;\; &&\qty| 2 \alpha - 1| > 1 - \frac{\xi_1}{\eta_1}.
+\end{aligned}
+\right.
+\end{equation*}
+Далее $p_2$ --- расстояние от центра прямоугольника, который перетекает в соседнюю ячейку до интерфейса. Если рассматривается единичный квадрат $[0, \, 1]^2$ и считается поток через правую сторону, то этот прямоугольник $[1 - C, \, 1] \times [0, \, 1]$, обозначен пунктиром на Рис.~\ref{fig:sections-3}.
+\begin{equation*}
+p_2 = p_1 + \half \cdot (C - 1) \cdot \cos \varphi.
+\end{equation*}
+
+В итоге, объемная доля отсечения от этого прямоугольника:
+\begin{equation*}
+\alpha^{*}_{\sigma} = \left\{
+\begin{aligned}
+&\half + \frac{p_2}{\eta_2}, \quad && |p_2| \le \frac{\eta_2 - \xi_2}{2}, \\
+&H(p_2) - \frac{\sgn(p_2)}{2 \xi_2 \eta_2} \cdot \qty( |p_2| - \frac{\xi_2 + \eta_2}{2} )^2, \quad && \frac{\eta_2 - \xi_2}{2} < |p_2| < \frac{\xi_2 + \eta_2}{2}, \\
+&H(p_2), \quad && \frac{\xi_2 + \eta_2}{2} \le | p_2 |.
+\end{aligned}
+\right.
+\end{equation*}
+Объемную долю $\alpha^{*}_{\sigma}$ уже следует использовать в расчетах для задачи переноса.
+
+
+
 
 \section{Специальные функции}
 
