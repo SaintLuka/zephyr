@@ -1,8 +1,27 @@
-#include "fast.h"
+/// @file Решатель газодинамики в одном файле на примере теста Шу-Ошера
+
+#include <iostream>
+#include <iomanip>
+
+#include <zephyr/geom/generator/strip.h>
+
+#include <zephyr/mesh/mesh.h>
+
+#include <zephyr/io/pvd_file.h>
 
 #include <zephyr/math/cfd/fluxes.h>
 #include <zephyr/math/cfd/models.h>
+
+#include <zephyr/phys/matter/eos/ideal_gas.h>
 #include <zephyr/phys/tests/shu_osher.h>
+
+using zephyr::geom::Box;
+using zephyr::geom::Boundary;
+using zephyr::geom::Vector3d;
+using zephyr::mesh::generator::Strip;
+using zephyr::mesh::AmrStorage;
+using zephyr::mesh::Mesh;
+using zephyr::io::PvdFile;
 
 using namespace zephyr::phys;
 using namespace zephyr::math;
@@ -51,7 +70,7 @@ int main() {
     gen.set_boundaries({.left = Boundary::ZOE, .right = Boundary::ZOE});
 
     // Создать сетку
-    EuMesh mesh(U, &gen);
+    Mesh mesh(U, &gen);
 
     // Заполняем начальные данные
     Vector3d shift = -2.0*Vector3d::UnitX();

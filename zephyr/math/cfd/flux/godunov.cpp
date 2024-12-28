@@ -31,40 +31,23 @@ smf::Flux Godunov::calc_flux(const smf::PState &zL, const smf::PState &zR, const
     return flux;
 }
 
-mmf::Flux Godunov::flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) const {
+mmf::Flux Godunov::flux(const mmf::PState &zL, const mmf::PState &zR, const phys::MixturePT &mixture) const {
     return calc_flux(zL, zR, mixture);
 }
 
-mmf::Flux Godunov::calc_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) {
-    bool zL_bad = std::isinf(zL.density) || std::isnan(zL.density) ||
-                  std::isinf(zL.velocity.x()) || std::isnan(zL.velocity.x()) ||
-                  std::isinf(zL.velocity.y()) || std::isnan(zL.velocity.y()) ||
-                  std::isinf(zL.velocity.z()) || std::isnan(zL.velocity.z()) ||
-                  std::isinf(zL.pressure) || std::isnan(zL.pressure) ||
-                  zL.mass_frac.empty();
-    if (zL_bad) {
+mmf::Flux Godunov::calc_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::MixturePT &mixture) {
+    if (zL.is_bad()) {
         std::cerr << "Bad left state in input of Godunov flux: " << zL << "\n";
-        exit(1);
         throw std::runtime_error("bad left state");
     }
-    bool zR_bad = std::isinf(zR.density) || std::isnan(zR.density) ||
-                  std::isinf(zR.velocity.x()) || std::isnan(zR.velocity.x()) ||
-                  std::isinf(zR.velocity.y()) || std::isnan(zR.velocity.y()) ||
-                  std::isinf(zR.velocity.z()) || std::isnan(zR.velocity.z()) ||
-                  std::isinf(zR.pressure) || std::isnan(zR.pressure) ||
-                  zR.mass_frac.empty();
-    if (zR_bad) {
+    if (zR.is_bad()) {
         std::cerr << "Bad right state in input of Godunov flux: " << zR << "\n";
-        exit(1);
         throw std::runtime_error("bad right state");
     }
 
     auto sol = RiemannSolver::solve(zL.to_smf(), zR.to_smf(),
-                                    mixture.stiffened_gas(zL.density, zL.pressure, zL.mass_frac, {.T0 = zL.temperature}),
-                                    mixture.stiffened_gas(zR.density, zR.pressure, zR.mass_frac, {.T0 = zR.temperature}));
-    if (sol.U * sol.Uf < 0 && abs(sol.U - sol.Uf) > 0.1) {
-        std::cerr << "Different sign of U and Uf\n" << "U: " << sol.U << ", Uf: " << sol.Uf << '\n';
-    }
+            mixture.stiffened_gas(zL.density, zL.pressure, zL.mass_frac, {.T0 = zL.temperature}),
+            mixture.stiffened_gas(zR.density, zR.pressure, zR.mass_frac, {.T0 = zR.temperature}));
 
     mmf::Flux flux;
     if (sol.U >= 0) {

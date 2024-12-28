@@ -1,9 +1,9 @@
 #pragma once
 
 #include <zephyr/math/cfd/models.h>
-#include <zephyr/phys/eos/stiffened_gas.h>
+#include <zephyr/phys/matter/eos/stiffened_gas.h>
 
-namespace zephyr { namespace math {
+namespace zephyr::math {
 
 using phys::StiffenedGas;
 
@@ -143,5 +143,4 @@ private:
     double DL1, DL2, DR1, DR2;
 };
 
-}
-}
+} // namespace zephyr::math

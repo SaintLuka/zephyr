@@ -1,5 +1,5 @@
 #include <iostream>
-#include <zephyr/phys/eos/materials.h>
+#include <zephyr/phys/matter/mixture_pt.h>
 
 namespace zephyr::phys {
 
@@ -7,27 +7,27 @@ inline double sqr(double x) {
     return x * x;
 }
 
-int Materials::size() const {
+int MixturePT::size() const {
     return m_materials.size();
 }
 
-void Materials::clear() {
+void MixturePT::clear() {
     m_materials.clear();
 }
 
-void Materials::append(Eos::Ptr eos) {
+void MixturePT::append(Eos::Ptr eos) {
     m_materials.emplace_back(eos);
 }
 
-void Materials::operator+=(Eos::Ptr eos) {
+void MixturePT::operator+=(Eos::Ptr eos) {
     m_materials.emplace_back(eos);
 }
 
-Eos &Materials::operator[](int idx) {
+Eos &MixturePT::operator[](int idx) {
     return *m_materials[idx];
 }
 
-const Eos &Materials::operator[](int idx) const {
+const Eos &MixturePT::operator[](int idx) const {
     return *m_materials[idx];
 }
 
@@ -36,8 +36,8 @@ inline double inv_J(dPdT &x, dPdT &y) {
     return 1.0 / (x.dT * y.dP - x.dP * y.dT);
 }
 
-dRdE Materials::pressure_re(double rho, double eps, const Fractions &beta,
-        const Options &options) const {
+dRdE MixturePT::pressure_re(double rho, double eps, const Fractions &beta,
+                            const Options &options) const {
 
     // Случай одного материала
     int idx = beta.index();
@@ -62,8 +62,8 @@ dRdE Materials::pressure_re(double rho, double eps, const Fractions &beta,
     return P;
 }
 
-dRdE Materials::pressure_re2(double rho, double eps, const Fractions &beta,
-                            const Options &options) const {
+dRdE MixturePT::pressure_re2(double rho, double eps, const Fractions &beta,
+                             const Options &options) const {
 
     // Случай одного материала
     int idx = beta.index();
@@ -88,8 +88,8 @@ dRdE Materials::pressure_re2(double rho, double eps, const Fractions &beta,
     return P;
 }
 
-double Materials::energy_rP(double rho, double P, const Fractions &beta,
-        const Options &options) const {
+double MixturePT::energy_rP(double rho, double P, const Fractions &beta,
+                            const Options &options) const {
 
     // Случай одного материала
     int idx = beta.index();
@@ -104,8 +104,8 @@ double Materials::energy_rP(double rho, double P, const Fractions &beta,
     return energy_PT(P, T, beta, {.rho0=rho, .alpha=options.alpha});
 }
 
-double Materials::sound_speed_re(double rho, double eps, const Fractions &beta,
-        const Options &options) const {
+double MixturePT::sound_speed_re(double rho, double eps, const Fractions &beta,
+                                 const Options &options) const {
 
     // Случай одного материала
     int idx = beta.index();
@@ -120,8 +120,8 @@ double Materials::sound_speed_re(double rho, double eps, const Fractions &beta,
     return sound_speed_PT(pair.P, pair.T, beta, {.rho0=rho, .alpha=options.alpha});
 }
 
-double Materials::sound_speed_rP(double rho, double P, const Fractions &beta,
-        const Options &options) const {
+double MixturePT::sound_speed_rP(double rho, double P, const Fractions &beta,
+                                 const Options &options) const {
 
     // Случай одного материала
     int idx = beta.index();
@@ -136,8 +136,8 @@ double Materials::sound_speed_rP(double rho, double P, const Fractions &beta,
     return sound_speed_PT(P, T, beta, {.rho0=rho, .alpha=options.alpha});
 }
 
-double Materials::pressure_rT_ver1(double rho, double T, const Fractions &beta,
-        const Options &options) const {
+double MixturePT::pressure_rT_ver1(double rho, double T, const Fractions &beta,
+                                   const Options &options) const {
 
     // Случай одного материала
     int idx = beta.index();
@@ -192,8 +192,8 @@ double Materials::pressure_rT_ver1(double rho, double T, const Fractions &beta,
     return P;
 }
 
-double Materials::pressure_rT_ver2(double rho, double T, const Fractions &beta,
-                              const Options &options, double eps) const {
+double MixturePT::pressure_rT_ver2(double rho, double T, const Fractions &beta,
+                                   const Options &options, double eps) const {
 
     // Случай одного материала
     int idx = beta.index();
@@ -301,14 +301,14 @@ double Materials::pressure_rT_ver2(double rho, double T, const Fractions &beta,
     return P;
 }
 
-double Materials::pressure_rT(double rho, double T, const Fractions &beta,
+double MixturePT::pressure_rT(double rho, double T, const Fractions &beta,
                               const Options &options) const {
 
     return pressure_rT_ver2(rho, T, beta, options);
 }
 
-double Materials::temperature_rP(double rho, double P, const Fractions &beta,
-        const Options &options) const {
+double MixturePT::temperature_rP(double rho, double P, const Fractions &beta,
+                                 const Options &options) const {
 
     // Случай одного материала
     int idx = beta.index();
@@ -351,8 +351,8 @@ double Materials::temperature_rP(double rho, double P, const Fractions &beta,
     return T;
 }
 
-dPdT Materials::volume_PT(double P, double T, const Fractions &beta,
-        const Options &options) const {
+dPdT MixturePT::volume_PT(double P, double T, const Fractions &beta,
+                          const Options &options) const {
 
     dPdT vol = {0.0, 0.0, 0.0};
     for (int i = 0; i < size(); ++i) {
@@ -372,8 +372,8 @@ dPdT Materials::volume_PT(double P, double T, const Fractions &beta,
     return vol;
 }
 
-dPdT Materials::energy_PT(double P, double T, const Fractions &beta,
-        const Options &options) const {
+dPdT MixturePT::energy_PT(double P, double T, const Fractions &beta,
+                          const Options &options) const {
 
     dPdT eps = {0.0, 0.0, 0.0};
     for (int i = 0; i < size(); ++i) {
@@ -393,8 +393,8 @@ dPdT Materials::energy_PT(double P, double T, const Fractions &beta,
     return eps;
 }
 
-StiffenedGas Materials::stiffened_gas(double rho, double P,
-        const Fractions &beta, const Options &options) const {
+StiffenedGas MixturePT::stiffened_gas(double rho, double P,
+                                      const Fractions &beta, const Options &options) const {
 
     // Случай одного материала
     int idx = beta.index();
@@ -417,7 +417,7 @@ StiffenedGas Materials::stiffened_gas(double rho, double P,
     return StiffenedGas(gamma, P0, eps_0, NAN);
 }
 
-double Materials::min_pressure(const Fractions &beta) const {
+double MixturePT::min_pressure(const Fractions &beta) const {
     double P_min = -std::numeric_limits<double>::infinity();
     for (int i = 0; i < size(); ++i) {
         if (beta.has(i)) {
@@ -427,7 +427,7 @@ double Materials::min_pressure(const Fractions &beta) const {
     return P_min;
 }
 
-void Materials::update_alpha(double rho, double P, double T,
+void MixturePT::update_alpha(double rho, double P, double T,
                              const Fractions& beta, Fractions& alpha) const {
 
     // Обновить объемные доли
@@ -449,8 +449,8 @@ void Materials::update_alpha(double rho, double P, double T,
     alpha.normalize();
 }
 
-PairET Materials::find_eT(double rho, double P, const Fractions& beta,
-        const Options& options) const {
+PairET MixturePT::find_eT(double rho, double P, const Fractions& beta,
+                          const Options& options) const {
 
     // Случай одного материала
     int idx = beta.index();
@@ -467,8 +467,8 @@ PairET Materials::find_eT(double rho, double P, const Fractions& beta,
     return {.e = e, .T = T};
 }
 
-PairPT Materials::find_PT_ver1(double rho, double eps, const Fractions &beta,
-        const Options &options) const {
+PairPT MixturePT::find_PT_ver1(double rho, double eps, const Fractions &beta,
+                               const Options &options) const {
 
     // Решаем vol = sum_i beta_i vol_i(P, T)
     //        eps = sum_i beta_i eps_i(P, T)
@@ -527,7 +527,7 @@ PairPT Materials::find_PT_ver1(double rho, double eps, const Fractions &beta,
     return {P, T};
 }
 
-PairPT Materials::find_PT_ver2(double rho, double e, const Fractions &beta,
+PairPT MixturePT::find_PT_ver2(double rho, double e, const Fractions &beta,
                                const Options &options) const {
     // Случай одного материала
     int cln = beta.index();
@@ -552,7 +552,7 @@ PairPT Materials::find_PT_ver2(double rho, double e, const Fractions &beta,
             alpha[i] = 0.0001; // добавить материал
         }
         if (beta.has(i)) {
-            alpha[i] = beta[i] / m_materials[i]->ref_density();
+            alpha[i] = beta[i] / m_materials[i]->density();
         }
     }
     alpha.normalize();
@@ -572,7 +572,7 @@ PairPT Materials::find_PT_ver2(double rho, double e, const Fractions &beta,
 
         for (int i = 0; i < n_fractions; ++i) {
             if (beta.has(i)) {
-                alpha[i] = beta[i] / m_materials[i]->ref_density();
+                alpha[i] = beta[i] / m_materials[i]->density();
             }
         }
 
@@ -684,14 +684,14 @@ PairPT Materials::find_PT_ver2(double rho, double e, const Fractions &beta,
     return {P, T};
 }
 
-PairPT Materials::find_PT(double rho, double e, const Fractions &beta,
+PairPT MixturePT::find_PT(double rho, double e, const Fractions &beta,
                           const Options &options) const {
 
     return find_PT_ver2(rho, e, beta, options);
 }
 
-double Materials::sound_speed_PT(double P, double T,
-        const Fractions &beta, const Options &options) const {
+double MixturePT::sound_speed_PT(double P, double T,
+                                 const Fractions &beta, const Options &options) const {
 
     auto v = volume_PT(P, T, beta, {.deriv=true, .rho0=options.rho0, .alpha=options.alpha});
     auto e = energy_PT(P, T, beta, {.deriv=true, .rho0=options.rho0, .alpha=options.alpha});

@@ -3,6 +3,7 @@
 #include <zephyr/math/cfd/face_extra.h>
 #include <zephyr/math/cfd/gradient.h>
 #include <zephyr/math/cfd/models.h>
+#include <zephyr/geom/sections.h>
 
 namespace zephyr::math {
 
@@ -17,10 +18,11 @@ MmFluid::State MmFluid::datatype() {
     return {};
 }
 
-MmFluid::MmFluid(const phys::Materials &mixture)
+MmFluid::MmFluid(const phys::MixturePT &mixture)
     : mixture(mixture) {
     m_nf = HLLC::create();
-    m_crp = true;
+    m_crp_mode = CrpMode::PLIC;
+    m_limiter = "MC";
     m_CFL = 0.7;
     m_g = 0.0;
     m_dt     = 1.0e+300;
@@ -38,15 +40,28 @@ void MmFluid::set_accuracy(int acc) {
 
 void MmFluid::set_method(Fluxes method) {
     if (method == Fluxes::CRP) {
-        m_crp = true;
+        m_crp_mode = CrpMode::PLIC;
 
-        // По умолчанию для одноматериальных
+        // Поток по умолчанию
         m_nf = NumFlux::create(Fluxes::HLLC);
     }
     else {
-        m_crp = false;
+        m_crp_mode = CrpMode::NONE;
         m_nf = NumFlux::create(method);
     }
+}
+
+void MmFluid::set_crp_mode(CrpMode mode) {
+    if (mode != CrpMode::NONE) {
+        m_crp_mode = mode;
+
+        // Поток по умолчанию
+        m_nf = NumFlux::create(Fluxes::HLLC);
+    }
+}
+
+void MmFluid::set_limiter(const std::string& limiter) {
+    m_limiter = limiter;
 }
 
 void MmFluid::set_splitting(DirSplit splitting) {
@@ -72,6 +87,9 @@ void MmFluid::set_max_dt(double dt) {
 mmf::PState get_current_mm(Cell &cell) {
     return cell(U).get_state();
 }
+Fractions get_current_a(Cell &cell) {
+    return cell(U).vol_frac;
+}
 
 PState boundary_value(const PState &zc, const Vector3d &normal, Boundary flag) {
     if (flag != Boundary::WALL) {
@@ -83,6 +101,10 @@ PState boundary_value(const PState &zc, const Vector3d &normal, Boundary flag) {
     zn.velocity = zc.velocity - 2.0 * Vn;
 
     return zn;
+}
+
+Fractions boundary_value_a(const Fractions &zc, const Vector3d &normal, Boundary flag) {
+    return zc;
 }
 
 void MmFluid::update(Mesh &mesh) {
@@ -105,6 +127,16 @@ void MmFluid::update(Mesh &mesh) {
 
 void MmFluid::integrate(Mesh &mesh, double dt, Direction dir) {
     if (m_acc == 1) {
+        if (m_crp_mode == CrpMode::MUSCL) {
+            // Для MUSCL нужен градиент объемных долей
+            fractions_grad(mesh, get_current_a);
+        }
+        else if (m_crp_mode == CrpMode::PLIC) {
+            // Для PLIC нужна, собственно реконструкция
+            interface_recovery(mesh);
+        }
+
+        // Расчет потоков
         fluxes(mesh, dt, dir);
     }
     else {
@@ -196,8 +228,8 @@ Point operator&(const Char& c1, const Char& c2) {
 // zRB -- чистое состояние в ячейке справа.
 // delta > 0 -- отступ от грани контактной границы в левой ячейке.
 // dt -- шаг интегрирования
-Flux crp_flux(const smf::PState& zLA, const smf::PState& zLB, const smf::PState& zRB,
-              const Materials& mixture, int iA, int iB, double delta, double dt) {
+Flux crp_flux_1(const smf::PState& zLA, const smf::PState& zLB, const smf::PState& zRB,
+                const MixturePT& mixture, int iA, int iB, double delta, double dt) {
     auto &eosA = mixture[iA];
     auto &eosB = mixture[iB];
 
@@ -273,6 +305,27 @@ Flux crp_flux(const smf::PState& zLA, const smf::PState& zLB, const smf::PState&
     */
 }
 
+Flux crp_flux_2(const smf::PState& zLA, const smf::PState& zRA, const smf::PState& zRB,
+                const MixturePT& mixture, int iA, int iB, double delta, double dt) {
+    auto& zLA_i = const_cast<smf::PState&>(zLA);
+    auto& zRA_i = const_cast<smf::PState&>(zRA);
+    auto& zRB_i = const_cast<smf::PState&>(zRB);
+
+    zLA_i.inverse();
+    zRA_i.inverse();
+    zRB_i.inverse();
+
+    auto flux = crp_flux_1(zRB_i, zRA_i, zLA_i, mixture, iB, iA, delta, dt);
+    flux.inverse();
+
+    zLA_i.inverse();
+    zRA_i.inverse();
+    zRB_i.inverse();
+
+    return flux;
+
+}
+
 static double face_fraction_v3(double a1, double a2) {
     auto [a_min, a_max] = minmax(a1, a2);
 
@@ -308,162 +361,94 @@ static double face_fraction_s(double a1, double a2) {
     return  between(a_sig, a_min, a_max);
 }
 
-Flux MmFluid::calc_flux(const PState& zL, const PState& zR, double hL, double hR, double dt) {
-    if (!m_crp) {
+Flux MmFluid::calc_flux(const PState& zL, const PState& zR, double hL, double hR, double a_sig, double dt) {
+    if (m_crp_mode == CrpMode::NONE) {
         return m_nf->flux(zL, zR, mixture);
     }
 
-    // Единственный материал в обеих ячейках
-    int iL = zL.beta().index();
-    int iR = zR.beta().index();
-    if (iL >= 0 && iL == iR) {
-        // Одноматериальный поток
-        smf::Flux sm_flux = m_nf->flux(zL.to_smf(), zR.to_smf(), mixture[iL]);
+    int iA = 0;
+    int iB = 1;
 
-        // Преобразует одноматериальный в многоматериальный
-        return Flux(sm_flux, iL);
+    double aL = zL.vol_frac[iA];
+    double aR = zR.vol_frac[iA];
+
+    // Либо не содержат iA, либо полностью заполнены iA
+    if ((aL == 0.0 || aL == 1.0) && (aR == 0.0 || aR == 1.0)) {
+        return m_nf->flux(zL, zR, mixture);
     }
 
-    // Хотя бы одная ячейка чистая
-    if (iL >= 0 || iR >= 0) {
-        // В обеих ячейках чистый материал, но разный, решается "обычным" HLLC
-        if (iL >= 0 && iR >= 0) {
-            //std::cout << "SIMPLE\n";
-            // Интересная версия))
-            //auto flux = HLLC::calc_flux(zL, zR, mixture);
-            return HLLC::calc_flux(zL, zR, mixture);
-        }
+    // Другие случаи пока не рассматриваем a_sig ∈ [a_min, a_max]
+    assert(std::min(aL, aR) <= a_sig && a_sig <= std::max(aL, aR));
 
-        // Одна ячейка смешаная, одна чистая, задача сводится к CRP
 
-        if (iR >= 0) {
-            // Справа чистая ячейка (классическая задача)
-            //std::cout << "CLASSIC\n";
+    double delta_L = (aL < a_sig ? aL / a_sig : (1.0 - aL) / (1.0 - a_sig)) * hL;
+    double delta_R = (aR < a_sig ? aR / a_sig : (1.0 - aR) / (1.0 - a_sig)) * hR;
 
-            auto[m1, m2] = zL.beta().pair();
 
-            int iB = iR;
-            int iA = m1 != iB ? m1 : m2;
+    // aL = 0, aR ∈ (0, 1)
+    if (aL == 0.0) {
+        auto[zRA, zRB] = zR.split(mixture, iA);
+        auto& zLB = zL;
 
-            auto zLA = zL.extract(mixture, iA);
-            auto zLB = zL.extract(mixture, iB);
-            auto zRB = zR.to_smf();
+        auto flux_A = m_nf->flux(zLB, zRA, mixture);
+        auto flux_B = crp_flux_2(zLB.to_smf(), zRB.to_smf(), zRA.to_smf(), mixture, iB, iA, delta_R, dt);
 
-            double delta = zL.vol_frac[iB] * hL;
-            auto flux = crp_flux(zLA, zLB, zRB, mixture, iA, iB, delta, dt);
+        return a_sig * flux_A.arr() + (1.0 - a_sig) * flux_B.arr();
+    }
 
-            return flux;
-        }
-        else {
-            // Слева чистая ячейка (iL >= 0), инвертированная задача
-            //std::cout << "INVERSE\n";
+    // aL = 1, aR ∈ (0, 1)
+    if (aL == 1.0) {
+        auto[zRA, zRB] = zR.split(mixture, iA);
+        auto& zLA = zL;
 
-            auto[m1, m2] = zR.beta().pair();
+        auto flux_A = crp_flux_2(zLA.to_smf(), zRA.to_smf(), zRB.to_smf(), mixture, iA, iB, delta_R, dt);
+        auto flux_B = m_nf->flux(zLA, zRB, mixture);
 
-            int iB = iL;
-            int iA = m1 != iB ? m1 : m2;
+        return a_sig * flux_A.arr() + (1.0 - a_sig) * flux_B.arr();
+    }
 
-            auto zLA = zR.extract(mixture, iA);
-            auto zLB = zR.extract(mixture, iB);
-            auto zRB = zL.to_smf();
+    // aL ∈ (0, 1), aR == 0
+    if (aR == 0.0) {
+        auto[zLA, zLB] = zL.split(mixture, iA);
+        auto& zRB = zR;
 
-            double delta = zR.vol_frac[iB] * hR;
+        auto flux_A = m_nf->flux(zLA, zRB, mixture);
+        auto flux_B = crp_flux_1(zLA.to_smf(), zLB.to_smf(), zRB.to_smf(), mixture, iA, iB, delta_L, dt);
 
-            zLA.inverse();
-            zLB.inverse();
-            zRB.inverse();
+        return a_sig * flux_A.arr() + (1.0 - a_sig) * flux_B.arr();
+    }
 
-            auto flux = crp_flux(zLA, zLB, zRB, mixture, iA, iB, delta, dt);
-            flux.inverse();
+    // aL ∈ (0, 1), aR == 1
+    if (aR == 1.0) {
+        auto[zLA, zLB] = zL.split(mixture, iA);
+        auto& zRA = zR;
 
-            return flux;
-        }
+        auto flux_A = crp_flux_1(zLB.to_smf(), zLA.to_smf(), zRA.to_smf(), mixture, iB, iA, delta_L, dt);
+        auto flux_B = m_nf->flux(zLB, zRA, mixture);
 
-        /*
-        std::cout << "\tzL: " << zL << "\n";
-        std::cout << "\tzR: " << zR << "\n";
+        return a_sig * flux_A.arr() + (1.0 - a_sig) * flux_B.arr();
+    }
 
-        std::cout << "\tiA, iB: " << iA << " " << iB << " " << delta << " " << dt << "\n";
-        std::cout << "\tzLA: " << zLA << "\n";
-        std::cout << "\tzLB: " << zLB << "\n";
-        std::cout << "\tzRB: " << zRB << "\n";
-        std::cout << "\tFlux: " << flux << "\n";
-         */
+    // Две строго смешаные ячейки
+    assert((0.0 < aL && aL < 1.0) && (0.0 < aR && aR < 1.0));
+
+    // Расщепление
+    auto[zLA, zLB] = zL.split(mixture, iA);
+    auto[zRA, zRB] = zR.split(mixture, iA);
+
+    mmf::Flux flux;
+    if (aL < aR) {
+        auto flux_A = crp_flux_1(zLB.to_smf(), zLA.to_smf(), zRA.to_smf(), mixture, iB, iA, delta_L, dt);
+        auto flux_B = crp_flux_2(zLB.to_smf(), zRB.to_smf(), zRA.to_smf(), mixture, iB, iA, delta_R, dt);
+        flux = a_sig * flux_A.arr() + (1.0 - a_sig) * flux_B.arr();
     }
     else {
-        //std::cout << "TWO MIXED\n";
-        auto [mL1, mL2] = zL.beta().pair();
-        auto [mR1, mR2] = zR.beta().pair();
-
-        // Убедимся, что материала только два в каждой ячейке,
-        // и это материалы с индексами {0, 1}, пока рассматриваем
-        // только такие случаи
-        if (mL1 != 0 || mR1 != 0 || mL2 != 1 || mR2 != 1) {
-            throw std::runtime_error("Not yet");
-        }
-
-        // Сделаем расщепление состояний в ячейках
-        int iA = mL1; // == 0
-        int iB = mL2; // == 1
-
-        auto zLA = zL.extract(mixture, iA);
-        auto zLB = zL.extract(mixture, iB);
-
-        auto zRA = zR.extract(mixture, iA);
-        auto zRB = zR.extract(mixture, iB);
-
-        double aA_L = zL.vol_frac[iA];
-        double aA_R = zR.vol_frac[iA];
-
-        // a_sig для материала m1
-        double aA_sig = face_fraction_v5(aA_L, aA_R);
-
-        if (aA_sig == 0.0 || aA_sig == 1.0) {
-            std::cout << "Classic problem, go to\n";
-        }
-
-        if (aA_sig < std::min(aA_L, aA_R) || aA_sig > std::max(aA_L, aA_R)) {
-            throw std::runtime_error("Something wrong a_sig(a1, a2)");
-        }
-
-        if (aA_L < aA_sig) {
-            // Классическая задача по iA
-            double delta_L = aA_L * hL / aA_sig;
-            auto flux1 = crp_flux(zLB, zLA, zRA, mixture, iB, iA, delta_L, dt);
-
-            // Инвертированная задача по iB
-            double delta_R = (1.0 - aA_R) * hR / (1.0 - aA_sig);
-
-            zRA.inverse();
-            zRB.inverse();
-            zLB.inverse();
-
-            auto flux2 = crp_flux(zRA, zRB, zLB, mixture, iA, iB, delta_R, dt);
-            flux2.inverse();
-
-            mmf::Flux flux = aA_sig * flux1.arr() + (1.0 - aA_sig) * flux2.arr();
-            return flux;
-        }
-        else {
-            // Классическая задача по iB
-            double delta_R = aA_R * hR / aA_sig;
-
-            auto flux2 = crp_flux(zLA, zLB, zRB, mixture, iA, iB, delta_R, dt);
-
-
-            // Инвертированная задача по iA
-            double delta_L =  (1.0 - aA_L) * hL / (1.0 - aA_sig);
-
-            zRB.inverse();
-            zRA.inverse();
-            zLA.inverse();
-            auto flux1 = crp_flux(zRB, zRA, zLA, mixture, iB, iA, delta_L, dt);
-            flux1.inverse();
-
-            mmf::Flux flux = aA_sig * flux1.arr() + (1.0 - aA_sig) * flux2.arr();
-            return flux;
-        }
+        auto flux_A = crp_flux_2(zLA.to_smf(), zRA.to_smf(), zRB.to_smf(), mixture, iA, iB, delta_R, dt);
+        auto flux_B = crp_flux_1(zLA.to_smf(), zLB.to_smf(), zRB.to_smf(), mixture, iA, iB, delta_L, dt);
+        flux = a_sig * flux_A.arr() + (1.0 - a_sig) * flux_B.arr();
     }
+
+    return flux;
 }
 
 void MmFluid::fluxes(Mesh &mesh, double dt, Direction dir) {
@@ -504,7 +489,17 @@ void MmFluid::fluxes(Mesh &mesh, double dt, Direction dir) {
             double hL = V_c / S;
             double hR = V_n / S;
 
-            Flux loc_flux = calc_flux(zm, zp, hL, hR, dt);
+            double a_sig = face_fraction(zm.vol_frac[0], zp.vol_frac[0]);
+            bool positive = zm.u() + zp.u() > 0.0;
+            double CFL = 0.5 * dt * std::abs(zm.u() + zp.u()) / hL;
+            double cos = (positive ? cell(U).n[0] : face.neib(U).n[0]).dot(face.normal());
+            if (!positive) {
+                cos *= -1.0;
+            }
+            a_sig = geom::average_flux(positive ? zm.vol_frac[0] : zp.vol_frac[0], cos, CFL);
+            a_sig = between(a_sig, zm.vol_frac[0], zp.vol_frac[0]);
+
+            Flux loc_flux = calc_flux(zm, zp, hL, hR, a_sig, dt);
             loc_flux.to_global(normal);
 
             // Суммируем поток
@@ -532,15 +527,55 @@ void MmFluid::fluxes(Mesh &mesh, double dt, Direction dir) {
     });
 }
 
-void MmFluid::compute_grad(Mesh &mesh, const std::function<mmf::PState(Cell &)> &get_state)  {
-    mesh.for_each([&get_state](Cell &cell) -> void {
-        // auto grad = compute_grad_gauss<mmf::PState>(cell, get_state);
-        auto grad = gradient::LSM<mmf::PState>(cell, get_state, boundary_value);
-        //auto lim_grad = gradient::limiting<mmf::PState>(cell, grad, get_state, boundary_value);
+void MmFluid::compute_grad(Mesh &mesh, const GetState<PState> &get_state)  {
+    mesh.for_each([this, &get_state](Cell &cell) {
+        auto grad = gradient::LSM<PState>(cell, get_state, boundary_value);
+        grad = gradient::limiting<PState>(cell, m_limiter, grad, get_state, boundary_value);
 
         cell(U).d_dx = grad.x;
         cell(U).d_dy = grad.y;
         cell(U).d_dz = grad.z;
+    });
+}
+
+void MmFluid::fractions_grad(Mesh& mesh, const GetState<Fractions>& get_state) {
+    mesh.for_each([this, &get_state](Cell &cell) {
+        auto grad = gradient::LSM<Fractions>(cell, get_current_a, boundary_value_a);
+        grad = gradient::limiting<Fractions>(cell, m_limiter, grad, get_current_a, boundary_value_a);
+
+        cell(U).d_dx.vol_frac = grad.x;
+        cell(U).d_dy.vol_frac = grad.y;
+        cell(U).d_dz.vol_frac = grad.z;
+    });
+}
+
+void MmFluid::interface_recovery(Mesh &mesh) {
+    // Сделаю пока простую схему для квадратов,
+    // точка p не восстанавливается, плевать на неё.
+
+    mesh.for_each([](Cell& cell) {
+        VectorSet ns;
+
+        const Fractions& a_c = cell(U).vol_frac;
+        for (auto face: cell.faces()) {
+            Vector3d S = face.area() * face.normal();
+
+            // На границе возвращает саму ячейку
+            const Fractions& a_n = face.neib(U).vol_frac;
+            for (int i = 0; i < Fractions::max_size; ++i) {
+                if (a_c.has(i)) {
+                    ns[i] -= face_fraction(a_c[i], a_n[i]) * S;
+                }
+            }
+        }
+
+        for (int i = 0; i < Fractions::max_size; ++i) {
+            if (a_c.has(i)) {
+                ns[i].normalize();
+            }
+        }
+
+        cell(U).n = ns;
     });
 }
 

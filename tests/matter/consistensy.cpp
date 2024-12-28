@@ -1,3 +1,5 @@
+/// @file Проверка совместности для уравнений состояния
+
 #include <stdexcept>
 #include <iostream>
 #include <iomanip>
@@ -7,9 +9,9 @@
 #include <zephyr/math/calc/derivatives.h>
 #include <zephyr/utils/error_list.h>
 
-#include <zephyr/phys/eos/ideal_gas.h>
-#include <zephyr/phys/eos/stiffened_gas.h>
-#include <zephyr/phys/eos/mie_gruneisen.h>
+#include <zephyr/phys/matter/eos/ideal_gas.h>
+#include <zephyr/phys/matter/eos/stiffened_gas.h>
+#include <zephyr/phys/matter/eos/mie_gruneisen.h>
 
 #include <zephyr/utils/matplotlib.h>
 namespace plt = zephyr::utils::matplotlib;

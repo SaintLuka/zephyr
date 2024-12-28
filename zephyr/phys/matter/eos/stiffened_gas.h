@@ -1,6 +1,6 @@
 #pragma once
 
-#include <zephyr/phys/eos/eos.h>
+#include <zephyr/phys/matter/eos/eos.h>
 
 namespace zephyr::phys {
 
@@ -13,6 +13,9 @@ public:
     double Cv;
     double T0;
 
+    /// @brief Умный указатель на класс
+    using Ptr = std::shared_ptr<StiffenedGas>;
+
     /// @brief Конструктор с заданием параметров
     explicit StiffenedGas(double gamma, double P0 = 0.0,
                           double e0 = 0.0, double Cv = 1.0, double T0 = 0.0);
@@ -22,7 +25,7 @@ public:
 
     /// @brief Создание указателя на базовый класс Eos
     template<typename... Args>
-    static Eos::Ptr create(Args &&... args) {
+    static StiffenedGas::Ptr create(Args &&... args) {
         return std::make_shared<StiffenedGas>(std::forward<Args>(args)...);
     };
 

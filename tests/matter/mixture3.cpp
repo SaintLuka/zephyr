@@ -4,11 +4,11 @@
 
 #include <zephyr/utils/error_list.h>
 
-#include <zephyr/phys/eos/ideal_gas.h>
-#include <zephyr/phys/eos/stiffened_gas.h>
-#include <zephyr/phys/eos/mie_gruneisen.h>
+#include <zephyr/phys/matter/eos/ideal_gas.h>
+#include <zephyr/phys/matter/eos/stiffened_gas.h>
+#include <zephyr/phys/matter/eos/mie_gruneisen.h>
 
-#include <zephyr/phys/eos/materials.h>
+#include <zephyr/phys/matter/mixture_pt.h>
 
 #include <zephyr/utils/matplotlib.h>
 namespace plt = zephyr::utils::matplotlib;
@@ -21,7 +21,7 @@ int main() {
     // Смесь
     auto Cu = MieGruneisen::create("Cu");
     auto Air = IdealGas::create("Air");
-    Materials mixture;
+    MixturePT mixture;
     mixture += Cu;
     mixture += Air;
 

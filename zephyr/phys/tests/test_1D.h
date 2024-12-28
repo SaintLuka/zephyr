@@ -1,7 +1,7 @@
 #pragma once
 
 #include <zephyr/geom/vector.h>
-#include <zephyr/phys/eos/eos.h>
+#include <zephyr/phys/matter/eos/eos.h>
 
 namespace zephyr::phys {
 

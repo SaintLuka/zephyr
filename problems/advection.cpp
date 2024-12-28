@@ -1,7 +1,20 @@
 /// @file Решение задачи переноса с неоднородной скоростью.
 /// Используется простейшая схема первого порядка (upwind)
 
-#include "fast.h"
+#include <iostream>
+#include <iomanip>
+
+#include <zephyr/geom/generator/rectangle.h>
+#include <zephyr/mesh/mesh.h>
+#include <zephyr/io/pvd_file.h>
+
+using zephyr::geom::Vector3d;
+using zephyr::geom::Box;
+using zephyr::geom::Boundary;
+using zephyr::geom::generator::Rectangle;
+using zephyr::mesh::Mesh;
+using zephyr::mesh::AmrStorage;
+using zephyr::io::PvdFile;
 
 // Вектор состояния
 struct _U_ {

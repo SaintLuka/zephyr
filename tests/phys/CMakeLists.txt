@@ -13,7 +13,7 @@ if (ZEPHYR_TESTS_ALL)
 endif()
 
 if (TESTS)
-    message(STATUS "Build phys tests:  ${TESTS}")
+    message(STATUS "Build phys tests:\n   ${TESTS}")
 endif()
 
 foreach(test IN LISTS TESTS)

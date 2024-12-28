@@ -40,12 +40,13 @@ constexpr double operator"" _g_cm3(long double x) { return double(x*1.0e3); }
 
 /// ============================ Единицы давления =============================
 
+constexpr double operator"" _mPa(long double x) { return double(x*1.0e-3); }
 constexpr double operator"" _Pa (long double x) { return double(x); }
 constexpr double operator"" _kPa(long double x) { return double(x*1.0e3); }
 constexpr double operator"" _bar(long double x) { return double(x*1.0e5); }
 constexpr double operator"" _MPa(long double x) { return double(x*1.0e6); }
 constexpr double operator"" _GPa(long double x) { return double(x*1.0e9); }
-constexpr double operator"" _TPa(long double x) { return static_cast<double>(x*1.0e12); }
+constexpr double operator"" _TPa(long double x) { return double(x*1.0e12); }
 
 /// =========================== Единицы энергии ===============================
 
@@ -71,7 +72,7 @@ constexpr double operator"" _MJ_kg(long double x) { return double(x*1.0e6); }
 /// @brief Удельная теплоемкость
 constexpr double operator"" _J_kgK(long double x) { return double(x); }
 
-// @brief Теплопроводность
+// @brief Коэффициент теплопроводности, Вт/(м*К)
 constexpr double operator"" _W_mK(long double x) { return double(x); }
 
 // @brief Градусы Цельсия

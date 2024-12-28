@@ -236,20 +236,45 @@ ScalarSet::ScalarSet(const std::vector<double> &vec) {
     }
 }
 
-double &ScalarSet::operator[](size_t idx) {
-    return m_data[idx];
-}
-
-const double &ScalarSet::operator[](size_t idx) const {
-    return m_data[idx];
-}
-
 std::ostream &operator<<(std::ostream &os, const ScalarSet &frac) {
     os << "{";
     for (int i = 0; i < Fractions::size() - 1; ++i) {
         os << frac.m_data[i] << ", ";
     }
     os << frac.m_data[Fractions::size() - 1] << "}";
+    return os;
+}
+
+VectorSet::VectorSet() {
+    m_data.fill(Vector3d::Zero());
+}
+
+VectorSet::VectorSet(const Vector3d& vec, int idx) {
+    m_data.fill(Vector3d::Zero());
+    m_data[idx] = vec;
+}
+
+VectorSet::VectorSet(const std::vector<Vector3d> &list) {
+    if (list.size() > Fractions::max_size) {
+        throw std::runtime_error("When construct VectorSet got list.size() > Fractions::max_size (" +
+                                 std::to_string(list.size()) + " > " + std::to_string(Fractions::max_size));
+    }
+
+    int counter = 0;
+    for (auto &elem: list) {
+        m_data[counter++] = elem;
+    }
+    for (int i = counter; i < Fractions::max_size; ++i) {
+        m_data[i] = Vector3d::Zero();
+    }
+}
+
+std::ostream &operator<<(std::ostream &os, const VectorSet &frac) {
+    os << "{ ";
+    for (int i = 0; i < Fractions::size() - 1; ++i) {
+        os << "{" << frac.m_data[i].transpose() << "}, ";
+    }
+    os << "{" << frac.m_data[Fractions::size() - 1].transpose() << "} }";
     return os;
 }
 

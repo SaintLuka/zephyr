@@ -38,11 +38,11 @@ smf::Flux Rusanov::calc_flux(const smf::PState &zL, const smf::PState &zR, const
     return F;
 }
 
-mmf::Flux Rusanov::flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) const {
+mmf::Flux Rusanov::flux(const mmf::PState &zL, const mmf::PState &zR, const phys::MixturePT &mixture) const {
     return calc_flux(zL, zR, mixture);
 }
 
-mmf::Flux Rusanov::calc_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) {
+mmf::Flux Rusanov::calc_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::MixturePT &mixture) {
     using namespace mmf;
 
     // Нормальные скорости слева и справа

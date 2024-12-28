@@ -4,11 +4,11 @@
 
 #include <zephyr/utils/error_list.h>
 
-#include <zephyr/phys/eos/ideal_gas.h>
-#include <zephyr/phys/eos/stiffened_gas.h>
-#include <zephyr/phys/eos/mie_gruneisen.h>
+#include <zephyr/phys/matter/eos/ideal_gas.h>
+#include <zephyr/phys/matter/eos/stiffened_gas.h>
+#include <zephyr/phys/matter/eos/mie_gruneisen.h>
 
-#include <zephyr/phys/eos/materials.h>
+#include <zephyr/phys/matter/mixture_pt.h>
 
 using namespace zephyr::phys;
 using namespace zephyr::utils;
@@ -17,7 +17,7 @@ using namespace zephyr::utils;
 /// (dV/dP)_T и (dV/dT)_P
 /// (dE/dP)_T и (dE/dT)_P
 /// Также проверяется аппроксимация двучленным УрС и скорость звука
-void test_mixture(Materials& mixture, Fractions& beta, double rho, double eps) {
+void test_mixture(MixturePT& mixture, Fractions& beta, double rho, double eps) {
     std::cout << std::scientific << std::setprecision(2);
 
     dRdE P = mixture.pressure_re(rho, eps, beta, {.deriv = true});
@@ -149,7 +149,7 @@ struct State {
 /// @param alpha Объемные доли
 /// @param P Давление смеси
 /// @param T Температура смеси
-void test_explicit(Materials& mixture, Fractions& alpha, double P, double T) {
+void test_explicit(MixturePT& mixture, Fractions& alpha, double P, double T) {
     State info;
 
     info.P = P;
@@ -182,7 +182,7 @@ void test_explicit(Materials& mixture, Fractions& alpha, double P, double T) {
 /// @param beta Массовые доли
 /// @param rho Смесевая плотность
 /// @param P Равновесное давление
-void test_implicit_rp(Materials& mixture, Fractions& beta, double rho, double P) {
+void test_implicit_rp(MixturePT& mixture, Fractions& beta, double rho, double P) {
     State info;
 
     info.P = P;
@@ -209,7 +209,7 @@ void test_implicit_rp(Materials& mixture, Fractions& beta, double rho, double P)
 /// @param beta Массовые доли
 /// @param rho Смесевая плотность
 /// @param p Равновесное давление
-void test_implicit_rt(Materials& mixture, Fractions& beta, double rho, double T) {
+void test_implicit_rt(MixturePT& mixture, Fractions& beta, double rho, double T) {
     State info;
 
     info.T = T;
@@ -236,7 +236,7 @@ void test_implicit_rt(Materials& mixture, Fractions& beta, double rho, double T)
 /// @param beta Массовые доли
 /// @param rho Смесевая плотность
 /// @param eps Энергия смеси
-void test_implicit_re(Materials& mixture, Fractions& beta, double rho, double eps) {
+void test_implicit_re(MixturePT& mixture, Fractions& beta, double rho, double eps) {
     State info;
 
     info.eps = eps;
@@ -261,7 +261,7 @@ void test_implicit_re(Materials& mixture, Fractions& beta, double rho, double ep
 int main() {
 #if 1
     // Смесь
-    Materials mixture;
+    MixturePT mixture;
     mixture += IdealGas::create("Air");
     mixture += StiffenedGas::create("Water2");
     mixture += StiffenedGas::create("Copper");
@@ -302,7 +302,7 @@ int main() {
 #else
 
     // Смесь
-    Materials mixture;
+    MixturePT mixture;
     mixture += IdealGas::create("Air");
     mixture += StiffenedGas::create("Water2");
     mixture += StiffenedGas::create("Copper");

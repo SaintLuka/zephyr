@@ -4,11 +4,12 @@
 #include <mutex>
 #include <zephyr/mesh/mesh.h>
 #include <zephyr/math/cfd/limiter.h>
-#include <zephyr/phys/eos/eos.h>
+#include <zephyr/phys/matter/eos/eos.h>
 #include <boost/format.hpp>
 #include <zephyr/phys/tests/test_1D.h>
 #include <zephyr/math/solver/riemann.h>
 #include <zephyr/math/cfd/fluxes.h>
+#include <zephyr/math/cfd/gradient.h>
 
 namespace zephyr::math {
 
@@ -16,14 +17,27 @@ using zephyr::mesh::Cell;
 using zephyr::mesh::Mesh;
 using zephyr::mesh::Distributor;
 using zephyr::geom::Vector3d;
-using zephyr::phys::Materials;
+using zephyr::phys::MixturePT;
+//using zephyr::phys::Fractions;
+using zephyr::phys::VectorSet;
+using zephyr::math::gradient::GetState;
+using zephyr::math::gradient::GetBoundary;
 
 using namespace zephyr::math::mmf;
 
+/// @brief Тип расщеления по направлениям
 enum class DirSplit {
     NONE,    ///< Без расщепления
     SIMPLE,  ///< Схема первого порядка
     STRANG,  ///< Схема второго порядка (G. Strang 1968)
+};
+
+/// @brief Метод выбора alpha_sigma в расчетах методом CRP
+enum class CrpMode {
+    NONE,       ///< Не использовать CRP
+    V3, V5, VS, ///< Эвристические шаблоны
+    PLIC,       ///< Линейная реконструкция границы
+    MUSCL,      ///< По градиенту объемных долей
 };
 
 class MmFluid {
@@ -45,6 +59,9 @@ public:
 
         /// @brief Градиент вектора состояния
         PState d_dx, d_dy, d_dz;
+
+        VectorSet n; ///< Нормаль к реконструкции границы
+        VectorSet p; ///< Точка реконструкции границы
 
 
         bool is_bad1() const { return get_state().is_bad(); }
@@ -82,7 +99,7 @@ public:
 
 
     /// @brief Конструктор класса
-    explicit MmFluid(const phys::Materials &eos);
+    explicit MmFluid(const phys::MixturePT &eos);
 
     /// @brief Декструктор
     ~MmFluid() = default;
@@ -95,6 +112,12 @@ public:
 
     /// @brief Установить метод
     void set_method(Fluxes method);
+
+    /// @brief Установить режим CRP
+    void set_crp_mode(CrpMode mode);
+
+    /// @brief Задать ограничитель
+    void set_limiter(const std::string& limiter);
 
     /// @brief Установить метод расщепления по направлениям
     void set_splitting(DirSplit splitting);
@@ -129,26 +152,34 @@ private:
     /// @brief Проинтегрировать на шаг dt, вдоль направления dir
     void integrate(Mesh &mesh, double dt, Direction dir = Direction::ANY);
 
+    /// @brief Лимитированный градиент вектора состояния
+    void compute_grad(Mesh &mesh, const GetState<PState>& get_state);
+
+    /// @brief Лимитированный градиент объемных долей
+    void fractions_grad(Mesh &mesh, const GetState<Fractions>& get_state);
+
+    /// @brief Подсеточная линейная реконструкция интерфейса
+    void interface_recovery(Mesh &mesh);
+
     /// @brief Расчёт потоков
     void fluxes(Mesh &mesh, double dt, Direction dir = Direction::ANY);
 
     /// @brief Обновление ячеек
     void swap(Mesh &mesh);
 
-    void compute_grad(Mesh &mesh, const std::function<mmf::PState(Cell &)> &to_state);
-
     void fluxes_stage1(Mesh &mesh, double dt, Direction dir = Direction::ANY);
 
     void fluxes_stage2(Mesh &mesh, double dt, Direction dir = Direction::ANY);
 
-    Flux calc_flux(const PState& zL, const PState& zR, double hL, double hR, double dt);
+    Flux calc_flux(const PState& zL, const PState& zR, double hL, double hR, double a_sig, double dt);
 
 protected:
-    Materials mixture;  ///< Список материалов (смесь)
+    MixturePT mixture;  ///< Список материалов (смесь)
     NumFlux::Ptr m_nf;  ///< Метод расчёта потока
-    bool m_crp;         ///< Композитная задача Римана
+    CrpMode m_crp_mode; ///< Композитная задача Римана?
     DirSplit m_split;   ///< Расщепление по направлениям
     int m_acc = 1;      ///< Порядок точности
+    Limiter m_limiter;  ///< Ограничитель для методов второго порядка
     double m_CFL;       ///< Число Куранта
     double m_g = 0.0;   ///< Ускорение свободного падения, направлено против oy
     double m_dt;        ///< Шаг интегрирования

@@ -61,7 +61,7 @@ int main() {
     Eos::Ptr eos_L = test.get_eos(-Ox);
     Eos::Ptr eos_R = test.get_eos( Ox);
 
-    Materials mixture;
+    MixturePT mixture;
     mixture += eos_L;
     mixture += eos_R;
 

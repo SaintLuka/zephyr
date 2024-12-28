@@ -1,10 +1,17 @@
 /// @file Решение задачи переноса с CRP решателем.
 
-#include "fast.h"
+#include <iostream>
+#include <iomanip>
 
+#include <zephyr/geom/vector.h>
+#include <zephyr/geom/generator/rectangle.h>
+#include <zephyr/io/pvd_file.h>
 #include <zephyr/math/solver/transfer.h>
 
 using namespace zephyr::geom;
+
+using zephyr::io::PvdFile;
+using zephyr::mesh::generator::Rectangle;
 
 class Solver;
 
@@ -175,8 +182,8 @@ int main() {
     pvd.variables += {"lvl", get_lvl};
     pvd.variables += {"n.x", normal_x};
     pvd.variables += {"n.y", normal_y};
-    pvd.variables += {"du/dx", grad_x};
-    pvd.variables += {"du/dy", grad_y};
+    //pvd.variables += {"du/dx", grad_x};
+    //pvd.variables += {"du/dy", grad_y};
     pvd.variables += {"p.x", point_x};
     pvd.variables += {"p.y", point_y};
     pvd.variables += {"over", get_over};

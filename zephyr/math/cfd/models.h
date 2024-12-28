@@ -3,11 +3,11 @@
 #include <zephyr/geom/vector.h>
 #include <zephyr/math/vectorization.h>
 #include <zephyr/math/cfd/rotate.h>
-#include <zephyr/phys/eos/eos.h>
-#include <zephyr/phys/eos/materials.h>
 
 #include <zephyr/phys/fractions.h>
-#include "zephyr/phys/eos/types.h"
+#include <zephyr/phys/matter/eos/types.h>
+#include <zephyr/phys/matter/eos/eos.h>
+#include <zephyr/phys/matter/mixture_pt.h>
 
 namespace zephyr::math {
 
@@ -154,7 +154,7 @@ namespace mmf {
 
 using zephyr::phys::Fractions;
 using zephyr::phys::ScalarSet;
-using zephyr::phys::Materials;
+using zephyr::phys::MixturePT;
 
 struct QState;
 
@@ -182,7 +182,7 @@ struct PState {
     /// состояния смеси (PT - замыкание).
     /// В качестве начальных приближений в следует передавать начальные
     /// приближения для давления (P0), температуры (T0) и объемных долей (alpha).
-    PState(const QState &q, const Materials &mixture,
+    PState(const QState &q, const MixturePT &mixture,
            double P0, double T0, const Fractions& alpha);
 
 
@@ -216,19 +216,24 @@ struct PState {
     double true_density(int idx) const;
 
     /// @brief Энергия компоненты energy(P, T)
-    double true_energy(const Materials& mixture, int idx) const;
+    double true_energy(const MixturePT& mixture, int idx) const;
 
     /// @brief Преобразование в одноматериальный вектор состояния
     smf::PState to_smf() const;
 
     /// @brief Выделить чистую компоненту материала с индексом idx
-    smf::PState extract(const Materials& mixture, int idx) const;
+    smf::PState extract(const MixturePT& mixture, int idx) const;
+
+    /// @brief Выделяет из вектора состояния компоненту с материалом с индексом idx
+    /// Если вектор не содержит материал с индексом idx, или содержит только его,
+    /// то поведение не определено, там всякие NAN'ы будут
+    std::pair<mmf::PState, mmf::PState> split(const MixturePT& mixture, int iA) const;
 
     /// @brief Обновить значения, полученные путем интерполяции.
     /// Восстанавливает согласованность состояния (термодинамических величин).
     /// Нормализует концентрации, выставляет согласованные значения
     /// для энергии и температуры (вычисляются по плотности и давлению)
-    void interpolation_update(const phys::Materials& mixture);
+    void interpolation_update(const phys::MixturePT& mixture);
 
     bool is_bad() const;
 

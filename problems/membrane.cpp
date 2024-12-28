@@ -1,8 +1,32 @@
-#include "fast.h"
+/// @file Решатель газодинамики в одном файле.
+/// В углу прямоугольной области колеблется мембрана.
+
+#include <iostream>
+#include <iomanip>
+
+#include <zephyr/geom/generator/rectangle.h>
+
+#include <zephyr/mesh/mesh.h>
+
+#include <zephyr/io/pvd_file.h>
 
 #include <zephyr/math/cfd/fluxes.h>
 #include <zephyr/math/cfd/models.h>
-#include <zephyr/phys/eos/ideal_gas.h>
+
+#include <zephyr/phys/matter/eos/ideal_gas.h>
+
+#include <zephyr/utils/stopwatch.h>
+
+using zephyr::geom::Box;
+using zephyr::geom::Boundary;
+using zephyr::geom::Vector3d;
+using zephyr::mesh::generator::Rectangle;
+using zephyr::mesh::AmrStorage;
+using zephyr::mesh::Mesh;
+using zephyr::mesh::Cell;
+using zephyr::io::PvdFile;
+using zephyr::utils::Stopwatch;
+using zephyr::utils::threads;
 
 using namespace zephyr::phys;
 using namespace zephyr::math;

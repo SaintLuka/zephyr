@@ -107,11 +107,11 @@ HLL::WaveConfig HLL::wave_config(const phys::Eos& eos,
     return WaveConfig({.S_L = S_L, .S_R = S_R, .Qs = Q, .Fs = F});
 }
 
-mmf::Flux HLL::flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) const {
+mmf::Flux HLL::flux(const mmf::PState &zL, const mmf::PState &zR, const phys::MixturePT &mixture) const {
     return calc_flux(zL, zR, mixture);
 }
 
-mmf::Flux HLL::calc_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) {
+mmf::Flux HLL::calc_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::MixturePT &mixture) {
     using namespace mmf;
 
     // Нормальные скорости слева и справа

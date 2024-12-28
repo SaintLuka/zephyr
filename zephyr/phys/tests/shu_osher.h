@@ -1,9 +1,15 @@
 #pragma once
 
-#include <zephyr/phys/eos/ideal_gas.h>
+#include <zephyr/phys/matter/eos/ideal_gas.h>
 #include <zephyr/phys/tests/test_1D.h>
 
+#include <zephyr/geom/primitives/boundary.h>
+#include <zephyr/geom/generator/rectangle.h>
+
 namespace zephyr::phys {
+
+using zephyr::geom::Boundary;
+using zephyr::geom::generator::Rectangle;
 
 /// @brief Тест Шу-Ошера 
 /// C.-W. Shu and S. Osher. Efficient Implementation of Essentially 

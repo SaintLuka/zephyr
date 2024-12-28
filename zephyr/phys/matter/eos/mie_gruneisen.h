@@ -1,6 +1,6 @@
 #pragma once
 
-#include <zephyr/phys/eos/eos.h>
+#include <zephyr/phys/matter/eos/eos.h>
 
 namespace zephyr::phys {
 
@@ -8,13 +8,15 @@ namespace zephyr::phys {
 /// состояния Ми-Грюнайзена и Мурнагана, хорошо было бы найти исходник.
 class MieGruneisen : public Eos {
 public:
+    /// @brief Умный указатель на класс
+    using Ptr = std::shared_ptr<MieGruneisen>;
 
     /// @brief Конструктор для известных материалов
     explicit MieGruneisen(const std::string &name);
 
     /// @brief Создание указателя на базовый класс Eos
     template<typename... Args>
-    static Eos::Ptr create(Args &&... args) {
+    static MieGruneisen::Ptr create(Args &&... args) {
         return std::make_shared<MieGruneisen>(std::forward<Args>(args)...);
     };
 

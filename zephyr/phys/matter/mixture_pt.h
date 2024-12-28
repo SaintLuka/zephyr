@@ -3,22 +3,23 @@
 #include <vector>
 
 #include <zephyr/phys/fractions.h>
-#include <zephyr/phys/eos/eos.h>
-#include <zephyr/phys/eos/stiffened_gas.h>
+#include <zephyr/phys/matter/eos/eos.h>
+#include <zephyr/phys/matter/eos/stiffened_gas.h>
+
+#define SCHEME_ALPHA
 
 
 namespace zephyr::phys {
 
-/// @brief Набор материалов.
-/// Можно использовать в качестве смесевого УрС (PT-замыкание).
-class Materials {
+/// @brief Смесь с равновесием по давлению и температуре (PT-замыкание).
+class MixturePT {
 public:
 
     /// @brief Конструктор по умолчанию (пустой список)
-    Materials() = default;
+    MixturePT() = default;
 
     /// @brief Создать из списка инициалиации
-    Materials(const std::initializer_list<Eos::Ptr>& il)
+    MixturePT(const std::initializer_list<Eos::Ptr>& il)
         : m_materials(il) { }
 
     /// @brief Число компонент
@@ -189,8 +190,8 @@ protected:
     double sound_speed_PT(double pressure, double temperature,
                           const Fractions& beta, const Options& = {}) const;
 
-    /// @brief Массив материалов
+    /// @brief Массив Урсов
     std::vector<Eos::Ptr> m_materials;
 };
 
-}
+} // namespace zephyr::phys

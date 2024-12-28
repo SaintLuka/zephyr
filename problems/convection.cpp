@@ -1,9 +1,31 @@
 /// @file Решение задачи переноса с неоднородной скоростью.
 /// Используется схема высокого порядка (MUSCL) с адаптацией.
+#include <iostream>
+#include <iomanip>
 
-#include "fast.h"
+#include <zephyr/geom/generator/rectangle.h>
+#include <zephyr/geom/generator/cuboid.h>
+
+#include <zephyr/mesh/mesh.h>
 
 #include <zephyr/math/solver/convection.h>
+
+#include <zephyr/io/pvd_file.h>
+
+#include <zephyr/utils/threads.h>
+#include <zephyr/utils/stopwatch.h>
+
+using zephyr::geom::Box;
+using zephyr::geom::Boundary;
+using zephyr::geom::Vector3d;
+using zephyr::mesh::generator::Rectangle;
+using zephyr::mesh::generator::Cuboid;
+using zephyr::mesh::AmrStorage;
+using zephyr::mesh::Mesh;
+using zephyr::io::PvdFile;
+using zephyr::utils::threads;
+using zephyr::utils::Stopwatch;
+
 
 /// @brief Наследуем собственный решатель от Convection, теперь переопределив
 /// поле скорости можно решать произвольные задачи на перенос.

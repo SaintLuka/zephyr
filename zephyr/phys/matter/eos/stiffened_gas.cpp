@@ -2,7 +2,7 @@
 #include <stdexcept>
 #include <cmath>
 
-#include <zephyr/phys/eos/stiffened_gas.h>
+#include <zephyr/phys/matter/eos/stiffened_gas.h>
 
 namespace zephyr::phys {
 

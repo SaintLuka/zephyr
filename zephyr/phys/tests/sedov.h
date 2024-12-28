@@ -1,7 +1,7 @@
 #pragma once
 
 #include <zephyr/geom/vector.h>
-#include <zephyr/phys/eos/ideal_gas.h>
+#include <zephyr/phys/matter/eos/ideal_gas.h>
 #include <zephyr/phys/tests/test_1D.h>
 
 namespace zephyr::phys {

@@ -17,7 +17,7 @@ if (ZEPHYR_TESTS_ALL)
 endif()
 
 if (TESTS)
-    message(STATUS "Build AMR tests:   ${TESTS}")
+    message(STATUS "Build AMR tests:\n   ${TESTS}")
 endif()
 
 foreach(test IN LISTS TESTS)

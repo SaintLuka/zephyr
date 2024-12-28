@@ -3,7 +3,7 @@
 #include <memory>
 
 #include <zephyr/phys/literals.h>
-#include <zephyr/phys/eos/types.h>
+#include <zephyr/phys/matter/eos/types.h>
 
 namespace zephyr::phys {
 
@@ -84,12 +84,19 @@ public:
 
     /// @brief Референсная плотность, значение используется в качестве
     /// начального приближения в PT-замыкании.
-    double ref_density() const;
+    double density() const;
 
     /// @brief Подгон теплоемкости Cv
     /// @param rho_ref, P_ref, T_ref Референсные значения плотности, давления
     /// и температуры.
     virtual void adjust_cv(double rho_ref, double P_ref, double T_ref);
+
+
+    /// @brief Приведение к конкретному типу уравнения состояния,
+    /// при невозможности приведения упадет с segfalult
+    template <class T>
+    typename std::enable_if<std::is_base_of<Eos, T>::value,T&>::type
+    cast() { return *(dynamic_cast<T*>(this)); };
 
 protected:
     /// @brief Референсная плотность при нормальных условиях.

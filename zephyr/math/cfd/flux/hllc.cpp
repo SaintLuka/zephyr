@@ -192,11 +192,11 @@ HLLC::WaveConfig HLLC::wave_config(
                        .QsR = Q_sR, .FsR = F_sR});
 }
 
-mmf::Flux HLLC::flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) const {
+mmf::Flux HLLC::flux(const mmf::PState &zL, const mmf::PState &zR, const phys::MixturePT &mixture) const {
     return calc_flux(zL, zR, mixture);
 }
 
-mmf::Flux HLLC::calc_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) {
+mmf::Flux HLLC::calc_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::MixturePT &mixture) {
     using namespace mmf;
 
     const double &rho_L = zL.density;

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <zephyr/mesh/mesh.h>
-#include <zephyr/phys/eos/eos.h>
+#include <zephyr/phys/matter/eos/eos.h>
 #include <zephyr/math/cfd/fluxes.h>
 #include <zephyr/math/cfd/limiter.h>
 

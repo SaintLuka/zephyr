@@ -3,7 +3,7 @@
 #include <zephyr/geom/vector.h>
 #include <zephyr/geom/primitives/boundary.h>
 #include <zephyr/geom/generator/rectangle.h>
-#include <zephyr/phys/eos/ideal_gas.h>
+#include <zephyr/phys/matter/eos/ideal_gas.h>
 
 namespace zephyr::phys {
 

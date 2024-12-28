@@ -1,6 +1,6 @@
 #pragma once
 
-#include <zephyr/phys/eos/eos.h>
+#include <zephyr/phys/matter/eos/eos.h>
 
 namespace zephyr::phys {
 
@@ -11,6 +11,7 @@ public:
     double gamma;
     double Cv;
 
+    /// @brief Умный указатель на класс
     using Ptr = std::shared_ptr<IdealGas>;
 
     /// @brief Конструктор с заданием параметров

@@ -1,4 +1,5 @@
 #list(APPEND TESTS asigma)
+#list(APPEND TESTS weno)
 
 # Assume all files in direcory are tests
 if (ZEPHYR_TESTS_ALL)
@@ -13,7 +14,7 @@ if (ZEPHYR_TESTS_ALL)
 endif()
 
 if (TESTS)
-    message(STATUS "Build eos tests:   ${TESTS}")
+    message(STATUS "Build math tests:\n   ${TESTS}")
 endif()
 
 foreach(test IN LISTS TESTS)

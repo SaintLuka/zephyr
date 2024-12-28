@@ -42,6 +42,8 @@ double get_vfrac1(AmrStorage::Item &cell) { return cell(U).vol_frac[0]; }
 double get_vfrac2(AmrStorage::Item &cell) { return cell(U).vol_frac[1]; }
 double get_rho1(AmrStorage::Item &cell) { return cell(U).get_state().true_density(0); }
 double get_rho2(AmrStorage::Item &cell) { return cell(U).get_state().true_density(1); }
+double get_normal_x(AmrStorage::Item &cell) { return cell(U).n[0].x(); }
+double get_normal_y(AmrStorage::Item &cell) { return cell(U).n[0].y(); }
 
 
 int main() {
@@ -51,7 +53,7 @@ int main() {
     Eos::Ptr sg2 = IdealGas::create(gamma, 1.0);
 
     // Формальная смесь
-    Materials mixture = {sg1, sg2};
+    MixturePT mixture = {sg1, sg2};
 
     // Файл для записи
     PvdFile pvd("Transfer2D", "output");
@@ -69,6 +71,8 @@ int main() {
     pvd.variables += {"a2", get_vfrac2};
     pvd.variables += {"rho1", get_rho1};
     pvd.variables += {"rho2", get_rho2};
+    pvd.variables += {"n.x", get_normal_x};
+    pvd.variables += {"n.y", get_normal_y};
 
 
     // Создаем одномерную сетку
@@ -85,6 +89,7 @@ int main() {
     solver.set_CFL(0.5);
     solver.set_accuracy(1);
     solver.set_method(Fluxes::CRP);
+    solver.set_crp_mode(CrpMode::PLIC);
     solver.set_splitting(DirSplit::SIMPLE);
 
     for (auto cell: mesh) {
@@ -139,7 +144,7 @@ int main() {
             std::cout << "\tStep: " << std::setw(6) << n_step << ";"
                       << "\tTime: " << std::setw(6) << std::setprecision(3) << curr_time << "\n";
             pvd.save(mesh, curr_time);
-            //next_write += max_time / 200;
+            next_write += max_time / 200;
         }
 
         // Точное завершение в end_time

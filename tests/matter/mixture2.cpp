@@ -4,9 +4,9 @@
 
 #include <zephyr/geom/vector.h>
 
-#include <zephyr/phys/eos/ideal_gas.h>
-#include <zephyr/phys/eos/mie_gruneisen.h>
-#include <zephyr/phys/eos/materials.h>
+#include <zephyr/phys/matter/eos/ideal_gas.h>
+#include <zephyr/phys/matter/eos/mie_gruneisen.h>
+#include <zephyr/phys/matter/mixture_pt.h>
 
 #include <zephyr/utils/matplotlib.h>
 
@@ -33,7 +33,7 @@ int main() {
     auto eos1 = MieGruneisen::create("Pb");
     auto eos2 = IdealGas::create("Air");
 
-    Materials mixture;
+    MixturePT mixture;
     mixture += eos1;
     mixture += eos2;
 

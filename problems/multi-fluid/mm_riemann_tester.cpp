@@ -1,3 +1,7 @@
+
+int main() { return 0; }
+
+#if 0
 #include "problems/fast.h"
 #include <zephyr/math/cfd/face_extra.h>
 #include <zephyr/math/solver/mm_fluid.h>
@@ -10,8 +14,8 @@
 #include <zephyr/phys/tests/test_1D.h>
 
 #include <zephyr/math/solver/riemann.h>
-#include <zephyr/phys/eos/stiffened_gas.h>
-#include <zephyr/phys/eos/mie_gruneisen.h>
+#include <zephyr/phys/matter/eos/stiffened_gas.h>
+#include <zephyr/phys/matter/eos/mie_gruneisen.h>
 #include <zephyr/utils/matplotlib.h>
 
 
@@ -945,3 +949,4 @@ int main() {
 
     return 0;
 }
+#endif

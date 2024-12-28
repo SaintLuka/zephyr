@@ -10,7 +10,7 @@
 #include <zephyr/utils/threads.h>
 #include <zephyr/io/pvd_file.h>
 
-#include <zephyr/phys/eos/ideal_gas.h>
+#include <zephyr/phys/matter/eos/ideal_gas.h>
 #include <zephyr/math/cfd/fluxes.h>
 #include <zephyr/math/solver/sm_fluid.h>
 

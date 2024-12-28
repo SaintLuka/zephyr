@@ -142,7 +142,7 @@ inline SolPU contact_p(
 
     // Вакуумный случай
     if (f_dno > 0.0) {
-//        std::cout << "Вакуум\n";
+        // std::cout << "Вакуум\n";
         std::cout << "Vacuum\n";
         return {p_dno, 0.0, true};
     }

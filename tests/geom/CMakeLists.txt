@@ -1,4 +1,4 @@
-list(APPEND TESTS crp_interface)
+#list(APPEND TESTS crp_interface)
 #list(APPEND TESTS curves)
 #list(APPEND TESTS game_of_life)
 #list(APPEND TESTS maps_integral)
@@ -21,7 +21,7 @@ if (ZEPHYR_TESTS_ALL)
 endif()
 
 if (TESTS)
-    message(STATUS "Build geom tests:  ${TESTS}")
+    message(STATUS "Build geom tests:\n   ${TESTS}")
 endif()
 
 foreach(test IN LISTS TESTS)

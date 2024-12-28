@@ -1,8 +1,9 @@
-#include <zephyr/math/cfd/models.h>
-#include <boost/format.hpp>
 #include <stdexcept>
 #include <iostream>
 #include <iomanip>
+#include <boost/format.hpp>
+
+#include <zephyr/math/cfd/models.h>
 
 namespace zephyr::math {
 
@@ -187,7 +188,7 @@ PState::PState(double density, const Vector3d &velocity, double pressure,
       vol_frac(vol_frac) {
 }
 
-PState::PState(const QState &q, const phys::Materials &mixture,
+PState::PState(const QState &q, const phys::MixturePT &mixture,
                double P0, double T0, const Fractions& alpha) {
 
     density   = q.density;
@@ -258,7 +259,7 @@ double PState::true_density(int idx) const {
     return mass_frac[idx] * density / vol_frac[idx];
 }
 
-double PState::true_energy(const Materials& mixture, int idx) const {
+double PState::true_energy(const MixturePT& mixture, int idx) const {
     return mixture[idx].energy_PT(pressure, temperature, {.deriv = false});
 }
 
@@ -266,11 +267,39 @@ smf::PState PState::to_smf() const {
     return {density, velocity, pressure, energy};
 }
 
-smf::PState PState::extract(const Materials& mixture, int idx) const {
+smf::PState PState::extract(const MixturePT& mixture, int idx) const {
     return smf::PState(true_density(idx), velocity, pressure, true_energy(mixture, idx));
 }
 
-void PState::interpolation_update(const Materials& mixture) {
+std::pair<mmf::PState, mmf::PState> PState::split(const MixturePT& mixture, int iA) const {
+    mmf::PState zA = *this;
+    mmf::PState zB = *this;
+
+    double alfa_A = vol_frac[iA];
+    double beta_A = mass_frac[iA];
+
+    double alfa_B = 1.0 - alfa_A;
+    double beta_B = 1.0 - beta_A;
+
+    zA.density = beta_A * density / alfa_A;
+    zA.mass_frac.set_pure(iA);
+    zA. vol_frac.set_pure(iA);
+
+    zB.density = beta_B * density / alfa_B;
+    for (int i = 0; i < Fractions::max_size; ++i) {
+        if (i == iA) {
+            zB.mass_frac[i] = 0.0;
+            zB. vol_frac[i] = 0.0;
+        }
+
+        zB.mass_frac[i] /= beta_B;
+        zB. vol_frac[i] /= alfa_B;
+    }
+
+    return {zA, zB};
+}
+
+void PState::interpolation_update(const MixturePT& mixture) {
     // Нормализуем после интерполяции
     mass_frac.normalize();
     vol_frac.normalize();

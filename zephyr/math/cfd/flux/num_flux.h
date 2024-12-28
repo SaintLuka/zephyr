@@ -2,8 +2,8 @@
 
 #include <memory>
 
-#include <zephyr/phys/eos/eos.h>
-#include <zephyr/phys/eos/materials.h>
+#include <zephyr/phys/matter/eos/eos.h>
+#include <zephyr/phys/matter/mixture_pt.h>
 #include <zephyr/math/cfd/models.h>
 
 namespace zephyr::math {
@@ -40,7 +40,7 @@ public:
     }
 
     /// @brief Численный поток для многоматериальной задачи
-    virtual mmf::Flux flux(const mmf::PState& zL, const mmf::PState& zR, const phys::Materials& mixture) const {
+    virtual mmf::Flux flux(const mmf::PState& zL, const mmf::PState& zR, const phys::MixturePT& mixture) const {
         throw std::runtime_error("NumFlux::flux(mmf::PState...) is not implemented");
     }
 

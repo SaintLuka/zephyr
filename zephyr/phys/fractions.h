@@ -88,7 +88,7 @@ struct Fractions {
     /// концентрации, затем нормализовать концентрации
     void cutoff(double eps = 1.0e-12);
 
-    /// @brief Не содержит концентраций
+    /// @brief Не содержит концентраций?
     bool empty() const;
 
     /// @brief Указатель на данные
@@ -108,7 +108,7 @@ struct Fractions {
 std::ostream &operator<<(std::ostream &os, const Fractions &frac);
 
 
-/// @brief Вектор потока величины нескольких веществ
+/// @brief Набор скалярных величин по числу компонент
 struct ScalarSet {
     /// @brief Массив данных
     std::array<double, Fractions::max_size> m_data{};
@@ -135,10 +135,14 @@ struct ScalarSet {
     explicit ScalarSet(const std::vector<double> &vec);
 
     /// @brief Оператор доступа по индексу
-    double &operator[](size_t idx);
+    inline double &operator[](int idx) {
+        return m_data[idx];
+    }
 
     /// @brief Оператор доступа по индексу
-    const double &operator[](size_t idx) const;
+    const double &operator[](int idx) const {
+        return m_data[idx];
+    }
 
     template<typename T>
     ScalarSet &operator*=(const T &c) {
@@ -173,5 +177,36 @@ struct ScalarSet {
 };
 
 std::ostream &operator<<(std::ostream &os, const ScalarSet &frac);
+
+using zephyr::geom::Vector3d;
+
+/// @brief Набор векторов по числу компонент
+struct VectorSet {
+    /// @brief Массив данных
+    std::array<Vector3d, Fractions::max_size> m_data{};
+
+    /// @brief Конструктор по умолчанию. Инициализирует нулями.
+    VectorSet();
+
+    /// @brief Установить единственное значение по индексу idx,
+    /// остальные компоненты инициализируются нулями.
+    VectorSet(const Vector3d& vec, int idx);
+
+
+    /// @brief Конструктор из вектора
+    explicit VectorSet(const std::vector<Vector3d> &vec);
+
+    /// @brief Оператор доступа по индексу
+    inline Vector3d &operator[](int idx) {
+        return m_data[idx];
+    }
+
+    /// @brief Оператор доступа по индексу
+    inline const Vector3d &operator[](int idx) const {
+        return m_data[idx];
+    }
+};
+
+std::ostream &operator<<(std::ostream &os, const VectorSet &frac);
 
 } // namespace zephyr

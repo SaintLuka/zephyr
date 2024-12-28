@@ -9,7 +9,6 @@
 #include <zephyr/geom/box.h>
 #include <zephyr/mesh/euler/eu_cell.h>
 #include <zephyr/mesh/euler/eu_mesh.h>
-#include <problems/fast.h>
 
 namespace zephyr::mesh {
 

@@ -1,8 +1,8 @@
 #include <stdexcept>
 #include <cmath>
 
-#include <zephyr/phys/eos/eos.h>
-#include <zephyr/phys/eos/stiffened_gas.h>
+#include <zephyr/phys/matter/eos/eos.h>
+#include <zephyr/phys/matter/eos/stiffened_gas.h>
 
 namespace zephyr::phys {
 
@@ -63,7 +63,7 @@ double Eos::min_pressure() const {
     throw std::runtime_error("min_pressure is not implemented");
 }
 
-double Eos::ref_density() const {
+double Eos::density() const {
     return rho_0;
 }
 

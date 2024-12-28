@@ -27,10 +27,10 @@ public:
 
 
     /// @brief Статическая многоматериальная версия
-    static mmf::Flux calc_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture);
+    static mmf::Flux calc_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::MixturePT &mixture);
 
     /// @brief Многоматериальная версия
-    mmf::Flux flux(const mmf::PState &zL, const mmf::PState &zR, const phys::Materials &mixture) const final;
+    mmf::Flux flux(const mmf::PState &zL, const mmf::PState &zR, const phys::MixturePT &mixture) const final;
 };
 
 }
