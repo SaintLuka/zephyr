@@ -13,8 +13,10 @@ diplom
 /diplom/*
 *.aux
 *.log
-*.pdf
 *.gz
 *.toc
 *.bbl
 *.blg
+
+doc/code/zephyr-code.pdf
+doc/scientific/scientific.pdf
