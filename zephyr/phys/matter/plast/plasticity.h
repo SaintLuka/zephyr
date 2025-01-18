@@ -22,6 +22,7 @@ public:
 
     /// @brief Умный указатель на класс
     using Ptr = std::shared_ptr<Plasticity>;
+    using Ref = const std::shared_ptr<Plasticity>&;
 
     /// @brief Нулевые коэффициенты для модуля Юнга, модуля сдвига и предела
     /// текучести, коэффициент Пуассона равен 1/2.

@@ -10,6 +10,5 @@ install(FILES
         ideal_gas.h
         mie_gruneisen.h
         stiffened_gas.h
-        types.h
         DESTINATION
         include/${PROJECT_NAME}/phys/matter/eos)

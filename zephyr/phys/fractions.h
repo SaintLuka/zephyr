@@ -114,12 +114,11 @@ struct ScalarSet {
     std::array<double, Fractions::max_size> m_data{};
 
 
-    /// @brief Конструктор по умолчанию
-    /// Инициализирует нулями.
+    /// @brief Конструктор по умолчанию. Инициализирует нулями.
     ScalarSet();
 
     /// @brief Установить значение
-    ScalarSet(double val);
+    explicit ScalarSet(double val);
 
     /// @brief Конструктор со списком инициализации
     ScalarSet(std::initializer_list<double> list);
@@ -142,30 +141,6 @@ struct ScalarSet {
     /// @brief Оператор доступа по индексу
     const double &operator[](int idx) const {
         return m_data[idx];
-    }
-
-    template<typename T>
-    ScalarSet &operator*=(const T &c) {
-        for (double &v: m_data)
-            v *= c;
-
-        return *this;
-    }
-
-    template<typename T>
-    ScalarSet &operator/=(const T &c) {
-        for (double &v: m_data)
-            v /= c;
-
-        return *this;
-    }
-
-    ScalarSet &operator+=(const ScalarSet &c) {
-        for (int i = 0; i < size(); ++i) {
-            m_data[i] += c[i];
-        }
-
-        return *this;
     }
 
     /// @brief Ссылка на массив данных

@@ -1,4 +1,5 @@
 set(ZEPHYR_MATH_CALC_SRC
+    ${CMAKE_CURRENT_SOURCE_DIR}/derivatives.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/integrals.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/weno.cpp
     PARENT_SCOPE)

@@ -5,7 +5,7 @@ add_subdirectory(multi-fluid)
 #list(APPEND PROBLEMS convection)
 #list(APPEND PROBLEMS membrane)
 #list(APPEND PROBLEMS shu_osher)
-list(APPEND PROBLEMS transfer)
+#list(APPEND PROBLEMS transfer)
 
 # Assume all files in direcory are tests
 if (ZEPHYR_PROBLEMS_ALL)

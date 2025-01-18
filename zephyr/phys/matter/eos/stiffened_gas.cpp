@@ -2,6 +2,7 @@
 #include <stdexcept>
 #include <cmath>
 
+#include <zephyr/phys/literals.h>
 #include <zephyr/phys/matter/eos/stiffened_gas.h>
 
 namespace zephyr::phys {
@@ -16,6 +17,7 @@ StiffenedGas::StiffenedGas(const std::string &name) {
     Cv = 1.0;
     T0 = 0.0;
 
+    double rho_0 = 1.0;
     if (name == "Air") {
         gamma = 1.4;
         Cv    = 718.0_J_kgK;
@@ -94,9 +96,11 @@ StiffenedGas::StiffenedGas(const std::string &name) {
         throw std::runtime_error("Unknown stiffened gas '" + std::string(name) + "'");
     }
     // @formatter:on
+
+    ref_density = rho_0;
 }
 
-dRdE StiffenedGas::pressure_re(double rho, double eps, const Options& options) const {
+dRdE StiffenedGas::pressure_re(double rho, double eps, const EosOptions& options) const {
     dRdE res {(gamma - 1.0) * rho * (eps - e0) - gamma * P0 };
     if (options.deriv) {
         res.dR = (gamma - 1.0) * (eps - e0);
@@ -105,7 +109,7 @@ dRdE StiffenedGas::pressure_re(double rho, double eps, const Options& options) c
     return res;
 }
 
-dRdT StiffenedGas::pressure_rT(double rho, double T, const Options& options) const {
+dRdT StiffenedGas::pressure_rT(double rho, double T, const EosOptions& options) const {
     dRdT P = (gamma - 1.0) * Cv * rho * (T - T0) - P0;
     if (options.deriv) {
         P.dR = (gamma - 1.0) * Cv * (T - T0);
@@ -114,7 +118,16 @@ dRdT StiffenedGas::pressure_rT(double rho, double T, const Options& options) con
     return P;
 }
 
-dRdT StiffenedGas::energy_rT(double rho, double T, const Options& options) const {
+dRdP StiffenedGas::energy_rP(double rho, double P, const EosOptions& options) const {
+    dRdP e = e0 + (P + gamma * P0) / ((gamma - 1.0) * rho);
+    if (options.deriv) {
+        e.dR = (e0 - e.val) / rho;
+        e.dP = 1.0 / ((gamma - 1.0) * rho);
+    }
+    return e;
+}
+
+dRdT StiffenedGas::energy_rT(double rho, double T, const EosOptions& options) const {
     dRdT e = e0 + Cv * (T - T0) + P0 / rho;
     if (options.deriv) {
         e.dR = -P0 / (rho * rho);
@@ -123,23 +136,19 @@ dRdT StiffenedGas::energy_rT(double rho, double T, const Options& options) const
     return e;
 }
 
-double StiffenedGas::energy_rP(double rho, double P, const Options& options) const {
-    return e0 + (P + gamma * P0) / ((gamma - 1.0) * rho);
-}
-
-double StiffenedGas::sound_speed_re(double rho, double eps, const Options& options) const {
-    return std::sqrt(gamma * (gamma - 1.0) * ((eps - e0) - P0 / rho));
-}
-
-double StiffenedGas::sound_speed_rP(double rho, double P, const Options& options) const {
-    return std::sqrt(gamma * (P + P0) / rho);
-}
-
-double StiffenedGas::temperature_rP(double rho, double P, const Options& options) const {
+double StiffenedGas::temperature_rP(double rho, double P, const EosOptions& options) const {
     return T0 + (P + P0) / ((gamma - 1.0) * Cv * rho);
 }
 
-dPdT StiffenedGas::volume_PT(double P, double T, const Options& options) const {
+double StiffenedGas::sound_speed_re(double rho, double eps, const EosOptions& options) const {
+    return std::sqrt(gamma * (gamma - 1.0) * ((eps - e0) - P0 / rho));
+}
+
+double StiffenedGas::sound_speed_rP(double rho, double P, const EosOptions& options) const {
+    return std::sqrt(gamma * (P + P0) / rho);
+}
+
+dPdT StiffenedGas::volume_PT(double P, double T, const EosOptions& options) const {
     dPdT res{((gamma - 1.0) * Cv * (T - T0)) / (P + P0)};
     if (options.deriv) {
         res.dP = -res.val / (P + P0);
@@ -148,23 +157,29 @@ dPdT StiffenedGas::volume_PT(double P, double T, const Options& options) const {
     return res;
 }
 
-inline double sqr(double x) { return x * x; }
-
-dPdT StiffenedGas::energy_PT(double P, double T, const Options& options) const {
+dPdT StiffenedGas::energy_PT(double P, double T, const EosOptions& options) const {
     dPdT res{e0 + ((P + gamma * P0) / (P + P0)) * Cv * (T - T0)};
     if (options.deriv) {
-        res.dP = (1.0 - gamma) * P0 * Cv * (T - T0) / sqr(P + P0);
+        res.dP = (1.0 - gamma) * P0 * Cv * (T - T0) / std::pow(P + P0, 2);
         res.dT = ((P + gamma * P0) / (P + P0)) * Cv;
     }
     return res;
 }
 
-StiffenedGas StiffenedGas::stiffened_gas(double rho, double P, const Options& options) const {
+StiffenedGas StiffenedGas::stiffened_gas(double rho, double P, const EosOptions& options) const {
     return StiffenedGas(gamma, P0, e0, Cv, T0);
 }
 
 double StiffenedGas::min_pressure() const {
     return -P0;
+}
+
+void StiffenedGas::adjust_cv(double rho_ref, double P_ref, double T_ref) {
+    Cv = (P_ref + P0) / ((gamma - 1.0) * rho_ref * (T_ref - T0));
+}
+
+void StiffenedGas::adjust_T0(double rho_ref, double P_ref, double T_ref) {
+    T0 = (P_ref + P0) / ((gamma - 1.0) * Cv * rho_ref);
 }
 
 } // namespace zephyr::phys

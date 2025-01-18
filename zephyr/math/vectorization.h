@@ -55,4 +55,7 @@
     inline static auto NaN() { \
         Eigen::Array<double, CustomVector::size(), 1> res(NAN); \
         return res; \
-    }
+    } \
+    \
+    inline CustomVector& operator*=(double q) { arr() *= q; return *this; } \
+    inline CustomVector& operator/=(double q) { arr() *= q; return *this; }

@@ -49,33 +49,6 @@ public:
         m_data.resize(m_size * m_itemsize);
     }
 
-    /// @brief Конструктор копирования хранилища
-    Storage(const Storage &src)
-        : m_size(src.m_size),
-          m_itemsize(src.m_itemsize),
-          m_data(src.m_data.size()) {
-
-        std::memcpy(m_data.data(), src.m_data.data(),
-                    m_data.size() * sizeof(Byte));
-    }
-
-    /// @brief Конструктор копирования хранилища
-    Storage& operator=(const Storage &src) {
-        m_size = src.m_size;
-        m_itemsize = src.m_itemsize;
-        m_data.resize(src.m_data.size());
-
-        std::memcpy(m_data.data(), src.m_data.data(),
-                    m_data.size() * sizeof(Byte));
-        return *this;
-    }
-
-    /// @brief Конструктор перемещения хранилища
-    Storage(Storage &&src)
-        : m_size(src.m_size),
-          m_itemsize(src.m_itemsize),
-          m_data(std::move(src.m_data)) { }
-
     /// @brief Пустое ли хранилище
     inline bool empty() const {
         return m_size < 1;

@@ -11,6 +11,7 @@ class Conductivity {
 public:
     /// @brief Умный указатель на класс
     using Ptr = std::shared_ptr<Conductivity>;
+    using Ref = const std::shared_ptr<Conductivity>&;
 
     /// @brief Создание класса с единственным параметром --
     /// коэффициентом теплопроводности

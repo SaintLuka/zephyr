@@ -11,95 +11,79 @@ void Material::set_tag(const std::string &tag) {
     m_tag = tag;
 }
 
-void Material::add(Eos::Ptr eos) {
+void Material::add(Eos::Ref eos) {
     m_eos = eos;
 }
 
-void Material::add(Conductivity::Ptr cond) {
+void Material::add(Conductivity::Ref cond) {
     m_cond = cond;
 }
 
-void Material::add(Viscosity::Ptr visc) {
+void Material::add(Viscosity::Ref visc) {
     m_visc = visc;
 }
 
-void Material::add(Plasticity::Ptr plast) {
+void Material::add(Plasticity::Ref plast) {
     m_plast = plast;
 }
 
-void Material::operator+=(Eos::Ptr eos) {
+void Material::operator+=(Eos::Ref eos) {
     m_eos = eos;
 }
 
-void Material::operator+=(Conductivity::Ptr cond) {
+void Material::operator+=(Conductivity::Ref cond) {
     m_cond = cond;
 }
 
-void Material::operator+=(Viscosity::Ptr visc) {
+void Material::operator+=(Viscosity::Ref visc) {
     m_visc = visc;
 }
 
-void Material::operator+=(Plasticity::Ptr plast) {
+void Material::operator+=(Plasticity::Ref plast) {
     m_plast = plast;
-}
-
-Eos::Ptr Material::eos() const {
-    return m_eos;
-}
-
-Conductivity::Ptr Material::cond() const {
-    return m_cond;
-}
-
-Viscosity::Ptr Material::visc() const {
-    return m_visc;
-}
-
-Plasticity::Ptr Material::plast() const {
-    return m_plast;
 }
 
 double Material::density() const {
     return m_eos->density();
 }
 
-dRdE Material::pressure_re(double density, double energy, const Options &options) const {
+dRdE Material::pressure_re(double density, double energy, const EosOptions &options) const {
     return m_eos->pressure_re(density, energy, options);
 }
 
-dRdT Material::pressure_rT(double density, double temperature, const Options &options) const {
+dRdT Material::pressure_rT(double density, double temperature, const EosOptions &options) const {
     return m_eos->pressure_rT(density, temperature, options);
 }
 
-dRdT Material::energy_rT(double density, double temperature, const Options &options) const {
+dRdT Material::energy_rT(double density, double temperature, const EosOptions &options) const {
     return m_eos->energy_rT(density, temperature, options);
 }
 
-double Material::sound_speed_re(double density, double energy, const Options &options) const {
+double Material::sound_speed_re(double density, double energy, const EosOptions &options) const {
     return m_eos->sound_speed_re(density, energy, options);
 }
 
-double Material::sound_speed_rP(double density, double pressure, const Options &options) const {
+double Material::sound_speed_rP(double density, double pressure, const EosOptions &options) const {
     return m_eos->sound_speed_rP(density, pressure, options);
 }
 
-double Material::energy_rP(double density, double pressure, const Options &options) const {
+double Material::energy_rP(double density, double pressure, const EosOptions &options) const {
     return m_eos->energy_rP(density, pressure, options);
 }
 
-double Material::temperature_rP(double density, double pressure, const Options &options) const {
+double Material::temperature_rP(double density, double pressure, const EosOptions &options) const {
     return m_eos->temperature_rP(density, pressure, options);
 }
 
-dPdT Material::volume_PT(double pressure, double temperature, const Options &options) const {
+dPdT Material::volume_PT(double pressure, double temperature, const EosOptions &options) const {
     return m_eos->volume_PT(pressure, temperature, options);
 }
 
-dPdT Material::energy_PT(double pressure, double temperature, const Options &options) const {
+dPdT Material::energy_PT(double pressure, double temperature, const EosOptions &options) const {
     return m_eos->energy_PT(pressure, temperature, options);
 }
 
-StiffenedGas Material::stiffened_gas(double density, double pressure, const Options &options) const {
+StiffenedGas Material::stiffened_gas(double density, double pressure, const EosOptions &options) const {
     return m_eos->stiffened_gas(density, pressure, options);
 }
 
@@ -109,6 +93,10 @@ double Material::min_pressure() const {
 
 void Material::adjust_cv(double rho_ref, double P_ref, double T_ref) {
     return m_eos->adjust_cv(rho_ref, P_ref, T_ref);
+}
+
+void Material::adjust_T0(double rho_ref, double P_ref, double T_ref) {
+    return m_eos->adjust_T0(rho_ref, P_ref, T_ref);
 }
 
 double Material::kappa(double temperature) const {

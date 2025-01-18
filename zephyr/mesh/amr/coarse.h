@@ -259,7 +259,7 @@ AmrCell get_parent(AmrStorage &locals, AmrStorage &aliens,
         std::set<int> found;
         for (int i = 0; i < FpF(dim); ++i) {
             for (int j = 0; j < FpF(dim); ++j) {
-                if ((pfaces[i] - cfaces[j]).norm() < eps) {
+                if ((pfaces[i] - cfaces[j]).norm() < e) {
                     found.insert(j);
                     break;
                 }
@@ -286,7 +286,7 @@ AmrCell get_parent(AmrStorage &locals, AmrStorage &aliens,
                 std::cout << "pf: " << pfaces[i] << "\n";
                 for (int j = 0; j < FpF(dim); ++j) {
                     std::cout << "  cf: " << cfaces[j] << "\n";
-                    if (distance(pfaces[i], cfaces[j]) < eps) {
+                    if (distance(pfaces[i], cfaces[j]) < e) {
                         found.insert(j);
                         break;
                     }

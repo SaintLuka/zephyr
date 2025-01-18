@@ -46,19 +46,19 @@ mmf::Flux Godunov::calc_flux(const mmf::PState &zL, const mmf::PState &zR, const
     }
 
     auto sol = RiemannSolver::solve(zL.to_smf(), zR.to_smf(),
-            mixture.stiffened_gas(zL.density, zL.pressure, zL.mass_frac, {.T0 = zL.temperature}),
-            mixture.stiffened_gas(zR.density, zR.pressure, zR.mass_frac, {.T0 = zR.temperature}));
+            mixture.stiffened_gas(zL.density, zL.pressure, zL.mass_frac, {.T0 = zL.temperature, .alpha=&zL.vol_frac}),
+            mixture.stiffened_gas(zR.density, zR.pressure, zR.mass_frac, {.T0 = zR.temperature, .alpha=&zR.vol_frac}));
 
     mmf::Flux flux;
     if (sol.U >= 0) {
         Vector3d v(sol.Uf, zL.velocity.y(), zL.velocity.z());
-        auto [energy, temperature] = mixture.find_eT(sol.rho, sol.Pf, zL.mass_frac, {.T0=zL.temperature});
+        auto [rhos, energy, temperature] = mixture.get_reT(sol.rho, sol.Pf, zL.mass_frac, {.T0=zL.temperature});
         mmf::PState z(sol.rho, v, sol.Pf, energy, temperature, zL.mass_frac, mmf::Fractions::NaN());
 
         flux = mmf::Flux(z);
     } else {
         Vector3d v(sol.Uf, zR.velocity.y(), zR.velocity.z());
-        auto [energy, temperature] = mixture.find_eT(sol.rho, sol.Pf, zR.mass_frac, {.T0=zR.temperature});
+        auto [rhos, energy, temperature] = mixture.get_reT(sol.rho, sol.Pf, zR.mass_frac, {.T0=zR.temperature});
         mmf::PState z(sol.rho, v, sol.Pf, energy, temperature, zR.mass_frac, mmf::Fractions::NaN());
 
         flux = mmf::Flux(z);

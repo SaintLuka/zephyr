@@ -189,7 +189,7 @@ PState::PState(double density, const Vector3d &velocity, double pressure,
 }
 
 PState::PState(const QState &q, const phys::MixturePT &mixture,
-               double P0, double T0, const Fractions& alpha) {
+               double P0, double T0, const Fractions& alpha0) {
 
     density   = q.density;
     velocity  = q.momentum / density;
@@ -199,15 +199,16 @@ PState::PState(const QState &q, const phys::MixturePT &mixture,
     mass_frac.cutoff(1.0e-12);
     mass_frac.normalize();
 
-    vol_frac  = alpha;
-
-    // в том числе обновляет vol_frac
-    auto PT = mixture.find_PT(density, energy, mass_frac,
-                              {.P0=P0, .T0=T0, .alpha=&vol_frac});
+    throw std::runtime_error("FIX 1432");
+    auto[rhos, P, T] = mixture.get_rPT(density, energy, mass_frac,
+                              {.P0=P0, .T0=T0, .alpha=&alpha0});
+    //vol_frac    = alpha;
+    pressure    = P;
+    temperature = T;
 
     // alpha и beta должны обращаться в ноль одновременно,
     // иначе возникают невнятные косяки
-    for (int i = 0; i < vol_frac.size(); ++i) {
+    for (int i = 0; i < Fractions::size(); ++i) {
         if (mass_frac.has(i) != vol_frac.has(i)) {
             std::cout << "SOMETHING WONG: " << "\n";
             if (!vol_frac.has(i)) {
@@ -216,10 +217,7 @@ PState::PState(const QState &q, const phys::MixturePT &mixture,
         }
     }
     mass_frac.normalize();
-    vol_frac.normalize();
-
-    pressure    = PT.P;
-    temperature = PT.T;
+    vol_frac .normalize();
 }
 
 void PState::to_local(const Vector3d &normal) {
@@ -302,13 +300,17 @@ std::pair<mmf::PState, mmf::PState> PState::split(const MixturePT& mixture, int 
 void PState::interpolation_update(const MixturePT& mixture) {
     // Нормализуем после интерполяции
     mass_frac.normalize();
-    vol_frac.normalize();
+    vol_frac .normalize();
+
+    throw std::runtime_error("FIX erte2");
 
     // Восстанавливаем совместность после интерполяции
-    auto pair = mixture.find_eT(density, pressure, mass_frac,
-                                {.T0 = temperature, .alpha = &vol_frac});
-    energy      = pair.e;
-    temperature = pair.T;
+    //auto[alpha, e, T] = mixture.get_aeT(density, pressure, mass_frac,
+    //                                    {.T0=temperature, .alpha=&vol_frac});
+
+    //vol_frac    = alpha;
+    //energy      = e;
+    //temperature = T;
 }
 
 bool PState::is_bad() const {

@@ -21,7 +21,7 @@
 
 \numberwithin{equation}{chapter}
 
-\newcommand{\eps}{\varepsilon}
+\newcommand{\e}{\varepsilon}
 \newcommand{\ups}{\upsilon}
 \newcommand{\half}{\frac{1}{2}}
 \newcommand{\thalf}{\tfrac{1}{2}}
@@ -247,6 +247,69 @@ e \qty( \rho, \, s ) = \qty[ A \exp \qty(\tfrac{s - s_0}{c_v}) - \frac{e_0}{\gam
 \smallskip
 
 Двучленное уравнение состояния допускает отрицательные давления (разрежение), минимальное давление составляет $-P_0$.
+\medskip
+
+\subsubsection*{Аппроксимация двучленным уравнением состояния}
+
+Для двучленного УрС решается...
+
+Возьмем уравнение состояния в форме:
+\begin{equation*}
+    P\qty(\rho, \, e) = \qty(\gamma - 1) \rho \qty(e - e_0) - \gamma P_0.
+\end{equation*}
+Тогда константы $\gamma$, $P_0$ и $e_0$ можно получить, если приравнять значения давления и первых производных при заданном состоянии $(\rho, \, e, \, P)$.
+\medskip
+
+Задано уравнение состояния $P(\rho, \, e)$:
+\begin{equation}\label{eq:sg-approx-1}
+\begin{gathered}
+P = P(\rho, \, e), \qquad
+P_{\rho} = \qty(\pdv{P}{\rho})_{e}, \qquad
+P_{e}    = \qty(\pdv{P}{e})_{\rho}, \\
+\gamma = 1 + \frac{P_e}{\rho},
+\qquad
+e_0 = e - \frac{\rho P_{\rho}}{P_e},
+\qquad
+P_0 = \frac{\rho P_{\rho} - P}{\gamma}.
+\end{gathered}
+\end{equation}
+
+Задано уравнение состояния $e(\rho, \, P)$:
+\begin{equation}\label{eq:sg-approx-2}
+\begin{gathered}
+e = e(\rho, \, P), \qquad
+e_{\rho} = \qty(\pdv{e}{\rho})_{P}, \qquad
+e_{P}    = \qty(\pdv{e}{P})_{\rho}, \\
+\gamma = 1 + \frac{1}{\rho e_P},
+\qquad
+e_0 = e + \rho e_{\rho},
+\qquad
+P_0 = -\frac{\rho e_{\rho} + P e_P}{\gamma e_P}.
+\end{gathered}
+\end{equation}
+
+
+Заданы две функции $1 / \rho = \ups(P, \, T)$ и $e(P, \, T)$:
+\begin{equation}\label{eq:sg-approx-3}
+\begin{gathered}
+\ups = \ups \qty(P, \, T), \qquad
+\ups_P = \qty( \pdv{\ups}{P} )_{T}, \qquad
+\ups_T = \qty( \pdv{\ups}{T} )_{P}, \\
+e = e \qty(P, \, T), \qquad
+e_P = \qty( \pdv{e}{P} )_{T}, \qquad
+e_T = \qty( \pdv{e}{T} )_{P}, \\
+\Delta = \ups_T \, e_P - \ups_P \, e_T, \\
+\gamma = 1 + \ups \frac{\ups_T}{\Delta},
+\qquad
+e_0 = e - \ups \frac{e_T}{\ups_T},
+\qquad
+P_0 = \frac{1}{\gamma} \qty( \ups \frac{e_T}{\Delta} - P).
+\end{gathered}
+\end{equation}
+
+
+
+
   
   
 \addcontentsline{toc}{subsection}{Уравнение состояния Ми -- Грюнайзена}
@@ -530,332 +593,375 @@ T_{ref}( \xi ) = \left\{
 \section{Уравнение состояния смеси}
 
 При заданных массовых концентрациях компонент $\beta$, уравнение состояния для смеси определяется следующим образом:
-\begin{equation}\label{eq:closure}
+\begin{equation}\label{eq:pt-closure}
 \left\{
 \begin{aligned}
-&\ups = \ups^{\beta} \qty(P, \, T) = \sum_i \beta_i \ups_i \qty( P, \, T), \\
-&e = e^{\beta} \qty(P, \, T) = \sum_i \beta_i e_i \qty( P, \, T),
+&\ups \qty(P, \, T) = \sum_{i = 1}^{m} \beta_i \, \ups_i \qty( P, \, T), \\
+&e    \qty(P, \, T) = \sum_{i = 1}^{m} \beta_i \,    e_i \qty( P, \, T),
 \end{aligned}
 \right.
 \end{equation}
-здесь $\ups = 1 / \rho$ --- удельный объем, $\ups_i (P, \, T)$ и $e_i (P, \, T)$ уравнения состояния для отдельных компонент. В соответствии с уравнением \eqref{eq:closure} явным образом определяется только внутренняя энергия смеси $e \qty(P, \, T)$ и удельный объем смеси $\ups \qty(P, \, T)$, что эквивалентно заданию $\rho \qty( P, \, T)$.
+здесь $\ups = 1 / \rho$ --- удельный объем, $\ups_i (P, \, T)$ и $e_i (P, \, T)$ уравнения состояния для отдельных компонент. В соответствии с уравнением \eqref{eq:pt-closure} явным образом определяется только внутренняя энергия смеси $e \qty(P, \, T)$ и удельный объем смеси $\ups \qty(P, \, T)$, что эквивалентно заданию $\rho \qty( P, \, T)$.
 
-Численные схемы обычно требуют получение зависимостей от других переменных. Так, система уравнений гидродинамики вообще не включает температуру, поэтому исключение температуры из системы \eqref{eq:closure} является важной процедурой. Далее перечислены фукнции, необходимые для работы с большинством численных методик.
-\medskip
+Численные схемы обычно требуют получение зависимостей от других переменных. Так, система уравнений гидродинамики вообще не включает температуру, поэтому исключение температуры из системы \eqref{eq:pt-closure} является важной процедурой. 
 
-1. Определить $P$ при известных $\ups$ (или $\rho$) и $T$:
-\begin{equation}
-P^{k+1} = P^{k} + \frac{\ups - \ups^{\beta}}{\ups^{\beta}_P }.
-\end{equation}
+Система уравнений \eqref{eq:pt-closure} является нелинейной, целесообразно решать её с использованием метода Ньютона. В зависимости от того, в какой форме заданы уравнения состояния, можно использовать различные итерационные процедуры. Мы рассмотрим два варианта:
+\begin{enumerate}
+\item Заданы уравнения состояния в форме $\ups(P, \, T)$, $e(P, \, T)$;
+\item Заданы уравнения состояния в форме $P(\rho, \, T)$, $e(\rho, \, T)$.
+\end{enumerate}
 
-2. Определить $T$ при известных $\ups$ (или $\rho$) и $P$:
-\begin{equation}
-T^{k+1} = T^{k} + \frac{\ups - \ups^{\beta}}{\ups^{\beta}_T}.
-\end{equation}
+Первый вариант кажется естественным, поскольку система \eqref{eq:pt-closure} красивая/симметричная и уже записана в переменных $(P, \, T)$. Действительно, в этом случае численное решение системы выписывается довольно изящно, но имеет некоторые практические недостатки.
 
-В схемах выше используются ньютоновские итерации по первому уравнению системы \eqref{eq:closure}.
-\medskip
+Во-первых, на практике уравнения состояния редко задаются в такой форме. Сложные уравнения состояния чаще всего имеют форму разложения в ряды по плотности и температуре, аналогично строятся и табличные уравнения состояния, то есть довольно часто от переменных $(\rho, \, T)$. В этом случае, плотность выражается неявно. Поэтому кроме итераций по самой системе уравнений \eqref{eq:pt-closure} придется также выполнять итерации внутри уравнения состояния, чтобы выразить плотность $\rho(P, \, T)$.
 
-3. Найти $P$ и $T$ при известных $\rho$ и $e$:
-\begin{equation}
-\begin{aligned}
-& \Delta = \ups^{\beta}_T \, e^{\beta}_P - \ups^{\beta}_P \, e^{\beta}_T, \\
-& P^{k+1} = P^{k} + \frac{ \qty( e - e^{\beta} ) \, \ups^{\beta}_T - \qty(\ups - \ups^{\beta}  ) \, e^{\beta}_{T} }{\Delta} & \\
-& T^{k+1} = T^{k} + \frac{\qty( \ups - \ups^{\beta} ) \, e^{\beta}_P - \qty(e - e^{\beta}  ) \, \ups^{\beta}_{P} }{\Delta}. 
-\end{aligned}
-\end{equation}
-
-В данном случае используются ньютоновские итерации по обоим уравнениям системы \eqref{eq:closure}.
-\medskip
-
-В итерационных формулах выше используются следующие обозначения: $\ups^{\beta}$ и $e^{\beta}$ обозначают удельный объем и внутреннюю энергию смеси от переменных $\qty(P, \, T)$, нижним индексом обозначаются производные смесевых величин по $P$ или $T$. К примеру:
-\begin{equation*}
-    \ups^{\beta}_P = \qty(\pdv{\ups^{\beta}}{P})_{T} = 
-    \sum_{i} \beta_i \qty(\pdv{\ups^{\beta}_i}{P})_{T}, \qquad e^{\beta}_T = \qty(\pdv{e^{\beta}}{T})_{P} = 
-    \sum_{i} \beta_i \qty(\pdv{e^{\beta}_i}{T})_{P}.
-\end{equation*}
-\medskip
-
-Кроме того, могут потребоваться производные:
-\begin{equation}
-    \qty(\pdv{p}{e})_{\ups} = \frac{\ups^{\beta}_T}{\Delta}, \qquad
-    \qty(\pdv{p}{\ups})_{e} = -\frac{e^{\beta}_T}{\Delta}.
-\end{equation}
-
-Формулы получаются после дифференцирования \eqref{eq:closure}. Производные в переменных $\qty( \rho, \, e)$:
-\begin{equation}
-    \qty(\pdv{p}{e})_{\rho} = \qty(\pdv{p}{e})_{\ups} =  \frac{\ups^{\beta}_T}{\Delta}, \qquad
-    \qty(\pdv{p}{\rho})_{e} = -\ups^2 \qty(\pdv{p}{\ups})_{e} = \ups^2 \frac{e^{\beta}_T}{\Delta}.
-\end{equation}
-
-Выражение для скорости звука:
-\begin{equation}\label{eq:pt_sound}
-    c^2 = \ups^2 \qty( p \qty(\pdv{p}{e})_{\ups} - \qty(\pdv{p}{\ups})_{e} ) =
-    \ups^2 \, \frac{ e^{\beta}_{T} + p \ups^{\beta}_T }{\Delta}.
-\end{equation}
-
-Константы двучленного уравнения состояния:
-\begin{equation}
-    P\qty(\rho, e) = \qty(\gamma - 1) \rho \qty(e - e_0) - \gamma P_0.
-\end{equation}
-\begin{equation}
-    \gamma = 1 + \ups \frac{\ups^{\beta}_T}{\Delta},
-    \qquad
-    e_0 = e - \ups \frac{e^{\beta}_T}{\ups^{\beta}_T},
-    \qquad
-    P_0 = \frac{1}{\gamma} \qty( \ups \frac{e^{\beta}_T}{\Delta} - P).
-\end{equation}
-
-Константы аппроксимации можно получить, если приравнять значения давления и первых производных при заданом состоянии $(\rho, \, e, \, P)$. Скорость звука определяется по первым производным, поэтому скорость звука, полученная по формуле \eqref{eq:pt_sound} будет сопадать со скоростью звука для двучленной аппроксимации (легко проверяется).
+Во-вторых, при итерациях по системе \eqref{eq:pt-closure} требуется следить за тем, чтобы давление оставалось в физических границах. Для этого необходимо ввести дополнительную функцию $P_{\min}(T)$, которая выдает давление, при котором плотность вещества обращается в ноль. Для жидкостей $P_{\min}$ может быть меньше нуля (разреженное состояния), для идеального газа $P_{\min} = 0$. В смеси выбирается максимальное $P_{\min}$ из возможных, то есть в смеси с идеальным газом давление обязательно больше нуля.
 
 \subsection{Схема 1.}
 
-При заданых массовых концентрациях компонент $\beta$, уравнение состояния для смеси определяется следующим образом:
-\begin{equation}\label{eq:closure}
-\left\{
-\begin{aligned}
-&\ups = \ups^{\beta} \qty(P, \, T) = \sum_i \beta_i \ups_i \qty( P, \, T), \\
-&e = e^{\beta} \qty(P, \, T) = \sum_i \beta_i e_i \qty( P, \, T),
-\end{aligned}
-\right.
-\end{equation}
-здесь $\ups = 1 / \rho$ --- удельный объем, $\ups_i (P, \, T)$ и $e_i (P, \, T)$ уравнения состояния для отдельных компонент. В соответствии с уравнением \eqref{eq:closure} явным образом определяется только внутренняя энергия смеси $e \qty(P, \, T)$ и удельный объем смеси $\ups \qty(P, \, T)$, что эквивалентно заданию $\rho \qty( P, \, T)$.
+Введем обозначения, пусть $\ups^{\beta}$ и $e^{\beta}$ --- удельный объем и внутренняя энергия смеси как функции от переменных $P$ и $T$:
+\begin{equation*}
+\ups^{\beta} (P, \, T) = \sum_{i} \beta_i \ups_i \qty(P, \, T), \qquad 
+   e^{\beta} (P, \, T) = \sum_{i} \beta_i    e_i \qty(P, \, T).
+\end{equation*}
+Нижним индексом обозначим производные смесевых величин по $P$ или $T$. К примеру:
+\begin{equation*}
+    \ups^{\beta}_P = \qty(\pdv{\ups^{\beta}}{P})_{T} = 
+    \sum_{i} \beta_i \qty(\pdv{\ups_i}{P})_{T}, \qquad e^{\beta}_T = \qty(\pdv{e^{\beta}}{T})_{P} = 
+    \sum_{i} \beta_i \qty(\pdv{e_i}{T})_{P}.
+\end{equation*}
 
-Численные схемы обычно требуют получение зависимостей от других переменных. Так, система уравнений гидродинамики вообще не включает температуру, поэтому исключение температуры из системы \eqref{eq:closure} является важной процедурой. Далее перечислены фукнции, необходимые для работы с большинством численных методик.
+\subsubsection{Алгоритм $\; (\rho, \, T, \, \beta) \to \qty( \rho_i, \, P) \; $ и $\; e(\rho, \, T, \, \beta)$.}
+
+Определить равновесное давление $P$ и истинные плотности компонент $\rho_i$. Известна плотность смеси $\rho$ (удельный объем $\ups$), температура $T$ и массовые концентрации $\beta$ компонент смеси. Ньютоновские итерации проводятся по первому уравнению системы \eqref{eq:pt-closure}. Заданы начальные приближения $\rho_i^{(0)}$ и $P^{(0)}$.
+\begin{equation}
+P^{(k+1)} = P^{(k)} + \frac{\ups - \ups^{\beta}}{\ups^{\beta}_P },
+\qquad\quad
+\ups^{\beta} = \ups^{\beta} \qty( P^{(k)}, \, T ), \quad
+\ups^{\beta}_{P} = \ups^{\beta}_P \qty( P^{(k)}, \, T ).
+\end{equation}
+На каждой итерации параллельно вычисляются истинные плотности $\rho^{(k)}_i = 1 / \ups^{(k)}_i$. Итерации завершаются при достижении требуемой точности $\varepsilon$ по относительному изменению истинных плотностей:
+\begin{equation}\label{eq:stop-iters}
+\max_{i = 1, \, m} \left| \frac{\rho_i^{(k + 1)} - \rho_i^{(k)}}{\rho_i^{(k + 1)}} \right| = \max_{i = 1, \, m} \left| 1 - \frac{\rho_i^{(k)}}{\rho_i^{(k + 1)}} \right| < \varepsilon.
+\end{equation}
+Такое условие кажется довольно удачным, поскольку $\rho_i > 0$. По этой причине оценка относительной погрешности довольно адекватна.
+
+При необходимости вычислить производные:
+\begin{equation*}
+\qty(\pdv{P}{\rho})_{T} = - \frac{\qty(\ups^{\beta})^2}{\ups^{\beta}_P},
+\qquad\quad
+\qty(\pdv{P}{T})_{\rho} = - \frac{\ups^{\beta}_T}{\ups^{\beta}_{P}},
+\end{equation*}
+используются величины $\ups^{\beta}$, $\ups^{\beta}_{P}$ и $\ups^{\beta}_{T}$, вычисленные на последней итерации.
 \medskip
 
-1. Определить $P$ при известных $\ups$ (или $\rho$) и $T$:
+Вычисление функции $e(\rho, \, T)$ возможно только после определения давления $P$. То есть, если значение энергии смеси необходимо, то оптимально вычислять его здесь же. Пусть в результате итераций мы получили давление и производные: 
+$\displaystyle \; P, \; \qty( \pdv{P}{\rho} )_{T}, \; \qty( \pdv{P}{T} )_{\rho}$. Тогда внутреннюю энергию смеси $e$ и производные можно посчитать по формулам:
+\begin{equation*}
+e = e^{\beta} \qty(P, \, T), 
+\qquad
+\qty(\pdv{e}{\rho})_{T} = e^{\beta}_{P} \cdot \qty( \pdv{P}{\rho} )_{T}, \qquad
+\qty(\pdv{e}{T})_{\rho} = e^{\beta}_{P} \cdot \qty( \pdv{P}{T} )_{\rho} + e^{\beta}_{T}.
+\end{equation*}
+
+\subsubsection{Алгоритм $\; (\rho, \, P, \, \beta) \to \qty( \rho_i, \, T) \;$ и $\; e(\rho, \, P, \, \beta)$.}
+
+Определить равновесную температуру $T$ и истинные плотности компонент $\rho_i$. Известна плотность смеси $\rho$ (удельный объем $\ups$), давление $P$ и массовые концентрации $\beta$ компонент смеси. Постановка задачи симметрична аналогичной для давления. Итерации проводятся по первому уравнению системы \eqref{eq:pt-closure}. Заданы начальные приближения $\rho_i^{(0)}$ и $T^{(0)}$.
 \begin{equation}
-P^{k+1} = P^{k} + \frac{\ups - \ups^{\beta}}{\ups^{\beta}_P }.
+T^{(k+1)} = T^{(k)} + \frac{\ups - \ups^{\beta}}{\ups^{\beta}_T},
+\qquad\quad
+\ups^{\beta} = \ups^{\beta} \qty( P, \, T^{(k)} ), \quad
+\ups^{\beta}_{T} = \ups^{\beta}_T \qty( P, \, T^{(k)} ).
 \end{equation}
 
-2. Определить $T$ при известных $\ups$ (или $\rho$) и $P$:
-\begin{equation}
-T^{k+1} = T^{k} + \frac{\ups - \ups^{\beta}}{\ups^{\beta}_T}.
-\end{equation}
-
-В схемах выше используются ньютоновские итерации по первому уравнению системы \eqref{eq:closure}.
+Условия завершения как и ранее~\eqref{eq:stop-iters}. Формулы для производных:
+\begin{equation*}
+\qty( \pdv{T}{\rho} )_{P} = - \frac{\qty(\ups^{\beta})^2}{\ups^{\beta}_{T}},
+\qquad
+\qty( \pdv{T}{P} )_{\rho} = - \frac{\ups^{\beta}_{P}}{\ups^{\beta}_{T}},
+\end{equation*}
+используются значения $\ups^{\beta}$, $\ups^{\beta}_{P}$ и $\ups^{\beta}_{T}$, вычисленные на последней итерации. 
 \medskip
 
-3. Найти $P$ и $T$ при известных $\rho$ и $e$:
+Вычисление функции $e(\rho, \, P)$ возможно только после определения температуры. То есть, если значение энергии смеси необходимо, то оптимально вычислять его здесь же. Пусть в результате итераций мы получили температуру и производные: 
+$\displaystyle \; T, \; \qty( \pdv{T}{\rho} )_{P}, \; \qty( \pdv{T}{P} )_{\rho}$. Тогда внутреннюю энергию смеси $e$ и производные можно посчитать по формулам:
+\begin{equation*}
+e = e^{\beta} \qty(P, \, T), 
+\qquad
+\qty(\pdv{e}{\rho})_{P} = e^{\beta}_{T} \cdot \qty( \pdv{T}{\rho} )_{P}, \qquad
+\qty(\pdv{e}{P})_{\rho} = e^{\beta}_{T} \cdot \qty( \pdv{T}{P} )_{\rho} + e^{\beta}_{P}.
+\end{equation*}
+
+\subsubsection{Алгоритм $\;\; (\rho, \, e, \, \beta) \to \qty( \rho_i, \, P, \, T)$.}
+
+Определить равновесное давление $P$ и температуру $T$ смеси, а также истинные плотности компонент $\rho_i$. Известна плотность смеси $\rho$ (удельный объем $\ups$), внутренняя энергия смеси $e$ и массовые концентрации $\beta$ компонент смеси. 
+
+В данном случае требуется выполнять ньютоновские итерации по обоим уравнениям системы \eqref{eq:pt-closure}. Заданы начальные приближения $\rho_i^{(0)}$, $P^{(0)}$ и $T^{(0)}$.
 \begin{equation}
 \begin{aligned}
 & \Delta = \ups^{\beta}_T \, e^{\beta}_P - \ups^{\beta}_P \, e^{\beta}_T, \\
-& P^{k+1} = P^{k} + \frac{ \qty( e - e^{\beta} ) \, \ups^{\beta}_T - \qty(\ups - \ups^{\beta}  ) \, e^{\beta}_{T} }{\Delta} & \\
-& T^{k+1} = T^{k} + \frac{\qty( \ups - \ups^{\beta} ) \, e^{\beta}_P - \qty(e - e^{\beta}  ) \, \ups^{\beta}_{P} }{\Delta}. 
+& P^{(k+1)} = P^{(k)} + \frac{ \qty( e - e^{\beta} ) \, \ups^{\beta}_T - \qty(\ups - \ups^{\beta}  ) \, e^{\beta}_{T} }{\Delta} & \\
+& T^{(k+1)} = T^{(k)} + \frac{\qty( \ups - \ups^{\beta} ) \, e^{\beta}_P - \qty(e - e^{\beta}  ) \, \ups^{\beta}_{P} }{\Delta}. 
 \end{aligned}
 \end{equation}
 
-В данном случае используются ньютоновские итерации по обоим уравнениям системы \eqref{eq:closure}.
-\medskip
-
-В итерационных формулах выше используются следующие обозначения: $\ups^{\beta}$ и $e^{\beta}$ обозначают удельный объем и внутреннюю энергию смеси от переменных $\qty(P, \, T)$, нижним индексом обозначаются производные смесевых величин по $P$ или $T$. К примеру:
+Условия завершения как и ранее~\eqref{eq:stop-iters}. Производные в переменных $\qty( \rho, \, e)$:
 \begin{equation*}
-    \ups^{\beta}_P = \qty(\pdv{\ups^{\beta}}{P})_{T} = 
-    \sum_{i} \beta_i \qty(\pdv{\ups^{\beta}_i}{P})_{T}, \qquad e^{\beta}_T = \qty(\pdv{e^{\beta}}{T})_{P} = 
-    \sum_{i} \beta_i \qty(\pdv{e^{\beta}_i}{T})_{P}.
+    \qty(\pdv{P}{e})_{\rho} = \qty(\pdv{P}{e})_{\ups} =  \frac{\ups^{\beta}_T}{\Delta}, \qquad
+    \qty(\pdv{P}{\rho})_{e} = -\ups^2 \qty(\pdv{P}{\ups})_{e} = \ups^2 \, \frac{e^{\beta}_T}{\Delta}.
 \end{equation*}
-\medskip
-
-Кроме того, могут потребоваться производные:
-\begin{equation}
-    \qty(\pdv{p}{e})_{\ups} = \frac{\ups^{\beta}_T}{\Delta}, \qquad
-    \qty(\pdv{p}{\ups})_{e} = -\frac{e^{\beta}_T}{\Delta}.
-\end{equation}
-
-Формулы получаются после дифференцирования \eqref{eq:closure}. Производные в переменных $\qty( \rho, \, e)$:
-\begin{equation}
-    \qty(\pdv{p}{e})_{\rho} = \qty(\pdv{p}{e})_{\ups} =  \frac{\ups^{\beta}_T}{\Delta}, \qquad
-    \qty(\pdv{p}{\rho})_{e} = -\ups^2 \qty(\pdv{p}{\ups})_{e} = \ups^2 \frac{e^{\beta}_T}{\Delta}.
-\end{equation}
-
-Выражение для скорости звука:
-\begin{equation}\label{eq:pt_sound}
-    c^2 = \ups^2 \qty( p \qty(\pdv{p}{e})_{\ups} - \qty(\pdv{p}{\ups})_{e} ) =
-    \ups^2 \, \frac{ e^{\beta}_{T} + p \ups^{\beta}_T }{\Delta}.
-\end{equation}
-
-Константы двучленного уравнения состояния:
-\begin{equation}
-    P\qty(\rho, e) = \qty(\gamma - 1) \rho \qty(e - e_0) - \gamma P_0.
-\end{equation}
-\begin{equation}
-    \gamma = 1 + \ups \frac{\ups^{\beta}_T}{\Delta},
-    \qquad
-    e_0 = e - \ups \frac{e^{\beta}_T}{\ups^{\beta}_T},
-    \qquad
-    P_0 = \frac{1}{\gamma} \qty( \ups \frac{e^{\beta}_T}{\Delta} - P).
-\end{equation}
-
-Константы аппроксимации можно получить, если приравнять значения давления и первых производных при заданом состоянии $(\rho, \, e, \, P)$. Скорость звука определяется по первым производным, поэтому скорость звука, полученная по формуле \eqref{eq:pt_sound} будет сопадать со скоростью звука для двучленной аппроксимации (легко проверяется).
 
 
 \subsection{Схема 2.}
 
-
-\subsubsection*{Начальное приближение}
-
-Если нет начального предположения. Если появилось вещество.
-
-\begin{equation}
-\alpha^{0}_i = \frac{\beta_i \ups_i^{0}}{\sum_i \beta_i \ups^{0}_i}.
-\end{equation}
-
-
-\subsubsection*{Алгоритм $P(\rho, \, T)$}
-
-Пусть известна равновесная температура $T$, плотность смеси $\rho$, а также массовые концентрации компонент $\beta_i$. Требуется определить объемные доли компонент $\alpha_i$ и найти равновесное давление $P$. Решается следующая система уравнений:
-\begin{equation}
-\forall i, j \quad 
-P^{i} \qty( \rho_i, \, T ) = P^{j} \qty( \rho_j, \, T), 
+В рамках данного раздела считаем, что задана пара уравнений состояния в форме $P_i(\rho, \, T)$ и $e_i(\rho, \, T)$, поэтому далее используем сокращения
+\begin{equation*}
+P_{\rho, i} = \qty(\pdv{P_i}{\rho})_{T},
 \qquad
-\sum_{i} \alpha_i = 1,
-\end{equation}
-где $\rho_i = \beta_i \rho / \alpha_i$. Это система на $\alpha_i$, давления здесь вообще нет. Число независимых уравнений равно $m$ --- числу компонент. Если система уравнений имеет единственное решение, тогда каждое уравнение состояния $P^i(\rho_i, \, T)$ в результате выдаст одинаковое давление. Поскольку $\beta_i$ и $\rho$ известны, можно считать, что заданы функции $P^{i} \qty(\alpha_i, \, T) = P^{i}(\beta_i \rho / \alpha_i, \, T)$. Так систему и перепишем:
-\begin{equation}
-\forall i, j \quad 
-P^{i} \qty( \tfrac{\beta_i \rho}{\alpha_i}, \, T ) = P^{k} \qty( \tfrac{\beta_k \rho}{\alpha_k}, \, T), 
+P_{T, i} = \qty(\pdv{P_i}{T})_{\rho},
 \qquad
-\sum_{i} \alpha_i = 1,
-\end{equation}
-теперь отчетливо видно, что это система из $m$ уравнений на параметры $\alpha_i$. Будем решать систему методом Ньютона. Введем обозначения для частных производных:
-\begin{equation}
-P^{i}_{\alpha} = \pdv{P^{i}}{\alpha_i} = - \frac{\rho_i}{\alpha_i} \qty(\pdv{P^{i}}{\rho})_{T} = -\frac{\rho_i}{\alpha_i} P^{i}_{\rho}.
-\end{equation}
+e_{\rho, i} = \qty(\pdv{e_i}{\rho})_{T},
+\qquad
+e_{T, i} = \qty(\pdv{e_i}{T})_{\rho},
+\end{equation*}
+предполагая, что производная по плотности $\rho$ берется при постоянной температуре $T$, а производная по температуре $T$ при постоянной плотности $\rho$. 
 
-Записываем метод Ньютона $\alpha_i \to \alpha_i + \Delta \alpha_i$. Пусть у нас имеется начальное приближение $\alpha^{0}_i$ такое, что уравнение $\sum_i \alpha^{0}_{i} = 1$ выполнено, тогда приращения на итерациях $\Delta \alpha_i$ должны удовлетворять условию $\sum_i \Delta \alpha_i = 0$. Другие уравнения:
-\begin{equation}
-P^{i} + P^{i}_{\alpha} \Delta \alpha_i = P^{j} + P^{j}_{\alpha} \Delta \alpha_j.
-\end{equation}
-Выразим отсюда $\Delta \alpha_i$, введем обозначение $\xi_i = - 1 / P^{i}_{\alpha}$:
-\begin{equation}
-\Delta \alpha_i = \xi_i \qty[P^{i} - \qty(P^{j} + P^{j}_{\alpha} \Delta \alpha_j ) ].
-\end{equation}
-Если посчитать сумму по $i$, то слева получится ноль, следовательно:
-\begin{equation}
-\sum_i \xi_i P^{i} - \sum_i \xi_i \cdot \qty[ P^{j} + P^{j}_{\alpha} \Delta \alpha_j] = 0,
-\end{equation}
-Введем обозначения $A_{\xi} = \sum_i \xi_i$, $B_{\xi} = \sum_i \xi_i P^{i}$, получится расчетная схема:
-\begin{equation}
-\Delta \alpha_i = \xi_i \cdot \qty( P^{i} \qty(\rho_i, \, T) - \frac{B_{\xi}}{A_{\xi}} ).
-\end{equation}
-Можно убедиться, что $\sum_i \Delta \alpha_i = 0$. 
+Введем также обозначения $\hat{\ups}^{\beta}$ и $\hat{e}^{\beta}$ --- это удельный объем и внутренняя энергия смеси, которые рассматриваются как функции $(\rho, \, T)$:
+\begin{equation*}
+\hat{\ups}^{\beta} = \sum_i \beta_i \ups_i \qty(\rho_i, \, T),
+\qquad
+\hat{e}^{\beta} = \sum_i \beta_i e_{i} \qty(\rho_i, \, T), 
+\qquad
+\hat{e}^{\beta}_T = \sum_i \beta_i e_{T, i} \qty(\rho_i, \, T).
+\end{equation*}
 
-Подробная схема вычисления. На $k$-ой итерации имеются значения $\alpha^{k}_{i}$, при этом выполнено условие $\sum_i \alpha^{k}_{i} = 1$.
-\begin{equation}
-\rho_i = \frac{\beta_i \rho}{\alpha^{k}_i},
-\quad
-\xi_i = \frac{\alpha_i}{\rho_i P_{\rho}^{i} \qty( \rho_i, \, T)},
-\quad
+\subsubsection{Алгоритм $\;\; (\rho, \, T, \, \beta) \to \qty( \rho_i, \, P)$.}
+
+Определить равновесное давление $P$ и истинные плотности компонент $\rho_i$. Известна плотность смеси $\rho$, температура $T$ и массовые концентрации $\beta$ компонент смеси. Решается следующая система уравнений:
+\begin{equation*}
+\sum_{i} \beta_i \ups_i = \ups,
+\qquad
+\forall i, j \quad 
+f \qty( P_{i} \qty( \ups_i, \, T ) ) = f \qty( P_{j} \qty( \ups_j, \, T) ),
+\quad f(P) \neq 0, \quad f'(P) \neq 0,
+\end{equation*}
+здесь $f(P)$ --- некоторая монотонная функция. Эта система на удельные объемы $\ups_i$ (плотности $\rho_i$), давление в системе присутствует только в виде функциональных зависимостей $P_i(\ups_i, \, T)$ --- уравнение состояния для $i$-ой компоненты. Число независимых уравнений равно $m$ --- числу компонент. Если система уравнений имеет единственное решение, тогда каждое уравнение состояния $P_i(\ups_i, \, T)$ в результате выдаст одинаковое давление.
+
+Для простоты можно использовать тождественную функцию $f(P) = P$. Хороший выбор функции $f(P)$ может ускорить сходимость. При подстановке $f(P) = P^{-1}$ для смеси идеальных газов мы получим систему линейных уравнений на $\ups_i$, которая методом Ньютона решается за одну итерацию. Были попытки с $f(P) = \frac{1}{P - P_{\min}}$, но работает не стабильно.
+\medskip
+
+Пусть заданы начальные приближения $\rho_i^{(0)}$ или $\ups_i^{(0)}$. Будем решать систему методом Ньютона. Получаем линейную систему на приращения $\Delta \ups_i$:
+\begin{equation*}
+\hat{\ups}^{\beta} + \sum_i \beta_i \Delta \ups_i = \ups, \qquad
+\hat{\ups}^{\beta} = \sum_i \beta_i \ups_i,
+\end{equation*}
+\begin{equation*}
+\forall i, j \quad
+f(P_i) - \rho_i^2 f'(P_i) P_{\rho, i} \, \Delta \ups_i
+=
+f(P_j) - \rho_j^2 f'(P_j) P_{\rho, j} \, \Delta \ups_j,
+\qquad
+\end{equation*}
+
+\textbf{Схема.} Вычисляем вспомогательные величины $A_{\xi}$, $B_{\xi}$, $C_{\xi}$, величины $P_i$, $P_{\rho, i}$, $P_{T, i}$ берутся от значений $(\rho^{(k)}_i, \, T)$ на текущей итерации:
+\begin{equation*}
+\xi_i = \frac{\beta_i}{\rho_i^2 f'(P_i) P_{\rho, i}},
+\qquad
 A_{\xi} = \sum_i \xi_i,
 \quad
-B_{\xi} = \sum_i \xi_i P^{i}  \qty( \rho_i, \, T).
-\end{equation}
-\begin{equation}
-\Delta \alpha_i = \xi_i \cdot \qty( P^{i} \qty(\rho_i, \, T) - \frac{B_{\xi}}{A_{\xi}} ).
-\end{equation}
-Затем мы $\Delta \alpha_i$ умножаем на некоторую константу $\chi$, такую, чтобы $\forall i \quad 0 < \alpha^{k}_i + \Delta \alpha_i < 1$. Подробнее расписать? После этого давление считается как среднее для всех компонент, при этом каждая компонента по факту одно и то же должна давать.
+B_{\xi} = \sum_i \xi_i f(P_{i}), 
+\quad
+C_{\xi} = \sum_i \xi_i f'(P_{i}) P_{T, i}.
+\end{equation*}
+Неограниченные приращения: 
+\begin{equation*}
+\Delta \tilde{\ups}_i = \frac{1}{\rho_i^2 f'(P_i) P_{\rho, i}} \cdot \qty( f(P_{i}) - \frac{B_{\xi}}{A_{\xi}} + \frac{\ups - \hat{\ups}^{\beta}}{A_{\xi}}).
+\end{equation*}
+Находим максимально возможную константу $\chi < 1: \;\; \ups_i^{(k)} + \chi \Delta \tilde{\ups}_i > 0$. Ограничиваем приращения и считаем новые плотности:
+\begin{equation*}
+\Delta \ups^{(k)}_i = \chi \cdot \Delta \tilde{\ups}_i,
+\qquad
+\rho^{(k + 1)}_i = \frac{\rho^{(k)}_i}{1 + \rho^{(k)}_i \Delta \ups^{(k)}_i}.
+\end{equation*}
+Условие завершения итераций \eqref{eq:stop-iters} запишем в новой форме:
+\begin{equation*}\label{eq:stop-iters-2}
+\max\qty( \left| 1 - \rho \hat{\ups}^{\beta} \right|, \, 
+\max_i \left| \rho_i^{(k)} \Delta \ups^{(k)}_i \right| ) < \varepsilon.
+\end{equation*}
+После достижения заданной погрешности: 
+\begin{equation*}
+P(\rho, \, T) = f^{-1} \qty( \frac{B_{\xi}}{A_{\xi}} ),
+\qquad
+\qty(\pdv{P}{\rho})_{T} = \frac{1}{\rho^2 f'(P) A_{\xi}}, 
+\qquad
+\qty(\pdv{P}{T})_{\rho} = \frac{C_{\xi}}{f'(P) A_{\xi}}.
+\end{equation*}
+\medskip
 
-\subsubsection*{Алгоритм $P(\rho, \, e)$ и $T(\rho, \, e)$}
+Вычисление функции $e(\rho, \, T)$ возможно только после определения давления $P$. То есть, если значение энергии смеси необходимо, то оптимально вычислять его здесь же. Пусть в результате итераций мы получили давление и производные: 
+$\displaystyle \; P, \; \qty( \pdv{P}{\rho} )_{T}, \; \qty( \pdv{P}{T} )_{\rho}$. Напомню, что у нас заданы уравнения состояния компонент в виде пары $e_i(\rho_i, \, T)$ и $P_i(\rho_i, \, T)$. Тогда внутреннюю энергию смеси $e$ и производные можно посчитать по формулам:
+\begin{equation*}
+e = \sum_i \beta_i e_i \qty(\rho_i, \, P), 
+\quad
+\qty(\pdv{e}{P})_{T} = \sum_i \beta_i  \frac{e_{\rho, i}}{P_{\rho, i}},
+\quad
+\qty(\pdv{e}{T})_{P} = \sum_i \beta_i 
+\qty[
+e_{T, i} - 
+\frac{e_{\rho, i} P_{T, i}}{P_{\rho, i}}
+].
+\end{equation*}
+Искомые производные в переменных $(\rho, \, T)$:
+\begin{equation*}
+\qty(\pdv{e}{\rho})_{T} = \qty( \pdv{e}{P} )_{T} \qty( \pdv{P}{\rho} )_{T},
+\qquad
+\qty(\pdv{e}{T})_{\rho} = \qty( \pdv{e}{P} )_{T}\qty( \pdv{P}{T} )_{\rho} + \qty( \pdv{e}{T} )_{P}.
+\end{equation*}
 
-Пусть известны массовые концентрации компонент $\beta_i$, плотность смеси $\rho$ и внутренняя энергия смеси $e$. Требуется определить объемные доли компонент $\alpha_i$ и найти равновесные температуру $T$ и давление $P$. Будем решать следующую систему уравнений:
-\begin{equation}
+\subsubsection{Алгоритм $\; (\rho, \, P, \, \beta) \to \qty( \rho_i, \, T) \;$ и $\; e(\rho, \, P, \, \beta)$.}
+
+Определить равновесную температуру $T$ и истинные плотности компонент $\rho_i$. Известна плотность смеси $\rho$ (удельный объем $\ups$), давление $P$ и массовые концентрации $\beta$ компонент смеси. Решается система $m + 1$ уравнение:
+\begin{equation*}
+\forall i \quad P_i(\rho_i, \, T) = P, \qquad \sum_i \beta_i \ups_i = \ups.
+\end{equation*}
+
+\textbf{Схема.} Вычисляем вспомогательные величины $A_{\xi}$, $B_{\xi}$, $C_{\xi}$, величины $P_i$, $P_{\rho, i}$, $P_{T, i}$ берутся от значений $(\rho^{(k)}_i, \, T)$ на текущей итерации:
+\begin{equation*}
+\xi_i = \frac{\beta_i}{\rho_i^2 P_{\rho, i}},
+\qquad
+A_{\xi} = \sum_i \xi_i,
+\quad
+B_{\xi} = \sum_i \xi_i P_{i}, 
+\quad
+C_{\xi} = \sum_i \xi_i P_{T, i}.
+\end{equation*}
+Неограниченные приращения: 
+\begin{equation*}
+\Delta \tilde{T} = \frac{\ups - \hat{\ups}^{\beta} + A_{\xi} P - B_{\xi}}{C_{\xi}}, 
+\qquad
+\Delta \tilde{\ups}_i = \frac{1}{\rho_i^2 P_{\rho, i}} \cdot \qty( P_i - P + P_{T, i} \,  \tilde{\Delta} T), 
+\end{equation*}
+Находим максимально возможную константу $\chi < 1$ такую, что
+\begin{equation*}
+\ups_i^{(k)} + \chi \Delta \tilde{\ups}_i > 0,
+\qquad
+T^{(k)} + \chi \Delta \tilde{T} \in \left( 0, \, 2  T^{(k)} \right]
+\end{equation*}
+Ограничиваем приращения и считаем новые плотности:
+\begin{equation*}
+\Delta T^{(k)} = \chi \cdot \tilde{\Delta} T,
+\qquad
+\Delta \ups^{(k)}_i = \chi \cdot \tilde{\Delta} \ups_i,
+\qquad
+\rho^{(k + 1)}_i = \frac{\rho^{(k)}_i}{1 + \rho^{(k)}_i \Delta \ups^{(k)}_i}.
+\end{equation*}
+Условие завершения итераций:
+\begin{equation*}\label{eq:stop-iters-3}
+\max\qty( \left| 1 - \rho \hat{\ups}^{\beta} \right|, \, 
+\max_i \left| \rho_i^{(k)} \Delta \ups^{(k)}_i \right| ) < \varepsilon,
+\qquad
+\Delta T < \varepsilon_{T} \cdot T.
+\end{equation*}
+Производные в искомых переменных $(\rho, \, P)$:
+\begin{equation*}
+\qty(\pdv{T}{P})_{\rho} = \frac{A_{\xi}}{C_{\xi}},
+\qquad
+\qty(\pdv{T}{\rho})_{P} = - \frac{1}{\rho^2 C_{\xi}}.
+\end{equation*}
+\medskip
+
+Вычисление функции $e(\rho, \, P)$ возможно только после определения температуры. То есть, если значение энергии смеси необходимо, то оптимально вычислять его здесь же. Пусть в результате итераций мы получили температуру и производные: 
+$\displaystyle \; T, \; \qty( \pdv{T}{\rho} )_{P}, \; \qty( \pdv{T}{P} )_{\rho}$. Тогда внутреннюю энергию смеси $e$ и производные можно посчитать по формулам:
+\begin{equation*}
+e = \sum_i \beta_i e_i \qty(\rho_i, \, P), 
+\quad
+\qty(\pdv{e}{P})_{T} = \sum_i \beta_i  \frac{e_{\rho, i}}{P_{\rho, i}},
+\quad
+\qty(\pdv{e}{T})_{P} = \sum_i \beta_i 
+\qty[
+e_{T, i} - 
+\frac{e_{\rho, i} P_{T, i}}{P_{\rho, i}}
+].
+\end{equation*}
+Производные в искомых переменных $(\rho, \, P)$:
+\begin{equation*}
+\qty(\pdv{e}{\rho})_{P} = \qty(\pdv{e}{T})_P \qty( \pdv{T}{\rho} )_{P}, \qquad
+\qty(\pdv{e}{P})_{\rho} = \qty(\pdv{e}{T})_P \qty( \pdv{T}{P} )_{\rho} + \qty(\pdv{e}{P})_T.
+\end{equation*}
+
+
+
+\subsubsection*{Алгоритм $\;\; (\rho, \, e, \, \beta) \to \qty( \rho_i, \, P, \, T)$.}
+
+Пусть известны массовые концентрации компонент $\beta_i$, плотность смеси $\rho$ и внутренняя энергия смеси $e$. Требуется определить плотности компонент $\rho_i$, найти равновесные температуру $T$ и давление $P$. Будем решать следующую систему уравнений:
+\begin{equation*}
 \forall i, j \quad 
-P^{i} \qty( \rho_i, \, T ) = P^{j} \qty( \rho_j, \, T), 
+P_{i} \qty( \ups_i, \, T ) = P_{j} \qty( \ups_j, \, T), 
 \qquad
-\sum_{i} \alpha_i = 1,
+\sum_{i} \beta_i \ups_i = \ups,
 \qquad
-\sum_{i} \beta_i e^{i} \qty( \rho_i, \, T) = e.
-\end{equation}
-где $\rho_i = \beta_i \rho / \alpha_i$. Это система на $\alpha_i$ и $T$, давления здесь вообще нет. Число независимых уравнений равно $m + 1$. Если система уравнений имеет единственное решение, тогда каждое уравнение состояния $P^i(\rho_i, \, T)$ в результате выдаст одинаковое давление. Поскольку $\beta_i$ и $\rho$ известны, можно считать, что заданы функции 
-$$P^{i} \qty(\alpha_i, \, T) = P^{i}(\beta_i \rho / \alpha_i, \, T),
-\qquad
-e^{i} \qty(\alpha_i, \, T) = e^{i}(\beta_i \rho / \alpha_i, \, T).$$
+\sum_{i} \beta_i e_{i} \qty( \rho_i, \, T) = e.
+\end{equation*}
+Это система из $m + 1$ независимых уравнений: на плотности $\rho_i$ и температуру $T$, давления здесь присутствуют только в виде некоторых функций $P_i(\rho_i, \, T)$. Если система уравнений имеет единственное решение, тогда каждое уравнение состояния $P_i(\rho_i, \, T)$ в результате выдаст одинаковое давление.
 
-Помимо начального приближения $\alpha^{0}$ добавляется $T^{0}$. Последние два уравнения с суммами распишем по Ньютону:
-\begin{equation}
+Пусть заданы начальные приближения $\rho_i^{(0)}$ и $T^{(0)}$. Распишем метод Ньютона, уравнения на приращения $\Delta \ups_i$ и $\Delta T$:
+\begin{equation*}
+\hat{\ups}^{\beta} + \sum_i \beta_i \Delta \ups_i = \ups, 
+\quad
+\hat{e}^{\beta} - \sum_i \beta_i \rho_{i}^2 e_{\rho, i} \Delta \ups_i + \hat{e}^{\beta}_{T} = e,
+\end{equation*}
+\begin{equation*}
+P_{i} - \rho^2_{i} P_{\rho, i} \Delta \ups_i + P_{T, i} \Delta T = P_{j} - \rho^{2}_i P_{\rho, j} \Delta \ups_j + P_{T, j} \Delta T,
+\end{equation*}
+здесь $\hat{\ups}^{\beta}$ и $\hat{e}^{\beta}$ --- удельный объем и внутренняя энергия смеси, которые рассматриваются как функции $(\rho, \, T)$:
+\begin{equation*}
+\hat{\ups}^{\beta} = \sum_i \beta_i \ups_i \qty(\rho_i, \, T),
+\qquad
+\hat{e}^{\beta} = \sum_i \beta_i e_{i} \qty(\rho_i, \, T), 
+\qquad
+\hat{e}^{\beta}_T = \sum_i \beta_i e_{T, i} \qty(\rho_i, \, T).
+\end{equation*}
+
+\textbf{Схема.} Вычисляем вспомогательные величины $A_{\xi}$, $B_{\xi}$, $C_{\xi}$, $A_{\eta}$, $B_{\eta}$, $C_{\eta}$. Величины $P_i$, $P_{\rho, i}$, $P_{T, i}$, $e_{\rho, i}$ берутся от значений $(\rho^{(k)}_i, \, T)$ на текущей итерации:
+\begin{equation*}
 \begin{aligned}
-&\sum_i \Delta \alpha_i = 0, \\
-&\sum_i \beta_i e^{i}_{\alpha} \Delta \alpha_i = e - e^{\beta} - e^{\beta}_{T} \Delta T,
+&\xi_i = \frac{\beta_i}{\rho_i^2 P_{\rho, i}}, \qquad
+A_{\xi} = \sum_i \xi_i , \quad
+B_{\xi} = \sum_i \xi_i P_{i}, \quad
+C_{\xi} = \sum_i \xi_i P_{T, i}, \\
+&\eta_i = \frac{\beta_i e_{\rho, i}}{P_{\rho, i}}, \qquad
+A_{\eta} = \sum_i \eta_i , \quad
+B_{\eta} = \sum_i \eta_i P_{i}, \quad
+C_{\eta} = \sum_i \eta_i P_{T, i}.
 \end{aligned}
-\end{equation}
-где $e^{\beta}$ --- внутренняя энергия смеси как функция $(\rho, \, T)$:
-\begin{equation}
-e^{\beta} = \sum_i \beta_i e^{i} \qty(\rho_i, \, T), 
+\end{equation*}
+Неограниченные приращения: 
+\begin{equation*}
+\Delta \tilde{T} = \frac{A_{\xi} B_{\eta} - A_{\eta} B_{\xi} + A_{\xi} \qty(e - \hat{e}^{\beta}) + A_{\eta} \qty(\ups - \hat{\ups}^{\beta})}{A_{\eta} C_{\xi} - A_{\xi} C_{\eta} + A_{\xi} \hat{e}^{\beta}_{T}}, 
+\end{equation*}
+\begin{equation*}
+\Delta \tilde{\ups}_i = \frac{1}{\rho_i^2 P_{\rho, i}} \cdot \qty( P_{i} - \frac{B_{\xi}}{A_{\xi}} + \frac{\ups - \hat{\ups}^{\beta}}{A_{\xi}} + \qty(P^{i}_T - \frac{C_{\xi}}{A_{\xi}}) \Delta T ).
+\end{equation*}
+Находим максимально возможную константу $\chi < 1: \;\; \ups_i^{(k)} + \chi \Delta \tilde{\ups}_i > 0$. Ограничиваем приращения и считаем новые плотности:
+\begin{equation*}
+\Delta T^{(k)} = \chi \cdot \tilde{\Delta} T,
 \qquad
-e^{\beta}_T = \sum_i \beta_i e^{i}_T \qty(\rho_i, \, T).
-\end{equation}
-
-Пилим Ньютона для уравнений на давление:
-\begin{equation}
-P^{i} + P^{i}_{\alpha} \Delta \alpha_i + P^{i}_{T} \Delta T = P^{j} + P^{j}_{\alpha} \Delta \alpha_j + P^{j}_{T} \Delta T .
-\end{equation}
-
-Выразим отсюда $\Delta \alpha_i$:
-\begin{equation}
-\Delta \alpha_i = \frac{1}{P^{i}_{\alpha}} \qty[ P^{j} + P^{j}_{\alpha} \Delta \alpha_j + P^{j}_{T} \Delta T - P^{i} - P^{i}_T \Delta T],
-\end{equation}
-и добавим множитель:
-\begin{equation}
-\beta_i e^{i}_{\alpha} \Delta \alpha_i = \frac{\beta_i e^{i}_{\alpha}}{P^{i}_{\alpha}} \qty[P^{j} + P^{j}_{\alpha} \Delta \alpha_j + P^{j}_{T} \Delta T - P^{i} - P^{i}_T \Delta T ].
-\end{equation}
-Коэффициент перед скобкой обозначим как $\eta_i$:
-\begin{equation}
-\beta_i e^{i}_{\alpha} \Delta \alpha_i = \eta_i \qty[P^{j} + P^{j}_{\alpha} \Delta \alpha_j + P^{j}_{T} \Delta T - P^{i} - P^{i}_T \Delta T ].
-\end{equation}
-
-Просуммируем по $i$, слева получится выражение с энергиями:
-\begin{equation}
-e - e^{\beta} - e^{\beta}_{T} \Delta T = \qty( \Sigma_i \eta_i ) \qty[P^{j} + P^{j}_{\alpha} \Delta \alpha_j + P^{j}_{T} \Delta T] - \qty( \Sigma_i \eta_i P^{i} ) - \qty( \Sigma_i \eta_i P^{i}_T ) \Delta T.
-\end{equation}
-Введем обозначения для сумм в скобках:
-\begin{equation}
-\eta_i = \frac{\beta_i e^{i}_{\rho}}{P^{i}_{\rho}}, \qquad
-A_{\eta} = \sum_i \eta_i , \qquad
-B_{\eta} = \sum_i \eta_i P^{i}, \qquad
-C_{\eta} = \sum_i \eta_i P^{i}_T.
-\end{equation}
-
-Кажется, всё не так плохо.
-\begin{equation}
-e - e^{\beta} - e^{\beta}_{T} \Delta T = A_{\eta} \qty( P^{i} + P^{i}_{\alpha} \Delta \alpha_i + P^{i}_{T} \Delta T) - B_{\eta} - C_{\eta} \Delta T.
-\end{equation}
-
-Введем величину $\xi_i = - 1 / P^{i}_{\alpha}$, как и ранее. Умножим всё на $\xi_i$:
-\begin{equation}
-\xi_i \qty[ e - e^{\beta} - e^{\beta}_{T} \Delta T ] = A_{\eta} \qty[ \xi_i P^{i} - \Delta \alpha_i + \xi_i P^{i}_{T} \Delta T ] - \xi_i B_{\eta} - \xi_i C_{\eta} \Delta T.
-\end{equation}
-
-Теперь это всё нужно просуммировать по $i$ и учесть, что $\sum_i \Delta \alpha_i = 0$. Получается
-\begin{equation}
-\qty(\Sigma_i \xi_i) \qty[ e - e^{\beta} - e^{\beta}_{T} \Delta T ] = A_{\eta} \qty[ \qty( \Sigma_i \xi_i P^{i} ) + \qty( \Sigma_i \xi_i P^{i}_{T} ) \Delta T ] - \qty(\Sigma_i \xi_i) B_{\eta} - \qty(\Sigma_i \xi_i) C_{\eta} \Delta T.
-\end{equation}
-Вводим аналогичные обозначения для сумм в скобках:
-\begin{equation}
-\xi_i = \frac{\alpha_i}{\rho_i P^{i}_{\rho}}, \qquad
-A_{\xi} = \sum_i \xi_i , \qquad
-B_{\xi} = \sum_i \xi_i P^{i}, \qquad
-C_{\xi} = \sum_i \xi_i P^{i}_T.
-\end{equation}
-
-Ну ничего, уже почти всё:
-\begin{equation}
-A_{\xi} \qty[ e - e^{\beta} - e^{\beta}_{T} \Delta T ] = A_{\eta} \qty[ B_{\xi} + C_{\xi} \Delta T ] - A_{\xi} B_{\eta} - A_{\xi} C_{\eta} \Delta T.
-\end{equation}
-Очевидно, отсюда надо выразить $\Delta T$:
-\begin{equation}
-\Delta T = \frac{A_{\eta} B_{\xi} - A_{\xi} B_{\eta} - A_{\xi} \qty(e - e^{\beta} )}{A_{\xi} C_{\eta} - A_{\eta} C_{\xi} - A_{\xi} e^{\beta}_{T}}.
-\end{equation}
-
-
-Ололо, если немного откатиться
-\begin{equation}
-A_{\xi} \qty[ P^{i} + P^{i}_{\alpha} \Delta \alpha_i + P^{i}_{T} \Delta T ] = B_{\xi} + C_{\xi} \Delta T.
-\end{equation}
-
-\begin{equation}
-\Delta \alpha_i = \xi_i \cdot \qty( P^{i} - \frac{B_{\xi}}{A_{\xi}} + \qty(P^{i}_T - \frac{C_{\xi}}{A_{\xi}}) \Delta T ).
-\end{equation}
+\Delta \ups^{(k)}_i = \chi \cdot \tilde{\Delta} \ups_i,
+\qquad
+\rho^{(k + 1)}_i = \frac{\rho^{(k)}_i}{1 + \rho^{(k)}_i \Delta \ups^{(k)}_i}.
+\end{equation*}
+Условие завершения итераций \eqref{eq:stop-iters} запишем в новой форме:
+\begin{equation*}\label{eq:stop-iters-4}
+\max\qty( \left| 1 - \rho \hat{\ups}^{\beta} \right|, \, 
+\max_i \left| \rho_i^{(k)} \Delta \ups^{(k)}_i \right| ) < \varepsilon?
+\end{equation*}
+Производные в искомых переменных $(\rho, \, e)$:
+\begin{equation*}
+\qty(\pdv{P}{\rho})_{e} = \frac{\hat{e}^{\beta}_{T} - C_{\eta}}{\rho^2 \qty( C_{\xi} A_{\eta} + A_{\xi}  (\hat{e}^{\beta}_T - C_{\eta}) )},
+\qquad
+\qty(\pdv{P}{e})_{\rho} = \frac{C_{\xi}}{C_{\xi} A_{\eta} + A_{\xi} \qty(\hat{e}^{\beta}_T - C_{\eta})}.
+\end{equation*}
+\newpage
 
 
 \section{Выкладки}

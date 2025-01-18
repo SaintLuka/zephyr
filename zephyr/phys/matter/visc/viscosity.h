@@ -16,6 +16,7 @@ public:
 
     /// @brief Умный указатель на класс
     using Ptr = std::shared_ptr<Viscosity>;
+    using Ref = const std::shared_ptr<Viscosity>&;
 
     /// @brief Вязкость отсутствует, все коэффициенты равны нулю.
     explicit Viscosity();

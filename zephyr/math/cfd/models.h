@@ -5,7 +5,6 @@
 #include <zephyr/math/cfd/rotate.h>
 
 #include <zephyr/phys/fractions.h>
-#include <zephyr/phys/matter/eos/types.h>
 #include <zephyr/phys/matter/eos/eos.h>
 #include <zephyr/phys/matter/mixture_pt.h>
 

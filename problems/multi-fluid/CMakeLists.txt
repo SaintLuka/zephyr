@@ -1,4 +1,4 @@
-list(APPEND PROBLEMS mmf_advection)
+#list(APPEND PROBLEMS mmf_advection)
 #list(APPEND PROBLEMS mmf_test_1D)
 
 # Assume all files in direcory are tests

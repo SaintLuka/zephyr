@@ -1,11 +1,10 @@
 #include <iostream>
+
+#include <zephyr/phys/matter/eos/ideal_gas.h>
+#include <zephyr/phys/matter/eos/stiffened_gas.h>
 #include <zephyr/phys/matter/mixture_pt.h>
 
 namespace zephyr::phys {
-
-inline double sqr(double x) {
-    return x * x;
-}
 
 int MixturePT::size() const {
     return m_materials.size();
@@ -15,20 +14,12 @@ void MixturePT::clear() {
     m_materials.clear();
 }
 
-void MixturePT::append(Eos::Ptr eos) {
+void MixturePT::append(Eos::Ref eos) {
     m_materials.emplace_back(eos);
 }
 
-void MixturePT::operator+=(Eos::Ptr eos) {
+void MixturePT::operator+=(Eos::Ref eos) {
     m_materials.emplace_back(eos);
-}
-
-Eos &MixturePT::operator[](int idx) {
-    return *m_materials[idx];
-}
-
-const Eos &MixturePT::operator[](int idx) const {
-    return *m_materials[idx];
 }
 
 // Обратный якобиан D(x, y) / D(T, P)
@@ -36,385 +27,149 @@ inline double inv_J(dPdT &x, dPdT &y) {
     return 1.0 / (x.dT * y.dP - x.dP * y.dT);
 }
 
-dRdE MixturePT::pressure_re(double rho, double eps, const Fractions &beta,
-                            const Options &options) const {
+dRdE MixturePT::pressure_re(double rho, double e,
+        const Fractions &beta, const MixOptions &options) const {
 
     // Случай одного материала
     int idx = beta.index();
     if (idx >= 0) {
-        if (options.alpha) {
-            options.alpha->set_pure(idx);
-        }
-        return m_materials[idx]->pressure_re(rho, eps, options);
+        return m_materials[idx]->pressure_re(rho, e, options[idx]);
     }
 
-    auto pair = find_PT(rho, eps, beta, options);
-
-    dRdE P{pair.P};
-    if (options.deriv) {
-        auto v = volume_PT(pair.P, pair.T, beta, {.deriv=true, .rho0=rho, .alpha=options.alpha});
-        auto e = energy_PT(pair.P, pair.T, beta, {.deriv=true, .rho0=rho, .alpha=options.alpha});
-        double inv_D = inv_J(v, e);
-
-        P.dE = inv_D * v.dT;
-        P.dR = inv_D * e.dT * sqr(v);
-    }
-    return P;
+    return std::get<1>(find_rPT(rho, e, beta, options));
 }
 
-dRdE MixturePT::pressure_re2(double rho, double eps, const Fractions &beta,
-                             const Options &options) const {
+dRdT MixturePT::pressure_rT(double rho, double T,
+        const Fractions &beta, const MixOptions &options) const {
 
     // Случай одного материала
     int idx = beta.index();
     if (idx >= 0) {
-        if (options.alpha) {
-            options.alpha->set_pure(idx);
-        }
-        return m_materials[idx]->pressure_re(rho, eps, options);
+        return m_materials[idx]->pressure_rT(rho, T, options[idx]);
     }
 
-    auto pair = find_PT_ver2(rho, eps, beta, options);
-
-    dRdE P{pair.P};
-    if (options.deriv) {
-        auto v = volume_PT(pair.P, pair.T, beta, {.deriv=true, .rho0=rho, .alpha=options.alpha});
-        auto e = energy_PT(pair.P, pair.T, beta, {.deriv=true, .rho0=rho, .alpha=options.alpha});
-        double inv_D = inv_J(v, e);
-
-        P.dE = inv_D * v.dT;
-        P.dR = inv_D * e.dT * sqr(v);
-    }
-    return P;
+    return std::get<1>(find_rP_rT(rho, T, beta, options));
 }
 
-double MixturePT::energy_rP(double rho, double P, const Fractions &beta,
-                            const Options &options) const {
+dRdT MixturePT::energy_rT(double rho, double T,
+        const Fractions& beta, const MixOptions &options) const {
 
     // Случай одного материала
     int idx = beta.index();
     if (idx >= 0) {
-        if (options.alpha) {
-            options.alpha->set_pure(idx);
-        }
-        return m_materials[idx]->energy_rP(rho, P, options);
+        return m_materials[idx]->energy_rT(rho, T, options[idx]);
     }
 
-    double T = temperature_rP(rho, P, beta, options);
-    return energy_PT(P, T, beta, {.rho0=rho, .alpha=options.alpha});
+    return std::get<1>(find_reP_rT(rho, T, beta, options));
 }
 
-double MixturePT::sound_speed_re(double rho, double eps, const Fractions &beta,
-                                 const Options &options) const {
+dRdP MixturePT::energy_rP(double rho, double P,
+        const Fractions &beta, const MixOptions &options) const {
 
     // Случай одного материала
     int idx = beta.index();
     if (idx >= 0) {
-        if (options.alpha) {
-            options.alpha->set_pure(idx);
-        }
-        return m_materials[idx]->sound_speed_re(rho, eps, options);
+        return m_materials[idx]->energy_rP(rho, P);
     }
 
-    auto pair = find_PT(rho, eps, beta, options);
-    return sound_speed_PT(pair.P, pair.T, beta, {.rho0=rho, .alpha=options.alpha});
+    return std::get<1>(find_reT_rP(rho, P, beta, options));
 }
 
-double MixturePT::sound_speed_rP(double rho, double P, const Fractions &beta,
-                                 const Options &options) const {
+double MixturePT::temperature_rP(double rho, double P,
+        const Fractions &beta, const MixOptions &options) const {
 
     // Случай одного материала
     int idx = beta.index();
     if (idx >= 0) {
-        if (options.alpha) {
-            options.alpha->set_pure(idx);
-        }
-        return m_materials[idx]->sound_speed_rP(rho, P, options);
+        return m_materials[idx]->temperature_rP(rho, P);
     }
 
-    double T = temperature_rP(rho, P, beta, options);
-    return sound_speed_PT(P, T, beta, {.rho0=rho, .alpha=options.alpha});
+    return std::get<1>(find_rT_rP(rho, P, beta, options));
 }
 
-double MixturePT::pressure_rT_ver1(double rho, double T, const Fractions &beta,
-                                   const Options &options) const {
+double MixturePT::sound_speed_re(double rho, double e,
+        const Fractions &beta, const MixOptions &options) const {
 
     // Случай одного материала
     int idx = beta.index();
     if (idx >= 0) {
-        if (options.alpha) {
-            options.alpha->set_pure(idx);
-        }
-        return m_materials[idx]->pressure_rT(rho, T, options);
+        return m_materials[idx]->sound_speed_re(rho, e);
     }
 
-    // Решаем vol = sum_i beta_i vol_i(P, T)
-    double vol = 1.0 / rho;
-    double P = std::isnan(options.P0) ? 1.0e5 : options.P0;
-    double P_min = min_pressure(beta);
-
-    // Начальное приближение объемных долей
-    Fractions alpha = options.alpha ? *options.alpha : beta;
-
-    double err = 1.0;
-    int counter = 0;
-    while (err > 1.0e-12 && counter < 30) {
-        auto v = volume_PT(P, T, beta, {.deriv=true, .rho0=rho, .alpha=&alpha});
-
-        double dP = (vol - v) / v.dP;
-
-        // Гарантирует выполнение P + dP > P_min
-        if (P + dP < P_min) {
-            // P + dP окажется на интервале (P_min, P)
-            // равно (1 - a) * P_min + a * P
-
-            const double a = 0.1;
-            dP = (1.0 - a) * P_min + (a - 1.0) * P;
-        }
-
-        err = std::abs(dP / P);
-
-        P += dP;
-
-        // Обновить объемные доли
-        update_alpha(rho, P, T, beta, alpha);
-
-        //std::cout << "\titer " << counter << ".\tP: " << P << ".\ta: " << alpha << "\n";
-
-        ++counter;
-    }
-
-    // Перенести объемные доли
-    if (options.alpha) {
-        *options.alpha = alpha;
-    }
-
-    return P;
+    MixOptions opts(options); opts.deriv = true;
+    auto[rhos, P, T] = find_rPT(rho, e, beta, opts);
+    double c2 = P.dR + P.val * P.dE / (rho * rho);
+    return std::sqrt(c2);
 }
 
-double MixturePT::pressure_rT_ver2(double rho, double T, const Fractions &beta,
-                                   const Options &options, double eps) const {
+double MixturePT::sound_speed_rP(double rho, double P,
+        const Fractions &beta, const MixOptions &options) const {
 
     // Случай одного материала
     int idx = beta.index();
     if (idx >= 0) {
-        if (options.alpha) {
-            options.alpha->set_pure(idx);
-        }
-        return m_materials[idx]->pressure_rT(rho, T, options);
+        return m_materials[idx]->sound_speed_rP(rho, P);
     }
 
-    // Решается система уравнений
-    //   sum alpha_i = 1,
-    //   P_i (rho_i, T) = P_j (rho_j, T),
-    // где rho_i = beta_i rho / alpha_i
-
-    // Число материалов в задаче
-    int n_fractions = beta.count();
-
-    // Начальное приближение объемных долей
-    Fractions alpha = options.alpha ? *options.alpha : beta;
-
-    // Приращения объемных долей на итерациях
-    ScalarSet delta;
-
-    double err = 1.0;
-    int counter = 0;
-    eps = std::isnan(eps) ? 1.0e-12 : eps;
-    while (err > eps && counter < 30) {
-        // Расчет вспомогательных величин
-        double A_xi = 0.0;
-        double B_xi = 0.0;
-        for (int i = 0; i < n_fractions; ++i) {
-            if (beta.has(i)) {
-                double rho_i = (beta[i] / alpha[i]) * rho;
-                dRdT P_i = m_materials[i]->pressure_rT(rho_i, T, {.deriv=true});
-
-                double xi = alpha[i] / (rho_i * P_i.dR);
-                A_xi += xi;
-                B_xi += xi * P_i;
-            }
-        }
-
-        // Вычисляем приращения alpha.
-        // Сумма delta равна нулю по построению, а значит
-        // сумма alpha будет равна единице.
-        for (int i = 0; i < n_fractions; ++i) {
-            if (beta.has(i)) {
-                double rho_i = (beta[i] / alpha[i]) * rho;
-                dRdT P_i = m_materials[i]->pressure_rT(rho_i, T, {.deriv=true});
-
-                double xi = alpha[i] / (rho_i * P_i.dR);
-                delta[i] = xi * (P_i - B_xi / A_xi);
-            }
-        }
-
-        // Поправляем условия, чтобы 0 < alpha_i + da_i < 1.
-        // Найдем константу chi, потом умножим на неё.
-        double chi = 1.0;
-        for (int i = 0; i < n_fractions; ++i) {
-            if (beta.has(i)) {
-                if (alpha[i] + delta[i] > 1.0) {
-                    chi = std::min(chi, 0.95 * (1.0 - alpha[i]) / (alpha[i] + delta[i] - 1.0));
-                }
-                else if (alpha[i] + delta[i] < 0.0) {
-                    chi = std::min(chi, 0.95 * (alpha[i]) / (-delta[i]));
-                }
-            }
-        }
-        for (int i = 0; i < n_fractions; ++i) {
-            if (beta.has(i)) {
-                delta[i] *= chi;
-            }
-        }
-
-        err = 0.0;
-        for (int i = 0; i < n_fractions; ++i) {
-            if (beta.has(i)) {
-                alpha[i] += delta[i];
-                err = std::max(err, std::abs(delta[i]));
-
-                assert(alpha[i] < 1.0);
-                assert(alpha[i] > 0.0);
-            }
-        }
-
-        ++counter;
-    }
-
-    // Просто усредняем. На самом деле, если метод сошелся,
-    // тогда все значения P_i равны
-    double P = 0.0;
-    for (int i = 0; i < n_fractions; ++i) {
-        if (beta.has(i)) {
-            double rho_i = (beta[i] / alpha[i]) * rho;
-            P += m_materials[i]->pressure_rT(rho_i, T);
-        }
-    }
-    P /= beta.nonzero();
-
-    // Перенести объемные доли
-    if (options.alpha) {
-        *options.alpha = alpha;
-    }
-
-    return P;
+    auto opts = options; opts.deriv = true;
+    auto[rhos, e, T] = find_reT_rP(rho, P, beta, opts);
+    double c2 = (P / (rho * rho) - e.dR) / e.dP;
+    return std::sqrt(c2);
 }
 
-double MixturePT::pressure_rT(double rho, double T, const Fractions &beta,
-                              const Options &options) const {
+dPdT MixturePT::volume_PT(double P, double T,
+        const Fractions &beta, const MixOptions &options) const {
 
-    return pressure_rT_ver2(rho, T, beta, options);
-}
-
-double MixturePT::temperature_rP(double rho, double P, const Fractions &beta,
-                                 const Options &options) const {
-
-    // Случай одного материала
-    int idx = beta.index();
-    if (idx >= 0) {
-        if (options.alpha) {
-            options.alpha->set_pure(idx);
-        }
-        return m_materials[idx]->temperature_rP(rho, P, options);
-    }
-
-    // Решаем vol = sum_i beta_i vol_i(P, T)
-    double vol = 1.0 / rho;
-    double T = std::isnan(options.T0) ? 300.0 : options.T0;
-
-    // Начальное приближение объемных долей
-    Fractions alpha = options.alpha ? *options.alpha : beta;
-
-    double err = 1.0;
-    int counter = 0;
-    while (err > 1.0e-10 && counter < 30) {
-        auto v = volume_PT(P, T, beta, {.deriv=true, .rho0=rho, .alpha=&alpha});
-
-        double dT = (vol - v) / v.dT;
-
-        err = std::abs(dT / T);
-
-        T += dT;
-
-        // Обновить объемные доли
-        update_alpha(rho, P, T, beta, alpha);
-
-        ++counter;
-    }
-
-    // Перенести объемные доли
-    if (options.alpha) {
-        *options.alpha = alpha;
-    }
-
-    return T;
-}
-
-dPdT MixturePT::volume_PT(double P, double T, const Fractions &beta,
-                          const Options &options) const {
-
-    dPdT vol = {0.0, 0.0, 0.0};
+    dPdT v = {0.0, 0.0, 0.0};
     for (int i = 0; i < size(); ++i) {
         if (beta.has(i)) {
             // есть начальное приближение
-            double rho_i0 = NAN;
-            if (!std::isnan(options.rho0) && options.alpha) {
-                rho_i0 = beta[i] * options.rho0 / (*options.alpha)[i];
-            }
+            double rho_i0 = options.rhos ? (*options.rhos)[i] : NAN;
 
-            auto v_i = m_materials[i]->volume_PT(P, T, {.deriv = true, .rho0 = rho_i0});
-            vol.val += beta[i] * v_i.val;
-            vol.dP  += beta[i] * v_i.dP;
-            vol.dT  += beta[i] * v_i.dT;
+            auto v_i = m_materials[i]->volume_PT(P, T, {.deriv=true, .rho0=rho_i0});
+            v.val += beta[i] * v_i.val;
+            v.dP  += beta[i] * v_i.dP;
+            v.dT  += beta[i] * v_i.dT;
         }
     }
-    return vol;
+    return v;
 }
 
-dPdT MixturePT::energy_PT(double P, double T, const Fractions &beta,
-                          const Options &options) const {
+dPdT MixturePT::energy_PT(double P, double T,
+        const Fractions &beta, const MixOptions &options) const {
 
-    dPdT eps = {0.0, 0.0, 0.0};
+    dPdT e = {0.0, 0.0, 0.0};
     for (int i = 0; i < size(); ++i) {
         if (beta.has(i)) {
             // есть начальное приближение
-            double rho_i0 = NAN;
-            if (!std::isnan(options.rho0) && options.alpha) {
-                rho_i0 = beta[i] * options.rho0 / (*options.alpha)[i];
-            }
+            double rho_i0 = options.rhos ? (*options.rhos)[i] : NAN;
 
-            auto e_i = m_materials[i]->energy_PT(P, T, {.deriv = true, .rho0 = rho_i0});
-            eps.val += beta[i] * e_i.val;
-            eps.dP  += beta[i] * e_i.dP;
-            eps.dT  += beta[i] * e_i.dT;
+            auto e_i = m_materials[i]->energy_PT(P, T, {.deriv=true, .rho0=rho_i0});
+            e.val += beta[i] * e_i.val;
+            e.dP  += beta[i] * e_i.dP;
+            e.dT  += beta[i] * e_i.dT;
         }
     }
-    return eps;
+    return e;
 }
 
 StiffenedGas MixturePT::stiffened_gas(double rho, double P,
-                                      const Fractions &beta, const Options &options) const {
-
+        const Fractions &beta, const MixOptions &options) const {
     // Случай одного материала
     int idx = beta.index();
     if (idx >= 0) {
-        if (options.alpha) {
-            options.alpha->set_pure(idx);
-        }
-        return m_materials[idx]->stiffened_gas(rho, P, options);
+        return m_materials[idx]->stiffened_gas(rho, P);
     }
 
-    double T = temperature_rP(rho, P, beta, options);
-    auto vol = volume_PT(P, T, beta, {.deriv=true, .rho0=rho, .alpha=options.alpha});
-    auto eps = energy_PT(P, T, beta, {.deriv=true, .rho0=rho, .alpha=options.alpha});
-    double inv_D = inv_J(vol, eps);
+    auto opts = options; opts.deriv = true;
 
-    double gamma = 1.0 + vol * vol.dT * inv_D;
-    double eps_0 = eps - vol * eps.dT / vol.dT;
-    double P0 = (vol * eps.dT * inv_D - P) / gamma;
+    auto[rhos, e, T] = find_reT_rP(rho, P, beta, opts);
 
-    return StiffenedGas(gamma, P0, eps_0, NAN);
+    double gamma = 1.0 + 1.0 / (rho * e.dP);
+    double e0 = e + rho * e.dR;
+    double P0 = -(rho * e.dR + P * e.dP) / (gamma * e.dP);
+
+    return StiffenedGas(gamma, P0, e0, NAN);
 }
 
 double MixturePT::min_pressure(const Fractions &beta) const {
@@ -427,53 +182,292 @@ double MixturePT::min_pressure(const Fractions &beta) const {
     return P_min;
 }
 
-void MixturePT::update_alpha(double rho, double P, double T,
-                             const Fractions& beta, Fractions& alpha) const {
-
-    // Обновить объемные доли
-    for (int i = 0; i < size(); ++i) {
-        if (beta[i] > 0.0) {
-            // Можно оценить удельный объем компоненты
-            double rho_i0 = NAN;
-            if (alpha[i] > 0.0) {
-                rho_i0 = beta[i] * rho / alpha[i];
-            }
-            double v_i0 = m_materials[i]->volume_PT(P, T, {.rho0 = rho_i0});
-
-            alpha[i] = beta[i] * rho * v_i0;
-        }
-        else {
-            alpha[i] = 0.0;
-        }
+void MixturePT::adjust_cv(double rho_ref, double P_ref, double T_ref) {
+    for (auto& mat: m_materials) {
+        mat->adjust_cv(rho_ref, P_ref, T_ref);
     }
-    alpha.normalize();
 }
 
-PairET MixturePT::find_eT(double rho, double P, const Fractions& beta,
-                          const Options& options) const {
+void MixturePT::adjust_T0(double rho_ref, double P_ref, double T_ref) {
+    for (auto& mat: m_materials) {
+        mat->adjust_T0(rho_ref, P_ref, T_ref);
+    }
+}
+
+MixturePT::triplet_re MixturePT::get_rPT(double rho, double e,
+        const Fractions& beta, const MixOptions& options) const {
 
     // Случай одного материала
     int idx = beta.index();
     if (idx >= 0) {
-        if (options.alpha) {
-            options.alpha->set_pure(idx);
-        }
-        return {.e = m_materials[idx]->energy_rP(rho, P, options),
-                .T = m_materials[idx]->temperature_rP(rho, P, options)};
+        ScalarSet rhos{NAN};
+        rhos[idx] = rho;
+        double P = m_materials[idx]->pressure_re(rho, e);
+        double T = m_materials[idx]->temperature_rP(rho, e);
+        return {rhos, P, T};
     }
 
-    double T = temperature_rP(rho, P, beta, {.deriv=false, .T0=options.T0, .alpha=options.alpha});
-    double e = energy_PT(P, T, beta, {.deriv=false, .rho0=rho, .alpha=options.alpha});
-    return {.e = e, .T = T};
+    return find_rPT(rho, e, beta, options);
 }
 
-PairPT MixturePT::find_PT_ver1(double rho, double eps, const Fractions &beta,
-                               const Options &options) const {
+MixturePT::triplet_rP MixturePT::get_reT(double rho, double P,
+        const Fractions& beta, const MixOptions& options) const {
 
-    // Решаем vol = sum_i beta_i vol_i(P, T)
-    //        eps = sum_i beta_i eps_i(P, T)
+    // Случай одного материала
+    int idx = beta.index();
+    if (idx >= 0) {
+        ScalarSet rhos{NAN};
+        rhos[idx] = rho;
+        double e = m_materials[idx]->energy_rP(rho, P);
+        double T = m_materials[idx]->temperature_rP(rho, P);
+        return {rhos, e, T};
+    }
 
-    double vol = 1.0 / rho;
+    return find_reT_rP(rho, P, beta, options);
+}
+
+double MixturePT::sound_speed_PT(double P, double T,
+        const Fractions &beta, const MixOptions &options) const {
+
+    auto v = volume_PT(P, T, beta, {.deriv=true, .rhos=options.rhos});
+    auto e = energy_PT(P, T, beta, {.deriv=true, .rhos=options.rhos});
+    double inv_D = inv_J(v, e);
+
+    double c2 = inv_D * std::pow(v, 2) * (e.dT + P * v.dT);
+    return std::sqrt(c2);
+}
+
+// Начальное приближение для объемных долей
+Fractions MixturePT::init_vol_fracs(const Fractions& beta, const MixOptions& options) const {
+    Fractions alpha = options.alpha ? *options.alpha : beta;
+    for (int i = 0; i < size(); ++i) {
+        if (beta.has(i) && alpha[i] == 0.0) {
+            alpha[i] = 0.0001; // добавить материал
+        }
+        if (beta.has(i)) {
+            alpha[i] = beta[i] / m_materials[i]->density();
+        }
+    }
+    alpha.normalize();
+    return alpha;
+}
+
+ScalarSet MixturePT::init_densities(const Fractions &beta, const MixOptions &options) const {
+    ScalarSet rhos{NAN};
+    if (options.rhos != nullptr) {
+        for (int i = 0; i < size(); ++i) {
+            if (beta.has(i)) {
+                rhos[i] = (*options.rhos)[i];
+            }
+        }
+    } else {
+        for (int i = 0; i < size(); ++i) {
+            if (beta.has(i)) {
+                rhos[i] = m_materials[i]->density();
+            }
+        }
+    }
+    return rhos;
+}
+
+MixturePT::doublet_rT MixturePT::find_rP_rT(double density, double temperature,
+        const Fractions& beta, const MixOptions& options) const {
+    return m_old ? find_rP_rT_old(density, temperature, beta, options) :
+                   find_rP_rT_new(density, temperature, beta, options);
+}
+
+MixturePT::triplet_rT MixturePT::find_reP_rT(double density, double temperature,
+        const Fractions& beta, const MixOptions& options) const {
+    return m_old ? find_reP_rT_old(density, temperature, beta, options) :
+                   find_reP_rT_new(density, temperature, beta, options);
+}
+
+MixturePT::doublet_rP MixturePT::find_rT_rP(double density, double pressure,
+        const Fractions& beta, const MixOptions& options) const {
+    if (m_old) {
+        return find_rT_rP_old(density, pressure, beta, options);
+    } else {
+        return find_rT_rP_new(density, pressure, beta, options);
+    }
+}
+
+MixturePT::triplet_rP MixturePT::find_reT_rP(double density, double pressure,
+        const Fractions& beta, const MixOptions& options) const {
+    if (m_old) {
+        return find_reT_rP_old(density, pressure, beta, options);
+    } else {
+        return find_reT_rP_new(density, pressure, beta, options);
+    }
+}
+
+MixturePT::triplet_re MixturePT::find_rPT(double density, double energy,
+        const Fractions& beta, const MixOptions& options) const {
+    if (m_old) {
+        return find_rPT_old(density, energy, beta, options);
+    } else {
+        return find_rPT_new(density, energy, beta, options);
+    }
+}
+
+namespace {
+const int max_counter = 30;
+const double epsilon_v = 1.0e-12;
+const double epsilon_T = 1.0e-12;
+const double epsilon_P = 1.0e-12;
+const double epsilon_e = 1.0e-12;
+}
+
+// Старая схема. Итерации по температуре. Не проверяет на чистоту
+MixturePT::doublet_rT MixturePT::find_rP_rT_old(double rho, double T,
+        const Fractions& beta, const MixOptions& options) const {
+    // Решаем уравнение
+    // v_mix = sum_i beta_i v_i(P, T)
+    double v_mix = 1.0 / rho;
+    double P = std::isnan(options.P0) ? 1.0e5 : options.P0;
+    double P_min = min_pressure(beta);
+
+    // Начальное приближение объемных долей
+    ScalarSet rhos = init_densities(beta, options);
+
+    //std::cout << "\tinitial \tP: " << P << ".\tϱ: " << rhos << "\n";
+
+    dPdT v{NAN};
+    int counter = 0;
+    while (counter < max_counter) {
+        double err = 0.0;
+        v = {0.0, 0.0, 0.0};
+        for (int i = 0; i < size(); ++i) {
+            if (beta.has(i)) {
+                auto v_i = m_materials[i]->volume_PT(P, T, {.deriv=true, .rho0=rhos[i]});
+                v.val += beta[i] * v_i.val;
+                v.dP  += beta[i] * v_i.dP;
+                v.dT  += beta[i] * v_i.dT;
+
+                err = std::max(err, std::abs(1.0 - rhos[i] * v_i));
+                rhos[i] = 1.0 / v_i;
+            }
+        }
+        err = std::max(err, std::abs(1.0 - rho * v));
+
+        //std::cout << "\tcounter: " << counter << ".\tP: " << P << ".\tϱ: " << rhos << "; error: " << err << "\n";
+
+        if (err < epsilon_v) {
+            break;
+        }
+
+        // Итерация по Ньютону
+        double dP = (v_mix - v) / v.dP;
+
+        // Гарантирует выполнение P + dP > P_min
+        if (P + dP < P_min) {
+            // P + dP окажется на интервале (P_min, P)
+            // равно (1 - a) * P_min + a * P
+
+            const double a = 0.1;
+            dP = (1.0 - a) * P_min + (a - 1.0) * P;
+        }
+
+        P += dP;
+
+        ++counter;
+    }
+
+    dRdT P1 = P;
+    if (options.deriv) {
+        P1.dR = -std::pow(v.val, 2) / v.dP;
+        P1.dT = -v.dT / v.dP;
+    }
+
+    return {rhos, P1};
+}
+
+MixturePT::triplet_rT MixturePT::find_reP_rT_old(double rho, double T,
+        const Fractions& beta, const MixOptions& options) const {
+    auto[rhos, P] = find_rP_rT_old(rho, T, beta, options);
+
+    dPdT e1 = energy_PT(P, T, beta, {.deriv=options.deriv, .rho0=rho, .rhos=&rhos});
+    dRdT e2 = e1.val;
+    if (options.deriv) {
+        e2.dR = e1.dP * P.dR;
+        e2.dT = e1.dP * P.dT + e1.dT;
+    }
+    return {rhos, e2, P};
+}
+
+// Старая схема. Итерации по давлению. Не проверяет на чистоту
+MixturePT::doublet_rP MixturePT::find_rT_rP_old(double rho, double P,
+        const Fractions& beta, const MixOptions& options) const {
+    // Решаем уравнение
+    // v_mix = sum_i beta_i volume_i(P, T)
+    double v_mix = 1.0 / rho;
+    double T = std::isnan(options.T0) ? 300.0 : options.T0;
+
+    // Начальное приближение плотностей
+    ScalarSet rhos = init_densities(beta, options);
+
+    //std::cout << "\tinitial: \tT: " << T << ".\tϱ: " << rhos << "\n";
+
+    dPdT v{NAN};
+    int counter = 0;
+    while (counter < max_counter) {
+        double err = 0.0;
+        v = {0.0, 0.0, 0.0};
+        for (int i = 0; i < size(); ++i) {
+            if (beta.has(i)) {
+                auto v_i = m_materials[i]->volume_PT(P, T, {.deriv=true, .rho0=rhos[i]});
+                v.val += beta[i] * v_i.val;
+                v.dP  += beta[i] * v_i.dP;
+                v.dT  += beta[i] * v_i.dT;
+
+                err = std::max(err, std::abs(1.0 - rhos[i] * v_i));
+                rhos[i] = 1.0 / v_i;
+            }
+        }
+        err = std::max(err, std::abs(1.0 - rho * v));
+
+        //std::cout << "\tcounter: " << counter << ".\tT: " << T << ".\tϱ: " << rhos << "\n";
+
+        if (err < epsilon_v) {
+            break;
+        }
+
+        // Итерация по Ньютону
+        T += (v_mix - v) / v.dT;
+
+        ++counter;
+    }
+
+    dRdP T1 = T;
+    if (options.deriv) {
+        T1.dR = -std::pow(v.val, 2) / v.dT;
+        T1.dP = -v.dP / v.dT;
+    }
+
+    return {rhos, T1};
+}
+
+MixturePT::triplet_rP MixturePT::find_reT_rP_old(double rho, double P,
+        const Fractions& beta, const MixOptions& options) const {
+    auto[rhos, T] = find_rT_rP_old(rho, P, beta, options);
+
+    dPdT e1 = energy_PT(P, T, beta, {.deriv=options.deriv, .rho0=rho, .rhos=&rhos});
+    dRdP e2 = e1.val;
+    if (options.deriv) {
+        e2.dR = e1.dT * T.dR;
+        e2.dP = e1.dT * T.dP + e1.dP;
+    }
+    return {rhos, e2, T};
+}
+
+// Старая схема. Итерации по давлению и температуре. Не проверяет на чистоту
+MixturePT::triplet_re MixturePT::find_rPT_old(double rho, double e_mix,
+        const Fractions& beta, const MixOptions& options) const {
+    // Решаем систему двух уравнений:
+    //     v_mix = sum_i beta_i volume_i(P, T)
+    //     e_mix = sum_i beta_i energy_i(P, T)
+
+    double v_mix = 1.0 / rho;
+
     double P = std::isnan(options.P0) ? 1.0e5 : options.P0;
     double T = std::isnan(options.T0) ? 300.0 : options.T0;
 
@@ -483,19 +477,48 @@ PairPT MixturePT::find_PT_ver1(double rho, double eps, const Fractions &beta,
     }
 
     // Начальное приближение объемных долей
-    Fractions alpha = options.alpha ? *options.alpha : beta;
+    ScalarSet rhos = init_densities(beta, options);
 
-    double err = 1.0;
+    //std::cout << "\tinitial: \tP: " << P << ".\tT: " << T << ".\tϱ: " << rhos <<  "\n";
+
     int counter = 0;
-    while (err > 1.0e-12 && counter < 30 && !std::isnan(P)) {
-        auto v = volume_PT(P, T, beta, {.deriv=true, .rho0=rho, .alpha=&alpha});
-        auto e = energy_PT(P, T, beta, {.deriv=true, .rho0=rho, .alpha=&alpha});
+    dPdT v{NAN}, e{NAN};
+    while (counter < max_counter) {
+        // Можно написать просто:
+        //   v = volume_PT(P, T, beta, {.deriv=true, .rho0=rho, .rhos=&rhos});
+        //   e = energy_PT(P, T, beta, {.deriv=true, .rho0=rho, .rhos=&rhos});
+        // Но тогда будут двойные вычисления, и ещё rhos обновлять отдельно
+        double err = 0.0;
+        v = {0.0, 0.0, 0.0};
+        e = {0.0, 0.0, 0.0};
+        for (int i = 0; i < size(); ++i) {
+            if (beta.has(i)) {
+                auto v_i = m_materials[i]->volume_PT(P, T, {.deriv=true, .rho0=rhos[i]});
+                v.val += beta[i] * v_i.val;
+                v.dP  += beta[i] * v_i.dP;
+                v.dT  += beta[i] * v_i.dT;
+
+                err = std::max(err, std::abs(1.0 - rhos[i] * v_i));
+                rhos[i] = 1.0 / v_i;
+
+                auto e_i = m_materials[i]->energy_PT(P, T, {.deriv=true, .rho0=rhos[i]});
+                e.val += beta[i] * e_i.val;
+                e.dP  += beta[i] * e_i.dP;
+                e.dT  += beta[i] * e_i.dT;
+            }
+        }
+        err = std::max(err, std::abs(1.0 - rho * v));
+        double err_e = std::abs(1.0 - e / e_mix);
+
+        //std::cout << "\tcounter: " << counter << ".\tP: " << P << ".\tT: " << T << ".\tϱ: " << rhos <<  "\terror : " << err << "\n";
+
+        if (err < epsilon_v && err_e < epsilon_e) {
+            break;
+        }
 
         double inv_D = inv_J(v, e);
-        double dP = inv_D * ((eps - e) * v.dT - (vol - v) * e.dT);
-        double dT = inv_D * ((vol - v) * e.dP - (eps - e) * v.dP);
-
-        err = std::abs(dP / P) + std::abs(dT / T);
+        double dP = inv_D * ((e_mix - e) * v.dT - (v_mix - v) * e.dT);
+        double dT = inv_D * ((v_mix - v) * e.dP - (e_mix - e) * v.dP);
 
         // Гарантирует выполнение P + dP > P_min
         double dP_lim = dP;
@@ -511,95 +534,336 @@ PairPT MixturePT::find_PT_ver1(double rho, double eps, const Fractions &beta,
         P += dP_lim;
         T += dT_lim;
 
-        // Обновить объемные доли
-        update_alpha(rho, P, T, beta, alpha);
+        ++counter;
+    }
 
-        //std::cout << "iter: " << counter << "; P: " << P << "; T: " << T << "; a: " << alpha << "\n";
+    dRdE P1 = P;
+    if (options.deriv) {
+        double inv_D = inv_J(v, e);
+        P1.dE = inv_D * v.dT;
+        P1.dR = inv_D * e.dT * std::pow(v, 2);
+    }
+
+    return {rhos, P1, T};
+}
+
+
+namespace Transform {
+struct identity_map {
+    inline double operator()(double x) const { return x; }
+};
+struct const_map {
+    inline double operator()(double x) const { return 1.0; }
+};
+struct inverse_map {
+    double val;
+    inline double operator()(double x) const { return 1.0 / (x - val); }
+};
+struct inverse_inverse_map {
+    double val;
+    inline double operator()(double x) const { return 1.0 / x + val; }
+};
+struct inverse_deriv_map {
+    double val;
+    inline double operator()(double x) const { return -1.0 / std::pow(x + val, 2); }
+};
+
+std::tuple<identity_map, const_map, identity_map> Identity() {
+    return { identity_map{}, const_map{}, identity_map{} };
+}
+
+std::tuple<inverse_map, inverse_deriv_map, inverse_inverse_map> Inverse(double P_min) {
+    return { inverse_map{P_min}, inverse_deriv_map{P_min}, inverse_inverse_map{P_min} };
+}
+}
+
+// Новая схема. Итерации по объемным долям. Не проверяет на чистоту
+MixturePT::doublet_rT MixturePT::find_rP_rT_new(double rho, double T,
+        const Fractions& beta, const MixOptions& options) const {
+    // Решается система уравнений
+    //   sum beta_i v_i = v,
+    //   P_i (v_i, T) = P_j (v_j, T)
+
+    // Число материалов в задаче
+    int n_fractions = beta.count();
+
+    double v = 1.0 / rho;
+
+    double P_min = min_pressure(beta);
+    //auto[f, df, inv_f] = Transform::Inverse(P_min);
+    auto[f, df, inv_f] = Transform::Identity();
+
+    // Начальное приближение плотностей (с нормировкой)
+    ScalarSet rhos = init_densities(beta, options);
+
+    //std::cout << "\tinitial: \tϱ: " << rhos << "\n";
+
+    // Приращения объемных долей на итерациях
+    ScalarSet dv;
+
+    dRdT P = NAN;
+
+    int counter = 0;
+    while (counter < max_counter) {
+        // Расчет вспомогательных величин
+        double A_xi = 0.0;
+        double B_xi = 0.0;
+        double C_xi = 0.0;
+        double v_hat = 0.0;
+        for (int i = 0; i < n_fractions; ++i) {
+            if (beta.has(i)) {
+                double rho_i = rhos[i];
+                dRdT P_i = m_materials[i]->pressure_rT(rho_i, T, {.deriv=true});
+
+                double xi = beta[i] / (rho_i * rho_i * df(P_i) * P_i.dR);
+                A_xi += xi;
+                B_xi += xi * f(P_i);
+                if (options.deriv) {
+                    C_xi += xi * df(P_i) * P_i.dT;
+                }
+
+                v_hat += beta[i] / rho_i;
+            }
+        }
+
+        // Вычисляем приращения dv
+        // Находим константу chi: v + chi * dv > 0.
+        double chi = 1.0;
+        for (int i = 0; i < n_fractions; ++i) {
+            if (beta.has(i)) {
+                double rho_i = rhos[i];
+                dRdT P_i = m_materials[i]->pressure_rT(rho_i, T, {.deriv=true});
+
+                double coeff = 1.0 / (rho_i * rho_i * df(P_i) * P_i.dR);
+                dv[i] = coeff * (f(P_i) - (B_xi + v_hat - v) / A_xi);
+
+                if (dv[i] < 0.0) {
+                    chi = std::min(chi, 0.95 / (rhos[i] * (-dv[i])));
+                }
+            }
+        }
+
+        // Поправляем приращения
+        dv.arr() *= chi;
+
+        // Вычисляем ошибку
+        double err = 0.0;
+        for (int i = 0; i < n_fractions; ++i) {
+            if (beta.has(i)) {
+                err = std::max(err, std::abs(rhos[i] * dv[i]));
+                rhos[i] = rhos[i] / (1.0 + rhos[i] * dv[i]);
+            }
+        }
+        err = std::max(err, std::abs(1.0 - rho * v_hat));
+
+        //std::cout << "\tcounter: " << counter << ".\tP: " << inv_f(B_xi / A_xi) << ".\tϱ: " << rhos << "; \terror: " << err << "\n";
+
+        if (err < epsilon_v) {
+            P = inv_f(B_xi / A_xi);
+            if (options.deriv) {
+                P.dR = 1.0 / (rho * rho * df(P) * A_xi);
+                P.dT = C_xi / (df(P) * A_xi);
+            }
+            break;
+        }
 
         ++counter;
     }
 
-    // Перенести объемные доли
-    if (options.alpha) {
-        *options.alpha = alpha;
-    }
-
-    return {P, T};
+    return {rhos, P};
 }
 
-PairPT MixturePT::find_PT_ver2(double rho, double e, const Fractions &beta,
-                               const Options &options) const {
-    // Случай одного материала
-    int cln = beta.index();
-    if (cln >= 0) {
-        if (options.alpha) {
-            options.alpha->set_pure(cln);
+MixturePT::triplet_rT MixturePT::find_reP_rT_new(double rho, double T,
+        const Fractions& beta, const MixOptions& options) const {
+    auto[rhos, P] = find_rP_rT_new(rho, T, beta, options);
+
+    dPdT e1 = {0.0, 0.0, 0.0};
+    for (int i = 0; i < size(); ++i) {
+        if (beta.has(i)) {
+            dRdT e_i = m_materials[i]->energy_rT(rhos[i], T, options[i]);
+            e1.val += beta[i] * e_i.val;
+            if (options.deriv) {
+                dRdT P_i = m_materials[i]->pressure_rT(rhos[i], T, options[i]);
+
+                e1.dP += beta[i] * e_i.dR / P_i.dR;
+                e1.dT += beta[i] * (e_i.dT - e_i.dR * P_i.dT / P_i.dR);
+            }
         }
-        double P = m_materials[cln]->pressure_re(rho, e, options);
-        double T = m_materials[cln]->temperature_rP(rho, P, options);
-        return {.P = P, .T = T};
     }
 
-    double T = std::isnan(options.T0) ? 300.0 : options.T0;
+    dRdT e2 = e1.val;
+    if (options.deriv) {
+        e2.dR = e1.dP * P.dR;
+        e2.dT = e1.dP * P.dT + e1.dT;
+    }
+
+    return {rhos, e2, P};
+}
+
+// Новая схема. Итерации по объемным долям и температуре. Не проверяет на чистоту
+MixturePT::doublet_rP MixturePT::find_rT_rP_new(double rho, double P,
+        const Fractions& beta, const MixOptions& options) const {
+    // Решается система уравнений
+    //   sum beta_i v_i = v,
+    //   P_i (v_i, T) = P
+
+    // Число материалов в задаче
+    int n_fractions = beta.count();
+
+    double v = 1.0 / rho;
+
+    dRdP T = std::isnan(options.T0) ? 300.0 : options.T0;
+
+    // Начальное приближение плотностей (с нормировкой)
+    ScalarSet rhos = init_densities(beta, options);
+
+    //std::cout << "\tinitial. \tT: " << T.val << ".\tϱ: " << rhos << "\n";
+
+    // Приращения объемных долей на итерациях
+    ScalarSet dv;
+
+    int counter = 0;
+    while (counter < max_counter) {
+        // Расчет вспомогательных величин
+        double A_xi = 0.0;
+        double B_xi = 0.0;
+        double C_xi = 0.0;
+        double v_hat = 0.0;
+        for (int i = 0; i < n_fractions; ++i) {
+            if (beta.has(i)) {
+                double rho_i = rhos[i];
+                dRdT P_i = m_materials[i]->pressure_rT(rho_i, T, {.deriv=true});
+
+                double xi = beta[i] / (rho_i * rho_i * P_i.dR);
+                A_xi += xi;
+                B_xi += xi * P_i;
+                C_xi += xi * P_i.dT;
+
+                v_hat += beta[i] / rho_i;
+            }
+        }
+
+        double dT = (v - v_hat + A_xi * P - B_xi) / C_xi;
+
+        // Вычисляем приращения dv
+        // Находим константу chi: v + chi * dv > 0.
+        double chi = 1.0;
+        for (int i = 0; i < n_fractions; ++i) {
+            if (beta.has(i)) {
+                double rho_i = rhos[i];
+                dRdT P_i = m_materials[i]->pressure_rT(rho_i, T, {.deriv=true});
+
+                double coeff = 1.0 / (rho_i * rho_i * P_i.dR);
+                dv[i] = coeff * (P_i - P + P_i.dT * dT);
+
+                if (dv[i] < 0.0) {
+                    chi = std::min(chi, 0.95 / (rhos[i] * (-dv[i])));
+                }
+            }
+        }
+
+        // 0 < T + chi * dT < 2T
+        chi = std::min(chi, 0.95 * T / std::abs(dT));
+
+        // Поправляем приращения
+        dv *= chi;
+        dT *= chi;
+
+        // Вычисляем ошибку
+        double err = 0.0;
+        for (int i = 0; i < n_fractions; ++i) {
+            if (beta.has(i)) {
+                err = std::max(err, std::abs(rhos[i] * dv[i]));
+                rhos[i] = rhos[i] / (1.0 + rhos[i] * dv[i]);
+            }
+        }
+        double err_T = std::abs(dT / T);
+
+        T.val += dT;
+
+        //std::cout << "\tcounter: " << counter << ".\tT: " << T.val << ".\tϱ: " << rhos << "; error: " << err << "\n";
+
+        if (err < epsilon_v && err_T < epsilon_T) {
+            if (options.deriv) {
+                T.dP = A_xi / C_xi;
+                T.dR = -1.0 / (rho * rho * C_xi);
+            }
+            break;
+        }
+
+        ++counter;
+    }
+
+    return {rhos, T};
+}
+
+// Старая схема. Итерации по давлению. Не проверяет на чистоту
+MixturePT::triplet_rP MixturePT::find_reT_rP_new(double rho, double P,
+        const Fractions& beta, const MixOptions& options) const {
+    auto[rhos, T] = find_rT_rP_new(rho, P, beta, options);
+
+    dPdT e1 = {0.0, 0.0, 0.0};
+    for (int i = 0; i < size(); ++i) {
+        if (beta.has(i)) {
+            dRdT e_i = m_materials[i]->energy_rT(rhos[i], T, options[i]);
+            e1.val += beta[i] * e_i.val;
+            if (options.deriv) {
+                dRdT P_i = m_materials[i]->pressure_rT(rhos[i], T, options[i]);
+
+                e1.dP += beta[i] * e_i.dR / P_i.dR;
+                e1.dT += beta[i] * (e_i.dT - e_i.dR * P_i.dT / P_i.dR);
+            }
+        }
+    }
+
+    dRdP e2 = e1.val;
+    if (options.deriv) {
+        e2.dR = e1.dT * T.dR;
+        e2.dP = e1.dT * T.dP + e1.dP;
+    }
+    return {rhos, e2, T};
+}
+
+// Новая схема. Итерации по объемным долям и температуре. Не проверяет на чистоту
+MixturePT::triplet_re MixturePT::find_rPT_new(double rho, double e,
+        const Fractions& beta, const MixOptions& options) const {
+    // Решается система уравнений
+    //   sum beta_i v_i = v,
+    //   P_i (v_i, T) = P_j (v_j, T)
+    //   sum beta_i e_i (v_i, T) = e
+
+    dRdE P = NAN;
+    dRdE T = std::isnan(options.T0) ? 300.0 : options.T0;
+
+    double v = 1.0 / rho;
 
     // Число материалов в задаче
     int n_fractions = beta.count();
 
     // Начальное приближение объемных долей
-    Fractions alpha = options.alpha ? *options.alpha : beta;
-    for (int i = 0; i < n_fractions; ++i) {
-        if (beta.has(i) && alpha[i] == 0.0) {
-            alpha[i] = 0.0001; // добавить материал
-        }
-        if (beta.has(i)) {
-            alpha[i] = beta[i] / m_materials[i]->density();
-        }
-    }
-    alpha.normalize();
-
-    /*
-    if (!std::isnan(options.T0)) {
-        if (options.alpha) {
-            *options.alpha = alpha;
-        }
-
-        for (int i = 0; i < n_fractions; ++i) {
-            if (beta[i] > 0.0 && alpha[i] == 0.0) {
-
-                std::cout << "OH NO\n";
-            }
-        }
-
-        for (int i = 0; i < n_fractions; ++i) {
-            if (beta.has(i)) {
-                alpha[i] = beta[i] / m_materials[i]->density();
-            }
-        }
-
-        alpha.normalize();
-
-        double temp_P = pressure_rT_ver2(rho, T, beta, options, 0.001);
-    }
-     */
+    ScalarSet rhos = init_densities(beta, options);
 
     // Приращения объемных долей на итерациях
-    ScalarSet delta;
+    ScalarSet dv;
 
-    double err = 1.0;
+    //std::cout << "\tinitial: \tT: " << T.val << ".\tϱ: " << rhos << "\n";
+
     int counter = 0;
-    while (err > 1.0e-12 && counter < 30) {
+    while (counter < max_counter) {
         // Расчет вспомогательных величин
         double A_xi{0.0}, A_eta{0.0};
         double B_xi{0.0}, B_eta{0.0};
         double C_xi{0.0}, C_eta{0.0};
-        double e_beta{0.0}, e_beta_T{0.0};
+        double v_hat = 0.0;
+        double e_hat = 0.0;
+        double e_hat_T = 0.0;
         for (int i = 0; i < n_fractions; ++i) {
-            if (alpha.has(i)) {
-                double rho_i = (beta[i] / alpha[i]) * rho;
+            if (beta.has(i)) {
+                double rho_i = rhos[i];
                 dRdT P_i = m_materials[i]->pressure_rT(rho_i, T, {.deriv=true});
                 dRdT e_i = m_materials[i]->energy_rT  (rho_i, T, {.deriv=true});
 
-                double xi = alpha[i] / (rho_i * P_i.dR);
+                double xi = beta[i] / (rho_i * rho_i * P_i.dR);
                 double eta = beta[i] * e_i.dR / P_i.dR;
 
                 A_xi += xi;
@@ -610,95 +874,63 @@ PairPT MixturePT::find_PT_ver2(double rho, double e, const Fractions &beta,
                 B_eta += eta * P_i;
                 C_eta += eta * P_i.dT;
 
-                e_beta += beta[i] * e_i.val;
-                e_beta_T += beta[i] * e_i.dT;
+                v_hat += beta[i] / rho_i;
+                e_hat += beta[i] * e_i.val;
+                e_hat_T += beta[i] * e_i.dT;
             }
         }
 
-        // Всё четко лол
-        double dT = (A_eta * B_xi - A_xi * B_eta - A_xi * (e - e_beta)) /
-                (A_xi * C_eta - A_eta * C_xi - A_xi * e_beta_T);
+        // Приращение dT не ограничиваем
+        double dT = (A_xi * B_eta - A_eta * B_xi + A_xi * (e - e_hat) + A_eta * (v - v_hat)) /
+                    (A_eta * C_xi - A_xi * C_eta + A_xi * e_hat_T);
 
-        for (int i = 0; i < n_fractions; ++i) {
-            if (alpha.has(i)) {
-                double rho_i = (beta[i] / alpha[i]) * rho;
-                dRdT P_i = m_materials[i]->pressure_rT(rho_i, T, {.deriv=true});
-                double xi = alpha[i] / (rho_i * P_i.dR);
-                delta[i] = xi * (P_i - B_xi / A_xi + (P_i.dT - C_xi / A_xi) * dT);
-            }
-        }
-
-        // Поправляем условия, чтобы 0 < alpha_i + da_i < 1.
-        // Найдем константу chi, потом умножим на неё.
         double chi = 1.0;
         for (int i = 0; i < n_fractions; ++i) {
-            if (alpha.has(i)) {
-                if (alpha[i] + delta[i] > 1.0) {
-                    chi = std::min(chi, 0.95 * (1.0 - alpha[i]) / (delta[i]));
-                }
-                else if (alpha[i] + delta[i] < 0.0) {
-                    chi = std::min(chi, 0.95 * (alpha[i]) / (-delta[i]));
-                }
+            if (beta.has(i)) {
+                double rho_i = rhos[i];
+                dRdT P_i = m_materials[i]->pressure_rT(rho_i, T, {.deriv=true});
 
+                double coeff = 1.0 / (rho_i * rho_i * P_i.dR);
+
+                dv[i] = coeff * (P_i + (v - v_hat - B_xi) / A_xi + (P_i.dT - C_xi / A_xi) * dT);
+
+                if (dv[i] < 0.0) {
+                    chi = std::min(chi, 0.95 / (rhos[i] * (-dv[i])));
+                }
             }
         }
-        for (int i = 0; i < n_fractions; ++i) {
-            if (alpha.has(i)) {
-                delta[i] *= chi;
-            }
-        }
+
+        dv *= chi;
         dT *= chi;
 
-        err = 0.0;
+        // Вычисляем ошибку
+        double err = 0.0;
         for (int i = 0; i < n_fractions; ++i) {
-            if (alpha.has(i)) {
-                alpha[i] += delta[i];
-                err = std::max(err, std::abs(delta[i]));
-
-                assert(alpha[i] <= 1.0);
-                assert(alpha[i] > 0.0);
+            if (beta.has(i)) {
+                err = std::max(err, std::abs(rhos[i] * dv[i]));
+                rhos[i] = rhos[i] / (1.0 + rhos[i] * dv[i]);
             }
         }
-        T += dT;
+        err = std::max(err, std::abs(1.0 - rho * v_hat));
+        double err_e = std::abs(1.0 - e / e_hat);
+
+        T.val += dT;
+
+        //std::cout << "\tcounter: " << counter << ".\tP: " << B_xi / A_xi << ".\tT: " << T.val << ".\tϱ: " << rhos << "\terror : " << err << "\n";
+
+        if (err < epsilon_v && err_e < epsilon_e) {
+            P = B_xi / A_xi;
+            if (options.deriv) {
+                P.dR = (e_hat_T - C_eta) / (rho * rho * (C_xi * A_eta + A_xi * (e_hat_T - C_eta)));
+                P.dE = C_xi / (C_xi * A_eta + A_xi * (e_hat_T - C_eta));
+            }
+            break;
+        }
 
         ++counter;
     }
 
-    alpha.normalize();
-
-    // Просто усредняем. На самом деле, если метод сошелся,
-    // тогда все значения P_i равны
-    double P = 0.0;
-    for (int i = 0; i < n_fractions; ++i) {
-        if (alpha.has(i)) {
-            double rho_i = (beta[i] / alpha[i]) * rho;
-            P += alpha[i] * m_materials[i]->pressure_rT(rho_i, T);
-        }
-    }
-
-    // Перенести объемные доли
-    if (options.alpha) {
-        *options.alpha = alpha;
-    }
-
-    return {P, T};
-}
-
-PairPT MixturePT::find_PT(double rho, double e, const Fractions &beta,
-                          const Options &options) const {
-
-    return find_PT_ver2(rho, e, beta, options);
-}
-
-double MixturePT::sound_speed_PT(double P, double T,
-                                 const Fractions &beta, const Options &options) const {
-
-    auto v = volume_PT(P, T, beta, {.deriv=true, .rho0=options.rho0, .alpha=options.alpha});
-    auto e = energy_PT(P, T, beta, {.deriv=true, .rho0=options.rho0, .alpha=options.alpha});
-    double inv_D = inv_J(v, e);
-
-    double c2 = inv_D * sqr(v) * (e.dT + P * v.dT);
-    return std::sqrt(c2);
+    return {rhos, P, T};
 }
 
 } // namespace zephyr::phys

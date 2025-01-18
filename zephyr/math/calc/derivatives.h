@@ -2,6 +2,9 @@
 
 #pragma once
 
+#include <cmath>
+#include <cassert>
+#include <stdexcept>
 #include <functional>
 
 namespace zephyr::math {
@@ -324,6 +327,56 @@ double derivative_r(F&& f, double x, double h) {
     else {
         throw std::runtime_error("derivative third order not implemented");
     }
+}
+
+
+enum class DiffStyle : int {
+    Central  = 0,
+    Forward  = 1,
+    Backward = 2,
+};
+
+// DERIVEST calculates numeric derivative of a function.
+// Arguments (input)
+//   fun              - function to differentiate
+//   x0               - point at which to differentiate fun
+//   derivative_order - specifies the derivative order estimated.
+//                      Must be a positive integer from the set {1, 2, 3, 4}.
+//   method_order     - specifies the order of the basic method used for
+//                      the estimation.
+//                      For central methods, methods_order must be 2 or 4;
+//                      otherwise can be 1, 2, 3 or 4
+//   style            - specifies the style of the basic method used for the
+//                      estimation. 'central', 'forward', or 'backwards'
+//                      difference methods are used.
+//   romberg_terms    - Allows the user to specify the generalized Romberg
+//                      extrapolation method used, or turn it off completely.
+//                      Must be a positive integer from the set {0, 1, 2, 3}.
+//
+// Arguments (output)
+//   &der             - store the result (derivative)
+//   &err             - store error estimate
+//   &final_delta     - store the final overall stepsize chosen by DERIVEST
+//
+// Return value: true if succeeded, false otherwise.
+//
+// Remark. Recommended params are as follows:
+//   diff_style    = DiffStyle::Central
+//   method_order  = 4
+//   romberg_terms = 2
+bool derivest_c(const std::function<double(double)>& fun, double x0,
+                int derivative_order, int method_order,
+                DiffStyle diff_style, int romberg_terms,
+                double &der, double& err, double& final_delta);
+
+/// @brief Вызов функции derivest_c на манер C++
+/// По хорошему derivest_c тоже можно переписать на шаблон. Но зачем?
+/// Так симпатичнее же? df = derivest<1>(func, x);
+template<int der_ord, int acc_ord = 4, DiffStyle style = DiffStyle::Central>
+double derivest(const std::function<double(double)>& func, double x) {
+    double res{NAN}, err{NAN}, delta{NAN};
+    bool conv = derivest_c(func, x, der_ord, acc_ord, style, 2, res, err, delta);
+    return conv ? res : NAN;
 }
 
 } // namespace zephyr::math

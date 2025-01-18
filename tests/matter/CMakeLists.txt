@@ -1,6 +1,6 @@
-#list(APPEND TESTS consistency)
+list(APPEND TESTS consistency)
 #list(APPEND TESTS matter-ex)
-#list(APPEND TESTS mixture)
+list(APPEND TESTS mixture)
 #list(APPEND TESTS mixture2)
 #list(APPEND TESTS mixutre3)
 

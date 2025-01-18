@@ -1,5 +1,6 @@
 #list(APPEND TESTS asigma)
 #list(APPEND TESTS weno)
+list(APPEND TESTS derivatives)
 
 # Assume all files in direcory are tests
 if (ZEPHYR_TESTS_ALL)
