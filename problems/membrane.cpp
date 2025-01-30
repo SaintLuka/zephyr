@@ -13,6 +13,7 @@
 #include <zephyr/math/cfd/fluxes.h>
 #include <zephyr/math/cfd/models.h>
 
+#include <zephyr/phys/literals.h>
 #include <zephyr/phys/matter/eos/ideal_gas.h>
 
 #include <zephyr/utils/stopwatch.h>

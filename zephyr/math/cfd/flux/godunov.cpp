@@ -46,8 +46,8 @@ mmf::Flux Godunov::calc_flux(const mmf::PState &zL, const mmf::PState &zR, const
     }
 
     auto sol = RiemannSolver::solve(zL.to_smf(), zR.to_smf(),
-            mixture.stiffened_gas(zL.density, zL.pressure, zL.mass_frac, {.T0 = zL.temperature, .alpha=&zL.vol_frac}),
-            mixture.stiffened_gas(zR.density, zR.pressure, zR.mass_frac, {.T0 = zR.temperature, .alpha=&zR.vol_frac}));
+            mixture.stiffened_gas(zL.density, zL.pressure, zL.mass_frac, {.T0 = zL.temperature, .rhos=&zL.densities}),
+            mixture.stiffened_gas(zR.density, zR.pressure, zR.mass_frac, {.T0 = zR.temperature, .rhos=&zR.densities}));
 
     mmf::Flux flux;
     if (sol.U >= 0) {

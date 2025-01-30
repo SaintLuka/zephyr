@@ -314,6 +314,18 @@ inline double pressure_rfan(cref uR, cref pR, cref cR, cref gR, cref p0R, cref x
     return (pR + p0R) * std::pow(2.0 / (gR + 1.0) - ((gR - 1.0) * (uR - xi)) / ((gR + 1.0) * cR), 2.0 * gR / (gR - 1.0)) - p0R;
 }
 
+RiemannSolver::RiemannSolver() {
+    x_jump = NAN;
+    gL = p0L = e0L = NAN;
+    gR = p0R = e0R = NAN;
+    rL = uL = pL = NAN;
+    rR = uR = pR = NAN;
+    cL = cR = NAN;
+    U = P = NAN;
+    rl = rr = NAN;
+    DL1 = DL2 = DR1 = DR2 = NAN;
+}
+
 RiemannSolver::Solution RiemannSolver::solve(
         const PState &zL, const PState &zR, const StiffenedGas &eos) {
 

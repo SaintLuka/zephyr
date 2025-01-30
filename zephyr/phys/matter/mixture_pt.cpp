@@ -237,21 +237,6 @@ double MixturePT::sound_speed_PT(double P, double T,
     return std::sqrt(c2);
 }
 
-// Начальное приближение для объемных долей
-Fractions MixturePT::init_vol_fracs(const Fractions& beta, const MixOptions& options) const {
-    Fractions alpha = options.alpha ? *options.alpha : beta;
-    for (int i = 0; i < size(); ++i) {
-        if (beta.has(i) && alpha[i] == 0.0) {
-            alpha[i] = 0.0001; // добавить материал
-        }
-        if (beta.has(i)) {
-            alpha[i] = beta[i] / m_materials[i]->density();
-        }
-    }
-    alpha.normalize();
-    return alpha;
-}
-
 ScalarSet MixturePT::init_densities(const Fractions &beta, const MixOptions &options) const {
     ScalarSet rhos{NAN};
     if (options.rhos != nullptr) {

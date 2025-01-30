@@ -37,6 +37,9 @@ struct Fractions {
     /// @brief Конструктор из набора скаляров
     explicit Fractions(const ScalarSet &scalars);
 
+    /// @brief Создать набор с единственной ненулевой
+    static Fractions Pure(int idx);
+
     /// @brief Содержит компоненту с индексом idx
     bool has(int idx) const;
 

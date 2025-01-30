@@ -6,9 +6,7 @@
 #include <zephyr/geom/generator/strip.h>
 #include <zephyr/mesh/mesh.h>
 
-#include <zephyr/phys/tests/toro.h>
-#include <zephyr/phys/tests/rarefied_water.h>
-#include <zephyr/phys/tests/multimat_1D.h>
+#include <zephyr/phys/tests/test_1D.h>
 
 #include <zephyr/math/solver/riemann.h>
 #include <zephyr/math/solver/mm_fluid.h>
@@ -38,10 +36,10 @@ double get_T(AmrStorage::Item &cell) { return cell(U).temperature; }
 double get_cln(AmrStorage::Item &cell) { return cell(U).mass_frac.index(); }
 double get_mfrac1(AmrStorage::Item &cell) { return cell(U).mass_frac[0]; }
 double get_mfrac2(AmrStorage::Item &cell) { return cell(U).mass_frac[1]; }
-double get_vfrac1(AmrStorage::Item &cell) { return cell(U).vol_frac[0]; }
-double get_vfrac2(AmrStorage::Item &cell) { return cell(U).vol_frac[1]; }
-double get_rho1(AmrStorage::Item &cell) { return cell(U).get_state().true_density(0); }
-double get_rho2(AmrStorage::Item &cell) { return cell(U).get_state().true_density(1); }
+double get_vfrac1(AmrStorage::Item &cell) { return cell(U).vol_frac(0); }
+double get_vfrac2(AmrStorage::Item &cell) { return cell(U).vol_frac(1); }
+double get_rho1(AmrStorage::Item &cell) { return cell(U).densities[0]; }
+double get_rho2(AmrStorage::Item &cell) { return cell(U).densities[1]; }
 double get_normal_x(AmrStorage::Item &cell) { return cell(U).n[0].x(); }
 double get_normal_y(AmrStorage::Item &cell) { return cell(U).n[0].y(); }
 
@@ -116,10 +114,10 @@ int main() {
         }
          */
         cell(U).mass_frac[0] = in ? 1.0 : 0.0;
-        cell(U).mass_frac[1] = 1.0 - cell(U).mass_frac[0] ;
+        cell(U).mass_frac[1] = 1.0 - cell(U).mass_frac[0];
 
-        cell(U).vol_frac[0] = cell(U).mass_frac[0];
-        cell(U).vol_frac[1] = cell(U).mass_frac[1];
+        cell(U).densities[0] = cell(U).mass_frac[0] > 0.0 ? cell(U).density : NAN;
+        cell(U).densities[1] = cell(U).mass_frac[1] > 0.0 ? cell(U).density : NAN;
 
         /*
         cell(U).density = 1.0 / mixture.volume_PT(

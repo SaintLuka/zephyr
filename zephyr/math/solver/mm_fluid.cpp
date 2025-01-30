@@ -14,6 +14,26 @@ using zephyr::utils::threads;
 
 static const MmFluid::State U = MmFluid::datatype();
 
+double MmFluid::State::vol_frac(int idx) const {
+    if (mass_frac.has(idx)) {
+        return mass_frac[idx] * density / densities[idx];
+    } else {
+        return 0.0;
+    }
+}
+
+Fractions MmFluid::State::vol_fracs() const {
+    Fractions alpha;
+    for (int i = 0; i < Fractions::size(); ++i) {
+        if (mass_frac.has(i)) {
+            // Если есть массовая концентрация beta_i, значит
+            // должна быть определена плотность rho_i !
+            alpha[i] = mass_frac[i] * density / densities[i];
+        }
+    }
+    return alpha;
+}
+
 MmFluid::State MmFluid::datatype() {
     return {};
 }
@@ -87,8 +107,9 @@ void MmFluid::set_max_dt(double dt) {
 mmf::PState get_current_mm(Cell &cell) {
     return cell(U).get_state();
 }
+
 Fractions get_current_a(Cell &cell) {
-    return cell(U).vol_frac;
+    return cell(U).vol_fracs();
 }
 
 PState boundary_value(const PState &zc, const Vector3d &normal, Boundary flag) {
@@ -158,7 +179,7 @@ void MmFluid::compute_dt(Mesh &mesh) {
         // скорость звука
         double c = mixture.sound_speed_rP(
                 cell(U).density, cell(U).pressure, cell(U).mass_frac,
-                {.T0=cell(U).temperature, .alpha=&cell(U).vol_frac});
+                {.T0=cell(U).temperature, .rhos=&cell(U).densities});
 
         for (auto &face: cell.faces()) {
             // Нормальная составляющая скорости
@@ -369,8 +390,8 @@ Flux MmFluid::calc_flux(const PState& zL, const PState& zR, double hL, double hR
     int iA = 0;
     int iB = 1;
 
-    double aL = zL.vol_frac[iA];
-    double aR = zR.vol_frac[iA];
+    double aL = zL.alpha(iA);
+    double aR = zR.alpha(iA);
 
     // Либо не содержат iA, либо полностью заполнены iA
     if ((aL == 0.0 || aL == 1.0) && (aR == 0.0 || aR == 1.0)) {
@@ -489,15 +510,15 @@ void MmFluid::fluxes(Mesh &mesh, double dt, Direction dir) {
             double hL = V_c / S;
             double hR = V_n / S;
 
-            double a_sig = face_fraction(zm.vol_frac[0], zp.vol_frac[0]);
+            double a_sig = face_fraction(zm.alpha(0), zp.alpha(0));
             bool positive = zm.u() + zp.u() > 0.0;
             double CFL = 0.5 * dt * std::abs(zm.u() + zp.u()) / hL;
             double cos = (positive ? cell(U).n[0] : face.neib(U).n[0]).dot(face.normal());
             if (!positive) {
                 cos *= -1.0;
             }
-            a_sig = geom::average_flux(positive ? zm.vol_frac[0] : zp.vol_frac[0], cos, CFL);
-            a_sig = between(a_sig, zm.vol_frac[0], zp.vol_frac[0]);
+            a_sig = geom::average_flux(positive ? zm.alpha(0) : zp.alpha(0), cos, CFL);
+            a_sig = between(a_sig, zm.alpha(0), zp.alpha(0));
 
             Flux loc_flux = calc_flux(zm, zp, hL, hR, a_sig, dt);
             loc_flux.to_global(normal);
@@ -510,7 +531,7 @@ void MmFluid::fluxes(Mesh &mesh, double dt, Direction dir) {
         q_c.arr() -= (dt / V_c) * flux.arr();
 
         // Новое значение примитивных переменных
-        cell(U).next = PState(q_c, mixture, z_c.P(), z_c.T(), z_c.alpha());
+        cell(U).next = PState(q_c, mixture, z_c.P(), z_c.T(), z_c.rhos());
 
         /*
         if (cell(U).next.P() < 0.0) {
@@ -543,9 +564,11 @@ void MmFluid::fractions_grad(Mesh& mesh, const GetState<Fractions>& get_state) {
         auto grad = gradient::LSM<Fractions>(cell, get_current_a, boundary_value_a);
         grad = gradient::limiting<Fractions>(cell, m_limiter, grad, get_current_a, boundary_value_a);
 
-        cell(U).d_dx.vol_frac = grad.x;
-        cell(U).d_dy.vol_frac = grad.y;
-        cell(U).d_dz.vol_frac = grad.z;
+        //cell(U).d_dx.vol_frac = grad.x;
+        //cell(U).d_dy.vol_frac = grad.y;
+        //cell(U).d_dz.vol_frac = grad.z;
+
+        throw std::runtime_error("FIX 23951");
     });
 }
 
@@ -556,12 +579,12 @@ void MmFluid::interface_recovery(Mesh &mesh) {
     mesh.for_each([](Cell& cell) {
         VectorSet ns;
 
-        const Fractions& a_c = cell(U).vol_frac;
+        Fractions a_c = cell(U).vol_fracs();
         for (auto face: cell.faces()) {
             Vector3d S = face.area() * face.normal();
 
             // На границе возвращает саму ячейку
-            const Fractions& a_n = face.neib(U).vol_frac;
+            Fractions a_n = face.neib(U).vol_fracs();
             for (int i = 0; i < Fractions::max_size; ++i) {
                 if (a_c.has(i)) {
                     ns[i] -= face_fraction(a_c[i], a_n[i]) * S;
@@ -637,7 +660,7 @@ void MmFluid::fluxes_stage1(Mesh &mesh, double dt, Direction dir)  {
         q_c.arr() -= (0.5 * dt / cell.volume()) * flux.arr();
 
         // Значение примитивных переменных на полушаге
-        cell(U).half = PState(q_c, mixture, z_c.P(), z_c.T(), z_c.alpha());
+        cell(U).half = PState(q_c, mixture, z_c.P(), z_c.T(), z_c.rhos());
     });
 }
 
@@ -715,7 +738,7 @@ void MmFluid::fluxes_stage2(Mesh &mesh, double dt, Direction dir)  {
         q_c.arr() -= (dt / cell.volume()) * flux.arr();
 
         // Значение примитивных переменных на полушаге
-        cell(U).next = PState(q_c, mixture, z_c.P(), z_c.T(), z_c.alpha());
+        cell(U).next = PState(q_c, mixture, z_c.P(), z_c.T(), z_c.rhos());
     });
 }
 

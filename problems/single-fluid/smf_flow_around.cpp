@@ -13,7 +13,7 @@
 #include <zephyr/geom/generator/collection/plane_with_cube.h>
 #include <zephyr/geom/generator/cuboid.h>
 
-#include <zephyr/phys/tests/shock_wave.h>
+#include <zephyr/phys/tests/test_1D.h>
 
 #include <zephyr/math/solver/sm_fluid.h>
 
@@ -54,16 +54,16 @@ int main() {
     ShockWave test(3.0, 0.8, 0.5);
 
     // Уравнение состояния
-    auto eos = test.get_eos({0.0, 0.0, 0.0});
+    auto eos = test.get_eos();
 
     // Начальные данные
     auto init_cells = [&test, &eos](Mesh& mesh) {
         for (auto cell: mesh) {
-            auto c = cell.center();
-            cell(U).density  = test.density(c);
-            cell(U).velocity = test.velocity(c);
-            cell(U).pressure = test.pressure(c);
-            cell(U).energy   = test.energy(cell.center());
+            auto cell_c = cell.center();
+            cell(U).density  = test.density(cell_c);
+            cell(U).velocity = test.velocity(cell_c);
+            cell(U).pressure = test.pressure(cell_c);
+            cell(U).energy   = test.energy(cell_c);
         }
     };
 

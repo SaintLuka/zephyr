@@ -50,6 +50,12 @@ Fractions::Fractions(const ScalarSet &scalars) {
     normalize();
 }
 
+Fractions Fractions::Pure(int idx) {
+    Fractions res;
+    res[idx] = 1.0;
+    return res;
+}
+
 bool Fractions::has(int idx) const {
     return m_data[idx] > 0.0;
 }

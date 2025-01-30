@@ -207,60 +207,52 @@ mmf::Flux HLLC::calc_flux(const mmf::PState &zL, const mmf::PState &zR, const ph
     const double &P_R = zR.pressure;
 
     // Скорость звука слева и справа
-    Fractions a_L = zL.alpha();
     double c_L = mixture.sound_speed_rP(zL.density, zL.pressure, zL.mass_frac,
-                                        {.T0 = zL.T(), .alpha = &a_L});
-    Fractions a_R = zR.alpha();
+                                        {.T0 = zL.T(), .rhos = &zL.densities});
     double c_R = mixture.sound_speed_rP(zR.density, zR.pressure, zR.mass_frac,
-                                        {.T0 = zR.T(), .alpha = &a_R});
+                                        {.T0 = zR.T(), .rhos = &zR.densities});
 
     // Оценки скоростей расходящихся волн
-    double S_L = std::min({u_L - c_L, u_R - c_R, 0.0});
-    double S_R = std::max({u_L + c_L, u_R + c_R, 0.0});
+    double S_L = std::min(u_L - c_L, u_R - c_R);
+    double S_R = std::max(u_L + c_L, u_R + c_R);
+
+    // Сверхзвуковое течение
+    if (S_L >= 0.0) { return Flux(zL); }
+    if (S_R <= 0.0) { return Flux(zR); }
+
+    double a_L = rho_L * (S_L - u_L);
+    double a_R = rho_R * (S_R - u_R);
 
     // Скорость контактного разрыва
-    double S_C = (P_R - P_L + rho_L * u_L * (S_L - u_L) - rho_R * u_R * (S_R - u_R)) /
-                 (rho_L * (S_L - u_L) - rho_R * (S_R - u_R));
+    double S_C = (P_L - P_R + a_R * u_R - a_L * u_L) / (a_R - a_L);
 
-    // Давление на контактном разрыве
-    double P_C = P_L + rho_L * (S_L - u_L) * (S_C - u_L);
+    // Плотность слева/справа от контактного разрыва
+    double rho_sL = a_L / (S_L - S_C);
+    double rho_sR = a_R / (S_R - S_C);
 
-    Flux F;
-    if (S_C >= 0.0) {
-        // Плотность слева от контактного разрыва
-        double rho_sL = rho_L * (S_L - u_L) / (S_L - S_C);
+    // Удельная полная энергия слева/справа от контактного разрыва
+    double E_sL = zL.E() + (S_C - u_L) * (S_C + P_L / a_L);
+    double E_sR = zR.E() + (S_C - u_R) * (S_C + P_R / a_R);
 
-        // Внутренняя энергия слева от контактного разрыва
-        double e_sL = zL.energy + 0.5 * sqr(S_C - u_L) + P_L * (S_C - u_L) / (rho_L * (S_L - u_L));
+    // Потоки масс слева/справа от контактного разрыва
+    ScalarSet rhos_sL = rho_sL * zL.beta().arr();
+    ScalarSet rhos_sR = rho_sR * zR.beta().arr();
 
-        // Вектор состояния слева от контактного разрыва
-        PState z_sL(rho_sL, {S_C, zL.v(), zL.w()}, P_C, e_sL, NAN, zL.beta(), Fractions::NaN());
+    // Консервативный вектор слева/справа от контактного разрыва
+    QState Q_sL(rho_sL, {rho_sL * S_C, rho_sL * zL.v(), rho_sL * zL.w()}, rho_sL * E_sL, rhos_sL);
+    QState Q_sR(rho_sR, {rho_sR * S_C, rho_sR * zR.v(), rho_sR * zR.w()}, rho_sR * E_sR, rhos_sR);
 
-        // Консервативный вектор слева от контактного разрыва
-        QState Q_sL(z_sL);
+    QState Q_L(zL);  // Консервативный вектор слева
+    QState Q_R(zR);  // Консервативный вектор слева
+    Flux F_L(zL);    // Дифференциальный поток слева
+    Flux F_R(zR);    // Дифференциальный поток справа
 
-        QState Q_L(zL);  // Консервативный вектор слева
-        Flux F_L(zL);    // Дифференциальный поток слева
-
-        F = F_L.arr() + S_L * (Q_sL.arr() - Q_L.arr());
-    } else {
-        // Плотность слева от контактного разрыва
-        double rho_sR = rho_R * (S_R - u_R) / (S_R - S_C);
-
-        // Внутренняя энергия слева от контактного разрыва
-        double e_sR = zR.energy + 0.5 * sqr(S_C - u_R) + P_R * (S_C - u_R) / (rho_R * (S_R - u_R));
-
-        // Вектор состояния слева от контактного разрыва
-        PState z_sR(rho_sR, {S_C, zR.v(), zR.w()}, P_C, e_sR, NAN, zR.beta(), Fractions::NaN());
-
-        // Консервативный вектор слева от контактного разрыва
-        QState Q_sR(z_sR);
-
-        QState Q_R(zR);  // Консервативный вектор слева
-        Flux F_R(zR);    // Дифференциальный поток справа
-
-        F = F_R.arr() + S_R * (Q_sR.arr() - Q_R.arr());
-    }
+    // Симметричная формула HLL(C)
+    Flux F = 0.5 * (F_L.arr() + F_R.arr() +
+                    S_L * (Q_sL.arr() - Q_L.arr()) +
+                    std::abs(S_C) * (Q_sL.arr() - Q_sR.arr()) +
+                    S_R * (Q_sR.arr() - Q_R.arr())
+    );
 
     if (F.arr().hasNaN()) {
         std::cerr << "HLLC::calc_flux error\n";
@@ -268,7 +260,7 @@ mmf::Flux HLLC::calc_flux(const mmf::PState &zL, const mmf::PState &zR, const ph
         std::cerr << "  z_R: " << zR << "\n";
         std::cerr << "  c_L: " << c_L << "; c_R: " << c_R << "\n";
         std::cerr << "  S_L: " << S_L << "; S_R: " << S_R << "\n";
-        std::cerr << "  F_HLL: " << F << "\n";
+        std::cerr << "  F_HLLC: " << F << "\n";
         throw std::runtime_error("HLLC::calc_flux error: bad value");
     }
 

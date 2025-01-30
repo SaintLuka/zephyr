@@ -1,21 +1,13 @@
 set(ZEPHYR_PHYS_TESTS_SRC
-        ${CMAKE_CURRENT_SOURCE_DIR}/multimat_1D.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/toro.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/ivp.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test_1D.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test_2D.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/sedov_blast.cpp
         PARENT_SCOPE)
 
 install(FILES
-        shu_osher.h
-        sod.h
-        toro.h
-        test_1D.h
-        sedov.h
-        sedov_blast.h
-        shock_wave.h
-        test_2D.h
-        multimat_1D.h
-        rarefied_water.h
-        richtmyer_meshkov.h
-        supersonic_flow_around_cylinder.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/ivp.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/test_1D.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/test_2D.h
         DESTINATION
         include/${PROJECT_NAME}/phys/tests)

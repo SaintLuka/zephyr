@@ -50,12 +50,10 @@ mmf::Flux Rusanov::calc_flux(const mmf::PState &zL, const mmf::PState &zR, const
     const double &u_R = zR.velocity.x();
 
     // Скорость звука слева и справа
-    Fractions a_L = zL.alpha();
     double c_L = mixture.sound_speed_rP(zL.density, zL.pressure, zL.mass_frac,
-                                        {.T0 = zL.T(), .alpha = &a_L});
-    Fractions a_R = zR.alpha();
+                                        {.T0 = zL.T(), .rhos = &zL.densities});
     double c_R = mixture.sound_speed_rP(zR.density, zR.pressure, zR.mass_frac,
-                                        {.T0 = zR.T(), .alpha = &a_R});
+                                        {.T0 = zR.T(), .rhos = &zR.densities});
 
     if (std::isnan(c_L) || std::isnan(c_R)) {
         std::cerr << "Rusanov::calc_mm_flux error #1\n";

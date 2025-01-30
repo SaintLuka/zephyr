@@ -14,9 +14,6 @@ struct MixOptions {
     double P0   = NAN;   ///< Начальное приближение давления
     double T0   = NAN;   ///< Начальное приближение температуры
 
-    /// @brief Начальные приближения для объемных долей
-    const Fractions* alpha = nullptr;
-
     /// @brief Начальные приближения для истинных плотностей
     const ScalarSet* rhos = nullptr;
 
@@ -33,7 +30,7 @@ class MixturePT {
 public:
 
     /// @brief Конструктор по умолчанию (пустой список)
-    MixturePT(bool old_style = false) : m_old(old_style) { };
+    MixturePT(bool old_style = true) : m_old(old_style) { };
 
     /// @brief Создать из списка инициалиации
     MixturePT(const std::initializer_list<Eos::Ptr>& il)
@@ -202,9 +199,6 @@ public:
                        const Fractions& beta, const MixOptions& options = {}) const;
 
 protected:
-    // Начальное приближение для объемных долей
-    Fractions init_vol_fracs(const Fractions& beta, const MixOptions& options) const;
-
     // Начальное приближение для истинных плотностей
     // Если beta[i] > 0.0, тогда densities[i] адекватно определена.
     ScalarSet init_densities(const Fractions& beta, const MixOptions& options) const;

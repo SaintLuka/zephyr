@@ -167,22 +167,23 @@ struct PState {
     double    energy;       ///< Внутренняя энергия смеси (доп)
     double    temperature;  ///< Равновесная температура (доп)
     Fractions mass_frac;    ///< Массовые доли компонент
-    Fractions vol_frac;     ///< Объемные доли компонент (доп)
+    ScalarSet densities;    ///< Истинные плотности (доп)
 
     /// @brief Инициализация нулями
     PState();
 
     /// @brief Инициализация с полным заданием параметров
     PState(double density, const Vector3d &velocity, double pressure, double energy,
-           double temperature, const Fractions &mass_frac, const Fractions& vol_frac);
+           double temperature, const Fractions &mass_frac, const ScalarSet& densities);
 
     /// @brief Инициализация из консервативного вектора состояния,
     /// давление, температура и объемные доли определяются из уравнения
     /// состояния смеси (PT - замыкание).
     /// В качестве начальных приближений в следует передавать начальные
-    /// приближения для давления (P0), температуры (T0) и объемных долей (alpha).
+    /// приближения для давления (P0), температуры (T0) и
+    /// плотностей компонент (densities).
     PState(const QState &q, const MixturePT &mixture,
-           double P0, double T0, const Fractions& alpha);
+           double P0, double T0, const ScalarSet& densities);
 
 
     /// @brief Переводит вектор состояния в локальную систему координат
@@ -208,11 +209,18 @@ struct PState {
     inline const double& P() const { return pressure; }
     inline const double& T() const { return temperature; }
     inline const double& e() const { return energy; }
-    inline const Fractions& alpha() const { return vol_frac; }
     inline const Fractions& beta() const { return mass_frac; }
+    inline const ScalarSet& rhos() const { return densities; }
 
-    /// @brief Плотность компоненты
-    double true_density(int idx) const;
+    inline double alpha(int idx) const {
+        return mass_frac[idx] * density / densities[idx];
+    }
+
+    // Квадрат модуля скорости
+    inline double v2() const { return velocity.squaredNorm(); }
+
+    // Полная удельная энергия
+    inline double E() const { return energy + 0.5 * v2(); }
 
     /// @brief Энергия компоненты energy(P, T)
     double true_energy(const MixturePT& mixture, int idx) const;

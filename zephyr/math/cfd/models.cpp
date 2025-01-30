@@ -173,23 +173,23 @@ PState::PState()
       pressure(0.0),
       temperature(0.0),
       energy(0.0),
-      mass_frac(),
-      vol_frac() { }
+      mass_frac{0.0},
+      densities{0.0} { }
 
 PState::PState(double density, const Vector3d &velocity, double pressure,
         double energy, double temperature,
-        const Fractions &mass_frac, const Fractions& vol_frac)
+        const Fractions &mass_frac, const ScalarSet& rhos)
     : density(density),
       velocity(velocity),
       pressure(pressure),
       energy(energy),
       temperature(temperature),
       mass_frac(mass_frac),
-      vol_frac(vol_frac) {
+      densities(rhos) {
 }
 
 PState::PState(const QState &q, const phys::MixturePT &mixture,
-               double P0, double T0, const Fractions& alpha0) {
+               double P0, double T0, const ScalarSet& rhos0) {
 
     density   = q.density;
     velocity  = q.momentum / density;
@@ -199,25 +199,11 @@ PState::PState(const QState &q, const phys::MixturePT &mixture,
     mass_frac.cutoff(1.0e-12);
     mass_frac.normalize();
 
-    throw std::runtime_error("FIX 1432");
     auto[rhos, P, T] = mixture.get_rPT(density, energy, mass_frac,
-                              {.P0=P0, .T0=T0, .alpha=&alpha0});
-    //vol_frac    = alpha;
+                                       {.P0=P0, .T0=T0, .rhos=&rhos0});
+    densities   = rhos;
     pressure    = P;
     temperature = T;
-
-    // alpha и beta должны обращаться в ноль одновременно,
-    // иначе возникают невнятные косяки
-    for (int i = 0; i < Fractions::size(); ++i) {
-        if (mass_frac.has(i) != vol_frac.has(i)) {
-            std::cout << "SOMETHING WONG: " << "\n";
-            if (!vol_frac.has(i)) {
-                mass_frac[i] = vol_frac[i] = 0.0;
-            }
-        }
-    }
-    mass_frac.normalize();
-    vol_frac .normalize();
 }
 
 void PState::to_local(const Vector3d &normal) {
@@ -249,16 +235,12 @@ std::ostream &operator<<(std::ostream &os, const PState &state) {
             "ρ: %.5f,  v: {%+.5e, %+.5e, %+.5e},  P: %+.5e,  e: %+.5e,  T: %+.5e,  ") %
           state.density % state.velocity.x() % state.velocity.y() % state.velocity.z() %
           state.pressure % state.energy % state.temperature;
-    os << boost::format("β: %1%,  α: %2%") % state.mass_frac % state.vol_frac;
+    os << boost::format("β: %1%,  ϱ: %2%") % state.mass_frac % state.mass_frac;
     return os;
 }
 
-double PState::true_density(int idx) const {
-    return mass_frac[idx] * density / vol_frac[idx];
-}
-
 double PState::true_energy(const MixturePT& mixture, int idx) const {
-    return mixture[idx].energy_PT(pressure, temperature, {.deriv = false});
+    return mixture[idx].energy_rT(densities[idx], temperature, {.deriv = false});
 }
 
 smf::PState PState::to_smf() const {
@@ -266,12 +248,15 @@ smf::PState PState::to_smf() const {
 }
 
 smf::PState PState::extract(const MixturePT& mixture, int idx) const {
-    return smf::PState(true_density(idx), velocity, pressure, true_energy(mixture, idx));
+    return smf::PState(densities[idx], velocity, pressure, true_energy(mixture, idx));
 }
 
 std::pair<mmf::PState, mmf::PState> PState::split(const MixturePT& mixture, int iA) const {
     mmf::PState zA = *this;
     mmf::PState zB = *this;
+
+    throw std::runtime_error("FIX5016");
+    /*
 
     double alfa_A = vol_frac[iA];
     double beta_A = mass_frac[iA];
@@ -295,22 +280,19 @@ std::pair<mmf::PState, mmf::PState> PState::split(const MixturePT& mixture, int 
     }
 
     return {zA, zB};
+     */
 }
 
 void PState::interpolation_update(const MixturePT& mixture) {
     // Нормализуем после интерполяции
     mass_frac.normalize();
-    vol_frac .normalize();
-
-    throw std::runtime_error("FIX erte2");
 
     // Восстанавливаем совместность после интерполяции
-    //auto[alpha, e, T] = mixture.get_aeT(density, pressure, mass_frac,
-    //                                    {.T0=temperature, .alpha=&vol_frac});
-
-    //vol_frac    = alpha;
-    //energy      = e;
-    //temperature = T;
+    auto[rhos, e, T] = mixture.get_reT(density, pressure, mass_frac,
+                                       {.T0=temperature, .rhos=&densities});
+    energy      = e;
+    temperature = T;
+    densities   = rhos;
 }
 
 bool PState::is_bad() const {
@@ -387,7 +369,7 @@ Flux::Flux()
 }
 
 Flux::Flux(const PState &z) {
-    density         = z.density * z.velocity.x();
+    density      = z.density * z.velocity.x();
     mass_frac    = z.density * z.velocity.x() * z.mass_frac.arr();
     momentum.x() = z.density * z.velocity.x() * z.velocity.x() + z.pressure;
     momentum.y() = z.density * z.velocity.x() * z.velocity.y();
@@ -428,7 +410,7 @@ void Flux::inverse() {
     momentum.y() = -momentum.y();
     momentum.z() = -momentum.z();
     energy = -energy;
-    mass_frac.arr() *= -1.0;
+    mass_frac *= -1.0;
 }
 
 std::ostream &operator<<(std::ostream &os, const Flux &flux) {

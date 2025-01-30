@@ -3,6 +3,7 @@
 #include <vector>
 
 #include <zephyr/phys/matter/material.h>
+#include "mixture_pt.h"
 
 namespace zephyr::phys {
 
@@ -21,6 +22,9 @@ public:
     /// @brief Число компонент
     inline int size() const { return m_materials.size(); }
 
+    /// @brief Единственный материал?
+    inline bool single() const { return m_materials.size() == 1; }
+
     /// @brief Удалить материалы
     void clear();
 
@@ -28,7 +32,13 @@ public:
     void append(Material& mat);
 
     /// @brief Добавить материал в список
-    void operator+=(Material& eos);
+    void operator+=(Material& mat);
+
+    /// @brief Добавить материал в список
+    void append(Eos::Ref eos);
+
+    /// @brief Добавить материал в список
+    void operator+=(Eos::Ref eos);
 
     /// @brief Оператор доступа к конкретному материалу
     /// @param idx Индекс материала
@@ -42,6 +52,8 @@ public:
         return m_materials[idx];
     }
 
+    /// @brief Уравнение состояния смеси с PT-замыканием
+    MixturePT mixture_PT() const;
 
 protected:
     /// @brief Массив материалов

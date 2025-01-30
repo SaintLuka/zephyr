@@ -36,6 +36,9 @@ public:
             : rho(rho), Uf(Uf), Pf(Pf), U(U), P(P), conv(conv) {}
     };
 
+    /// @brief Инициализирует NAN
+    RiemannSolver();
+
     /// @brief Решить задачу Римана о распаде разрыва
     /// @param rhoL, uL, pL Плотность, скорость, давление слева
     /// @param rhoR, uR, pR Плотность, скорость, давление справа

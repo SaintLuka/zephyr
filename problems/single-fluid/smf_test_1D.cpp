@@ -8,10 +8,7 @@
 #include <zephyr/geom/generator/strip.h>
 #include <zephyr/mesh/mesh.h>
 
-#include <zephyr/phys/tests/sod.h>
-#include <zephyr/phys/tests/toro.h>
-#include <zephyr/phys/tests/shu_osher.h>
-#include <zephyr/phys/tests/shock_wave.h>
+#include <zephyr/phys/tests/test_1D.h>
 
 #include <zephyr/math/solver/riemann.h>
 #include <zephyr/math/solver/sm_fluid.h>
@@ -42,10 +39,10 @@ double get_e(AmrStorage::Item& cell) { return cell(U).energy; }
 
 int main() {
     // Тестовая задача
-    //SodTest test;
-    ToroTest test(1);
+    SodTest test;
+    //ToroTest test(1);
     //ShuOsherTest test;
-    //ShockWave test(5.0, 0.1, 0.1);
+    //ShockWave test(3.0, 0.1, 1.0);
 
     // Начальные данные
     auto init_cells = [&test](Mesh& mesh) {
@@ -57,19 +54,8 @@ int main() {
         }
     };
 
-    // Состояния слева и справа в тесте
-    Vector3d Ox = 100.0 * Vector3d::UnitX();
-    PState zL(test.density(-Ox), test.velocity(-Ox),
-              test.pressure(-Ox), test.energy(-Ox));
-
-    PState zR(test.density(Ox), test.velocity(Ox),
-              test.pressure(Ox), test.energy(Ox));
-
-    // Точное решение задачи Римана
-    // (если есть, не для всех одномерных тестов)
-    auto eos = test.get_eos(Ox);
-    StiffenedGas sg = eos->stiffened_gas(zL.density, zL.pressure);
-    RiemannSolver exact(zL, zR, sg, test.get_x_jump());
+    // Уравнение состояния
+    Eos::Ptr eos = test.get_eos();
 
     // Файл для записи
     PvdFile pvd("test1D", "output");
@@ -84,28 +70,30 @@ int main() {
     pvd.variables += {"e", get_e};
 
     pvd.variables += {"rho_exact",
-                      [&exact, &curr_time](const AmrStorage::Item &cell) -> double {
-                          return exact.density(cell.center.x(), curr_time);
+                      [&test, &curr_time](const AmrStorage::Item &cell) -> double {
+                          return test.density_t(cell.center, curr_time);
                       }};
     pvd.variables += {"u_exact",
-                      [&exact, &curr_time](const AmrStorage::Item &cell) -> double {
-                          return exact.velocity(cell.center.x(), curr_time);
+                      [&test, &curr_time](const AmrStorage::Item &cell) -> double {
+                          return test.velocity_t(cell.center, curr_time).x();
                       }};
     pvd.variables += {"p_exact",
-                      [&exact, &curr_time](const AmrStorage::Item &cell) -> double {
-                          return exact.pressure(cell.center.x(), curr_time);
+                      [&test, &curr_time](const AmrStorage::Item &cell) -> double {
+                          return test.pressure_t(cell.center, curr_time);
                       }};
     pvd.variables += {"e_exact",
-                      [&exact, &curr_time](const AmrStorage::Item &cell) -> double {
-                          return exact.energy(cell.center.x(), curr_time);
+                      [&test, &curr_time](const AmrStorage::Item &cell) -> double {
+                          return test.energy_t(cell.center, curr_time);
                       }};
     pvd.variables += {"c",
                       [&eos](AmrStorage::Item& cell) -> double {
                           return eos->sound_speed_rP(cell(U).density, cell(U).pressure);
                       }};
     pvd.variables += {"c_exact",
-                      [&exact, &curr_time](const AmrStorage::Item &cell) -> double {
-                          return exact.sound_speed(cell.center.x(), curr_time);
+                      [&eos, &test, &curr_time](const AmrStorage::Item &cell) -> double {
+                          double rho = test.density_t(cell.center, curr_time);
+                          double P = test.pressure_t(cell.center, curr_time);
+                          return eos->sound_speed_rP(rho, P);
                       }};
 
     // Создаем одномерную сетку
@@ -181,38 +169,33 @@ int main() {
     csv.save(mesh);
 
     // Расчёт ошибок
-    double r_err = 0.0, u_err = 0.0, p_err = 0.0, e_err = 0.0, c_err = 0.0;
-    double r_avg = 0.0, u_avg = 0.0, p_avg = 0.0, e_avg = 0.0, c_avg = 0.0;
+    double r_err = 0.0, u_err = 0.0, p_err = 0.0, e_err = 0.0;
+    double r_avg = 0.0, u_avg = 0.0, p_avg = 0.0, e_avg = 0.0;
     for (auto cell: mesh) {
-        double x = cell.center().x();
+        Vector3d r = cell.center();
         double V = cell.volume();
 
-        r_err += V * std::abs(cell(U).density      - exact.density(x, curr_time));
-        u_err += V * std::abs(cell(U).velocity.x() - exact.velocity(x, curr_time));
-        p_err += V * std::abs(cell(U).pressure     - exact.pressure(x, curr_time));
-        e_err += V * std::abs(cell(U).energy       - exact.energy(x, curr_time));
-        c_err += V * std::abs(eos->sound_speed_rP(cell(U).density, cell(U).pressure) -
-                              exact.sound_speed(x, curr_time));
+        r_err += V * std::abs(cell(U).density      - test.density_t(r, curr_time));
+        u_err += V * std::abs(cell(U).velocity.x() - test.velocity_t(r, curr_time).x());
+        p_err += V * std::abs(cell(U).pressure     - test.pressure_t(r, curr_time));
+        e_err += V * std::abs(cell(U).energy       - test.energy_t(r, curr_time));
 
         r_avg += V * std::abs(cell(U).density     );
         u_avg += V * std::abs(cell(U).velocity.x());
         p_avg += V * std::abs(cell(U).pressure    );
         e_avg += V * std::abs(cell(U).energy      );
-        c_avg += V * std::abs(eos->sound_speed_rP(cell(U).density, cell(U).pressure));
     }
     r_err /= r_avg;
     u_err /= u_avg;
     p_err /= p_avg;
     e_err /= e_avg;
-    c_err /= c_avg;
 
     std::cout << std::scientific << std::setprecision(4);
     std::cout << "\nMean errors\n";
-    std::cout << "    Density:     " << r_err << "\n";
-    std::cout << "    Velocity:    " << u_err << "\n";
-    std::cout << "    Pressure:    " << p_err << "\n";
-    std::cout << "    Energy:      " << e_err << "\n";
-    std::cout << "    Sound Speed: " << c_err << "\n";
+    std::cout << "    Density:  " << r_err << "\n";
+    std::cout << "    Velocity: " << u_err << "\n";
+    std::cout << "    Pressure: " << p_err << "\n";
+    std::cout << "    Energy:   " << e_err << "\n";
 
     return 0;
 }

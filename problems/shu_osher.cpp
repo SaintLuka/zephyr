@@ -12,8 +12,7 @@
 #include <zephyr/math/cfd/fluxes.h>
 #include <zephyr/math/cfd/models.h>
 
-#include <zephyr/phys/matter/eos/ideal_gas.h>
-#include <zephyr/phys/tests/shu_osher.h>
+#include <zephyr/phys/tests/test_1D.h>
 
 using zephyr::geom::Box;
 using zephyr::geom::Boundary;
@@ -62,7 +61,7 @@ int main() {
     ShuOsherTest test;
 
     // Уравнение состояния
-    auto eos = test.get_eos({0.0, 0.0, 0.0});
+    auto eos = test.get_eos();
 
     // Создаем одномерную сетку
     Strip gen(test.xmin(), test.xmax());
@@ -73,12 +72,11 @@ int main() {
     Mesh mesh(U, &gen);
 
     // Заполняем начальные данные
-    Vector3d shift = -2.0*Vector3d::UnitX();
     for (auto cell: mesh) {
-        cell(U).rho1 = test.density(cell.center());
+        cell(U).rho1 = test.density (cell.center());
         cell(U).v1   = test.velocity(cell.center());
         cell(U).p1   = test.pressure(cell.center());
-        cell(U).e1   = test.energy(cell.center());
+        cell(U).e1   = test.energy  (cell.center());
     }
 
     // Число Куранта

@@ -6,12 +6,7 @@
 
 #include <zephyr/mesh/mesh.h>
 
-#include <zephyr/phys/tests/toro.h>
-#include <zephyr/phys/tests/sedov.h>
 #include <zephyr/phys/tests/test_2D.h>
-#include <zephyr/phys/tests/shu_osher.h>
-#include <zephyr/phys/tests/shock_wave.h>
-#include <zephyr/phys/tests/richtmyer_meshkov.h>
 
 #include <zephyr/math/solver/sm_fluid.h>
 
@@ -51,57 +46,25 @@ int main() {
     threads::on(6);
 
     // Тестовая задача
-    //Test2D test(6);
-    SedovBlast test;
-    //ShuOsherTest test;
+    Riemann2D test(6);
     //ToroTest2D test(1, 0.3 * M_PI);
     //SkewShockWave test(5.0, M_PI/6, 0.2);
     //RichtmyerMeshkov test;
 
-    auto eos = test.get_eos({0.0, 0.0, 0.0});
+    auto eos = test.get_eos();
 
     // Использовать подсеточную реконструкцию начальных данных?
-    bool simple_init = false;
-
-    // Распределение консервативных величин
-    auto density      = [&test](const Vector3d& r) -> double { return test.density(r); };
-    auto momentum_x   = [&test](const Vector3d& r) -> double { return test.density(r) * test.velocity(r).x(); };
-    auto momentum_y   = [&test](const Vector3d& r) -> double { return test.density(r) * test.velocity(r).y(); };
-    auto momentum_z   = [&test](const Vector3d& r) -> double { return test.density(r) * test.velocity(r).z(); };
-    auto total_energy = [&test](const Vector3d& r) -> double {
-        Vector3d v = test.velocity(r);
-        return test.density(r) * (test.energy(r) + 0.5 * v.dot(v));
-    };
+    const bool simple_init = false;
+    const int n = simple_init ? 0 : 20;
 
     // Задание начальных данных
-    auto init_cells = [&](Mesh& mesh) {
+    auto init_cells = [&test, eos, n](Mesh& mesh) {
         mesh.for_each([&](Cell& cell) {
-            if (simple_init ||
-               (cell.const_function(density) &&
-                cell.const_function(total_energy))) {
-
-                Vector3d r = cell.center();
-                cell(U).density  = test.density(r);
-                cell(U).velocity = test.velocity(r);
-                cell(U).energy   = test.energy(r);
-                cell(U).pressure = test.pressure(r);
-            }
-            else {
-                int n = 20;
-                double V = cell.volume();
-
-                QState q(
-                        cell.integrate_low(density, n) / V, {
-                                cell.integrate_low(momentum_x, n) / V,
-                                cell.integrate_low(momentum_y, n) / V,
-                                cell.integrate_low(momentum_z, n) / V
-                        },
-                        cell.integrate_low(total_energy, n) / V);
-
-                PState z(q, *eos);
-
-                cell(U).set_state(z);
-            }
+            QState q(test.density_mean(cell, n),
+                     test.momentum_mean(cell, n),
+                     test.energy_mean(cell, n));
+            PState z(q, *eos);
+            cell(U).set_state(z);
         });
     };
 
@@ -119,7 +82,8 @@ int main() {
 
     // Генератор сетки (с граничными условиями) дает тест,
     // число ячеек можно задать
-    Rectangle gen = test.generator;
+    Rectangle gen(test.xmin(), test.xmax(), test.ymin(), test.ymax());
+    gen.set_boundaries(test.boundaries());
     gen.set_nx(mpi::single() ? 50 : 500);
 
     // Создать сетку
@@ -131,7 +95,7 @@ int main() {
     solver.set_accuracy(2);
     solver.set_CFL(0.5);
     solver.set_limiter("MC");
-    solver.set_method(Fluxes::HLLC_M);
+    solver.set_method(Fluxes::HLLC);
 
     // Сеточная адаптация
     mesh.set_max_level(mpi::single() ? 3 : 0);

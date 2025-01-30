@@ -52,7 +52,7 @@ public:
         double temperature;  ///< Равновесная температура
 
         Fractions mass_frac; ///< Массовые доли веществ
-        Fractions vol_frac;  ///< Объемные доли веществ
+        ScalarSet densities; ///< Плотности компонент
 
         PState half;         ///< Состояние на полушаге
         PState next;         ///< Состояние на следующем шаге
@@ -75,7 +75,7 @@ public:
         /// @brief Собрать вектор состояния на предыдущем шаге
         PState get_state() const {
             return PState(density, velocity, pressure, energy,
-                          temperature, mass_frac, vol_frac);
+                          temperature, mass_frac, densities);
         }
 
         /// @brief Установить вектор состояния на предыдущем шаге
@@ -87,8 +87,14 @@ public:
             temperature = z.temperature;
 
             mass_frac   = z.mass_frac;
-            vol_frac    = z.vol_frac;
+            densities   = z.densities;
         }
+
+        /// @brief Массив объемных долей
+        double vol_frac(int idx) const;
+
+        /// @brief Массив объемных долей
+        Fractions vol_fracs() const;
     };
 
     /// @brief Получить экземпляр расширенного вектора состояния

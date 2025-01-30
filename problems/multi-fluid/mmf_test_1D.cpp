@@ -6,9 +6,8 @@
 #include <zephyr/geom/generator/strip.h>
 #include <zephyr/mesh/mesh.h>
 
-#include <zephyr/phys/tests/toro.h>
-#include <zephyr/phys/tests/rarefied_water.h>
-#include <zephyr/phys/tests/multimat_1D.h>
+#include <zephyr/phys/literals.h>
+#include <zephyr/phys/tests/test_1D.h>
 
 #include <zephyr/math/solver/riemann.h>
 #include <zephyr/math/solver/mm_fluid.h>
@@ -38,37 +37,19 @@ double get_T(AmrStorage::Item &cell) { return cell(U).temperature; }
 double get_cln(AmrStorage::Item &cell) { return cell(U).mass_frac.index(); }
 double get_mfrac1(AmrStorage::Item &cell) { return cell(U).mass_frac[0]; }
 double get_mfrac2(AmrStorage::Item &cell) { return cell(U).mass_frac[1]; }
-double get_vfrac1(AmrStorage::Item &cell) { return cell(U).vol_frac[0]; }
-double get_vfrac2(AmrStorage::Item &cell) { return cell(U).vol_frac[1]; }
-double get_rho1(AmrStorage::Item &cell) { return cell(U).get_state().true_density(0); }
-double get_rho2(AmrStorage::Item &cell) { return cell(U).get_state().true_density(1); }
+double get_vfrac1(AmrStorage::Item &cell) { return cell(U).vol_frac(0); }
+double get_vfrac2(AmrStorage::Item &cell) { return cell(U).vol_frac(1); }
+double get_rho1(AmrStorage::Item &cell) { return cell(U).densities[0]; }
+double get_rho2(AmrStorage::Item &cell) { return cell(U).densities[1]; }
 
 
 int main() {
     // Тестовая задача
     //RarefiedWater test;
-    Multimat1D test(1, 1, 0);
+    //Multimat1D test(1, 1, 0);
+    ToroTest test(1, true, true);
 
-    // Чистые состояния слева и справа в тесте
-    Vector3d Ox = {100.0, 0.0, 0.0};
-    smf::PState zL(test.density(-Ox), test.velocity(-Ox),
-                   test.pressure(-Ox), test.energy(-Ox));
-
-    smf::PState zR(test.density(Ox), test.velocity(Ox),
-                   test.pressure(Ox), test.energy(Ox));
-
-    // Вытащим УрС
-    Eos::Ptr eos_L = test.get_eos(-Ox);
-    Eos::Ptr eos_R = test.get_eos( Ox);
-
-    MixturePT mixture;
-    mixture += eos_L;
-    mixture += eos_R;
-
-    // Точное решение задачи Римана
-    StiffenedGas sgL = eos_L->stiffened_gas(zL.density, zL.pressure);
-    StiffenedGas sgR = eos_R->stiffened_gas(zR.density, zR.pressure);
-    RiemannSolver exact(zL, zR, sgL, sgR, test.get_x_jump());
+    MixturePT mixture = test.mixture_PT();
 
     // Файл для записи
     PvdFile pvd("test1D", "output");
@@ -90,28 +71,24 @@ int main() {
     double curr_time = 0.0;
 
     pvd.variables += {"rho_exact",
-                      [&exact, &curr_time](const AmrStorage::Item &cell) -> double {
-                          return exact.density(cell.center.x(), curr_time);
+                      [&test, &curr_time](const AmrStorage::Item &cell) -> double {
+                          return test.density_t(cell.center, curr_time);
                       }};
     pvd.variables += {"u_exact",
-                      [&exact, &curr_time](const AmrStorage::Item &cell) -> double {
-                          return exact.velocity(cell.center.x(), curr_time);
+                      [&test, &curr_time](const AmrStorage::Item &cell) -> double {
+                          return test.velocity_t(cell.center, curr_time).x();
                       }};
     pvd.variables += {"p_exact",
-                      [&exact, &curr_time](const AmrStorage::Item &cell) -> double {
-                          return exact.pressure(cell.center.x(), curr_time);
+                      [&test, &curr_time](const AmrStorage::Item &cell) -> double {
+                          return test.pressure_t(cell.center, curr_time);
                       }};
     pvd.variables += {"e_exact",
-                      [&exact, &curr_time](const AmrStorage::Item &cell) -> double {
-                          return exact.energy(cell.center.x(), curr_time);
-                      }};
-    pvd.variables += {"c_exact",
-                      [&exact, &curr_time](const AmrStorage::Item &cell) -> double {
-                          return exact.sound_speed(cell.center.x(), curr_time);
+                      [&test, &curr_time](const AmrStorage::Item &cell) -> double {
+                          return test.energy_t(cell.center, curr_time);
                       }};
     pvd.variables += {"b_exact",
-                      [&exact, &curr_time](const AmrStorage::Item &cell) -> double {
-                          return exact.fraction(cell.center.x(), curr_time);
+                      [&test, &curr_time](const AmrStorage::Item &cell) -> double {
+                          return test.fractions_t(cell.center, curr_time)[0];
                       }};
 
     // Создаем одномерную сетку
@@ -124,7 +101,7 @@ int main() {
     // Создать решатель
     MmFluid solver(mixture);
     solver.set_CFL(0.5);
-    solver.set_accuracy(1);
+    solver.set_accuracy(2);
     solver.set_method(Fluxes::HLLC);
 
     for (auto cell: mesh) {
@@ -134,11 +111,10 @@ int main() {
         cell(U).pressure = test.pressure(r);
         cell(U).energy   = test.energy(r);
 
-        cell(U).mass_frac[0] = test.fraction(r, 0);
-        cell(U).mass_frac[1] = test.fraction(r, 1);
+        cell(U).mass_frac = test.fractions(r);
 
-        cell(U).vol_frac[0] = test.fraction(r, 0);
-        cell(U).vol_frac[1] = test.fraction(r, 1);
+        cell(U).densities[0] = test.fractions(r)[0] > 0.0 ? test.density(r) : NAN;
+        cell(U).densities[1] = test.fractions(r)[1] > 0.0 ? test.density(r) : NAN;
 
         cell(U).temperature = mixture.temperature_rP(
                 cell(U).density, cell(U).pressure, cell(U).mass_frac);
@@ -153,7 +129,7 @@ int main() {
                       << "\tTime: " << std::setw(6) << std::setprecision(3) << curr_time << "\n";
             pvd.save(mesh, curr_time);
             if (n_step < 3870000000000000000) {
-                next_write += test.max_time() / 200;
+                next_write += 0.0;//test.max_time() / 200;
             }
         }
 
@@ -175,13 +151,13 @@ int main() {
     double r_err = 0.0, u_err = 0.0, p_err = 0.0, e_err = 0.0;
     double r_avg = 0.0, u_avg = 0.0, p_avg = 0.0, e_avg = 0.0;
     for (auto cell: mesh) {
-        double x = cell.center().x();
+        Vector3d r = cell.center();
         double V = cell.volume();
 
-        r_err += V * std::abs(cell(U).density      - exact.density(x, curr_time));
-        u_err += V * std::abs(cell(U).velocity.x() - exact.velocity(x, curr_time));
-        p_err += V * std::abs(cell(U).pressure     - exact.pressure(x, curr_time));
-        e_err += V * std::abs(cell(U).energy       - exact.energy(x, curr_time));
+        r_err += V * std::abs(cell(U).density      - test.density_t(r, curr_time));
+        u_err += V * std::abs(cell(U).velocity.x() - test.velocity_t(r, curr_time).x());
+        p_err += V * std::abs(cell(U).pressure     - test.pressure_t(r, curr_time));
+        e_err += V * std::abs(cell(U).energy       - test.energy_t(r, curr_time));
 
         r_avg += V * std::abs(cell(U).density     );
         u_avg += V * std::abs(cell(U).velocity.x());
