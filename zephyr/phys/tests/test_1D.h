@@ -80,7 +80,7 @@ public:
 /// (глава 10 и 4.3.3 Numerical Tests)
 /// E.F. Toro. Riemann Solvers and Numerical Methods for Fluid Dynamics.
 class ToroTest : public Test1D {
-public:
+protected:
     double x_jump;  ///< Положение разрыва
     double finish;  ///< Конечный момент времени
     double rL, rR;  ///< Плотность
@@ -91,9 +91,18 @@ public:
     /// @brief Точное решение задачи Римана
     RiemannSolver exact;
 
+    // Обновляет энергии и точное решение после изменения
+    // параметров или уравнений состояния
+    void update();
+
+public:
     /// @brief Конструктор
     /// @param num Номер теста 1..7
-    explicit ToroTest(int num, bool multimat = false, bool adjust_cv = true);
+    explicit ToroTest(int num, bool multimat = false);
+
+    /// @brief Выравнять температуру на разрыве путем
+    /// настройки удельной теплоемкости
+    void adjust_cv();
 
     std::string name() const final { return "ToroTest";}
 

@@ -4,7 +4,7 @@
 #include <zephyr/geom/primitives/boundary.h>
 #include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/phys/matter/eos/ideal_gas.h>
-#include <zephyr/phys/tests/ivp.h>
+#include <zephyr/phys/tests/test_1D.h>
 
 namespace zephyr::phys {
 
@@ -73,6 +73,75 @@ public:
     Vector3d velocity(const Vector3d &vec) const final;
 
     double pressure(const Vector3d &vec) const final;
+};
+
+/// @brief Одномерный тест, повернутый на угол alpha
+/// Поворот осуществляется вокруг центра одномерной задачи.
+/// Размер двумерной области в полтора раза больше длины
+/// одномерной области, чтобы исключить влияние граничных условий.
+class RotatedTest : public Test2D {
+public:
+    Test1D& test_1D;
+
+    double x_c;           // Центр одномерной задачи
+    double sin_p, cos_p;  // sin/cos угла поворота
+    double x_min, x_max;
+    double y_min, y_max;
+
+    RotatedTest(Test1D& test, double angle);
+
+    /// @brief Название теста
+    std::string name() const final {
+        return "Rotated " + test_1D.name();
+    }
+
+    // Границы области
+
+    double xmin() const final { return x_min; }
+
+    double xmax() const final { return x_max; }
+
+    double ymin() const final { return y_min; }
+
+    double ymax() const final { return y_max; }
+
+    /// @brief Конечный момент времени
+    double max_time() const final { return test_1D.max_time(); }
+
+    // Начальные условия
+
+    int index(const Vector3d& r) const final;
+
+    double density(const Vector3d &r) const final;
+
+    Vector3d velocity(const Vector3d &r) const final;
+
+    double pressure(const Vector3d &r) const final;
+
+    double energy(const Vector3d &r) const final;
+
+    double temperature(const Vector3d &r) const final;
+
+    Fractions fractions(const Vector3d &r) const final;
+
+    // Точное решение
+
+    int index_t(const Vector3d& r, double t) const final;
+
+    double density_t(const Vector3d &r, double t) const final;
+
+    Vector3d velocity_t(const Vector3d &r, double t) const final;
+
+    double pressure_t(const Vector3d &r, double t) const final;
+
+    double energy_t(const Vector3d &r, double t) const final;
+
+    double temperature_t(const Vector3d& r, double t) const final;
+
+    Fractions fractions_t(const Vector3d &r, double t) const final;
+
+protected:
+    Vector3d rotate(const Vector3d& r) const;
 };
 
 /// @brief Неустойчивость Рихтмайера -- Мешкова,

@@ -47,7 +47,8 @@ int main() {
     // Тестовая задача
     //RarefiedWater test;
     //Multimat1D test(1, 1, 0);
-    ToroTest test(1, true, true);
+    ToroTest test(1, true);
+    //test.adjust_cv();
 
     MixturePT mixture = test.mixture_PT();
 
@@ -78,13 +79,17 @@ int main() {
                       [&test, &curr_time](const AmrStorage::Item &cell) -> double {
                           return test.velocity_t(cell.center, curr_time).x();
                       }};
-    pvd.variables += {"p_exact",
+    pvd.variables += {"P_exact",
                       [&test, &curr_time](const AmrStorage::Item &cell) -> double {
                           return test.pressure_t(cell.center, curr_time);
                       }};
     pvd.variables += {"e_exact",
                       [&test, &curr_time](const AmrStorage::Item &cell) -> double {
                           return test.energy_t(cell.center, curr_time);
+                      }};
+    pvd.variables += {"T_exact",
+                      [&test, &curr_time](const AmrStorage::Item &cell) -> double {
+                          return test.temperature_t(cell.center, curr_time);
                       }};
     pvd.variables += {"b_exact",
                       [&test, &curr_time](const AmrStorage::Item &cell) -> double {
@@ -123,14 +128,12 @@ int main() {
     size_t n_step = 0;
     double next_write = 0.0;
 
-    while (curr_time < test.max_time() && n_step < 15000000000) {
+    while (curr_time < test.max_time()) {
         if (curr_time >= next_write) {
             std::cout << "\tStep: " << std::setw(6) << n_step << ";"
                       << "\tTime: " << std::setw(6) << std::setprecision(3) << curr_time << "\n";
             pvd.save(mesh, curr_time);
-            if (n_step < 3870000000000000000) {
-                next_write += 0.0;//test.max_time() / 200;
-            }
+            next_write += test.max_time() / 200;
         }
 
         // Точное завершение в end_time
@@ -171,10 +174,10 @@ int main() {
 
     std::cout << "\nMean errors\n";
     std::cout << std::scientific << std::setprecision(4);
-    std::cout << "    Density:     " << r_err << "\n";
-    std::cout << "    Velocity:    " << u_err << "\n";
-    std::cout << "    Pressure:    " << p_err << "\n";
-    std::cout << "    Energy:      " << e_err << "\n";
+    std::cout << "    Density:  " << r_err << "\n";
+    std::cout << "    Velocity: " << u_err << "\n";
+    std::cout << "    Pressure: " << p_err << "\n";
+    std::cout << "    Energy:   " << e_err << "\n";
 
     return 0;
 }

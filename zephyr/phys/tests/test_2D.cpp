@@ -106,6 +106,91 @@ double Riemann2D::pressure(const Vector3d &vec) const {
 }
 
 // ============================================================================
+//                                Rotated 1D Test
+// ============================================================================
+
+RotatedTest::RotatedTest(Test1D& test, double angle)
+    : test_1D(test) {
+
+    m_materials = test_1D.materials();
+
+    x_c = 0.5 * (test_1D.xmin() + test_1D.xmax());
+
+    sin_p = std::sin(angle);
+    cos_p = std::cos(angle);
+
+    double scale = 1.5;
+    double delta = scale * 0.5 * (test_1D.xmax() - test_1D.xmin());
+
+    x_min = x_c - delta;
+    x_max = x_c + delta;
+    y_min = -delta;
+    y_max = +delta;
+}
+
+Vector3d RotatedTest::rotate(const Vector3d& r) const {
+    return {+cos_p * (r.x() - x_c) + sin_p * r.y() + x_c,
+            -sin_p * (r.x() - x_c) + cos_p * r.y(),
+            0.0};
+}
+
+int RotatedTest::index(const Vector3d& r) const {
+    return test_1D.index(rotate(r));
+}
+
+double RotatedTest::density(const Vector3d &r) const {
+    return test_1D.density(rotate(r));
+}
+
+Vector3d RotatedTest::velocity(const Vector3d &r) const {
+    return test_1D.velocity(rotate(r));
+}
+
+double RotatedTest::pressure(const Vector3d &r) const {
+    return test_1D.pressure(rotate(r));
+}
+
+double RotatedTest::energy(const Vector3d &r) const {
+    return test_1D.energy(rotate(r));
+}
+
+double RotatedTest::temperature(const Vector3d &r) const {
+    return test_1D.temperature(rotate(r));
+}
+
+Fractions RotatedTest::fractions(const Vector3d &r) const {
+    return test_1D.fractions(rotate(r));
+}
+
+int RotatedTest::index_t(const Vector3d& r, double t) const {
+    return test_1D.index_t(rotate(r), t);
+}
+
+double RotatedTest::density_t(const Vector3d &r, double t) const {
+    return test_1D.density_t(rotate(r), t);
+}
+
+Vector3d RotatedTest::velocity_t(const Vector3d &r, double t) const {
+    return test_1D.velocity_t(rotate(r), t);
+}
+
+double RotatedTest::pressure_t(const Vector3d &r, double t) const {
+    return test_1D.pressure_t(rotate(r), t);
+}
+
+double RotatedTest::energy_t(const Vector3d &r, double t) const {
+    return test_1D.energy_t(rotate(r), t);
+}
+
+double RotatedTest::temperature_t(const Vector3d& r, double t) const {
+    return test_1D.temperature_t(rotate(r), t);
+}
+
+Fractions RotatedTest::fractions_t(const Vector3d &r, double t) const {
+    return test_1D.fractions_t(rotate(r), t);
+}
+
+// ============================================================================
 //                      Richtmyer - Meshkov Instability
 // ============================================================================
 

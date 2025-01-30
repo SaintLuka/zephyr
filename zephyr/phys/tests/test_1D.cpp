@@ -59,19 +59,10 @@ double SodTest::pressure_t(const Vector3d &r, double t) const {
 //                           Toro Tests
 // ============================================================================
 
-ToroTest::ToroTest(int num, bool multimat, bool adjust_cv) {
-    Eos::Ptr eos_L, eos_R;
-    if (!multimat) {
-        eos_L = IdealGas::create(1.4);
-        eos_R = eos_L;
-        m_materials += eos_L;
-    }
-    else {
-        eos_L = IdealGas::create(1.3);
-        eos_R = IdealGas::create(1.5);
-        m_materials += eos_L;
-        m_materials += eos_R;
-    }
+ToroTest::ToroTest(int num, bool multimat) {
+    // Показатель адиабаты
+    double gamma_1 = 1.4;
+    double gamma_2 = 1.1;
 
     switch (num) {
         case 1:
@@ -109,6 +100,8 @@ ToroTest::ToroTest(int num, bool multimat, bool adjust_cv) {
             pR = 0.01;
             x_jump = 0.5;
             finish = 0.012;
+
+            gamma_2 = 1.6; // лучше такое значение
             break;
         case 4:
             // Тест 4 представляет собой правую половину задачи Вудворда и Колеллы;
@@ -134,8 +127,11 @@ ToroTest::ToroTest(int num, bool multimat, bool adjust_cv) {
             pR = 0.01;
             x_jump = 0.8;
             finish = 0.012;
+
+            gamma_2 = 1.6; // лучше такое значение
             break;
         case 6:
+            // Тест 6. Стацонарный тест. HLLC выдерживает разрыв, в отличае от HLL
             rL = 1.4;
             uL = 0.0;
             pL = 1.0;
@@ -146,6 +142,8 @@ ToroTest::ToroTest(int num, bool multimat, bool adjust_cv) {
             finish = 2.0;
             break;
         case 7:
+            // Тест 7. Простой перенос. Дисипация контактного разрыва в методе HLLС
+            // и Годунова меньше, чем в методах типа HLL и Русанова
             rL = 1.4;
             uL = 0.1;
             pL = 1.0;
@@ -159,10 +157,24 @@ ToroTest::ToroTest(int num, bool multimat, bool adjust_cv) {
             throw std::runtime_error("Unknown Toro test (num > 7)");
     }
 
-    if (multimat && adjust_cv) {
-        eos_L->adjust_cv(rL, pL, 1.0);
-        eos_R->adjust_cv(rR, pR, 1.0);
+    m_materials += IdealGas::create(gamma_1);
+    if (multimat) {
+        m_materials += IdealGas::create(gamma_2);
     }
+    update();
+}
+
+void ToroTest::adjust_cv() {
+    if (!m_materials.single()) {
+        m_materials[0].adjust_cv(rL, pL, 1.0);
+        m_materials[1].adjust_cv(rR, pR, 1.0);
+        update();
+    }
+}
+
+void ToroTest::update() {
+    Eos::Ptr eos_L = m_materials[0].eos();
+    Eos::Ptr eos_R = m_materials.single() ? eos_L : m_materials[1].eos();
 
     eL = eos_L->energy_rP(rL, pL);
     eR = eos_R->energy_rP(rR, pR);

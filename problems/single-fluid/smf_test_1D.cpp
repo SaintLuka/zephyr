@@ -39,8 +39,8 @@ double get_e(AmrStorage::Item& cell) { return cell(U).energy; }
 
 int main() {
     // Тестовая задача
-    SodTest test;
-    //ToroTest test(1);
+    //SodTest test;
+    ToroTest test(1);
     //ShuOsherTest test;
     //ShockWave test(3.0, 0.1, 1.0);
 

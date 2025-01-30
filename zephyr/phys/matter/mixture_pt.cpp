@@ -203,7 +203,7 @@ MixturePT::triplet_re MixturePT::get_rPT(double rho, double e,
         ScalarSet rhos{NAN};
         rhos[idx] = rho;
         double P = m_materials[idx]->pressure_re(rho, e);
-        double T = m_materials[idx]->temperature_rP(rho, e);
+        double T = m_materials[idx]->temperature_rP(rho, P);
         return {rhos, P, T};
     }
 

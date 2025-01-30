@@ -50,6 +50,8 @@ int main() {
     //ToroTest2D test(1, 0.3 * M_PI);
     //SkewShockWave test(5.0, M_PI/6, 0.2);
     //RichtmyerMeshkov test;
+    //SodTest test_1D;
+    //RotatedTest test(test_1D, M_PI / 4.0);
 
     auto eos = test.get_eos();
 
@@ -80,6 +82,16 @@ int main() {
     pvd.variables += {"p", get_p};
     pvd.variables += {"e", get_e};
 
+    double curr_time = 0.0;
+    pvd.variables += {"rho_exact",
+                      [&test, &curr_time](const AmrStorage::Item &cell) -> double {
+                          return test.density_t(cell.center, curr_time);
+                      }};
+    pvd.variables += {"p_exact",
+                      [&test, &curr_time](const AmrStorage::Item &cell) -> double {
+                          return test.pressure_t(cell.center, curr_time);
+                      }};
+
     // Генератор сетки (с граничными условиями) дает тест,
     // число ячеек можно задать
     Rectangle gen(test.xmin(), test.xmax(), test.ymin(), test.ymax());
@@ -109,7 +121,6 @@ int main() {
     init_cells(mesh);
 
     size_t n_step = 0;
-    double curr_time = 0.0;
     double next_write = 0.0;
 
     Stopwatch elapsed(true);
