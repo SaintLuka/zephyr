@@ -183,6 +183,15 @@ public:
     /// данные с других процессов
     void exchange();
 
+    /// @brief Балансирует нагрузку согласно decomposition
+    void balancing(double load);
+
+    /// @brief Дисбаланс нагрузки
+    double get_imbalance(const std::vector<double>& ws) const {
+        if(m_decomp)
+            return m_decomp->imbalance(ws);
+        return -1;
+    }
 
     /// @brief Найти описывающий параллелепипед (Bounding box)
     geom::Box bbox();

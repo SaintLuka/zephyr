@@ -23,12 +23,26 @@ void EuMesh::set_decomposition(const std::string& type) {
 }
 
 void EuMesh::set_decomposition(const decomp::ORB& orb, bool update) {
+#ifdef ZEPHYR_MPI
     if (mpi::single()) return;
 
 	m_decomp = std::make_shared<ORB>(orb);
 	if (update) {
+		// вызываю, чтобы инициализировать m_tourism
+		build_aliens();
         redistribute();
 	}
+#endif
+}
+
+void EuMesh::balancing(double load){
+	if (mpi::single()) return;
+
+#ifdef ZEPHYR_MPI
+	std::vector<double> ws(mpi::size());
+	mpi::all_gather(load, ws);
+	m_decomp->balancing(ws);
+#endif
 }
 
 void EuMesh::redistribute() {
@@ -126,15 +140,12 @@ void EuMesh::migrate() {
 	std::vector<int> m_i(size, 0);
 	// По некоторому правилу определяется новый rank для всех ячеек из массива locals
 	for (auto& cell: m_locals){
-		// m_decomp->rank(cell);
-		
 		cell.rank = m_decomp->rank(cell);
 
-		// cell.rank = (cell.index / (m_nx*m_nx/2)) * 2 + (cell.index % (m_nx)) / (m_nx/2);
 		// Подсчитываем число ячеек, которые должны быть перемещены с данного процесса на другие
 		++m_i[cell.rank];
 	}
-	
+
 	/* DEBUG
 	if(mpi::master()){
 		for (auto& cell: m_locals){
@@ -148,6 +159,7 @@ void EuMesh::migrate() {
 		for(int i=0; i<size; ++i)
 			printf("m_%d: %d\n", i, m_i[i]);
 	}*/
+
 
 	std::vector<int> m = mpi::all_gather_vectors(m_i);
 
@@ -167,13 +179,22 @@ void EuMesh::migrate() {
 		printf("\n");
 	}
 	*/
-
+	
+	exchange();
+	
 	// Переиндексируем грани
 	for (auto& cell: m_locals){
 		for(auto& face: cell.faces){
-			if(face.adjacent.index >= 0){
+			if (face.is_undefined()) 
+				continue;
+			
+			if(face.adjacent.alien == -1){
+				auto& it = m_locals[face.adjacent.index];
 				face.adjacent.rank = m_locals[face.adjacent.index].rank;
 				face.adjacent.index = m_locals[face.adjacent.index].index;
+			} else{
+				face.adjacent.rank = m_aliens[face.adjacent.alien].rank;
+				face.adjacent.index = m_aliens[face.adjacent.alien].index;
 			}
 		}
 	}
@@ -190,14 +211,14 @@ void EuMesh::migrate() {
 		printf("\n");
 	}
 	//*/
-	
+
 	// Заполняем migrants, сортируем по rank
 	auto& migrants = m_migration.m_migrants; 
 	// [?!] Просто migrants.resize(m_locals.size()); не получится, т.к. тогда неправильно задан itemsize
 	migrants = m_locals;
 	for (int i = 0; i < migrants.size(); ++i)
 		std::memcpy(migrants[m_i_sum[m_locals[i].rank]++].ptr(), m_locals[i].ptr(), migrants.itemsize());
-
+				
 	/*// DEBUG
 	if(mpi::master()){
 		for(int i=0; i<m_locals.size(); ++i)
@@ -231,7 +252,7 @@ void EuMesh::migrate() {
 	
 	// Отправляем всем процессам соостветствующие
 	MPI_Alltoallv(
-		migrants.item(0).ptr(), send_counts.data(), send_displs.data(), MPI_BYTE, 
+		migrants.item(0).ptr(), send_counts.data(), send_displs.data(), MPI_BYTE,
 		m_locals.item(0).ptr(), recv_counts.data(), recv_displs.data(), MPI_BYTE, 
 		mpi::comm()
 	);
@@ -243,6 +264,7 @@ void EuMesh::migrate() {
 		printf("\n");
 	}
 	//*/
+
 #endif
 }
 
@@ -252,6 +274,12 @@ void EuMesh::build_aliens() {
 #ifdef ZEPHYR_MPI
 	int size = mpi::size();
 	int rank = mpi::rank();
+
+	m_tourism.m_border_indices.clear();
+	m_tourism.m_count_to_send.clear();
+	m_tourism.m_count_to_recv.clear();
+	m_tourism.m_send_offsets.clear();
+	m_tourism.m_recv_offsets.clear();
 
 	// Выделяем память
 	// [!] думаю, нужно перенести этот код, чтобы он выполнялся единожды
@@ -264,6 +292,8 @@ void EuMesh::build_aliens() {
 	// Заполняем m_border_indices
 	for (auto cell: *this) {
 		for (auto face: cell.faces()) {
+			//if(mpi::master())
+			//	printf("face.adjacent().rank: %d\n", face.adjacent().rank);
 			auto& border_indices = m_tourism.m_border_indices[face.adjacent().rank];
 			if(face.adjacent().rank != rank && (border_indices.empty() || border_indices.back() != cell.geom().index))
 				border_indices.push_back(cell.geom().index);
@@ -274,16 +304,17 @@ void EuMesh::build_aliens() {
 	for(int r = 0; r < size; ++r)
 		m_tourism.m_count_to_send[r] = m_tourism.m_border_indices[r].size();
 	// Заполняем m_send_offsets
-	for(int r = 1; r < size; ++r)
+	for(int r = 1; r < size; ++r){
 		m_tourism.m_send_offsets[r] = m_tourism.m_send_offsets[r - 1] + m_tourism.m_count_to_send[r - 1];
+	}
 
 	// Отправляем m_count_to_send -> получаем m_count_to_recv
 	mpi::all_to_all(m_tourism.m_count_to_send, m_tourism.m_count_to_recv);
 
 	// Заполняем m_recv_offsets
-	for(int r = 1; r < size; ++r)
+	for(int r = 1; r < size; ++r){
 		m_tourism.m_recv_offsets[r] = m_tourism.m_recv_offsets[r - 1] + m_tourism.m_count_to_recv[r - 1];
-
+	}
 	// Заполняем m_border
 	int border_size = m_tourism.m_send_offsets[size - 1] + m_tourism.m_count_to_send[size - 1];
 	m_tourism.m_border = m_locals;
@@ -301,7 +332,7 @@ void EuMesh::build_aliens() {
 
 	m_aliens.resize(m_tourism.m_recv_offsets[size - 1] + m_tourism.m_count_to_recv[size - 1]);
 
-	for(int i=0; i<size; ++i){
+	for(int i = 0; i < size; ++i){
 		m_tourism.m_count_to_send[i] *= m_aliens.itemsize();
 		m_tourism.m_count_to_recv[i] *= m_aliens.itemsize();
 		m_tourism.m_send_offsets[i] *= m_aliens.itemsize();
@@ -313,25 +344,33 @@ void EuMesh::build_aliens() {
 
 	for(auto& cell : m_locals){
 		for(auto& face : cell.faces){
+			if (face.is_undefined()) 
+				continue;
+				
 			if(face.adjacent.rank == rank)
 				face.adjacent.alien = -1;
 		}
 	}
 
-	int i = 0;
+	int al_it = 0;
 	for(auto& cell : m_aliens){
 		for(auto& face : cell.faces){
-			if(face.adjacent.rank == rank){
+			if (face.is_undefined()) 
+				continue;
+
+			if(face.adjacent.index != -1 && face.adjacent.rank == rank){
+				//printf("I: %d\n", face.adjacent.index);
 				auto& curr_cell = m_locals[face.adjacent.index];
-				for(auto& l_face : curr_cell.faces)
-					if(l_face.adjacent.index == cell.index){
-						l_face.adjacent.index = -1;
-						l_face.adjacent.alien = i++;
+				for(auto& l_face : curr_cell.faces){
+					if(l_face.adjacent.rank == cell.rank && l_face.adjacent.index == cell.index){
+						l_face.adjacent.alien = al_it;
 						break;
 					}
+				}
 			}
 		}
-	}
+		++al_it;
+	}	
 
 	// [?] если m_border_indices[r].size() == m_count_to_send[r], то зачем второе вообще нужно?
 #endif
