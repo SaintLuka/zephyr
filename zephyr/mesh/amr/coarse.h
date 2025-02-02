@@ -75,7 +75,7 @@ Children select_children(AmrStorage& cells, int ic) {
     return children;
 }
 
-/// @brief Список вершин родительской ячейки
+/// @brief Вершины родительской ячейки (2D)
 template <int dim>
 typename std::enable_if<dim == 2, SqQuad>::type
 parent_vs(Children& children) {
@@ -92,7 +92,7 @@ parent_vs(Children& children) {
     };
 }
 
-/// @brief Список вершин родительской ячейки
+/// @brief Вершины родительской ячейки (3D)
 template <int dim>
 typename std::enable_if<dim == 3, Cube>::type
 parent_vs(Children& children) {
@@ -300,15 +300,6 @@ AmrCell get_parent(AmrStorage &locals, AmrStorage &aliens,
     return parent;
 }
 
-/// @brief Добавляет в массив сиблингов главного ребенка, сортирует сиблингов
-/// по номеру в родительской ячейке
-/// @param cells Хранилище ячеек
-/// @param ic Номер главного ребенка в хранилище
-/// @return Массив индексов дочерних ячеек
-template <int dim>
-std::array<int, CpC(dim)> sorted_siblings(AmrStorage& cells,  int ic) {
-}
-
 /// @brief Основная функция огрубления ячеек, состоит из сбора сиблингов в
 /// один массив, вызова функции get_parent и переноса полученных данных в
 /// хранилище на место родительской ячейки.
@@ -316,10 +307,10 @@ std::array<int, CpC(dim)> sorted_siblings(AmrStorage& cells,  int ic) {
 /// @param op Оператор огрубления данных
 template<int dim>
 void coarse_cell(AmrStorage::Item& child, AmrStorage &locals, AmrStorage &aliens, int rank, const Distributor& op) {
-    child.set_undefined();
-
-    // главный ребенок всем заведует
+    // Функцию выполняет главный ребенок, остальные
+    // высталяются на undefined и отдыхают
     if (child.z_idx % CpC(dim) != 0) {
+        child.set_undefined();
         return;
     }
 
@@ -328,6 +319,8 @@ void coarse_cell(AmrStorage::Item& child, AmrStorage &locals, AmrStorage &aliens
     AmrStorage::Item& parent = locals[child.next];
     parent = get_parent<dim>(locals, aliens, rank, children);
     op.merge(children, parent);
+
+    child.set_undefined();
 }
 
 } // namespace zephyr::mesh::amr

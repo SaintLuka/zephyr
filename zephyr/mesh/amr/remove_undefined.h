@@ -12,7 +12,7 @@ namespace zephyr::mesh::amr {
 using zephyr::utils::Stopwatch;
 
 /// @brief Функция меняет индексы соседей через грань на новые, выполняется
-/// для одной ячейки. Предполагается, что в поле element.index записан индекс,
+/// для одной ячейки. Предполагается, что в поле element.next записан индекс,
 /// куда ячейка будет перемещена в дальнейшем
 /// @param cell Целевая ячейка
 /// @param cells Хранилище ячеек
@@ -30,7 +30,7 @@ void change_adjacent_one(AmrStorage::Item& cell, AmrStorage& cells) {
                 throw std::runtime_error("change_adjacent_partial() error: adjacent.index out of range");
             }
 #endif
-            face.adjacent.index = cells[face.adjacent.index].index;
+            face.adjacent.index = cells[face.adjacent.index].next;
         }
 
     }
@@ -38,7 +38,7 @@ void change_adjacent_one(AmrStorage::Item& cell, AmrStorage& cells) {
 
 /// @brief Функция меняет индексы соседей через грань на новые, выполняется
 /// для всех ячеек в однопоточном режиме. Предполагается, что в поле
-/// element.index записан индекс, куда ячейка будет перемещена в дальнейшем
+/// element.next записан индекс, куда ячейка будет перемещена в дальнейшем
 /// @param cells Хранилище ячеек
 void change_adjacent(AmrStorage& cells) {
     threads::for_each<20>(
@@ -48,18 +48,18 @@ void change_adjacent(AmrStorage& cells) {
 }
 
 /// @brief Выполняет перемещение элемента в соответствии с индексом
-/// в поле Element.index для одной ячейки.
+/// в поле element.next для одной ячейки.
 /// @details Данные актуальной ячейки перемещаются на место неактуальной
 /// ячейки, индексы смежности не изменяются, они должны быть выставлены
 /// заранее.
 void move_cell(int ic, AmrStorage& cells) {
-    int jc = cells[ic].index;
+    int jc = cells[ic].next;
 
     // move from jc to ic
     cells.move_item(jc, ic);
 
     cells[ic].index = ic;
-    cells[ic].next = ic;
+    cells[ic].next  = ic;
     cells[jc].set_undefined();
 }
 
@@ -117,11 +117,11 @@ struct SwapLists {
     /// оказываться ближе к началу списка, чем неопределенный
     void check_mapping(AmrStorage& cells) const {
         for (int i = 0; i < cells.size(); ++i) {
-            auto j = cells[i].index;
-            if (i != cells[j].index) {
+            auto j = cells[i].next;
+            if (i != cells[j].next) {
                 // Перестановка не является транспозицией
-                std::cout << i << " " << cells[i].index << "\n";
-                std::cout << j << " " << cells[j].index << "\n";
+                std::cout << i << " " << cells[i].next << "\n";
+                std::cout << j << " " << cells[j].next << "\n";
                 throw std::runtime_error("Only swaps are allowed");
             }
             if (i != j) {
@@ -147,7 +147,7 @@ struct SwapLists {
     /// @param from, to Диапазон ячеек в хранилище
     void set_identical_mapping_partial(AmrStorage& cells, int from, int to) const {
         for (int ic = from; ic < to; ++ic) {
-            cells[ic].index = ic;
+            cells[ic].next = ic;
         }
     }
 
@@ -159,14 +159,15 @@ struct SwapLists {
             int ai = actual_cells[i];
             int ui = undefined_cells[i];
 
-            cells[ui].index = ai;
-            cells[ai].index = ui;
+            cells[ui].next = ai;
+            cells[ai].next = ui;
         }
     }
 
     /// @brief Устанавливает следующие позиции ячеек в однопоточном режиме
     /// @details После выполнения операции поле element.index у ячеек указывает
-    /// на следующее положение ячейки в хранилище
+    /// на следующее положение ячейки в хранилище (зачем это надо вообще??)
+    /// почему не next????
     void set_mapping(AmrStorage& cells) const {
         set_identical_mapping_partial(cells, 0, cells.size());
         set_swap_mapping_partial(cells, 0, size());
@@ -219,7 +220,7 @@ struct SwapLists {
 #endif
 
     /// @brief Выполняет перестановку элементов в соответствии с индексом
-    /// в поле element.index в однопоточном режиме.
+    /// в поле element.next в однопоточном режиме.
     /// @details Данные актуальной ячейки перемещаются на место неактуальной
     /// ячейки, индексы смежности не изменяются, они должны быть выставлены
     /// заранее.
@@ -245,10 +246,10 @@ struct SwapLists {
 /// 1. На первом этапе составляются списки неопределенных ячеек, начиная с начала
 /// хранилища, а также актуальных ячеек, начиная с конца хранилища. На данном
 /// этапе используется конструктор класса SwapLists
-/// 2. Далее для ячеек изменяется поле element.index, которое после выполнения
-/// функции set_mapping равно индексу, куда необходимо сместить ячейку.
+/// 2. Далее для ячеек изменяется поле element.next, которое после выполнения
+/// функции set_mapping равно индексу, куда необходимо переместить ячейку.
 /// 3. Выполняется функция change_adjacent, которая меняет индексы смежности
-/// в соответствии с element.index
+/// в соответствии с element.next
 /// 4. Актуальные ячейки перемещаются на место неопределенных.
 /// 5. Хранилище меняет размер, все неопределенные ячейки остаются за пределами
 /// хранилища.

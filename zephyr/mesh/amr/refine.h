@@ -160,24 +160,25 @@ std::array<AmrCell, CpC(dim)> get_children(AmrCell &cell) {
 
     auto children = create_children<dim>(cell.vertices);
 
-    // По умолчанию дети ссылаются на родительскую ячейку
-    for (auto &child: children) {
-        child.rank = cell.rank;
-        child.index = cell.index;
+    for (int i = 0; i < CpC(dim); ++i) {
+        auto& child = children[i];
 
+        child.rank  = cell.rank;
+        child.index = cell.next + i;
+
+        child.next = cell.next + i;
+        child.flag = 0;
+        child.b_idx = cell.b_idx;
+        child.level = cell.level + 1;
+        child.z_idx = CpC(dim) * cell.z_idx + i;
+
+        // По умолчанию дети ссылаются на родительскую ячейку
+        // зачем этот код? Потом все изменяются
         for (int s = 0; s < FpC(dim); ++s) {
-            child.faces[s].adjacent.rank = cell.rank;
+            child.faces[s].adjacent.rank  = cell.rank;
             child.faces[s].adjacent.index = cell.index;
             child.faces[s].adjacent.alien = -1;
         }
-    }
-
-    for (int i = 0; i < CpC(dim); ++i) {
-        children[i].next = cell.next + i;
-        children[i].flag = 0;
-        children[i].b_idx = cell.b_idx;
-        children[i].level = cell.level + 1;
-        children[i].z_idx = CpC(dim) * cell.z_idx + i;
     }
 
     // Далее необходимо связать дочерние ячейки с соседями
