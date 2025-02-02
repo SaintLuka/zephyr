@@ -272,6 +272,9 @@ void remove_undefined(AmrStorage &cells, const Statistics &count) {
     swap_list.set_mapping(cells);
     set_mapping_timer.stop();
 
+    // Делаем MPI запрос чтобы узнать, куда переместились
+    // alien-ячейки.
+
     change_adjacent_timer.resume();
     change_adjacent(cells);
     change_adjacent_timer.stop();

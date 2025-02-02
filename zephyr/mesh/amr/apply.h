@@ -17,6 +17,11 @@
 #include <zephyr/mesh/amr/sorting.h>
 #include <zephyr/mesh/amr/link_aliens.h>
 
+namespace zephyr::mesh {
+// Сейчас нужно для MPI, там функция обменов
+class EuMesh;
+}
+
 namespace zephyr::mesh::amr {
 
 using utils::Stopwatch;
@@ -39,8 +44,8 @@ using utils::Stopwatch;
 /// Этап 5. На начале этапа все ячейки правильно связаны, но внутри хранилища
 /// часть старых ячеек (не листовых) являются неопределенными.
 /// Алгоритм осуществляет удаление данных ячеек.
-template<int dim = 0>
-void apply(AmrStorage &cells, const Distributor& op) {
+template<int dim>
+void apply_impl(AmrStorage &cells, const Distributor& op) {
     static Stopwatch count_timer;
     static Stopwatch positions_timer;
     static Stopwatch geometry_timer;
@@ -101,28 +106,27 @@ void apply(AmrStorage &cells, const Distributor& op) {
 #endif
 }
 
-/// @brief Специализация по умолчанию с автоматическим выбором размерности
-template<>
-void apply<0>(AmrStorage &cells, const Distributor& op) {
+/// @brief Автоматический выбор размерности
+void apply(AmrStorage &cells, const Distributor& op) {
     if (cells.empty())
         return;
 
     auto dim = cells[0].dim;
 
     if (dim < 3) {
-        amr::apply<2>(cells, op);
+        amr::apply_impl<2>(cells, op);
     }
     else {
-        amr::apply<3>(cells, op);
+        amr::apply_impl<3>(cells, op);
     }
 }
 
-#ifdef ZEPHYR_MPI_PASS
+#ifdef ZEPHYR_MPI
 /// @brief Многопроцессорная версия функции, выполняет непостредственную
 /// адаптацию ячеек в хранилище в соответствии с флагами адапатции.
 /// Предполагается, что флаги адаптации сбалансированы.
 /// @details Алгоритм практически совпадает с однопроцессорной версией,
-/// поскольку недопускается огрубление ячеек, у которых сиблинги находятся
+/// поскольку не допускается огрубление ячеек, у которых сиблинги находятся
 /// на различных процессах. Детали алгоритма:
 /// Этап 1. Сбор данных о количестве ячеек для огрубления, разбиения и т. д.
 /// Этап 2. Определение позиций для создания новых ячеек (все ячейки будут
@@ -138,13 +142,16 @@ void apply<0>(AmrStorage &cells, const Distributor& op) {
 /// хранилища часть старых ячеек (не листовых) являются неопределенными.
 /// Алгоритм осуществляет удаление данных ячеек.
 /// Этап 6. ???
-template<int dim = 1234>
-void apply(
-        Decomposition &decomposition,
-        const DataDistributor& op
-        if_multithreading(, ThreadPool& threads = dummy_pool))
+///
+/// \param mesh Сейчас используется, поскольку нужна операция обменов,
+/// потом желательно выкинуть
+template<int dim>
+void apply_impl(
+        AmrStorage &locals, AmrStorage &aliens,
+        const Distributor& op,
+        EuMesh& mesh)
 {
-    using ::zephyr::performance::timer::Stopwatch;
+    using zephyr::utils::Stopwatch;
 
     static Stopwatch count_timer;
     static Stopwatch positions_timer;
@@ -154,40 +161,53 @@ void apply(
     static Stopwatch sort_timer;
     static Stopwatch link_timer;
 
-    AmrStorage& locals = decomposition.inner_elements();
-    AmrStorage& aliens = decomposition.outer_elements();
-    int rank = decomposition.network().rank();
+    int rank = mpi::rank();
 
     /// Этап 1. Сбор статистики
     count_timer.resume();
-    Statistics<dim> count(locals if_multithreading(, threads));
-    //count.print(decomposition.network());
+    Statistics count(locals);
+    mpi::for_each([&]() {
+        std::cout << "rank " << mpi::rank() << "\n";
+        count.print();
+    });
     count_timer.stop();
 
     /// Этап 2. Распределяем места для новых ячеек
     positions_timer.resume();
-    setup_positions(locals, count if_multithreading(, threads));
+    setup_positions<dim>(locals, count);
     positions_timer.stop();
+
+    // Отправить MPI locals.next (!!!!)
 
     /// Этап 3. Восстановление геометрии
     geometry_timer.resume();
-    setup_geometry(locals, aliens, rank, count, op if_multithreading(, threads));
+    setup_geometry<dim>(locals, aliens, rank, count, op);
     geometry_timer.stop();
 
+    // Получить по MPI aliens.next (!!!!)
+    // Полностью элемент! Нужно значение rank !
+    // Если rank < 0, то ячейка считается неактуальной, то есть
+    // она переместилась, так мы отличаем тех, кто остался от тех, кто удалится.
+    // Ну и флаги нужны, конечно. Но они и так есть, вроде как.
+    mesh.exchange();
+
     /// Этап 4. Восстановление соседства
+    // Убрать геометрические проверки, проверять топологию (?)
+    // Возможно ли это в принципе?
     connections_timer.resume();
-    restore_connections(locals, aliens, rank, count if_multithreading(, threads));
+    restore_connections<dim>(locals, aliens, rank, count);
     connections_timer.stop();
 
     /// Этап 5. Удаление неопределенных ячеек
+    /// Сделать внутри MPI запрос чтобы узнать, куда переместились ячейки !
     clean_timer.resume();
-    remove_undefined(locals, count if_multithreading(, threads));
+    remove_undefined<dim>(locals, count);
     clean_timer.stop();
 
     /// Этап 6. Пересылка и линковка alien ячеек
-    link_timer.resume();
-    link_aliens<dim>(decomposition if_multithreading(, threads));
-    link_timer.stop();
+    //link_timer.resume();
+    //link_aliens<dim>(decomposition if_multithreading(, threads));
+    //link_timer.stop();
 
 #if CHECK_PERFORMANCE
     static size_t counter = 0;
@@ -205,37 +225,34 @@ void apply(
 
 /// @brief Специализация для пустых хранилищ
 template<>
-void apply<0>(
-        Decomposition &decomposition,
-        const DataDistributor& op
-        if_multithreading(, ThreadPool& threads))
+void apply_impl<0>(
+        AmrStorage &locals, AmrStorage &aliens,
+        const Distributor& op,
+        EuMesh& mesh)
 {
-    link_aliens<0>(decomposition if_multithreading(, threads));
+    // TODO LINK ALIENS
+    //link_aliens<0>(decomposition);
 }
 
-/// @brief Специализация по умолчанию с автоматическим выбором размерности
-template<>
-void apply<1234>(
-        Decomposition &decomposition,
-        const DataDistributor& op
-        if_multithreading(, ThreadPool& threads))
+/// @brief Автоматический выбор размерности
+void apply(
+        AmrStorage &locals, AmrStorage &aliens,
+        const Distributor& op,
+        EuMesh& mesh)
 {
-    AmrStorage& cells = decomposition.inner_elements();
-
-    if (cells.empty()) {
-        amr::apply<0>(decomposition, op if_multithreading(, threads));
+    if (locals.empty()) {
+        amr::apply_impl<0>(locals, aliens, op, mesh);
     }
     else {
-        auto dim = cells[0][element].dimension;
+        auto dim = locals[0].dim;
 
         if (dim < 3) {
-            amr::apply<2>(decomposition, op if_multithreading(, threads));
+            amr::apply_impl<2>(locals, aliens, op, mesh);
         } else {
-            amr::apply<3>(decomposition, op if_multithreading(, threads));
+            amr::apply_impl<3>(locals, aliens, op, mesh);
         }
     }
 }
-
 #endif
 
-} // namespace zephyr
+} // namespace zephyr::mesh::amr

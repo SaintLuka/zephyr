@@ -98,7 +98,7 @@ public:
     /// @brief Коллективная операция. Покомпонентный максимум для каждого
     /// элемента вектора серди всех процессов сети.
     template <class T>
-    static T max(const std::vector<T>& values);
+    static std::vector<T> max(const std::vector<T>& values);
 
     /// @brief Коллективная операция. Сумма величин со всех процессов сети.
     template <class T>
@@ -158,6 +158,9 @@ void mpi::for_each(F&& f) {
 
 template <class T>
 T mpi::min(const T& value) {
+    if (mpi::single()) {
+        return value;
+    }
     T g_value;
     MPI_Allreduce(&value, &g_value, 1, mpi_type<T>(), MPI_MIN, comm());
     return g_value;
@@ -165,6 +168,9 @@ T mpi::min(const T& value) {
 
 template <class T>
 std::vector<T> mpi::min(const std::vector<T>& values) {
+    if (mpi::single()) {
+        return values;
+    }
     std::vector<T> g_values(values.size());
     MPI_Allreduce(values.data(), g_values.data(), int(values.size()),
                   mpi_type<T>(), MPI_MIN, comm());
@@ -173,13 +179,19 @@ std::vector<T> mpi::min(const std::vector<T>& values) {
 
 template <class T>
 T mpi::max(const T& value) {
+    if (mpi::single()) {
+        return value;
+    }
     T g_value;
     MPI_Allreduce(&value, &g_value, 1, mpi_type<T>(), MPI_MAX, comm());
     return g_value;
 }
 
 template <class T>
-T mpi::max(const std::vector<T>& values) {
+std::vector<T> mpi::max(const std::vector<T>& values) {
+    if (mpi::single()) {
+        return values;
+    }
     std::vector<T> g_values(values.size());
     MPI_Allreduce(values.data(), g_values.data(), int(values.size()),
                   mpi_type<T>(), MPI_MAX, comm());
@@ -188,6 +200,9 @@ T mpi::max(const std::vector<T>& values) {
 
 template <class T>
 T mpi::sum(const T& value) {
+    if (mpi::single()) {
+        return value;
+    }
     T g_value;
     MPI_Allreduce(&value, &g_value, 1, mpi_type<T>(), MPI_SUM, comm());
     return g_value;
@@ -195,6 +210,9 @@ T mpi::sum(const T& value) {
 
 template <class T>
 std::vector<T> mpi::sum(const std::vector<T>& values) {
+    if (mpi::single()) {
+        return values;
+    }
     std::vector<T> g_values(values.size());
     MPI_Allreduce(values.data(), g_values.data(), int(values.size()),
                   mpi_type<T>(), MPI_SUM, comm());

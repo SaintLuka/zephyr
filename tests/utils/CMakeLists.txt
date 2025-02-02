@@ -1,6 +1,7 @@
 #list(APPEND TESTS balancing)
 list(APPEND TESTS balancing_mpi)
 #list(APPEND TESTS decomposition)
+#list(APPEND TESTS distributed-amr)
 #list(APPEND TESTS mpitest)
 #list(APPEND TESTS range)
 #list(APPEND TESTS stopwatch)

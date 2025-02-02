@@ -90,7 +90,7 @@ void EuMesh::refine() {
         amr::apply(m_locals, distributor);
     }
     else {
-        //amr::apply(decomposition, distributor);
+        //amr::apply(m_locals, m_aliens, distributor, *this);
     }
     apply.stop();
 

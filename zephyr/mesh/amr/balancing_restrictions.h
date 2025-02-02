@@ -8,7 +8,7 @@
 #include <zephyr/mesh/amr/common.h>
 #include <zephyr/mesh/amr/siblings.h>
 
-namespace zephyr { namespace mesh { namespace amr {
+namespace zephyr::mesh::amr {
 
 /// @brief Функция накладывает базовые ограничения на флаг адаптации ячейки:
 /// 1. Ячейка нижнего уровня не огрубляется;
@@ -111,6 +111,4 @@ void check_flags(AmrStorage& locals, AmrStorage& aliens, int max_level) {
     }
 }
 
-} // namespace amr
-} // namespace mesh
 } // namespace zephyr

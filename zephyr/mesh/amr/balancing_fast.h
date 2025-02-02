@@ -314,8 +314,8 @@ void round_4(const std::vector<size_t> &indices, AmrStorage &cells) {
 /// в round_3 флаги могут повыситься только до 0.
 /// 4. На заключительном обходе координируются сиблинги, которые хотят
 /// огрубиться (@see round_4), флаги могут повыситься до 0.
-template <int dim = 1234>
-void balance_flags_fast(AmrStorage& cells, int max_level) {
+template <int dim>
+void balance_flags_fast_impl(AmrStorage& cells, int max_level) {
     static Stopwatch restriction_timer;
     static Stopwatch sorting_timer;
     static Stopwatch round_timer_1;
@@ -374,22 +374,21 @@ void balance_flags_fast(AmrStorage& cells, int max_level) {
 }
 
 /// @brief Специализация по умолчанию с автоматическим выбором размерности
-template <>
-void balance_flags_fast<1234>(AmrStorage& cells, int max_level) {
+void balance_flags_fast(AmrStorage& cells, int max_level) {
     if (cells.empty())
         return;
 
     auto dim = cells[0].dim;
 
     if (dim < 3) {
-        amr::balance_flags_fast<2>(cells, max_level);
+        amr::balance_flags_fast_impl<2>(cells, max_level);
     }
     else {
-        amr::balance_flags_fast<3>(cells, max_level);
+        amr::balance_flags_fast_impl<3>(cells, max_level);
     }
 
 #if SCRUTINY
-    throw std::runtime_error("add check #2");
+    //throw std::runtime_error("add check #2");
     // amr::check_flags(cells, max_level);
 #endif
 }

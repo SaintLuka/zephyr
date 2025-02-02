@@ -259,23 +259,23 @@ AmrCell get_parent(AmrStorage &locals, AmrStorage &aliens,
         std::set<int> found;
         for (int i = 0; i < FpF(dim); ++i) {
             for (int j = 0; j < FpF(dim); ++j) {
-                if ((pfaces[i] - cfaces[j]).norm() < e) {
+                if ((pfaces[i] - cfaces[j]).norm() < 1.0e-6) {
                     found.insert(j);
                     break;
                 }
             }
         }
-        /*
+
         if (found.size() != FpF(dim)) {
             std::cout << "side: " << side_to_string(side) << "\n";
             std::cout << std::scientific << std::setprecision(6) << "\n";
-            std::cout << parent2.vertices.list[parent2.faces[side].vertices[0]] << ", "
-                      << parent2.vertices.list[parent2.faces[side].vertices[1]] << ", "
-                      << parent2.vertices.list[parent2.faces[side].vertices[2]] << ", "
-                      << parent2.vertices.list[parent2.faces[side].vertices[3]] << "\nchildrend:\n";
+            std::cout << parent.vertices[parent.faces[side].vertices[0]] << ", "
+                      << parent.vertices[parent.faces[side].vertices[1]] << ", "
+                      << parent.vertices[parent.faces[side].vertices[2]] << ", "
+                      << parent.vertices[parent.faces[side].vertices[3]] << "\nchildrend:\n";
 
             for (int ck = 0; ck < 8; ++ck) {
-                auto child = children[ck];
+                auto& child = children[ck];
                 std::cout << child.vertices[child.faces[side].vertices[0]] << ", "
                           << child.vertices[child.faces[side].vertices[1]] << ", "
                           << child.vertices[child.faces[side].vertices[2]] << ", "
@@ -286,7 +286,7 @@ AmrCell get_parent(AmrStorage &locals, AmrStorage &aliens,
                 std::cout << "pf: " << pfaces[i] << "\n";
                 for (int j = 0; j < FpF(dim); ++j) {
                     std::cout << "  cf: " << cfaces[j] << "\n";
-                    if (distance(pfaces[i], cfaces[j]) < e) {
+                    if ((pfaces[i] - cfaces[j]).norm() < 1.0e-6) {
                         found.insert(j);
                         break;
                     }
@@ -294,7 +294,6 @@ AmrCell get_parent(AmrStorage &locals, AmrStorage &aliens,
             }
             throw std::runtime_error("Can't link faces");
         }
-         */
 #endif
     }
 

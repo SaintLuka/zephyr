@@ -15,11 +15,14 @@ namespace zephyr::mesh {
 using namespace zephyr::utils;
 
 void EuMesh::set_decomposition(const std::string& type) {
+#ifdef ZEPHYR_MPI
     if (mpi::single()) return;
 
     auto domain = bbox();
     m_decomp = ORB::create(domain, type, mpi::size());
+    build_aliens();
     redistribute();
+#endif
 }
 
 void EuMesh::set_decomposition(const decomp::ORB& orb, bool update) {
@@ -36,9 +39,9 @@ void EuMesh::set_decomposition(const decomp::ORB& orb, bool update) {
 }
 
 void EuMesh::balancing(double load){
+#ifdef ZEPHYR_MPI
 	if (mpi::single()) return;
 
-#ifdef ZEPHYR_MPI
 	std::vector<double> ws(mpi::size());
 	mpi::all_gather(load, ws);
 	m_decomp->balancing(ws);
@@ -46,6 +49,7 @@ void EuMesh::balancing(double load){
 }
 
 void EuMesh::redistribute() {
+#ifdef ZEPHYR_MPI
     if (mpi::single()) return;
 
 	// Следующий бессмысленный код для демонстрации
@@ -103,12 +107,13 @@ void EuMesh::redistribute() {
 
 	migrate();
 	build_aliens();
+#endif
 }
 
 void EuMesh::exchange() {
+#ifdef ZEPHYR_MPI
     if (mpi::single()) return;
 
-#ifdef ZEPHYR_MPI
 	int size = mpi::size();
 	int rank = mpi::rank();
 
@@ -131,9 +136,9 @@ void EuMesh::exchange() {
 }
 
 void EuMesh::migrate() {
+#ifdef ZEPHYR_MPI
     if (mpi::single()) return;
 
-#ifdef ZEPHYR_MPI
 	int size = mpi::size();
 	int rank = mpi::rank();
 

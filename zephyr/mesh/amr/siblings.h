@@ -260,6 +260,7 @@ std::array<int, CpC(dim) - 1> get_siblings(const AmrCell& main_cell, AmrStorage 
 #if SCRUTINY
         // Следующие недорозумения должны были быть устранены после выполнения
         // базовых ограничений при балансировке флагов
+        auto adj = cell.faces[sides[z]].adjacent;
 
         // Сиблинг актуален и находится на другом процессе
         if (cell.is_actual() && adj.rank != cell.rank) {

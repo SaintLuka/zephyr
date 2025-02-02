@@ -34,7 +34,7 @@ public:
 
     /// @brief Задаем скорость переноса
     Vector3d velocity(const Vector3d& c) const override {
-        return { 0.5, 0.4, 0.3 };
+        //return { 0.5, 0.4, 0.3 };
         return { 0.8, 0.40 + 0.3*std::sin(4 * M_PI * c.x()), 0.2 };
     }
 };

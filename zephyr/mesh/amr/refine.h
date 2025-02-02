@@ -11,7 +11,7 @@
 #include <zephyr/mesh/amr/faces.h>
 #include <zephyr/mesh/amr/coarse.h>
 
-namespace zephyr { namespace mesh { namespace amr {
+namespace zephyr::mesh::amr {
 
 /// @brief Создать геометрию дочернх ячеек по родительской ячейке
 /// @param cube Родительская ячейка
@@ -39,6 +39,114 @@ std::array<AmrCell, CpC(3)> create_children<3>(const SqCube& cube) {
             AmrCell(cubes[0]), AmrCell(cubes[1]), AmrCell(cubes[2]), AmrCell(cubes[3]),
             AmrCell(cubes[4]), AmrCell(cubes[5]), AmrCell(cubes[6]), AmrCell(cubes[7])
     };
+}
+
+/// @brief Связать грани соседних дочерних ячеек
+/// @param children Набор дочерних ячеек
+/// @param first_index Индекс первой ячейки
+/// Помним, что все дочерние ячейки будут располагаться последовательно,
+/// нумерация начнется с first_index.
+template <int dim>
+void link_siblings(std::array<AmrCell, CpC(dim)>& children, int first_index);
+
+#define subs2D(i, j, x, y) (children[Quad::iss<i, j>()].faces[side_by_dir<x, y>()].adjacent.index = first_index + Quad::iss<i + 2 * x, j + 2 * y>())
+#define subs3D(i, j, k, x, y, z) (children[Cube::iss<i, j, k>()].faces[side_by_dir<x, y, z>()].adjacent.index = first_index + Cube::iss<i + 2 * x, j + 2 * y, k + 2 * z>())
+
+template <>
+void link_siblings<2>(std::array<AmrCell, CpC(2)>& children, int first_index) {
+    subs2D(-1, -1, +1, 0);
+    subs2D(-1, -1, 0, +1);
+
+    subs2D(+1, -1, -1, 0);
+    subs2D(+1, -1, 0, +1);
+
+    subs2D(-1, +1, +1, 0);
+    subs2D(-1, +1, 0, -1);
+
+    subs2D(+1, +1, -1, 0);
+    subs2D(+1, +1, 0, -1);
+}
+
+template <>
+void link_siblings<3>(std::array<AmrCell, CpC(3)>& children, int first_index) {
+    subs3D(-1, -1, -1, +1, 0, 0);
+    subs3D(-1, -1, -1, 0, +1, 0);
+    subs3D(-1, -1, -1, 0, 0, +1);
+
+    subs3D(+1, -1, -1, -1, 0, 0);
+    subs3D(+1, -1, -1, 0, +1, 0);
+    subs3D(+1, -1, -1, 0, 0, +1);
+
+    subs3D(-1, +1, -1, +1, 0, 0);
+    subs3D(-1, +1, -1, 0, -1, 0);
+    subs3D(-1, +1, -1, 0, 0, +1);
+
+    subs3D(+1, +1, -1, -1, 0, 0);
+    subs3D(+1, +1, -1, 0, -1, 0);
+    subs3D(+1, +1, -1, 0, 0, +1);
+
+    subs3D(-1, -1, +1, +1, 0, 0);
+    subs3D(-1, -1, +1, 0, +1, 0);
+    subs3D(-1, -1, +1, 0, 0, -1);
+
+    subs3D(+1, -1, +1, -1, 0, 0);
+    subs3D(+1, -1, +1, 0, +1, 0);
+    subs3D(+1, -1, +1, 0, 0, -1);
+
+    subs3D(-1, +1, +1, +1, 0, 0);
+    subs3D(-1, +1, +1, 0, -1, 0);
+    subs3D(-1, +1, +1, 0, 0, -1);
+
+    subs3D(+1, +1, +1, -1, 0, 0);
+    subs3D(+1, +1, +1, 0, -1, 0);
+    subs3D(+1, +1, +1, 0, 0, -1);
+}
+
+template <int dim>
+void check_link(std::array<AmrCell, CpC(dim)>& children, AmrCell &parent) {
+    // Проверяем, что внутренние ячейки связаны верно
+    for (int c1 = 0; c1 < CpC(dim); ++c1) {
+        auto& child1 = children[c1];
+
+        int count_sibs = 0;
+        for (int side1 = 0; side1 < FpC(dim); ++side1) {
+            auto& face1 = child1.faces[side1];
+
+            // Грань наружу, пропускаем
+            if ((parent.center - child1.center).dot(face1.normal) < 0.0)
+                continue;
+
+            ++count_sibs;
+
+            // Локальный индекс брата
+            int c2 = face1.adjacent.index - parent.next;
+
+            scrutiny_check(0 <= c1 && c1 < CpC(dim), "bro index in range [0, CpC(dim))")
+            scrutiny_check(c1 != c2, "bro index != my index")
+
+            // Обходим грани брата
+            auto& child2 = children[c2];
+
+            int side2 = 0;
+            for (; side2 < FpC(dim); ++side2) {
+                auto &face2 = child2.faces[side2];
+
+                if ((face1.center - face2.center).norm() < 1.0e-5 * parent.size) {
+                    break;
+                }
+            }
+            // Нашли соответствующую грань, должен быть искомый
+            scrutiny_check(side2 < FpC(dim), "not found bro")
+            int c3 = child2.faces[side2].adjacent.index - parent.next;
+            scrutiny_check(c1 == c3, "Bad link")
+        }
+
+        // Число братьев через грань равно размерности
+        if (count_sibs != dim) {
+            std::cout << "Count siblings: " << count_sibs << "\n";
+            throw std::runtime_error("neibs sibings count != dimension");
+        }
+    }
 }
 
 /// @brief Создать дочерние ячейки
@@ -72,16 +180,9 @@ std::array<AmrCell, CpC(dim)> get_children(AmrCell &cell) {
         children[i].z_idx = CpC(dim) * cell.z_idx + i;
     }
 
-    // Выставить граничный флаг
-    for (int side = 0; side < FpC(dim); ++side) {
-        auto flag = cell.faces[side].boundary;
-        for (int i: children_by_side[side]) {
-            children[i].faces[side].boundary = flag;
-        }
-    }
-
     // Далее необходимо связать дочерние ячейки с соседями
     for (int side = 0; side < FpC(dim); ++side) {
+        // Выставить граничный флаг
         auto flag = cell.faces[side].boundary;
         for (int i: children_by_side[side]) {
             children[i].faces[side].boundary = flag;
@@ -111,6 +212,13 @@ std::array<AmrCell, CpC(dim)> get_children(AmrCell &cell) {
             }
         }
     }
+
+    // Свяжем внутренние ячейки
+    link_siblings<dim>(children, cell.next);
+
+#if SCRUTINY
+    check_link<dim>(children, cell);
+#endif
 
     return children;
 }
@@ -159,6 +267,12 @@ void refine_cell(AmrStorage::Item& parent, AmrStorage &locals, AmrStorage &alien
     auto children = get_children<dim>(parent);
 
     for (int i = 0; i < CpC(dim); ++i) {
+#if SCRUTINY
+        if (parent.next + i < 0 || parent.next + i >= locals.size()) {
+            throw std::runtime_error("[parent.next + i] out of range (refine_cell)");
+        }
+#endif
+
         AmrCell& child = locals[parent.next + i];
 
         // Возможна оптимизация (!), создавать дочерние ячейки сразу
@@ -176,7 +290,7 @@ void refine_cell(AmrStorage::Item& parent, AmrStorage &locals, AmrStorage &alien
             if (adj.rank == rank) {
                 // Локальная ячейка
 #if SCRUTINY
-                if (adj.index >= locals.size()) {
+                if (adj.index < 0 || adj.index >= locals.size()) {
                     throw std::runtime_error("adjacent.index out of range (refine_cell)");
                 }
 #endif
@@ -186,7 +300,7 @@ void refine_cell(AmrStorage::Item& parent, AmrStorage &locals, AmrStorage &alien
             else {
                 // Удаленная ячейка
 #if SCRUTINY
-                if (adj.alien >= aliens.size()) {
+                if (adj.alien < 0 || adj.alien >= aliens.size()) {
                     throw std::runtime_error("adjacent.alien out of range (refine_cell)");
                 }
 #endif
@@ -206,6 +320,4 @@ void refine_cell(AmrStorage::Item& parent, AmrStorage &locals, AmrStorage &alien
     parent.set_undefined();
 }
 
-} // namespace amr
-} // namespace mesh
-} // namespace zephyr
+} // namespace zephyr::mesh::amr

@@ -4,9 +4,9 @@ namespace zephyr::utils {
 
 #ifdef ZEPHYR_MPI
 
-static int g_size  = -1;
-static int g_rank  = -1;
-static int g_tasks = -1;
+static int g_size  = 1;
+static int g_rank  = 0;
+static int g_tasks = 1;
 
 // Собирает уникальные имена процессоров/узлов
 std::vector<std::string> proc_names();
@@ -95,6 +95,8 @@ std::vector<std::string> proc_names() {
 
     return names;
 }
+
+mpi::master_stream mpi::cout = {};
 
 #else
 

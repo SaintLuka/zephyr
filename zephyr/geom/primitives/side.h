@@ -28,16 +28,17 @@ enum Side : int {
     FRONT0  = 5,  FRONT1  = 11,  FRONT2  = 17,  FRONT3  = 23
 };
 
-/// @brief Грань в название
+/// @brief Грань в название, часто используется в дебаге
 inline std::string side_to_string(Side s) {
-    switch (s) {
-        case Side::LEFT:   return "left";
-        case Side::RIGHT:  return "right";
-        case Side::BOTTOM: return "bottom";
-        case Side::TOP:    return "top";
-        case Side::BACK:   return "back";
-        case Side::FRONT:  return "front";
-        default: return "other";
+    std::string num = " face (" + std::to_string(s / 6) + ")";
+    switch (s % 6) {
+        case Side::LEFT:   return "left" + num;
+        case Side::RIGHT:  return "right" + num;
+        case Side::BOTTOM: return "bottom" + num;
+        case Side::TOP:    return "top" + num;
+        case Side::BACK:   return "back" + num;
+        case Side::FRONT:  return "front" + num;
+        default: return "other" + num;
     }
 }
 
@@ -53,6 +54,28 @@ static_assert(Side::BOTTOM == 2, "Bottom != 2");
 static_assert(Side::TOP    == 3, "Top    != 3");
 static_assert(Side::BACK   == 4, "Back   != 4");
 static_assert(Side::FRONT  == 5, "Front  != 5");
+
+/// @brief Передаем нормальный вектор, функция выбирает сторону
+template <int i, int j, int k = 0>
+inline constexpr Side side_by_dir();
+
+template <>
+inline constexpr Side side_by_dir<-1, 0, 0>() { return Side::LEFT; }
+
+template <>
+inline constexpr Side side_by_dir<+1, 0, 0>() { return Side::RIGHT; }
+
+template <>
+inline constexpr Side side_by_dir<0, -1, 0>() { return Side::BOTTOM; }
+
+template <>
+inline constexpr Side side_by_dir<0, +1, 0>() { return Side::TOP; }
+
+template <>
+inline constexpr Side side_by_dir<0, 0, -1>() { return Side::BACK; }
+
+template <>
+inline constexpr Side side_by_dir<0, 0, +1>() { return Side::FRONT; }
 
 
 /// @brief Для AMR-ячейки вершины и грани упорядочены определеным образом,

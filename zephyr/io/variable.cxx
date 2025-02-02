@@ -80,13 +80,24 @@ Variable::Variable(const char* name)
         };
     }
     else if (!std::strcmp(name, "face.rank")) {
-        m_type = VtkType::UInt8;
+        m_type = VtkType::Int8;
         m_n_components = BFaces::max_count;
 
         m_amr_func = [](AmrStorage::Item& cell, void *arg) {
             auto out = (int8_t *) arg;
             for (int i = 0; i < BFaces::max_count; ++i) {
                 out[i] = cell.faces[i].adjacent.rank;
+            }
+        };
+    }
+    else if (!std::strcmp(name, "face.alien")) {
+        m_type = VtkType::Int32;
+        m_n_components = BFaces::max_count;
+
+        m_amr_func = [](AmrStorage::Item& cell, void *arg) {
+            auto out = (int32_t *) arg;
+            for (int i = 0; i < BFaces::max_count; ++i) {
+                out[i] = cell.faces[i].adjacent.alien;
             }
         };
     }
