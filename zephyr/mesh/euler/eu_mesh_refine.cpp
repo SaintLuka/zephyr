@@ -7,7 +7,6 @@
 
 #include <zephyr/mesh/amr/apply.h>
 #include <zephyr/mesh/amr/balancing.h>
-#include <zephyr/mesh/amr/balancing_fast.h>
 
 
 namespace zephyr::mesh {
@@ -58,7 +57,48 @@ void EuMesh::set_distributor(Distributor distr) {
     distributor = std::move(distr);
 }
 
+void EuMesh::balance_flags() {
+#if SCRUTINY
+    static bool first_time = true;
+    if (first_time) {
+        int res = check_base();
+        if (res < 0) {
+            throw std::runtime_error("Check base failed");
+        }
+        first_time = false;
+    }
+#endif
+    if (mpi::single()) {
+        amr::balance_flags(m_locals, m_max_level);
+    }
+#ifdef ZEPHYR_MPI
+    else {
+        amr::balance_flags(m_locals, m_aliens, m_max_level, *this);
+    }
+#endif
+}
+
+void EuMesh::apply_flags() {
+    if (mpi::single()) {
+        amr::apply(m_locals, distributor);
+    }
+#ifdef ZEPHYR_MPI
+    else {
+        amr::apply(m_locals, m_aliens, distributor, *this);
+    }
+#endif
+
+#if SCRUTINY
+    int res = check_refined();
+    if (res < 0) {
+        throw std::runtime_error("Check refined failed");
+    }
+#endif
+}
+
 void EuMesh::refine() {
+    if (!is_adaptive()) { return; }
+
     break_nodes();
 
     static Stopwatch balance;
@@ -73,25 +113,11 @@ void EuMesh::refine() {
     full.resume();
 
     balance.resume();
-    if (mpi::single()) {
-#if FAST_BALANCING
-        amr::balance_flags_fast(m_locals, m_max_level);
-#else
-        amr::balance_flags_slow(m_locals, m_aliens, m_max_level);
-#endif
-    }
-    else {
-        //amr::balance_flags_slow(decomposition, max_level);
-    }
+    balance_flags();
     balance.stop();
 
     apply.resume();
-    if (mpi::single()) {
-        amr::apply(m_locals, distributor);
-    }
-    else {
-        //amr::apply(m_locals, m_aliens, distributor, *this);
-    }
+    apply_flags();
     apply.stop();
 
     full.stop();

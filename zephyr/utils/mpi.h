@@ -147,6 +147,10 @@ public:
 
 template <class F>
 void mpi::for_each(F&& f) {
+    if (mpi::single()) {
+        f(); std::cout << std::flush;
+        return;
+    }
     for (int r = 0; r < mpi::size(); ++r) {
         if (r == mpi::rank()) {
             f();

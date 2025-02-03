@@ -4,6 +4,7 @@
 
 #include <zephyr/utils/error_list.h>
 
+#include <zephyr/phys/literals.h>
 #include <zephyr/phys/matter/eos/ideal_gas.h>
 #include <zephyr/phys/matter/eos/stiffened_gas.h>
 #include <zephyr/phys/matter/eos/mie_gruneisen.h>
@@ -11,6 +12,7 @@
 #include <zephyr/phys/matter/mixture_pt.h>
 
 #include <zephyr/utils/matplotlib.h>
+
 namespace plt = zephyr::utils::matplotlib;
 
 using namespace zephyr::phys;
@@ -68,7 +70,7 @@ int main() {
         Pcu_rb2[i] = mixture.pressure_re(rho_tests[i], e_test, {1.0 - sb2, sb2});
         Pcu_rb3[i] = mixture.pressure_re(rho_tests[i], e_test, {1.0 - sb3, sb3});
 
-        auto [P0, T0] = mixture.find_PT(rho_tests[i], e_test, {1.0, 0.0});
+        auto [rhos, P0, T0] = mixture.get_rPT(rho_tests[i], e_test, {1.0, 0.0});
 
         Pcu_rb0_r[i] = mixture.pressure_re(rho_tests[i], e_test, {1.0, 0.0}, {.deriv=true, .P0=P0, .T0=T0}).dR;
         Pcu_rb1_r[i] = mixture.pressure_re(rho_tests[i], e_test, {1.0 - sb1, sb1}, {.deriv=true, .P0=P0, .T0=T0}).dR;
@@ -134,7 +136,7 @@ int main() {
         Pcu_eb2[i] = mixture.pressure_re(rho_test, e_tests[i], {1.0 - sb2, sb2});
         Pcu_eb3[i] = mixture.pressure_re(rho_test, e_tests[i], {1.0 - sb3, sb3});
 
-        auto [P0, T0] = mixture.find_PT(rho_test, e_tests[i], {1.0, 0.0});
+        auto [rhos, P0, T0] = mixture.get_rPT(rho_test, e_tests[i], {1.0, 0.0});
 
         Pcu_eb0_r[i] = mixture.pressure_re(rho_test, e_tests[i], {1.0, 0.0}, {.deriv=true, .P0=P0, .T0=T0}).dR;
         Pcu_eb1_r[i] = mixture.pressure_re(rho_test, e_tests[i], {1.0 - sb1, sb1}, {.deriv=true, .P0=P0, .T0=T0}).dR;

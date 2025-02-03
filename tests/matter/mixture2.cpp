@@ -5,6 +5,7 @@
 #include <zephyr/geom/vector.h>
 
 #include <zephyr/phys/matter/eos/ideal_gas.h>
+#include <zephyr/phys/matter/eos/stiffened_gas.h>
 #include <zephyr/phys/matter/eos/mie_gruneisen.h>
 #include <zephyr/phys/matter/mixture_pt.h>
 

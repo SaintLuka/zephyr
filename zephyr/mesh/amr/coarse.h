@@ -122,6 +122,10 @@ AmrCell get_parent(AmrStorage &locals, AmrStorage &aliens,
 
     AmrCell parent(parent_vs<dim>(children));
 
+    parent.rank  = children[0].rank;
+    parent.index = children[0].next;
+    parent.next  = children[0].next;
+
     parent.b_idx = children[0].b_idx;
     parent.flag = 0;
     parent.level = children[0].level - 1;

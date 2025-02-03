@@ -32,7 +32,7 @@ void AmrCell::print_info() const {
         auto &face = faces[i];
         if (face.is_undefined()) continue;
 
-        std::cout << "\t\t\t" << side_to_string(Side(i % 6)) << " face (" << i / 6 << "):\n";
+        std::cout << "\t\t\t" << side_to_string(i) << ":\n";
         std::cout << "\t\t\t\tvertices:";
         for (int j = 0; j < (dim < 3 ? 2 : 4); ++j) {
             std::cout << " " << face.vertices[j];

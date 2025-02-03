@@ -154,7 +154,7 @@ void restore_connections_one(AmrStorage::Item& cell,
         }
 
         if (!local_cell) {
-            return;
+            continue;
         }
 
         // Если ячейка локальная, то можем проверить полным обходом

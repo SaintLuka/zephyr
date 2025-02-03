@@ -6,7 +6,7 @@
 #include <zephyr/geom/primitives/decomposition.h>
 #include <zephyr/mesh/euler/eu_mesh.h>
 
-namespace zephyr { namespace mesh {
+namespace zephyr::mesh {
 
 using utils::mpi;
 using namespace geom;
@@ -35,6 +35,12 @@ int check_connectivity(AmrStorage &locals, int ic, AmrStorage& aliens) {
         AmrCell* neib_ptr = nullptr;
         auto& adj = face.adjacent;
 
+        if (adj.rank < 0) {
+            std::cout << "\tadjacent.rank < 0\n";
+            cell.print_info();
+            return -1;
+        }
+
         if (adj.rank == mpi::rank()) {
             // Локальная ячейка
             if (adj.alien >= 0) {
@@ -42,7 +48,7 @@ int check_connectivity(AmrStorage &locals, int ic, AmrStorage& aliens) {
                 cell.print_info();
                 return -1;
             }
-            if (adj.index >= locals.size()) {
+            if (adj.index < 0 || adj.index >= locals.size()) {
                 std::cout << "\tLocal neighbor out of range\n";
                 cell.print_info();
                 return -1;
@@ -56,6 +62,11 @@ int check_connectivity(AmrStorage &locals, int ic, AmrStorage& aliens) {
         }
         else {
             // Удаленная ячейка
+            if (adj.index < 0) {
+                std::cout << "\tRemote neighbor wrong index\n";
+                cell.print_info();
+                return -1;
+            }
             if (adj.alien < 0 || adj.alien >= aliens.size()) {
                 std::cout << "\tRemote neighbor out of range\n";
                 cell.print_info();
@@ -124,6 +135,25 @@ int check_connectivity(AmrStorage &locals, int ic, AmrStorage& aliens) {
                 neib.print_info();
                 return -1;
             }
+            // Указывает на исходную ячейку
+            if (nface.adjacent.index != ic) {
+                std::cout << "\tWrong connection (index != ic)\n";
+                std::cout << "\tCurrent cell:\n";
+                cell.print_info();
+                std::cout << "\tNeighbor:\n";
+                neib.print_info();
+                return -1;
+            }
+            // Ранг смежной (исходная) больше нуля
+            if (nface.adjacent.rank < 0) {
+                std::cout << "\tWrong adjacent (rank < 0)\n";
+                std::cout << "\tCurrent cell:\n";
+                cell.print_info();
+                std::cout << "\tNeighbor:\n";
+                neib.print_info();
+                return -1;
+            }
+            // Ранг смежной (исходная) равен рангу процесса
             if (nface.adjacent.rank != mpi::rank()) {
                 std::cout << "\tWrong adjacent (rank)\n";
                 std::cout << "\tCurrent cell:\n";
@@ -145,8 +175,7 @@ int check_connectivity(AmrStorage &locals, int ic, AmrStorage& aliens) {
             }
             else {
                 // Удаленный сосед
-                if (nface.adjacent.alien < 0 ||
-                    nface.adjacent.alien >= aliens.size()) {
+                if (nface.adjacent.alien < 0) {
                     std::cout << "\tWrong connection\n";
                     std::cout << "\tCurrent cell:\n";
                     cell.print_info();
@@ -157,7 +186,7 @@ int check_connectivity(AmrStorage &locals, int ic, AmrStorage& aliens) {
             }
         }
         if (counter < 1) {
-            std::cout << "\tHas no neighbor across ordinary face (" << side_to_string(iface/4) << ")\n";
+            std::cout << "\tHas no neighbor across ordinary " << side_to_string(iface) << ")\n";
             cell.print_info();
             std::cout << "\tNeighbor:\n";
             locals[cell.faces[iface].adjacent.index].print_info();
@@ -194,12 +223,12 @@ int EuMesh::check_base() {
     for (int ic = 0; ic < m_locals.size(); ++ic) {
         AmrCell& cell = m_locals[ic];
 
-        if (cell.index != ic) {
+        if (cell.index < 0 || cell.index != ic) {
             std::cout << "\tWrong cell index\n";
             return -1;
         }
 
-        if (cell.rank != mpi::rank() || cell.rank < 0) {
+        if (cell.rank < 0 || cell.rank != mpi::rank()) {
             std::cout << "\tWrong cell rank\n";
             return -1;
         }
@@ -268,15 +297,16 @@ int EuMesh::check_refined() {
         AmrCell& cell = m_locals[ic];
 
         if (cell.is_undefined()) {
-            continue;
+            std::cout << "\tUndefined cell\n";
+            return -1;
         }
 
-        if (cell.index != ic) {
+        if (cell.index < 0 || cell.index != ic) {
             std::cout << "\tWrong cell index\n";
             return -1;
         }
 
-        if (cell.rank != mpi::rank()) {
+        if (cell.rank < 0 || cell.rank != mpi::rank()) {
             std::cout << "\tWrong cell rank\n";
             return -1;
         }
@@ -334,5 +364,4 @@ int EuMesh::check_refined() {
     return 0;
 }
 
-} // mesh
-} // zephyr
+} // namespace zephyr::mesh

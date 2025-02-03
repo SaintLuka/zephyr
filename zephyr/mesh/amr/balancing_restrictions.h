@@ -82,26 +82,25 @@ void check_flags(AmrStorage& locals, AmrStorage& aliens, int max_level) {
 
             auto &adj = face.adjacent;
 
-            auto& neib = adj.rank == cell.rank ?
-                        locals[adj.index] : aliens[adj.alien];
+            auto& neib = adj.rank == cell.rank ? locals[adj.index] : aliens[adj.alien];
 
             int neib_wanted_lvl = neib.level + neib.flag;
             if (std::abs(cell_wanted_lvl - neib_wanted_lvl) > 1) {
                 std::string message = "Adaptation flag balance is broken.";
                 std::cerr << message << "\n";
+                std::cout << "cell:\n";
+                cell.print_info();
+                std::cout << "neib:\n";
+                neib.print_info();
                 throw std::runtime_error(message);
             }
         }
 
         if (cell.flag < 0) {
-            bool can = false;
-            if (cell.dim < 3) {
-                can = can_coarse<2>(locals, it - locals.begin());
-            }
-            else{
-                can = can_coarse<3>(locals, it - locals.begin());
+            bool can = cell.dim < 3 ?
+                       can_coarse<2>(locals, it - locals.begin()) :
+                       can_coarse<3>(locals, it - locals.begin());
 
-            }
             if (!can) {
                 std::string message = "Not all siblings want to coarse.";
                 std::cerr << message << "\n";

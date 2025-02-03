@@ -163,13 +163,16 @@ void apply_impl(
 
     int rank = mpi::rank();
 
+    // Я не знаю флаги, надо получить.
+    mesh.exchange();
+
     /// Этап 1. Сбор статистики
     count_timer.resume();
     Statistics count(locals);
-    mpi::for_each([&]() {
-        std::cout << "rank " << mpi::rank() << "\n";
-        count.print();
-    });
+    //mpi::for_each([&]() {
+    //    std::cout << "rank " << mpi::rank() << "\n";
+    //    count.print();
+    //});
     count_timer.stop();
 
     /// Этап 2. Распределяем места для новых ячеек
@@ -178,22 +181,20 @@ void apply_impl(
     positions_timer.stop();
 
     // Отправить MPI locals.next (!!!!)
+    mesh.exchange();
 
     /// Этап 3. Восстановление геометрии
     geometry_timer.resume();
     setup_geometry<dim>(locals, aliens, rank, count, op);
     geometry_timer.stop();
 
-    // Получить по MPI aliens.next (!!!!)
-    // Полностью элемент! Нужно значение rank !
-    // Если rank < 0, то ячейка считается неактуальной, то есть
+    // Получить по MPI aliens.index, aliens.next
+    // Если index < 0, то ячейка считается неактуальной, то есть
     // она переместилась, так мы отличаем тех, кто остался от тех, кто удалится.
     // Ну и флаги нужны, конечно. Но они и так есть, вроде как.
     mesh.exchange();
 
     /// Этап 4. Восстановление соседства
-    // Убрать геометрические проверки, проверять топологию (?)
-    // Возможно ли это в принципе?
     connections_timer.resume();
     restore_connections<dim>(locals, aliens, rank, count);
     connections_timer.stop();
@@ -201,8 +202,11 @@ void apply_impl(
     /// Этап 5. Удаление неопределенных ячеек
     /// Сделать внутри MPI запрос чтобы узнать, куда переместились ячейки !
     clean_timer.resume();
-    remove_undefined<dim>(locals, count);
+    remove_undefined<dim>(locals, aliens, count, mesh);
     clean_timer.stop();
+
+    mesh.build_aliens();
+    mesh.exchange();
 
     /// Этап 6. Пересылка и линковка alien ячеек
     //link_timer.resume();
@@ -230,7 +234,7 @@ void apply_impl<0>(
         const Distributor& op,
         EuMesh& mesh)
 {
-    // TODO LINK ALIENS
+    // TODO LINK ALIENS, WHAT??
     //link_aliens<0>(decomposition);
 }
 

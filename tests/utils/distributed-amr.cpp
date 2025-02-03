@@ -48,6 +48,44 @@ double get_vy(AmrStorage::Item& cell) {
     return velocity(cell.center).y();
 }
 
+void set_initials(EuMesh& mesh, Box domain) {
+    Vector3d vc = domain.vmin + 0.2 * domain.size();
+    double D = 0.1 * domain.diameter();
+    for (auto& cell: mesh) {
+        cell(U).u1 = (cell.center() - vc).norm() < D ? 1.0 : 0.0;
+        cell(U).u2 = 0.0;
+    }
+}
+
+void set_flags(EuMesh& mesh) {
+    for (auto cell: mesh) {
+        cell.set_flag(-1);
+
+        double u1 = cell(U).u1;
+        for (auto face: cell.faces()) {
+            double u2 = face.neib(U).u1;
+
+            if (std::abs(u1 - u2) > 0.01) {
+                cell.set_flag(1);
+                break;
+            }
+        }
+    }
+}
+
+// Если поставить обычный распределитель, то возникают
+// странные дефекты, я уж думал ошибка адаптации.
+Distributor conv_distributor() {
+    Distributor distr = Distributor::simple();
+    distr.merge = [](Children &children, AmrStorage::Item &parent) {
+        double sum = 0.0;
+        for (auto &child: children) {
+            sum += child(U).u1 * child.volume();
+        }
+        parent(U).u1 = sum / parent.volume();
+    };
+    return distr;
+}
 
 int main() {
     mpi::init();
@@ -73,44 +111,21 @@ int main() {
     // Создаем сетку
     EuMesh mesh(U, gen);
 
-    mesh.set_max_level(5);
+    mesh.set_max_level(3);
+    mesh.set_distributor(conv_distributor());
 
     // Добавляем декомпозицию
     mesh.set_decomposition("XY");
 
-
-    // Сделаем какой-нибудь refine
-    for (auto& cell: mesh) {
-        Vector3d c = cell.center();
-        double f = std::sin(10.6 * c.x() + 9.7 * c.y()) * std::cos(3.3 * c.y() - 11.7 * c.x());
-        cell(U).u1 = f;
-        cell.set_flag(std::abs(f) < 0.25 ? 1 : 0);
-    }
-
-    pvd.save(mesh, -1.0);
-
-    mesh.refine();
-
-    pvd.save(mesh, -0.9);
-
-    mpi::finalize();
-    return 0;
-
-
-    // Задаем начальные и считаем с декомпозицией
-
-
-
-    // Дальше простая схема, ничего интересного
     // Начальные данные
-    Vector3d vc = domain.center();
-    double D = 0.1 * domain.diameter();
-    for (auto& cell: mesh) {
-        //if(mpi::rank()==0)
-        //    printf("i_m: %d\n", cell.geom().index);
-        cell(U).u1 = (cell.center() - vc).norm() < D ? 1.0 : 0.0;
-        cell(U).u2 = 0.0;
+    for (int i = 0; i < mesh.max_level(); ++i) {
+        set_initials(mesh, domain);
+        mesh.exchange();
+        set_flags(mesh);
+        mesh.refine();
     }
+    set_initials(mesh, domain);
+    mesh.exchange();
 
     // Число Куранта
     double CFL = 0.5;
@@ -120,8 +135,13 @@ int main() {
     double next_write = 0.0;
 
     Stopwatch elapsed(true);
-    while (curr_time <= 0.2) {
-        mesh.exchange();
+    while (curr_time <= 1.0 && n_step < 2000000000) {
+        // Балансировка декомпозиции
+        if (n_step % 10 == 0) {
+            //mesh.balancing(double(mesh.locals().size()));
+            //mesh.redistribute();
+            //mesh.exchange();
+        }
 
         if (curr_time >= next_write) {
             mpi::cout << "\tШаг: " << std::setw(6) << n_step << ";"
@@ -165,6 +185,12 @@ int main() {
             cell(U).u1 = cell(U).u2;
             cell(U).u2 = 0.0;
         }
+
+        mesh.exchange();
+        set_flags(mesh);
+        mesh.exchange();
+        mesh.refine();
+        mesh.exchange();
 
         n_step += 1;
         curr_time += dt;

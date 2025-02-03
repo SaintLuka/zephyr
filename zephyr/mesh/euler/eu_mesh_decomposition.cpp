@@ -40,10 +40,9 @@ void EuMesh::set_decomposition(const decomp::ORB& orb, bool update) {
 
 void EuMesh::balancing(double load){
 #ifdef ZEPHYR_MPI
-	if (mpi::single()) return;
+	if (mpi::single()) { return; }
 
-	std::vector<double> ws(mpi::size());
-	mpi::all_gather(load, ws);
+	auto ws = mpi::all_gather(load);
 	m_decomp->balancing(ws);
 #endif
 }
@@ -296,6 +295,10 @@ void EuMesh::build_aliens() {
 
 	// Заполняем m_border_indices
 	for (auto cell: *this) {
+	    // build alien можно вызвать для не совсем нормальной сетки
+	    if (cell.geom().is_undefined()) {
+            continue;
+	    }
 		for (auto face: cell.faces()) {
 			//if(mpi::master())
 			//	printf("face.adjacent().rank: %d\n", face.adjacent().rank);
