@@ -55,8 +55,23 @@ void Box::extend(double margin_x, double margin_y, double margin_z) {
     vmax.z() += margin_z * L.z();
 }
 
+Random2D Box::random2D(int seed) const {
+    return Random2D(vmin, vmax, seed);
+}
+
 QuasiRandom2D Box::quasiRandom2D() const {
     return QuasiRandom2D(vmin, size());
+}
+
+Random2D::Random2D(const Vector3d& vmin, const Vector3d& vmax, int seed) {
+    gen = std::mt19937_64(seed);
+
+    distr_x = std::uniform_real_distribution<double>(vmin.x(), vmax.x());
+    distr_y = std::uniform_real_distribution<double>(vmin.y(), vmax.y());
+}
+
+Vector3d Random2D::get() {
+    return {distr_x(gen), distr_y(gen), 0.0};
 }
 
 QuasiRandom2D::QuasiRandom2D(const Vector3d &_vmin, const Vector3d &_size)

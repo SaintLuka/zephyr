@@ -20,7 +20,12 @@ void change_adjacent_one1(AmrStorage::Item& cell, AmrStorage& locals) {
     if (cell.is_undefined()) { return; }
 
     for (BFace &face: cell.faces) {
-        if (face.is_undefined() || face.is_boundary()) {
+        if (face.is_undefined()) {
+            continue;
+        }
+        // Граничные указывают на ячейку
+        if (face.is_boundary()) {
+            face.adjacent.index = cell.next;
             continue;
         }
 
@@ -42,7 +47,12 @@ void change_adjacent_one2(AmrStorage::Item& cell, AmrStorage& locals, AmrStorage
     if (cell.is_undefined()) { return; }
 
     for (BFace &face: cell.faces) {
-        if (face.is_undefined() || face.is_boundary()) {
+        if (face.is_undefined()) {
+            continue;
+        }
+        // Граничные указывают на ячейку
+        if (face.is_boundary()) {
+            face.adjacent.index = cell.next;
             continue;
         }
 

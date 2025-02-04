@@ -137,11 +137,11 @@ int main() {
     Stopwatch elapsed(true);
     while (curr_time <= 1.0 && n_step < 2000000000) {
         // Балансировка декомпозиции
-        if (n_step % 10 == 0) {
-            //mesh.balancing(double(mesh.locals().size()));
-            //mesh.redistribute();
-            //mesh.exchange();
-        }
+        //if (n_step % 10 == 0) {
+            mesh.balancing(double(mesh.locals().size()));
+            mesh.redistribute();
+            mesh.exchange();
+        //}
 
         if (curr_time >= next_write) {
             mpi::cout << "\tШаг: " << std::setw(6) << n_step << ";"

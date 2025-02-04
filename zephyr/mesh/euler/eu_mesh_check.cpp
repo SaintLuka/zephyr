@@ -26,9 +26,19 @@ int check_connectivity(AmrStorage &locals, int ic, AmrStorage& aliens) {
             continue;
         }
 
+        // Простая граничная грань
         if (face.boundary != Boundary::ORDINARY &&
             face.boundary != Boundary::PERIODIC) {
-            // Простая граничная грань
+
+            // Грань должна ссылаться на искомую ячейку
+            if (face.adjacent.rank != cell.rank ||
+                face.adjacent.index != cell.index ||
+                face.adjacent.alien >= 0) {
+                std::cout << "\tBoundary face should point to origin cell\n";
+                cell.print_info();
+                return -1;
+            }
+
             continue;
         }
 

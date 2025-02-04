@@ -51,59 +51,6 @@ void EuMesh::redistribute() {
 #ifdef ZEPHYR_MPI
     if (mpi::single()) return;
 
-	// Следующий бессмысленный код для демонстрации
-	/*
-	int r = mpi::rank();
-
-	int s = mpi::size();
-
-	// MPI_COMM_WORLD покороче
-	mpi::comm();
-
-	// Указатель на элемент хранилища
-	Byte * ptr = m_locals[10].ptr();
-
-	// Размер элемента хранилища в байтах
-	int is = m_locals.itemsize();
-
-	for (auto& cell: m_locals) {
-		// Важные поля
-		cell.rank;
-		cell.index;
-
-		for (auto& face: cell.faces) {
-			// Часть граней пустые, там резервное место
-			if (face.is_undefined()) {
-				continue;
-			}
-
-			// Противоположный face.is_undefined()
-			face.is_actual();
-
-			// Важные поля
-			face.adjacent.rank;
-			face.adjacent.index;
-			face.adjacent.alien;
-
-		}
-	}
-
-
-	// Это вариант обхода как по распределенной сетке,
-	// там внутри итераторы сложнее зашиты
-	for (auto cell: *this) {
-		// К примеру, здесь пропускаются неактуальные грани.
-		for (auto face: cell.faces()) {
-
-			// Ещё здесь нельзя просто так получить  геометрические данные,
-			// для этого и нужно пользоваться итераторами по m_locals
-			cell.geom().rank = 10;
-
-			face.adjacent().rank;
-		}
-	}
-	*/
-
 	migrate();
 	build_aliens();
 #endif
@@ -174,7 +121,7 @@ void EuMesh::migrate() {
 			m_sum[s] += m[size * i + s];
 
 	for (auto& cell: m_locals)
-		cell.index = m_sum[cell.rank]++; 
+		cell.index = m_sum[cell.rank]++;
 
 	/* // DEBUG
 	if(mpi::master()){
@@ -185,19 +132,19 @@ void EuMesh::migrate() {
 	*/
 	
 	exchange();
-	
-	// Переиндексируем грани
+
+    // Переиндексируем грани
 	for (auto& cell: m_locals){
 		for(auto& face: cell.faces){
-			if (face.is_undefined()) 
+			if (face.is_undefined())
 				continue;
 			
-			if(face.adjacent.alien == -1){
-				auto& it = m_locals[face.adjacent.index];
-				face.adjacent.rank = m_locals[face.adjacent.index].rank;
+			if(face.adjacent.alien == -1) {
+			    // Зачем этот код??
+				face.adjacent.rank  = m_locals[face.adjacent.index].rank;
 				face.adjacent.index = m_locals[face.adjacent.index].index;
-			} else{
-				face.adjacent.rank = m_aliens[face.adjacent.alien].rank;
+			} else {
+				face.adjacent.rank  = m_aliens[face.adjacent.alien].rank;
 				face.adjacent.index = m_aliens[face.adjacent.alien].index;
 			}
 		}

@@ -8,7 +8,7 @@
 
 #ifdef ZEPHYR_MPI
 
-#include <openmpi/mpi.h>
+#include <mpi.h>
 
 // Нормальная параллельная версия обертки mpi
 

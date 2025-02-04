@@ -2,8 +2,11 @@
 
 #include <zephyr/geom/vector.h>
 
+#include <random>
+
 namespace zephyr::geom {
 
+class Random2D;
 class QuasiRandom2D;
 
 // TODO: Написать нормально
@@ -35,7 +38,23 @@ public:
 
     void extend(double margin_x, double margin_y, double margin_z = 0.0);
 
+    Random2D random2D(int seed = 0) const;
+
     QuasiRandom2D quasiRandom2D() const;
+};
+
+/// @brief Случайная двумерная последовательность в прямоугольнике
+class Random2D {
+public:
+
+    Random2D(const Vector3d& vmin, const Vector3d& vmax, int seed = 13);
+
+    Vector3d get();
+
+private:
+    std::mt19937_64 gen;
+    std::uniform_real_distribution<double> distr_x;
+    std::uniform_real_distribution<double> distr_y;
 };
 
 /// @brief Квазислучайная двумерная последовательность
