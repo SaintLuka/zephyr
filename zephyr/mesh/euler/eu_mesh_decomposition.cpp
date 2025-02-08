@@ -20,22 +20,34 @@ void EuMesh::set_decomposition(const std::string& type) {
 
     auto domain = bbox();
     m_decomp = ORB::create(domain, type, mpi::size());
-    build_aliens();
-    redistribute();
+
+    set_decomposition(m_decomp, true);
 #endif
 }
 
-void EuMesh::set_decomposition(const decomp::ORB& orb, bool update) {
+void EuMesh::set_decomposition(ORB& orb, bool update) {
 #ifdef ZEPHYR_MPI
     if (mpi::single()) return;
 
-	m_decomp = std::make_shared<ORB>(orb);
-	if (update) {
-		// вызываю, чтобы инициализировать m_tourism
-		build_aliens();
-        redistribute();
-	}
+    ORB::Ptr decmp = std::make_shared<ORB>(orb);
+    orb = *decmp;
+
+    set_decomposition(decmp, update);
 #endif
+}
+
+void EuMesh::set_decomposition(Decomposition::Ref decmp, bool update) {
+#ifdef ZEPHYR_MPI
+    if (mpi::single()) return;
+
+    m_decomp = decmp;
+    if (update) {
+        // вызываю, чтобы инициализировать m_tourism
+        build_aliens();
+        redistribute();
+    }
+#endif
+
 }
 
 void EuMesh::balancing(double load){
@@ -53,6 +65,11 @@ void EuMesh::redistribute() {
 
 	migrate();
 	build_aliens();
+
+	//int res = check_refined();
+	//if (res < 0) {
+	//    throw std::runtime_error("Bad mesh after redistribute");
+	//}
 #endif
 }
 

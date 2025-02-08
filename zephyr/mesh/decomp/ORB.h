@@ -1,17 +1,15 @@
 #pragma once
 
-#include <zephyr/geom/box.h>
 #include <zephyr/mesh/decomp/orb/blocks.h>
 #include <zephyr/mesh/decomp/decomposition.h>
 
 namespace zephyr::mesh::decomp {
 
-using zephyr::geom::Box;
-
 class ORB : public Decomposition {
 public:
     /// @brief Умный указатель на экземпляр класса
     using Ptr = std::shared_ptr<ORB>;
+    using Ref = const std::shared_ptr<ORB>&;
 
     /// @brief Параметры декомпозиции
     struct params {
@@ -25,15 +23,15 @@ public:
     /// @param size Количество блоков
     /// @param p Опции балансировки
     ORB(Box domain, const std::string& type, int size,
-            const params& p = {.newton=false, .mobility=0.1});
+        const params& p = {.newton = false, .mobility = 0.1});
 
     /// @brief Конструктор с автоматической декомпозицией по размерам области
     /// @param box Домен
     /// @param type Тип декомпозиции
     /// @param size Число блоков
     /// @param nx Число блоков по первой координате
-    ORB(Box domain, const std::string& type, int size, int nx,
-            const params& p = {.newton=false, .mobility=0.1});
+    ORB(Box domain, const std::string& type, int size,
+        int nx, const params& p = {.newton = false, .mobility = 0.1});
 
     /// @brief Конструктор с автоматической декомпозицией по размерам области
     /// @param box Домен
@@ -41,14 +39,26 @@ public:
     /// @param size Число блоков
     /// @param ny Число блоков по второй координате, для двумерной декомпозиции
     /// это полное описание декомпозиции
-    ORB(Box domain, const std::string& type, int size,
-           const std::vector<int>& ny,
-           const params& p = {.newton=false, .mobility=0.1});
+    ORB(Box domain, const std::string& type, int size, const std::vector<int>& ny,
+        const params& p = {.newton = false, .mobility = 0.1});
 
-    /// @brief Создать умный указатель
-    template <class... Args>
-    static ORB::Ptr create(Args&&... args){
-        return std::make_shared<ORB>(std::forward<Args>(args)...);
+    /// @brief Создание указателя
+    static ORB::Ptr create(const Box& domain, const std::string& type, int size,
+                           const params& p = {.newton = false, .mobility = 0.1}){
+        return std::make_shared<ORB>(domain, type, size, p);
+    }
+
+    /// @brief Создание указателя
+    static ORB::Ptr create(const Box& domain, const std::string& type, int size, int nx,
+                           const params& p = {.newton = false, .mobility = 0.1}) {
+        return std::make_shared<ORB>(domain, type, size, nx, p);
+    }
+
+    /// @brief Создание указателя
+    static ORB::Ptr create(const Box& domain, const std::string& type, int size,
+                           const std::vector<int>& ny,
+                           const params& p = {.newton = false, .mobility = 0.1}){
+        return std::make_shared<ORB>(domain, type, size, ny, p);
     }
 
     /// @brief Определить ранг процесса, которому принадлежит точка v.

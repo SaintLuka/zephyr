@@ -66,6 +66,13 @@ struct plane {
     bool under(const Vector3d& v) {
         return (v - p).dot(n) < 0.0;
     }
+
+    // Положение точки относительно плоскости
+    // -1: под, 0: на, +1: над
+    int position(const Vector3d& v) {
+        double val = (v - p).dot(n);
+        return val == 0.0 ? 0 : (val < 0.0 ? -1 : +1);
+    }
 };
 
 /// @brief Окружность

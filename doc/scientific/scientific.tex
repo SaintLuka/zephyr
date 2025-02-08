@@ -1,4 +1,4 @@
-\documentclass[12pt,draft]{report}
+\documentclass[12pt]{report}
 \usepackage[left=20mm, top=20mm, right=20mm, bottom=20mm, nohead]{geometry}
 \usepackage[T2A]{fontenc}
 \usepackage[utf8x]{inputenc}
@@ -962,137 +962,6 @@ C_{\eta} = \sum_i \eta_i P_{T, i}.
 \qty(\pdv{P}{e})_{\rho} = \frac{C_{\xi}}{C_{\xi} A_{\eta} + A_{\xi} \qty(\hat{e}^{\beta}_T - C_{\eta})}.
 \end{equation*}
 \newpage
-
-
-\section{Выкладки}
-
-\subsection{Двучленное уравнение состояния и Stiffened Gas}
-\label{app:stiffened}
-
-Стартуем с формулы
-\begin{equation}
-P(\rho, \, e) = \qty(\gamma - 1) \rho e + c_0^2 \qty(\rho - \rho_0)
-\end{equation}
-Хотим найти термическое уравнение состояния $P(\rho, \, T)$. Просто так его из $P(\rho, \, e)$ не вывести, требуется хотя бы некоторое допущение. Используем следующее, предполагаем, что $\qty( \dfrac{\partial e}{\partial T} )_{\rho} = c_v = \const$, тогда внутренняя энергия представляется в форме
-\begin{equation}
-e(\rho, \, T) = c_v T + K( \rho ),
-\end{equation}
-
-Попробуем найти каноническое уравнение состояния $e(\rho, \, s)$.
-\begin{equation}
-\qty( \pdv{e}{s} )_{\rho} = T = \frac{e (\rho, \, s) - K(\rho)}{c_v},
-\end{equation}
-это что-то вроде ОДУ на $e(\rho, \, s)$, общее решение имеет вид
-\begin{equation}
-e(\rho, \, s) = A(\rho) \exp \qty( \tfrac{s}{c_v} ) + K(\rho).
-\end{equation}
-
-Также известно
-\begin{equation}
-\qty(\pdv{e}{\rho})_{s} = \frac{P}{\rho^2}.
-\end{equation}
-Тут уже ОДУ которое должно выполняться тождественно $\forall s$:
-\begin{equation}
-\rho^2 \qty[ A'(\rho) \exp \qty( \tfrac{s}{c_v} ) + K'(\rho)] = P = \qty(\gamma - 1) \rho \qty[ A(\rho) \exp \qty( \tfrac{s}{c_v} ) + K(\rho)] + c_0^2 \qty(\rho - \rho_0)
-\end{equation}
-Отсюда можно вычислить $A(\rho)$ и $K(\rho)$, а значит и $e(\rho, \, s)$. Решение содержит только две константы $e_1$ и $e_2$. 
-\begin{equation}
-A(\rho) = e_1 \exp \qty(\tfrac{s}{c_v}) \qty(\frac{\rho}{\rho_0})^{\gamma - 1},
-\qquad
-K(\rho) = e_2 \qty(\frac{\rho}{\rho_0})^{\gamma - 1} + \frac{\rho_0 c_0^2}{\gamma \rho} - \frac{c_0^2}{\gamma - 1},
-\end{equation}
-\begin{equation}
-e\qty(\rho, \, s) = \qty[e_1 \exp \qty(\tfrac{s}{c_v}) + e_2] \qty(\frac{\rho}{\rho_0})^{\gamma - 1} + \frac{\rho_0 c_0^2}{\gamma \rho} - \frac{c_0^2}{\gamma - 1}.
-\end{equation}
-
-Константа $e_1$ перед экспонентой никак не влияет на формулу для давления. Теперь есть два варианта. 1 это волевым решением положить $e_2 = 0$. Пурурум, получится Stiffened Gas.  
-\begin{equation}
-e\qty(\rho, \, s) = A \exp \qty(\tfrac{s}{c_v}) \rho^{\gamma - 1} + \frac{P_0}{\rho} + e_0.
-\end{equation}
-
-Второй вариант. Выпишем давление:
-\begin{multline*}
-P = (\gamma - 1) \rho (c_v T + K(\rho)) + c_0^2 (\rho - \rho_0) =
-(\gamma - 1) \rho \qty[c_v T + e_2 \qty(\frac{\rho}{\rho_0})^{\gamma - 1} + \frac{\rho_0 c_0^2}{\gamma \rho} - \frac{c_0^2}{\gamma - 1}] + \\ + c_0^2 (\rho - \rho_0) = \qty(\gamma - 1) c_v \rho T + \qty(\gamma - 1) \rho_0 e_2 \qty( \frac{\rho}{\rho_0} )^{\gamma} - \frac{\rho_0 c_0^2}{\gamma} = \\ = \qty(\gamma - 1) c_v \rho T + \frac{\rho_0 c_0^2}{\gamma} \qty[ \frac{\gamma \qty(\gamma - 1) e_2}{c_0^2} \qty( \frac{\rho}{\rho_0} )^{\gamma} - 1].
-\end{multline*}
-Вторую скобку будем называть <<упругой частью>> давления. Будем выбирать параметр $e_0$ таким образом, чтобы упругая часть давления обращалась в ноль при $\rho = \rho_0$, то есть
-\begin{equation}
-e_2 = \frac{c_0^2}{\gamma \qty(\gamma - 1)} = - \frac{e_0}{\gamma}.
-\end{equation}
-
-Второй вариант канонического уравнения состояния:
-\begin{equation}
-e\qty(\rho, \, s) = \qty[A \exp \qty(\tfrac{s}{c_v}) - \frac{e_0}{\gamma}] \qty(\frac{\rho}{\rho_0})^{\gamma - 1} + \frac{P_0}{\rho} + e_0.
-\end{equation}
-
-Параметр $A$ ни на что не влияет. Пофиг.
-
-\subsection{Ми -- Грюнайзена и Мурнагана}
-
-Будем следовать статье \cite{Heuze12} при выводе общей формы уравнения Ми -- Грюнайзена. В начале 20-го века Ми и Грюнайзен разрабатывали теорию твердых материалов, в которой давление линейная функция энергии. Общее наименование Ми -- Грюнайзена относится к моделям, которые следуют этому допущению. Коэффициент пропорциональности $\Gamma(\rho)$, который связывает энергию и давление называется параметром Грюнайзена.
-
-При исследовании кристаллов они получили, что внутренняя энергия кристаллов складывается из их потенциальной энергии при нулевой температуре (потенциал взаимодействия атомов при нулевой температуре), а также из температурной энергии вибраций, которая растет с температурой
-\begin{equation}
-e(\rho, \, T) = e_{ref} (\rho) + e_{T} (\rho, \, T),
-\end{equation}
-Аналогичное разложение используется для давления:
-\begin{equation}
-P(\rho, \, T) = P_{ref} (\rho) + P_T (\rho, \, T),
-\end{equation}
-Потенциальная энергия $e_{ref}(\rho)$ также называется холодной энергией или референсным потенциалом, $P_{ref}(\rho)$ --- холодное или референсное давление. Они связаны соотношением
-\begin{equation}
-P_{ref}(\rho) = \rho^2 e'_{ref} (\rho).
-\end{equation}
-
-Референсные кривые при нулевой температуре получаются математически при анализе кристаллических решеток, к примеру, простые формулы приводятся здесь \cite{Lemons99}. Правда математика и теоретическая физика дают очень грубые оценки для констант в уравнениях, так что их потом подбирают в экспериментах. Ну хотя бы вид функций известен.
-
-
-Температурное давление $P_T(\rho, \, T)$ пропорционально энергии $e_{T} (\rho, \, T)$. Их соотношение не зависит от температуры, а только от вибрационной частоты $\nu$ и плотности $\rho$. Параметр Грюнайзена $\Gamma$ можно ввести как
-\begin{equation*}
-\Gamma (\rho) = \frac{d \ln \nu}{d \ln \rho}.
-\end{equation*}
-Исходя из \textit{virial theorem} Грюнайзен получил
-\begin{equation}
-P(\rho, \, e) - P_{ref} \qty(\rho) = \Gamma (\rho) \rho \, \qty[ e - e_{ref}(\rho) ].
-\end{equation}
-
-Что ещё интересного вводится в статье. Ну во первых предположим, что $c_v = \qty(de / dT)_{\rho} = \const$, как часто делаем.
-Вот есть формула температуры Дебая
-\begin{equation}
-T_ref(\rho) = T_0 \cdot \exp \qty[ \int_{\rho_0}^{\rho} \frac{\Gamma(\rho)}{\rho} d \rho ],
-\end{equation}
-которую будем использовать в качестве референсной кривой.
-И известно, свойство, указано в статье \cite{Heuze12}.
-\begin{equation}
-e - e_{ref}(\rho) = T_{ref}(\rho) \qty[ \sigma (s) - \sigma (s_0)].
-\end{equation}
-где $\sigma (s)$ -- энтропийная функция.
-
-Откуда берется уравнение состояния из основного раздела? Для референсной кривой выбирается закон Мурнагана.
-\begin{equation}
-P_{ref} (\rho) = \frac{B}{n} \qty[ \qty( \frac{\rho}{\rho_0} )^{n} - 1].
-\end{equation}
-Для референсной температуры есть две опции, если предположить $\Gamma = \const$, тогда интегрирование даст
-\begin{equation}
-T_{ref}(\rho) = T_0 \qty( \frac{\rho}{\rho_0} )^{\Gamma},
-\end{equation}
-ну то есть как для двучленного уравнения состояния ($\Gamma = \gamma - 1$). Можем также предположить, в \cite{Heuze12} написано, что это стандартное предположение для металлов, что $\Gamma (\rho) \rho = \Gamma \rho_0 = \const$. Тогда после интегрирования получим
-\begin{equation}
-T_{ref}(\rho) = T_0 \exp \qty[ \Gamma \qty(1 - \frac{\rho_0}{\rho} ) ],
-\end{equation}
-действительно, такая версия встречается, к примеру, у Уолша и Кристиана \cite{Walsh55}. Во видимому, если выбирать эту версию, то и в основном уравнении следует заменить $\rho$ на $\rho_0$. Последний произвол остался в выборе энтропийной функции. Ну тут выбираем как обычно, откуда это следует, я пока не разобрался. Кажется из того что $c_v = \const$
-\begin{equation}
-\sigma(s) = \exp \qty( \tfrac{s - s_0}{c_v} ).
-\end{equation}
-Тогда каноническое уравнение состояния:
-\begin{equation}
-e = e_{ref}(\rho) + c_v T_{ref}(\rho) \qty( \exp \qty( \tfrac{s - s_0}{c_v} ) - 1).
-\end{equation}
-
-
-
-
-
 \chapter{Классическая газодинамика}
 
 \section{Математическая модель}
@@ -1259,6 +1128,27 @@ p_2 = p_1 + \half \cdot (C - 1) \cdot \cos \varphi.
 \right.
 \end{equation*}
 Объемную долю $\alpha^{*}_{\sigma}$ уже следует использовать в расчетах для задачи переноса.
+\medskip
+
+Интересная задача: при заданных сечениях на ребрах квадрата, оценить объемную долю в самой квадратной ячейке (Рис.~\ref{fig:edge-to-area}). Важно ещё, чтобы решение для прямой возвращало точный результат. Общее решение предложил Лёша, нужно каким-то образом составить пятиугольник из векторов. Треугольник это считай вырожденный пятиугольник с нулевой стороной.
+\begin{figure}[!h]
+\centering
+\includegraphics[width=0.8\linewidth]{images/sections/edge_to_area.pdf}
+\caption{Восстановление объемной доли в квадрате, по долям на ребрах.\label{fig:edge-to-area}}
+\end{figure}
+Я покрутил квадраты, итоговая формула получилась следующая:
+\begin{multline*}
+\alpha= \frac{1}{2} \big[
+\min \qty(\alpha_L, \, \alpha_R) \cdot \max \qty(\alpha_B, \, \alpha_T) + 
+\max \qty(\alpha_L, \, \alpha_R) \cdot \min \qty(\alpha_B, \, \alpha_T) + \\ +
+\max \qty(\alpha_L, \, \alpha_R) \cdot \max \qty(\alpha_B, \, \alpha_T) -
+\min \qty(\alpha_L, \, \alpha_R) \cdot \min \qty(\alpha_B, \, \alpha_T)
+\big].
+\end{multline*}
+
+\subsection{Сечения кубоидов}
+
+1. Сечение единичного куба. Нормаль упорядочена, $|n_x| \le |n_y| \le |n_z|$.
 
 
 
@@ -1398,6 +1288,142 @@ p_2 = p_1 + \half \cdot (C - 1) \cdot \cos \varphi.
 \sgn_{rn} (x) = \sgn(\xi) \cdot \qty( 1 + \eta(1 - |\xi|) \cdot \qty( \frac{1}{n} \sqrt[n]{|\xi|} \cdot (n + 1 - |\xi|) - 1) ), \qquad \xi = \frac{x - x_0}{w}.
 \end{equation*} 
 Функция $\sgn_{rn}(x)$ является гладкой в точках сшивки $x = x_0 \pm w$. Показатель корня $n$ влияет на резкость функции, при $n \to \infty$ функция стремится к обычной функции знака. На практике, для оптимизации вычислений, следует использовать квадратный или кубический корень.
+
+
+\chapter{Приложения}
+
+
+
+\section{Выкладки}
+
+\subsection{Двучленное уравнение состояния и Stiffened Gas}
+\label{app:stiffened}
+
+Стартуем с формулы
+\begin{equation}
+P(\rho, \, e) = \qty(\gamma - 1) \rho e + c_0^2 \qty(\rho - \rho_0)
+\end{equation}
+Хотим найти термическое уравнение состояния $P(\rho, \, T)$. Просто так его из $P(\rho, \, e)$ не вывести, требуется хотя бы некоторое допущение. Используем следующее, предполагаем, что $\qty( \dfrac{\partial e}{\partial T} )_{\rho} = c_v = \const$, тогда внутренняя энергия представляется в форме
+\begin{equation}
+e(\rho, \, T) = c_v T + K( \rho ),
+\end{equation}
+
+Попробуем найти каноническое уравнение состояния $e(\rho, \, s)$.
+\begin{equation}
+\qty( \pdv{e}{s} )_{\rho} = T = \frac{e (\rho, \, s) - K(\rho)}{c_v},
+\end{equation}
+это что-то вроде ОДУ на $e(\rho, \, s)$, общее решение имеет вид
+\begin{equation}
+e(\rho, \, s) = A(\rho) \exp \qty( \tfrac{s}{c_v} ) + K(\rho).
+\end{equation}
+
+Также известно
+\begin{equation}
+\qty(\pdv{e}{\rho})_{s} = \frac{P}{\rho^2}.
+\end{equation}
+Тут уже ОДУ которое должно выполняться тождественно $\forall s$:
+\begin{equation}
+\rho^2 \qty[ A'(\rho) \exp \qty( \tfrac{s}{c_v} ) + K'(\rho)] = P = \qty(\gamma - 1) \rho \qty[ A(\rho) \exp \qty( \tfrac{s}{c_v} ) + K(\rho)] + c_0^2 \qty(\rho - \rho_0)
+\end{equation}
+Отсюда можно вычислить $A(\rho)$ и $K(\rho)$, а значит и $e(\rho, \, s)$. Решение содержит только две константы $e_1$ и $e_2$. 
+\begin{equation}
+A(\rho) = e_1 \exp \qty(\tfrac{s}{c_v}) \qty(\frac{\rho}{\rho_0})^{\gamma - 1},
+\qquad
+K(\rho) = e_2 \qty(\frac{\rho}{\rho_0})^{\gamma - 1} + \frac{\rho_0 c_0^2}{\gamma \rho} - \frac{c_0^2}{\gamma - 1},
+\end{equation}
+\begin{equation}
+e\qty(\rho, \, s) = \qty[e_1 \exp \qty(\tfrac{s}{c_v}) + e_2] \qty(\frac{\rho}{\rho_0})^{\gamma - 1} + \frac{\rho_0 c_0^2}{\gamma \rho} - \frac{c_0^2}{\gamma - 1}.
+\end{equation}
+
+Константа $e_1$ перед экспонентой никак не влияет на формулу для давления. Теперь есть два варианта. 1 это волевым решением положить $e_2 = 0$. Пурурум, получится Stiffened Gas.  
+\begin{equation}
+e\qty(\rho, \, s) = A \exp \qty(\tfrac{s}{c_v}) \rho^{\gamma - 1} + \frac{P_0}{\rho} + e_0.
+\end{equation}
+
+Второй вариант. Выпишем давление:
+\begin{multline*}
+P = (\gamma - 1) \rho (c_v T + K(\rho)) + c_0^2 (\rho - \rho_0) =
+(\gamma - 1) \rho \qty[c_v T + e_2 \qty(\frac{\rho}{\rho_0})^{\gamma - 1} + \frac{\rho_0 c_0^2}{\gamma \rho} - \frac{c_0^2}{\gamma - 1}] + \\ + c_0^2 (\rho - \rho_0) = \qty(\gamma - 1) c_v \rho T + \qty(\gamma - 1) \rho_0 e_2 \qty( \frac{\rho}{\rho_0} )^{\gamma} - \frac{\rho_0 c_0^2}{\gamma} = \\ = \qty(\gamma - 1) c_v \rho T + \frac{\rho_0 c_0^2}{\gamma} \qty[ \frac{\gamma \qty(\gamma - 1) e_2}{c_0^2} \qty( \frac{\rho}{\rho_0} )^{\gamma} - 1].
+\end{multline*}
+Вторую скобку будем называть <<упругой частью>> давления. Будем выбирать параметр $e_0$ таким образом, чтобы упругая часть давления обращалась в ноль при $\rho = \rho_0$, то есть
+\begin{equation}
+e_2 = \frac{c_0^2}{\gamma \qty(\gamma - 1)} = - \frac{e_0}{\gamma}.
+\end{equation}
+
+Второй вариант канонического уравнения состояния:
+\begin{equation}
+e\qty(\rho, \, s) = \qty[A \exp \qty(\tfrac{s}{c_v}) - \frac{e_0}{\gamma}] \qty(\frac{\rho}{\rho_0})^{\gamma - 1} + \frac{P_0}{\rho} + e_0.
+\end{equation}
+
+Параметр $A$ ни на что не влияет. Пофиг.
+
+\subsection{Ми -- Грюнайзена и Мурнагана}
+
+Будем следовать статье \cite{Heuze12} при выводе общей формы уравнения Ми -- Грюнайзена. В начале 20-го века Ми и Грюнайзен разрабатывали теорию твердых материалов, в которой давление линейная функция энергии. Общее наименование Ми -- Грюнайзена относится к моделям, которые следуют этому допущению. Коэффициент пропорциональности $\Gamma(\rho)$, который связывает энергию и давление называется параметром Грюнайзена.
+
+При исследовании кристаллов они получили, что внутренняя энергия кристаллов складывается из их потенциальной энергии при нулевой температуре (потенциал взаимодействия атомов при нулевой температуре), а также из температурной энергии вибраций, которая растет с температурой
+\begin{equation}
+e(\rho, \, T) = e_{ref} (\rho) + e_{T} (\rho, \, T),
+\end{equation}
+Аналогичное разложение используется для давления:
+\begin{equation}
+P(\rho, \, T) = P_{ref} (\rho) + P_T (\rho, \, T),
+\end{equation}
+Потенциальная энергия $e_{ref}(\rho)$ также называется холодной энергией или референсным потенциалом, $P_{ref}(\rho)$ --- холодное или референсное давление. Они связаны соотношением
+\begin{equation}
+P_{ref}(\rho) = \rho^2 e'_{ref} (\rho).
+\end{equation}
+
+Референсные кривые при нулевой температуре получаются математически при анализе кристаллических решеток, к примеру, простые формулы приводятся здесь \cite{Lemons99}. Правда математика и теоретическая физика дают очень грубые оценки для констант в уравнениях, так что их потом подбирают в экспериментах. Ну хотя бы вид функций известен.
+
+
+Температурное давление $P_T(\rho, \, T)$ пропорционально энергии $e_{T} (\rho, \, T)$. Их соотношение не зависит от температуры, а только от вибрационной частоты $\nu$ и плотности $\rho$. Параметр Грюнайзена $\Gamma$ можно ввести как
+\begin{equation*}
+\Gamma (\rho) = \frac{d \ln \nu}{d \ln \rho}.
+\end{equation*}
+Исходя из \textit{virial theorem} Грюнайзен получил
+\begin{equation}
+P(\rho, \, e) - P_{ref} \qty(\rho) = \Gamma (\rho) \rho \, \qty[ e - e_{ref}(\rho) ].
+\end{equation}
+
+Что ещё интересного вводится в статье. Ну во первых предположим, что $c_v = \qty(de / dT)_{\rho} = \const$, как часто делаем.
+Вот есть формула температуры Дебая
+\begin{equation}
+T_ref(\rho) = T_0 \cdot \exp \qty[ \int_{\rho_0}^{\rho} \frac{\Gamma(\rho)}{\rho} d \rho ],
+\end{equation}
+которую будем использовать в качестве референсной кривой.
+И известно, свойство, указано в статье \cite{Heuze12}.
+\begin{equation}
+e - e_{ref}(\rho) = T_{ref}(\rho) \qty[ \sigma (s) - \sigma (s_0)].
+\end{equation}
+где $\sigma (s)$ -- энтропийная функция.
+
+Откуда берется уравнение состояния из основного раздела? Для референсной кривой выбирается закон Мурнагана.
+\begin{equation}
+P_{ref} (\rho) = \frac{B}{n} \qty[ \qty( \frac{\rho}{\rho_0} )^{n} - 1].
+\end{equation}
+Для референсной температуры есть две опции, если предположить $\Gamma = \const$, тогда интегрирование даст
+\begin{equation}
+T_{ref}(\rho) = T_0 \qty( \frac{\rho}{\rho_0} )^{\Gamma},
+\end{equation}
+ну то есть как для двучленного уравнения состояния ($\Gamma = \gamma - 1$). Можем также предположить, в \cite{Heuze12} написано, что это стандартное предположение для металлов, что $\Gamma (\rho) \rho = \Gamma \rho_0 = \const$. Тогда после интегрирования получим
+\begin{equation}
+T_{ref}(\rho) = T_0 \exp \qty[ \Gamma \qty(1 - \frac{\rho_0}{\rho} ) ],
+\end{equation}
+действительно, такая версия встречается, к примеру, у Уолша и Кристиана \cite{Walsh55}. Во видимому, если выбирать эту версию, то и в основном уравнении следует заменить $\rho$ на $\rho_0$. Последний произвол остался в выборе энтропийной функции. Ну тут выбираем как обычно, откуда это следует, я пока не разобрался. Кажется из того что $c_v = \const$
+\begin{equation}
+\sigma(s) = \exp \qty( \tfrac{s - s_0}{c_v} ).
+\end{equation}
+Тогда каноническое уравнение состояния:
+\begin{equation}
+e = e_{ref}(\rho) + c_v T_{ref}(\rho) \qty( \exp \qty( \tfrac{s - s_0}{c_v} ) - 1).
+\end{equation}
+
+
+
+
+
+
 
 \bibliography{library.bib}
 

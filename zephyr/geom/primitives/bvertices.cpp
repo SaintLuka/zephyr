@@ -11,7 +11,18 @@ BVertices::BVertices(const Polygon &poly) {
     for (int i = mid_count; i < max_count; ++i) {
         verts[i] = {NAN, NAN, NAN};
     }
-};
+}
+
+BVertices::BVertices(const Polyhedron &poly) {
+    int mid_count = std::min(poly.n_verts(), max_count);
+
+    for (int i = 0; i < mid_count; ++i) {
+        verts[i] = poly.vertex(i);
+    }
+    for (int i = mid_count; i < max_count; ++i) {
+        verts[i] = {NAN, NAN, NAN};
+    }
+}
 
 int BVertices::find(const Vector3d &v1, double eps) const {
     double eps2 = eps * eps;

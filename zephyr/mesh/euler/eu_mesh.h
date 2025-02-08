@@ -163,14 +163,21 @@ public:
     /// @brief Ссылка на декомпозицию
     const Decomposition& decomp() const { return *m_decomp; }
 
+    /// @brief Добавить декомпозицию сетки, основная функция
+    /// @param decmp Умный указатель на декомпозицию
+    /// @param update Сразу перераспределить ячейки
+    void set_decomposition(Decomposition::Ref decmp, bool update=true);
+
+    /// @brief Добавить ORB декомпозицию сетки
+    /// @param orb Ссылка на ORB декомпозицию, внутри функции заменяется
+    /// @param update Сразу перераспределить ячейки
+    void set_decomposition(ORB& orb, bool update=true);
+
     /// @brief Добавить ORB декомпозицию сетки, используется простейший
     /// конструктор ORB декомпозиции, ячейки сразу перераспределяются.
     /// @param type Тип ORB декомпозиции
     void set_decomposition(const std::string& type);
 
-    /// @brief Добавить ORB декомпозицию сетки
-    /// @param update Сразу перераспределить ячейки
-    void set_decomposition(const decomp::ORB& orb, bool update=true);
 
     /// @brief Перераспределить ячейки между процессами в соответствии с рангом,
     /// который выдает функция m_decomp::rank().

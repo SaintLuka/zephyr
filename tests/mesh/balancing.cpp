@@ -7,6 +7,8 @@
 
 #include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/mesh/decomp/ORB.h>
+#include <zephyr/mesh/decomp/VD3.h>
+#include <zephyr/mesh/decomp/rwalk.h>
 
 #include <zephyr/geom/generator/cuboid.h>
 #include <zephyr/geom/generator/rectangle.h>
@@ -19,6 +21,8 @@ using zephyr::geom::generator::Cuboid;
 using zephyr::geom::generator::Rectangle;
 
 using zephyr::mesh::decomp::ORB;
+using zephyr::mesh::decomp::VD3;
+using zephyr::mesh::decomp::RWalk;
 
 struct _U_ {
     int rank;
@@ -48,15 +52,18 @@ double foo(const Vector3d& v) {
 }
 
 std::vector<double> calc_loads(Mesh& mesh, int size) {
-    std::vector<double> ws(size);
+    std::vector<double> ws(size, 1.0e-3);
     for (auto cell: mesh) {
+        if (cell(U).rank < 0 || cell(U).rank > size) {
+            throw std::runtime_error("Wrong rank");
+        }
         ws[cell(U).rank] += cell(U).load;
     }
     return ws;
 }
 
 int main() {
-    mpi::init();
+    threads::off();
 
     // Файл для записи
     PvdFile pvd("mesh", "output");
@@ -81,29 +88,33 @@ int main() {
     }
 
     // Различные варианты инициализации ORB декомпозиции
-    ORB orb(domain, "XY", -1, {2, 3, 4, 5, 1});
-    //decomp::ORB orb(domain, "YX", 13);
-    //decomp::ORB orb(domain, "YX", 13, 3);
+    //auto decmp = ORB::create(domain, "XY", -1, {2, 3, 4, 5, 1});
+    //auto decmp = ORB::create(domain, "YX", 13);
+    //auto decmp = ORB::create(domain, "YX", 13, 3);
+    //auto decmp = VD3::create(domain, 23);
+    auto decmp = RWalk::create(domain, 3);
 
     for (int step = 0; step < 1000; ++step) {
         // Вычисляем новый ранг ячеек
         for (auto &cell: mesh.locals()) {
-            cell(U).rank = orb.rank(cell);
+            cell(U).rank = decmp->rank(cell);
         }
 
-        // Подсчитываем нагрузку каждого ранга
-        auto ws = calc_loads(mesh, orb.size());
-
         if (step % 10 == 0) {
-            std::cout << "Step:      " << step << "\n";
-            std::cout << "Imbalance: " << ORB::imbalance(ws) << "\n";
+            std::cout << "Step:      " << step << "; \t";
             pvd.save(mesh, step);
         }
 
+        // Подсчитываем нагрузку каждого ранга
+        auto ws = calc_loads(mesh, decmp->size());
+
+        if (step % 10 == 0) {
+            std::cout << "Imbalance: " << decmp->imbalance(ws) << "\n";
+        }
+
         // Балансировка декомпозиции
-        orb.balancing(ws);
+        decmp->balancing(ws);
     }
 
-    mpi::finalize();
     return 0;
 }

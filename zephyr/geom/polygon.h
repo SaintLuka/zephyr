@@ -6,7 +6,6 @@
 #include <zephyr/geom/box.h>
 #include <zephyr/geom/vector.h>
 #include <zephyr/geom/line.h>
-#include <zephyr/geom/quad.h>
 
 namespace zephyr::geom {
 
@@ -95,7 +94,6 @@ public:
 
     /// @brief Площадь произвольного многоугольника
     /// Вершины должны располагаться в плоскости (x, y).
-    /// @param c Точка внутри полигона, если известена
     double area() const;
 
     /// @brief Барицентр произвольного многоугольника.

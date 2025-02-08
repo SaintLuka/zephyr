@@ -2,6 +2,7 @@
 
 #include <zephyr/geom/cube.h>
 #include <zephyr/geom/polygon.h>
+#include <zephyr/geom/polyhedron.h>
 
 namespace zephyr::geom {
 
@@ -53,6 +54,9 @@ public:
 
     /// @brief Конструктор по полигону
     BVertices(const Polygon &poly);
+
+    /// @brief Конструктор по многограннику
+    BVertices(const Polyhedron &poly);
 
     /// @brief Найти индекс вершины в списке
     /// @param v Целевая вершина

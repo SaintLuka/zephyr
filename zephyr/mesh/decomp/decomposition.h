@@ -2,15 +2,19 @@
 
 #include <memory>
 
+#include <zephyr/geom/box.h>
 #include <zephyr/mesh/euler/amr_storage.h>
 
 namespace zephyr::mesh::decomp {
+
+using zephyr::geom::Box;
 
 /// @brief Базовый класс декомпозиции
 class Decomposition {
 public:
     /// @brief Умный указатель на экземаляр класса
     using Ptr = std::shared_ptr<Decomposition>;
+    using Ref = const std::shared_ptr<Decomposition>&;
 
     /// @brief Конструктор по умолчанию.
     /// Размер декомпозиции выбирается равным mpi::size()

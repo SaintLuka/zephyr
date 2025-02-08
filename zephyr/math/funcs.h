@@ -3,6 +3,7 @@
 
 #include <cmath>
 #include <tuple>
+#include <vector>
 
 namespace zephyr::math {
 

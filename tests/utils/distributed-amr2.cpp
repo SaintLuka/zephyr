@@ -10,6 +10,8 @@
 
 #include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/mesh/decomp/ORB.h>
+#include <zephyr/mesh/decomp/VD3.h>
+#include <zephyr/mesh/decomp/rwalk.h>
 
 #include <zephyr/geom/generator/cuboid.h>
 #include <zephyr/geom/generator/rectangle.h>
@@ -21,27 +23,26 @@ using zephyr::io::PvdFile;
 using zephyr::geom::generator::Cuboid;
 using zephyr::geom::generator::Rectangle;
 
+using zephyr::mesh::decomp::ORB;
+using zephyr::mesh::decomp::VD3;
+using zephyr::mesh::decomp::RWalk;
+
 // Решаем два волновых уравнения по простой схеме
 struct _U_ {
-    double u, v;
-
-    // Равномерно распределенные в области величины [0, 1]
-    // на отрезке [0, 1]
-    double prob1, prob2;
+    double u;      ///< Некоторая гладкая функция
+    double wflag;  ///< Равномерно распределенная величина [0, 1]
 };
 
 _U_ U;
 
 // Переменные для сохранения
-double get_u(AmrStorage::Item& cell) { return cell(U).u; }
-double get_v(AmrStorage::Item& cell) { return cell(U).v; }
-double get_color(AmrStorage::Item& cell) { return cell(U).prob1; }
-double get_crank(AmrStorage::Item& cell) { return cell(U).prob2; }
+double get_u(AmrStorage::Item& cell)     { return cell(U).u; }
+double get_wflag(AmrStorage::Item& cell) { return cell(U).wflag; }
 
 class Membrane {
 public:
     explicit Membrane(int seed = 0) {
-        count = 15;
+        count = 125;
         A.resize(count);
 
         n.resize(count);
@@ -52,7 +53,7 @@ public:
         y0.resize(count);
         t0.resize(count);
 
-        const int N = 7; // Влияет на величину формаций
+        const int N = 15; // Влияет на величину формаций
 
         std::mt19937_64 gen(seed);
         std::uniform_int_distribution<int> uni_i(0, N);
@@ -64,11 +65,11 @@ public:
             y0[i] = uni_d(gen);
             t0[i] = uni_d(gen);
 
-            n[i] = 2 * M_PI * uni_i(gen);
-            m[i] = 2 * M_PI * uni_i(gen);
+            n[i] = M_PI * uni_i(gen);
+            m[i] = M_PI * uni_i(gen);
             q[i] = std::sqrt(n[i] * n[i] + m[i] * m[i]);
 
-            A[i] = uni_d(gen);
+            A[i] = (2.0 * uni_d(gen) - 1.0) / std::pow((n[i] + 3) * (m[i] + 3), 0.25);
         }
     }
 
@@ -94,76 +95,57 @@ protected:
 
 void setup_values(EuMesh& mesh, double t = 0.0) {
     static Membrane func_u(1);
-    static Membrane func_v(2);
 
     double u_min = +1.0e300;
     double u_max = -1.0e300;
-    double v_min = +1.0e300;
-    double v_max = -1.0e300;
     for (auto &cell: mesh) {
         double u = func_u(cell.center(), t);
-        double v = func_v(cell.center(), t);
         cell(U).u = u;
-        cell(U).v = v;
         u_min = std::min(u, u_min);
         u_max = std::max(u, u_max);
-        v_min = std::min(v, v_min);
-        v_max = std::max(v, v_max);
     }
 
     u_min = mpi::min(u_min);
     u_max = mpi::max(u_max);
-    v_min = mpi::min(v_min);
-    v_max = mpi::max(v_max);
 
     // Нормируем от 0.0 до 1.0
     for (auto &cell: mesh) {
         cell(U).u = (cell(U).u - u_min) / (u_max - u_min);
-        cell(U).v = (cell(U).v - v_min) / (v_max - v_min);
     }
 
     double count = 100.0;
 
     double volume = 0.0;
     std::vector<double> vols_u(count);
-    std::vector<double> vols_v(count);
     for (auto &cell: mesh) {
         // Индекс от 0 до count
         double idx_u = std::floor(cell(U).u * count);
-        double idx_v = std::floor(cell(U).v * count);
 
         double V = cell.volume();
         vols_u[idx_u] += V;
-        vols_v[idx_v] += V;
         volume += V;
     }
 
     volume = mpi::sum(volume);
     vols_u = mpi::sum(vols_u);
-    vols_v = mpi::sum(vols_v);
-
-    std::vector<double> xs = zephyr::geom::linspace(1.0 / count, 1.0, count);
 
     // Кумулятивная сумма
     vols_u[0] /= volume;
     for (int i = 1; i < count; ++i) {
         vols_u[i] += vols_u[i - 1] / volume;
-        vols_v[i] += vols_v[i - 1] / volume;
     }
 
     for (auto &cell: mesh) {
         int idx_u = int(std::floor(cell(U).u * count));
-        int idx_v = int(std::floor(cell(U).v * count));
-        cell(U).prob1 = vols_u[idx_u];
-        cell(U).prob2 = vols_v[idx_v];
+        cell(U).wflag = vols_u[idx_u];
     }
 }
 
 void set_flags(EuMesh& mesh) {
     for (auto cell: mesh) {
-        if (cell(U).prob1 < 0.5) {
+        if (cell(U).wflag < 0.5) {
             cell.set_flag(-1);
-        } else if (cell(U).prob1 < 0.8) {
+        } else if (cell(U).wflag < 0.9) {
             cell.set_flag(0);
         } else {
             cell.set_flag(1);
@@ -171,11 +153,6 @@ void set_flags(EuMesh& mesh) {
     }
 }
 
-void set_ranks(EuMesh& mesh) {
-    for (auto cell: mesh) {
-        cell.geom().rank = int(std::floor(cell(U).prob2 * mpi::size()));
-    }
-}
 
 int main() {
     mpi::init();
@@ -185,16 +162,14 @@ int main() {
     // Файл для записи
     PvdFile pvd("mesh", "output");
 
-    pvd.variables = {"rank", "index", "flag", "faces"};
+    pvd.variables = {"rank", "index", "level", "faces"};
     pvd.variables += {"u", get_u};
-    pvd.variables += {"v", get_v};
-    pvd.variables += {"color", get_color};
-    pvd.variables += {"prob2", get_crank};
+    pvd.variables += {"wflag", get_wflag};
 
     // Сеточный генератор
     //Cuboid gen(0.0, 1.0, 0.0, 0.6, 0.0, 0.9);
     Rectangle gen(0.0, 1.0, 0.0, 1.0);
-    gen.set_nx(200);
+    gen.set_nx(50);
 
     // Bounding Box для сетки
     Box domain = gen.bbox();
@@ -202,11 +177,14 @@ int main() {
     // Создаем сетку
     EuMesh mesh(U, gen);
 
-    mesh.set_max_level(0);
+    mesh.set_max_level(1);
     mesh.set_distributor(Distributor::simple());
 
+    //auto decmp = ORB::create(domain, "XY", mpi::size());
+    auto decmp = RWalk::create(domain, mpi::size());
+
     // Добавляем декомпозицию
-    mesh.set_decomposition("XY");
+    mesh.set_decomposition(decmp);
 
     // Начальные данные
     for (int i = 0; i < mesh.max_level(); ++i) {
@@ -226,10 +204,9 @@ int main() {
     while (curr_time <= 1.0 && n_step < 20000000) {
         // Балансировка декомпозиции
         //if (n_step % 10 == 0) {
-            //mesh.balancing(double(mesh.locals().size()));
-            //set_ranks(mesh);
-            //mesh.redistribute();
-            //mesh.exchange();
+            mesh.balancing(mesh.n_cells());
+            mesh.redistribute();
+            mesh.exchange();
         //}
 
         if (curr_time >= next_write) {

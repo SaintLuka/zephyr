@@ -71,7 +71,7 @@ AmrCell::AmrCell(const Polygon& poly)
 
     double area = poly.area();
 
-    size = std::sqrt(area);
+    size   = std::sqrt(area);
     center = poly.centroid(area);
 
     for (int i = 0; i < poly.size(); ++i) {
@@ -83,6 +83,45 @@ AmrCell::AmrCell(const Polygon& poly)
         faces[i].area     = vs.length();
         faces[i].center   = vs.center();
         faces[i].normal   = vs.normal(center);
+        faces[i].boundary = Boundary::ORDINARY;
+    }
+}
+
+AmrCell::AmrCell(const Polyhedron &poly)
+        : Element(0, 0), dim(3),
+          adaptive(false), linear(true),
+          vertices(poly), faces(CellType::POLYHEDRON),
+          b_idx(-1), z_idx(-1), level(0), flag(0)  {
+
+    double vol = poly.volume();
+
+    size   = std::cbrt(vol);
+    center = poly.centroid(vol);
+
+    if (poly.n_faces() > BFaces::max_count) {
+        throw std::runtime_error("Polygon has > 24 faces");
+    }
+
+    for (int i = 0; i < poly.n_faces(); ++i) {
+        int n_verts = poly.face_indices(i).size();
+        if (n_verts < 4) {
+            faces[i].vertices = {poly.face_indices(i)[0],
+                                 poly.face_indices(i)[1],
+                                 poly.face_indices(i)[2],
+                                 -1
+            };
+        }
+        else {
+            faces[i].vertices = {poly.face_indices(i)[0],
+                                 poly.face_indices(i)[1],
+                                 poly.face_indices(i)[2],
+                                 poly.face_indices(i)[3]
+            };
+        }
+
+        faces[i].area     = poly.face_area(i);
+        faces[i].center   = poly.face_center(i);
+        faces[i].normal   = poly.face_normal(i);
         faces[i].boundary = Boundary::ORDINARY;
     }
 }
@@ -123,6 +162,10 @@ Polygon AmrCell::polygon() const {
     } else {
         return Polygon(&vertices[0], vertices.count());
     }
+}
+
+Polyhedron AmrCell::polyhedron() const {
+    throw std::runtime_error("AmrCell::polyhedron");
 }
 
 inline double min(double x, double y, double z) {

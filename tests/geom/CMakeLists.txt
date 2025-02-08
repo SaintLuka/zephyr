@@ -5,6 +5,7 @@
 #list(APPEND TESTS mesh_generator)
 #list(APPEND TESTS movable_mesh)
 #list(APPEND TESTS polygon_clip)
+list(APPEND TESTS polyhedra)
 #list(APPEND TESTS splines)
 #list(APPEND TESTS volume_fraction)
 

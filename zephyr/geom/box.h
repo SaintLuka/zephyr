@@ -26,13 +26,27 @@ public:
     
     double diameter() const;
 
+    /// @brief Проверяет совпадение z-координаты
+    bool is_2D() const;
+
+    /// @brief Проверяет совпадение z-координаты
+    bool is_3D() const;
+
     /// @brief Площадь для двумерного Box
     double area() const;
 
     /// @brief Объем для трехмерного Box
     double volume() const;
 
+    // Точка внутри?
     bool inside(const Vector3d& p) const;
+
+    /// @brief Сунуть точку внутрь Box
+    Vector3d shove_in(const Vector3d& p) const;
+
+    std::vector<double> outline_x() const;
+
+    std::vector<double> outline_y() const;
 
     void extend(double margin);
 
@@ -42,6 +56,8 @@ public:
 
     QuasiRandom2D quasiRandom2D() const;
 };
+
+std::ostream& operator<<(std::ostream& os, const Box& box);
 
 /// @brief Случайная двумерная последовательность в прямоугольнике
 class Random2D {

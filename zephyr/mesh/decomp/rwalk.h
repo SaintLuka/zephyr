@@ -5,30 +5,33 @@
 
 namespace zephyr::mesh::decomp {
 
-/// @brief Декомпозиция на основе диаграмм Вороного
-class VD3 : public Decomposition {
+/// @brief RWalk от Random Walk, блуждающие ячейки Вороного.
+class RWalk : public Decomposition {
 public:
     /// @brief Умный указатель на экземаляр класса
-    using Ptr = std::shared_ptr<VD3>;
-    using Ref = const std::shared_ptr<VD3>&;
+    using Ptr = std::shared_ptr<RWalk>;
+    using Ref = const std::shared_ptr<RWalk>&;
 
     /// @brief Конструктор со случайными генераторами
     /// @param size Размер декомпозиции, не обязательно равен mpi::size(),
     /// для возможности тестирования декомпозиции на одном процессе.
-    VD3(const Box& domain, int size);
+    RWalk(const Box& domain, int size);
 
     /// @brief Создать указатель
-    static VD3::Ptr create(const Box& domain, int size) {
-        return std::make_shared<VD3>(domain, size);
+    static RWalk::Ptr create(const Box& domain, int size) {
+        return std::make_shared<RWalk>(domain, size);
     }
 
     /// @brief Основная функция. Определение нового ранга ячейки.
     int rank(AmrStorage::Item& elem) const final;
 
-    /// @brief Балансировка нагрузки
+    /// @brief Балансировка нагрузки (ничего не балансирует,
+    /// просто смещает генераторы ячеек)
     void balancing(const std::vector<double>& w) final;
 
 protected:
+    double   m_step;
+    Box      m_domain;
     VDiagram m_diagram;
 };
 

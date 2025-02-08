@@ -3,15 +3,18 @@ set(ZEPHYR_DECOMPOSITION_SOURCES
 		${CMAKE_CURRENT_SOURCE_DIR}/orb/transform.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/orb/blocks.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/orb/ORB.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/rwalk.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/VD3.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/vdiagram.cpp
 	PARENT_SCOPE
 )
 
 install(FILES
-		decomposition.h
-		ORB.h
-		VD3.h
-		morton.h
-		hilbert.h
+		${CMAKE_CURRENT_SOURCE_DIR}/decomposition.h
+		${CMAKE_CURRENT_SOURCE_DIR}/ORB.h
+	${CMAKE_CURRENT_SOURCE_DIR}/rwalk.h
+		${CMAKE_CURRENT_SOURCE_DIR}/VD3.h
+		${CMAKE_CURRENT_SOURCE_DIR}/vdiagram.h
 		DESTINATION include/${PROJECT_NAME}/mesh/decomp
 		)
 

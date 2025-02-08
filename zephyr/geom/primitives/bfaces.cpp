@@ -38,6 +38,9 @@ BFaces::BFaces(CellType ctype, int count) {
             }
             break;
 
+        case CellType::POLYHEDRON:
+            break;
+
         default:
             std::string message = "BFaces::BFaces error(): not implemented for current CellType";
             std::cerr << message << "\n";

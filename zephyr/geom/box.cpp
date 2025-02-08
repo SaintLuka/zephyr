@@ -22,6 +22,14 @@ Vector3d Box::size() const {
     return vmax - vmin;
 }
 
+bool Box::is_2D() const {
+    return vmax.z() == vmin.z();
+}
+
+bool Box::is_3D() const {
+    return vmax.z() > vmin.z();
+}
+
 double Box::diameter() const {
     return (vmax - vmin).norm();
 }
@@ -38,6 +46,22 @@ bool Box::inside(const Vector3d& p) const {
     return vmin.x() <= p.x() && p.x() <= vmax.x() &&
            vmin.y() <= p.y() && p.y() <= vmax.y() &&
            vmin.z() <= p.z() && p.z() <= vmax.z();
+}
+
+Vector3d Box::shove_in(const Vector3d& p) const {
+    return {
+            std::max(vmin.x(), std::min(p.x(), vmax.x())),
+            std::max(vmin.y(), std::min(p.y(), vmax.y())),
+            std::max(vmin.z(), std::min(p.z(), vmax.y()))
+    };
+}
+
+std::vector<double> Box::outline_x() const {
+    return {vmin.x(), vmax.x(), vmax.x(), vmin.x(), vmin.x()};
+}
+
+std::vector<double> Box::outline_y() const {
+    return {vmin.y(), vmin.y(), vmax.y(), vmax.y(), vmin.y()};
 }
 
 void Box::extend(double margin) {
@@ -62,6 +86,16 @@ Random2D Box::random2D(int seed) const {
 QuasiRandom2D Box::quasiRandom2D() const {
     return QuasiRandom2D(vmin, size());
 }
+
+std::ostream& operator<<(std::ostream& os, const Box& box) {
+    os << "[" << box.vmax.x() << ", " << box.vmax.x() << "] × [" <<
+       box.vmax.x() << ", " << box.vmax.x() << "]";
+    if (box.vmax.z() - box.vmin.z() > 0.0) {
+        os << " × [" << box.vmax.z() << ", " << box.vmax.z() << "]";
+    }
+    return os;
+}
+
 
 Random2D::Random2D(const Vector3d& vmin, const Vector3d& vmax, int seed) {
     gen = std::mt19937_64(seed);

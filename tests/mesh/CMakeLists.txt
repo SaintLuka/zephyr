@@ -1,12 +1,5 @@
-list(APPEND TESTS balancing_mpi)
-#list(APPEND TESTS decomposition)
-#list(APPEND TESTS distributed-amr)
-#list(APPEND TESTS distributed-amr2)
-#list(APPEND TESTS mpitest)
-#list(APPEND TESTS range)
-#list(APPEND TESTS stopwatch)
-#list(APPEND TESTS threads)
-#list(APPEND TESTS vectors)
+list(APPEND TESTS balancing)
+list(APPEND TESTS voronoi)
 
 # Assume all files in direcory are tests
 if (ZEPHYR_TESTS_ALL)

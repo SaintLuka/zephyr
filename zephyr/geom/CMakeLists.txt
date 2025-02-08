@@ -13,6 +13,7 @@ set(ZEPHYR_GEOM_SRC
         ${CMAKE_CURRENT_SOURCE_DIR}/sections.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/triangle.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/polygon.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/polyhedron.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/grid.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/intersection.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/interface_recovery.cpp
@@ -28,6 +29,7 @@ install(FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/sections.h
         ${CMAKE_CURRENT_SOURCE_DIR}/triangle.h
         ${CMAKE_CURRENT_SOURCE_DIR}/polygon.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/polyhedron.h
         ${CMAKE_CURRENT_SOURCE_DIR}/geom.h
         ${CMAKE_CURRENT_SOURCE_DIR}/grid.h
         ${CMAKE_CURRENT_SOURCE_DIR}/intersection.h
