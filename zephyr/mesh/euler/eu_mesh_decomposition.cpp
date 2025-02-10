@@ -105,13 +105,14 @@ void EuMesh::migrate() {
 	int size = mpi::size();
 	int rank = mpi::rank();
 
-	std::vector<int> m_i(size, 0);
+	m_migration.clear();
+
 	// По некоторому правилу определяется новый rank для всех ячеек из массива locals
 	for (auto& cell: m_locals){
 		cell.rank = m_decomp->rank(cell);
 
 		// Подсчитываем число ячеек, которые должны быть перемещены с данного процесса на другие
-		++m_i[cell.rank];
+		++m_migration.m_i[cell.rank];
 	}
 
 	/* DEBUG
@@ -129,16 +130,15 @@ void EuMesh::migrate() {
 	}*/
 
 
-	std::vector<int> m = mpi::all_gather_vectors(m_i);
+	m_migration.m = mpi::all_gather_vectors(m_migration.m_i);
 
 	// Переиндексируем локальные ячейки
-	std::vector<int> m_sum(size, 0);
 	for(int i = 0; i < rank; ++i)
 		for(int s = 0; s < size; ++s)
-			m_sum[s] += m[size * i + s];
+			m_migration.m_sum[s] += m_migration.m[size * i + s];
 
 	for (auto& cell: m_locals)
-		cell.index = m_sum[cell.rank]++;
+		cell.index = m_migration.m_sum[cell.rank]++;
 
 	/* // DEBUG
 	if(mpi::master()){
@@ -168,9 +168,8 @@ void EuMesh::migrate() {
 	}
 
 	// Для сортировки в migrants по ранку за О(n). m_i_sum[i] показывает с какого индекса в migrants ставить i-ранковую ячейку.
-	std::vector<int> m_i_sum(size, 0);
 	for(int i = 1; i < size; ++i)
-		m_i_sum[i] = m_i_sum[i - 1] + m_i[i - 1];
+		m_migration.m_i_sum[i] = m_migration.m_i_sum[i - 1] + m_migration.m_i[i - 1];
 
 	/*// DEBUG
 	if(mpi::master()){
@@ -185,7 +184,7 @@ void EuMesh::migrate() {
 	// [?!] Просто migrants.resize(m_locals.size()); не получится, т.к. тогда неправильно задан itemsize
 	migrants = m_locals;
 	for (int i = 0; i < migrants.size(); ++i)
-		std::memcpy(migrants[m_i_sum[m_locals[i].rank]++].ptr(), m_locals[i].ptr(), migrants.itemsize());
+		std::memcpy(migrants[m_migration.m_i_sum[m_locals[i].rank]++].ptr(), m_locals[i].ptr(), migrants.itemsize());
 				
 	/*// DEBUG
 	if(mpi::master()){
@@ -201,27 +200,23 @@ void EuMesh::migrate() {
 	// Меняем размер m_locals
 	int new_size = 0;
 	for(int i=0; i<size; ++i)
-		new_size += m[rank + size * i];
+		new_size += m_migration.m[rank + size * i];
 	m_locals.resize(new_size);
 
 	// Считаем вспомогательные для отправки массивы
-	std::vector<int> send_counts(size, 0);
 	for(int i=0; i<size; ++i)
-		send_counts[i] = m_i[i] * migrants.itemsize();
-	std::vector<int> send_displs(size, 0);
+		m_migration.m_send_counts[i] = m_migration.m_i[i] * migrants.itemsize();
 	for(int i = 1; i < size; ++i)
-		send_displs[i] = send_displs[i - 1] + send_counts[i - 1];
-	std::vector<int> recv_counts(size, 0);
+		m_migration.m_send_offsets[i] = m_migration.m_send_offsets[i - 1] + m_migration.m_send_counts[i - 1];
 	for(int i=0; i<size; ++i)
-		recv_counts[i] = m[rank + size * i] * migrants.itemsize();
-	std::vector<int> recv_displs(size, 0);
+		m_migration.m_recv_counts[i] = m_migration.m[rank + size * i] * migrants.itemsize();
 	for(int i=1; i<size; ++i)
-		recv_displs[i] = recv_displs[i-1] + recv_counts[i-1];
+		m_migration.m_recv_offsets[i] = m_migration.m_recv_offsets[i - 1] + m_migration.m_recv_counts[i - 1];
 	
 	// Отправляем всем процессам соостветствующие
 	MPI_Alltoallv(
-		migrants.item(0).ptr(), send_counts.data(), send_displs.data(), MPI_BYTE,
-		m_locals.item(0).ptr(), recv_counts.data(), recv_displs.data(), MPI_BYTE, 
+		migrants.item(0).ptr(), m_migration.m_send_counts.data(), m_migration.m_send_offsets.data(), MPI_BYTE,
+		m_locals.item(0).ptr(), m_migration.m_recv_counts.data(), m_migration.m_recv_offsets.data(), MPI_BYTE, 
 		mpi::comm()
 	);
 
