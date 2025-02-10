@@ -1,10 +1,31 @@
 #pragma once
+#include <vector>
+#include <zephyr/utils/mpi.h>
 
 namespace zephyr::mesh {
+
+using zephyr::utils::mpi;
 
 /// @class Просто забавное название)
 class TouristAgency {
 public:
+    TouristAgency() :
+	    m_count_to_send(mpi::size()),
+	    m_count_to_recv(mpi::size()),
+	    m_send_offsets(mpi::size(), 0),
+	    m_recv_offsets(mpi::size(), 0),
+        m_border_indices(mpi::size(), std::vector<int>())
+    {}
+
+    // Должно вызываться в начале build_aliens
+    void reset() {
+        m_recv_offsets[0] = 0;
+        m_send_offsets[0] = 0;
+
+        for(int r = 0; r<m_border_indices.size(); ++r)
+            m_border_indices[r].clear();
+    }
+
     std::vector<int> m_count_to_send;
     std::vector<int> m_count_to_recv;
 

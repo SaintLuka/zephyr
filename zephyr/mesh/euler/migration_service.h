@@ -53,7 +53,8 @@ public:
         m_recv_offsets(mpi::size(), 0)
     {}
 
-    void clear() {
+    // Должно вызываться в начале migrate
+    void reset() {
         std::fill(m_i.begin(), m_i.end(), 0);
         std::fill(m_sum.begin(), m_sum.end(), 0);
         m_i_sum[0] = 0;

@@ -105,7 +105,7 @@ void EuMesh::migrate() {
 	int size = mpi::size();
 	int rank = mpi::rank();
 
-	m_migration.clear();
+	m_migration.reset();
 
 	// По некоторому правилу определяется новый rank для всех ячеек из массива locals
 	for (auto& cell: m_locals){
@@ -238,19 +238,7 @@ void EuMesh::build_aliens() {
 	int size = mpi::size();
 	int rank = mpi::rank();
 
-	m_tourism.m_border_indices.clear();
-	m_tourism.m_count_to_send.clear();
-	m_tourism.m_count_to_recv.clear();
-	m_tourism.m_send_offsets.clear();
-	m_tourism.m_recv_offsets.clear();
-
-	// Выделяем память
-	// [!] думаю, нужно перенести этот код, чтобы он выполнялся единожды
-	m_tourism.m_border_indices.resize(size, std::vector<int>());
-	m_tourism.m_count_to_send.resize(size);
-	m_tourism.m_count_to_recv.resize(size);
-	m_tourism.m_send_offsets.resize(size, 0);
-	m_tourism.m_recv_offsets.resize(size, 0);
+	m_tourism.reset();
 
 	// Заполняем m_border_indices
 	for (auto cell: *this) {
