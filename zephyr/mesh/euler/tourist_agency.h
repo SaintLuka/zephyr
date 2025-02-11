@@ -10,6 +10,10 @@ using zephyr::utils::mpi;
 class TouristAgency {
 public:
     TouristAgency() :
+#ifdef ZEPHYR_MPI
+        m_requests_recv(mpi::size()),
+        m_requests_send(mpi::size()),
+#endif
 	    m_count_to_send(mpi::size()),
 	    m_count_to_recv(mpi::size()),
 	    m_send_offsets(mpi::size(), 0),
@@ -31,6 +35,11 @@ public:
 
     std::vector<int> m_send_offsets;
     std::vector<int> m_recv_offsets;
+
+#ifdef ZEPHYR_MPI 
+    std::vector<MPI_Request> m_requests_send;
+    std::vector<MPI_Request> m_requests_recv;
+#endif
 
     std::vector<std::vector<int>> m_border_indices;
 

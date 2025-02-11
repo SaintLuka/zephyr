@@ -73,28 +73,63 @@ void EuMesh::redistribute() {
 #endif
 }
 
+void EuMesh::exchange_start(){
+#ifdef ZEPHYR_MPI
+    const int size = mpi::size();
+	const int rank = mpi::rank();
+
+    m_tourism.m_requests_send.resize(size);
+    m_tourism.m_requests_recv.resize(size);
+    std::fill(m_tourism.m_requests_send.begin(), m_tourism.m_requests_send.end(), MPI_REQUEST_NULL);    
+	std::fill(m_tourism.m_requests_recv.begin(), m_tourism.m_requests_recv.end(), MPI_REQUEST_NULL);
+
+    int temp_border_it = 0;
+    for(auto& border_indices : m_tourism.m_border_indices){
+		for(auto cell_index : border_indices){
+            // [?]            
+			memcpy(m_tourism.m_border[temp_border_it].ptr(), m_locals[cell_index].ptr(), m_locals.itemsize());
+            ++temp_border_it;
+        }
+	}
+    for (int i = 0; i < size; ++i) {
+        if (i != rank) {            
+			MPI_Isend(
+                m_tourism.m_border.item(0).ptr() + m_tourism.m_send_offsets[i], m_tourism.m_count_to_send[i], MPI_BYTE,
+				i, 0, mpi::comm(), &m_tourism.m_requests_send[i]
+            );
+		}
+    }
+#endif
+}
+
+void EuMesh::exchange_end(){
+#ifdef ZEPHYR_MPI
+    const int size = mpi::size();
+	const int rank = mpi::rank();
+
+    for (int i = 0; i < size; ++i) {
+        if (i != rank) {
+			MPI_Irecv(
+                m_aliens.item(0).ptr() + m_tourism.m_recv_offsets[i], m_tourism.m_count_to_recv[i], MPI_BYTE, 
+				i, 0, mpi::comm(), &m_tourism.m_requests_recv[i]
+            );
+		}
+    }
+
+    MPI_Waitall(mpi::size() - 1, m_tourism.m_requests_send.data(), MPI_STATUSES_IGNORE);
+	MPI_Waitall(mpi::size() - 1, m_tourism.m_requests_recv.data(), MPI_STATUSES_IGNORE);
+	
+	// Без этого чет все рушится
+    MPI_Barrier(mpi::comm());
+#endif
+}
+
 void EuMesh::exchange() {
 #ifdef ZEPHYR_MPI
     if (mpi::single()) return;
 
-	int size = mpi::size();
-	int rank = mpi::rank();
-
-	int temp_border_it = 0;
-	for(auto& border_indices : m_tourism.m_border_indices){
-		for(auto cell_index : border_indices){
-			// [?]
-			memcpy(m_tourism.m_border[temp_border_it].ptr(), m_locals[cell_index].ptr(), m_locals.itemsize());
-
-			++temp_border_it;
-		}
-	}
-
-	MPI_Alltoallv(
-		m_tourism.m_border.item(0).ptr(), m_tourism.m_count_to_send.data(), m_tourism.m_send_offsets.data(), MPI_BYTE, 
-		m_aliens.item(0).ptr(), m_tourism.m_count_to_recv.data(), m_tourism.m_recv_offsets.data(), MPI_BYTE, 
-		mpi::comm()
-	);
+	exchange_start();
+	exchange_end();
 #endif
 }
 

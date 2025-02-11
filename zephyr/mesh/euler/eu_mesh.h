@@ -189,6 +189,8 @@ public:
     /// @brief Обмен данными между процессами, в массивы aliens записываются
     /// данные с других процессов
     void exchange();
+    void exchange_start();
+    void exchange_end();
 
     /// @brief Балансирует нагрузку согласно decomposition
     void balancing(double load);
