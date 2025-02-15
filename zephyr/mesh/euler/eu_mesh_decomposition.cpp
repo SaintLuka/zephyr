@@ -73,6 +73,8 @@ void EuMesh::redistribute() {
 #endif
 }
 
+// Должен быть готов: m_locals, m_tourism
+// Отправляет m_tourism.m_border -> m_aliens
 void EuMesh::exchange_start(){
 #ifdef ZEPHYR_MPI
     const int size = mpi::size();
@@ -329,8 +331,8 @@ void EuMesh::build_aliens() {
 		m_tourism.m_recv_offsets[i] *= m_aliens.itemsize();
 	}
 
-	// Отправляем и получам в aliens
-	exchange();
+	// Отправляем 
+	exchange_start();
 
 	for(auto& cell : m_locals){
 		for(auto& face : cell.faces){
@@ -341,6 +343,9 @@ void EuMesh::build_aliens() {
 				face.adjacent.alien = -1;
 		}
 	}
+
+	// Получам в aliens
+	exchange_end();
 
 	int al_it = 0;
 	for(auto& cell : m_aliens){
