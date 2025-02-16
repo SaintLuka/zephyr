@@ -23,6 +23,22 @@ int check_connectivity(AmrStorage &locals, int ic, AmrStorage& aliens) {
     for (int iface = 0; iface < BFaces::max_count; ++iface) {
         auto &face = cell.faces[iface];
         if (face.is_undefined()) {
+            // Проверим обнуление параметров
+            if (face.adjacent.rank >= 0) {
+                std::cout << "\tUndefined face, adjacent.rank >= 0\n";
+                cell.print_info();
+                return -1;
+            }
+            if (face.adjacent.alien >= 0) {
+                std::cout << "\tUndefined face, adjacent.alien >= 0\n";
+                cell.print_info();
+                return -1;
+            }
+            if (face.adjacent.index >= 0) {
+                std::cout << "\tUndefined face, adjacent.index >= 0\n";
+                cell.print_info();
+                return -1;
+            }
             continue;
         }
 
@@ -186,12 +202,16 @@ int check_connectivity(AmrStorage &locals, int ic, AmrStorage& aliens) {
             else {
                 // Удаленный сосед
                 if (nface.adjacent.alien < 0) {
+                    // Проверка не актуальна сразу после построения списка соседей,
+                    // face.alien для alien ячеек не получены, да и не важны.
+                    /*
                     std::cout << "\tWrong connection\n";
                     std::cout << "\tCurrent cell:\n";
                     cell.print_info();
                     std::cout << "\tNeighbor:\n";
                     neib.print_info();
                     return -1;
+                     */
                 }
             }
         }

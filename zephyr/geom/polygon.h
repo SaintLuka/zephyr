@@ -2,6 +2,7 @@
 
 #include <array>
 #include <vector>
+#include <functional>
 
 #include <zephyr/geom/box.h>
 #include <zephyr/geom/vector.h>

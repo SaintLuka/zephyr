@@ -1,6 +1,7 @@
 #include <iomanip>
 #include <algorithm>
 #include <iostream>
+#include <cstring>
 
 #include <zephyr/math/calc/integrals.h>
 

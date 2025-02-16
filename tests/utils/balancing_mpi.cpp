@@ -1,4 +1,6 @@
 /// @brief Балансировка сетки на mpi
+//
+// TODO: удалить, плохая копия distributed-conv
 
 #include <iostream>
 
@@ -138,11 +140,7 @@ int main() {
 
         double dt = std::numeric_limits<double>::max();
         for (auto& cell: mesh) {
-            double max_area = 0.0;
-            for (auto &face: cell.faces()) {
-                max_area = std::max(max_area, face.area());
-            }
-            double dx = cell.volume() / max_area;
+            double dx = cell.incircle_diameter();
             dt = std::min(dt, dx / velocity(cell.center()).norm());
         }
         dt = mpi::min(CFL * dt);

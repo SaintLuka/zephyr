@@ -138,12 +138,12 @@ void PvdFile::save(mesh::EuMesh& mesh, double timestep) {
 }
 
 void PvdFile::save(AmrStorage& elements, double timestep) {
-    VtuFile::save(get_filename(), elements, variables, hex_only, filter);
+    VtuFile::save(get_filename(), elements, variables, hex_only, polyhedral, filter);
     update_pvd(timestep);
 }
 
 void PvdFile::save(AmrStorage& elements, const std::vector<geom::Vector3d>& nodes, double timestep) {
-    VtuFile::save(get_filename(), elements, nodes, variables, hex_only);
+    VtuFile::save(get_filename(), elements, nodes, variables, hex_only, polyhedral);
     update_pvd(timestep);
 }
 

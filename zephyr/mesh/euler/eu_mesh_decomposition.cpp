@@ -65,11 +65,6 @@ void EuMesh::redistribute() {
 
 	migrate();
 	build_aliens();
-
-	//int res = check_refined();
-	//if (res < 0) {
-	//    throw std::runtime_error("Bad mesh after redistribute");
-	//}
 #endif
 }
 

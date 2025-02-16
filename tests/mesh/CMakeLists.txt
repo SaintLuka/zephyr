@@ -1,5 +1,7 @@
-list(APPEND TESTS balancing)
-list(APPEND TESTS voronoi)
+#list(APPEND TESTS balancing)
+#list(APPEND TESTS mesh_generator)
+#list(APPEND TESTS movable_mesh)
+#list(APPEND TESTS voronoi)
 
 # Assume all files in direcory are tests
 if (ZEPHYR_TESTS_ALL)

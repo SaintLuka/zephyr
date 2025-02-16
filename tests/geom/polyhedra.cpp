@@ -1,164 +1,54 @@
 /// @brief Тестирование многогранников, сечения, объемы и прочее
 
 #include <zephyr/geom/polyhedron.h>
-#include <zephyr/io/vtu_file.h>
-
+#include <zephyr/io/pvd_file.h>
 
 using namespace zephyr::geom;
 using namespace zephyr::io;
 
+void plot_sections(
+        const Polyhedron& poly,
+        const Vector3d& normal,
+        const std::string& figname) {
 
-Polyhedron tetra() {
-    std::vector<Vector3d> vs = {
-            {0.0, 0.0, 0.0},
-            {1.0, 0.0, 0.0},
-            {0.0, 1.0, 0.0},
-            {0.3, 0.3, 0.5},
-    };
-    return Polyhedron(CellType::TETRA, vs);
-}
-
-Polyhedron pyramid() {
-    std::vector<Vector3d> vs = {
-            {0.0, 0.0, 0.0},
-            {1.1, 0.0, 0.0},
-            {0.9, 0.8, 0.0},
-            {0.0, 1.0, 0.0},
-            {0.6, 0.4, 0.8},
-    };
-    return Polyhedron(CellType::PYRAMID, vs);
-}
-
-Polyhedron wedge() {
-    std::vector<Vector3d> vs = {
-            {0.0, 0.0, 0.0},
-            {0.9, 0.8, 0.0},
-            {1.1, 0.0, 0.0},
-            {0.1, 0.1, 0.5},
-            {1.0, 0.9, 0.5},
-            {1.2, 0.1, 0.5}
-    };
-    return Polyhedron(CellType::WEDGE, vs);
-}
-
-Polyhedron unit_cube_1() {
-    std::vector<Vector3d> vs = {
-            {-0.5, -0.5, -0.5},
-            {+0.5, -0.5, -0.5},
-            {+0.5, +0.5, -0.5},
-            {-0.5, +0.5, -0.5},
-            {-0.5, -0.5, +0.5},
-            {+0.5, -0.5, +0.5},
-            {+0.5, +0.5, +0.5},
-            {-0.5, +0.5, +0.5},
-    };
-
-    Polyhedron poly(CellType::HEXAHEDRON, vs);
-
-    return poly;
-}
-
-Polyhedron cuboid() {
-    double a = 1.222;
-    double b = 1.454;
-    double c = 0.982;
-
-    std::vector<Vector3d> vs = {
-            {-0.5, -0.5, -0.5},
-            {+0.5, -0.5, -0.5},
-            {+0.5, +0.5, -0.5},
-            {-0.5, +0.5, -0.5},
-            {-0.5, -0.5, +0.5},
-            {+0.5, -0.5, +0.5},
-            {+0.5, +0.5, +0.5},
-            {-0.5, +0.5, +0.5},
-    };
-
-    Polyhedron poly(CellType::HEXAHEDRON, vs);
-
-    return poly;
-}
-
-double volfrac(double Pz, Vector3d n, double a, double b, double c) {
-    std::vector<double> kek={std::abs(a * n.x()), std::abs(b * n.y()), std::abs(c * n.z())};
-    std::sort(kek.begin(), kek.end());
-
-    double xi = kek[0];
-    double eta = kek[1];
-    double chi = kek[2];
-
-    std::cout << "  n: " << n << "\n";
-    std::cout << "  xi : " << xi << "\n";
-    std::cout << "  eta: " << eta << "\n";
-    std::cout << "  chi: " << chi << "\n";
-
-    double p = Pz + 0.5 * (xi + eta + chi);
-
-    bool inv = p > 0.5 * (xi + eta + chi);
-
-    if (inv) {
-        std::cout << "  Inversed case\n";
-        p = xi + eta + chi - p;
-    }
-
-    double vol = NAN;
-    if (p < xi) {
-        std::cout << "  case 1\n";
-        vol = std::pow(p, 3) / (6.0 * xi * eta * chi);
-    }
-    else if (p < eta) {
-        std::cout << "  case 2\n";
-        vol = (3.0 * p * (p - xi) + xi * xi) / (6.0 * eta * chi);
-    }
-    else if (p < std::min(xi + eta, chi)) {
-        std::cout << "  case 3\n";
-
-        vol = (std::pow(p, 3) - std::pow(p - xi, 3) - std::pow(p - eta, 3)) / (6.0 * xi * eta * chi);
-    }
-    else {
-        if (xi + eta < chi) {
-            std::cout << "  case 4.1\n";
-            vol = (2.0 * p - xi - eta) / (2.0 * chi);
-        } else {
-            std::cout << "  case 4.2\n";
-
-            vol = (std::pow(p, 3) - std::pow(p - xi, 3) - std::pow(p - eta, 3) - std::pow(p - chi, 3)) / (6.0 * xi * eta * chi);
-        }
-    }
-
-    if (inv) {
-        vol = 1.0 - vol;
-    }
-
-    return vol;
-
-}
-
-int main() {
+    PvdFile pvd(figname, "output/" + figname);
+    pvd.polyhedral = true;
 
     AmrStorage cell(1);
 
-    Polyhedron poly = unit_cube_1();
-    //Polyhedron poly = unit_cube_1();
+    double p_min = +1.0e100;
+    double p_max = -1.0e100;
+    for (int i = 0; i < poly.n_verts(); ++i) {
+        p_min = std::min(p_min, poly.vertex(i).dot(normal));
+        p_max = std::max(p_max, poly.vertex(i).dot(normal));
+    }
+    p_min -= 0.001 * (p_max - p_min);
+    p_max += 0.001 * (p_max - p_min);
 
-    double V =  poly.volume();
+    int N = 101;
+    for (int i = 0; i < N; ++i) {
+        Vector3d p = (p_max - (p_max - p_min) * i / N) * normal;
 
-    std::cout << "Volume: " << V << "\n";
+        Polyhedron clip = poly.clip(p, normal);
 
-    Vector3d p = {0.2, 0.2, 0.2};
-    Vector3d n = {0.1, 0.3, 0.5};
+        cell[0] = AmrCell(clip);
+        pvd.save(cell, i);
+    }
+}
+
+int main() {
+    Vector3d n = {0.1, 0.2, 0.3};
     n.normalize();
 
-    cell[0] = AmrCell(poly);
-
-    VtuFile::save("cell1.vtu", cell, Variables{});
-
-    poly = poly.clip(p, n);
-
-    cell[0] = AmrCell(poly);
-
-    VtuFile::save("cell2.vtu", cell, Variables{});
-
+    plot_sections(Polyhedron::Cube(), n, "cube");
+    plot_sections(Polyhedron::Cuboid(1.0, 1.2, 0.8), n, "cuboid");
+    plot_sections(Polyhedron::Pyramid(), n, "pyramid");
+    plot_sections(Polyhedron::Wedge(), n, "wedge");
+    plot_sections(Polyhedron::Tetrahedron(), n, "tetrahedron");
+    plot_sections(Polyhedron::Octahedron(), n, "octahedron");
+    plot_sections(Polyhedron::Dodecahedron(), n, "dodecahedron");
+    plot_sections(Polyhedron::Icosahedron(), n, "icosahedron");
+    plot_sections(Polyhedron::TruncatedCube(), n, "truncated_cube");
 
     return 0;
 }

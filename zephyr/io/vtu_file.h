@@ -23,6 +23,10 @@ public:
     ComplexFilter filter;     ///< Функтор, возвращает true для нужных ячеек
     bool hex_only = true;     ///< Записывать как четырехугольники/шестигранники
 
+    /// @brief Интерпретировать трёхмерные ячейки как многогранники общего вида.
+    /// Сохраняет отдельно грани. Работет долго, включать при необходимости.
+    bool polyhedral = false;
+    
     /// @brief Сохранять уникальные вершины, актуально для EuMesh, если сетка
     /// часто перестраивается, то функция выполняется достаточно долго.
     bool unique_nodes = false;
@@ -33,7 +37,8 @@ public:
     /// экземпляра класса.
     explicit VtuFile(const std::string &filename,
                      const Variables &variables = {},
-                     bool hex_only = true);
+                     bool hex_only   = true,
+                     bool polyhedral = false);
 
     /// @brief Базовая функция записи в файл. До вызова функции должен быть
     /// создан экземпляр класса и настроены опции записи.
@@ -57,21 +62,25 @@ public:
     void save(CellStorage &cells, NodeStorage& nodes);
 
     /// @brief Статическая функция записи в файл. Полный аналог функции-члена
-    /// класса write, но вызывается без экземпляра класса, все параметры записи
+    /// класса save, но вызывается без экземпляра класса, все параметры записи
     /// передаются непосредственно как аргументы функции.
     static void save(const std::string &filename, AmrStorage &cells,
-                     const Variables &variables, bool hex_only = false,
+                     const Variables &variables, 
+                     bool hex_only   = false,
+                     bool polyhedral = false,
                      const Filter &filter = TrivialFilter());
 
     /// @brief Статическая функция записи в файл. Полный аналог функции-члена
-    /// класса write, но вызывается без экземпляра класса, все параметры записи
+    /// класса save, но вызывается без экземпляра класса, все параметры записи
     /// передаются непосредственно как аргументы функции.
     static void save(const std::string &filename, AmrStorage &cells,
                      const std::vector<geom::Vector3d>& nodes,
-                     const Variables &variables, bool hex_only = false);
+                     const Variables &variables, 
+                     bool hex_only   = false,
+                     bool polyhedral = false);
 
     /// @brief Статическая функция записи в файл. Полный аналог функции-члена
-    /// класса write, но вызывается без экземпляра класса, все параметры записи
+    /// класса save, но вызывается без экземпляра класса, все параметры записи
     /// передаются непосредственно как аргументы функции.
     static void save(const std::string &filename, CellStorage &cells,
                      NodeStorage &nodes, const Variables &variables,

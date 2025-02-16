@@ -1,4 +1,5 @@
 #include <iostream>
+#include <algorithm>
 
 #include <zephyr/geom/vector.h>
 #include <zephyr/math/cfd/flux/hll.h>

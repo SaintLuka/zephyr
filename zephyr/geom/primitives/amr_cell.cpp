@@ -87,7 +87,7 @@ AmrCell::AmrCell(const Polygon& poly)
     }
 }
 
-AmrCell::AmrCell(const Polyhedron &poly)
+AmrCell::AmrCell(Polyhedron poly)
         : Element(0, 0), dim(3),
           adaptive(false), linear(true),
           vertices(poly), faces(CellType::POLYHEDRON),
@@ -111,12 +111,19 @@ AmrCell::AmrCell(const Polyhedron &poly)
                                  -1
             };
         }
-        else {
+        else if (n_verts < 5) {
             faces[i].vertices = {poly.face_indices(i)[0],
                                  poly.face_indices(i)[1],
                                  poly.face_indices(i)[2],
                                  poly.face_indices(i)[3]
             };
+        }
+        else {
+            // Хардкор, полигональная грань
+            faces[i].set_polygonal();
+            for (int j = 0; j < n_verts; ++j) {
+                faces[i].set_poly_vertex(j, poly.face_indices(i)[j]);
+            }
         }
 
         faces[i].area     = poly.face_area(i);
@@ -172,7 +179,7 @@ inline double min(double x, double y, double z) {
     return std::min(x, std::min(y, z));
 }
 
-double AmrCell::incircle_radius() const {
+double AmrCell::incircle_diameter() const {
     if (adaptive) {
         if (dim == 2) {
             return std::sqrt(std::min(

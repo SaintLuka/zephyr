@@ -209,9 +209,14 @@ AmrCell get_parent(AmrStorage &locals, AmrStorage &aliens,
 
         // Простой случай: грань родительской ячейки должна быть простой
         if (some_neib_wanted_lvl <= parent.level) {
-            parent.faces[side].adjacent.rank = some_neib_rank;
+            parent.faces[side].adjacent.rank  = some_neib_rank;
             parent.faces[side].adjacent.index = some_neib_index;
             parent.faces[side].adjacent.alien = some_neib_ghost;
+
+            // Обнуляем неативные подграни
+            for (int i = 1; i < FpF(dim); ++i) {
+                parent.faces[side + 6 * i].set_undefined();
+            }
             continue;
         }
 
