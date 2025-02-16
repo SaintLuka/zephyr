@@ -11,7 +11,6 @@ namespace zephyr::mesh {
 
 using zephyr::geom::Adjacent;
 using zephyr::geom::Vector3d;
-using zephyr::geom::Vector2d;
 
 /// @brief Ячейка (итератор для доступа к элементам класса EuMesh)
 /// @details Копирует функции AmrStorage::Item, а также добавляет
@@ -235,8 +234,8 @@ public:
     /// Величину удобно использовать совместно с условием Куранта.
     /// Для двумерных расчетов на прямоугольных сетках совпадает с минимальной
     /// стороной прямоугольной ячейки.
-    inline double incircle_radius() const {
-        return m_it->incircle_radius();
+    inline double incircle_diameter() const {
+        return m_it->incircle_diameter();
     }
 
     /// @brief Оценка объемной доли, которая отсекается от ячейки некоторым телом.

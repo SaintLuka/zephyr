@@ -2,6 +2,7 @@
 
 #include <array>
 #include <vector>
+#include <functional>
 
 #include <zephyr/geom/box.h>
 #include <zephyr/geom/vector.h>
@@ -32,23 +33,26 @@ public:
     /// типы ячеек в VTK формате
     Polyhedron(CellType ctype, const std::vector<Vector3d>& vertices);
 
+    /// @brief Создать пустой многогранник
+    static Polyhedron Empty() { return Polyhedron(); }
+
     /// @brief Пустой многогранник?
-    inline bool empty() const { return vs.empty(); }
+    inline bool empty() const { return verts.empty(); }
 
     /// @brief Число вершин
-    int n_verts() const { return vs.size(); }
+    int n_verts() const { return verts.size(); }
 
     /// @brief Число граней
-    int n_faces() const { return fs.size(); }
+    int n_faces() const { return faces.size(); }
 
     /// @brief Вершина по индексу
     const Vector3d& vertex(int idx) const {
-        return vs[idx];
+        return verts[idx];
     }
 
     /// @brief Индексы вершин грани
     const std::vector<int>& face_indices(int idx) const {
-        return fs[idx];
+        return faces[idx];
     }
 
     /// @brief Ограничивающий прямоугольник
@@ -56,6 +60,11 @@ public:
 
     /// @brief Центр полигона (среднее вершин)
     Vector3d center() const;
+
+    /// @brief Радиус описаной окружности.
+    /// На самом деле не совсем, возвращает максимальное расстояние от центра
+    /// многогранника до его вершин
+    double excircle_radius() const;
 
     /// @brief Площадь грани
     double face_area(int idx) const;
@@ -76,6 +85,11 @@ public:
     /// @param vol Объем многогранника (если известен)
     /// @details На данный момент приближение -- просто ценр
     Vector3d centroid(double vol = 0.0) const;
+
+    /// @brief Привести к каноническому виду, 3 или 4 вершины на гранях
+    /// @details Новые вершины не добавляются и массив вершин не изменяется,
+    /// всего лишь новые индексы на гранях
+    void canonic();
 
     /// @brief Объем внутри многогранника на пересечении с характеристической
     /// функцией inside. Вычисляется приближенно с точностью ~ 1 / N
@@ -108,15 +122,60 @@ public:
     double volume_fraction(const std::function<bool(const Vector3d&)>& inside,
                            int n_points = 10000) const;
 
+
+    // ========================================================================
+    //                          Несколько пресетов
+    // ========================================================================
+
+    /// @brief Единичный куб с центром в начале координат
+    static Polyhedron Cube() { return Polyhedron::Cuboid(1.0, 1.0, 1.0); }
+
+    /// @brief Прямугольный параллелепипед со сторонами [a, b, c] и центром
+    /// в начале координат
+    static Polyhedron Cuboid(double a, double b, double c);
+
+    /// @brief Четырехугольная пирамида, вписана в единичную сферу
+    static Polyhedron Pyramid();
+
+    /// @brief Треугольная призма, вписана в единичную сферу
+    static Polyhedron Wedge();
+
+    /// @brief Правильный тэтраэдр, вписан в единичную сферу
+    static Polyhedron Tetrahedron();
+
+    /// @brief Правильный октаэдр, вписан в единичную сферу
+    static Polyhedron Octahedron();
+
+    /// @brief Правильный додекаэдр, вписан в единичную сферу
+    static Polyhedron Dodecahedron();
+
+    /// @brief Правильный икосаэдр, вписан в единичную сферу
+    static Polyhedron Icosahedron();
+
+    /// @brief Усеченный куб, вписан в единичный куб
+    static Polyhedron TruncatedCube();
+
 protected:
     void build(const std::vector<Vector3d>& vertices,
                const std::vector<std::vector<int>>& face_indices);
 
-    std::vector<Vector3d> vs;          ///< Массив вершин
-    std::vector<std::vector<int>> fs;  ///< Индексы вершин граней
-    std::vector<Vector3d> fcs;         ///< Центры граней
-    std::vector<Vector3d> fns;         ///< Внешние нормали граней
-    Vector3d m_center;                 ///< Центр полигона
+    /// @brief Заменить вершины у грани
+    void replace_face(int face_idx, int v1, int v2, int v3, int v4);
+
+    /// @brief Добавить грань на существующих вершинах
+    void add_face(int v1, int v2, int v3);
+
+    /// @brief Добавить грань на существующих вершинах
+    void add_face(int v1, int v2, int v3, int v4);
+
+    // Базовые поля
+    std::vector<Vector3d> verts;          ///< Массив вершин
+    std::vector<std::vector<int>> faces;  ///< Индексы вершин граней
+
+    // Вычисляемые
+    Vector3d m_center;                    ///< Центр многогранника
+    std::vector<Vector3d> faces_c;        ///< Центры граней
+    std::vector<Vector3d> faces_s;        ///< Нормаль с площадью
 };
 
 std::ostream& operator<<(std::ostream& os, const Polyhedron& poly);

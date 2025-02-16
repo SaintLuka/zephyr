@@ -1,4 +1,7 @@
-/// @brief Декомпозиция сетки, уравнение переноса
+/// @file Тяжелый тест на динамическую декомпозицию и адаптацию.
+/// Процессы хаотично перемещаются, ячейки хаотично адаптируются.
+
+// TODO: Удалить лишние mesh.exchange()
 
 #include <iostream>
 #include <iomanip>
@@ -9,11 +12,10 @@
 #include <zephyr/io/pvd_file.h>
 
 #include <zephyr/mesh/euler/eu_mesh.h>
-#include <zephyr/mesh/decomp/ORB.h>
+#include <zephyr/mesh/decomp/rwalk.h>
 
 #include <zephyr/geom/generator/cuboid.h>
 #include <zephyr/geom/generator/rectangle.h>
-
 
 using namespace zephyr::mesh;
 using zephyr::utils::mpi;
@@ -22,168 +24,187 @@ using zephyr::io::PvdFile;
 using zephyr::geom::generator::Cuboid;
 using zephyr::geom::generator::Rectangle;
 
-using zephyr::mesh::decomp::ORB;
+using zephyr::mesh::decomp::RWalk;
 
+// Решаем два волновых уравнения по простой схеме
 struct _U_ {
-    double u1, u2;
+    double u;      ///< Некоторая гладкая функция
+    double wflag;  ///< Равномерно распределенная величина [0, 1]
 };
 
 _U_ U;
 
-// Векторное поле скорости
-Vector3d velocity(const Vector3d& c) {
-    return { 1.0, 0.3 + 0.3*std::sin(4 * M_PI * c.x()), 0.0 };
-}
-
 // Переменные для сохранения
-double get_u(AmrStorage::Item& cell)  {
-    return cell(U).u1;
-}
+double get_u(AmrStorage::Item& cell)     { return cell(U).u; }
+double get_wflag(AmrStorage::Item& cell) { return cell(U).wflag; }
 
-double get_vx(AmrStorage::Item& cell) {
-    return velocity(cell.center).x();
-}
+// Некоторая странная функция (случайный тригонометрический ряд
+// для генерации случайных возмущений)
+struct Membrane {
+    int count;
+    std::vector<double> A, n, m, q;
+    std::vector<double> x0, y0, t0;
 
-double get_vy(AmrStorage::Item& cell) {
-    return velocity(cell.center).y();
-}
+    explicit Membrane(int seed = 0) {
+        count = 125;
+        A.resize(count);
 
-void set_initials(EuMesh& mesh, Box domain) {
-    Vector3d vc = domain.vmin + 0.2 * domain.size();
-    double D = 0.1 * domain.diameter();
-    for (auto& cell: mesh) {
-        cell(U).u1 = (cell.center() - vc).norm() < D ? 1.0 : 0.0;
-        cell(U).u2 = 0.0;
+        n.resize(count);
+        m.resize(count);
+        q.resize(count);
+
+        x0.resize(count);
+        y0.resize(count);
+        t0.resize(count);
+
+        const int N = 15; // Влияет на величину формаций
+
+        std::mt19937_64 gen(seed);
+        std::uniform_int_distribution<int> uni_i(0, N);
+        std::uniform_real_distribution<double> uni_d(0.0, 1.0);
+
+        for (int i = 0; i < count; ++i) {
+
+            x0[i] = uni_d(gen);
+            y0[i] = uni_d(gen);
+            t0[i] = uni_d(gen);
+
+            n[i] = M_PI * uni_i(gen);
+            m[i] = M_PI * uni_i(gen);
+            q[i] = std::sqrt(n[i] * n[i] + m[i] * m[i]);
+
+            A[i] = (2.0 * uni_d(gen) - 1.0) / std::pow((n[i] + 3) * (m[i] + 3), 0.25);
+        }
+    }
+
+    double operator()(const Vector3d& v, double t) const {
+        double x = v.x();
+        double y = v.y();
+
+        double res = 0;
+        for (int i = 0; i < count; ++i) {
+            res += A[i] *
+                   std::cos(n[i] * (x - x0[i])) *
+                   std::cos(m[i] * (y - y0[i])) *
+                   std::cos(q[i] * (t - t0[i]));
+        }
+        return res;
+    }
+};
+
+// Поле cell.u задается из Membrane, функция
+// Поле cell.wflag задается по процентилям от cell.u
+void setup_values(EuMesh& mesh, double t = 0.0) {
+    static Membrane func_u(1);
+
+    double u_min = +1.0e300;
+    double u_max = -1.0e300;
+    for (auto &cell: mesh) {
+        double u = func_u(cell.center(), t);
+        cell(U).u = u;
+        u_min = std::min(u, u_min);
+        u_max = std::max(u, u_max);
+    }
+
+    u_min = mpi::min(u_min);
+    u_max = mpi::max(u_max);
+
+    // Нормируем от 0.0 до 1.0
+    for (auto &cell: mesh) {
+        cell(U).u = (cell(U).u - u_min) / (u_max - u_min);
+    }
+
+    double count = 100.0;
+
+    double volume = 0.0;
+    std::vector<double> vols_u(count);
+    for (auto &cell: mesh) {
+        // Индекс от 0 до count
+        double idx_u = std::floor(cell(U).u * count);
+
+        double V = cell.volume();
+        vols_u[idx_u] += V;
+        volume += V;
+    }
+
+    volume = mpi::sum(volume);
+    vols_u = mpi::sum(vols_u);
+
+    // Кумулятивная сумма
+    vols_u[0] /= volume;
+    for (int i = 1; i < count; ++i) {
+        vols_u[i] += vols_u[i - 1] / volume;
+    }
+
+    for (auto &cell: mesh) {
+        int idx_u = int(std::floor(cell(U).u * count));
+        cell(U).wflag = vols_u[idx_u];
     }
 }
 
+// Флаги выставляются по процентилям в wflag
 void set_flags(EuMesh& mesh) {
     for (auto cell: mesh) {
-        cell.set_flag(-1);
-
-        double u1 = cell(U).u1;
-        for (auto face: cell.faces()) {
-            double u2 = face.neib(U).u1;
-
-            if (std::abs(u1 - u2) > 0.01) {
-                cell.set_flag(1);
-                break;
-            }
+        if (cell(U).wflag < 0.5) {
+            cell.set_flag(-1);
+        } else if (cell(U).wflag < 0.9) {
+            cell.set_flag(0);
+        } else {
+            cell.set_flag(1);
         }
     }
-}
-
-// Если поставить обычный распределитель, то возникают
-// странные дефекты, я уж думал ошибка адаптации.
-Distributor conv_distributor() {
-    Distributor distr = Distributor::simple();
-    distr.merge = [](Children &children, AmrStorage::Item &parent) {
-        double sum = 0.0;
-        for (auto &child: children) {
-            sum += child(U).u1 * child.volume();
-        }
-        parent(U).u1 = sum / parent.volume();
-    };
-    return distr;
 }
 
 int main() {
     mpi::init();
 
-    threads::off();
-
     // Файл для записи
     PvdFile pvd("mesh", "output");
 
-    pvd.variables = {"rank", "index", "flag", "faces"};
-    pvd.variables += {"u",  get_u};
-    pvd.variables += {"vx", get_vx};
-    pvd.variables += {"vy", get_vy};
+    pvd.variables = {"rank", "level"};
+    pvd.variables += {"u", get_u};
+    pvd.variables += {"wflag", get_wflag};
 
     // Сеточный генератор
     //Cuboid gen(0.0, 1.0, 0.0, 0.6, 0.0, 0.9);
     Rectangle gen(0.0, 1.0, 0.0, 1.0);
-    gen.set_nx(123);
+    gen.set_nx(50);
 
     // Bounding Box для сетки
     Box domain = gen.bbox();
 
     // Создаем сетку
     EuMesh mesh(U, gen);
+    mesh.set_max_level(4);
 
-    mesh.set_max_level(3);
-    mesh.set_distributor(conv_distributor());
+    // Сложная случайная декомпозиция
+    auto decmp = RWalk::create(domain, mpi::size());
 
     // Добавляем декомпозицию
-    mesh.set_decomposition("XY");
+    mesh.set_decomposition(decmp);
 
     // Начальные данные
     for (int i = 0; i < mesh.max_level(); ++i) {
-        set_initials(mesh, domain);
+        setup_values(mesh);
         mesh.exchange();
         set_flags(mesh);
         mesh.refine();
     }
-    set_initials(mesh, domain);
+    setup_values(mesh);
     mesh.exchange();
 
-    // Число Куранта
-    double CFL = 0.5;
-
-    int n_step = 0;
-    double curr_time = 0.0;
-    double next_write = 0.0;
-
     Stopwatch elapsed(true);
-    while (curr_time <= 1.0 && n_step < 2000000000) {
-        // Балансировка декомпозиции
-        //if (n_step % 10 == 0) {
-            mesh.balancing(double(mesh.locals().size()));
-            mesh.redistribute();
-            mesh.exchange();
-        //}
+    for (int n_step = 0; n_step <= 1000; ++n_step) {
+        // redistribute на каждом шаге
+        mesh.balancing(mesh.n_cells());
+        mesh.redistribute();
+        mesh.exchange();
 
-        if (curr_time >= next_write) {
-            mpi::cout << "\tШаг: " << std::setw(6) << n_step << ";"
-                      << "\tВремя: " << std::setw(6) << std::setprecision(3) << curr_time << "\n";
-            pvd.save(mesh, curr_time);
-            next_write += 0.02;
-        }
+        setup_values(mesh, 0.01 * n_step);
 
-        // Определяем dt
-        double dt = std::numeric_limits<double>::max();
-        for (auto& cell: mesh) {
-            double max_area = 0.0;
-            for (auto &face: cell.faces()) {
-                max_area = std::max(max_area, face.area());
-            }
-            double dx = cell.volume() / max_area;
-            dt = std::min(dt, dx / velocity(cell.center()).norm());
-        }
-        dt = mpi::min(CFL * dt);
-
-        // Расчет по схеме upwind
-        for (auto& cell: mesh) {
-            auto& zc = cell(U);
-
-            double fluxes = 0.0;
-            for (auto& face: cell.faces()) {
-                const auto& zn = face.neib(U);
-
-                double af = velocity(face.center()).dot(face.normal());
-                double a_p = std::max(af, 0.0);
-                double a_m = std::min(af, 0.0);
-
-                fluxes += (a_p * zc.u1 + a_m * zn.u1) * face.area();
-            }
-
-            zc.u2 = zc.u1 - dt * fluxes / cell.volume();
-        }
-
-        // Обновляем слои
-        for (auto& cell: mesh) {
-            cell(U).u1 = cell(U).u2;
-            cell(U).u2 = 0.0;
+        if (n_step % 10 == 0) {
+            mpi::cout << "\tШаг: " << std::setw(6) << n_step << "\n";
+            pvd.save(mesh, n_step);
         }
 
         mesh.exchange();
@@ -191,9 +212,6 @@ int main() {
         mesh.exchange();
         mesh.refine();
         mesh.exchange();
-
-        n_step += 1;
-        curr_time += dt;
     }
     elapsed.stop();
 

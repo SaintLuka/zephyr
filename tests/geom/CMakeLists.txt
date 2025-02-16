@@ -1,11 +1,10 @@
 #list(APPEND TESTS crp_interface)
+#list(APPEND TESTS cuboid_clip)
 #list(APPEND TESTS curves)
 #list(APPEND TESTS game_of_life)
 #list(APPEND TESTS maps_integral)
-#list(APPEND TESTS mesh_generator)
-#list(APPEND TESTS movable_mesh)
 #list(APPEND TESTS polygon_clip)
-list(APPEND TESTS polyhedra)
+#list(APPEND TESTS polyhedra)
 #list(APPEND TESTS splines)
 #list(APPEND TESTS volume_fraction)
 

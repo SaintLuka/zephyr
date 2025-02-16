@@ -65,6 +65,9 @@ public:
 	/// @brief Установить неопределенную грань
     inline void set_undefined() {
         boundary = Boundary::UNDEFINED;
+        adjacent.rank  = -1;
+        adjacent.index = -1;
+        adjacent.alien = -1;
     }
 
     /// @brief Число вершин грани
@@ -102,6 +105,65 @@ public:
                 return false;
 	    }
 	}
+
+	// Расширение массива индексов для хранения полигональных граней,
+	// Полная дичь, мне было скучно. В последний индекс vertices[3]
+	// можно сунуть 6 индексов вместо одного.
+
+    // У полигональной грани первые два бита индекса vertices[3] равны 0x10...
+    // Для неопределенной вершины (vertices[3] == -1) все биты равны единице,
+    // Для обычной определенной вершины первые два бита равны нулю.
+
+    /// @brief Установить неопределенную полигональную грань
+	inline void set_polygonal() {
+        vertices[3] = 0b10111111111111111111111111111111;
+    }
+
+	/// @brief Полигональная грань? Проверяет первые биты
+    inline bool poly_simple() const {
+        return (vertices[3] & 0b11000000000000000000000000000000) !=
+                              0b10000000000000000000000000000000;
+    }
+
+	/// @brief Число вершин полигональной грани
+	/// Максимальное количество равно девяти.
+	int poly_size() const {
+        if (poly_simple()) { return size(); }
+        for (int i = 2; i < 9; ++i) {
+            if (get_poly_vertex(i) < 0) {
+                return i;
+            }
+        }
+        return 9;
+    }
+
+    /// @brief Получить индекс вершины
+    int get_poly_vertex(int i) const {
+        if (poly_simple() || i < 3) { return vertices[i]; }
+
+        // Единички на нужном месте
+        int mask = 0b11111 << (5 * (i - 3));
+        int res = (vertices[3] & mask) >> (5 * (i - 3));
+        return res < 31 ? res : -1;
+    }
+
+    /// @brief Установить индекс вершины, v_idx --- от 0 до 30
+    /// фактически, максимальное число вершин BVertices::max_count = 24.
+    void set_poly_vertex(int i, int v_idx) {
+        if (poly_simple() || i < 3) {
+            vertices[i] = v_idx;
+            return;
+        }
+
+        // Зануляет значения на нужном месте
+        vertices[3] &= ((0b11111 << (5 * (i - 3))) ^ 0xFFFFFFFF);
+
+        // Помещает value на нужное место
+        int shifted_value = (0b11111 & v_idx) << (5 * (i - 3));
+
+        // По сути ставит value на обуленное место
+        vertices[3] += shifted_value;
+    }
 };
 
 } // namespace zephyr::geom

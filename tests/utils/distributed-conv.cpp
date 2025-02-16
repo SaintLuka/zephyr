@@ -1,7 +1,8 @@
-/// @brief Декомпозиция сетки, уравнение переноса
+/// @file Динамическая ORB декомпозиция без адаптации.
+/// Можно проверить динамическую балансировку на различных сетках,
+/// включая неструктурированные сетки из многоугольников.
 
 #include <iostream>
-#include <iomanip>
 
 #include <zephyr/utils/mpi.h>
 #include <zephyr/utils/stopwatch.h>
@@ -14,17 +15,17 @@
 #include <zephyr/geom/generator/cuboid.h>
 #include <zephyr/geom/generator/rectangle.h>
 
-
 using namespace zephyr::mesh;
 using zephyr::utils::mpi;
-using zephyr::utils::Stopwatch;
 using zephyr::io::PvdFile;
 using zephyr::geom::generator::Cuboid;
 using zephyr::geom::generator::Rectangle;
+using zephyr::utils::Stopwatch;
 
 using zephyr::mesh::decomp::ORB;
 
 struct _U_ {
+    double load;
     double u1, u2;
 };
 
@@ -36,18 +37,18 @@ Vector3d velocity(const Vector3d& c) {
 }
 
 // Переменные для сохранения
-double get_u(AmrStorage::Item& cell)  {
-    return cell(U).u1;
-}
+double get_u(AmrStorage::Item& cell)  { return cell(U).u1; }
 
-double get_vx(AmrStorage::Item& cell) {
-    return velocity(cell.center).x();
-}
+double get_load(const AmrStorage::Item &cell) { return cell(U).load; }
 
-double get_vy(AmrStorage::Item& cell) {
-    return velocity(cell.center).y();
+// Просуммировать фиктивную нагрузку
+double calc_loads(Mesh& mesh) {
+    double load = 0;
+    for (auto cell: mesh) {
+        load += cell(U).load;
+    }
+    return load;
 }
-
 
 int main() {
     mpi::init();
@@ -55,62 +56,60 @@ int main() {
     // Файл для записи
     PvdFile pvd("mesh", "output");
 
+    pvd.variables = {"rank"};
     pvd.variables += {"u",  get_u};
-    pvd.variables += {"vx", get_vx};
-    pvd.variables += {"vy", get_vy};
+    pvd.variables += {"load", get_load};
 
     // Сеточный генератор
     //Cuboid gen(0.0, 1.0, 0.0, 0.6, 0.0, 0.9);
     Rectangle gen(0.0, 1.0, 0.0, 1.0);
-    gen.set_nx(257);
-
-    // Bounding Box для сетки
-    Box domain = gen.bbox();
+    gen.set_nx(50);
 
     // Создаем сетку
     EuMesh mesh(U, gen);
 
-    // Добавляем декомпозицию
-    ORB orb(domain, "XY", mpi::size());
-    mesh.set_decomposition(orb);
+    // Bounding Box для сетки
+    Box domain = gen.bbox();
 
-    // Дальше простая схема, ничего интересного
-    // Начальные данные
-    Vector3d vc = domain.center();
+    // Заполняем данные о нагрузке ячеек
+    Vector3d vc = domain.vmin + 0.2 * domain.size();
     double D = 0.1 * domain.diameter();
-    for (auto& cell: mesh) {
-        //if(mpi::rank()==0)
-        //    printf("i_m: %d\n", cell.geom().index);
+    for (auto cell: mesh) {
         cell(U).u1 = (cell.center() - vc).norm() < D ? 1.0 : 0.0;
         cell(U).u2 = 0.0;
+        cell(U).load = cell(U).u1;
     }
+
+    // Различные варианты инициализации ORB декомпозиции
+    ORB orb(domain, "XY", mpi::size());
+    //ORB orb(domain, "YX", 13);
+    //ORB orb(domain, "YX", 13, 3);
+
+    mesh.set_decomposition(orb);
 
     // Число Куранта
     double CFL = 0.5;
 
     int n_step = 0;
-    double curr_time = 0.0;
-    double next_write = 0.0;
 
     Stopwatch elapsed(true);
-    while (curr_time <= 1.0) {
-        mesh.exchange();
-
-        if (curr_time >= next_write) {
-            mpi::cout << "\tШаг: " << std::setw(6) << n_step << ";"
-                      << "\tВремя: " << std::setw(6) << std::setprecision(3) << curr_time << "\n";
-            pvd.save(mesh, curr_time);
-            next_write += 0.02;
+    for (int step = 0; step < 500; ++step) {
+        // Балансировка декомпозиции
+        {
+            double load = calc_loads(mesh);
+            mesh.balancing(load);
+            mesh.redistribute();
         }
 
-        // Определяем dt
+        // Подсчитываем нагрузку каждого ранга
+        if (step % 10 == 0) {
+            mpi::cout << "Step:      " << step << "\n";
+            pvd.save(mesh, step);
+        }
+
         double dt = std::numeric_limits<double>::max();
         for (auto& cell: mesh) {
-            double max_area = 0.0;
-            for (auto &face: cell.faces()) {
-                max_area = std::max(max_area, face.area());
-            }
-            double dx = cell.volume() / max_area;
+            double dx = cell.incircle_diameter();
             dt = std::min(dt, dx / velocity(cell.center()).norm());
         }
         dt = mpi::min(CFL * dt);
@@ -137,10 +136,10 @@ int main() {
         for (auto& cell: mesh) {
             cell(U).u1 = cell(U).u2;
             cell(U).u2 = 0.0;
+            cell(U).load = cell(U).u1;
         }
 
         n_step += 1;
-        curr_time += dt;
     }
     elapsed.stop();
 

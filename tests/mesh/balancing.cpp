@@ -1,7 +1,7 @@
-/// @brief Балансировка сетки
+/// @file Балансировка сетки на одном процессе. Демонстрирует работу
+/// алгоритмов балансировки нагрузки и подходит для их отладки.
 
 #include <iostream>
-#include <zephyr/utils/mpi.h>
 
 #include <zephyr/io/pvd_file.h>
 
@@ -35,7 +35,7 @@ double get_rank(const AmrStorage::Item &cell) { return cell(U).rank; }
 
 double get_load(const AmrStorage::Item &cell) { return cell(U).load; }
 
-
+// Абстрактная нагрузка
 double foo(const Vector3d& v) {
     Vector3d c1 = {0.2, 0.4, 0.0};
     Vector3d c2 = {0.6, 0.1, 0.0};
@@ -90,9 +90,9 @@ int main() {
     // Различные варианты инициализации ORB декомпозиции
     //auto decmp = ORB::create(domain, "XY", -1, {2, 3, 4, 5, 1});
     //auto decmp = ORB::create(domain, "YX", 13);
-    //auto decmp = ORB::create(domain, "YX", 13, 3);
+    auto decmp = ORB::create(domain, "YX", 13, 3);
     //auto decmp = VD3::create(domain, 23);
-    auto decmp = RWalk::create(domain, 3);
+    //auto decmp = RWalk::create(domain, 3);
 
     for (int step = 0; step < 1000; ++step) {
         // Вычисляем новый ранг ячеек

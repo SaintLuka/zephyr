@@ -1,38 +1,56 @@
 #pragma once
 
 #include <cmath>
+#include <tuple>
+#include <vector>
+
+#include <Eigen/Dense>
 
 #include <zephyr/configuration.h>
 
-#ifdef ZEPHYR_EIGEN
-#include <Eigen/Dense>
-#else
+#ifndef ZEPHYR_EIGEN
 #include <zephyr/geom/eigen/interface.h>
 #endif
 
 namespace zephyr::geom {
 
 #ifdef ZEPHYR_EIGEN
-using namespace Eigen;
+using Vector3d = Eigen::Matrix<double, 3, 1>; ///< 3-ех мерный Eigen вектор-столбец
+using Matrix3d = Eigen::Matrix<double, 3, 3>; ///< Eigen матрица 4 x 4
+#else
+using Vector3d = eigen_wrapper::Matrix<double, 3, 1>;
+using Matrix3d = eigen_wrapper::Matrix<double, 3, 3>;
 #endif
 
-typedef Matrix<double, 3, 1> Vector3d; ///< 3-ех мерный Eigen вектор-столбец
-typedef Matrix<double, 4, 1> Vector4d; ///< 4-ех мерный Eigen вектор-столбец
-typedef Matrix<double, 5, 1> Vector5d; ///< 5-и  мерный Eigen вектор-столбец
-typedef Matrix<double, 6, 1> Vector6d; ///< 6-и  мерный Eigen вектор-столбец
-typedef Matrix<double, 7, 1> Vector7d; ///< 7-и  мерный Eigen вектор-столбец
+using Vector2d = Eigen::Matrix<double, 2, 1>; ///< 2-х мерный Eigen вектор-столбец
+using Vector4d = Eigen::Matrix<double, 4, 1>; ///< 4-ех мерный Eigen вектор-столбец
+using Vector5d = Eigen::Matrix<double, 5, 1>; ///< 5-и  мерный Eigen вектор-столбец
+using Vector6d = Eigen::Matrix<double, 6, 1>; ///< 6-и  мерный Eigen вектор-столбец
+using Vector7d = Eigen::Matrix<double, 7, 1>; ///< 7-и  мерный Eigen вектор-столбец
 
-typedef Matrix<double, 3, 3> Matrix3d; ///< Eigen матрица 3 x 3
-typedef Matrix<double, 4, 4> Matrix4d; ///< Eigen матрица 4 x 4
-typedef Matrix<double, 5, 5> Matrix5d; ///< Eigen матрица 5 x 5
-typedef Matrix<double, 6, 6> Matrix6d; ///< Eigen матрица 6 x 6
-typedef Matrix<double, 7, 7> Matrix7d; ///< Eigen матрица 7 x 7
+using Matrix2d = Eigen::Matrix<double, 4, 4>; ///< Eigen матрица 2 x 2
+using Matrix4d = Eigen::Matrix<double, 4, 4>; ///< Eigen матрица 4 x 4
+using Matrix5d = Eigen::Matrix<double, 5, 5>; ///< Eigen матрица 5 x 5
+using Matrix6d = Eigen::Matrix<double, 6, 6>; ///< Eigen матрица 6 x 6
+using Matrix7d = Eigen::Matrix<double, 7, 7>; ///< Eigen матрица 7 x 7
 
-typedef DiagonalMatrix<double, 3, 3> DiagMatrix3d; ///< Диагональная Eigen матрица 3 x 3
-typedef DiagonalMatrix<double, 4, 4> DiagMatrix4d; ///< Диагональная Eigen матрица 4 x 4
-typedef DiagonalMatrix<double, 5, 5> DiagMatrix5d; ///< Диагональная Eigen матрица 5 x 5
-typedef DiagonalMatrix<double, 6, 6> DiagMatrix6d; ///< Диагональная Eigen матрица 6 x 6
-typedef DiagonalMatrix<double, 7, 7> DiagMatrix7d; ///< Диагональная Eigen матрица 7 x 7
+using DiagMatrix3d = Eigen::DiagonalMatrix<double, 3, 3>; ///< Диагональная Eigen матрица 3 x 3
+using DiagMatrix4d = Eigen::DiagonalMatrix<double, 4, 4>; ///< Диагональная Eigen матрица 4 x 4
+using DiagMatrix5d = Eigen::DiagonalMatrix<double, 5, 5>; ///< Диагональная Eigen матрица 5 x 5
+using DiagMatrix6d = Eigen::DiagonalMatrix<double, 6, 6>; ///< Диагональная Eigen матрица 6 x 6
+using DiagMatrix7d = Eigen::DiagonalMatrix<double, 7, 7>; ///< Диагональная Eigen матрица 7 x 7
+
+/// @brief Eigen вектор-столбец
+template <typename Scalar, int Rows>
+using Vector = Eigen::Matrix<Scalar, Rows, 1>;
+
+/// @brief Eigen вектор-столбец
+template <typename Scalar, int Rows>
+using Array = Eigen::Array<Scalar, Rows, 1>;
+
+/// @brief Eigen матрица
+template <typename Scalar, int Rows, int Cols>
+using Matrix = Eigen::Matrix<Scalar, Rows, Cols>;
 
 
 /// @brief Тип произвольного класса, приведенный к Eigen::Array

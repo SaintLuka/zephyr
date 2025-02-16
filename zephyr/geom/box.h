@@ -10,9 +10,7 @@ class Random2D;
 class QuasiRandom2D;
 
 // TODO: Написать нормально
-class Box {
-public:
-
+struct Box {
     Vector3d vmin, vmax;
 
     /// @brief Инициализирует NAN
@@ -20,10 +18,21 @@ public:
 
     Box(const Vector3d& _vmin, const Vector3d& _vmax);
 
+    static Box NaN();
+
+    static Box Zero();
+
+    /// vmin = {+inf, +inf, +inf}
+    /// vmax = {-inf, -inf, -inf}
+    static Box Empty(int dim);
+
+    /// @brief Центр ящика
     Vector3d center() const;
 
+    /// @brief Вектор размеров ящика по осям координат
     Vector3d size() const;
-    
+
+    /// @brief Расстояние между крайними точками ящика
     double diameter() const;
 
     /// @brief Проверяет совпадение z-координаты
@@ -38,14 +47,19 @@ public:
     /// @brief Объем для трехмерного Box
     double volume() const;
 
-    // Точка внутри?
+    /// @brief Точка находится внутри ящика?
     bool inside(const Vector3d& p) const;
 
-    /// @brief Сунуть точку внутрь Box
+    /// @brief Ограничить координаты точки до границ ящика
     Vector3d shove_in(const Vector3d& p) const;
 
+    /// @brief Расширить ящик, чтобы захватить точку
+    void capture(const Vector3d& p);
+
+    /// @brief Замкнутая линия x-координат границ бокса
     std::vector<double> outline_x() const;
 
+    /// @brief Замкнутая линия y-координат границ бокса
     std::vector<double> outline_y() const;
 
     void extend(double margin);

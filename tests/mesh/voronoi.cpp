@@ -4,7 +4,6 @@
 #include <zephyr/mesh/decomp/vdiagram.h>
 #include <zephyr/utils/matplotlib.h>
 
-
 using namespace zephyr::mesh;
 using namespace zephyr::geom;
 

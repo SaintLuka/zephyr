@@ -401,7 +401,7 @@ void VDiagram::set_coords(int iGen, double x, double y) {
         throw std::out_of_range("VDiagram::set_coords");
     }
     m_coords[iGen] = {x, y, 0.0};
-    changed();
+    // Если здесь вызывать changed(), то ломается балансировка
 }
 
 void VDiagram::set_weight(int iGen, double w) {
@@ -409,7 +409,7 @@ void VDiagram::set_weight(int iGen, double w) {
         throw std::out_of_range("VDiagram::set_weight");
     }
     m_weights[iGen] = w;
-    changed();
+    // Если здесь вызывать changed(), то ломается балансировка
 }
 
 double VDiagram::get_weight(int iGen) {

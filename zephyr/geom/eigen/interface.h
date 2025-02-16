@@ -5,7 +5,9 @@
 #include <array>
 #include <cassert>
 
-namespace zephyr::geom {
+#include <Eigen/Dense>
+
+namespace zephyr::geom::eigen_wrapper {
 
 template <typename _Scalar, int _Size, int _Unused = _Size>
 class DiagonalMatrix;
@@ -279,6 +281,20 @@ public:
         return c;
     }
 
+    SameMatrix inverse() const {
+        Eigen::Matrix<double, _Rows, _Cols> mat;
+        for (int i = 0; i < _Size; ++i) {
+            mat.data()[i] = get(i);
+        }
+        mat = mat.inverse();
+
+        SameMatrix res;
+        for (int i = 0; i < _Size; ++i) {
+            res.get(i) = mat.data()[i];
+        }
+        return res;
+    }
+
     bool hasNaN() const {
         for (int i = 0; i < _Size; ++i) {
             if (std::isnan(get(i))) {
@@ -286,6 +302,15 @@ public:
             }
         }
         return false;
+    }
+
+    bool isZero() const {
+        for (int i = 0; i < _Size; ++i) {
+            if (get(i) != 0.0) {
+                return false;
+            }
+        }
+        return true;
     }
 
     SameMatrix cwiseAbs() const {
@@ -517,5 +542,8 @@ private:
     /// @brief Данные
     std::array<_Scalar, _Size> m_data;
 };
+
+template <typename _Scalar, int _Size, int _Unused>
+using Array = Matrix<_Scalar, _Size, _Unused>;
 
 } // namespace zephyr::geom
