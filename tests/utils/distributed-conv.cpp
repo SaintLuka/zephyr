@@ -62,8 +62,9 @@ int main() {
 
     // Сеточный генератор
     //Cuboid gen(0.0, 1.0, 0.0, 0.6, 0.0, 0.9);
-    Rectangle gen(0.0, 1.0, 0.0, 1.0);
-    gen.set_nx(50);
+    //gen.set_nx(50);
+    Rectangle gen(0.0, 1.0, 0.0, 1.0, true);
+    gen.set_nx(250);
 
     // Создаем сетку
     EuMesh mesh(U, gen);

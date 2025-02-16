@@ -129,10 +129,10 @@ int main() {
     double next_write = 0.0;
 
     Stopwatch elapsed(true);
-    while (curr_time <= 1.0) {
+    while (curr_time <= 0.8) {
         // Балансировка декомпозиции
         if (n_step % 10 == 0) {
-            mesh.balancing(double(mesh.locals().size()));
+            mesh.balancing(mesh.n_cells());
             mesh.redistribute();
             mesh.exchange();
         }
