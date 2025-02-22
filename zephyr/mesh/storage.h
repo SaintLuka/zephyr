@@ -115,7 +115,7 @@ public:
 
         /// @brief Указатель на начало элемента
         inline const Byte* ptr() const {
-            return reinterpret_cast<Byte *>(this);
+            return reinterpret_cast<const Byte *>(this);
         }
 
         /// @brief Указатель на данные элемента

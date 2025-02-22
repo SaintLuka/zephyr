@@ -68,65 +68,16 @@ void EuMesh::redistribute() {
 #endif
 }
 
-// Должен быть готов: m_locals, m_tourism
-// Отправляет m_tourism.m_border -> m_aliens
-void EuMesh::exchange_start(){
-#ifdef ZEPHYR_MPI
-    const int size = mpi::size();
-	const int rank = mpi::rank();
 
-    m_tourism.m_requests_send.resize(size);
-    m_tourism.m_requests_recv.resize(size);
-    std::fill(m_tourism.m_requests_send.begin(), m_tourism.m_requests_send.end(), MPI_REQUEST_NULL);    
-	std::fill(m_tourism.m_requests_recv.begin(), m_tourism.m_requests_recv.end(), MPI_REQUEST_NULL);
 
-    int temp_border_it = 0;
-    for(auto& border_indices : m_tourism.m_border_indices){
-		for(auto cell_index : border_indices){
-            // [?]            
-			memcpy(m_tourism.m_border[temp_border_it].ptr(), m_locals[cell_index].ptr(), m_locals.itemsize());
-            ++temp_border_it;
-        }
-	}
-    for (int i = 0; i < size; ++i) {
-        if (i != rank) {            
-			MPI_Isend(
-                m_tourism.m_border.item(0).ptr() + m_tourism.m_send_offsets[i], m_tourism.m_count_to_send[i], MPI_BYTE,
-				i, 0, mpi::comm(), &m_tourism.m_requests_send[i]
-            );
-		}
-    }
-#endif
-}
 
-void EuMesh::exchange_end(){
-#ifdef ZEPHYR_MPI
-    const int size = mpi::size();
-	const int rank = mpi::rank();
-
-    for (int i = 0; i < size; ++i) {
-        if (i != rank) {
-			MPI_Irecv(
-                m_aliens.item(0).ptr() + m_tourism.m_recv_offsets[i], m_tourism.m_count_to_recv[i], MPI_BYTE, 
-				i, 0, mpi::comm(), &m_tourism.m_requests_recv[i]
-            );
-		}
-    }
-
-    MPI_Waitall(mpi::size() - 1, m_tourism.m_requests_send.data(), MPI_STATUSES_IGNORE);
-	MPI_Waitall(mpi::size() - 1, m_tourism.m_requests_recv.data(), MPI_STATUSES_IGNORE);
-	
-	// Без этого чет все рушится
-    MPI_Barrier(mpi::comm());
-#endif
-}
 
 void EuMesh::exchange() {
 #ifdef ZEPHYR_MPI
     if (mpi::single()) return;
 
-	exchange_start();
-	exchange_end();
+	m_tourism.exchange_start(m_locals);
+	m_tourism.exchange_end(m_aliens);
 #endif
 }
 
@@ -327,7 +278,7 @@ void EuMesh::build_aliens() {
 	}
 
 	// Отправляем 
-	exchange_start();
+	m_tourism.exchange_start(m_locals);
 
 	for(auto& cell : m_locals){
 		for(auto& face : cell.faces){
@@ -340,7 +291,7 @@ void EuMesh::build_aliens() {
 	}
 
 	// Получам в aliens
-	exchange_end();
+	m_tourism.exchange_end(m_aliens);
 
 	int al_it = 0;
 	for(auto& cell : m_aliens){

@@ -189,8 +189,6 @@ public:
     /// @brief Обмен данными между процессами, в массивы aliens записываются
     /// данные с других процессов
     void exchange();
-    void exchange_start();
-    void exchange_end();
 
     /// @brief Балансирует нагрузку согласно decomposition
     void balancing(double load);
@@ -265,7 +263,7 @@ public:
     AmrStorage m_aliens;  ///< Ячейки с других процессов
 
     /// @brief Все данные, связанные с обменными слоями
-    TouristAgency    m_tourism;
+    Tourism    m_tourism;
 
     /// @brief Метод декомпозиции
     Decomposition::Ptr m_decomp = nullptr;
