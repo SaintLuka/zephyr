@@ -12,7 +12,7 @@
 #include <zephyr/mesh/euler/eu_face.h>
 #include <zephyr/mesh/euler/eu_cell.h>
 
-#include <zephyr/mesh/euler/tourist_agency.h>
+#include <zephyr/mesh/euler/tourism.h>
 #include <zephyr/mesh/euler/migration_service.h>
 
 #include <zephyr/mesh/decomp/ORB.h>

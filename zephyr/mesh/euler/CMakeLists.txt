@@ -6,6 +6,7 @@ set(ZEPHYR_MESH_EULER_SRC
         ${CMAKE_CURRENT_SOURCE_DIR}/eu_mesh_check.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/eu_mesh_refine.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/eu_mesh_decomposition.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/tourism.cpp
         PARENT_SCOPE)
 
 install(FILES
@@ -14,6 +15,6 @@ install(FILES
     eu_cell.h
     eu_mesh.h
     migration_service.h
-    tourist_agency.h
+    tourism.h
     DESTINATION
     include/${PROJECT_NAME}/mesh/euler)
