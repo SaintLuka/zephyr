@@ -60,8 +60,9 @@ public:
         /// @brief Градиент вектора состояния
         PState d_dx, d_dy, d_dz;
 
-        VectorSet n; ///< Нормаль к реконструкции границы
-        VectorSet p; ///< Точка реконструкции границы
+        VectorSet n;      ///< Нормаль к реконструкции границы
+        VectorSet p;      ///< Точка реконструкции границы
+        VectorSet grad_a; ///< Градиент объемных долей (для CrpMode::MUSCL)
 
 
         bool is_bad1() const { return get_state().is_bad(); }
@@ -143,13 +144,16 @@ public:
     /// @brief Основная функция решателя, сделать шаг
     void update(Mesh &mesh);
 
+    /// @brief Сделать отсечение, построить поверхность
+    mesh::AmrStorage body(Mesh& mesh, int idx) const;
+
     /// @brief Установить флаги адаптации
     void set_flags(Mesh &mesh);
 
     /// @brief Распределитель данных при адаптации
     Distributor distributor() const;
 
-private:
+public:
 
     /// @brief Посчитать шаг интегрирования по времени с учетом
     /// условия Куранта
@@ -167,17 +171,25 @@ private:
     /// @brief Подсеточная линейная реконструкция интерфейса
     void interface_recovery(Mesh &mesh);
 
-    /// @brief Расчёт потоков
+    /// @brief Расчёт потоков с первым порядком
     void fluxes(Mesh &mesh, double dt, Direction dir = Direction::ANY);
 
-    /// @brief Обновление ячеек
-    void swap(Mesh &mesh);
-
+    /// @brief Стадия предиктора при расчете со вторым порядком
     void fluxes_stage1(Mesh &mesh, double dt, Direction dir = Direction::ANY);
 
+    /// @brief Стадия корректора при расчете со вторым порядком
     void fluxes_stage2(Mesh &mesh, double dt, Direction dir = Direction::ANY);
 
-    Flux calc_flux(const PState& zL, const PState& zR, double hL, double hR, double a_sig, double dt);
+    /// @brief Обмен слоев
+    void swap(Mesh &mesh);
+
+    Flux calc_flux(const PState& zL, const PState& zR, double hL, double hR, int iA, double a_sig, double dt);
+
+    Flux top_calc_flux(mesh::EuCell& cell, mesh::EuFace& face,
+                       const PState& z_L, const PState& z_R,
+                       double h_L, double h_R, double dt);
+
+    //double alpha_sigma(Cell& cell_L, Cell& cell_R, mesh::Face& face, int idx) const;
 
 protected:
     MixturePT mixture;  ///< Список материалов (смесь)

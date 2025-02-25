@@ -1,21 +1,26 @@
 #include <iostream>
 #include <iomanip>
-#include <algorithm>
 
 #include <zephyr/geom/vector.h>
 #include <zephyr/math/cfd/flux/hllc.h>
 
+using namespace zephyr::phys;
+
 namespace zephyr::math {
 
-inline double sqr(double x) {
-    return x * x;
+inline double min(double x, double y, double z) {
+    return std::min(x, std::min(y, z));
 }
 
-smf::Flux HLLC::flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) const {
+inline double max(double x, double y, double z) {
+    return std::max(x, std::max(y, z));
+}
+
+smf::Flux HLLC::flux(const smf::PState &zL, const smf::PState &zR, const Eos &eos) const {
     return calc_flux(zL, zR, eos);
 }
 
-smf::Flux HLLC::calc_flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) {
+smf::Flux HLLC::calc_flux(const smf::PState &zL, const smf::PState &zR, const Eos &eos) {
     using namespace smf;
 
     const double &rho_L = zL.density;
@@ -84,9 +89,9 @@ smf::Flux HLLC::calc_flux(const smf::PState &zL, const smf::PState &zR, const ph
     return F;
 }
 
-HLLC::WaveConfig HLLC::wave_config(
-        const phys::Eos& eosL, const smf::PState& zL,
-        const phys::Eos& eosR, const smf::PState& zR) {
+smf::WaveConfig3 HLLC::wave_config(
+        const Eos& eosL, const smf::PState& zL,
+        const Eos& eosR, const smf::PState& zR) {
     const double &rho_L = zL.density;
     const double &rho_R = zR.density;
     const double &u_L = zL.velocity.x();
@@ -99,8 +104,8 @@ HLLC::WaveConfig HLLC::wave_config(
     double c_R = eosR.sound_speed_rP(rho_R, P_R);
 
     // Оценки скоростей расходящихся волн
-    double S_L = std::min({u_L - c_L, u_R - c_R, 0.0});
-    double S_R = std::max({u_L + c_L, u_R + c_R, 0.0});
+    double S_L = std::min(u_L - c_L, u_R - c_R);
+    double S_R = std::max(u_L + c_L, u_R + c_R);
 
     // Перенос массы через левую/правую волну
     double a_L = rho_L * (S_L - u_L);
@@ -132,14 +137,14 @@ HLLC::WaveConfig HLLC::wave_config(
     smf::Flux F_sL = F_L.arr() - S_L * (Q_sL.arr() - Q_L.arr());
     smf::Flux F_sR = F_R.arr() - S_R * (Q_sR.arr() - Q_R.arr());
 
-    return WaveConfig({.S_L = S_L, .S_C = S_C, .S_R = S_R,
-                       .QsL = Q_sL, .FsL = F_sL,
-                       .QsR = Q_sR, .FsR = F_sR});
+    return smf::WaveConfig3({.S_L = S_L, .S_C = S_C, .S_R = S_R,
+                             .QsL = Q_sL, .FsL = F_sL,
+                             .QsR = Q_sR, .FsR = F_sR});
 }
 
-HLLC::WaveConfig HLLC::wave_config(
-        const phys::Eos& eosL, const smf::QState& Q_L, const smf::Flux& F_L,
-        const phys::Eos& eosR, const smf::QState& Q_R, const smf::Flux& F_R) {
+smf::WaveConfig3 HLLC::wave_config(
+        const Eos& eosL, const smf::QState& Q_L, const smf::Flux& F_L,
+        const Eos& eosR, const smf::QState& Q_R, const smf::Flux& F_R) {
 
     Vector3d v_L = Q_L.momentum / Q_L.density;
     Vector3d v_R = Q_R.momentum / Q_R.density;
@@ -151,23 +156,23 @@ HLLC::WaveConfig HLLC::wave_config(
     double c_R = eosR.sound_speed_re(Q_R.density, e_R);
 
     // Оценки скоростей расходящихся волн
-    double S_L = std::min({v_L.x() - c_L, v_R.x() - c_R, 0.0});
-    double S_R = std::max({v_L.x() + c_L, v_R.x() + c_R, 0.0});
+    double S_L = min(v_L.x() - c_L, v_R.x() - c_R, 0.0);
+    double S_R = max(v_L.x() + c_L, v_R.x() + c_R, 0.0);
 
     // Поток через левую/правую волну
     smf::Flux a_L = F_L.arr() - S_L * Q_L.arr();
     smf::Flux a_R = F_R.arr() - S_R * Q_R.arr();
 
     // Скорость контактного разрыва
-    double S_C = (a_R.momentum.x() - a_L.momentum.x()) / (a_R.mass - a_L.mass);
+    double S_C = (a_R.momentum.x() - a_L.momentum.x()) / (a_R.density - a_L.density);
 
     // Плотность слева/справа от контактного разрыва
-    double rho_sL = a_L.mass / (S_C - S_L);
-    double rho_sR = a_R.mass / (S_C - S_R);
+    double rho_sL = a_L.density / (S_C - S_L);
+    double rho_sR = a_R.density / (S_C - S_R);
 
     // Удельная полная энергия слева/справа от контактного разрыва
-    double E_sL = sqr(S_C) + (a_L.energy - S_C * a_L.momentum.x()) / a_L.mass;
-    double E_sR = sqr(S_C) + (a_R.energy - S_C * a_R.momentum.x()) / a_R.mass;
+    double E_sL = std::pow(S_C, 2) + (a_L.energy - S_C * a_L.momentum.x()) / a_L.density;
+    double E_sR = std::pow(S_C, 2) + (a_R.energy - S_C * a_R.momentum.x()) / a_R.density;
 
     // Консервативный вектор слева/справа от контактного разрыва
     smf::QState Q_sL(rho_sL, {rho_sL * S_C, rho_sL * v_L.y(), rho_sL * v_L.z()}, rho_sL * E_sL);
@@ -188,16 +193,133 @@ HLLC::WaveConfig HLLC::wave_config(
     }
 #endif
 
-    return WaveConfig({.S_L = S_L, .S_C = S_C, .S_R = S_R,
-                       .QsL = Q_sL, .FsL = F_sL,
-                       .QsR = Q_sR, .FsR = F_sR});
+    return smf::WaveConfig3({.S_L = S_L, .S_C = S_C, .S_R = S_R,
+                             .QsL = Q_sL, .FsL = F_sL,
+                             .QsR = Q_sR, .FsR = F_sR});
 }
 
-mmf::Flux HLLC::flux(const mmf::PState &zL, const mmf::PState &zR, const phys::MixturePT &mixture) const {
-    return calc_flux(zL, zR, mixture);
+mmf::WaveConfig3 HLLC::wave_config(
+        const MixturePT& mix,
+        const mmf::PState& zL,
+        const mmf::PState& zR) {
+    const double &rho_L = zL.density;
+    const double &rho_R = zR.density;
+    const double &u_L = zL.velocity.x();
+    const double &u_R = zR.velocity.x();
+    const double &P_L = zL.pressure;
+    const double &P_R = zR.pressure;
+
+    // Скорость звука слева и справа
+    double c_L = mix.sound_speed_rP(rho_L, P_L, zL.mass_frac, {.T0=zL.T(), .rhos=&zL.rhos()});
+    double c_R = mix.sound_speed_rP(rho_R, P_R, zR.mass_frac, {.T0=zR.T(), .rhos=&zR.rhos()});
+
+    // Оценки скоростей расходящихся волн
+    double S_L = std::min(u_L - c_L, u_R - c_R);
+    double S_R = std::max(u_L + c_L, u_R + c_R);
+
+    // Перенос массы через левую/правую волну
+    double a_L = rho_L * (S_L - u_L);
+    double a_R = rho_R * (S_R - u_R);
+
+    // Скорость контактного разрыва
+    double S_C = (P_L - P_R + a_R * u_R - a_L * u_L) / (a_R - a_L);
+
+    // Плотность слева/справа от контактного разрыва
+    double rho_sL = a_L / (S_L - S_C);
+    double rho_sR = a_R / (S_R - S_C);
+
+    // Удельная полная энергия слева/справа от контактного разрыва
+    double E_sL = zL.E() + (S_C - u_L) * (S_C + P_L / a_L);
+    double E_sR = zR.E() + (S_C - u_R) * (S_C + P_R / a_R);
+
+    // Консервативный вектор слева/справа от контактного разрыва
+    mmf::QState Q_sL(rho_sL, {rho_sL * S_C, rho_sL * zL.v(), rho_sL * zL.w()},
+                     rho_sL * E_sL, rho_sL * zL.mass_frac.arr());
+    mmf::QState Q_sR(rho_sR, {rho_sR * S_C, rho_sR * zR.v(), rho_sR * zR.w()},
+                     rho_sR * E_sR, rho_sR * zR.mass_frac.arr());
+
+    // Консервативный вектор слева/справа
+    mmf::QState Q_L(zL);
+    mmf::QState Q_R(zR);
+
+    // Дифференциальный поток слева/справа
+    mmf::Flux F_L(zL);
+    mmf::Flux F_R(zR);
+
+    mmf::Flux F_sL = F_L.arr() - S_L * (Q_sL.arr() - Q_L.arr());
+    mmf::Flux F_sR = F_R.arr() - S_R * (Q_sR.arr() - Q_R.arr());
+
+    return mmf::WaveConfig3({.S_L = S_L, .S_C = S_C, .S_R = S_R,
+                             .QsL = Q_sL, .FsL = F_sL,
+                             .QsR = Q_sR, .FsR = F_sR});
 }
 
-mmf::Flux HLLC::calc_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::MixturePT &mixture) {
+mmf::WaveConfig3 HLLC::wave_config(const MixturePT& mix,
+        const mmf::QState& Q_L, const mmf::Flux& F_L,
+        const mmf::QState& Q_R, const mmf::Flux& F_R) {
+
+    Vector3d v_L = Q_L.momentum / Q_L.density;
+    Vector3d v_R = Q_R.momentum / Q_R.density;
+    double e_L = Q_L.energy / Q_L.density - 0.5 * v_L.squaredNorm();
+    double e_R = Q_R.energy / Q_R.density - 0.5 * v_R.squaredNorm();
+
+    Fractions beta_L = Q_L.mass_frac.arr() / Q_L.density;
+    Fractions beta_R = Q_R.mass_frac.arr() / Q_R.density;
+
+    // Скорость звука слева и справа
+    double c_L = mix.sound_speed_re(Q_L.density, e_L, beta_L);
+    double c_R = mix.sound_speed_re(Q_R.density, e_R, beta_R);
+
+    // Оценки скоростей расходящихся волн
+    double S_L = min(v_L.x() - c_L, v_R.x() - c_R, 0.0);
+    double S_R = max(v_L.x() + c_L, v_R.x() + c_R, 0.0);
+
+    // Поток через левую/правую волну
+    mmf::Flux a_L = F_L.arr() - S_L * Q_L.arr();
+    mmf::Flux a_R = F_R.arr() - S_R * Q_R.arr();
+
+    // Скорость контактного разрыва
+    double S_C = (a_R.momentum.x() - a_L.momentum.x()) / (a_R.density - a_L.density);
+
+    // Плотность слева/справа от контактного разрыва
+    double rho_sL = a_L.density / (S_C - S_L);
+    double rho_sR = a_R.density / (S_C - S_R);
+
+    // Удельная полная энергия слева/справа от контактного разрыва
+    double E_sL = std::pow(S_C, 2) + (a_L.energy - S_C * a_L.momentum.x()) / a_L.density;
+    double E_sR = std::pow(S_C, 2) + (a_R.energy - S_C * a_R.momentum.x()) / a_R.density;
+
+    // Консервативный вектор слева/справа от контактного разрыва
+    mmf::QState Q_sL(rho_sL, {rho_sL * S_C, rho_sL * v_L.y(), rho_sL * v_L.z()},
+                     rho_sL * E_sL, rho_sL * beta_L.arr());
+    mmf::QState Q_sR(rho_sR, {rho_sR * S_C, rho_sR * v_R.y(), rho_sR * v_R.z()},
+                     rho_sR * E_sR, rho_sR * beta_R.arr());
+
+    mmf::Flux F_sL = a_L.arr() + S_L * Q_sL.arr();
+    mmf::Flux F_sR = a_R.arr() + S_R * Q_sR.arr();
+
+#if 0
+    double err1 = ((F_R .arr() - F_sR.arr()) - S_R * (Q_R .arr() - Q_sR.arr())).cwiseAbs().maxCoeff();
+    double err2 = ((F_sR.arr() - F_sL.arr()) - S_C * (Q_sR.arr() - Q_sL.arr())).cwiseAbs().maxCoeff();
+    double err3 = ((F_sL.arr() - F_L .arr()) - S_L * (Q_sL.arr() - Q_L .arr())).cwiseAbs().maxCoeff();
+    double err4 = (F_L.arr() - F_R.arr() + S_R * (Q_R.arr() - Q_sR.arr()) +
+            S_C * (Q_sR.arr() - Q_sL.arr()) + S_L * (Q_sL.arr() - Q_L.arr())).cwiseAbs().maxCoeff();
+
+    if (std::max({err1, err2, err3, err4}) > 1.0e-6) {
+        throw std::runtime_error("Rankine-Hugoniot conditions failed");
+    }
+#endif
+
+    return mmf::WaveConfig3({.S_L = S_L, .S_C = S_C, .S_R = S_R,
+                             .QsL = Q_sL, .FsL = F_sL,
+                             .QsR = Q_sR, .FsR = F_sR});
+}
+
+mmf::Flux HLLC::flux(const mmf::PState &zL, const mmf::PState &zR, const MixturePT &mix) const {
+    return calc_flux(zL, zR, mix);
+}
+
+mmf::Flux HLLC::calc_flux(const mmf::PState &zL, const mmf::PState &zR, const MixturePT &mix) {
     using namespace mmf;
 
     const double &rho_L = zL.density;
@@ -208,10 +330,10 @@ mmf::Flux HLLC::calc_flux(const mmf::PState &zL, const mmf::PState &zR, const ph
     const double &P_R = zR.pressure;
 
     // Скорость звука слева и справа
-    double c_L = mixture.sound_speed_rP(zL.density, zL.pressure, zL.mass_frac,
-                                        {.T0 = zL.T(), .rhos = &zL.densities});
-    double c_R = mixture.sound_speed_rP(zR.density, zR.pressure, zR.mass_frac,
-                                        {.T0 = zR.T(), .rhos = &zR.densities});
+    double c_L = mix.sound_speed_rP(zL.density, zL.pressure, zL.mass_frac,
+                                    {.T0 = zL.T(), .rhos = &zL.densities});
+    double c_R = mix.sound_speed_rP(zR.density, zR.pressure, zR.mass_frac,
+                                    {.T0 = zR.T(), .rhos = &zR.densities});
 
     // Оценки скоростей расходящихся волн
     double S_L = std::min(u_L - c_L, u_R - c_R);
@@ -269,11 +391,11 @@ mmf::Flux HLLC::calc_flux(const mmf::PState &zL, const mmf::PState &zR, const ph
 
 }
 
-smf::Flux HLLC_LM::flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) const {
+smf::Flux HLLC_LM::flux(const smf::PState &zL, const smf::PState &zR, const Eos &eos) const {
     return calc_flux(zL, zR, eos);
 }
 
-smf::Flux HLLC_LM::calc_flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) {
+smf::Flux HLLC_LM::calc_flux(const smf::PState &zL, const smf::PState &zR, const Eos &eos) {
     using namespace smf;
 
     const double &rho_L = zL.density;
@@ -348,11 +470,11 @@ smf::Flux HLLC_LM::calc_flux(const smf::PState &zL, const smf::PState &zR, const
     return F;
 }
 
-smf::Flux HLLC_M::flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) const {
+smf::Flux HLLC_M::flux(const smf::PState &zL, const smf::PState &zR, const Eos &eos) const {
     return calc_flux(zL, zR, eos);
 }
 
-smf::Flux HLLC_M::calc_flux(const smf::PState &zL, const smf::PState &zR, const phys::Eos &eos) {
+smf::Flux HLLC_M::calc_flux(const smf::PState &zL, const smf::PState &zR, const Eos &eos) {
     using namespace smf;
 
     const double &rho_L = zL.density;
@@ -394,8 +516,8 @@ smf::Flux HLLC_M::calc_flux(const smf::PState &zL, const smf::PState &zR, const 
     double E_sR = zR.E() + (S_C - u_R) * (S_C + P_R / a_R);
 
     // Квадраты тангенциальной составляющей скорости
-    double v_L2 = sqr(zL.v()) + sqr(zL.w());
-    double v_R2 = sqr(zR.v()) + sqr(zR.w());
+    double v_L2 = std::pow(zL.v(), 2) + std::pow(zL.w(), 2);
+    double v_R2 = std::pow(zR.v(), 2) + std::pow(zR.w(), 2);
 
     // Добавка для HLLC-M
     E_sL += 0.5 * ((a_R * v_R2 - a_L * v_L2) / (a_R - a_L) - v_L2);

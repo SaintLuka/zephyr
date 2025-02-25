@@ -32,10 +32,10 @@ struct State {
     double rho = NAN;  ///< Смесевая плотность
     double e   = NAN;  ///< Смесевая энергия
 
-    Fractions alpha{0.0};  ///< Объемные концентрации
-    Fractions beta {0.0};  ///< Массовые концентрации
-    ScalarSet rs   {NAN};  ///< Истинные плотности
-    ScalarSet es   {NAN};  ///< Истинные энергии
+    Fractions alpha = Fractions::Zero();  ///< Объемные концентрации
+    Fractions beta  = Fractions::Zero();  ///< Массовые концентрации
+    ScalarSet rs    = ScalarSet::NaN();   ///< Истинные плотности
+    ScalarSet es    = ScalarSet::NaN();   ///< Истинные энергии
 
     /// @brief Создать сместь от (P, T)
     static State Explicit(MixturePT &mixture, Fractions alpha, double P, double T) {

@@ -108,14 +108,14 @@ struct QState {
 
 /// @brief Вектор потока
 /// @code
-///   mass = rho * u;
+///   density = rho * u;
 ///   momentum.x() = rho * u^2 + P;
 ///   momentum.y() = rho * u * v;
 ///   momentum.z() = rho * u * w;
 ///   energy = u * (rho * (e + 0.5 * velocity^2) + P);
 /// @endcode
 struct Flux {
-    double   mass;      ///< Плотность потока массы
+    double   density;   ///< Плотность потока массы
     Vector3d momentum;  ///< Плотность потока импульса
     double   energy;    ///< Плотность потока энергии
 
@@ -123,7 +123,7 @@ struct Flux {
     Flux();
 
     /// @brief Инициализация с полным заданием параметров
-    Flux(double mass, const Vector3d &momentum, double energy);
+    Flux(double density, const Vector3d &momentum, double energy);
 
     /// @brief Дифференциальный поток по вектору примитивных переменных
     explicit Flux(const PState &z);
@@ -213,7 +213,8 @@ struct PState {
     inline const ScalarSet& rhos() const { return densities; }
 
     inline double alpha(int idx) const {
-        return mass_frac[idx] * density / densities[idx];
+        return std::isnan(densities[idx]) ? 0.0 :
+               mass_frac[idx] * density / densities[idx];
     }
 
     // Квадрат модуля скорости

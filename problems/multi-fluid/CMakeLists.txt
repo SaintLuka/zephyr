@@ -1,5 +1,6 @@
-#list(APPEND PROBLEMS mmf_advection)
+list(APPEND PROBLEMS mmf_advection)
 list(APPEND PROBLEMS mmf_test_1D)
+list(APPEND PROBLEMS mmf_triple_point)
 
 # Assume all files in direcory are tests
 if (ZEPHYR_PROBLEMS_ALL)
