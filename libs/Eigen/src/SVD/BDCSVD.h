@@ -311,7 +311,7 @@ template<typename MatrixType>
 template<typename HouseholderU, typename HouseholderV, typename NaiveU, typename NaiveV>
 void BDCSVD<MatrixType>::copyUV(const HouseholderU &householderU, const HouseholderV &householderV, const NaiveU &naiveU, const NaiveV &naiveV)
 {
-  // Note exchange of U and V: m_matrixU is set from m_naiveV and vice versa
+  // Note sync of U and V: m_matrixU is set from m_naiveV and vice versa
   if (computeU())
   {
     Index Ucols = m_computeThinU ? m_diagSize : householderU.cols();

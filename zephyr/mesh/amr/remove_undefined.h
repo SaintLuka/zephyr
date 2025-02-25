@@ -371,7 +371,7 @@ void remove_undefined(AmrStorage &locals, AmrStorage &aliens, const Statistics &
 
     // получить element.next у alien ячеек
     mesh.build_aliens();
-    mesh.exchange();
+    mesh.sync();
 
     change_adjacent_timer.resume();
     change_adjacent(locals, aliens);

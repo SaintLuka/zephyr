@@ -186,9 +186,15 @@ public:
     /// корректно связаны).
     void redistribute();
 
+    /// @brief Рассылка данных соседям
+    void send(Post post = Post::FULL);
+
+    /// @brief Получение данных от соседей
+    void recv(Post post = Post::FULL);
+
     /// @brief Обмен данными между процессами, в массивы aliens записываются
-    /// данные с других процессов
-    void exchange();
+    /// данные с других процессов. Последовательное выволнение send и recv
+    void sync(Post post = Post::FULL);
 
     /// @brief Балансирует нагрузку согласно decomposition
     void balancing(double load);

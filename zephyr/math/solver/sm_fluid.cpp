@@ -76,16 +76,16 @@ void SmFluid::update(Mesh &mesh) {
     compute_dt(mesh);
 
     if (m_acc == 1) {
-        mesh.exchange();
+        mesh.sync();
         fluxes(mesh);
     }
     else {
-        mesh.exchange();
+        mesh.sync();
         compute_grad(mesh, get_current_sm);
 
         fluxes_stage1(mesh);
 
-        mesh.exchange();
+        mesh.sync();
         fluxes_stage2(mesh);
     }
 

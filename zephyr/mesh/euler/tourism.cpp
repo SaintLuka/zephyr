@@ -10,7 +10,7 @@ void Tourism::reset() {
         m_border_indices[r].clear();
 }
 
-void Tourism::exchange_start(const AmrStorage& locals){
+void Tourism::send(const AmrStorage& locals, Post post) {
 #ifdef ZEPHYR_MPI
     const int size = mpi::size();
     const int rank = mpi::rank();
@@ -39,7 +39,7 @@ void Tourism::exchange_start(const AmrStorage& locals){
 #endif
 }
 
-void Tourism::exchange_end(AmrStorage& aliens) {
+void Tourism::recv(AmrStorage& aliens, Post post) {
 #ifdef ZEPHYR_MPI
     const int size = mpi::size();
     const int rank = mpi::rank();

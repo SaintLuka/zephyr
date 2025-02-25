@@ -319,7 +319,7 @@ void balance_flags_slow(AmrStorage &locals, AmrStorage &aliens,
     flag_balancing_timer.resume();
     int changed = 1;
     while (changed) {
-        mesh.exchange();
+        mesh.sync();
         vicinity_list.update();
 
         changed = flag_balancing_step(locals, vicinity_list);
@@ -349,8 +349,8 @@ void balance_flags_slow<0>(AmrStorage &locals, AmrStorage &aliens,
     /*
     bool changed = true;
     while (changed) {
-        decomposition.exchange_start();
-        decomposition.exchange_end();
+        decomposition.send();
+        decomposition.recv();
         changed = network.max(0);
     }
      */

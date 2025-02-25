@@ -164,7 +164,7 @@ void apply_impl(
     int rank = mpi::rank();
 
     // Я не знаю флаги, надо получить.
-    mesh.exchange();
+    mesh.sync();
 
     /// Этап 1. Сбор статистики
     count_timer.resume();
@@ -181,7 +181,7 @@ void apply_impl(
     positions_timer.stop();
 
     // Отправить MPI locals.next (!!!!)
-    mesh.exchange();
+    mesh.sync();
 
     /// Этап 3. Восстановление геометрии
     geometry_timer.resume();
@@ -192,7 +192,7 @@ void apply_impl(
     // Если index < 0, то ячейка считается неактуальной, то есть
     // она переместилась, так мы отличаем тех, кто остался от тех, кто удалится.
     // Ну и флаги нужны, конечно. Но они и так есть, вроде как.
-    mesh.exchange();
+    mesh.sync();
 
     /// Этап 4. Восстановление соседства
     connections_timer.resume();
@@ -206,7 +206,7 @@ void apply_impl(
     clean_timer.stop();
 
     mesh.build_aliens();
-    mesh.exchange();
+    mesh.sync();
 
     /// Этап 6. Пересылка и линковка alien ячеек
     //link_timer.resume();

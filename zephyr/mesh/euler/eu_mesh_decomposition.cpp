@@ -68,16 +68,28 @@ void EuMesh::redistribute() {
 #endif
 }
 
-
-
-
-
-void EuMesh::exchange() {
+void EuMesh::send(Post post) {
 #ifdef ZEPHYR_MPI
     if (mpi::single()) return;
 
-	m_tourism.exchange_start(m_locals);
-	m_tourism.exchange_end(m_aliens);
+    m_tourism.send(m_locals, post);
+#endif
+}
+
+void EuMesh::recv(Post post) {
+#ifdef ZEPHYR_MPI
+    if (mpi::single()) return;
+
+    m_tourism.recv(m_aliens, post);
+#endif
+}
+
+void EuMesh::sync(Post post) {
+#ifdef ZEPHYR_MPI
+    if (mpi::single()) return;
+
+    m_tourism.send(m_locals, post);
+    m_tourism.recv(m_aliens, post);
 #endif
 }
 
@@ -130,8 +142,8 @@ void EuMesh::migrate() {
 		printf("\n");
 	}
 	*/
-	
-	exchange();
+
+    sync();
 
     // Переиндексируем грани
 	for (auto& cell: m_locals){
@@ -278,7 +290,7 @@ void EuMesh::build_aliens() {
 	}
 
 	// Отправляем 
-	m_tourism.exchange_start(m_locals);
+    m_tourism.send(m_locals);
 
 	for(auto& cell : m_locals){
 		for(auto& face : cell.faces){
@@ -291,7 +303,7 @@ void EuMesh::build_aliens() {
 	}
 
 	// Получам в aliens
-	m_tourism.exchange_end(m_aliens);
+    m_tourism.recv(m_aliens);
 
 	int al_it = 0;
 	for(auto& cell : m_aliens){

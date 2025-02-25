@@ -1,7 +1,7 @@
 /// @file Тяжелый тест на динамическую декомпозицию и адаптацию.
 /// Процессы хаотично перемещаются, ячейки хаотично адаптируются.
 
-// TODO: Удалить лишние mesh.exchange()
+// TODO: Удалить лишние mesh.sync()
 
 #include <iostream>
 #include <iomanip>
@@ -186,19 +186,19 @@ int main() {
     // Начальные данные
     for (int i = 0; i < mesh.max_level(); ++i) {
         setup_values(mesh);
-        mesh.exchange();
+        mesh.sync();
         set_flags(mesh);
         mesh.refine();
     }
     setup_values(mesh);
-    mesh.exchange();
+    mesh.sync();
 
     Stopwatch elapsed(true);
     for (int n_step = 0; n_step <= 1000; ++n_step) {
         // redistribute на каждом шаге
         mesh.balancing(mesh.n_cells());
         mesh.redistribute();
-        mesh.exchange();
+        mesh.sync();
 
         setup_values(mesh, 0.01 * n_step);
 
@@ -207,11 +207,11 @@ int main() {
             pvd.save(mesh, n_step);
         }
 
-        mesh.exchange();
+        mesh.sync();
         set_flags(mesh);
-        mesh.exchange();
+        mesh.sync();
         mesh.refine();
-        mesh.exchange();
+        mesh.sync();
     }
     elapsed.stop();
 

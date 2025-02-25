@@ -7,6 +7,14 @@ namespace zephyr::mesh {
 
 using zephyr::utils::mpi;
 
+/// @brief Поля данных для отправки
+enum class Post : int {
+    FULL = 0,
+    DATA = 2,
+    FLAG = 1,
+    // ...
+};
+
 /// @class Просто забавное название)
 class Tourism {
 public:
@@ -29,10 +37,10 @@ public:
 
     // Должен быть готов: m_tourism
     // Отправляет m_tourism.m_border -> aliens
-    void exchange_start(const AmrStorage& locals);
+    void send(const AmrStorage& locals, Post post = Post::FULL);
     
     // Получает aliens
-    void exchange_end(AmrStorage& aliens);
+    void recv(AmrStorage& aliens, Post post = Post::FULL);
 
     std::vector<int> m_count_to_send;
     std::vector<int> m_count_to_recv;

@@ -1,7 +1,7 @@
 /// @file Динамическая ORB декомпозиция сетки совместно с адаптацией.
 /// На сетке решается уравнение переноса для проверки связности сетки.
 
-// TODO: Удалить лишние mesh.exchange()
+// TODO: Удалить лишние mesh.sync()
 
 #include <iostream>
 #include <iomanip>
@@ -114,12 +114,12 @@ int main() {
     // Начальные данные
     for (int i = 0; i < mesh.max_level(); ++i) {
         set_initials(mesh, domain);
-        mesh.exchange();
+        mesh.sync();
         set_flags(mesh);
         mesh.refine();
     }
     set_initials(mesh, domain);
-    mesh.exchange();
+    mesh.sync();
 
     // Число Куранта
     double CFL = 0.5;
@@ -134,7 +134,7 @@ int main() {
         if (n_step % 10 == 0) {
             mesh.balancing(mesh.n_cells());
             mesh.redistribute();
-            mesh.exchange();
+            mesh.sync();
         }
 
         if (curr_time >= next_write) {
@@ -176,11 +176,11 @@ int main() {
             cell(U).u2 = 0.0;
         }
 
-        mesh.exchange();
+        mesh.sync();
         set_flags(mesh);
-        mesh.exchange();
+        mesh.sync();
         mesh.refine();
-        mesh.exchange();
+        mesh.sync();
 
         n_step += 1;
         curr_time += dt;
