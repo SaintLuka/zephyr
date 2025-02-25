@@ -200,8 +200,7 @@ MixturePT::triplet_re MixturePT::get_rPT(double rho, double e,
     // Случай одного материала
     int idx = beta.index();
     if (idx >= 0) {
-        ScalarSet rhos{NAN};
-        rhos[idx] = rho;
+        ScalarSet rhos = ScalarSet::Pure(idx, rho);
         double P = m_materials[idx]->pressure_re(rho, e);
         double T = m_materials[idx]->temperature_rP(rho, P);
         return {rhos, P, T};
@@ -216,8 +215,7 @@ MixturePT::triplet_rP MixturePT::get_reT(double rho, double P,
     // Случай одного материала
     int idx = beta.index();
     if (idx >= 0) {
-        ScalarSet rhos{NAN};
-        rhos[idx] = rho;
+        ScalarSet rhos = ScalarSet::Pure(idx, rho);
         double e = m_materials[idx]->energy_rP(rho, P);
         double T = m_materials[idx]->temperature_rP(rho, P);
         return {rhos, e, T};
@@ -238,7 +236,7 @@ double MixturePT::sound_speed_PT(double P, double T,
 }
 
 ScalarSet MixturePT::init_densities(const Fractions &beta, const MixOptions &options) const {
-    ScalarSet rhos{NAN};
+    ScalarSet rhos = ScalarSet::NaN();
     if (options.rhos != nullptr) {
         for (int i = 0; i < size(); ++i) {
             if (beta.has(i)) {

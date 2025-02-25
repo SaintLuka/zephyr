@@ -201,10 +201,6 @@ ScalarSet::ScalarSet() {
     m_data.fill(0.0);
 }
 
-ScalarSet::ScalarSet(double val) {
-    m_data.fill(val);
-}
-
 ScalarSet::ScalarSet(std::initializer_list<double> list) {
     if (list.size() > Fractions::max_size) {
         throw std::runtime_error("When construct ScalarSet got list.size() > Fractions::max_size (" +
@@ -220,7 +216,7 @@ ScalarSet::ScalarSet(std::initializer_list<double> list) {
     }
 }
 
-ScalarSet::ScalarSet(double val, int idx) {
+ScalarSet::ScalarSet(int idx, double val) {
     m_data.fill(0.0);
     m_data[idx] = val;
 }
@@ -240,6 +236,12 @@ ScalarSet::ScalarSet(const std::vector<double> &vec) {
     for (int i = vec.size(); i < Fractions::max_size; ++i) {
         m_data[i] = 0.0;
     }
+}
+
+ScalarSet ScalarSet::Pure(int idx, double value) {
+    ScalarSet res = ScalarSet::NaN();
+    res[idx] = value;
+    return res;
 }
 
 std::ostream &operator<<(std::ostream &os, const ScalarSet &frac) {

@@ -115,21 +115,21 @@ std::ostream &operator<<(std::ostream &os, const QState &state) {
 }
 
 Flux::Flux()
-    : mass(0.0),
+    : density(0.0),
       momentum({0.0, 0.0, 0.0}),
       energy(0.0) {
 
 }
 
 Flux::Flux(double mass, const Vector3d &momentum, double energy)
-    : mass(mass),
+    : density(mass),
       momentum(momentum),
       energy(energy) {
 
 }
 
 Flux::Flux(const PState &z) {
-    mass = z.density * z.velocity.x();
+    density = z.density * z.velocity.x();
     momentum.x() = z.density * z.velocity.x() * z.velocity.x() + z.pressure;
     momentum.y() = z.density * z.velocity.x() * z.velocity.y();
     momentum.z() = z.density * z.velocity.x() * z.velocity.z();
@@ -158,7 +158,7 @@ Flux Flux::in_global(const Vector3d &normal) const {
 
 std::ostream &operator<<(std::ostream &os, const Flux &flux) {
     os << boost::format("ρ: %+.5f,  ρv: {%+.5e, %+.5e, %+.5e},  ρE: %+.5e") %
-          flux.mass % flux.momentum.x() % flux.momentum.y() % flux.momentum.z() % flux.energy;
+          flux.density % flux.momentum.x() % flux.momentum.y() % flux.momentum.z() % flux.energy;
     return os;
 }
 
@@ -201,6 +201,7 @@ PState::PState(const QState &q, const phys::MixturePT &mixture,
 
     auto[rhos, P, T] = mixture.get_rPT(density, energy, mass_frac,
                                        {.P0=P0, .T0=T0, .rhos=&rhos0});
+
     densities   = rhos;
     pressure    = P;
     temperature = T;
@@ -252,35 +253,44 @@ smf::PState PState::extract(const MixturePT& mixture, int idx) const {
 }
 
 std::pair<mmf::PState, mmf::PState> PState::split(const MixturePT& mixture, int iA) const {
-    mmf::PState zA = *this;
-    mmf::PState zB = *this;
+    // Внутренняя энегия для материала A
+    double energy_A = mixture[iA].energy_rT(densities[iA], temperature, {.P0=pressure});
 
-    throw std::runtime_error("FIX5016");
-    /*
+    // Чистое состояние для материала A
+    mmf::PState zA(
+            densities[iA],
+            velocity,
+            pressure,
+            energy_A,
+            temperature,
+            Fractions::Pure(iA),
+            ScalarSet::Pure(iA, densities[iA]));
 
-    double alfa_A = vol_frac[iA];
+    // Смешаное состояние (всё кроме A)
+    mmf::PState zB(
+            NAN,
+            velocity,
+            pressure,
+            NAN,
+            temperature,
+            Fractions::Zero(),
+            ScalarSet::NaN());
+
+    // Массовые концентрации, с которыми смешиваются zA и zB
     double beta_A = mass_frac[iA];
+    double beta_B = 1.0 - mass_frac[iA];
 
-    double alfa_B = 1.0 - alfa_A;
-    double beta_B = 1.0 - beta_A;
+    zB.density = beta_B / (1.0 / density - beta_A / densities[iA]);
+    zB.energy  = (energy - beta_A * energy_A ) / beta_B;
 
-    zA.density = beta_A * density / alfa_A;
-    zA.mass_frac.set_pure(iA);
-    zA. vol_frac.set_pure(iA);
-
-    zB.density = beta_B * density / alfa_B;
-    for (int i = 0; i < Fractions::max_size; ++i) {
-        if (i == iA) {
-            zB.mass_frac[i] = 0.0;
-            zB. vol_frac[i] = 0.0;
+    for (int i = 0; i < Fractions::size(); ++i) {
+        if (mass_frac.has(i) && i != iA) {
+            zB.densities[i] = densities[i];
+            zB.mass_frac[i] = mass_frac[i] / beta_B;
         }
-
-        zB.mass_frac[i] /= beta_B;
-        zB. vol_frac[i] /= alfa_B;
     }
 
     return {zA, zB};
-     */
 }
 
 void PState::interpolation_update(const MixturePT& mixture) {
@@ -378,10 +388,10 @@ Flux::Flux(const PState &z) {
 }
 
 Flux::Flux(const smf::Flux& flux, int mat)
-    : density(flux.mass),
+    : density(flux.density),
       momentum(flux.momentum),
       energy(flux.energy),
-      mass_frac(flux.mass, mat) {
+      mass_frac(mat, flux.density) {
 }
 
 void Flux::to_local(const Vector3d &normal) {

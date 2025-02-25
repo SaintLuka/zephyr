@@ -120,21 +120,22 @@ struct ScalarSet {
     /// @brief Конструктор по умолчанию. Инициализирует нулями.
     ScalarSet();
 
-    /// @brief Установить значение
-    explicit ScalarSet(double val);
-
     /// @brief Конструктор со списком инициализации
     ScalarSet(std::initializer_list<double> list);
 
     /// @brief Установить единственное значение по индексу idx,
     /// остальные компоненты инициализируются нулями.
-    ScalarSet(double val, int idx);
+    ScalarSet(int idx, double val);
 
     /// @brief Конструктор из Fractions
     explicit ScalarSet(const Fractions &frac);
 
     /// @brief Конструктор из вектора
     explicit ScalarSet(const std::vector<double> &vec);
+
+    /// @brief Специализация для набора плотностей, все равны NAN,
+    /// кроме компоненты по idx, которая выставляется на value
+    static ScalarSet Pure(int idx, double value);
 
     /// @brief Оператор доступа по индексу
     inline double &operator[](int idx) {
