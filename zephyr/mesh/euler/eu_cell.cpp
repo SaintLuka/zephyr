@@ -1,5 +1,5 @@
-#include <zephyr/geom/primitives/side.h>
-#include <zephyr/geom/primitives/amr_cell.h>
+#include <zephyr/mesh/primitives/side.h>
+#include <zephyr/mesh/primitives/amr_cell.h>
 #include <zephyr/mesh/euler/eu_cell.h>
 
 namespace zephyr::mesh {
@@ -74,7 +74,7 @@ const Byte* EuCell::neib_data(const BFace& face) const {
     }
 }
 
-EuFace EuCell::face(const geom::Side side) const {
+EuFace EuCell::face(const Side side) const {
     return EuFace(*this, side);
 }
 
@@ -86,11 +86,11 @@ void EuCell::print_neibs_info() const {
     m_it->print_info();
 
     std::cout << "\tAll neighbors of cell:\n";
-    for (int i = 0; i < geom::BFaces::max_count; ++i) {
+    for (int i = 0; i < BFaces::max_count; ++i) {
         auto &face = m_it->faces[i];
         if (face.is_undefined() or face.is_boundary()) continue;
 
-        std::cout << "\tNeighbor through the " << side_to_string(geom::Side(i % 6)) << " face (" << i / 6 << "):\n";
+        std::cout << "\tNeighbor through the " << side_to_string(i) << ":\n";
 
         if (face.adjacent.alien > std::numeric_limits<int>::max()) {
             // Локальная ячейка
@@ -114,6 +114,5 @@ void EuCell::print_neibs_info() const {
         }
     }
 }
-
 
 } // namespace zephyr::mesh

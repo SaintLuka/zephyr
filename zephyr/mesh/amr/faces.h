@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include <zephyr/geom/primitives/side.h>
-#include <zephyr/geom/primitives/amr_cell.h>
+#include <zephyr/mesh/primitives/side.h>
+#include <zephyr/mesh/primitives/amr_cell.h>
 #include <zephyr/mesh/amr/common.h>
 
 namespace zephyr::mesh::amr {

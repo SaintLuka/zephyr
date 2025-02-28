@@ -7,7 +7,7 @@ namespace zephyr::mesh {
 void LaMesh::initialize(const Grid& grid) {
     m_nodes.resize(grid.n_nodes());
     for (int i = 0; i < grid.n_nodes(); ++i) {
-        m_nodes[i] = *grid.node(i);
+        m_nodes[i] = grid.node(i)->bnode();
     }
 
     m_cells.resize(grid.n_cells());

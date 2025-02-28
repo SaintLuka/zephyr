@@ -7,14 +7,10 @@
 
 namespace zephyr::io {
 
-using zephyr::mesh::AmrStorage;
-using zephyr::mesh::CellStorage;
-using zephyr::mesh::NodeStorage;
+using namespace zephyr::mesh;
 
 Variable::Variable(const char* name)
     : m_name(name) {
-    
-    using geom::BFaces;
 
     if (!std::strcmp(name, "rank")) {
         m_type = VtkType::Int32;

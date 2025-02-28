@@ -3,7 +3,7 @@
 #include <memory>
 
 #include <zephyr/geom/vector.h>
-#include <zephyr/geom/primitives/boundary.h>
+#include <zephyr/geom/boundary.h>
 
 namespace zephyr::geom::generator {
 

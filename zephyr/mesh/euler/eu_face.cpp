@@ -1,19 +1,21 @@
 #include <cstring>
 
-#include <zephyr/geom/primitives/amr_cell.h>
-#include <zephyr/geom/primitives/bfaces.h>
+#include <zephyr/mesh/primitives/amr_cell.h>
+#include <zephyr/mesh/primitives/bfaces.h>
 #include <zephyr/mesh/euler/eu_face.h>
 #include <zephyr/mesh/euler/eu_cell.h>
 
+using namespace zephyr::geom;
+
 namespace zephyr::mesh {
 
-EuFace::EuFace(const EuCell &cell, geom::Side side)
+EuFace::EuFace(const EuCell &cell, Side side)
     : m_cell(cell),
       m_face(nullptr),
       m_end (nullptr),
       m_dir(Direction::ANY) {
 
-    m_face = m_end = &const_cast<geom::AmrCell &>(cell.geom()).faces[side];
+    m_face = m_end = &const_cast<AmrCell &>(cell.geom()).faces[side];
 }
 
 EuFace::EuFace(const EuCell &cell, BFace* self, BFace* end, Direction dir)

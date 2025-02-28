@@ -137,12 +137,12 @@ AmrStorage InterfaceRecovery::body(EuMesh& mesh) const {
                         cell(p) + Vector3d{-d, +d, 0.0},
                         cell(p) + Vector3d{+d, +d, 0.0},
                 };
-                cells[count] = AmrCell(quad);
+                cells[count] = mesh::AmrCell(quad);
             }
             else {
                 auto poly = cell.polygon();
                 auto part = poly.clip(cell(p), cell(n));
-                cells[count] = AmrCell(part);
+                cells[count] = mesh::AmrCell(part);
             }
         }
         else {

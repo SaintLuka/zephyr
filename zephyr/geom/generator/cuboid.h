@@ -1,7 +1,7 @@
 #pragma once
 
 #include <zephyr/configuration.h>
-#include <zephyr/geom/primitives/boundary.h>
+#include <zephyr/geom/boundary.h>
 #include <zephyr/geom/generator/generator.h>
 
 namespace zephyr::geom::generator {

@@ -1,21 +1,18 @@
 #pragma once
 
-#include <zephyr/geom/primitives/side.h>
-#include <zephyr/geom/primitives/bface.h>
-
+#include <zephyr/mesh/primitives/side.h>
+#include <zephyr/mesh/primitives/bface.h>
 #include <zephyr/mesh/euler/amr_storage.h>
 #include <zephyr/mesh/euler/eu_face.h>
 
 
 namespace zephyr::mesh {
 
-using zephyr::geom::Adjacent;
-using zephyr::geom::Vector3d;
-
 /// @brief Ячейка (итератор для доступа к элементам класса EuMesh)
 /// @details Копирует функции AmrStorage::Item, а также добавляет
 /// специфические функции для ячейки: volume, center, faces.
 class EuCell {
+    using Vector3d = zephyr::geom::Vector3d;
 public:
     // Конструкторы
 
@@ -131,18 +128,18 @@ public:
     }
 
     /// @brief Ссылка на геометрию ячейки
-    inline geom::AmrCell& geom(){
+    inline AmrCell& geom(){
         return *m_it;
     }
 
     /// @brief Ссылка на геометрию ячейки
-    inline const geom::AmrCell& geom() const {
+    inline const AmrCell& geom() const {
         return *m_it;
     }
 
     /// @brief Выбрать грань на стороне. Корректно работает
     /// для декартовых сеток без адаптации
-    EuFace face(const geom::Side side) const;
+    EuFace face(const Side side) const;
 
     /// @brief Итератор по граням
     /// @param dir Выбрать грани по некоторым направлениям

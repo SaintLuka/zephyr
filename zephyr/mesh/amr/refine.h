@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <zephyr/geom/primitives/amr_cell.h>
+#include <zephyr/mesh/primitives/amr_cell.h>
 #include <zephyr/geom/cube.h>
 
 #include <zephyr/mesh/amr/common.h>
@@ -17,13 +17,13 @@ namespace zephyr::mesh::amr {
 /// @param cube Родительская ячейка
 /// @return Массив с дочерними ячейками
 template <int dim>
-std::array<geom::AmrCell, CpC(dim)> create_children(const SqCube& cube);
+std::array<AmrCell, CpC(dim)> create_children(const SqCube& cube);
 
 /// @brief Создать геометрию дочерних ячеек по родительским вершинам (2D)
 /// @param cube Вершины родительской ячейки
 /// @return Массив с дочерними ячейками
 template <>
-std::array<geom::AmrCell, CpC(2)> create_children<2>(const SqCube& cube) {
+std::array<AmrCell, CpC(2)> create_children<2>(const SqCube& cube) {
     auto quads = cube.as2D().children();
     return {AmrCell(quads[0]), AmrCell(quads[1]),
             AmrCell(quads[2]), AmrCell(quads[3])};

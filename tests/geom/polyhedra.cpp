@@ -31,7 +31,7 @@ void plot_sections(
 
         Polyhedron clip = poly.clip(p, normal);
 
-        cell[0] = AmrCell(clip);
+        cell[0] = zephyr::mesh::AmrCell(clip);
         pvd.save(cell, i);
     }
 }

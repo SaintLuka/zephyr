@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.14)
-project(zephyr C CXX)
+project(zephyr
+    VERSION   0.1
+    LANGUAGES CXX)
 
 set(CMAKE_LIB_NAME zephyr)
 
@@ -12,7 +14,6 @@ if (NOT CMAKE_BUILD_TYPE)
 endif()
 
 option(ZEPHYR_MPI          "Use MPI functions"  OFF)
-option(ZEPHYR_YAML         "YAML support"       OFF)
 option(ZEPHYR_EIGEN        "Use Eigen library"  ON)
 option(ZEPHYR_TESTS        "Build tests"        ON)
 option(ZEPHYR_TESTS_ALL    "Build ALL tests"    OFF)
@@ -25,22 +26,24 @@ configure_file(
 )
 
 find_package(Threads REQUIRED)
-find_package(Boost   COMPONENTS system filesystem)
+find_package(Eigen3  REQUIRED)
+find_package(Boost   COMPONENTS program_options REQUIRED)
 find_package(Python3 COMPONENTS Interpreter Development NumPy REQUIRED)
-
-if (ZEPHYR_YAML)
-    find_package(yaml-cpp REQUIRED)
-endif()
 
 add_subdirectory(zephyr)
 
-add_library(zephyr SHARED ${ZEPHYR_SOURCES})
-target_link_libraries(zephyr PUBLIC ${Boost_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
+# Тип компиляции библиотеки, потом сделаем изменяемым вместо хардкода
+set(BUILD_SHARED_LIBS YES)
+
+# Тип компиляции (SHARED/STATIC) пропущен, полагаемся на переменную BUILD_SHARED_LIBS
+add_library(zephyr ${ZEPHYR_SOURCES})
+target_link_libraries(zephyr PUBLIC ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(zephyr PUBLIC ${Boost_LIBRARIES})
 target_link_libraries(zephyr PUBLIC Python3::Python Python3::NumPy)
+target_link_libraries(zephyr PUBLIC Eigen3::Eigen)
 
 target_include_directories(zephyr PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>
-    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>/libs
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
     $<BUILD_INTERFACE:${Boost_INCLUDE_DIR}>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/include>
@@ -54,13 +57,9 @@ if (ZEPHYR_MPI)
     target_include_directories(zephyr PUBLIC ${MPI_INCLUDE_PATH})
     target_link_libraries(zephyr PUBLIC ${MPI_LIBRARIES})
 endif()
-if (ZEPHYR_YAML)
-    target_link_libraries(zephyr PUBLIC yaml-cpp)
-endif()
 install(TARGETS zephyr DESTINATION lib EXPORT zephyr-targets)
 
 install(EXPORT zephyr-targets DESTINATION share/cmake/zephyr)
-install(DIRECTORY libs/Eigen DESTINATION include)
 
 include(CMakePackageConfigHelpers)
 # gen_eu the config file that is includes the exports

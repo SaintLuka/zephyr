@@ -1,24 +1,22 @@
 #pragma once
 
-#include <zephyr/geom/primitives/bface.h>
+#include <zephyr/mesh/primitives/bface.h>
 #include <zephyr/mesh/euler/amr_storage.h>
 
 namespace zephyr::mesh {
 
 class EuCell;
-using zephyr::geom::BFace;
-using zephyr::geom::Boundary;
-using zephyr::geom::Vector3d;
-using zephyr::geom::Direction;
 
 /// @brief Обертка для типа geom::BFace, реализует интерфейс грани,
 /// необходимый для работы. Также содержит несколько новых функций.
 class EuFace {
+    using Vector3d = zephyr::geom::Vector3d;
+    using Boundary = zephyr::geom::Boundary;
 public:
 
     /// @brief Изолированная грань на стороне side,
     /// не позволяет обходить грани
-    EuFace(const EuCell &cell, geom::Side side);
+    EuFace(const EuCell &cell, Side side);
 
     /// @brief Внешняя нормаль
     const Vector3d &normal() const;
@@ -75,7 +73,7 @@ public:
     Vector3d symm_point(const Vector3d& p) const;
 
 
-    inline const geom::Adjacent &adjacent() const {
+    inline const Adjacent &adjacent() const {
         return m_face->adjacent;
     }
 

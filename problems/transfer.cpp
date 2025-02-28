@@ -9,6 +9,7 @@
 #include <zephyr/math/solver/transfer.h>
 
 using namespace zephyr::geom;
+using namespace zephyr::mesh;
 
 using zephyr::io::PvdFile;
 using zephyr::mesh::generator::Rectangle;
@@ -495,7 +496,7 @@ Vector3d Solver::velocity(const Vector3d& p) const {
 
 AmrStorage Solver::exact(Body& body, double curr_time) const {
     using zephyr::geom::Quad;
-    using zephyr::geom::AmrCell;
+    using zephyr::mesh::AmrCell;
 
     // Точная граница в начальный момент времени
     std::vector<Vector3d> vs = body.vs;

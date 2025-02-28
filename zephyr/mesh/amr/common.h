@@ -18,7 +18,7 @@
 #endif
 
 #include <array>
-#include <zephyr/geom/primitives/decomposition.h>
+#include <zephyr/mesh/primitives/decomposition.h>
 
 namespace zephyr::mesh::amr {
 

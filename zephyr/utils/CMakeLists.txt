@@ -1,4 +1,5 @@
 set(ZEPHYR_UTILS_SRC
+    ${CMAKE_CURRENT_SOURCE_DIR}/json.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/mpi.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/threads.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/stopwatch.cpp
@@ -6,8 +7,10 @@ set(ZEPHYR_UTILS_SRC
 
 install(FILES
     error_list.h
+    json.h
     matplotlib.h
     mpi.h
+    thread-pool.h
     threads.h
     range.h
     stopwatch.h

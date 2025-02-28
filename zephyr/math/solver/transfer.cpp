@@ -1,5 +1,5 @@
 #include <zephyr/math/solver/transfer.h>
-#include <zephyr/geom/primitives/bface.h>
+#include <zephyr/mesh/primitives/bface.h>
 #include <zephyr/geom/polygon.h>
 #include <zephyr/geom/intersection.h>
 #include <zephyr/geom/sections.h>

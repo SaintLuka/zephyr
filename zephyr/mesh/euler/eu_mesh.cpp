@@ -1,8 +1,8 @@
 #include <map>
 
 #include <zephyr/geom/grid.h>
-#include <zephyr/geom/primitives/amr_cell.h>
-#include <zephyr/geom/primitives/bfaces.h>
+#include <zephyr/mesh/primitives/amr_cell.h>
+#include <zephyr/mesh/primitives/bfaces.h>
 #include <zephyr/geom/box.h>
 #include <zephyr/mesh/euler/eu_cell.h>
 #include <zephyr/mesh/euler/eu_mesh.h>

@@ -3,8 +3,8 @@
 #include <zephyr/geom/grid.h>
 #include <zephyr/geom/generator/generator.h>
 
-#include <zephyr/geom/primitives/mov_node.h>
-#include <zephyr/geom/primitives/mov_cell.h>
+#include <zephyr/mesh/primitives/mov_node.h>
+#include <zephyr/mesh/primitives/mov_cell.h>
 
 #include <zephyr/mesh/storage.h>
 

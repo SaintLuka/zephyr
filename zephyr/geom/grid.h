@@ -5,13 +5,17 @@
 #include <set>
 
 #include <zephyr/geom/vector.h>
-#include <zephyr/geom/primitives/boundary.h>
-#include <zephyr/geom/primitives/mov_node.h>
-#include <zephyr/geom/primitives/cell_type.h>
+#include <zephyr/geom/boundary.h>
+#include <zephyr/geom/cell_type.h>
+
+namespace zephyr::mesh {
+class AmrCell;
+class MovNode;
+class MovCell;
+}
 
 namespace zephyr::geom {
 
-class MovNode;
 
 /// @class Узел сетки общего вида
 class GNode {
@@ -55,11 +59,7 @@ public:
     void add_neib_cell(int idx);
 
     /// @brief Создать базовую вершину для размещения в хранилище
-    MovNode bnode() const;
-
-    operator MovNode() const {
-        return bnode();
-    }
+    mesh::MovNode bnode() const;
 
 private:
     /// @brief Множество граничных условий, для узла может быть более одного
@@ -133,8 +133,6 @@ private:
     std::vector<int>        m_neibs;
 };
 
-class AmrCell;
-class MovCell;
 
 /// @brief Сетка общего вида, которую выдают сеточные генераторы.
 /// Непосредственно в расчетах не используется, после создания преобразуется
@@ -167,9 +165,9 @@ public:
     void setup_adjacency();
 
 
-    AmrCell amr_cell(int idx) const;
+    mesh::AmrCell amr_cell(int idx) const;
 
-    MovCell mov_cell(int idx) const;
+    mesh::MovCell mov_cell(int idx) const;
 
     void assume_structured(int nx, int ny, int nz = 1);
 

@@ -12,6 +12,12 @@ static int g_tasks = 1;
 std::vector<std::string> proc_names();
 
 void mpi::init() {
+    int flag;
+    MPI_Initialized(&flag);
+    if (flag) {
+        return;
+    }
+
     MPI_Init(nullptr, nullptr);
     MPI_Comm_size(MPI_COMM_WORLD, &g_size);
     MPI_Comm_rank(MPI_COMM_WORLD, &g_rank);

@@ -2,6 +2,7 @@
 #list(APPEND TESTS distributed-amr)
 #list(APPEND TESTS distributed-conv)
 #list(APPEND TESTS distributed-conv-amr)
+#list(APPEND TESTS json_config)
 #list(APPEND TESTS mpitest)
 #list(APPEND TESTS range)
 #list(APPEND TESTS stopwatch)

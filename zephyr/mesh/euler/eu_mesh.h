@@ -5,8 +5,8 @@
 
 #include <zephyr/geom/grid.h>
 #include <zephyr/geom/generator/generator.h>
-#include <zephyr/geom/primitives/amr_cell.h>
-#include <zephyr/geom/primitives/bnodes.h>
+#include <zephyr/mesh/primitives/amr_cell.h>
+#include <zephyr/mesh/primitives/bnodes.h>
 
 #include <zephyr/mesh/euler/distributor.h>
 #include <zephyr/mesh/euler/eu_face.h>

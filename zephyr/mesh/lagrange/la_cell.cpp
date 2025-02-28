@@ -1,5 +1,5 @@
-#include <zephyr/geom/primitives/side.h>
-#include <zephyr/geom/primitives/mov_cell.h>
+#include <zephyr/mesh/primitives/side.h>
+#include <zephyr/mesh/primitives/mov_cell.h>
 #include <zephyr/mesh/lagrange/la_cell.h>
 
 namespace zephyr::mesh {

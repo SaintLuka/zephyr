@@ -13,15 +13,17 @@
 
 namespace zephyr::math {
 
+using zephyr::geom::Vector3d;
 using zephyr::mesh::Cell;
 using zephyr::mesh::Mesh;
+using zephyr::mesh::Direction;
 using zephyr::mesh::Distributor;
-using zephyr::geom::Vector3d;
 using zephyr::phys::MixturePT;
-//using zephyr::phys::Fractions;
-using zephyr::phys::VectorSet;
 using zephyr::math::gradient::GetState;
 using zephyr::math::gradient::GetBoundary;
+
+using zephyr::phys::Fractions;
+using zephyr::phys::VectorSet;
 
 using namespace zephyr::math::mmf;
 

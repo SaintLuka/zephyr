@@ -1,7 +1,7 @@
 #pragma once
 
 #include <zephyr/geom/vector.h>
-#include <zephyr/geom/primitives/boundary.h>
+#include <zephyr/geom/boundary.h>
 #include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/phys/matter/eos/ideal_gas.h>
 #include <zephyr/phys/tests/test_1D.h>

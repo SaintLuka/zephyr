@@ -961,13 +961,13 @@ AmrStorage MmFluid::body(Mesh& mesh, int idx) const {
                         cell.center() + Vector3d{-d, +d, 0.0},
                         cell.center() + Vector3d{+d, +d, 0.0},
                 };
-                cells[count] = AmrCell(quad);
+                cells[count] = mesh::AmrCell(quad);
             }
             else {
                 auto poly = cell.polygon();
                 Vector3d point = poly.find_section(normal, alpha);
                 auto part = poly.clip(point, normal);
-                cells[count] = AmrCell(part);
+                cells[count] = mesh::AmrCell(part);
             }
         }
         else {

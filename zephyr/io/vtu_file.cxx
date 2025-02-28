@@ -1,15 +1,16 @@
 #include <fstream>
 
-#include <zephyr/geom/primitives/side.h>
-#include <zephyr/geom/primitives/mov_node.h>
-#include <zephyr/geom/primitives/amr_cell.h>
-#include <zephyr/geom/primitives/mov_cell.h>
+#include <zephyr/mesh/primitives/side.h>
+#include <zephyr/mesh/primitives/mov_node.h>
+#include <zephyr/mesh/primitives/amr_cell.h>
+#include <zephyr/mesh/primitives/mov_cell.h>
 
 #include <zephyr/io/vtu_file.h>
 
 namespace zephyr::io {
 
 using namespace zephyr::geom;
+using namespace zephyr::mesh;
 
 /// ===========================================================================
 ///             Реализация записи в виде набора статических функций
@@ -56,7 +57,7 @@ struct Handler {
     }
 
     /// @brief VTK тип ячейки
-    type_t type(const geom::AmrCell& cell) {
+    type_t type(const AmrCell& cell) {
         if (cell.adaptive) {
             // Адаптивная ячейка
             if (cell.dim < 3) {
@@ -119,7 +120,7 @@ struct Handler {
     }
 
     /// @brief VTK тип ячейки
-    static type_t type(const geom::MovCell& cell) {
+    static type_t type(const MovCell& cell) {
         if (cell.dim < 3) {
             // Двумерный полигон
             switch (cell.nodes.count()) {
@@ -146,7 +147,7 @@ struct Handler {
     }
 
     /// @brief Количество вершин элемента
-    index_t n_points(geom::AmrCell& cell) {
+    index_t n_points(AmrCell& cell) {
         if (cell.adaptive) {
             // Адаптивная ячейка
             if (cell.dim < 3) {
@@ -182,12 +183,12 @@ struct Handler {
     }
 
     /// @brief Количество вершин элемента
-    static index_t n_points(geom::MovCell& cell) {
+    static index_t n_points(MovCell& cell) {
         return cell.nodes.count();
     }
 
     /// @brief Число граней ячейки + число вершин на каждой грани
-    index_t n_fverts(geom::AmrCell& cell) {
+    index_t n_fverts(AmrCell& cell) {
         if (!polyhedral) { return 0; }
 
         index_t res = 0;
@@ -201,7 +202,7 @@ struct Handler {
     }
 
     /// @brief Записать в файл координаты вершин элемента
-    void write_points(std::ofstream &file, const geom::AmrCell& cell) {
+    void write_points(std::ofstream &file, const AmrCell& cell) {
         auto& vertices = cell.vertices;
 
         if (cell.adaptive) {
@@ -265,7 +266,7 @@ struct Handler {
     }
 
     /// @brief Записать порядок вершин элемента
-    void write_connectivity(std::ofstream &file, geom::AmrCell& cell, index_t &counter) {
+    void write_connectivity(std::ofstream &file, AmrCell& cell, index_t &counter) {
         index_t n = n_points(cell);
         for (index_t i = 0; i < n; ++i) {
             index_t val = counter++;
@@ -274,7 +275,7 @@ struct Handler {
     }
     
     /// @brief Вариант вызывается при заданых nodes.
-    void write_connectivity2(std::ofstream &file, geom::AmrCell& cell, index_t &counter) {
+    void write_connectivity2(std::ofstream &file, AmrCell& cell, index_t &counter) {
         auto& nodes = cell.nodes;
 
         if (cell.adaptive) {
@@ -359,7 +360,7 @@ struct Handler {
     }
 
     /// @brief Записать порядок вершин элемента
-    static void write_connectivity(std::ofstream &file, geom::MovCell& cell, index_t &counter) {
+    static void write_connectivity(std::ofstream &file, MovCell& cell, index_t &counter) {
         index_t n = cell.nodes.count();
         for (index_t i = 0; i < n; ++i) {
             index_t val = cell.nodes[i];

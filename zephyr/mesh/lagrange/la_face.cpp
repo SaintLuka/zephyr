@@ -1,9 +1,11 @@
 #include <cstring>
 
-#include <zephyr/geom/primitives/mov_cell.h>
-#include <zephyr/geom/primitives/bfaces.h>
+#include <zephyr/mesh/primitives/mov_cell.h>
+#include <zephyr/mesh/primitives/bfaces.h>
 #include <zephyr/mesh/lagrange/la_face.h>
 #include <zephyr/mesh/lagrange/la_cell.h>
+
+using namespace zephyr::geom;
 
 namespace zephyr::mesh {
 

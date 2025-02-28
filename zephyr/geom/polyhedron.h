@@ -7,7 +7,7 @@
 #include <zephyr/geom/box.h>
 #include <zephyr/geom/vector.h>
 #include <zephyr/geom/line.h>
-#include <zephyr/geom/primitives/cell_type.h>
+#include <zephyr/geom/cell_type.h>
 
 namespace zephyr::geom {
 

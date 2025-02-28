@@ -1,25 +1,25 @@
-set(ZEPHYR_DECOMPOSITION_SOURCES
-		${CMAKE_CURRENT_SOURCE_DIR}/decomposition.cpp
-		${CMAKE_CURRENT_SOURCE_DIR}/orb/transform.cpp
-		${CMAKE_CURRENT_SOURCE_DIR}/orb/blocks.cpp
-		${CMAKE_CURRENT_SOURCE_DIR}/orb/ORB.cpp
+set(ZEPHYR_MESH_DECOMP_SOURCES
+	${CMAKE_CURRENT_SOURCE_DIR}/decomposition.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/orb/transform.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/orb/blocks.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/orb/ORB.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/rwalk.cpp
-		${CMAKE_CURRENT_SOURCE_DIR}/VD3.cpp
-		${CMAKE_CURRENT_SOURCE_DIR}/vdiagram.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/VD3.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/vdiagram.cpp
 	PARENT_SCOPE
 )
 
 install(FILES
-		${CMAKE_CURRENT_SOURCE_DIR}/decomposition.h
-		${CMAKE_CURRENT_SOURCE_DIR}/ORB.h
+	${CMAKE_CURRENT_SOURCE_DIR}/decomposition.h
+	${CMAKE_CURRENT_SOURCE_DIR}/ORB.h
 	${CMAKE_CURRENT_SOURCE_DIR}/rwalk.h
-		${CMAKE_CURRENT_SOURCE_DIR}/VD3.h
-		${CMAKE_CURRENT_SOURCE_DIR}/vdiagram.h
-		DESTINATION include/${PROJECT_NAME}/mesh/decomp
-		)
+	${CMAKE_CURRENT_SOURCE_DIR}/VD3.h
+	${CMAKE_CURRENT_SOURCE_DIR}/vdiagram.h
+	DESTINATION include/${PROJECT_NAME}/mesh/decomp
+)
 
 install(FILES
-		orb/blocks.h
-		orb/transform.h
-	DESTINATION include/${PROJECT_NAME}/network/decomp/ORB
+	${CMAKE_CURRENT_SOURCE_DIR}/orb/blocks.h
+	${CMAKE_CURRENT_SOURCE_DIR}/orb/transform.h
+	DESTINATION include/${PROJECT_NAME}/mesh/decomp/orb
 )

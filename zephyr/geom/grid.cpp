@@ -1,10 +1,17 @@
 #include <cassert>
+
 #include <zephyr/utils/mpi.h>
-#include <zephyr/geom/primitives/side.h>
 #include <zephyr/geom/grid.h>
-#include <zephyr/geom/primitives/mov_node.h>
-#include <zephyr/geom/primitives/amr_cell.h>
-#include <zephyr/geom/primitives/mov_cell.h>
+
+#include <zephyr/mesh/primitives/side.h>
+#include <zephyr/mesh/primitives/mov_node.h>
+#include <zephyr/mesh/primitives/amr_cell.h>
+#include <zephyr/mesh/primitives/mov_cell.h>
+
+using zephyr::mesh::Side;
+using zephyr::mesh::AmrCell;
+using zephyr::mesh::MovNode;
+using zephyr::mesh::MovCell;
 
 namespace zephyr::geom {
 
@@ -102,20 +109,20 @@ void GNode::add_neib_cell(int idx) {
 }
 
 MovNode GNode::bnode() const {
-    MovNode bnode(0, index);
+    MovNode mov_node(0, index);
     if (m_bounds.empty()) {
-        bnode.boundary = *m_bounds.begin();
+        mov_node.boundary = *m_bounds.begin();
     }
-    bnode.coords = this->v;
+    mov_node.coords = this->v;
 
     int counter = 0;
     for (int idx: m_neibs) {
-        bnode.neibs[counter].rank = 0;
-        bnode.neibs[counter].index = idx;
-        bnode.neibs[counter].alien = -1;
+        mov_node.neibs[counter].rank = 0;
+        mov_node.neibs[counter].index = idx;
+        mov_node.neibs[counter].alien = -1;
         ++counter;
     }
-    return bnode;
+    return mov_node;
 }
 
 GCell::GCell()

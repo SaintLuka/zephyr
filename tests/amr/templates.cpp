@@ -1,5 +1,5 @@
 /// @file Проверка производных на AMR-шаблонах
-
+#ifdef ZEPHYR_EIGEN
 #include <iomanip>
 
 #include <zephyr/mesh/euler/eu_mesh.h>
@@ -102,7 +102,7 @@ void gauss(Cell &cell) {
 }
 
 // Расчет градиента старым МНК
-void LSM_old(Cell &cell) {
+void LSM_old(EuCell &cell) {
     if (!cell(U).target) {
         cell(U).grad_o = Vector2d::Zero();
         cell(U).err_o  = Vector2d::Zero();
@@ -504,3 +504,6 @@ int main() {
 
     return 0;
 }
+#else
+int main() { return 0; }
+#endif

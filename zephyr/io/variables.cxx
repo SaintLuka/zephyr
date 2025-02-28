@@ -1,8 +1,8 @@
 #include <cstring>
 
-#include <zephyr/geom/primitives/mov_node.h>
-#include <zephyr/geom/primitives/mov_cell.h>
-#include <zephyr/geom/primitives/amr_cell.h>
+#include <zephyr/mesh/primitives/mov_node.h>
+#include <zephyr/mesh/primitives/mov_cell.h>
+#include <zephyr/mesh/primitives/amr_cell.h>
 
 #include <zephyr/io/variables.h>
 

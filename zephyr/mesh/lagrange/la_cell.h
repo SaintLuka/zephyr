@@ -1,6 +1,6 @@
 #pragma once
 
-#include <zephyr/geom/primitives/bface.h>
+#include <zephyr/mesh/primitives/bface.h>
 
 #include <zephyr/mesh/lagrange/mov_storage.h>
 #include <zephyr/mesh/lagrange/la_face.h>
@@ -8,13 +8,11 @@
 
 namespace zephyr::mesh {
 
-using zephyr::geom::Adjacent;
-using zephyr::geom::Vector3d;
-
 /// @brief Ячейка (итератор для доступа к элементам класса LaMesh)
 /// @details Копирует функции CellStorage::Item, а также добавляет
 /// специфические функции для ячейки: volume, center, faces.
 class LaCell {
+    using Vector3d = zephyr::geom::Vector3d;
 public:
     // Конструкторы
 

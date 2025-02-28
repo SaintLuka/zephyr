@@ -1,20 +1,18 @@
 #pragma once
 
 #include <zephyr/mesh/storage.h>
-#include <zephyr/geom/primitives/bface.h>
+#include <zephyr/mesh/primitives/bface.h>
 
 
 namespace zephyr::mesh {
 
 class LaCell;
-using zephyr::geom::BFace;
-using zephyr::geom::Boundary;
-using zephyr::geom::Vector3d;
-using zephyr::geom::Direction;
 
 /// @brief Обертка для типа geom::BFace, реализует интерфейс грани,
 /// необходимый для работы. Также содержит несколько новых функций.
 class LaFace {
+    using Vector3d = zephyr::geom::Vector3d;
+    using Boundary = zephyr::geom::Boundary;
 public:
 
     /// @brief Внешняя нормаль
@@ -59,7 +57,7 @@ public:
     const Vector3d& vs(int idx) const;
 
 
-    inline const geom::Adjacent &adjacent() const {
+    inline const Adjacent &adjacent() const {
         return m_face->adjacent;
     }
 

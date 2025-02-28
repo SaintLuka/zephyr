@@ -6,13 +6,14 @@
 
 namespace zephyr::math {
 
+using zephyr::geom::Vector3d;
+using zephyr::geom::InterfaceRecovery;
+
 using zephyr::mesh::EuCell;
 using zephyr::mesh::EuMesh;
+using zephyr::mesh::Direction;
 using zephyr::mesh::AmrStorage;
 using zephyr::mesh::Distributor;
-using zephyr::geom::Vector3d;
-using zephyr::geom::Direction;
-using zephyr::geom::InterfaceRecovery;
 
 
 /// @brief Класс для моделирования уравнения переноса с аналогом CRP.

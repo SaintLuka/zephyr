@@ -1,9 +1,9 @@
 #include <zephyr/utils/mpi.h>
 
-#include <zephyr/geom/primitives/side.h>
-#include <zephyr/geom/primitives/amr_cell.h>
-#include <zephyr/geom/primitives/bfaces.h>
-#include <zephyr/geom/primitives/decomposition.h>
+#include <zephyr/mesh/primitives/side.h>
+#include <zephyr/mesh/primitives/amr_cell.h>
+#include <zephyr/mesh/primitives/bfaces.h>
+#include <zephyr/mesh/primitives/decomposition.h>
 #include <zephyr/mesh/euler/eu_mesh.h>
 
 namespace zephyr::mesh {
