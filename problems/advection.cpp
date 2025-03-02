@@ -59,7 +59,7 @@ int main() {
             .bottom = Boundary::PERIODIC, .top   = Boundary::PERIODIC});
 
     // Создать сетку
-    Mesh mesh(U, &rect);
+    Mesh mesh(rect, U);
 
     // Заполняем начальные данные
     Box box = mesh.bbox();

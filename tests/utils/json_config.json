@@ -1,0 +1,38 @@
+{
+  "mesh": {
+    "type": "rectangle",
+    "geometry": {
+      "x_min": 0.0,
+      "x_max": 1.5,
+      "y_min": 0.0,
+      "y_max": 1.1
+    },
+    "size": {
+      "nx": 100,
+      "ny": 30
+    },
+    "bounds": {
+      "left":   "ZOE",
+      "right":  "WALL",
+      "bottom": "ZOE",
+      "top":    "WALL"
+    },
+
+    "adaptive": true,
+    "max_level": 5,
+    "decomp": {
+      "type": "XY",
+      "proc_nx": 3,
+      "newton": false,
+      "mobility": 0.1
+    }
+  },
+
+  "io": {
+    "filename": "test",
+    "directory": "out",
+    "clear_dir": true,
+    "hex_only": true,
+    "unique_nodes": false
+  }
+}

@@ -12,6 +12,7 @@ namespace zephyr::geom::generator::collection {
 class PlaneWithHole : public BlockStructured {
 public:
     using Ptr = std::shared_ptr<PlaneWithHole>;
+    using Ref = const std::shared_ptr<PlaneWithHole>&;
 
     /// @brief Флаги граничных условий
     struct Boundaries {
@@ -22,10 +23,8 @@ public:
         Boundary hole   = Boundary::WALL;
     };
 
-#ifdef ZEPHYR_YAML
     /// @brief Конструктор класса по кофигу
-    explicit PlaneWithHole(YAML::Node config);
-#endif
+    explicit PlaneWithHole(const Json& config);
 
     /// @brief Конструктор класса
     /// @param xmin, xmax, ymin, ymax Границы прямоугольника

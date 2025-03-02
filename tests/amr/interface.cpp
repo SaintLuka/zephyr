@@ -116,7 +116,7 @@ int main() {
     Rectangle rect(-1.0, 1.0, -1.0, 1.0);
     rect.set_nx(30);
 
-    EuMesh mesh(U, &rect);
+    EuMesh mesh(rect, U);
 
     mesh.set_max_level(4);
 

@@ -101,7 +101,7 @@ int main() {
     gen.set_size(1000);
 
     // Создать сетку
-    EuMesh mesh(U, &gen);
+    EuMesh mesh(gen, U);
 
     // Создать решатель
     MmFluid solver(mixture);

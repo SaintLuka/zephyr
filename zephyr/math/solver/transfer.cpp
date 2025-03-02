@@ -987,7 +987,7 @@ AmrStorage Transfer::scheme(EuMesh& mesh) {
         }
     }
 
-    AmrStorage cells(U, count);
+    AmrStorage cells(count, U);
 
     count = 0;
     for (auto cell: mesh) {
@@ -1027,7 +1027,8 @@ AmrStorage Transfer::scheme(EuMesh& mesh) {
 
             if (V1.dot(fn) == 0.0) {
                 if (V2.dot(fn) == 0.0) {
-                    return 0.0;
+                    //return 0.0;
+                    throw std::runtime_error("I don't understand");
                 }
 
                 xi1 = -1.0;

@@ -5,18 +5,16 @@
 
 #include <zephyr/geom/box.h>
 #include <zephyr/geom/grid.h>
+#include <zephyr/utils/json.h>
 #include <zephyr/geom/generator/sector.h>
 
 namespace zephyr::geom::generator {
 
-#ifdef ZEPHYR_YAML
-Sector::Sector(YAML::Node config)
-        : Generator("sector"), m_r2(-1.0), m_r1(-1.0), m_angle(-1.0), m_hole(false),
-        m_left_flag(Boundary::UNDEFINED), m_right_flag(Boundary::UNDEFINED),
-        m_inner_flag(Boundary::UNDEFINED), m_outer_flag(Boundary::UNDEFINED) {
+Sector::Sector(const Json& config)
+        : Generator("sector"), m_r2(-1.0), m_r1(-1.0), m_angle(-1.0), m_hole(false) {
 
     if (!config["geometry"]) {
-        throw std::runtime_error("EuMesh config doesn't contain 'geometry'");
+        throw std::runtime_error("Sector config doesn't contain key 'geometry'");
     }
 
     m_r1 = config["geometry"]["r_min"].as<double>();
@@ -31,39 +29,38 @@ Sector::Sector(YAML::Node config)
 
     init_params();
 
-    if (!config["boundary"]) {
-        throw std::runtime_error("EuMesh config doesn't contain 'boundary'");
+    if (!config["bounds"]) {
+        throw std::runtime_error("Sector config doesn't contain 'bounds'");
     }
 
-    m_left_flag = Boundary::UNDEFINED;
-    if (config["boundary"]["left"]) {
-        m_left_flag = boundary_from_string(config["boundary"]["left"].as<std::string>());
+    m_bounds.left = Boundary::UNDEFINED;
+    if (config["bounds"]["left"]) {
+        m_bounds.left = boundary_from_string(config["bounds"]["left"].as<std::string>());
     }
 
-    m_right_flag = Boundary::UNDEFINED;
-    if (config["boundary"]["right"]) {
-        m_right_flag = boundary_from_string(config["boundary"]["right"].as<std::string>());
+    m_bounds.right = Boundary::UNDEFINED;
+    if (config["bounds"]["right"]) {
+        m_bounds.right = boundary_from_string(config["bounds"]["right"].as<std::string>());
     }
 
-    m_inner_flag = Boundary::UNDEFINED;
+    m_bounds.inner = Boundary::UNDEFINED;
     if (config["boundary"]["bottom"]) {
-        m_inner_flag = boundary_from_string(config["boundary"]["bottom"].as<std::string>());
+        m_bounds.inner = boundary_from_string(config["bounds"]["bottom"].as<std::string>());
     }
     if (config["boundary"]["inner"]) {
-        m_inner_flag = boundary_from_string(config["boundary"]["inner"].as<std::string>());
+        m_bounds.inner = boundary_from_string(config["bounds"]["inner"].as<std::string>());
     }
 
-    m_outer_flag = Boundary::UNDEFINED;
+    m_bounds.outer = Boundary::UNDEFINED;
     if (config["boundary"]["bottom"]) {
-        m_outer_flag = boundary_from_string(config["boundary"]["top"].as<std::string>());
+        m_bounds.outer = boundary_from_string(config["bounds"]["top"].as<std::string>());
     }
     if (config["boundary"]["inner"]) {
-        m_outer_flag = boundary_from_string(config["boundary"]["outer"].as<std::string>());
+        m_bounds.outer = boundary_from_string(config["bounds"]["outer"].as<std::string>());
     }
 
-    set_n_phi(config["n_phi"].as<size_t>());
+    set_n_phi(config["n_phi"].as<int>());
 }
-#endif
 
 Sector::Sector(double r_max, double r_min, double angle, bool hole) :
         Generator("sector"),

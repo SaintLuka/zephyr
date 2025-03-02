@@ -50,7 +50,7 @@ void test_1D(TestFunc test) {
     Strip gen(0.0, 1.0, Strip::Type::UNIFORM);
     gen.set_nx(54);
 
-    EuMesh cells(U, gen);
+    EuMesh cells(gen, U);
 
     // Установить начальные данные (средние величины в ячейках)
     for (int i = 0; i < cells.nx(); ++i) {

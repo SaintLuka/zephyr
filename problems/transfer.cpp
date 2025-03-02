@@ -218,7 +218,7 @@ int main() {
     solver.test = Solver::Test::Translation;
 
     // Создать сетку
-    EuMesh mesh(U, &rect);
+    EuMesh mesh(rect, U);
 
     // Настраиваем адаптацию
     mesh.set_max_level(0);

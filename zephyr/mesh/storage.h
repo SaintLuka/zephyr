@@ -8,8 +8,7 @@ namespace zephyr::mesh {
 
 using Byte = unsigned char;
 
-/// @brief Вспомогательный тип для
-/// точечного извлечения данных из Storage
+/// @brief Вспомогательный тип для точечного извлечения данных из Storage
 template <typename T>
 struct VarExtra {
     int offset;
@@ -17,36 +16,40 @@ struct VarExtra {
 
 /// @class Хранилище для расчетных элементов. Каждый элемент хранилища
 /// содержит геометрию + данные элемента (расчетные величины).
-/// Используется три типа геометрии: AmrCell, BCell и BNode.
+/// Используется три типа геометрии: AmrCell, MovCell и MovNode.
 /// @tparam Geom Геометрический тип данных
 template <class Geom>
 class Storage {
 public:
-
     /// @brief Пустое и бессмысленное хранилище
-    Storage() {
-        m_size = 0;
-        m_itemsize = int(sizeof(Geom));
-        m_data = {};
-    };
+    Storage() :
+        m_size(0),
+        m_itemsize(sizeof(Geom)),
+        m_data() {
+    }
 
-    /// @brief Хранилище без указания типа для хранения,
-    /// содержит только геометрию
-    Storage(int size) {
-        m_size = std::max(0, size);
-        m_itemsize = int(sizeof(Geom));
-        m_data.resize(m_size * m_itemsize);
-    };
+    /// @brief Хранилище без указания типа для хранения, содержит только геометрию
+    explicit Storage(int size) :
+        m_size(std::max(0, size)),
+        m_itemsize(sizeof(Geom)),
+        m_data(m_size * m_itemsize) {
+    }
 
-    /// @brief Создать хранилище размера size для хранения типа U
-    /// @tparam U Тип данных, который предполагается располагать в хранилище,
-    /// используется только для выделения достаточного количества памяти.
-    /// @warning Не устанавливает значения в хранилище
-    template<class U>
-    explicit Storage(const U &, int size) {
-        m_size = std::max(0, size);
-        m_itemsize = int(sizeof(Geom) + sizeof(U));
-        m_data.resize(m_size * m_itemsize);
+    /// @brief Хранилище с указанием типа для хранения
+    template <class U>
+    Storage(int size, const U& type) :
+        m_size(std::max(0, size)),
+        m_itemsize(sizeof(Geom) + sizeof(U)),
+        m_data(m_size * m_itemsize) {
+    }
+
+    /// @brief Хранилище с указанием размера буффера
+    /// @param dynamic Фиктивный параметр
+    /// @param datasize Размер данных элемента для хранения в байтах
+    Storage(int size, bool dynamic, int datasize) :
+        m_size(std::max(0, size)),
+        m_itemsize(sizeof(Geom) + std::max(0, datasize)),
+        m_data(m_size * m_itemsize) {
     }
 
     /// @brief Пустое ли хранилище
@@ -120,13 +123,13 @@ public:
 
         /// @brief Указатель на данные элемента
         /// (указатель на память сразу за экземпляром класса)
-        inline Byte * data() {
+        inline Byte* data() {
             return reinterpret_cast<Byte *>(this) + sizeof(Geom);
         }
 
         /// @brief Указатель на данные элемента
         /// (указатель на память сразу за экземпляром класса)
-        inline const Byte * data() const {
+        inline const Byte* data() const {
             return reinterpret_cast<const Byte *>(this) + sizeof(Geom);
         }
 
@@ -156,13 +159,13 @@ public:
 
         /// @brief Извлечь данные элемента
         template<class T>
-        inline const T& operator()(const VarExtra<T> & var) const {
+        inline const T& operator()(const VarExtra<T>& var) const {
             return *reinterpret_cast<const T *>(data() + var.offset);
         }
 
         /// @brief Извлечь данные элемента
         template<class T>
-        inline T& operator()(const VarExtra<T> & var) {
+        inline T& operator()(const VarExtra<T>& var) {
             return *reinterpret_cast<T *>(data() + var.offset);
         }
     };

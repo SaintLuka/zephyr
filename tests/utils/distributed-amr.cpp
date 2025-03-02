@@ -174,7 +174,7 @@ int main() {
     Box domain = gen.bbox();
 
     // Создаем сетку
-    EuMesh mesh(U, gen);
+    EuMesh mesh(gen, U);
     mesh.set_max_level(4);
 
     // Сложная случайная декомпозиция

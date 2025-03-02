@@ -31,3 +31,9 @@ foreach(test IN LISTS TESTS)
     target_link_libraries(${test} PUBLIC zephyr)
     install(TARGETS ${test} DESTINATION tests/utils)
 endforeach()
+
+add_custom_command(
+        TARGET json_config POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+        ${CMAKE_CURRENT_SOURCE_DIR}/json_config.json
+        ${CMAKE_CURRENT_BINARY_DIR})

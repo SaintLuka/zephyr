@@ -89,7 +89,7 @@ int main() {
                         .bottom=Boundary::WALL, .top=Boundary::WALL});
 
     // Создать сетку
-    EuMesh mesh(U, &gen);
+    EuMesh mesh(gen, U);
 
     // Создать решатель
     MmFluid solver(mixture);

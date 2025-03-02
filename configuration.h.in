@@ -1,3 +1,2 @@
 #cmakedefine ZEPHYR_MPI
-#cmakedefine ZEPHYR_YAML
 #cmakedefine ZEPHYR_EIGEN

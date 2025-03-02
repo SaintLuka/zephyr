@@ -61,7 +61,7 @@ int main() {
     Rectangle rect(0.0, 1.0, 0.0, 1.0);
     rect.set_nx(50);
 
-    EuMesh mesh(U, &rect);
+    EuMesh mesh(rect, U);
 
     for (auto cell: mesh) {
         cell(U).u1 = rand() % 2;

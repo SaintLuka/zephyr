@@ -176,7 +176,7 @@ EuMesh get_template(int num, double H) {
         Rectangle rect(-1.5 * H, 1.5 * H, -1.5 * H, 1.5 * H);
         rect.set_nx(3);
 
-        EuMesh mesh(U, &rect);
+        EuMesh mesh(rect, U);
         mesh.set_max_level(1);
 
         if (num == 0) {
@@ -245,7 +245,7 @@ EuMesh get_template(int num, double H) {
                        -1.5 * H, 2.5 * H);
         rect.set_nx(2);
 
-        EuMesh mesh(U, &rect);
+        EuMesh mesh(rect, U);
         mesh.set_max_level(2);
 
         if (num == 6) {

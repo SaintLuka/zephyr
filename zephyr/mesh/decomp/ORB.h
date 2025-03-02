@@ -42,6 +42,9 @@ public:
     ORB(Box domain, const std::string& type, int size, const std::vector<int>& ny,
         const params& p = {.newton = false, .mobility = 0.1});
 
+    /// @brief Задать декомпозицию по файлу конфигурации
+    ORB(Box domain, const utils::Json& config);
+
     /// @brief Создание указателя
     static ORB::Ptr create(const Box& domain, const std::string& type, int size,
                            const params& p = {.newton = false, .mobility = 0.1}){
@@ -59,6 +62,11 @@ public:
                            const std::vector<int>& ny,
                            const params& p = {.newton = false, .mobility = 0.1}){
         return std::make_shared<ORB>(domain, type, size, ny, p);
+    }
+
+    /// @brief Создание указателя
+    static ORB::Ptr create(Box domain, const utils::Json& config){
+        return std::make_shared<ORB>(domain, config);
     }
 
     /// @brief Определить ранг процесса, которому принадлежит точка v.

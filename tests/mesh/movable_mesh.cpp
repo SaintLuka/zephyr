@@ -47,7 +47,7 @@ int main() {
     Rectangle rect(0.0, 1.0, 0.0, 1.0);
     rect.set_nx(200);
 
-    LaMesh mesh(U, V, &rect);
+    LaMesh mesh(&rect, U, V);
 
     for (auto& cell: mesh.locals()) {
         cell(U).x = std::cos(3.0 / (cell.center.norm() + 0.1));

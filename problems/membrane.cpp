@@ -104,7 +104,7 @@ int main() {
         .bottom = Boundary::WALL, .top   = Boundary::WALL});
 
     // Создать сетку
-    Mesh mesh(U, &rect);
+    Mesh mesh(rect, U);
 
     // Заполняем начальные данные
     for (auto cell: mesh) {

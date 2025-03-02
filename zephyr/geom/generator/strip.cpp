@@ -3,9 +3,34 @@
 
 #include <zephyr/geom/box.h>
 #include <zephyr/geom/grid.h>
+#include <zephyr/utils/json.h>
 #include <zephyr/geom/generator/strip.h>
 
 namespace zephyr::geom::generator {
+
+Strip::Strip(const Json& config)
+        : Generator("strip"),
+          m_xmin(0.0), m_xmax(1.0), m_nx(0) {
+
+    if (!config["geometry"]) {
+        throw std::runtime_error("Strip config doesn't contain key 'geometry'");
+    }
+
+    m_xmin = config["geometry"]["x_min"].as<double>();
+    m_xmax = config["geometry"]["x_max"].as<double>();
+    
+    if (!config["bounds"]) {
+        throw std::runtime_error("Strip config doesn't contain key 'bounds'");
+    }
+    m_bounds.left   = boundary_from_string(config["bounds"]["left"].as<std::string>());
+    m_bounds.right  = boundary_from_string(config["bounds"]["right"].as<std::string>());
+
+    if (!config["size"] || !config["size"].is_number()) {
+        throw std::runtime_error("Strip config doesn't contain key 'size'");
+    }
+
+    set_size(config["cells"].as<int>());
+}
 
 Strip::Strip(double xmin, double xmax, Type type) :
         Generator("strip"),

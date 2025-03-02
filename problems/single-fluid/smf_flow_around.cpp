@@ -122,7 +122,7 @@ int main() {
     // gen.set_nz(30);
 
     // Создать сетку
-    EuMesh mesh(U, &gen);
+    EuMesh mesh(gen, U);
 
     // Создать решатель
     SmFluid solver(eos);

@@ -54,9 +54,11 @@ public:
     // Загрузить json файл по имени файла
     static Json load(const std::string& filename);
 
-    // В командной строке ищется ключ -c или --config
-    // с именем файла, данный файл загружается как json
-    static Json load(int argc, char** argv);
+    /// @brief В командной строке ищется ключ -c или --config с именем файла,
+    /// данный файл загружается как json
+    /// @param default_filename Имя файла, которое используется по умолчанию,
+    /// если имя не найдено в командной строке
+    static Json load(int argc, char** argv, const std::string& default_filename = "");
 
     // Implicit constructor: anything with a to_json() function.
     template<class T, class = decltype(&T::to_json)>

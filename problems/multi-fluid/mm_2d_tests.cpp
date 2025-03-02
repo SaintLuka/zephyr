@@ -121,7 +121,7 @@ void RiemannTesterWithSolver2D(Fluxes flux, int n_cells = 10, int acc = 1, const
     double time = 0.0;
 
     // Создать сетку
-    Mesh mesh(U, &rect);
+    Mesh mesh(rect, U);
 
     MmFluid solver(mixture, flux);
     solver.set_acc(acc);
@@ -229,7 +229,7 @@ void vertical_instability_adaptive(double g = 9.81, const std::string &filename 
     double time = 0.0;
 
     // Создать сетку
-    Mesh mesh(U, &rect);
+    Mesh mesh(rect, U);
 
     MmFluid solver(mixture, Fluxes::GODUNOV, g);
     solver.set_acc(2);
@@ -381,7 +381,7 @@ void vertical_instability_adaptive2(double g = 9.81, const std::string &filename
     double time = 0.0;
 
     // Создать сетку
-    Mesh mesh(U, &rect);
+    Mesh mesh(rect, U);
 
     MmFluid solver(mixture, Fluxes::GODUNOV, g);
     solver.set_acc(2);
@@ -529,7 +529,7 @@ void kelvin_helmholtz_instability(int acc = 2, const std::string &filename = "ke
     double time = 0.0;
 
     // Создать сетку
-    Mesh mesh(U, &rect);
+    Mesh mesh(rect, U);
 
     MmFluid solver(mixture, Fluxes::GODUNOV, 1);
     solver.set_acc(acc);
@@ -673,7 +673,7 @@ void Bubble2D(int n_cells, int acc = 2, const std::string &filename = "output") 
     double time = 0.0;
 
     // Создать сетку
-    Mesh mesh(U, &rect);
+    Mesh mesh(rect, U);
 
     MmFluid solver(mixture, Fluxes::GODUNOV);
     solver.set_acc(acc);
@@ -820,7 +820,7 @@ void Bubble2DStatic(int n_cells, int acc = 2, const std::string &filename = "out
     double time = 0.0;
 
     // Создать сетку
-    Mesh mesh(U, &rect);
+    Mesh mesh(rect, U);
 
     MmFluid solver(mixture, Fluxes::GODUNOV);
     solver.set_acc(acc);
@@ -951,7 +951,7 @@ void AirWithSF62D(int n_cells = 25, int acc = 2, const std::string &filename = "
     double time = 0.0;
 
     // Создать сетку
-    Mesh mesh(U, &rect);
+    Mesh mesh(rect, U);
 
     MmFluid solver(mixture, Fluxes::GODUNOV);
     solver.set_acc(acc);
@@ -1065,7 +1065,7 @@ void EjectaProblem(int acc = 2, const std::string &filename = "output") {
     double time = 0.0;
 
     // Создать сетку
-    Mesh mesh(U, &rect);
+    Mesh mesh(rect, U);
 
     MmFluid solver(mixture, Fluxes::GODUNOV);
     solver.set_acc(acc);

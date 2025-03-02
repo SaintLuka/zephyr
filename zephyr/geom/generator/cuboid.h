@@ -11,6 +11,7 @@ namespace zephyr::geom::generator {
 class Cuboid : public Generator {
 public:
     using Ptr = std::shared_ptr<Cuboid>;
+    using Ref = const std::shared_ptr<Cuboid>&;
 
     struct Boundaries {
         Boundary left   = Boundary::WALL;
@@ -21,10 +22,8 @@ public:
         Boundary front  = Boundary::WALL;
     };
 
-#ifdef ZEPHYR_YAML
     /// @brief Конструктор класса по кофигу
-    explicit Cuboid(YAML::Node config);
-#endif
+    explicit Cuboid(const Json& config);
 
     /// @brief Конструктор класса
     /// @param xmin, xmax Границы прямоугольника по оси x

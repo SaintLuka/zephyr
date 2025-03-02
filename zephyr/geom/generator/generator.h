@@ -3,6 +3,8 @@
 #include <string>
 #include <memory>
 
+namespace zephyr::utils { class Json; }
+
 namespace zephyr::geom {
 
 class Box;  ///< Ограничивающий объем
@@ -11,11 +13,17 @@ class Grid; ///< Сетка общего вида, создается генер
 /// @class Базовый класс для сеточных генераторов. Содержит набор
 /// виртуальных функций для создания AmrStorage с сеткой.
 class Generator {
+protected:
+    using Json = zephyr::utils::Json;
 public:
     using Ptr = std::shared_ptr<Generator>;
+    using Ref = const std::shared_ptr<Generator>&;
 
     /// @brief Базовый конструктор только с именем типа сетки
     explicit Generator(const std::string &name);
+
+    /// @brief Создать умный указатель по файлу конфигурации
+    static Generator::Ptr create(const Json& config);
 
     /// @brief Тип сеточного генератора
     const std::string &name() const;

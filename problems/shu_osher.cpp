@@ -69,7 +69,7 @@ int main() {
     gen.set_boundaries({.left = Boundary::ZOE, .right = Boundary::ZOE});
 
     // Создать сетку
-    Mesh mesh(U, &gen);
+    Mesh mesh(gen, U);
 
     // Заполняем начальные данные
     for (auto cell: mesh) {

@@ -24,10 +24,8 @@ public:
         Boundary right = Boundary::ZOE;
     };
 
-#ifdef ZEPHYR_YAML
     /// @brief Конструктор класса по кофигу
-    explicit Strip(YAML::Node config);
-#endif
+    explicit Strip(const Json& config);
 
     /// @brief Конструктор класса
     /// @param xmin, xmax Границы прямоугольника по оси x

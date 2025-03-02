@@ -308,7 +308,7 @@ Json Json::load(const std::string& filename) {
                 throw std::runtime_error("Json::load(filename) error: .json syntax is incorrect: " + errors);
             }
         } else {
-            throw std::runtime_error("Json::load(filename) error: can't open .json file: " + filename);
+            throw std::runtime_error("Json::load(filename) error: can't open file: \"" + filename + "\"");
         }
 
         config_dc.close();
@@ -316,7 +316,6 @@ Json Json::load(const std::string& filename) {
 
     return config;
 }
-
 
 po::variables_map parse_options(int argc, char ** argv) {
     po::options_description description("zephyr");
@@ -334,13 +333,19 @@ po::variables_map parse_options(int argc, char ** argv) {
     return vm;
 }
 
-Json Json::load(int argc, char** argv) {
+Json Json::load(int argc, char** argv, const std::string& default_filename) {
     // Парсим командную строку
     auto vm = parse_options(argc, argv);
     std::string filename = vm["config"].as<std::string>();
 
     if (filename.empty()) {
-        throw std::runtime_error("Json::load error: .json filename is not given.");
+        if (default_filename.empty()) {
+            throw std::runtime_error("Json::load error: .json filename is not given.");
+        }
+        else {
+            filename = default_filename;
+            std::cerr << "Warning: Load default config file '" + filename + "'.\n";
+        }
     }
     return Json::load(filename);
 }

@@ -17,6 +17,8 @@
 
 #include <zephyr/mesh/decomp/ORB.h>
 
+namespace zephyr::utils { class Json; }
+
 namespace zephyr::mesh {
 
 using zephyr::utils::threads;
@@ -31,50 +33,38 @@ using zephyr::mesh::decomp::ORB;
 // TODO: Стркуктурировать поля и методы класса
 class EuMesh {
 public:
-    /// @brief Конструктор сетки из генератора
-    /// @tparam T Тип данных для хранения в ячейках
-    /// @param gen Сеточный генератор
-    template<class T>
-    EuMesh(const T &val, Generator *gen)
-            : m_locals(val, 0), m_aliens(val, 0) {
-        if (mpi::master()) {
-            initialize(gen->make());
-        }
-    }
-
-    /// @brief Конструктор сетки из генератора
-    /// @tparam T Тип данных для хранения в ячейках
-    /// @param gen Сеточный генератор
-    template<class T>
-    EuMesh(const T &val, const std::shared_ptr<Generator>& gen)
-            : m_locals(val, 0), m_aliens(val, 0) {
-        if (mpi::master()) {
-            initialize(gen->make());
-        }
-    }
-
-    /// @brief Конструктор сетки из генератора
-    /// @tparam T Тип данных для хранения в ячейках
-    /// @param gen Сеточный генератор
-    template<class T>
-    EuMesh(const T &val, Generator &gen)
-            : m_locals(val, 0), m_aliens(val, 0) {
-        if (mpi::master()) {
-            initialize(gen.make());
-        }
-    }
-
-    /// @brief Можно сказать основной конструктор.
-    /// Преобразует сетку Grid в специализированную EuMesh
-    /// @tparam T Тип данных для хранения в ячейках
+    /// @brief Можно сказать основной конструктор, преобрзаует
+    /// сетку общего вида Grid в специализированную EuMesh
     /// @param grid Сетка общего вида
+    /// @tparam T Тип данных для хранения в ячейках
     template <class T>
-    EuMesh(const T&val, const Grid& grid)
-            : m_locals(val, 0), m_aliens(val, 0) {
-        if (mpi::master()) {
-            initialize(grid);
-        }
+    EuMesh(const Grid& grid, const T& val) : m_locals(0, val), m_aliens(0, val) {
+        if (mpi::master()) { initialize(grid); }
     }
+
+    /// @brief Конструктор сетки из генератора
+    /// @param gen Сеточный генератор
+    /// @tparam T Тип данных для хранения в ячейках
+    template<class T>
+    EuMesh(Generator *gen, const T &val) : m_locals(0, val), m_aliens(0, val) {
+        if (mpi::master()) { initialize(gen->make()); }
+    }
+
+    /// @brief Конструктор сетки из генератора
+    /// @param gen Сеточный генератор
+    /// @tparam T Тип данных для хранения в ячейках
+    template<class T>
+    EuMesh(Generator::Ref gen, const T &val) : EuMesh(gen.get(), val) { }
+
+    /// @brief Конструктор сетки из генератора
+    /// @param gen Сеточный генератор
+    /// @tparam T Тип данных для хранения в ячейках
+    template<class T>
+    EuMesh(Generator &gen, const T &val) : EuMesh(&gen, val) { }
+
+    /// @brief Создание сетки из конфигурации.
+    /// @param datasize Размер данных ячейки в байтах
+    EuMesh(const utils::Json& config, int datasize);
 
     /// @brief Локальное количество ячеек
     inline int n_cells() { return m_locals.size(); }

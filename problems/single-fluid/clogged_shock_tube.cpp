@@ -189,7 +189,7 @@ int main () {
         .left   = Boundary::ZOE,  .right = Boundary::ZOE,
         .bottom = Boundary::WALL, .top   = Boundary::WALL});
 
-    EuMesh mesh(U, &rect);
+    EuMesh mesh(rect, U);
 
     // Создать решатель
     SmFluid solver(eos);

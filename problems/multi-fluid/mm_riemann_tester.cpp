@@ -159,7 +159,7 @@ RiemannTesterWithSolver(Fluxes flux, const MmTest &test, int n_cells = 10, int a
     gen.set_boundaries({.left   = Boundary::ZOE, .right = Boundary::ZOE});
 
     // Создать сетку
-    Mesh mesh(U, &gen);
+    Mesh mesh(gen, U);
 
     MmFluid solver(mixture, flux);
     solver.set_acc(acc);
@@ -297,7 +297,7 @@ void ImpactProblem(int n_cells = 500, int acc = 2, const std::string &filename =
     gen.set_boundaries({.left   = Boundary::WALL, .right = Boundary::ZOE});
 
     // Создать сетку
-    Mesh mesh(U, &gen);
+    Mesh mesh(gen, U);
 
     MmFluid solver(mixture, Fluxes::GODUNOV);
     solver.set_acc(acc);
@@ -409,7 +409,7 @@ RiemannTesterWithSolverCSV(Fluxes flux, const MmTest &test, int n_cells = 10, in
     gen.set_boundaries({.left   = Boundary::ZOE, .right = Boundary::ZOE});
 
     // Создать сетку
-    Mesh mesh(U, &gen);
+    Mesh mesh(gen, U);
 
     MmFluid solver(mixture, flux);
     solver.set_CFL(0.1);
@@ -544,7 +544,7 @@ void ExactSolutionCSV(Fluxes flux, const MmTest &test, int n_cells = 10, const s
     gen.set_boundaries({.left   = Boundary::ZOE, .right = Boundary::ZOE});
 
     // Создать сетку
-    Mesh mesh(U, &gen);
+    Mesh mesh(gen, U);
 
     for (auto cell: mesh) {
         if (cell.center().x() < x_jump) {

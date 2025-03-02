@@ -20,10 +20,8 @@ public:
         Boundary inner = Boundary::WALL; ///< На внутренней границе (если есть)
     };
 
-#ifdef ZEPHYR_YAML
     /// @brief Конструктор класса по кофигу
-    explicit Sector(YAML::Node config);
-#endif
+    explicit Sector(const Json& config);
 
     /// @brief Генератор сетки внутри круга из четырехугольников
     /// @param r_max Радиус круга

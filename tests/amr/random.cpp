@@ -54,7 +54,7 @@ int main() {
     Cuboid cube(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
     cube.set_nx(10);
 
-    EuMesh mesh(U, &rect);
+    EuMesh mesh(rect, U);
 
     mesh.set_max_level(4);
 

@@ -99,7 +99,7 @@ int main() {
     Box domain = gen.bbox();
 
     // Создаем сетку
-    EuMesh mesh(U, gen);
+    EuMesh mesh(gen, U);
 
     // Заполняем данные о нагрузке ячеек
     Vector3d vc = domain.center();

@@ -1,12 +1,59 @@
 #include <iostream>
 
+#include <zephyr/utils/json.h>
 #include <zephyr/geom/box.h>
 #include <zephyr/geom/generator/generator.h>
+#include <zephyr/geom/generator/strip.h>
+#include <zephyr/geom/generator/rectangle.h>
+#include <zephyr/geom/generator/cuboid.h>
+#include <zephyr/geom/generator/sector.h>
+#include <zephyr/geom/generator/collection/plane_with_hole.h>
 
 namespace zephyr::geom {
 
 Generator::Generator(const std::string &type)
         : m_name(type) { }
+
+Generator::Ptr Generator::create(const Json& config) {
+    using namespace generator;
+
+    if (!config["type"]) {
+        throw std::runtime_error("EuMesh config doesn't contain 'type'");
+    }
+
+    std::string type = config["type"].as<std::string>();
+    if (type == "strip") {
+        return Strip::create(config);
+    }
+    else if (type == "rectangle") {
+        return Rectangle::create(config);
+    } else if (type == "cuboid") {
+        return Cuboid::create(config);
+    } else if (type == "sector") {
+        return Sector::create(config);
+    } else if (type.find("collection") != std::string::npos) {
+        // Block Structured from collection
+        int idx = type.find('.') + 1;
+        std::string name = type.substr(idx);
+
+        std::transform(name.begin(), name.end(), name.begin(), ::tolower);
+
+        if (name == "plane-with-hole") {
+            return collection::PlaneWithHole::create(config);
+        }
+        else {
+            std::string message = "Create generators error: unknown mesh type '"
+                                  + name + "' from collection";
+            std::cerr << message << "\n";
+            throw std::runtime_error(message);
+        }
+    }
+    else {
+        std::string message = "Error: Unknown mesh type '" + type + "'";
+        std::cerr << message << "\n";
+        throw std::runtime_error(message);
+    }
+}
 
 const std::string &Generator::name() const {
     return m_name;
@@ -18,44 +65,6 @@ Box Generator::bbox() const {
     throw std::runtime_error(message);
 }
 
-#ifdef ZEPHYR_YAML
-std::unique_ptr<Generator> Generator::create(YAML::Node config) {
-    if (!config["type"]) {
-        throw std::runtime_error("EuMesh config doesn't contain 'type'");
-    }
-
-    std::string type = config["type"].as<std::string>();
-    if (type == "rectangle") {
-        return std::unique_ptr<VRectangle>(new VRectangle(config));
-    } else if (type == "cuboid") {
-        return std::unique_ptr<Cuboid>(new Cuboid(config));
-    } else if (type == "sector") {
-        return std::unique_ptr<Sector>(new Sector(config));
-    } else if (type.find("collection") != std::string::npos) {
-        // Block Structured from collection
-        int idx = type.find('.') + 1;
-        std::string name = type.substr(idx);
-
-        std::transform(name.begin(), name.end(), name.begin(), ::tolower);
-
-        if (name == "plane-with-hole") {
-            return std::unique_ptr<collection::PlaneWithHole>(
-                    new collection::PlaneWithHole(config));
-        }
-        else {
-            std::string message = "Create generators error: unknown mesh type '"
-                    + name + "' from collection";
-            std::cerr << message << "\n";
-            throw std::runtime_error(message);
-        }
-    }
-    else {
-        std::string message = "Error: Unknown mesh type '" + type + "'";
-        std::cerr << message << "\n";
-        throw std::runtime_error(message);
-    }
-}
-#endif
 
 void Generator::check_size() const {
     if (size() < 1) {

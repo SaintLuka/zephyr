@@ -5,6 +5,8 @@
 #include <zephyr/geom/box.h>
 #include <zephyr/mesh/euler/amr_storage.h>
 
+namespace zephyr::utils { class Json; }
+
 namespace zephyr::mesh::decomp {
 
 using zephyr::geom::Box;
@@ -23,7 +25,10 @@ public:
     /// @brief Конструктор
     /// @param size Размер декомпозиции, не обязательно равен mpi::size(),
     /// для возможности тестирования декомпозиции на одном процессе.
-    Decomposition(int size);
+    explicit Decomposition(int size);
+
+    /// @brief Создать декомпозицию по конфигурации
+    static Decomposition::Ptr create(const Box& domain, const utils::Json& config);
 
     /// @brief Деструктор по умолчанию
 	virtual ~Decomposition() = default;

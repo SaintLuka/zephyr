@@ -67,7 +67,7 @@ int main() {
     gen.set_nx(250);
 
     // Создаем сетку
-    EuMesh mesh(U, gen);
+    EuMesh mesh(gen, U);
 
     // Bounding Box для сетки
     Box domain = gen.bbox();

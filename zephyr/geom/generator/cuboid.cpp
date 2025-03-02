@@ -4,22 +4,19 @@
 #include <zephyr/geom/box.h>
 #include <zephyr/geom/grid.h>
 #include <zephyr/geom/generator/cuboid.h>
+#include <zephyr/utils/json.h>
 
 namespace zephyr::geom::generator {
 
-#ifdef ZEPHYR_YAML
-Cuboid::Cuboid(YAML::Node config)
+Cuboid::Cuboid(const Json& config)
     : Generator("cuboid"),
       m_xmin(0.0), m_xmax(1.0),
       m_ymin(0.0), m_ymax(1.0),
       m_zmin(0.0), m_zmax(1.0),
-      m_nx(0), m_ny(0), m_nz(0),
-      m_bounds.left(Boundary::UNDEFINED), m_bounds.right(Boundary::UNDEFINED),
-      m_bounds.bottom(Boundary::UNDEFINED), m_bounds.top(Boundary::UNDEFINED),
-      m_bounds.back(Boundary::UNDEFINED), m_bounds.front(Boundary::UNDEFINED) {
+      m_nx(0), m_ny(0), m_nz(0) {
 
     if (!config["geometry"]) {
-        throw std::runtime_error("EuMesh config doesn't contain 'geometry'");
+        throw std::runtime_error("Cuboid config doesn't contain key 'geometry'");
     }
 
     m_xmin = config["geometry"]["x_min"].as<double>();
@@ -29,29 +26,33 @@ Cuboid::Cuboid(YAML::Node config)
     m_zmin = config["geometry"]["z_min"].as<double>();
     m_zmax = config["geometry"]["z_max"].as<double>();
 
-    if (!config["boundary"]) {
-        throw std::runtime_error("EuMesh config doesn't contain 'boundary'");
+    if (!config["bounds"]) {
+        throw std::runtime_error("Cuboid config doesn't contain key 'bounds'");
     }
-    m_bounds.left = boundary_from_string(config["boundary"]["left"].as<std::string>());
-    m_bounds.right = boundary_from_string(config["boundary"]["right"].as<std::string>());
-    m_bounds.bottom = boundary_from_string(config["boundary"]["bottom"].as<std::string>());
-    m_bounds.top = boundary_from_string(config["boundary"]["top"].as<std::string>());
-    m_bounds.back = boundary_from_string(config["boundary"]["back"].as<std::string>());
-    m_bounds.front = boundary_from_string(config["boundary"]["front"].as<std::string>());
+    m_bounds.left   = boundary_from_string(config["bounds"]["left"].as<std::string>());
+    m_bounds.right  = boundary_from_string(config["bounds"]["right"].as<std::string>());
+    m_bounds.bottom = boundary_from_string(config["bounds"]["bottom"].as<std::string>());
+    m_bounds.top    = boundary_from_string(config["bounds"]["top"].as<std::string>());
+    m_bounds.back   = boundary_from_string(config["bounds"]["back"].as<std::string>());
+    m_bounds.front  = boundary_from_string(config["bounds"]["front"].as<std::string>());
 
-    if (config["cells"]) {
-        set_size(config["cells"].as<size_t>());
+    if (!config["size"]) {
+        throw std::runtime_error("Cuboid config doesn't contain key 'size'");
+    }
+
+    if (config["size"].is_number()) {
+        set_size(config["size"].as<int>());
     }
     else {
-        size_t nx(0), ny(0), nz(0);
-        if (config["cells_per_x"]) {
-            nx = config["cells_per_x"].as<size_t>();
+        int nx(0), ny(0), nz(0);
+        if (config["size"]["nx"]) {
+            nx = config["size"]["nx"].as<int>();
         }
-        if (config["cells_per_y"]) {
-            ny = config["cells_per_y"].as<size_t>();
+        if (config["size"]["ny"]) {
+            ny = config["size"]["ny"].as<int>();
         }
-        if (config["cells_per_z"]) {
-            ny = config["cells_per_z"].as<size_t>();
+        if (config["size"]["nz"]) {
+            ny = config["size"]["nz"].as<int>();
         }
         if (nx > 0 && ny > 0 && nz > 0) {
             set_sizes(nx, ny, nz);
@@ -59,20 +60,22 @@ Cuboid::Cuboid(YAML::Node config)
         else {
             if (nx > 0) {
                 set_nx(nx);
-            }
-            else if (ny > 0) {
+            } else if (ny > 0) {
                 set_ny(ny);
-            }
-            else if (nz > 0) {
+            } else if (nz > 0) {
                 set_nz(nz);
-            }
-            else {
-                throw std::runtime_error("Cuboid error: Strange mesh sizes");
+            } else {
+                std::string message = "Cuboid(json) error: Strange mesh sizes: " +
+                                      std::to_string(nx) + " x " +
+                                      std::to_string(ny) + " x " +
+                                      std::to_string(nz) + "." +
+                                      "Setup size.nx, size.ny, size.nz or each value";
+                std::cerr << message << "\n";
+                throw std::runtime_error(message);
             }
         }
     }
 }
-#endif
 
 Cuboid::Cuboid(double xmin, double xmax, double ymin, double ymax, double zmin, double zmax) :
         Generator("cuboid"),

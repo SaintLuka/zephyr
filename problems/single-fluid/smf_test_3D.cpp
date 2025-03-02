@@ -127,7 +127,7 @@ int main() {
                         .back=Boundary::WALL, .front=Boundary::ZOE});
 
     // Создать сетку
-    EuMesh mesh(U, &gen);
+    EuMesh mesh(gen, U);
     mesh.set_decomposition("XY");
 
     // Создать решатель

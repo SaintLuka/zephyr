@@ -1,14 +1,57 @@
-#include <map>
-
+#include <zephyr/geom/box.h>
 #include <zephyr/geom/grid.h>
 #include <zephyr/mesh/primitives/amr_cell.h>
 #include <zephyr/mesh/primitives/bfaces.h>
-#include <zephyr/geom/box.h>
 #include <zephyr/mesh/euler/eu_cell.h>
 #include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/utils/json.h>
+
+using zephyr::utils::Json;
 
 namespace zephyr::mesh {
 
+EuMesh::EuMesh(const Json& config, int datasize)
+    : m_locals(0, true, datasize), m_aliens(0, true, datasize) {
+
+    if (mpi::master()) {
+        // Задать генератор
+        auto gen = Generator::create(config);
+
+        initialize(gen->make());
+    }
+
+    m_max_level = 0;
+    if (config["max_level"]) {
+        m_max_level = std::max(0, config["max_level"].as<int>());
+        if (m_max_level > 15) {
+            std::cerr << "Max level set up to " << m_max_level << ", decreased to 15\n";
+            m_max_level = 15;
+        }
+    }
+    if (config["adaptive"]) {
+        // Есть ключевое слово adaptive, выставлено на false
+        if (!config["adaptive"].as<bool>()) {
+            m_max_level = 0;
+        }
+    }
+
+    // Если есть декомпозиция, то задать задать
+    if (!mpi::single()) {
+        geom::Box domain = bbox();
+
+        if (config["decomp"]) {
+            // Там все свойства декомпозиции автоматически ставятся
+            m_decomp = Decomposition::create(domain, config["decomp"]);
+
+            build_aliens();
+            redistribute();
+        }
+        else {
+            // По умолчанию что-то такое
+            set_decomposition("XY");
+        }
+    }
+}
 
 void EuMesh::initialize(const Grid& grid) {
     m_locals.resize(grid.n_cells());
@@ -37,31 +80,26 @@ EuCell EuMesh::operator()(int i, int j, int k) {
 }
 
 geom::Box EuMesh::bbox() {
-    double inf = std::numeric_limits<double>::infinity();
-    Vector3d vmin = {+inf, +inf, +inf};
-    Vector3d vmax = {-inf, -inf, -inf};
-
+    geom::Box box1 = Box::Empty(3);
     for (auto& cell: *this) {
         for (auto& face: cell.faces()) {
             for (int i = 0; i < face.size(); ++i) {
-                auto& v = face.vs(i);
-                vmin = vmin.cwiseMin(v);
-                vmax = vmax.cwiseMax(v);
+                box1.capture(face.vs(i));
             }
         }
     }
 
-    geom::Box box(vmin, vmax);
+    geom::Box box2;
 
 #ifdef ZEPHYR_MPI
     if (!mpi::single()) {
         // Покомпонентный минимум/максимум
-        MPI_Allreduce(vmin.data(), box.vmin.data(), 3, MPI_DOUBLE, MPI_MIN, mpi::comm());
-        MPI_Allreduce(vmax.data(), box.vmax.data(), 3, MPI_DOUBLE, MPI_MAX, mpi::comm());
+        MPI_Allreduce(box1.vmin.data(), box2.vmin.data(), 3, MPI_DOUBLE, MPI_MIN, mpi::comm());
+        MPI_Allreduce(box1.vmax.data(), box2.vmax.data(), 3, MPI_DOUBLE, MPI_MAX, mpi::comm());
     }
 #endif
 
-    return box;
+    return box2;
 }
 
 bool EuMesh::has_nodes() const {

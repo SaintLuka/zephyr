@@ -5,6 +5,7 @@
 
 #include <zephyr/geom/box.h>
 #include <zephyr/geom/grid.h>
+#include <zephyr/utils/json.h>
 
 #include <zephyr/geom/generator/curve/plane.h>
 #include <zephyr/geom/generator/curve/circle.h>
@@ -12,18 +13,14 @@
 
 namespace zephyr::geom::generator::collection {
 
-#ifdef ZEPHYR_YAML
-PlaneWithHole::PlaneWithHole(YAML::Node config) :
-        Generator("collection.plane-with-hole"),
-        blocks(12),
+PlaneWithHole::PlaneWithHole(const Json& config) :
+        BlockStructured(12),
         m_xmin(0.0), m_xmax(0.0),
         m_ymin(0.0), m_ymax(0.0),
         m_xc(0.0), m_yc(0.0),
-        m_r(0.0), m_xi(2.0),
-        m_left_flag(Boundary::UNDEFINED), m_right_flag(Boundary::UNDEFINED),
-        m_bottom_flag(Boundary::UNDEFINED), m_top_flag(Boundary::UNDEFINED),
-        m_hole_flag(Boundary::UNDEFINED) {
+        m_r(0.0), m_xi(2.0) {
 
+    /*
     if (!config["geometry"]) {
         throw std::runtime_error("EuMesh config doesn't contain 'geometry'");
     }
@@ -71,8 +68,8 @@ PlaneWithHole::PlaneWithHole(YAML::Node config) :
     if (config["epsilon"]) {
         blocks.set_accuracy(config["epsilon"].as<double>());
     }
+     */
 }
-#endif
 
 PlaneWithHole::PlaneWithHole(
         double xmin, double xmax,

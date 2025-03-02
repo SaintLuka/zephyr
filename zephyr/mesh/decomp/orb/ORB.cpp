@@ -1,4 +1,5 @@
 #include <zephyr/utils/mpi.h>
+#include <zephyr/utils/json.h>
 #include <zephyr/mesh/decomp/ORB.h>
 
 namespace zephyr::mesh::decomp {
@@ -31,6 +32,34 @@ ORB::ORB(Box domain, const std::string& type, int size,
 
     m_blocks = Blocks(domain, type, size, ny);
     m_size = m_blocks.size();
+}
+
+ORB::ORB(Box domain, const utils::Json& config)
+    : Decomposition(mpi::size()) {
+    params p;
+    m_newton = p.newton;
+    m_mobility = p.mobility;
+
+    if (config["mobility"]) {
+        m_mobility = config["mobility"].as<double>();
+    }
+    if (config["newton"]) {
+        m_newton = config["newton"].as<double>();
+    }
+
+    std::string type;
+    if (config["type"]) {
+        type = config["type"].as<std::string>();
+    } else {
+        type = domain.size().z() > 1.0e-5 ? "XYZ" : "XY";
+    }
+
+    if (config["proc_nx"]) {
+        m_blocks = Blocks(domain, type, m_size);
+    } else {
+        int nx = config["nx"].as<int>();
+        m_blocks = Blocks(domain, type, m_size, nx);
+    }
 }
 
 int ORB::rank(const Vector3d& v) const {

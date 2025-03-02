@@ -134,7 +134,7 @@ int main() {
     solver.set_limiter("van Leer");
 
     // Создать сетку
-    Mesh mesh(U, &gen);
+    Mesh mesh(gen, U);
 
     // Настраиваем адаптацию
     mesh.set_max_level(5);

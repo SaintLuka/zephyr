@@ -22,11 +22,6 @@ public:
         Boundary hole   = Boundary::WALL;
     };
 
-#ifdef ZEPHYR_YAML
-    /// @brief Конструктор класса по кофигу
-    explicit PlaneWithCube(YAML::Node config);
-#endif
-
     /// @brief Конструктор класса
     /// @param xmin, xmax, ymin, ymax Границы прямоугольника
     /// @param xc, yc, r Центр и радиус отверстия

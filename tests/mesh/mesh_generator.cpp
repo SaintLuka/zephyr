@@ -474,7 +474,7 @@ void fill(AmrStorage& cells) {
 }
 
 EuMesh Test::gen_eu() const {
-    EuMesh mesh(U, generator.get());
+    EuMesh mesh(generator, U);
     
     Box box = mesh.bbox();
     double L = box.diameter();
@@ -489,7 +489,7 @@ EuMesh Test::gen_eu() const {
 }
 
 LaMesh Test::gen_la() const {
-    LaMesh mesh(U, V, generator.get());
+    LaMesh mesh(generator.get(), U, V);
 
     Box box = mesh.bbox();
     double L = box.diameter();

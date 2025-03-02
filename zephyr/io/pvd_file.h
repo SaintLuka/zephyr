@@ -1,8 +1,8 @@
 #pragma once
 
-#include <zephyr/configuration.h>
-
 #include <zephyr/io/vtu_file.h>
+
+namespace zephyr::utils { class Json; }
 
 namespace zephyr::io {
 
@@ -25,6 +25,11 @@ public:
     /// @brief Сохранять уникальные вершины, актуально для EuMesh, если сетка
     /// часто перестраивается, то функция выполняется достаточно долго.
     bool unique_nodes = false;
+
+    /// @brief Очистить существующую директорию перед записью?
+    /// При выборе опции false существующая директория не удаляется, а запись
+    /// выполняется в новую с именем dirname_01, dirname_02 и т.д.
+    bool clear_dir = true;
 
     /// @brief Пустой конструктор, не создает PVD файл, после создания
     /// экземпляра класса требуется вызов функции PvdFile::open.
@@ -57,6 +62,9 @@ public:
     explicit PvdFile(Args&&... args) : PvdFile() {
         open(std::forward<Args>(args)...);
     }
+
+    /// @brief Создание файла из .json конфигурации
+    explicit PvdFile(const utils::Json& config);
 
     /// @brief Записать хранилище (или часть, при распределенном счете) в один
     /// файл VTU (или набор VTU), затем обновить PVD файл.

@@ -11,6 +11,7 @@ namespace zephyr::geom::generator {
 class Rectangle : public Generator {
 public:
     using Ptr = std::shared_ptr<Rectangle>;
+    using Ref = const std::shared_ptr<Rectangle>&;
 
     /// @brief Флаги граничных условий
     struct Boundaries {
@@ -20,13 +21,11 @@ public:
         Boundary top    = Boundary::WALL;
     };
 
-#ifdef ZEPHYR_YAML
-    /// @brief Конструктор класса по кофигу
-    explicit Rectangle(YAML::Node config);
-#endif
-
     /// @brief Единичный квадрат из одной ячейки
     Rectangle();
+
+    /// @brief Конструктор класса по конфигу
+    explicit Rectangle(const Json& config);
 
     /// @brief Конструктор класса
     /// @param xmin, xmax Границы прямоугольника по оси x

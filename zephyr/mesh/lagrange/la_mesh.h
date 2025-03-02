@@ -22,28 +22,24 @@ using NodeStorage = Storage<MovNode>;
 class LaMesh {
 public:
 
-    template<class U, class V>
-    LaMesh(const U &u, const V &v, Generator *gen)
-            : m_cells(u, 0), m_nodes(v, 0) {
-        initialize(gen->make());
-    }
-
     template <class U, class V>
-    LaMesh(const U &u, const V &v, const Grid& grid)
-            : m_cells(u), m_nodes(v) {
+    LaMesh(const Grid& grid, const U &u, const V &v) : m_cells(u), m_nodes(v) {
         initialize(grid);
     }
 
-    template<class U>
-    LaMesh(const U &u, Generator *gen)
-            : m_cells(u), m_nodes() {
+    template<class U, class V>
+    LaMesh(Generator *gen, const U &u, const V &v) : m_cells(0, u), m_nodes(0, v) {
         initialize(gen->make());
     }
 
     template <class U>
-    LaMesh(const U &u, const Grid& grid)
-            : m_cells(u), m_nodes() {
+    LaMesh(const Grid& grid, const U &u) : m_cells(0, u), m_nodes(0, true, 0) {
         initialize(grid);
+    }
+
+    template<class U>
+    LaMesh(Generator *gen, const U &u) : m_cells(0, u), m_nodes(0, true, 0) {
+        initialize(gen->make());
     }
 
 

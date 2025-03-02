@@ -115,7 +115,7 @@ int main() {
 #endif
 
     // Создать сетку
-    EuMesh mesh(U, &gen);
+    EuMesh mesh(gen, U);
 
     // Создать решатель
     SmFluid solver(eos);

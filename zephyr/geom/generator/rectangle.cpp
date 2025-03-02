@@ -4,19 +4,17 @@
 #include <zephyr/geom/box.h>
 #include <zephyr/geom/grid.h>
 #include <zephyr/geom/generator/rectangle.h>
+#include <zephyr/utils/json.h>
 
 namespace zephyr::geom::generator {
 
-#ifdef ZEPHYR_YAML
-Rectangle::Rectangle(YAML::Node config)
+Rectangle::Rectangle(const Json& config)
     : Generator("rectangle"),
       m_xmin(0.0), m_xmax(1.0), m_ymin(0.0), m_ymax(1.0), m_nx(0), m_ny(0),
-      m_left_flag(Boundary::WALL), m_right_flag(Boundary::WALL),
-      m_bottom_flag(Boundary::WALL), m_top_flag(Boundary::WALL),
       m_voronoi(false) {
 
     if (!config["geometry"]) {
-        throw std::runtime_error("EuMesh config doesn't contain 'geometry'");
+        throw std::runtime_error("Rectangle config doesn't contain key 'geometry'");
     }
 
     m_xmin = config["geometry"]["x_min"].as<double>();
@@ -24,28 +22,31 @@ Rectangle::Rectangle(YAML::Node config)
     m_ymin = config["geometry"]["y_min"].as<double>();
     m_ymax = config["geometry"]["y_max"].as<double>();
 
-    if (!config["boundary"]) {
-        throw std::runtime_error("EuMesh config doesn't contain 'boundary'");
+    if (!config["bounds"]) {
+        throw std::runtime_error("Rectangle config doesn't contain key 'bounds'");
     }
-    m_left_flag = boundary_from_string(config["boundary"]["left"].as<std::string>());
-    m_right_flag = boundary_from_string(config["boundary"]["right"].as<std::string>());
-    m_bottom_flag = boundary_from_string(config["boundary"]["bottom"].as<std::string>());
-    m_top_flag = boundary_from_string(config["boundary"]["top"].as<std::string>());
+    m_bounds.left   = boundary_from_string(config["bounds"]["left"].as<std::string>());
+    m_bounds.right  = boundary_from_string(config["bounds"]["right"].as<std::string>());
+    m_bounds.bottom = boundary_from_string(config["bounds"]["bottom"].as<std::string>());
+    m_bounds.top    = boundary_from_string(config["bounds"]["top"].as<std::string>());
 
     if (config["voronoi"]) {
         m_voronoi = config["voronoi"].as<bool>();
     }
 
-    if (config["cells"]) {
-        set_size(config["cells"].as<int>());
+    if (!config["size"]) {
+        throw std::runtime_error("Rectangle config doesn't contain key 'size'");
     }
-    else {
+
+    if (config["size"].is_number()) {
+        set_size(config["cells"].as<int>());
+    } else {
         int nx(0), ny(0);
-        if (config["cells_per_x"]) {
-            nx = config["cells_per_x"].as<int>();
+        if (config["size"]["nx"]) {
+            nx = config["size"]["nx"].as<int>();
         }
-        if (config["cells_per_y"]) {
-            ny = config["cells_per_y"].as<int>();
+        if (config["size"]["ny"]) {
+            ny = config["size"]["ny"].as<int>();
         }
         if (nx > 0 && ny > 0) {
             set_sizes(nx, ny);
@@ -54,11 +55,14 @@ Rectangle::Rectangle(YAML::Node config)
         } else if (ny > 0) {
             set_ny(ny);
         } else {
-            throw std::runtime_error("Rectangle error: Strange mesh sizes");
+            std::string message = "Rectangle(json) error: Strange mesh sizes: " +
+                                  std::to_string(nx) + " x " + std::to_string(ny) + "." +
+                                  "Setup size.nx, size.ny or both";
+            std::cerr << message << "\n";
+            throw std::runtime_error(message);
         }
     }
 }
-#endif
 
 Rectangle::Rectangle()
     : Rectangle(0.0, 1.0, 0.0, 1.0, false) {
