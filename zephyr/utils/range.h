@@ -12,7 +12,7 @@ namespace zephyr::utils {
 ///     std::cout << i << "\n";
 /// }
 /// @endcode
-template<typename T = int>
+template<typename T = size_t>
 class range {
 private:
     T m_begin;  ///< Начальный элемент диапазона
@@ -45,10 +45,10 @@ public:
         inline void operator++(int) { ++m_val; }
 
         /// @brief Инкремент на шаг step
-        inline void operator+=(int step) { m_val += step; }
+        inline void operator+=(size_t step) { m_val += step; }
 
         /// @brief Инкремент на шаг step
-        inline iterator operator+(int val) const {
+        inline iterator operator+(size_t val) const {
             return m_val + val;
         }
 

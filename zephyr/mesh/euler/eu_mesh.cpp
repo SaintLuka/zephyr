@@ -10,7 +10,7 @@ using zephyr::utils::Json;
 
 namespace zephyr::mesh {
 
-EuMesh::EuMesh(const Json& config, int datasize)
+EuMesh::EuMesh(const Json& config, size_t datasize)
     : m_locals(0, true, datasize), m_aliens(0, true, datasize) {
 
     if (mpi::master()) {

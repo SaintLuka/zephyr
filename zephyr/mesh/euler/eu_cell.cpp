@@ -31,7 +31,7 @@ AmrStorage::Iterator safe_iterator(AmrStorage &locals, AmrStorage &aliens, const
     }
 }
 
-EuCell::EuCell(AmrStorage &_locals, AmrStorage &_aliens, int idx)
+EuCell::EuCell(AmrStorage &_locals, AmrStorage &_aliens, size_t idx)
     : m_it(safe_iterator(_locals, _aliens, idx)),
       m_locals(_locals), m_aliens(_aliens) {
 
@@ -43,7 +43,7 @@ EuCell::EuCell(AmrStorage &_locals, AmrStorage &_aliens, const Adjacent &adj)
 
 }
 
-EuCell EuCell::locals(int idx) {
+EuCell EuCell::locals(size_t idx) {
     return { m_locals, m_aliens, idx };
 }
 

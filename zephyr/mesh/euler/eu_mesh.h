@@ -64,7 +64,7 @@ public:
 
     /// @brief Создание сетки из конфигурации.
     /// @param datasize Размер данных ячейки в байтах
-    EuMesh(const utils::Json& config, int datasize);
+    EuMesh(const utils::Json& config, size_t datasize);
 
     /// @brief Локальное количество ячеек
     inline int n_cells() { return m_locals.size(); }
@@ -76,7 +76,7 @@ public:
     EuCell end() { return {m_locals, m_aliens, m_locals.size()}; }
 
     /// @brief Доступ к локальной ячейке по индексу (idx < n_cells())
-    EuCell operator[](int idx) {
+    EuCell operator[](size_t idx) {
         return {m_locals, m_aliens, idx};
     }
 

@@ -234,30 +234,16 @@ void threads::for_each(Iter begin, Iter end, Func &&func, Args &&... args) {
     }
 
     int n_tasks = get_n_tasks<n_tpt, min_ept>(n_threads, size);
-    int bin = size / n_tasks;
+    size_t bin = size / n_tasks;
     std::vector<std::future<void>> results;
     results.reserve(n_tasks);
 
-#if 0
-    // Тестировал вариант с непоследовательной загрузкой задач
-    for (int j = 0; j < n_tasks_per_thread; ++j) {
-        for (int i = 0; i < n_threads; ++i) {
-            int a = (i * n_tasks_per_thread + j) * bin;
-            int b = a + bin;
-            if (i * n_tasks_per_thread + j == n_tasks - 1) {
-                b = size;
-            }
-            results.emplace_back(pool->enqueue(bin_function, begin + a, begin + b));
-        }
-    }
-#else
     Iter from = begin;
     for (int i = 0; i < n_tasks - 1; ++i) {
         results.emplace_back(pool->enqueue(bin_function, from, from + bin));
         from += bin;
     }
     results.emplace_back(pool->enqueue(bin_function, from, end));
-#endif
 
     for (auto &result : results)
         result.wait();
@@ -291,7 +277,7 @@ auto threads::min(Iter begin, Iter end, const Value &init, Func &&func, Args &&.
     }
 
     int n_tasks = get_n_tasks<n_tpt, min_ept>(n_threads, size);
-    int bin = size / n_tasks;
+    size_t bin = size / n_tasks;
     std::vector<std::future<Value>> results;
     results.reserve(n_tasks);
 
@@ -341,7 +327,7 @@ auto threads::max(Iter begin, Iter end, const Value &init, Func &&func, Args &&.
     }
 
     int n_tasks = get_n_tasks<n_tpt, min_ept>(n_threads, size);
-    int bin = size / n_tasks;
+    size_t bin = size / n_tasks;
     std::vector<std::future<Value>> results;
     results.reserve(n_tasks);
 
@@ -387,7 +373,7 @@ auto threads::partial_sum(Iter begin, Iter end, const Value &init, Func &&func, 
     }
 
     int n_tasks = get_n_tasks<n_tpt, min_ept>(n_threads, size);
-    int bin = size / n_tasks;
+    size_t bin = size / n_tasks;
     std::vector<std::future<Value>> results;
     results.reserve(n_tasks);
 
@@ -431,7 +417,7 @@ auto threads::sum(Iter begin, Iter end, const Value &init, Func &&func, Args &&.
     }
 
     int n_tasks = get_n_tasks<n_tpt, min_ept>(n_threads, size);
-    int bin = size / n_tasks;
+    size_t bin = size / n_tasks;
     std::vector<std::future<Value>> results;
     results.reserve(n_tasks);
 
@@ -473,7 +459,7 @@ auto threads::reduce(Iter begin, Iter end, const Value &init, Func &&func, Args 
     }
 
     int n_tasks = get_n_tasks<n_tpt, min_ept>(n_threads, size);
-    int bin = size / n_tasks;
+    size_t bin = size / n_tasks;
     std::vector<std::future<Value>> results;
     results.reserve(n_tasks);
 

@@ -31,7 +31,6 @@ PvdFile::PvdFile()
       filter(),
       hex_only(true),
       unique_nodes(false),
-      clear_dir(true),
       m_open(false),
       m_counter(0)
 {
@@ -61,9 +60,6 @@ PvdFile::PvdFile(const utils::Json& config)
     }
     if (config["unique_nodes"]) {
         unique_nodes = config["unique_nodes"].as<bool>();
-    }
-    if (config["clear_dir"]) {
-        clear_dir = config["clear_dir"].as<bool>();
     }
 
     open(filename, directory);
@@ -114,49 +110,10 @@ void PvdFile::open(const std::string& filename, const std::string& _directory, b
         }
     }
 
-    // Такой директории не существует, создать
-    if (!fs::exists(directory) || !fs::is_directory(directory)) {
-        // Ждем пока все процессы убедятся, что директории
-        // не существует, после мастер создает.
-        mpi::barrier();
-        if (mpi::master()) {
+    // Мастер проверяет наличие директории и создает при необходимости
+    if (mpi::master()) {
+        if (!fs::exists(directory) || !fs::is_directory(directory)) {
             fs::create_directory(directory);
-        }
-        mpi::barrier();
-    }
-    else {
-        // Директория существует
-        if (clear_dir) {
-            mpi::barrier();
-            if (mpi::master()) {
-                fs::remove_all(directory);
-                fs::create_directory(directory);
-            }
-            mpi::barrier();
-        } else {
-            bool success = false;
-            for (int i = 1; i < 9; ++i) {
-                std::string appendix = "_" + std::to_string(i);
-                fs::path test_dir = directory.string() + appendix;
-                if (!fs::exists(test_dir) || !fs::is_directory(test_dir)) {
-                    // Ждем пока все процессы убедятся, что директории
-                    // не существует, после мастер создает.
-                    mpi::barrier();
-                    if (mpi::master()) {
-                        directory += appendix;
-                        fs::create_directory(directory);
-                    }
-                    mpi::barrier();
-                    success = true;
-                    break;
-                }
-            }
-            if (!success) {
-                std::string message = "PvdFile open error: only 10 directories with the same name '"
-                                      + directory.filename().string() + "'";
-                std::cerr << message << "\n";
-                throw std::runtime_error(message);
-            }
         }
     }
 

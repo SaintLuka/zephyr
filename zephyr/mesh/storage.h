@@ -29,16 +29,16 @@ public:
     }
 
     /// @brief Хранилище без указания типа для хранения, содержит только геометрию
-    explicit Storage(int size) :
-        m_size(std::max(0, size)),
+    explicit Storage(size_t size) :
+        m_size(size),
         m_itemsize(sizeof(Geom)),
         m_data(m_size * m_itemsize) {
     }
 
     /// @brief Хранилище с указанием типа для хранения
     template <class U>
-    Storage(int size, const U& type) :
-        m_size(std::max(0, size)),
+    Storage(size_t size, const U& type) :
+        m_size(size),
         m_itemsize(sizeof(Geom) + sizeof(U)),
         m_data(m_size * m_itemsize) {
     }
@@ -46,9 +46,9 @@ public:
     /// @brief Хранилище с указанием размера буффера
     /// @param dynamic Фиктивный параметр
     /// @param datasize Размер данных элемента для хранения в байтах
-    Storage(int size, bool dynamic, int datasize) :
-        m_size(std::max(0, size)),
-        m_itemsize(sizeof(Geom) + std::max(0, datasize)),
+    Storage(size_t size, bool dynamic, size_t datasize) :
+        m_size(size),
+        m_itemsize(sizeof(Geom) + datasize),
         m_data(m_size * m_itemsize) {
     }
 
@@ -58,29 +58,29 @@ public:
     }
 
     /// @brief Количество элементов хранилища
-    inline int size() const {
+    inline size_t size() const {
         return m_size;
     }
 
     /// @brief Размер данных элемента хранилища в байтах
-    inline int datasize() const {
-        return m_itemsize - int(sizeof(Geom));
+    inline size_t datasize() const {
+        return m_itemsize - sizeof(Geom);
     }
 
     /// @brief Размер элемента хранилища в байтах (> datasize)
-    inline int itemsize() const {
+    inline size_t itemsize() const {
         return m_itemsize;
     }
 
     /// @brief Изменить размер хранилища
-    inline void resize(int new_size) {
-        m_size = std::max(0, new_size);
-        m_data.resize(m_size * m_itemsize);
+    inline void resize(size_t new_size) {
+        m_size = new_size;
+        m_data.resize(m_size * size_t(m_itemsize));
     }
 
     /// @brief Скопировать элемент хранилища с индексом from в элемент
     /// хранилища с индексом to (геометрия и данные).
-    inline void move_item(int from, int to) {
+    inline void move_item(size_t from, size_t to) {
         std::memcpy(
                 m_data.data() + to * m_itemsize,
                 m_data.data() + from * m_itemsize,
@@ -179,7 +179,7 @@ public:
                 : m_ptr(nullptr), m_itemsize(0) { }
 
         /// @brief Создание нормального итератора
-        inline Iterator(Byte *ptr, int itemsize)
+        inline Iterator(Byte *ptr, size_t itemsize)
                 : m_ptr(ptr), m_itemsize(itemsize) { }
 
         /// @brief Проверка на совпадение с нулевым указателем
@@ -188,7 +188,7 @@ public:
         }
 
         /// @brief Размер данных в байтах
-        inline int datasize() const {
+        inline size_t datasize() const {
             return m_itemsize - int(sizeof(Geom));
         }
 
@@ -219,19 +219,19 @@ public:
         }
 
         /// @brief Сдвиг итератора (it += step)
-        inline Iterator &operator+=(int step) {
+        inline Iterator &operator+=(size_t step) {
             m_ptr += step * m_itemsize;
             return *this;
         }
 
         /// @brief Смещенный итератор (it2 = it + step)
-        inline Iterator operator+(int step) {
+        inline Iterator operator+(size_t step) {
             return {m_ptr + step * m_itemsize, m_itemsize};
         }
 
         /// @brief Расстояние между парой итераторов
-        inline int operator-(const Iterator &it) const {
-            return int(m_ptr - it.m_ptr) / m_itemsize;
+        inline size_t operator-(const Iterator &it) const {
+            return (m_ptr - it.m_ptr) / m_itemsize;
         }
 
         // Решил не мелочиться и реализовать все операции сравнения
@@ -249,37 +249,37 @@ public:
         inline bool operator!=(const Iterator &it) const { return m_ptr != it.m_ptr; }
 
     private:
-        Byte *m_ptr;     ///< Ссылка на начало данных
-        int m_itemsize;  ///< Размер элемента в байтах
+        Byte *m_ptr;        ///< Ссылка на начало данных
+        size_t m_itemsize;  ///< Размер элемента в байтах
     };
 
     /// @brief Получить указатель на данные по индексу
-    inline const Byte* data_at(int idx) const {
+    inline const Byte* data_at(size_t idx) const {
         return m_data.data() + m_itemsize * idx + sizeof(Geom);
     }
 
     /// @brief Получить итератор по индексу
-    inline Iterator iterator(int idx) {
+    inline Iterator iterator(size_t idx) {
         return {m_data.data() + m_itemsize * idx, m_itemsize};
     }
 
     /// @brief Получить элемент по индексу
-    inline Item& item(int idx) {
+    inline Item& item(size_t idx) {
         return *reinterpret_cast<Item*>(m_data.data() + m_itemsize * idx);
     }
 
     /// @brief Получить элемент по индексу
-    inline const Item& item(int idx) const {
+    inline const Item& item(size_t idx) const {
         return *reinterpret_cast<const Item*>(m_data.data() + m_itemsize * idx);
     }
 
     /// @brief Ссылка на элемент хранилища
-    inline Item& operator[](int idx) {
+    inline Item& operator[](size_t idx) {
         return item(idx);
     }
 
     /// @brief Константная ссылка на элемент хранилища
-    inline const Item& operator[](int idx) const {
+    inline const Item& operator[](size_t idx) const {
         return item(idx);
     }
 
@@ -294,8 +294,8 @@ public:
     }
 
 private:
-    int m_size;
-    int m_itemsize;
+    size_t m_size;
+    size_t m_itemsize;
     std::vector<Byte> m_data;
 };
 

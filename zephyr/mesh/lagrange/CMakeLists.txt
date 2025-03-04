@@ -8,5 +8,7 @@ install(FILES
         la_face.h
         la_cell.h
         la_mesh.h
+        la_node.h
+        mov_storage.h
         DESTINATION
         include/${PROJECT_NAME}/mesh/lagrange)

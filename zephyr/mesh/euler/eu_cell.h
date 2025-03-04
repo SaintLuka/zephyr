@@ -29,7 +29,7 @@ public:
     /// большой (больше locals.size + aliens.size), тогда возвращается
     /// итератор на конец хранилища locals.
     /// @param idx Индекс ячейки.
-    EuCell(AmrStorage &locals, AmrStorage &aliens, int idx);
+    EuCell(AmrStorage &locals, AmrStorage &aliens, size_t idx);
 
     /// @brief Вспомогательный конструктор. Взять смежную ячейку из locals
     /// или aliens хранилища по индексу смежности с грани.
@@ -162,7 +162,7 @@ public:
 
     /// @brief Для данной ячейки вернуть ячейку из local AmrStorage
     /// @param idx Индекс ячейки в локальном хранилище
-    EuCell locals(int idx);
+    EuCell locals(size_t idx);
 
 
     // Далее простые get/set функции
