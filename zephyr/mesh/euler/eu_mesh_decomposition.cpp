@@ -110,21 +110,6 @@ void EuMesh::migrate() {
 		++m_migration.m_i[cell.rank];
 	}
 
-	/* DEBUG
-	if(mpi::master()){
-		for (auto& cell: m_locals){
-			printf("i: %d, r: %d\n", cell.index, cell.rank);
-		}
-	}*/
-
-	/* DEBUG
-	if(mpi::master()){
-		printf("rank %d : %d\n", rank, m_locals.size());
-		for(int i=0; i<size; ++i)
-			printf("m_%d: %d\n", i, m_i[i]);
-	}*/
-
-
 	m_migration.m = mpi::all_gather_vectors(m_migration.m_i);
 
 	// Переиндексируем локальные ячейки
@@ -134,14 +119,6 @@ void EuMesh::migrate() {
 
 	for (auto& cell: m_locals)
 		cell.index = m_migration.m_sum[cell.rank]++;
-
-	/* // DEBUG
-	if(mpi::master()){
-		for(int i=0; i<m_locals.size(); ++i)
-			printf("r:%d,i:%d | ", m_locals[i].rank, m_locals[i].index);
-		printf("\n");
-	}
-	*/
 
     sync();
 
@@ -166,31 +143,12 @@ void EuMesh::migrate() {
 	for(int i = 1; i < size; ++i)
 		m_migration.m_i_sum[i] = m_migration.m_i_sum[i - 1] + m_migration.m_i[i - 1];
 
-	/*// DEBUG
-	if(mpi::master()){
-		for(int i=0; i<size; ++i)
-			printf("sum: %d\n", m_i_sum[i]);
-		printf("\n");
-	}
-	//*/
-
 	// Заполняем migrants, сортируем по rank
 	auto& migrants = m_migration.m_migrants; 
 	// [?!] Просто migrants.resize(m_locals.size()); не получится, т.к. тогда неправильно задан itemsize
 	migrants = m_locals;
 	for (int i = 0; i < migrants.size(); ++i)
 		std::memcpy(migrants[m_migration.m_i_sum[m_locals[i].rank]++].ptr(), m_locals[i].ptr(), migrants.itemsize());
-				
-	/*// DEBUG
-	if(mpi::master()){
-		for(int i=0; i<m_locals.size(); ++i)
-			printf("r:%d,i:%d | ", m_locals[i].rank, m_locals[i].index);
-		printf("\n");
-		for(int i=0; i<migrants.size(); ++i)
-			printf("r:%d,i:%d | ", migrants[i].rank, migrants[i].index);
-		printf("\n");
-	}
-	//*/
 
 	// Меняем размер m_locals
 	int new_size = 0;
@@ -215,14 +173,6 @@ void EuMesh::migrate() {
 		mpi::comm()
 	);
 
-	/*// DEBUG
-	if(rank == 3){
-		for(int i=0; i<m_locals.size();++i)
-		printf("r:%d, i:%d | ", m_locals[i].rank, m_locals[i].index);
-		printf("\n");
-	}
-	//*/
-
 #endif
 }
 
@@ -235,59 +185,7 @@ void EuMesh::build_aliens() {
 
 	m_tourism.reset();
 
-	// Заполняем m_border_indices
-	for (auto cell: *this) {
-	    // build alien можно вызвать для не совсем нормальной сетки
-	    if (cell.geom().is_undefined()) {
-            continue;
-	    }
-		for (auto face: cell.faces()) {
-			//if(mpi::master())
-			//	printf("face.adjacent().rank: %d\n", face.adjacent().rank);
-			auto& border_indices = m_tourism.m_border_indices[face.adjacent().rank];
-			if(face.adjacent().rank != rank && (border_indices.empty() || border_indices.back() != cell.geom().index))
-				border_indices.push_back(cell.geom().index);
-		}
-	}
-
-	// Заполняем m_count_to_send
-	for(int r = 0; r < size; ++r)
-		m_tourism.m_count_to_send[r] = m_tourism.m_border_indices[r].size();
-	// Заполняем m_send_offsets
-	for(int r = 1; r < size; ++r){
-		m_tourism.m_send_offsets[r] = m_tourism.m_send_offsets[r - 1] + m_tourism.m_count_to_send[r - 1];
-	}
-
-	// Отправляем m_count_to_send -> получаем m_count_to_recv
-	mpi::all_to_all(m_tourism.m_count_to_send, m_tourism.m_count_to_recv);
-
-	// Заполняем m_recv_offsets
-	for(int r = 1; r < size; ++r){
-		m_tourism.m_recv_offsets[r] = m_tourism.m_recv_offsets[r - 1] + m_tourism.m_count_to_recv[r - 1];
-	}
-	// Заполняем m_border
-	int border_size = m_tourism.m_send_offsets[size - 1] + m_tourism.m_count_to_send[size - 1];
-	m_tourism.m_border = m_locals;
-	m_tourism.m_border.resize(border_size);
-
-	int temp_border_it = 0;
-	for(auto& border_indices : m_tourism.m_border_indices){
-		for(auto cell_index : border_indices){
-			// [?]
-			memcpy(m_tourism.m_border[temp_border_it].ptr(), m_locals[cell_index].ptr(), m_locals.itemsize());
-
-			++temp_border_it;
-		}
-	}
-
-	m_aliens.resize(m_tourism.m_recv_offsets[size - 1] + m_tourism.m_count_to_recv[size - 1]);
-
-	for(int i = 0; i < size; ++i){
-		m_tourism.m_count_to_send[i] *= m_aliens.itemsize();
-		m_tourism.m_count_to_recv[i] *= m_aliens.itemsize();
-		m_tourism.m_send_offsets[i] *= m_aliens.itemsize();
-		m_tourism.m_recv_offsets[i] *= m_aliens.itemsize();
-	}
+	m_tourism.build_border();
 
 	// Отправляем 
     m_tourism.send(m_locals);

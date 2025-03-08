@@ -41,6 +41,10 @@ public:
     // Получает aliens
     void recv(AmrStorage& aliens, Post post = Post::FULL);
 
+    // 
+    void build_border();
+
+private:
     std::vector<int> m_count_to_send;
     std::vector<int> m_count_to_recv;
 
