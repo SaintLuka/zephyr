@@ -1,10 +1,10 @@
-/// @file Тестирование класса Polygon. Проверка функций интегрирования
+/// @brief Тестирование класса Polygon. Проверка функций интегрирования
 /// по полигону, отсечения линией и кругом.
 
 #include <iostream>
 
-#include <zephyr/geom/polygon.h>
-#include <zephyr/geom/triangle.h>
+#include <zephyr/geom/primitives/polygon.h>
+#include <zephyr/geom/primitives/triangle.h>
 
 #include <zephyr/utils/matplotlib.h>
 #include <zephyr/math/funcs.h>

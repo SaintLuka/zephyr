@@ -1,4 +1,5 @@
-/// @file Простое, но очень полезное определеине.
+/// @file amr_storage.h
+/// @brief Простое, но очень полезное определеине.
 
 #include <zephyr/mesh/primitives/amr_cell.h>
 #include <zephyr/mesh/storage.h>

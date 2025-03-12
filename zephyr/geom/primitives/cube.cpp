@@ -1,9 +1,9 @@
 #include <cstring>
 #include <iostream>
 
-#include <zephyr/geom/line.h>
-#include <zephyr/geom/quad.h>
-#include <zephyr/geom/cube.h>
+#include <zephyr/geom/primitives/line.h>
+#include <zephyr/geom/primitives/quad.h>
+#include <zephyr/geom/primitives/cube.h>
 
 namespace zephyr::geom {
 

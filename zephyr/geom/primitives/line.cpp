@@ -1,7 +1,7 @@
 #include <cstring>
 #include <iostream>
 
-#include <zephyr/geom/line.h>
+#include <zephyr/geom/primitives/line.h>
 
 namespace zephyr::geom {
 
@@ -46,12 +46,36 @@ Vector3d Line::center() const {
     return 0.5 * (verts[0] + verts[1]);
 }
 
+Vector3d Line::centroid() const {
+    return 0.5 * (verts[0] + verts[1]);
+}
+
+// Точная формула, получена интегрированием
+Vector3d Line::centroid(bool axial) const {
+    Vector3d c = 0.5 * (verts[0] + verts[1]);
+    if (!axial || c.y() == 0.0) { return c; }
+
+    double dx = verts[1].x() - verts[0].x();
+    double dy = verts[1].y() - verts[0].y();
+
+    double coeff = dy / (12.0 * c.y());
+    return Vector3d{c.x() + coeff * dx, c.y() + coeff * dy, c.z()};
+}
+
 Vector3d Line::normal(const Vector3d &c) const {
     return perpendicular(verts[1] - verts[0], verts[0] - c);
 }
 
 double Line::length() const {
     return (verts[1] - verts[0]).norm();
+}
+
+double Line::area_as() const {
+    return M_PI * (verts[0].y() + verts[1].y()) * (verts[1] - verts[0]).norm();
+}
+
+Vector3d Line::area_n(const Vector3d& c) const {
+    return length() * normal(c);
 }
 
 // ============================================================================

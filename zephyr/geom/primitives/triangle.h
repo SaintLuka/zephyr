@@ -8,6 +8,9 @@
 
 namespace zephyr::geom {
 
+/// @addtogroup Geom-Primitives
+/// @{
+
 /// @brief Представление треугольника. Содержит несколько полезных функций,
 /// а также отвечает за отображение из барицентрических координат.
 struct Triangle {
@@ -88,7 +91,7 @@ public:
 
     /// @brief Интеграл скалярной функции по треугольному элементу
     /// @param n Разбиение по сторонам
-    /// @details Формула 13-го порядка по 37 узлам (extra-high  accuracy order)
+    /// @details Формула 13-го порядка по 37 узлам (extra-high accuracy order)
     double integrate_extra(const std::function<double(const Vector3d&)>& func, int n) const;
 
 private:
@@ -96,5 +99,7 @@ private:
     /// @details Требуется предворительная нормировка sum x_i = 1
     Vector3d pget(double x1, double x2, double x3) const;
 };
+
+/// @}
 
 } // namespace zephyr::geom

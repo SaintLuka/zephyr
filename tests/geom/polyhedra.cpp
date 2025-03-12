@@ -1,6 +1,6 @@
 /// @brief Тестирование многогранников, сечения, объемы и прочее
 
-#include <zephyr/geom/polyhedron.h>
+#include <zephyr/geom/primitives/polyhedron.h>
 #include <zephyr/io/pvd_file.h>
 
 using namespace zephyr::geom;

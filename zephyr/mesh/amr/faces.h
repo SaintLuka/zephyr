@@ -39,10 +39,10 @@ void split_face_indices(BFaces& faces) {
 
 /// @brief Устанавливает нормали и площади новых подграней
 template <int dim>
-void setup_face_features(BFace& face, SqCube& vertices);
+void setup_face_features(BFace& face, SqCube& vertices, bool axial = false);
 
 template <>
-void setup_face_features<2>(BFace& face, SqCube& vertices) {
+void setup_face_features<2>(BFace& face, SqCube& vertices, bool axial) {
     // Точка внутри ячейки
     Vector3d C = vertices.vs<0, 0>();
 
@@ -54,12 +54,14 @@ void setup_face_features<2>(BFace& face, SqCube& vertices) {
 
     // Установить длину и нормаль
     face.area   = vl.length();
-    face.center = vl.center();
+    face.center = vl.centroid(axial);
     face.normal = vl.normal(C);
+
+    if (axial) { face.area_alt = vl.area_as(); }
 }
 
 template <>
-void setup_face_features<3>(BFace& face, SqCube& vertices) {
+void setup_face_features<3>(BFace& face, SqCube& vertices, bool axial) {
     // Точка внутри ячейки
     const Vector3d& C = vertices.vs<0, 0, 0>();
 
@@ -79,9 +81,9 @@ void setup_face_features<3>(BFace& face, SqCube& vertices) {
 
 /// @brief Устанавливает нормали и площади новых подграней
 template <int dim>
-void split_face_features(BFaces& faces, SqCube& vertices, int side) {
-    setup_face_features<dim>(faces[side], vertices);
-    setup_face_features<dim>(faces[side + 6], vertices);
+void split_face_features(BFaces& faces, SqCube& vertices, int side, bool axial) {
+    setup_face_features<dim>(faces[side], vertices, axial);
+    setup_face_features<dim>(faces[side + 6], vertices, axial);
 
     if (dim > 2) {
         setup_face_features<dim>(faces[side + 12], vertices);
@@ -93,7 +95,7 @@ void split_face_features(BFaces& faces, SqCube& vertices, int side) {
 /// Устанавливает площади и нормали новых граней.
 /// Размерность и сторона являются аргументами шаблона
 template <int dim, int side>
-void split_face(BFaces& faces, SqCube& vertices) {
+void split_face(BFaces& faces, SqCube& vertices, bool axial = false) {
 #if SCRUTINY
     if (faces[side + 6].is_actual()) {
         throw std::runtime_error("Try to cut complex face");
@@ -104,35 +106,35 @@ void split_face(BFaces& faces, SqCube& vertices) {
 
     split_face_indices<dim, side>(faces);
 
-    split_face_features<dim>(faces, vertices, side);
+    split_face_features<dim>(faces, vertices, side, axial);
 }
 
 /// @brief Разбивает грань на стороне side на подграни.
 /// Устанавливает площади и нормали новых граней.
 /// Преобразует аргумент функции side в аргумент шаблона.
 template <int dim>
-void split_face(BFaces& faces, SqCube& vertices, int side);
+void split_face(BFaces& faces, SqCube& vertices, int side, bool axial);
 
 template <>
-void split_face<2>(BFaces& faces, SqCube& vertices, int side) {
+void split_face<2>(BFaces& faces, SqCube& vertices, int side, bool axial) {
     switch (side) {
         case Side::LEFT:
-            split_face<2, Side::L>(faces, vertices);
+            split_face<2, Side::L>(faces, vertices, axial);
             break;
         case Side::RIGHT:
-            split_face<2, Side::R>(faces, vertices);
+            split_face<2, Side::R>(faces, vertices, axial);
             break;
         case Side::BOTTOM:
-            split_face<2, Side::B>(faces, vertices);
+            split_face<2, Side::B>(faces, vertices, axial);
             break;
         default:
-            split_face<2, Side::T>(faces, vertices);
+            split_face<2, Side::T>(faces, vertices, axial);
             break;
     }
 }
 
 template <>
-void split_face<3>(BFaces& faces, SqCube& vertices, int side) {
+void split_face<3>(BFaces& faces, SqCube& vertices, int side, bool axial) {
     switch (side) {
         case Side::LEFT:
             split_face<3, Side::L>(faces, vertices);
@@ -159,7 +161,7 @@ void split_face<3>(BFaces& faces, SqCube& vertices, int side) {
 /// Устанавливает площади и нормали новых граней.
 template <int dim>
 void split_face(AmrCell& cell, int side) {
-    split_face<dim>(cell.faces, cell.vertices, side);
+    split_face<dim>(cell.faces, cell.vertices, side, cell.axial);
 }
 
 /// @brief Объединяет подграни в одну грань на стороне side
@@ -177,7 +179,7 @@ void merge_faces(AmrCell& cell) {
         faces[side + 18].set_undefined();
     }
 
-    setup_face_features<dim>(faces[side], vertices);
+    setup_face_features<dim>(faces[side], vertices, cell.axial);
 }
 
 /// @brief Объединяет подграни в одну грань на стороне side

@@ -95,7 +95,7 @@ Box Cuboid::bbox() const {
     Vector3d vmin(m_xmin, m_ymin, m_zmin);
     Vector3d vmax(m_xmax, m_ymax, m_zmax);
 
-    return Box(vmin, vmax);
+    return {vmin, vmax};
 }
 
 void Cuboid::set_nx(int nx) {

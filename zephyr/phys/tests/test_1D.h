@@ -17,7 +17,7 @@ namespace zephyr::phys {
 
 using zephyr::math::RiemannSolver;
 
-/// @class Абстрактный класс одномерного теста
+/// @brief Абстрактный класс одномерного теста
 class Test1D : public IVP {
 public:
     /// @brief Левая граница области
@@ -32,7 +32,7 @@ public:
     }
 };
 
-/// @class Классический одномерный тест Сода
+/// @brief Классический одномерный тест Сода
 class SodTest : public Test1D {
 public:
     double x_jump;  ///< Положение разрыва
@@ -76,7 +76,7 @@ public:
     double pressure_t(const Vector3d &r, double t) const final;
 };
 
-/// @class Набор тестов на распад разрыва из монографии Торо
+/// @brief Набор тестов на распад разрыва из монографии Торо
 /// (глава 10 и 4.3.3 Numerical Tests)
 /// E.F. Toro. Riemann Solvers and Numerical Methods for Fluid Dynamics.
 class ToroTest : public Test1D {
@@ -264,7 +264,7 @@ public:
     double pressure(const Vector3d &r) const final;
 };
 
-/// @class Похоже на одномерные тесты Торо, но с многоматериальной постановкой.
+/// @brief Похоже на одномерные тесты Торо, но с многоматериальной постановкой.
 /// x_jump -- положение разрыва, x_cont -- граница материалов.
 /// Большое число одномерных тестов, часто с точным решением.
 class Multimat1D : public Test1D {

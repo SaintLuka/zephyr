@@ -1,4 +1,4 @@
-/// @file Динамическая ORB декомпозиция сетки совместно с адаптацией.
+/// @brief Динамическая ORB декомпозиция сетки совместно с адаптацией.
 /// На сетке решается уравнение переноса для проверки связности сетки.
 
 // TODO: Удалить лишние mesh.sync()
@@ -76,9 +76,9 @@ Distributor conv_distributor() {
     distr.merge = [](Children &children, AmrStorage::Item &parent) {
         double sum = 0.0;
         for (auto &child: children) {
-            sum += child(U).u1 * child.volume();
+            sum += child(U).u1 * child.volume;
         }
-        parent(U).u1 = sum / parent.volume();
+        parent(U).u1 = sum / parent.volume;
     };
     return distr;
 }

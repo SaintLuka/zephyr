@@ -1,4 +1,5 @@
-/// @file Решатель газодинамики в одном файле.
+/// @file membrane.cpp
+/// @brief Решатель газодинамики в одном файле.
 /// В углу прямоугольной области колеблется мембрана.
 
 #include <iostream>
@@ -179,7 +180,7 @@ int main() {
             Flux flux;
             for (auto &face: cell.faces()) {
                 // Внешняя нормаль
-                auto &normal = face.normal();
+                auto normal = face.normal();
 
                 // Примитивный вектор соседа
                 PState zn(zc);

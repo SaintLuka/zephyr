@@ -8,7 +8,7 @@
 
 namespace zephyr::geom::generator::collection {
 
-/// @class SemicircleCutout. Генератор для создания сетки внутри прямоугольной области
+/// @brief Генератор для создания сетки внутри прямоугольной области
 /// с полукруглым вырезом.
 class SemicircleCutout : public BlockStructured {
 public:

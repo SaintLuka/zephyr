@@ -6,9 +6,12 @@
 
 #include <zephyr/geom/box.h>
 #include <zephyr/geom/vector.h>
-#include <zephyr/geom/line.h>
+#include <zephyr/geom/primitives/line.h>
 
 namespace zephyr::geom {
+
+/// @addtogroup Geom-Primitives
+/// @{
 
 /// @brief Представление многоугольника в плоскости OXY.
 /// Для треугольника лучше использовать класс geom::Triangle
@@ -184,5 +187,7 @@ protected:
 };
 
 std::ostream& operator<<(std::ostream& os, const Polygon& poly);
+
+/// @}
 
 } // namespace zephyr::geom

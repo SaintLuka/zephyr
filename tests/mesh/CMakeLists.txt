@@ -1,3 +1,4 @@
+#list(APPEND TESTS axial)
 #list(APPEND TESTS balancing)
 #list(APPEND TESTS mesh_generator)
 #list(APPEND TESTS movable_mesh)

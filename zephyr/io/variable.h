@@ -34,7 +34,7 @@ using WriteCellItem = std::function<void(CellStorage::Item&, T*)>;
 template <typename T>
 using WriteNodeItem = std::function<void(NodeStorage::Item&, T*)>;
 
-/// @class Класс для записи переменных в VTU файл, каждой переменной для
+/// @brief Класс для записи переменных в VTU файл, каждой переменной для
 /// записи должен соответствовать экземпляр Variable.
 class Variable {
 public:

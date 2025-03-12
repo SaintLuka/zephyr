@@ -9,22 +9,35 @@ namespace zephyr::geom {
 class Random2D;
 class QuasiRandom2D;
 
-// TODO: Написать нормально
-struct Box {
-    Vector3d vmin, vmax;
+/// @class Box box.h
+/// @brief Ограничивающий кубоид (bounding box).
+/// @details Очень полезная структура для хранения ограничивающего
+/// прямоугольника или кубоида (bounding box). Содержит пару полезных функций.
+/// Ящик считается двумерным прямоугольником, если vmin.z() == vmax.z(),
+/// условие справедливо в том числе для бесконечных и пустых ящиков.
+/// В обратном случае vmin.z() != vmax.z() ящик считается трёхмерном.
+struct Box final {
+    Vector3d vmin = {NAN, NAN, NAN};
+    Vector3d vmax = {NAN, NAN, NAN};
 
-    /// @brief Инициализирует NAN
-    Box();
-
-    Box(const Vector3d& _vmin, const Vector3d& _vmax);
-
+    /// @brief Статический конструктор с неопределенными значениями
     static Box NaN();
 
+    /// @brief Статический конструктор с нулевыми значениями
     static Box Zero();
 
+    /// @brief Минимально возможный bounding box, предполагает
+    /// последовательное увеличение путем помещения новых точек.
     /// vmin = {+inf, +inf, +inf}
     /// vmax = {-inf, -inf, -inf}
+    /// @param dim Размерность ящика (1 или 2)
     static Box Empty(int dim);
+
+    /// @brief Bounding box охватывающий всё пространство
+    /// vmin = {-inf, -inf, -inf}
+    /// vmax = {+inf, +inf, +inf}
+    /// @param dim Размерность ящика (1 или 2)
+    static Box Infinite(int dim);
 
     /// @brief Центр ящика
     Vector3d center() const;
@@ -62,12 +75,17 @@ struct Box {
     /// @brief Замкнутая линия y-координат границ бокса
     std::vector<double> outline_y() const;
 
+    /// @brief Расширить границы на долю margin по каждой координате
     void extend(double margin);
 
+    /// @brief Расширить границы на долю margin по каждой координате
     void extend(double margin_x, double margin_y, double margin_z = 0.0);
 
+    /// @brief Создать генератор случайных чисел внутри прямоугольника
     Random2D random2D(int seed = 0) const;
 
+    /// @brief Создать генератор квазислучайной последовательности внутри
+    /// прямоугольника
     QuasiRandom2D quasiRandom2D() const;
 };
 

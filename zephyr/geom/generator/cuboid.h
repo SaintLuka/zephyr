@@ -6,7 +6,7 @@
 
 namespace zephyr::geom::generator {
 
-/// @class Cuboid. Простой класс для генерации декартовой сетки или сетки
+/// @brief Простой класс для генерации декартовой сетки или сетки
 /// внутри параллелепипеда.
 class Cuboid : public Generator {
 public:

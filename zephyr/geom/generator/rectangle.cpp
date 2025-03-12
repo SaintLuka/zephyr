@@ -91,7 +91,11 @@ Box Rectangle::bbox() const {
     Vector3d vmin(m_xmin, m_ymin, 0.0);
     Vector3d vmax(m_xmax, m_ymax, 0.0);
 
-    return Box(vmin, vmax);
+    return {vmin, vmax};
+}
+
+void Rectangle::set_axial(bool axial) {
+    m_axial = axial;
 }
 
 void Rectangle::set_nx(int nx) {
@@ -240,6 +244,10 @@ void Rectangle::compute_size() {
 Grid Rectangle::make() {
     check_size();
 
+    if (m_axial && m_ymin == 0.0) {
+        m_bounds.bottom = Boundary::WALL;
+    }
+
     if (m_voronoi) {
         return create_voronoi();
     } else {
@@ -276,6 +284,7 @@ Grid Rectangle::create_classic() const {
     }
 
     Grid grid;
+    grid.set_axial(m_axial);
 
     grid.reserve_nodes((m_nx + 1) * (m_ny + 1));
     for (int i = 0; i <= m_nx; ++i) {

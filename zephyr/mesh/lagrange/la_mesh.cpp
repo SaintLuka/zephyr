@@ -17,16 +17,11 @@ void LaMesh::initialize(const Grid& grid) {
 }
 
 geom::Box LaMesh::bbox() {
-    double inf = std::numeric_limits<double>::infinity();
-    Vector3d vmin = {+inf, +inf, +inf};
-    Vector3d vmax = {-inf, -inf, -inf};
-
+    Box box = Box::Empty(3);
     for (auto& node: m_nodes) {
-        vmin = vmin.cwiseMin(node.coords);
-        vmax = vmax.cwiseMax(node.coords);
+        box.capture(node.coords);
     }
-
-    return geom::Box(vmin, vmax);
+    return box;
 }
 
 } // namespace zephyr::mesh

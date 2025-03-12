@@ -8,7 +8,7 @@
 
 namespace zephyr::phys {
 
-/// @class Абстрактный класс для двумерных тестов.
+/// @brief Абстрактный класс для двумерных тестов.
 /// Только в прямоугольнике?
 class Test2D : public IVP {
 public:

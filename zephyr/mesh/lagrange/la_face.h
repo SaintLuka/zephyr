@@ -15,9 +15,6 @@ class LaFace {
     using Boundary = zephyr::geom::Boundary;
 public:
 
-    /// @brief Внешняя нормаль
-    const Vector3d &normal() const;
-
     /// @brief Ячейка по внешней нормали, на границе сетки возвращается
     /// сама ячейка
     LaCell neib() const;
@@ -38,8 +35,14 @@ public:
     /// @brief Установить флаг грани
     void set_boundary(Boundary flag);
 
+    /// @brief Внешняя нормаль
+    const Vector3d& normal() const;
+
     /// @brief Площадь (в 3D) или длина (в 2D) грани
     double area() const;
+
+    /// @brief Внешняя нормаль с площадью
+    Vector3d area_n() const;
 
     /// @brief Центр грани
     Vector3d center() const;

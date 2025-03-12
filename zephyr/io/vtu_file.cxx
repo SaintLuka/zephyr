@@ -973,7 +973,6 @@ void VtuFile::save(
     file.close();
 }
 
-
 void VtuFile::save(
         const std::string &filename, AmrStorage &cells,
         const std::vector<geom::Vector3d>& nodes,
@@ -1016,6 +1015,88 @@ void VtuFile::save(
     write_mesh_primitives(file, cells, nodes, variables);
     write_cells_data(file, cells, variables);
     write_nodes_data(file, nodes, variables);
+
+    file.close();
+}
+
+void VtuFile::save(const std::string &filename, NodeStorage &nodes) {
+    if (nodes.empty()) {
+        return;
+    }
+
+    std::ofstream file(filename, std::ios::out | std::ios::binary);
+    if (!file.is_open()) {
+        std::cerr << "Warning: Cannot open file '" << filename << "'\n";
+        return;
+    }
+
+    index_t n_points = nodes.size();
+
+    std::string byteord = is_big_endian() ? "BigEndian" : "LittleEndian";
+
+    file << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" byte_order=\"" + byteord + "\">\n";
+    file << "  <UnstructuredGrid>" << '\n';
+    file << "    <Piece NumberOfPoints=\"" << n_points << "\" NumberOfCells=\"" << n_points << "\">\n";
+
+    // Points
+    size_t byte_offset = 0;
+    file << "      <Points>\n";
+    file << "        <DataArray type=\"Float64\" Name=\"Points\" NumberOfComponents=\"3\" format=\"appended\" offset=\"" << byte_offset << "\"/>\n";
+    file << "      </Points>\n";
+    byte_offset += sizeof(datasize_t) + 3 * n_points * sizeof(double);
+
+    // Cells
+    file << "      <Cells>" << '\n';
+    file << "        <DataArray type=\"" << VtkType::get<index_t>() << "\" Name=\"connectivity\" format=\"appended\" offset=\"" << byte_offset << "\"/>\n";
+    byte_offset += sizeof(datasize_t) + n_points * sizeof(index_t);
+
+    file << "        <DataArray type=\"" << VtkType::get<index_t>() << "\" Name=\"offsets\" format=\"appended\" offset=\"" << byte_offset << "\"/>\n";
+    byte_offset += sizeof(datasize_t) + n_points * sizeof(index_t);
+
+    file << "        <DataArray type=\"" << VtkType::get<type_t>() << "\" Name=\"types\" format=\"appended\" offset=\"" << byte_offset << "\"/>\n";
+    byte_offset += sizeof(datasize_t) + n_points * sizeof(type_t);
+
+    file << "      </Cells>\n";
+    file << "    </Piece>\n";
+    file << "  </UnstructuredGrid>\n";
+
+    // AppendedData
+    file << "  <AppendedData encoding=\"raw\">\n";
+    file << "_";
+
+    // PointsCoords
+    datasize_t data_size = 3 * n_points * sizeof(double);
+    file.write((char *) &data_size, sizeof(datasize_t));
+
+    for (const auto &node: nodes) {
+        file.write((char *) &node.coords, 3 * sizeof(double));
+    }
+
+    // Cells
+    // Connectivity
+    data_size = n_points * sizeof(index_t);
+    file.write((char *) &data_size, sizeof(datasize_t));
+
+    for (index_t i = 0; i < n_points; ++i) {
+        file.write((char *) &i, sizeof(index_t));
+    }
+
+    // Offsets
+    data_size = n_points * sizeof(index_t);
+    file.write((char *) &data_size, sizeof(datasize_t));
+
+    for (index_t i = 1; i <= n_points; ++i) {
+        file.write((char *) &i, sizeof(index_t));
+    }
+
+    // Types
+    data_size = n_points * sizeof(type_t);
+    file.write((char *) &data_size, sizeof(datasize_t));
+
+    type_t type = 1;
+    for (index_t i = 0; i < n_points; ++i) {
+        file.write((char *) &type, sizeof(type_t));
+    }
 
     file.close();
 }

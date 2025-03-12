@@ -108,6 +108,15 @@ parent_vs(Children& children) {
     };
 }
 
+template<int dim, bool axial=false>
+inline AmrCell get_parent_1(Children& children) {
+    if constexpr (dim == 2 && axial) {
+        return AmrCell(parent_vs<dim>(children), axial);
+    } else {
+        return AmrCell(parent_vs<dim>(children));
+    }
+}
+
 /// @brief Создает родительскую ячейку с учетом окружения, то есть полученная
 /// ячейка будет иметь актуальные ссылки на (старых) соседей, также полученная
 /// ячейка может иметь более одной грани по каждой из сторон
@@ -115,12 +124,12 @@ parent_vs(Children& children) {
 /// @param rank Ранг текущего процесса
 /// @param children Массив дочерних ячеек
 /// @return Полностью готовая родительская ячейка
-template<int dim>
+template<int dim, bool axial=false>
 AmrCell get_parent(AmrStorage &locals, AmrStorage &aliens,
         int rank, Children& children) {
     const auto children_by_side = get_children_by_side<dim>();
 
-    AmrCell parent(parent_vs<dim>(children));
+    AmrCell parent = get_parent_1<dim, axial>(children);
 
     parent.rank  = children[0].rank;
     parent.index = children[0].next;
@@ -239,24 +248,27 @@ AmrCell get_parent(AmrStorage &locals, AmrStorage &aliens,
                 // Простая грань
                 cfaces[i] = child.faces[side].center;
             } else {
-                // Сложная грань, считаем центр по основным вершинам
+                // Сложная грань, считаем центр тяжести
                 cfaces[i] = Vector3d(0.0, 0.0, 0.0);
+                double full_area = 0.0;
                 for (int j = 0; j < FpF(dim); ++j) {
-                    cfaces[i] += child.vertices[child.faces[side + 6 *j].vertices[j]];
+                    double area = child.faces[side + 6 * j].get_area(parent.axial);
+                    full_area += area;
+                    cfaces[i] += area * child.faces[side + 6 * j].center;
                 }
-                cfaces[i] /= FpF(dim);
+                cfaces[i] /= full_area;
 
             }
         }
 
         /// Находим соответстиве между pfaces и cfaces
-        double eps = 1.0e-6 * parent.size;
+        double eps = 1.0e-3 * parent.linear_size();
         for (int i = 0; i < FpF(dim); ++i) {
             const auto& child = children[children_by_side[side][i]];
             const auto& child_face = child.faces[side];
             for (int j = 0; j < FpF(dim); ++j) {
                 if ((pfaces[i] - cfaces[j]).norm() < eps) {
-                    parent.faces[side + 6*j].adjacent.rank = child_face.adjacent.rank;
+                    parent.faces[side + 6*j].adjacent.rank  = child_face.adjacent.rank;
                     parent.faces[side + 6*j].adjacent.index = child_face.adjacent.index;
                     parent.faces[side + 6*j].adjacent.alien = child_face.adjacent.alien;
                     break;
@@ -268,7 +280,7 @@ AmrCell get_parent(AmrStorage &locals, AmrStorage &aliens,
         std::set<int> found;
         for (int i = 0; i < FpF(dim); ++i) {
             for (int j = 0; j < FpF(dim); ++j) {
-                if ((pfaces[i] - cfaces[j]).norm() < 1.0e-6) {
+                if ((pfaces[i] - cfaces[j]).norm() < eps) {
                     found.insert(j);
                     break;
                 }
@@ -276,31 +288,40 @@ AmrCell get_parent(AmrStorage &locals, AmrStorage &aliens,
         }
 
         if (found.size() != FpF(dim)) {
-            std::cout << "side: " << side_to_string(side) << "\n";
+            std::cout << "Side: " << side_to_string(side) << "\n";
             std::cout << std::scientific << std::setprecision(6) << "\n";
-            std::cout << parent.vertices[parent.faces[side].vertices[0]] << ", "
-                      << parent.vertices[parent.faces[side].vertices[1]] << ", "
-                      << parent.vertices[parent.faces[side].vertices[2]] << ", "
-                      << parent.vertices[parent.faces[side].vertices[3]] << "\nchildrend:\n";
+            std::cout << "Parent:\n";
+            std::cout << parent.vertices[parent.faces[side].vertices[0]].transpose() << ", "
+                      << parent.vertices[parent.faces[side].vertices[1]].transpose() << ", "
+                      << parent.vertices[parent.faces[side].vertices[2]].transpose() << ", "
+                      << parent.vertices[parent.faces[side].vertices[3]].transpose() << "\n";
 
-            for (int ck = 0; ck < 8; ++ck) {
+            std::cout << "Children:\n";
+            for (int ck = 0; ck < CpC(dim); ++ck) {
                 auto& child = children[ck];
-                std::cout << child.vertices[child.faces[side].vertices[0]] << ", "
-                          << child.vertices[child.faces[side].vertices[1]] << ", "
-                          << child.vertices[child.faces[side].vertices[2]] << ", "
-                          << child.vertices[child.faces[side].vertices[3]] << "\n";
+                std::cout << child.vertices[child.faces[side].vertices[0]].transpose() << ", "
+                          << child.vertices[child.faces[side].vertices[1]].transpose() << ", "
+                          << child.vertices[child.faces[side].vertices[2]].transpose() << ", "
+                          << child.vertices[child.faces[side].vertices[3]].transpose() << "\n";
             }
 
             for (int i = 0; i < FpF(dim); ++i) {
-                std::cout << "pf: " << pfaces[i] << "\n";
+                std::cout << "pface: " << pfaces[i].transpose() << "\n";
                 for (int j = 0; j < FpF(dim); ++j) {
-                    std::cout << "  cf: " << cfaces[j] << "\n";
-                    if ((pfaces[i] - cfaces[j]).norm() < 1.0e-6) {
+                    std::cout << "  cface: " << cfaces[j].transpose() << "\n";
+                    std::cout << "  norm:  " << (pfaces[i] - cfaces[j]).norm() << "\n";
+                    if ((pfaces[i] - cfaces[j]).norm() < eps) {
                         found.insert(j);
                         break;
                     }
                 }
             }
+
+            parent.visualize("parent.py");
+            for (auto& child: children) {
+                child.visualize("child" + std::to_string(child.z_idx) + ".py");
+            }
+
             throw std::runtime_error("Can't link faces");
         }
 #endif
@@ -326,7 +347,12 @@ void coarse_cell(AmrStorage::Item& child, AmrStorage &locals, AmrStorage &aliens
     auto children = select_children<dim>(locals, child.index);
 
     AmrStorage::Item& parent = locals[child.next];
-    parent = get_parent<dim>(locals, aliens, rank, children);
+    if (dim == 2 && children[0].axial) {
+        parent = get_parent<dim, true>(locals, aliens, rank, children);
+    }
+    else {
+        parent = get_parent<dim>(locals, aliens, rank, children);
+    }
     op.merge(children, parent);
 
     child.set_undefined();

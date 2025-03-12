@@ -8,7 +8,8 @@
 
 namespace zephyr::geom::generator::collection {
 
-/// @class PlaneWithCube. Генератор для создания сетки внутри прямоугольника с квадратным отверстием радиуса r.
+/// @brief Генератор для создания сетки внутри прямоугольника
+/// с квадратным отверстием со стороной r.
 class PlaneWithCube : public BlockStructured {
 public:
     using Ptr = std::shared_ptr<PlaneWithCube>;

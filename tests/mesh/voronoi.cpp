@@ -1,4 +1,4 @@
-/// @file Простая демонстрация возможностей встроенного класса VDiagram,
+/// @brief Простая демонстрация возможностей встроенного класса VDiagram,
 /// который реализует взвешенные диаграммы Вороного.
 
 #include <zephyr/mesh/decomp/vdiagram.h>
@@ -13,8 +13,8 @@ namespace plt = zephyr::utils::matplotlib;
 
 int main() {
     // Прямоугольная область
-    Box box(Vector3d{0.0, 0.0, 0.0},
-            Vector3d{3.0, 1.0, 0.0});
+    Box box{Vector3d{0.0, 0.0, 0.0},
+            Vector3d{3.0, 1.0, 0.0}};
 
     // Генератор точек в прямоугольнике
     auto rb = box.random2D(13);

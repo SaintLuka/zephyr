@@ -23,7 +23,7 @@ struct Router {
 
 };
 
-/// @class Просто забавное название)
+
 class MigrationService {
 public:
 

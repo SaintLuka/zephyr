@@ -1,4 +1,5 @@
-/// @file Решение задачи переноса с CRP решателем.
+/// @file transfer.cpp
+/// @brief Решение задачи переноса с CRP решателем.
 
 #include <iostream>
 #include <iomanip>
@@ -338,7 +339,7 @@ double BodyLine::volume_inside(AmrStorage &body) const {
         if (0.0 < a && a < 1.0) {
             a = cell.volume_fraction(inside, 1000);
         }
-        res += a * cell.volume();
+        res += a * cell.volume;
     }
     return res;
 }
@@ -413,7 +414,7 @@ double BodySquare::volume_inside(AmrStorage &body) const {
             vol = cell.volume_fraction(inside, 1000);
         }
         cell(U).u1 = vol;
-        vol *= cell.volume();
+        vol *= cell.volume;
         res += vol;
     }
     return res;
@@ -473,7 +474,7 @@ double BodyDisk::volume_inside(AmrStorage &body) const {
     for (auto& cell: body) {
         auto poly = cell.polygon();
         double vol = poly.disk_clip_area(C, R);
-        cell(U).u1 = vol / cell.volume();
+        cell(U).u1 = vol / cell.volume;
         res += vol;
     }
     return res;

@@ -136,7 +136,7 @@ int check_connectivity(AmrStorage &locals, int ic, AmrStorage& aliens) {
             }
             nfc /= VpF(dim);
 
-            if ((fc - nfc).norm() > 1.0e-6 * cell.size) {
+            if ((fc - nfc).norm() > 1.0e-6 * cell.linear_size()) {
                 continue;
             }
 
@@ -153,7 +153,7 @@ int check_connectivity(AmrStorage &locals, int ic, AmrStorage& aliens) {
                 return -1;
             }
             // площади совпадают
-            if (std::abs(face.area - nface.area) > 1.0e-6 * cell.size) {
+            if (std::abs(face.area - nface.area) > 1.0e-6 * cell.linear_size()) {
                 std::cout << "\tOpposite faces have different area\n";
                 std::cout << "\tCurrent cell:\n";
                 cell.print_info();
@@ -362,7 +362,7 @@ int EuMesh::check_refined() {
         for (int i = 0; i < std::pow(3, dim); ++i) {
             for (int j = i + 1; j < std::pow(3, dim); ++j) {
                 double dist = (cell.vertices[i] - cell.vertices[j]).norm();
-                if (dist < 1.0e-5 * cell.size) {
+                if (dist < 1.0e-5 * cell.linear_size()) {
                     std::cout << "\tIdentical vertices\n";
                     cell.print_info();
                     return -1;

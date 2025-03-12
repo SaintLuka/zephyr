@@ -5,7 +5,7 @@
 #include <map>
 
 #include <zephyr/mesh/decomp/vdiagram.h>
-#include <zephyr/geom/polygon.h>
+#include <zephyr/geom/primitives/polygon.h>
 
 
 namespace zephyr::mesh::decomp {

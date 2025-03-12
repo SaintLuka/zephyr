@@ -18,10 +18,6 @@ LaFace::LaFace(const LaCell &cell, BFace* self, BFace* end, Direction dir)
     }
 }
 
-const Vector3d &LaFace::normal() const {
-    return m_face->normal;
-}
-
 LaCell LaFace::neib() const {
     return m_face->is_boundary() ? m_cell : m_cell.neib(*m_face);
 }
@@ -42,8 +38,16 @@ void LaFace::set_boundary(Boundary flag) {
     m_face->boundary = flag;
 }
 
+const Vector3d& LaFace::normal() const {
+    return m_face->normal;
+}
+
 double LaFace::area() const {
     return m_face->area;
+}
+
+Vector3d LaFace::area_n() const {
+    return m_face->area_n();
 }
 
 Vector3d LaFace::center() const {

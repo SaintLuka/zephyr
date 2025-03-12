@@ -18,7 +18,7 @@ struct U {
 int main(int argc, char** argv) {
     mpi::init();
 
-    Json config = Json::load(argc, argv, "json_config.json");
+    Json config = Json::load(argc, argv, "json-config.json");
 
     EuMesh mesh(config["mesh"], 7);
 

@@ -50,7 +50,7 @@ Box Strip::bbox() const {
     Vector3d vmin(x_min(), y_min(), 0.0);
     Vector3d vmax(x_max(), y_max(), 0.0);
 
-    return Box(vmin, vmax);
+    return {vmin, vmax};
 }
 
 void Strip::set_nx(int nx) {

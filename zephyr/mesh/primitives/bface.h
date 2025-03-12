@@ -18,31 +18,31 @@ enum class Direction : int {
 /// @brief Базовый класс грани произвольной ячейки, хранит индексы
 /// вершин (узлов), которые хранятся в массиве в самой ячейке.
 /// BFace -- Base/Basic face
-class BFace {
+///
+/// @details Разрешается хранение граней для осесимметричных задач,
+/// в этом случае барицентр грани не равен полусумме вершин.
+/// Также для осесимметричных ячеек инициализируется поле area_alt,
+/// в котором хранится "альтернативное" значение площади грани.
+/// По умолчанию используются только треугольные и четырехугольные грани,
+/// поэтому массив vertices имеет длину равную четырем. Но есть также
+/// вариант сложной упаковки для хранения более четырех индексов.
+class BFace final {
     using Vector3d = zephyr::geom::Vector3d;
     using Boundary = zephyr::geom::Boundary;
 public:
     /// @brief Максимальное число вершин грани
     static const int max_size = 4;
 
-    /// @brief Тип граничного условия
-    Boundary boundary = Boundary::UNDEFINED;
+    Boundary boundary = Boundary::UNDEFINED; ///< Тип граничного условия
+    Adjacent adjacent = {};                  ///< Составной индекс смежной ячейки
+    Vector3d normal;                         ///< Внешняя нормаль к грани
+    Vector3d center;                         ///< Барицентр грани
+    double   area     = NAN;                 ///< Площадь грани
+    double   area_alt = NAN;                 ///< "Альтернативная" площадь грани
 
-    /// @brief Составной индекс смежной ячейки
-    Adjacent adjacent = {};
-
-    /// @brief Площадь грани
-    double area = NAN;
-
-    /// @brief Внешняя нормаль грани
-    Vector3d normal;
-
-    /// @brief Центр грани
-    Vector3d center;
-
-    /// @brief Список индексов вершин в массиве вершин ячейки,
-    /// которой принадлежит грань
+    /// @brief Список индексов вершин в массиве вершин ячейки
     std::array<int, max_size> vertices = {-1, -1, -1, -1};
+
 
     /// @brief Конструктор по умолчанию
     BFace() = default;
@@ -72,6 +72,14 @@ public:
         adjacent.alien = -1;
     }
 
+    /// @brief Внешняя нормаль грани на площадь
+    inline Vector3d area_n() const { return area * normal; }
+
+    /// @brief Площадь/длина обычной грани или грани осесимметричной ячейки
+    inline double get_area(bool axial = false) const { 
+        return axial ? area_alt : area; 
+    }
+
     /// @brief Число вершин грани
     /// Для граней двумерных ячеек равно двум,
     /// для граней трехмерных ячеек: 3 или 4.
@@ -95,17 +103,17 @@ public:
             return true;
 	    }
 	    switch (dir) {
-	        case Direction::ANY:
+            case Direction::ANY:
                 return false;
-	        case Direction::X:
-                return std::abs(normal.x()) < 0.8;
-	        case Direction::Y:
-                return std::abs(normal.y()) < 0.8;
-	        case Direction::Z:
-                return std::abs(normal.z()) < 0.8;
+            case Direction::X:
+                return std::abs(normal.x()) < 0.7;
+            case Direction::Y:
+                return std::abs(normal.y()) < 0.7;
+            case Direction::Z:
+                return std::abs(normal.z()) < 0.7;
             default:
                 return false;
-	    }
+        }
 	}
 
 	// Расширение массива индексов для хранения полигональных граней,

@@ -6,7 +6,7 @@
 
 namespace zephyr::geom::generator {
 
-/// @class Sector. Генератор для создания блочно-структурированной
+/// @brief Генератор для создания блочно-структурированной
 /// сетки внутри сектора или круга.
 class Sector : public Generator {
 public:
@@ -41,6 +41,9 @@ public:
 
     /// @brief Установить флаги граничных условий
     void set_boundaries(Boundaries bounds);
+
+    /// @brief Использовать осевую симметрию
+    void set_axial(bool axial);
 
     /// @brief Количество ячеек сетки
     int size() const final;
@@ -86,6 +89,8 @@ private:
     int m_ny;      ///< Разбиение по радиусу во внутренней части
     int m_Ny;      ///< Разбиение по радиусу во внешней структурированной части
     int m_size;    ///< Полное число ячеек
+
+    bool m_axial = true;
 };
 
 } // namespace zephyr::geom::generator

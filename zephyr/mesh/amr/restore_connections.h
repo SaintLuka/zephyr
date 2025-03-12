@@ -179,7 +179,7 @@ void restore_connections_one(AmrStorage::Item& cell,
                 if (face2.is_undefined())
                     continue;
 
-                if ((face1.center - face2.center).norm() < 1.0e-5 * cell.size) {
+                if ((face1.center - face2.center).norm() < 1.0e-5 * cell.linear_size()) {
                     adj_index = jc;
                     found = true;
                     break;

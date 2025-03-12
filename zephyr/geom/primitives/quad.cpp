@@ -1,8 +1,8 @@
 #include <cstring>
 #include <iostream>
 
-#include <zephyr/geom/line.h>
-#include <zephyr/geom/quad.h>
+#include <zephyr/geom/primitives/line.h>
+#include <zephyr/geom/primitives/quad.h>
 
 namespace zephyr::geom {
 
@@ -65,6 +65,10 @@ double Quad::area() const {
     return 0.5 * (verts[3] - verts[0]).cross(verts[2] - verts[1]).norm();
 }
 
+Vector3d Quad::area_n(const Vector3d& c) const {
+    return Quad::area() * Quad::normal(c);
+}
+
 double Quad::volume_as() const {
     // Обход вершин против часовой стрелки
     int ord[4] = {0, 1, 3, 2};
@@ -76,7 +80,7 @@ double Quad::volume_as() const {
 
         V -= (v2.x() - v1.x()) * (v2.y() * v2.y() + v2.y() * v1.y() + v1.y() * v1.y());
     }
-    V /= 6.0;
+    V *= M_PI / 3.0;
 
     return V;
 }
@@ -98,6 +102,31 @@ Vector3d Quad::centroid(double area) const {
         C.y() -= (v2.x() - v1.x()) * (v2.y() * v2.y() + v2.y() * v1.y() + v1.y() * v1.y());
     }
     C /= (6.0 * area);
+
+    return C;
+}
+
+Vector3d Quad::centroid_as(double vol_as) const {
+    if (vol_as == 0.0) {
+        vol_as = Quad::volume_as();
+    }
+
+    // Обход вершин против часовой стрелки
+    int ord[4] = {0, 1, 3, 2};
+
+    Vector3d C = {0.0, 0.0, 0.0};
+    for (int i: {0, 1, 2, 3}) {
+        auto &v1 = verts[ord[i]];
+        auto &v2 = verts[ord[(i + 1) % 4]];
+
+        C.x() += (+1.5 * std::pow(v1.y(), 2) + v1.y() * v2.y() + 0.5 * std::pow(v2.y(), 2)) * std::pow(v1.x(), 2) +
+                 (-1.5 * std::pow(v2.y(), 2) - v1.y() * v2.y() - 0.5 * std::pow(v1.y(), 2)) * std::pow(v2.x(), 2) +
+                 (v2.y() * v2.y() - v1.y() * v1.y()) * v1.x() * v2.x();
+
+        C.y() -= (std::pow(v1.y(), 3) + std::pow(v1.y(), 2) * v2.y() +
+                  std::pow(v2.y(), 3) + std::pow(v2.y(), 2) * v1.y()) * (v2.x() - v1.x());
+    }
+    C *= M_PI / (6.0 * vol_as);
 
     return C;
 }

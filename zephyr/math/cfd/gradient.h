@@ -169,7 +169,7 @@ Grad<State> LSM(Cell &cell,
     using Array = ei_vec<State>;
 
     // Делает матрицу A безразмерной
-    double w0 = cell.dim() < 3 ? 1.0 : 1.0 / cell.size();
+    double w0 = cell.dim() < 3 ? 1.0 : 1.0 / cell.linear_size();
 
     State zc = get_state(cell);
     Vector3d cell_c = cell.center();
@@ -294,7 +294,7 @@ Grad<State> limiting(Cell &cell, const Limiter& limiter,
     using Array = ei_arr<State>;
 
     // Делает матрицу A безразмерной
-    double w0 = cell.dim() < 3 ? 1.0 : 1.0 / cell.size();
+    double w0 = cell.dim() < 3 ? 1.0 : 1.0 / cell.linear_size();
 
     State zc = get_state(cell);
     Vector3d cell_c = cell.center();

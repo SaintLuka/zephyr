@@ -96,7 +96,7 @@ Box Sector::bbox() const {
         vmin.y() = -std::cos(0.5 * m_angle);
     }
 
-    return Box(vmin, vmax);
+    return {vmin, vmax};
 }
 
 void Sector::init_params() {
@@ -165,6 +165,10 @@ void Sector::set_n_phi(int N) {
 
 void Sector::set_boundaries(Boundaries bounds) {
     m_bounds = bounds;
+}
+
+void Sector::set_axial(bool axial) {
+    m_axial = axial;
 }
 
 void Sector::check_params() const {
@@ -586,6 +590,7 @@ Grid Sector::make() {
     int max_nodes = (m_Nx + 1)*(m_ny + m_Ny + 1) + m_parts * (m_nx + 1) * (m_nx + 1);
 
     Grid grid;
+    grid.set_axial(m_axial);
     grid.reserve_cells(m_size);
     grid.reserve_nodes(max_nodes);
     int n_cells = 0;

@@ -22,6 +22,7 @@ SmFluid::State SmFluid::datatype() {
 SmFluid::SmFluid(Eos::Ptr eos) : m_eos(eos) {
     m_nf = HLLC::create();
     m_CFL = 0.5;
+    m_axial = false;
     m_limiter = Limiter("MC");
     m_dt = NAN;
     m_max_dt = std::numeric_limits<double>::max();
@@ -33,6 +34,10 @@ void SmFluid::set_CFL(double CFL) {
 
 void SmFluid::set_accuracy(int acc) {
     m_acc = std::min(std::max(1, acc), 2);  // 1 или 2
+}
+
+void SmFluid::set_axial(bool axial) {
+    m_axial = axial;
 }
 
 void SmFluid::set_method(Fluxes method) {
@@ -95,23 +100,8 @@ void SmFluid::update(Mesh &mesh) {
 
 void SmFluid::compute_dt(Mesh &mesh) {
     double dt = mesh.min([this](Cell &cell) -> double {
-        double dt = std::numeric_limits<double>::infinity();
-
-        // скорость звука
         double c = m_eos->sound_speed_rP(cell(U).density, cell(U).pressure);
-
-        for (auto &face: cell.faces()) {
-            // Нормальная составляющая скорости
-            double vn = cell(U).velocity.dot(face.normal());
-
-            // Максимальное по модулю СЗ
-            double lambda = std::abs(vn) + c;
-
-            // Условие КФЛ
-            dt = std::min(dt, cell.volume() / (face.area() * lambda));
-        }
-
-        return dt;
+        return cell.incircle_diameter() / (cell(U).velocity.norm() + c);
     });
 
     dt = std::min(m_CFL * dt, m_max_dt);
@@ -146,7 +136,7 @@ void SmFluid::fluxes(Mesh &mesh) {
         Flux flux;
         for (auto &face: cell.faces()) {
             // Внешняя нормаль
-            auto &normal = face.normal();
+            auto normal = face.normal();
 
             // Примитивный вектор соседа
             PState z_n;
@@ -154,6 +144,10 @@ void SmFluid::fluxes(Mesh &mesh) {
                 z_n = face.neib(U).get_state();
             } else {
                 z_n = boundary_value(z_c, normal, face.flag());
+            }
+
+            if (face.center().y() < 1.0e-10) {
+                continue;
             }
 
             // Значение на грани со стороны ячейки
@@ -167,11 +161,16 @@ void SmFluid::fluxes(Mesh &mesh) {
             loc_flux.to_global(normal);
 
             // Суммируем поток
-            flux.arr() += loc_flux.arr() * face.area();
+            flux.arr() += loc_flux.arr() * face.area(m_axial);
         }
 
         // Обновляем значение в ячейке (консервативные переменные)
-        q_c.arr() -= (m_dt / cell.volume()) * flux.arr();
+        q_c.arr() -= (m_dt / cell.volume(m_axial)) * flux.arr();
+
+        if (m_axial) {
+            double coeff = 2.0 * M_PI * cell.volume() / cell.volume(m_axial);
+            q_c.momentum.y() += coeff * z_c.pressure * m_dt;
+        }
 
         // Новое значение примитивных переменных
         cell(U).next = PState(q_c, *m_eos);
@@ -193,7 +192,7 @@ void SmFluid::fluxes_stage1(Mesh &mesh)  {
         Flux flux;
         for (auto &face: cell.faces()) {
             // Внешняя нормаль и центр грани
-            auto &normal = face.normal();
+            auto normal = face.normal();
             auto &face_c = face.center();
 
             // Возвращает саму ячейку, если соседа не существует
@@ -233,11 +232,16 @@ void SmFluid::fluxes_stage1(Mesh &mesh)  {
             loc_flux.to_global(normal);
 
             // Суммируем поток
-            flux.arr() += loc_flux.arr() * face.area();
+            flux.arr() += loc_flux.arr() * face.area(m_axial);
         }
 
         // Обновляем значение в ячейке (консервативные переменные)
-        q_c.arr() -= (0.5 * m_dt / cell.volume()) * flux.arr();
+        q_c.arr() -= (0.5 * m_dt / cell.volume(m_axial)) * flux.arr();
+
+        if (m_axial) {
+            double coeff = M_PI * cell.volume() / cell.volume(m_axial);
+            q_c.momentum.y() += coeff * z_c.pressure * m_dt;
+        }
 
         // Значение примитивных переменных на полушаге
         cell(U).half = PState(q_c, *m_eos);
@@ -262,7 +266,7 @@ void SmFluid::fluxes_stage2(Mesh &mesh)  {
         Flux flux;
         for (auto &face: cell.faces()) {
             // Внешняя нормаль и центр грани
-            auto &normal = face.normal();
+            auto  normal = face.normal();
             auto &face_c = face.center();
 
             // Возвращает саму ячейку, если соседа не существует
@@ -321,11 +325,16 @@ void SmFluid::fluxes_stage2(Mesh &mesh)  {
             loc_flux.to_global(normal);
 
             // Суммируем поток
-            flux.arr() += loc_flux.arr() * face.area();
+            flux.arr() += loc_flux.arr() * face.area(m_axial);
         }
 
         // Обновляем значение в ячейке (консервативные переменные)
-        q_c.arr() -= (m_dt / cell.volume()) * flux.arr();
+        q_c.arr() -= (m_dt / cell.volume(m_axial)) * flux.arr();
+
+        if (m_axial) {
+            double coeff = 2.0 * M_PI * cell.volume() / cell.volume(m_axial);
+            q_c.momentum.y() += coeff * z_ch.pressure * m_dt;
+        }
 
         // Значение примитивных переменных на новом слое
         cell(U).next = PState(q_c, *m_eos);
@@ -352,9 +361,9 @@ Distributor SmFluid::distributor(const std::string& type) const {
         QState q_p;
         for (auto &child: children) {
             QState q_ch(child(U).get_state());
-            q_p.arr() += q_ch.arr() * child.volume();
+            q_p.arr() += q_ch.arr() * child.get_volume();
         }
-        q_p.arr() /= parent.volume();
+        q_p.arr() /= parent.get_volume();
         PState z_p(q_p, *m_eos);
         parent(U).set_state(z_p);
     };

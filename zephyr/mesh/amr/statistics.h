@@ -14,7 +14,7 @@ namespace zephyr::mesh::amr {
 using zephyr::utils::threads;
 using zephyr::utils::mpi;
 
-/// @struct Содержит статистику о числе ячеек с флагами -1, 0 и 1 в некотором
+/// @brief Содержит статистику о числе ячеек с флагами -1, 0 и 1 в некотором
 /// диапазоне ячеек. В том числе и для одной ячейки.
 struct PartStatistics {
     int n_coarse = 0; ///< Число ячеек в диапазоне для огрубления
@@ -45,7 +45,7 @@ inline PartStatistics cell_statistics(AmrStorage::Item& cell) {
     }
 }
 
-/// @struct Содержит статистику о числе ячеек с флагами -1, 0 и 1, число новых
+/// @brief Содержит статистику о числе ячеек с флагами -1, 0 и 1, число новых
 /// дочерних и родительских ячеек и другие параметры
 struct Statistics {
     int n_cells;     ///< Исходное количество в AmrStorage (перед адаптацией)

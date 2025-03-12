@@ -15,7 +15,6 @@ enum class Post : int {
     // ...
 };
 
-/// @class Просто забавное название)
 class Tourism {
 public:
     Tourism() :

@@ -1,11 +1,11 @@
-/// @file Файл содержит реализацию функций для разбиения ячейки.
+/// @brief Файл содержит реализацию функций для разбиения ячейки.
 /// Данный файл не устанавливается при установке zephyr, все изложенные описания
 /// алгоритмов и комментарии к функциям предназначены исключительно для разработчиков.
 
 #pragma once
 
 #include <zephyr/mesh/primitives/amr_cell.h>
-#include <zephyr/geom/cube.h>
+#include <zephyr/geom/primitives/cube.h>
 
 #include <zephyr/mesh/amr/common.h>
 #include <zephyr/mesh/amr/faces.h>
@@ -17,23 +17,23 @@ namespace zephyr::mesh::amr {
 /// @param cube Родительская ячейка
 /// @return Массив с дочерними ячейками
 template <int dim>
-std::array<AmrCell, CpC(dim)> create_children(const SqCube& cube);
+std::array<AmrCell, CpC(dim)> create_children(const SqCube& cube, bool axial);
 
 /// @brief Создать геометрию дочерних ячеек по родительским вершинам (2D)
 /// @param cube Вершины родительской ячейки
 /// @return Массив с дочерними ячейками
 template <>
-std::array<AmrCell, CpC(2)> create_children<2>(const SqCube& cube) {
+std::array<AmrCell, CpC(2)> create_children<2>(const SqCube& cube, bool axial) {
     auto quads = cube.as2D().children();
-    return {AmrCell(quads[0]), AmrCell(quads[1]),
-            AmrCell(quads[2]), AmrCell(quads[3])};
+    return {AmrCell(quads[0], axial), AmrCell(quads[1], axial),
+            AmrCell(quads[2], axial), AmrCell(quads[3], axial)};
 }
 
 /// @brief Создать геометрию дочернх ячеек по родительским вершинам (3D)
 /// @param cube Вершины родительской ячейки
 /// @return Массив с дочерними ячейками
 template <>
-std::array<AmrCell, CpC(3)> create_children<3>(const SqCube& cube) {
+std::array<AmrCell, CpC(3)> create_children<3>(const SqCube& cube, bool axial) {
     auto cubes = cube.children();
     return {
             AmrCell(cubes[0]), AmrCell(cubes[1]), AmrCell(cubes[2]), AmrCell(cubes[3]),
@@ -131,7 +131,7 @@ void check_link(std::array<AmrCell, CpC(dim)>& children, AmrCell &parent) {
             for (; side2 < FpC(dim); ++side2) {
                 auto &face2 = child2.faces[side2];
 
-                if ((face1.center - face2.center).norm() < 1.0e-5 * parent.size) {
+                if ((face1.center - face2.center).norm() < 1.0e-5 * parent.linear_size()) {
                     break;
                 }
             }
@@ -158,7 +158,7 @@ template<int dim>
 std::array<AmrCell, CpC(dim)> get_children(AmrCell &cell) {
     const auto children_by_side = get_children_by_side<dim>();
 
-    auto children = create_children<dim>(cell.vertices);
+    auto children = create_children<dim>(cell.vertices, cell.axial);
 
     for (int i = 0; i < CpC(dim); ++i) {
         auto& child = children[i];
@@ -205,7 +205,7 @@ std::array<AmrCell, CpC(dim)> get_children(AmrCell &cell) {
                     BFace& cell_face = cell.faces[s];
                     auto cell_fc = cell_face.center;
 
-                    if ((child_fc - cell_fc).norm() < 1.0e-5 * cell.size) {
+                    if ((child_fc - cell_fc).norm() < 1.0e-5 * cell.linear_size()) {
                         child_face.adjacent = cell_face.adjacent;
                         break;
                     }

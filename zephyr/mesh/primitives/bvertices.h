@@ -1,8 +1,8 @@
 #pragma once
 
-#include <zephyr/geom/cube.h>
-#include <zephyr/geom/polygon.h>
-#include <zephyr/geom/polyhedron.h>
+#include <zephyr/geom/primitives/cube.h>
+#include <zephyr/geom/primitives/polygon.h>
+#include <zephyr/geom/primitives/polyhedron.h>
 
 namespace zephyr::mesh {
 

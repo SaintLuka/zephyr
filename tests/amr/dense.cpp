@@ -1,4 +1,5 @@
-/// @file Тестирование AMR на задачах с движением больших областей с высоким
+/// @file dense.cpp
+/// @brief Тестирование AMR на задачах с движением больших областей с высоким
 /// уровнем адаптации. Под большими областями понимаются области, которые имеют
 /// ту же меру размерности, что и сама область.
 
@@ -6,7 +7,7 @@
 
 #include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/geom/generator/rectangle.h>
-#include <zephyr/geom/polygon.h>
+#include <zephyr/geom/primitives/polygon.h>
 #include <zephyr/io/pvd_file.h>
 #include <zephyr/io/variables.h>
 #include <zephyr/utils/stopwatch.h>

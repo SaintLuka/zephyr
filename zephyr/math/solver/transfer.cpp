@@ -1,6 +1,6 @@
 #include <zephyr/math/solver/transfer.h>
 #include <zephyr/mesh/primitives/bface.h>
-#include <zephyr/geom/polygon.h>
+#include <zephyr/geom/primitives/polygon.h>
 #include <zephyr/geom/intersection.h>
 #include <zephyr/geom/sections.h>
 
@@ -486,7 +486,7 @@ void Transfer::fluxes_MUSCL(EuCell &cell, Direction dir) {
         auto neib = face.neib();
         auto &zn = neib(U);
 
-        auto& fn = face.normal();
+        auto fn = face.normal();
         double vn = velocity(face.center()).dot(fn);
 
         double a_sig = NAN;
@@ -948,9 +948,9 @@ Distributor Transfer::distributor() const {
     distr.merge = [](Children &children, AmrStorage::Item& parent) {
         double sum = 0.0;
         for (auto &child: children) {
-            sum += child(U).u1 * child.volume();
+            sum += child(U).u1 * child.volume;
         }
-        parent(U).u1 = sum / parent.volume();
+        parent(U).u1 = sum / parent.volume;
     };
 
     return distr;
@@ -977,9 +977,9 @@ AmrStorage Transfer::scheme(EuMesh& mesh) {
             const auto& V2 = velocity(face.vs(1));
 
             // Нормаль к грани
-            auto &fn = face.normal();
+            auto Sn = face.area_n();
 
-            if ((V1 + V2).dot(fn) < 0.0) {
+            if ((V1 + V2).dot(Sn) < 0.0) {
                 continue;
             }
 
@@ -1004,7 +1004,7 @@ AmrStorage Transfer::scheme(EuMesh& mesh) {
             const auto& V2 = velocity(face.vs(1));
 
             // Нормаль к грани
-            auto &fn = face.normal();
+            auto fn = face.normal();
 
             if ((V1 + V2).dot(fn) < 0.0) {
                 continue;

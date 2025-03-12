@@ -4,10 +4,11 @@
 
 namespace zephyr::geom {
 
-/// @namespace Objects, простейшие геометрические объекты
+/// @namespace zephyr::geom::obj
+/// @brief Простейшие геометрические объекты: отрезок, линия, луч, плоскость
 namespace obj {
 
-/// @struct Отрезок
+/// @brief Отрезок
 struct segment {
     Vector3d v1;  ///< Начальная точка
     Vector3d v2;  ///< Конечная точка
@@ -17,58 +18,59 @@ struct segment {
         return v1 + (v2 - v1) * t;
     }
 
-    /// Направляющая
+    /// @brief Направляющая
     Vector3d tau() const {
         return v2 - v1;
     }
 
+    /// @brief Длина
     double length() const {
         return (v2 - v1).norm();
     }
 };
 
-/// @struct Прямая
+/// @brief Прямая
 struct line {
     Vector3d p;    ///< Точка прямой
     Vector3d tau;  ///< Направляющая
 
-    /// Параметризация: r(t) = p + tau * t
+    /// @brief Параметризация: r(t) = p + tau * t
     Vector3d get(double t) const {
         return p + tau * t;
     }
 };
 
-/// @struct Луч
+/// @brief Луч
 struct ray {
     Vector3d p;    ///< Начало луча
     Vector3d tau;  ///< Направление луча
 
-    /// Параметризация r(t) = p + tau * t
+    /// @brief Параметризация r(t) = p + tau * t
     Vector3d get(double t) const {
         return p + tau * t;
     }
 };
 
-/// @struct Плоскость
-/// Множество точек r: (r - p, n) = 0.
-/// Считается, что нормаль n -- внешняя.
+/// @brief Плоскость
+/// @details Множество точек r: (r - p, n) = 0.
+///          Считается, что нормаль n -- внешняя.
 struct plane {
     Vector3d p;   ///< Точка плоскости
     Vector3d n;   ///< Внешняя нормаль плоскости
 
-    /// Параметризация в двумерном случае (прямая)
+    /// @brief Параметризация в двумерном случае (прямая)
     /// Нормаль n - правая при движении вдоль прямой.
     Vector3d get(double t) const {
         return {p.x() - n.y() * t, p.y() + n.x() * t, 0.0};
     }
 
-    // Под плоскостью (n -- внешняя нормаль)
+    /// @brief Под плоскостью? (n -- внешняя нормаль)
     bool under(const Vector3d& v) {
         return (v - p).dot(n) < 0.0;
     }
 
-    // Положение точки относительно плоскости
-    // -1: под, 0: на, +1: над
+    /// @brief Положение точки относительно плоскости
+    /// @return -1: под, 0: на, +1: над
     int position(const Vector3d& v) {
         double val = (v - p).dot(n);
         return val == 0.0 ? 0 : (val < 0.0 ? -1 : +1);
@@ -84,7 +86,9 @@ struct circle {
 } // namespace obj
 
 
-/// @brief В функциях данного пространства имен подразумевается,
+/// @namespace zephyr::geom::intersection2D
+/// @brief Пересечения на плоскости
+/// @details В функциях данного пространства имен подразумевается,
 /// что объекты являются двумерными, то есть координата z = 0.
 /// В данном случае структура plane подразумевается прямой.
 namespace intersection2D {
@@ -122,7 +126,7 @@ Vector3d find_fast(const obj::plane& plane, const obj::segment& seg);
 
 
 /// @brief Пересечение окружности и отрезка
-/// Пусть прямая задана параметрически: r(t) = p + tau * t
+/// @details Пусть прямая задана параметрически: r(t) = p + tau * t
 /// Если пересечения с окружностью существуют, тогда находятся
 /// параметры t1, t2 и соответствующие точки пересечения p1, p2
 /// Пересечение по касательной игнорируется.
@@ -143,6 +147,8 @@ circle_segment_intersection find(const obj::circle& circle, const obj::segment& 
 
 
 
+/// @namespace zephyr::geom::intersection3D
+/// @brief Пересечения в пространстве
 namespace intersection3D {
 
 } // namespace intersection3D

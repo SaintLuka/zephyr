@@ -128,18 +128,14 @@ public:
     }
 
     /// @brief Ссылка на геометрию ячейки
-    inline AmrCell& geom(){
-        return *m_it;
-    }
+    inline AmrCell& geom() { return *m_it; }
 
     /// @brief Ссылка на геометрию ячейки
-    inline const AmrCell& geom() const {
-        return *m_it;
-    }
+    inline const AmrCell& geom() const { return *m_it; }
 
     /// @brief Выбрать грань на стороне. Корректно работает
     /// для декартовых сеток без адаптации
-    EuFace face(const Side side) const;
+    EuFace face(Side side) const;
 
     /// @brief Итератор по граням
     /// @param dir Выбрать грани по некоторым направлениям
@@ -201,28 +197,25 @@ public:
     inline const double& z() const { return m_it->center.z(); }
 
     /// @brief Линейный размер ячейки
-    inline const double& size() const { return m_it->size; }
+    inline double linear_size() const { return m_it->linear_size(); }
 
     /// @brief Площадь (в 2D) или объем (в 3D) ячейки
-    inline double volume() const { return m_it->volume(); }
+    inline double volume() const { return m_it->volume; }
+
+    /// @brief Объем обычной или осесимметричной ячейки
+    inline double volume(bool axial) const { return axial? m_it->volume_alt : m_it->volume; }
 
     /// @brief Вершина ячейки по индексу
-    inline const Vector3d& vs(int idx) const {
-        return m_it->vertices[idx];
-    }
+    inline const Vector3d& vs(int idx) const { return m_it->vertices[idx]; }
 
     /// @brief Оператор доступа по индексам отображения
     /// @tparam i, j, k in {-1, 0, +1}
     template <int i, int j, int k = -1>
-    inline const Vector3d &vs() const {
-        return m_it->vertices.vs<i, j, k>();
-    }
+    inline const Vector3d &vs() const { return m_it->vertices.vs<i, j, k>(); }
 
     /// @brief Скорпировать вершины в полигон (двумерные ячейки)
     /// Для нелинейных AMR-ячеек возвращает до 8 граней.
-    inline geom::Polygon polygon() const {
-        return m_it->polygon();
-    }
+    inline geom::Polygon polygon() const { return m_it->polygon(); }
 
     /// @brief Диаметр вписаной окружности.
     /// @details Для AMR-ячейки представляет собой минимальное расстояние между
@@ -231,9 +224,7 @@ public:
     /// Величину удобно использовать совместно с условием Куранта.
     /// Для двумерных расчетов на прямоугольных сетках совпадает с минимальной
     /// стороной прямоугольной ячейки.
-    inline double incircle_diameter() const {
-        return m_it->incircle_diameter();
-    }
+    inline double incircle_diameter() const { return m_it->incircle_diameter(); }
 
     /// @brief Оценка объемной доли, которая отсекается от ячейки некоторым телом.
     /// @param inside Характеристическая функция области, возвращает true для

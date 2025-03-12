@@ -6,8 +6,8 @@
 
 namespace zephyr::geom::generator {
 
-/// @class Rectangle. Простой класс для генерации декартовой сетки
-/// или сетки из ячеек Воронного внутри прямоугольной области.
+/// @brief Простой класс для генерации декартовой сетки или сетки
+/// из ячеек Воронного внутри прямоугольной области.
 class Rectangle : public Generator {
 public:
     using Ptr = std::shared_ptr<Rectangle>;
@@ -38,6 +38,9 @@ public:
     static Rectangle::Ptr create(Args&&... args){
         return std::make_shared<Rectangle>(std::forward<Args>(args)...);
     }
+
+    /// @brief Использовать осевую симметрию (вращение вокруг оси Ox)
+    void set_axial(bool axial = true);
 
     /// @brief Установить желаемое число ячеек сетки по оси Ox
     /// @details Число ячеек по оси Oy подбирается так, чтобы aspect ячеек
@@ -115,7 +118,8 @@ private:
     double m_xmin, m_xmax;  ///< Границы области по оси X
     double m_ymin, m_ymax;  ///< Границы области по оси Y
     Boundaries m_bounds;    ///< Граничные условия
-    bool m_voronoi;         ///< Использовать ячейки Вороного
+    bool m_voronoi = false; ///< Использовать ячейки Вороного
+    bool m_axial = false;   ///< Осевая симметрия
 };
 
 } // namespace zephyr::geom::generator

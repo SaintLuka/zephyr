@@ -140,7 +140,7 @@ Box SemicircleCutout::bbox() const {
     Vector3d vmin(m_xmin, m_ymin, 0.0);
     Vector3d vmax(m_xmax, m_ymax, 0.0);
 
-    return Box(vmin, vmax);
+    return {vmin, vmax};
 }
 
 void SemicircleCutout::check_params() const {

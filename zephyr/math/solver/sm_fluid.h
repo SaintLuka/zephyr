@@ -15,8 +15,9 @@ using zephyr::phys::Eos;
 
 using namespace smf;
 
-/// @class Single-Material Fluid.
-/// @brief Решатель классической одноматериальной газодинамики
+/// @class SmFluid sm_fluid.h
+/// @brief Single-Material Fluid. Решатель для классической
+/// одноматериальной гидро- и газодинамики.
 class SmFluid {
 public:
 
@@ -65,6 +66,9 @@ public:
 
     /// @brief Задать точность метода (1 или 2)
     void set_accuracy(int acc);
+
+    /// @brief Установить осевую симметрию
+    void set_axial(bool axial = true);
 
     /// @brief Установить метод
     void set_method(Fluxes method);
@@ -118,6 +122,7 @@ protected:
     Eos::Ptr m_eos;          ///< Уравнение состояния
     NumFlux::Ptr m_nf;       ///< Метод расчёта потока
     int m_acc = 1;           ///< Порядок точности
+    bool m_axial;            ///< Осевая симметрия
     Limiter m_limiter;       ///< Ограничитель градиента
     double m_CFL = 0.5;      ///< Число Куранта
     double m_dt;             ///< Шаг интегрирования

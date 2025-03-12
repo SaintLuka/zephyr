@@ -13,23 +13,22 @@ inline double sqr(double x) {
     return x * x;
 }
 
-/// @brief Скорость звука от плотности (rho) и давления (p)
+// Скорость звука от плотности (rho) и давления (p)
 inline double eos_sound(cref rho, cref p, cref gamma, cref p0) {
     return std::sqrt(gamma * (p + p0) / rho);
 }
 
-/// @brief Плотность от давления (p) и скорости звука (c)
+// Плотность от давления (p) и скорости звука (c)
 inline double eos_density(cref p, cref c, cref gamma, cref p0) {
     return gamma * (p + p0) / sqr(c);
 }
 
-/// @brief Внутренняя энергия от плотности (rho) и давления (p)
+// Внутренняя энергия от плотности (rho) и давления (p)
 inline double eos_energy(cref rho, cref p, cref gamma, cref p0, cref eps0) {
     return eps0 + (p + gamma * p0) / ((gamma - 1.0) * rho);
 }
 
-/// @brief Начальное давление для итераций по Ньютону
-/// (акустическое приближение)
+// Начальное давление для итераций по Ньютону (акустическое приближение)
 inline double p_init(
         cref rL, cref uL, cref pL, cref cL, cref p0L,
         cref rR, cref uR, cref pR, cref cR, cref p0R) {
@@ -44,8 +43,7 @@ inline double p_init(
     return std::max(Pmin, P);
 }
 
-/// @brief Начальное давление для итераций по Ньютону
-/// (две ударных волны)
+// Начальное давление для итераций по Ньютону (две ударных волны)
 inline double p_init_two_shocks(
         cref rL, cref uL, cref pL, cref cL, cref p0L,
         cref rR, cref uR, cref pR, cref cR, cref p0R) {
@@ -54,8 +52,7 @@ inline double p_init_two_shocks(
                   rR, uR, pR, cR, p0R);
 }
 
-/// @brief Начальное давление для итераций по Ньютону
-/// (две волны разрежения)
+// Начальное давление для итераций по Ньютону (две волны разрежения)
 inline double p_init_two_rarefactions(
         cref rL, cref uL, cref pL, cref cL, cref p0L,
         cref rR, cref uR, cref pR, cref cR, cref p0R) {
@@ -96,7 +93,7 @@ inline double deriv_fK(
     }
 }
 
-/// @struct Минималистичная структура для хранения пары чисел:
+/// @brief Минималистичная структура для хранения пары чисел:
 /// давления P и скорости U на контактном разрыве при решении
 /// задачи Римана о распаде разрыва
 struct SolPU {

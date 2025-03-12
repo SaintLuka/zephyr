@@ -5,11 +5,11 @@
 
 #include <zephyr/mesh/euler/amr_storage.h>
 
-namespace zephyr { namespace io {
+namespace zephyr::io {
 
 using zephyr::mesh::AmrStorage;
 
-/// @class Абстрактный фильтр для сохранения элементов хранилища в VTU файл
+/// @brief Абстрактный фильтр для сохранения элементов хранилища в VTU файл
 class Filter {
 public:
     /// @brief Оператор фильтрации, возвращает true, если элемент хранилища,
@@ -22,7 +22,7 @@ public:
     virtual bool is_trivial() const = 0;
 };
 
-/// @class Тривиальный фильтр, сохраняет все элементы хранилища
+/// @brief Тривиальный фильтр, сохраняет все элементы хранилища
 class TrivialFilter : public Filter {
 public:
     bool operator()(AmrStorage::Item& cell) const override {
@@ -34,7 +34,7 @@ public:
     }
 };
 
-/// @class Оставляет элементы только внутри некоторого параллелепипеда
+/// @brief Оставляет элементы только внутри некоторого параллелепипеда
 class BoxFilter : public Filter {
 public:
     BoxFilter(
@@ -62,7 +62,7 @@ private:
     double xmin, xmax, ymin, ymax, zmin, zmax;
 };
 
-/// @class Оставляет только элементы внутри некоторого цилиндра
+/// @brief Оставляет только элементы внутри некоторого цилиндра
 class CylinderFilter : public Filter {
 public:
     CylinderFilter(double r, double x = 0.0, double y = 0.0)
@@ -82,7 +82,7 @@ private:
     double r, x, y;
 };
 
-/// @class Сложный фильтр, позволяет объединить набор других фильтров.
+/// @brief Сложный фильтр, позволяет объединить набор других фильтров.
 /// При пустом наборе фильтров является тривиальным. Новые фильтры добавляются
 /// с помощью изящного оператора +=.
 /// @code
@@ -134,6 +134,5 @@ private:
     std::vector<std::unique_ptr<Filter>> filters;
 };
 
-} // namespace io
-} // namespace zephyr
+} // namespace zephyr::io
 

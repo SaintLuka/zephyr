@@ -42,6 +42,9 @@ enum class CrpMode {
     MUSCL,      ///< По градиенту объемных долей
 };
 
+/// @class MmFluid mm_fluid.h
+/// @brief Multi-Material Fluid. Решатель для многоматериальной гидро- и
+/// газодинамики с равновесием по давлению и температуре.
 class MmFluid {
 public:
 

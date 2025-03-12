@@ -1,9 +1,9 @@
 #include <iostream>
 #include <iomanip>
 
-#include <zephyr/geom/cube.h>
-#include <zephyr/geom/triangle.h>
-#include <zephyr/geom/polygon.h>
+#include <zephyr/geom/primitives/cube.h>
+#include <zephyr/geom/primitives/triangle.h>
+#include <zephyr/geom/primitives/polygon.h>
 
 using namespace zephyr::geom;
 

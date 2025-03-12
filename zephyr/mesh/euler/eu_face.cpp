@@ -27,10 +27,6 @@ EuFace::EuFace(const EuCell &cell, BFace* self, BFace* end, Direction dir)
     }
 }
 
-const Vector3d &EuFace::normal() const {
-    return m_face->normal;
-}
-
 EuCell EuFace::neib() const {
     return m_face->is_boundary() ? m_cell : m_cell.neib(*m_face);
 }
@@ -51,8 +47,20 @@ void EuFace::set_boundary(Boundary flag) {
     m_face->boundary = flag;
 }
 
+const Vector3d& EuFace::normal() const {
+    return m_face->normal;
+}
+
 double EuFace::area() const {
     return m_face->area;
+}
+
+double EuFace::area(bool axial) const {
+    return m_face->get_area(axial);
+}
+
+Vector3d EuFace::area_n() const {
+    return m_face->area_n();
 }
 
 const Vector3d& EuFace::vs(int idx) const {

@@ -10,13 +10,12 @@ namespace zephyr::mesh {
 AmrCell::AmrCell(const Quad& quad)
     : Element(0, 0), dim(2),
     adaptive(true), linear(true),
+    axial(false), volume_alt(NAN),
     vertices(quad), faces(CellType::AMR2D),
     b_idx(-1), z_idx(-1), level(0), flag(0) {
 
-    double area = quad.area();
-
-    size = std::sqrt(area);
-    center = quad.centroid(area);
+    volume = quad.area();
+    center = quad.centroid(volume);
 
     for (int i = 0; i < 4; ++i) {
         Line vs = {
@@ -31,19 +30,62 @@ AmrCell::AmrCell(const Quad& quad)
     }
 }
 
+AmrCell::AmrCell(const Quad& quad, bool axial)
+        : Element(0, 0), dim(2),
+          adaptive(true), linear(true), axial(axial),
+          vertices(quad), faces(CellType::AMR2D),
+          b_idx(-1), z_idx(-1), level(0), flag(0) {
+
+    for (int i = 0; i < vertices.count(); ++i) {
+        if (vertices[i].z() != 0.0) {
+            throw std::runtime_error("No way");
+        }
+    }
+
+    volume = quad.area();
+    if (!axial) {
+        volume_alt = NAN;
+        center     = quad.centroid(volume);
+    }
+    else {
+        volume_alt = quad.volume_as();
+        center     = quad.centroid_as(volume_alt);
+    }
+
+    for (int i = 0; i < 4; ++i) {
+        Line vs = {
+                vertices[faces[i].vertices[0]],
+                vertices[faces[i].vertices[1]]
+        };
+
+        faces[i].area     = vs.length();
+        faces[i].center   = vs.centroid(axial);
+        faces[i].normal   = vs.normal(center);
+        faces[i].boundary = Boundary::ORDINARY;
+
+        if (axial) {
+            faces[i].area_alt = vs.area_as();
+        }
+    }
+}
+
 AmrCell::AmrCell(const SqQuad& quad)
     : AmrCell(quad.reduce()) {
     //std::cerr << "Nonlinear AmrCells is not supported\n";
 }
 
+AmrCell::AmrCell(const SqQuad& quad, bool axial)
+        : AmrCell(quad.reduce(), axial) {
+    //std::cerr << "Nonlinear AmrCells is not supported\n";
+}
+
 AmrCell::AmrCell(const Cube& cube)
     : Element(0, 0), dim(3),
-    adaptive(true), linear(true),
+    adaptive(true), linear(true), axial(false),
     vertices(cube), faces(CellType::AMR3D),
     b_idx(-1), z_idx(-1), level(0), flag(0) {
 
-    double volume = cube.volume();
-    size = std::cbrt(volume);
+    volume = cube.volume();
     center = cube.centroid(volume);
 
     for (int i = 0; i < 6; ++i) {
@@ -68,14 +110,12 @@ AmrCell::AmrCell(const SqCube& cube)
 
 AmrCell::AmrCell(const Polygon& poly)
         : Element(0, 0), dim(2),
-          adaptive(false), linear(true),
+          adaptive(false), linear(true), axial(false),
           vertices(poly), faces(CellType::POLYGON, poly.size()),
           b_idx(-1), z_idx(-1), level(0), flag(0) {
 
-    double area = poly.area();
-
-    size   = std::sqrt(area);
-    center = poly.centroid(area);
+    volume = poly.area();
+    center = poly.centroid(volume);
 
     for (int i = 0; i < poly.size(); ++i) {
         Line vs = {
@@ -96,10 +136,8 @@ AmrCell::AmrCell(Polyhedron poly)
           vertices(poly), faces(CellType::POLYHEDRON),
           b_idx(-1), z_idx(-1), level(0), flag(0)  {
 
-    double vol = poly.volume();
-
-    size   = std::cbrt(vol);
-    center = poly.centroid(vol);
+    volume = poly.volume();
+    center = poly.centroid(volume);
 
     if (poly.n_faces() > BFaces::max_count) {
         throw std::runtime_error("Polygon has > 24 faces");
@@ -136,8 +174,35 @@ AmrCell::AmrCell(Polyhedron poly)
     }
 }
 
-double AmrCell::volume() const {
-    return size * (dim < 3 ? size : size * size);
+double AmrCell::linear_size() const {
+    return dim < 3 ? std::sqrt(volume) : std::cbrt(volume);
+}
+
+inline double min(double x, double y, double z) {
+    return std::min(x, std::min(y, z));
+}
+
+double AmrCell::incircle_diameter() const {
+    if (adaptive) {
+        if (dim == 2) {
+            return std::sqrt(std::min(
+                    (vertices.vs<+1, 0>() - vertices.vs<-1, 0>()).squaredNorm(),
+                    (vertices.vs<0, +1>() - vertices.vs<0, -1>()).squaredNorm()));
+        }
+        else {
+            return std::sqrt(min(
+                    (vertices.vs<+1, 0, 0>() - vertices.vs<-1, 0, 0>()).squaredNorm(),
+                    (vertices.vs<0, +1, 0>() - vertices.vs<0, -1, 0>()).squaredNorm(),
+                    (vertices.vs<0, 0, +1>() - vertices.vs<0, 0, -1>()).squaredNorm()));
+        }
+    }
+    else {
+        assert(dim == 2);
+        int n = vertices.count();
+        // Диаметр описаной окружности вокруг правильного многоугольника
+        // с площадью volume.
+        return 2.0 * std::sqrt(volume / (n * std::tan(M_PI / n)));
+    }
 }
 
 Polygon AmrCell::polygon() const {
@@ -178,30 +243,20 @@ Polyhedron AmrCell::polyhedron() const {
     throw std::runtime_error("AmrCell::polyhedron");
 }
 
-inline double min(double x, double y, double z) {
-    return std::min(x, std::min(y, z));
-}
+void AmrCell::mark_actual_nodes(int mark) {
+    static_assert(BNodes::max_count == BVertices::max_count);
 
-double AmrCell::incircle_diameter() const {
-    if (adaptive) {
-        if (dim == 2) {
-            return std::sqrt(std::min(
-                    (vertices.vs<+1, 0>() - vertices.vs<-1, 0>()).squaredNorm(),
-                    (vertices.vs<0, +1>() - vertices.vs<0, -1>()).squaredNorm()));
+    nodes.clear();
+    for (const BFace &face: faces) {
+        for (int k = 0; k < BFace::max_size; ++k) {
+            int iv = face.vertices[k];
+            if (iv >= 0) {
+                nodes[iv] = -13;
+            }
+            else {
+                break;
+            }
         }
-        else {
-            return std::sqrt(min(
-                    (vertices.vs<+1, 0, 0>() - vertices.vs<-1, 0, 0>()).squaredNorm(),
-                    (vertices.vs<0, +1, 0>() - vertices.vs<0, -1, 0>()).squaredNorm(),
-                    (vertices.vs<0, 0, +1>() - vertices.vs<0, 0, -1>()).squaredNorm()));
-        }
-    }
-    else {
-        assert(dim == 2);
-        int n = vertices.count();
-        // Диаметр описаной окружности вокруг правильного многоугольника
-        // с площадью size^2.
-        return 2.0 * size / std::sqrt(n * std::tan(M_PI / n));
     }
 }
 
@@ -295,7 +350,7 @@ double AmrCell::volume_fraction(const std::function<double(const Vector3d &)> &i
                 res += tri.volume_fraction(inside, N) * tri.area();
             }
 
-            return res / volume();
+            return res / volume;
         }
     }
     else {
@@ -373,23 +428,6 @@ double AmrCell::integrate_low(const std::function<double(const Vector3d&)>& func
     else {
         // Трехмерная ячейка
         throw std::runtime_error("AmrCell::volume_fraction #1");
-    }
-}
-
-void AmrCell::mark_actual_nodes(int mark) {
-    static_assert(BNodes::max_count == BVertices::max_count);
-
-    nodes.clear();
-    for (const BFace &face: faces) {
-        for (int k = 0; k < BFace::max_size; ++k) {
-            int iv = face.vertices[k];
-            if (iv >= 0) {
-                nodes[iv] = -13;
-            }
-            else {
-                break;
-            }
-        }
     }
 }
 

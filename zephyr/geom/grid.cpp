@@ -355,6 +355,10 @@ Grid::Grid() : structured(false) {
 
 }
 
+void Grid::set_axial(bool axial) {
+    m_axial = axial;
+}
+
 int Grid::n_nodes() const {
     return m_nodes.size();
 }
@@ -424,7 +428,7 @@ AmrCell Grid::amr_cell(int idx) const {
 
         Quad vlist = {v1->v, v2->v, v3->v, v4->v};
 
-        AmrCell cell(vlist);
+        AmrCell cell(vlist, m_axial);
 
         cell.rank  = mpi::rank();
         cell.index = idx;

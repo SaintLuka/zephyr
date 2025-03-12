@@ -2,7 +2,7 @@
 #list(APPEND TESTS distributed-amr)
 #list(APPEND TESTS distributed-conv)
 #list(APPEND TESTS distributed-conv-amr)
-#list(APPEND TESTS json_config)
+#list(APPEND TESTS json-config)
 #list(APPEND TESTS mpitest)
 #list(APPEND TESTS range)
 #list(APPEND TESTS stopwatch)
@@ -32,8 +32,10 @@ foreach(test IN LISTS TESTS)
     install(TARGETS ${test} DESTINATION tests/utils)
 endforeach()
 
-add_custom_command(
-        TARGET json_config POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy
-        ${CMAKE_CURRENT_SOURCE_DIR}/json_config.json
-        ${CMAKE_CURRENT_BINARY_DIR})
+if (json-config IN_LIST TESTS)
+    add_custom_command(
+            TARGET json-config POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy
+            ${CMAKE_CURRENT_SOURCE_DIR}/json-config.json
+            ${CMAKE_CURRENT_BINARY_DIR})
+endif()

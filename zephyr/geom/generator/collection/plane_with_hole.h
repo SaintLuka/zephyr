@@ -8,7 +8,7 @@
 
 namespace zephyr::geom::generator::collection {
 
-/// @class PlaneWithHole. Генератор для создания сетки внутри прямоугольника с отверстием.
+/// @brief Генератор для создания сетки внутри прямоугольника с отверстием.
 class PlaneWithHole : public BlockStructured {
 public:
     using Ptr = std::shared_ptr<PlaneWithHole>;

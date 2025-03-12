@@ -74,7 +74,7 @@ const Byte* EuCell::neib_data(const BFace& face) const {
     }
 }
 
-EuFace EuCell::face(const Side side) const {
+EuFace EuCell::face(Side side) const {
     return EuFace(*this, side);
 }
 

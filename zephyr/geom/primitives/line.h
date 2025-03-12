@@ -7,6 +7,10 @@
 
 namespace zephyr::geom {
 
+/// @addtogroup Geom-Primitives
+/// @brief Геометрические примитивы
+/// @{
+
 /// @brief Представление отрезка. Содержит несколько полезных функций,
 /// а также отвечает за отображение параметра x in [-1, 1] на отрезок
 /// и сопутствующие отображению функции.
@@ -74,12 +78,25 @@ public:
     /// @brief Центр отрезка
     Vector3d center() const;
 
+    /// @brief Для отрезков эквивалентно center()
+    Vector3d centroid() const;
+
+    /// @brief Барицентр для осесимметричных задач, вращение вокруг оси x.
+    Vector3d centroid(bool axial) const;
+
     /// @brief Нормаль к отрезку, располагается в плоскости с отрезком
     /// и точкой 'c', направлена от точки 'c'.
     Vector3d normal(const Vector3d &c) const;
 
     /// @brief Длина отрезка
     double length() const;
+
+    /// @brief Площадь в случае осевой симметрии
+    double area_as() const;
+
+    /// @brief Нормаль, умноженная на длину отрезка, нормаль располагается
+    /// в плоскости с отрезком и точкой 'c', направлена от точки 'c'.
+    Vector3d area_n(const Vector3d &c) const;
 };
 
 /// @brief Криволинейный отрезок: строится по трем точкам в виде
@@ -183,5 +200,7 @@ protected:
     /// сам вектор 'a' без изменений.
     Vector3d projection(const Vector3d& a) const;
 };
+
+/// @}
 
 } // namespace zephyr::geom

@@ -4,11 +4,17 @@
 #include <vector>
 
 #include <zephyr/geom/vector.h>
-#include <zephyr/geom/quad.h>
+#include <zephyr/geom/primitives/quad.h>
 
 namespace zephyr::geom {
 
-/// @brief Представление шестигранника
+/// @addtogroup Geom-Primitives
+/// @{
+
+/// @struct Cube cube.h
+/// @brief Представление шестигранника (топологический куб)
+/// @details Линейное отображение куба [-1, 1]^3 на произвольный
+/// топологический кубоид.
 struct Cube {
 protected:
     /// @brief Вешины (таблица 2 x 2 x 2)
@@ -92,7 +98,10 @@ public:
     Vector3d centroid(double volume = 0.0) const;
 };
 
-/// @brief Представление квадратичного шестигранника
+/// @struct SqCube cube.h
+/// @brief Представление квадратичного шестигранника (топологический куб)
+/// @details Квадратичное отображение куба [-1, 1]^3 на произвольный
+/// топологический кубоид.
 struct SqCube {
 protected:
     /// @brief Вешины (таблица 3 x 3 x 3)
@@ -213,5 +222,7 @@ public:
     /// @param volume Объем ячейки
     Vector3d centroid(double volume = 0.0) const;
 };
+
+/// @}
 
 } // namespace zephyr::geom

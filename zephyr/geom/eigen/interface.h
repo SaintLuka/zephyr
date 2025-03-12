@@ -1,4 +1,5 @@
-/// @file Здесь будет копия интерфейса Eigen, потому что Eigen бывает тупит,
+/// @file interface.h
+/// @brief Здесь будет копия интерфейса Eigen, потому что Eigen бывает тупит,
 /// выдает странные ошибки и тяжело отлаживается.
 
 #include <iostream>
@@ -396,6 +397,7 @@ std::ostream& operator<<(std::ostream& os, const Matrix<_Scalar, _Rows, _Cols>& 
                 os << " ";
             }
         }
+        os << m[_Size - 1];
     }
     else {
         for (int i = 0; i < _Rows; ++i) {

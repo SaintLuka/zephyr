@@ -651,7 +651,7 @@ void MmFluid::fluxes(Mesh &mesh, double dt, Direction dir) {
         Flux flux;
         for (auto &face: cell.faces(dir)) {
             // Внешняя нормаль
-            auto &normal = face.normal();
+            auto normal = face.normal();
 
             // Примитивный вектор соседа
             PState z_n;
@@ -1021,13 +1021,13 @@ Distributor MmFluid::distributor() const {
         QState sum;
         double mean_p = 0.0, mean_t = 0.0;
         for (auto &child: children) {
-            sum.arr() += QState(child(U).get_state()).arr() * child.volume();
-            mean_p += child(U).pressure * child.volume();
-            mean_t += child(U).temperature * child.volume();
+            sum.arr() += QState(child(U).get_state()).arr() * child.volume;
+            mean_p += child(U).pressure * child.volume;
+            mean_t += child(U).temperature * child.volume;
         }
-        sum.arr() /= parent.volume();
-        mean_p /= parent.volume();
-        mean_t /= parent.volume();
+        sum.arr() /= parent.volume;
+        mean_p /= parent.volume;
+        mean_t /= parent.volume;
         for (auto &b: sum.mass_frac.m_data)
             if (b < 0)
                 b = 0;

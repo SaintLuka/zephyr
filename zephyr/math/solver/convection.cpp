@@ -221,9 +221,9 @@ Distributor Convection::distributor() const {
     distr.merge = [](Children &children, AmrStorage::Item &parent) {
         double sum = 0.0;
         for (auto &child: children) {
-            sum += child(U).u1 * child.volume();
+            sum += child(U).u1 * child.volume;
         }
-        parent(U).u1 = sum / parent.volume();
+        parent(U).u1 = sum / parent.volume;
     };
 
     return distr;

@@ -19,6 +19,7 @@ option(ZEPHYR_TESTS        "Build tests"        ON)
 option(ZEPHYR_TESTS_ALL    "Build ALL tests"    OFF)
 option(ZEPHYR_PROBLEMS     "Build problems"     ON)
 option(ZEPHYR_PROBLEMS_ALL "Build ALL problems" OFF)
+option(ZEPHYR_DOXYGEN      "Create docs"        OFF)
 
 configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/configuration.h.in
@@ -91,4 +92,7 @@ endif()
 
 add_subdirectory(python)
 
-#target_link_libraries(zephyr ${CMAKE_SOURCE_DIR}/cmake-build-debug/libzephyr.dll)
+if (ZEPHYR_DOXYGEN)
+    find_package(Doxygen REQUIRED dot)
+    doxygen_add_docs(docs ${PROJECT_SOURCE_DIR}/zephyr)
+endif()

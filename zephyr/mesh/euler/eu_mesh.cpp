@@ -184,7 +184,7 @@ NodeOwners find_owners(AmrStorage& cells, AmrCell& base_cell, int base_iv) {
 
     // Интересующая нас вершина
     Vector3d base_v = base_cell.vertices[base_iv];
-    double eps = 1.0e-10 * base_cell.size;
+    double eps = 1.0e-10 * base_cell.linear_size();
 
     // Моделирует стек с ячейками в работе
     std::vector<NodeOwner> in_work;

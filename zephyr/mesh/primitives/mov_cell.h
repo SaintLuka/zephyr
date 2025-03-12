@@ -1,6 +1,6 @@
 #pragma once
 
-#include <zephyr/geom/polygon.h>
+#include <zephyr/geom/primitives/polygon.h>
 
 #include <zephyr/mesh/primitives/element.h>
 #include <zephyr/mesh/primitives/bnodes.h>
@@ -8,7 +8,7 @@
 
 namespace zephyr::mesh {
 
-/// @struct Обязательные данные ячейки сетки
+/// @brief Обязательные данные ячейки подвижной сетки
 class MovCell : public Element {
     using Vector3d = zephyr::geom::Vector3d;
     using Polygon  = zephyr::geom::Polygon;

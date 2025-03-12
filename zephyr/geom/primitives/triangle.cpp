@@ -1,7 +1,7 @@
 #include <cstring>
 #include <iostream>
 
-#include <zephyr/geom/triangle.h>
+#include <zephyr/geom/primitives/triangle.h>
 
 namespace zephyr::geom {
 

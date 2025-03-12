@@ -43,8 +43,7 @@ std::vector<int> decomp(double Lx, double Ly, int size) {
 }
 
 Blocks::Blocks()
-    : m_box(Vector3d{-inf, -inf, -inf},
-            Vector3d{+inf, +inf, +inf}) {
+    : m_box(Box::Infinite(3)) {
 
     init_single();
 }

@@ -18,9 +18,6 @@ public:
     /// не позволяет обходить грани
     EuFace(const EuCell &cell, Side side);
 
-    /// @brief Внешняя нормаль
-    const Vector3d &normal() const;
-
     /// @brief Ячейка по внешней нормали, на границе сетки возвращается
     /// сама ячейка
     EuCell neib() const;
@@ -48,8 +45,17 @@ public:
     /// @brief Установить флаг грани
     void set_boundary(Boundary flag);
 
+    /// @brief Внешняя нормаль
+    const Vector3d& normal() const;
+
     /// @brief Площадь (в 3D) или длина (в 2D) грани
     double area() const;
+
+    /// @brief Площадь, возможно с учетом осевой симметрии
+    double area(bool axial) const;
+
+    /// @brief Внешняя нормаль с площадью
+    Vector3d area_n() const;
 
     /// @brief Центр грани
     inline const Vector3d& center() const { return m_face->center; }

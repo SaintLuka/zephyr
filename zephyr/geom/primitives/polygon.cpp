@@ -5,8 +5,8 @@
 
 #include <zephyr/math/calc/integrals.h>
 
-#include <zephyr/geom/polygon.h>
-#include <zephyr/geom/triangle.h>
+#include <zephyr/geom/primitives/polygon.h>
+#include <zephyr/geom/primitives/triangle.h>
 #include <zephyr/geom/intersection.h>
 
 namespace zephyr::geom {
@@ -266,6 +266,7 @@ Polygon Polygon::clip(const Vector3d& p, const Vector3d& n) const {
     return Polygon(std::move(part));
 }
 
+/// @private
 struct AnS {
     double area;   ///< Площадь отсечения
     Vector3d p1;   ///< Точка сечения

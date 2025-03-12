@@ -86,6 +86,9 @@ public:
                      NodeStorage &nodes, const Variables &variables,
                      const Filter &filter = TrivialFilter());
 
+    /// @brief Простое сохранение узлов
+    static void save(const std::string &filename, NodeStorage &nodes);
+
 };
 
 } // namespace zephyr::io

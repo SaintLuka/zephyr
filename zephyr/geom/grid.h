@@ -17,7 +17,7 @@ class MovCell;
 namespace zephyr::geom {
 
 
-/// @class Узел сетки общего вида
+/// @brief Узел сетки общего вида
 class GNode {
 public:
     /// @brief Умный указатель на узел
@@ -141,6 +141,8 @@ class Grid {
 public:
     Grid();
 
+    void set_axial(bool axial = true);
+
     int n_nodes() const;
 
     int n_cells() const;
@@ -182,6 +184,9 @@ public:
 private:
     std::vector<GNode::Ptr> m_nodes;
     std::vector<GCell> m_cells;
+
+    ///
+    bool m_axial = false;
 
     /// Поля для структурированной сетки
     bool structured = false;

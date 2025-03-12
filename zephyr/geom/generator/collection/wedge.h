@@ -8,7 +8,7 @@
 
 namespace zephyr::geom::generator::collection {
 
-/// @class Wedge. Генератор для создания сетки внутри прямоугольной области
+/// @brief Генератор для создания сетки внутри прямоугольной области
 /// с отрезаным углом.
 class Wedge : public BlockStructured {
 public:

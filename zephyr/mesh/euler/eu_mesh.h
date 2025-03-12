@@ -28,7 +28,7 @@ using namespace zephyr::geom;
 using zephyr::mesh::decomp::Decomposition;
 using zephyr::mesh::decomp::ORB;
 
-/// @class Класс для хранения распределенной эйлеровой сетки.
+/// @brief Класс для хранения распределенной эйлеровой сетки.
 /// Для сеток из четырехугольников и кубоидов допускается адаптация.
 // TODO: Стркуктурировать поля и методы класса
 class EuMesh {

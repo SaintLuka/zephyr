@@ -7,7 +7,7 @@
 
 namespace zephyr::mesh {
 
-/// @class Узел подвижной сетки
+/// @brief Узел подвижной сетки
 class MovNode : public Element {
     using Vector3d = zephyr::geom::Vector3d;
     using Boundary = zephyr::geom::Boundary;

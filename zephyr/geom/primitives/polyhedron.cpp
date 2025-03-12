@@ -1,9 +1,8 @@
 #include <iostream>
 #include <map>
-#include <unordered_map>
 
 #include <zephyr/geom/intersection.h>
-#include <zephyr/geom/polyhedron.h>
+#include <zephyr/geom/primitives/polyhedron.h>
 
 
 namespace zephyr::geom {
@@ -62,12 +61,14 @@ std::vector<std::vector<int>> default_face_indices(CellType ctype) {
 //                         Вспомогательные структуры
 // ============================================================================
 
+/// @private
 // Пара (вершина, индекс)
 struct point_t {
     Vector3d v;
     int index = -1;
 };
 
+/// @private
 // Пара индексов смежных вершин, можно поставить два одинаковых индекса,
 // тогда это считается индексом вершины
 struct edge_t {
@@ -100,6 +101,7 @@ protected:
     int m_v1, m_v2;
 };
 
+/// @private
 // Компаратор.
 // Сортировщик для точек на плоскости, позволяет упорядочить
 // точки в плоскости против часовой стрелки вокруг нормали n.
@@ -408,6 +410,10 @@ Vector3d Polyhedron::face_center(int idx) const {
 
 Vector3d Polyhedron::face_normal(int idx) const {
     return faces_s[idx].normalized();
+}
+
+Vector3d Polyhedron::face_area_n(int idx) const {
+    return faces_s[idx];
 }
 
 bool Polyhedron::inside(const Vector3d& p) const {

@@ -6,10 +6,13 @@
 
 #include <zephyr/geom/box.h>
 #include <zephyr/geom/vector.h>
-#include <zephyr/geom/line.h>
 #include <zephyr/geom/cell_type.h>
+#include <zephyr/geom/primitives/line.h>
 
 namespace zephyr::geom {
+
+/// @addtogroup Geom-Primitives
+/// @{
 
 /// @brief Представление многогранника
 class Polyhedron {
@@ -74,6 +77,9 @@ public:
 
     /// @brief Внешняя нормаль к грани
     Vector3d face_normal(int idx) const;
+
+    /// @brief Внешняя нормаль к грани, умноженная на площадь
+    Vector3d face_area_n(int idx) const;
 
     /// @brief Точка внутри многогранника?
     bool inside(const Vector3d& p) const;
@@ -179,5 +185,7 @@ protected:
 };
 
 std::ostream& operator<<(std::ostream& os, const Polyhedron& poly);
+
+/// @}
 
 } // namespace zephyr::geom

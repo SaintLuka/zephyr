@@ -12,7 +12,8 @@ namespace zephyr::math {
 
 using namespace geom;
 
-/// @brief Одноматериальная модель Single Material Fluid
+/// @namespace zephyr::math::smf
+/// @brief Одноматериальная модель (Single-Material Fluid)
 namespace smf {
 
 struct QState;
@@ -148,7 +149,8 @@ struct Flux {
 
 } // namespace smf
 
-/// @brief Многоматериальная модель Multi Material Fluid
+/// @namespace zephyr::math::mmf
+/// @brief Многоматериальная модель (Multi-Material Fluid)
 namespace mmf {
 
 using zephyr::phys::Fractions;

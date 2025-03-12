@@ -7,38 +7,51 @@
 
 namespace zephyr::mesh {
 
-/// @class Обязательные данные ячейки сетки
+/// @brief Обязательные данные ячейки сетки
 class AmrCell : public Element {
     using Vector3d = zephyr::geom::Vector3d;
 public:
-    // Геометрия ячейки
+    /// @{ @name Геометрия ячейки
 
-    int       dim;       ///< Размерность ячейки
-    bool      adaptive;  ///< Адаптивная ячейка?
-    bool      linear;    ///< Линейная ячейка?
-    Vector3d  center;    ///< Барицентр ячейки
-    double    size;      ///< Линейный размер ячейки
-    BVertices vertices;  ///< Вершины ячейки
-    BFaces    faces;     ///< Список граней
+    int       dim;         ///< Размерность ячейки
+    bool      adaptive;    ///< Адаптивная ячейка?
+    bool      linear;      ///< Линейная ячейка?
+    bool      axial;       ///< Осевая симметрия, см описание класса
+    Vector3d  center;      ///< Барицентр ячейки
+    double    volume;      ///< Объем трехмерной/площадь двумерной ячейки
+    double    volume_alt;  ///< Объем двумерной осесимметричной ячейки
+    BVertices vertices;    ///< Вершины ячейки
+    BFaces    faces;       ///< Список граней
 
     /// @brief Индексы узлов в глобальном массиве вершин.
     /// Необязательное поле, используется только в некоторых алгоритмах,
     /// обычно заполнено неопределенными индексами (-1)
     BNodes nodes;
 
-    // Данные AMR
+    /// @}
+
+    /// @{ @name Данные AMR
 
     int b_idx;  ///< Индекс среди базовых ячеек
     int z_idx;  ///< Индекс ячейки на z-кривой
     int level;  ///< Уровень адаптации (0 для базовой)
     int flag;   ///< Желаемый флаг адаптации
 
+    /// @}
+
+    /// @{ @name Конструкторы
 
     /// @brief Двумерная простая
     explicit AmrCell(const geom::Quad &quad);
 
+    /// @brief Двумерная с осевой симметрией
+    AmrCell(const geom::Quad &quad, bool axial);
+
     /// @brief Двумерная криволинейная
     explicit AmrCell(const geom::SqQuad &quad);
+
+    /// @brief Двумерная криволинейная с осевой симметрией
+    AmrCell(const geom::SqQuad &quad, bool axial);
 
     /// @brief Трехмерная простая
     explicit AmrCell(const geom::Cube &cube);
@@ -54,16 +67,15 @@ public:
     /// представлять куб, но вершины и грани упорядочены иначе.
     explicit AmrCell(geom::Polyhedron poly);
 
-    /// @brief Площадь (в 2D) или объем (в 3D) ячейки
-    double volume() const;
+    /// @}
 
-    /// @brief Скорпировать вершины в полигон (двумерные ячейки)
-    /// Для нелинейных и AMR-ячеек возвращает до 8 граней.
-    geom::Polygon polygon() const;
+    /// @{ @name get-функции
 
-    /// @brief Создать многогранник на основе вершин.
-    /// Для нелинейных и AMR-ячеек возвращает до 24 граней.
-    geom::Polyhedron polyhedron() const;
+    /// @brief Обычный объем или объем осесимметичной ячейки
+    double get_volume() const { return axial ? volume_alt : volume; }
+
+    /// @brief Линейный размер ячейки
+    double linear_size() const;
 
     /// @brief Диаметр вписаной окружности.
     /// @details Для AMR-ячейки представляет собой минимальное расстояние между
@@ -73,6 +85,27 @@ public:
     /// Для двумерных расчетов на прямоугольных сетках совпадает с минимальной
     /// стороной прямоугольной ячейки.
     double incircle_diameter() const;
+
+    /// @brief Скорпировать вершины в полигон (двумерные ячейки)
+    /// Для нелинейных и AMR-ячеек возвращает до 8 граней.
+    geom::Polygon polygon() const;
+
+    /// @brief Создать многогранник на основе вершин.
+    /// Для нелинейных и AMR-ячеек возвращает до 24 граней.
+    geom::Polyhedron polyhedron() const;
+
+    /// @}
+
+    /// @{ @name set-функции
+
+    /// @brief Помечает индексы в массиве nodes. Выставляет индексы актуальных
+    /// вершин равными flag, для остальных вершин выставляет значение -1.
+    /// Актуальными считаем вершины, на которые ссылаются грани.
+    void mark_actual_nodes(int mark);
+
+    /// @}
+
+    /// @{ @name Сечения и интегрирование по ячейке
 
     /// @brief Оценка объемной доли, которая отсекается от ячейки некоторым телом.
     /// @param inside Характеристическая функция области, возвращает true для
@@ -101,10 +134,9 @@ public:
     /// @details Сумма по барицентрам 2-го порядка (low accuracy order)
     double integrate_low(const std::function<double(const Vector3d&)>& func, int n) const;
 
-    /// @brief Помечает индексы в массиве nodes. Выставляет индексы актуальных
-    /// вершин равными flag, для остальных вершин выставляет значение -1.
-    /// Актуальными считаем вершины, на которые ссылаются грани.
-    void mark_actual_nodes(int mark);
+    /// @}
+
+    /// @{ @name Функции для дебага
 
     /// @brief Вывести информацию о ячейке
     void print_info() const;
@@ -129,6 +161,7 @@ public:
     /// @return -1 для плохой ячейки
     int check_complex_faces() const;
 
+    /// @}
 };
 
 } // namespace zephyr::mesh

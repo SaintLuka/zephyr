@@ -1,4 +1,5 @@
-/// @file Простое, но очень полезное определеине.
+/// @file mov_storage.h
+/// @brief Простое, но очень полезное определение
 
 #include <zephyr/mesh/primitives/mov_node.h>
 #include <zephyr/mesh/primitives/mov_cell.h>

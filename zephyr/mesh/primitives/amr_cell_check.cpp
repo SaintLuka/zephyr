@@ -3,7 +3,7 @@
 #include <fstream>
 #include <iomanip>
 
-#include <zephyr/geom/cube.h>
+#include <zephyr/geom/primitives/cube.h>
 #include <zephyr/mesh/primitives/side.h>
 #include <zephyr/mesh/primitives/decomposition.h>
 #include <zephyr/mesh/primitives/amr_cell.h>
@@ -16,8 +16,8 @@ void AmrCell::print_info() const {
     std::cout << "\t\tcenter: " << center.transpose() << "\n";
     std::cout << "\t\trank:   " << rank << "\n";
     std::cout << "\t\tindex:  " << index << "\n";
-    std::cout << "\t\tsize:   " << size << "\n";
-    std::cout << "\t\tvolume: " << volume() << "\n";
+    std::cout << "\t\tsize:   " << linear_size() << "\n";
+    std::cout << "\t\tvolume: " << volume << "\n";
     std::cout << "\t\tflag:   " << flag << "\n";
     std::cout << "\t\tnext:   " << next << "\n";
     std::cout << "\t\tb_idx:  " << b_idx << "\n";
@@ -125,7 +125,7 @@ void AmrCell::visualize(std::string filename) const {
 
         Vector3d v1 = vertices[face.vertices[0]];
         Vector3d v2 = vertices[face.vertices[1]];
-        Vector3d vc = (v1 + v2) / 2.0;
+        Vector3d vc = face.center;
 
         file << "# face " << i << "\n";
 

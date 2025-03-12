@@ -3,34 +3,34 @@
 
 namespace zephyr::geom {
 
-Box::Box()
-    : vmin{NAN, NAN, NAN},
-      vmax{NAN, NAN, NAN} {
-
-}
-
-Box::Box(const Vector3d &_vmin, const Vector3d &_vmax)
-    : vmin(_vmin), vmax(_vmax) {
-
-}
-
 Box Box::NaN() {
-    return Box({NAN, NAN, NAN}, {NAN, NAN, NAN});
+    return {Vector3d{NAN, NAN, NAN},
+            Vector3d{NAN, NAN, NAN}};
 }
 
 Box Box::Zero() {
-    return Box({0.0, 0.0, 0.0}, {0.0, 0.0, 0.0});
+    return {Vector3d::Zero(), Vector3d::Zero()};
 }
 
 Box Box::Empty(int dim) {
     const double max = +std::numeric_limits<double>::infinity();
-    const double min = -std::numeric_limits<double>::infinity();    
-    
+    const double min = -std::numeric_limits<double>::infinity();
+
     if (dim < 3) {
-        return Box({max, max, 0.0}, {min, min, 0.0});
+        return {Vector3d{max, max, 0.0}, Vector3d{min, min, 0.0}};
+    } else {
+        return {Vector3d{max, max, max}, Vector3d{min, min, min}};
     }
-    else {
-        return Box({max, max, max}, {min, min, min});
+}
+
+Box Box::Infinite(int dim){
+    const double max = +std::numeric_limits<double>::infinity();
+    const double min = -std::numeric_limits<double>::infinity();
+
+    if (dim < 3) {
+        return {Vector3d{min, min, 0.0}, Vector3d{max, max, 0.0}};
+    } else {
+        return {Vector3d{min, min, min}, Vector3d{max, max, max}};
     }
 }
 
