@@ -42,7 +42,7 @@ public:
     void recv(AmrStorage& aliens, Post post = Post::FULL);
 
     // 
-    void build_border();
+    void build_border(AmrStorage& locals, AmrStorage& aliens);
 
 private:
     std::vector<int> m_count_to_send;

@@ -185,7 +185,7 @@ void EuMesh::build_aliens() {
 
 	m_tourism.reset();
 
-	m_tourism.build_border();
+	m_tourism.build_border(m_locals, m_aliens);
 
 	// Отправляем 
     m_tourism.send(m_locals);
