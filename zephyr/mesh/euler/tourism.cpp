@@ -53,12 +53,16 @@ void Tourism::recv(AmrStorage& aliens, Post post) {
         }
     }
 
-    if(m_requests_send[rank] != MPI_REQUEST_NULL){
-        MPI_Wait(&m_requests_send[rank], MPI_STATUSES_IGNORE);
-        MPI_Wait(&m_requests_recv[rank], MPI_STATUSES_IGNORE);
+    for (int i = 0; i < size; ++i) {
+        if (i != rank && m_count_to_send[i] > 0) {
+            MPI_Wait(&m_requests_send[i], MPI_STATUSES_IGNORE);
+        }
     }
-
-    MPI_Barrier(mpi::comm());
+    for (int i = 0; i < size; ++i) {
+        if (i != rank && m_count_to_recv[i] > 0) {
+            MPI_Wait(&m_requests_recv[i], MPI_STATUSES_IGNORE);
+        }
+    }
 #endif
 }
 
