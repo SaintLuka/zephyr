@@ -71,7 +71,7 @@ double Line::length() const {
 }
 
 double Line::area_as() const {
-    return M_PI * (verts[0].y() + verts[1].y()) * (verts[1] - verts[0]).norm();
+    return 0.5 * (verts[0].y() + verts[1].y()) * (verts[1] - verts[0]).norm();
 }
 
 Vector3d Line::area_n(const Vector3d& c) const {

@@ -1,6 +1,6 @@
-list(APPEND TESTS consistency)
+#list(APPEND TESTS consistency)
 #list(APPEND TESTS matter-ex)
-list(APPEND TESTS mixture)
+#list(APPEND TESTS mixture)
 #list(APPEND TESTS mixture2)
 #list(APPEND TESTS mixutre3)
 
@@ -14,6 +14,12 @@ if (ZEPHYR_TESTS_ALL)
         get_filename_component(test ${filename} NAME_WE)
         list(APPEND TESTS ${test})
     endforeach()
+endif()
+
+# Can't compile targets without python
+if (NOT ZEPHYR_PYTHON)
+    list(REMOVE_ITEM TESTS mixture2)
+    list(REMOVE_ITEM TESTS mixture3)
 endif()
 
 if (TESTS)

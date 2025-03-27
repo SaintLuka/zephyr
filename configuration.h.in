@@ -1,2 +1,3 @@
 #cmakedefine ZEPHYR_MPI
 #cmakedefine ZEPHYR_EIGEN
+#cmakedefine ZEPHYR_PYTHON

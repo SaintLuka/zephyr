@@ -168,7 +168,7 @@ void SmFluid::fluxes(Mesh &mesh) {
         q_c.arr() -= (m_dt / cell.volume(m_axial)) * flux.arr();
 
         if (m_axial) {
-            double coeff = 2.0 * M_PI * cell.volume() / cell.volume(m_axial);
+            double coeff = cell.volume() / cell.volume(m_axial);
             q_c.momentum.y() += coeff * z_c.pressure * m_dt;
         }
 
@@ -239,8 +239,8 @@ void SmFluid::fluxes_stage1(Mesh &mesh)  {
         q_c.arr() -= (0.5 * m_dt / cell.volume(m_axial)) * flux.arr();
 
         if (m_axial) {
-            double coeff = M_PI * cell.volume() / cell.volume(m_axial);
-            q_c.momentum.y() += coeff * z_c.pressure * m_dt;
+            double coeff = cell.volume() / cell.volume(m_axial);
+            q_c.momentum.y() += 0.5 * coeff * z_c.pressure * m_dt;
         }
 
         // Значение примитивных переменных на полушаге
@@ -332,7 +332,7 @@ void SmFluid::fluxes_stage2(Mesh &mesh)  {
         q_c.arr() -= (m_dt / cell.volume(m_axial)) * flux.arr();
 
         if (m_axial) {
-            double coeff = 2.0 * M_PI * cell.volume() / cell.volume(m_axial);
+            double coeff = cell.volume() / cell.volume(m_axial);
             q_c.momentum.y() += coeff * z_ch.pressure * m_dt;
         }
 

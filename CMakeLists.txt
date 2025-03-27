@@ -13,13 +13,14 @@ if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-option(ZEPHYR_MPI          "Use MPI functions"  OFF)
+option(ZEPHYR_DOXYGEN      "Create docs"        OFF)
 option(ZEPHYR_EIGEN        "Use Eigen library"  ON)
-option(ZEPHYR_TESTS        "Build tests"        ON)
-option(ZEPHYR_TESTS_ALL    "Build ALL tests"    OFF)
+option(ZEPHYR_MPI          "Use MPI functions"  OFF)
 option(ZEPHYR_PROBLEMS     "Build problems"     ON)
 option(ZEPHYR_PROBLEMS_ALL "Build ALL problems" OFF)
-option(ZEPHYR_DOXYGEN      "Create docs"        OFF)
+option(ZEPHYR_PYTHON       "Use python libs"    ON)
+option(ZEPHYR_TESTS        "Build tests"        ON)
+option(ZEPHYR_TESTS_ALL    "Build ALL tests"    OFF)
 
 configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/configuration.h.in
@@ -29,7 +30,9 @@ configure_file(
 find_package(Threads REQUIRED)
 find_package(Eigen3  REQUIRED)
 find_package(Boost   COMPONENTS program_options REQUIRED)
-find_package(Python3 COMPONENTS Interpreter Development NumPy REQUIRED)
+if (ZEPHYR_PYTHON)
+    find_package(Python3 COMPONENTS Interpreter Development NumPy REQUIRED)
+endif()
 
 add_subdirectory(zephyr)
 
@@ -40,7 +43,9 @@ set(BUILD_SHARED_LIBS YES)
 add_library(zephyr ${ZEPHYR_SOURCES})
 target_link_libraries(zephyr PUBLIC ${CMAKE_THREAD_LIBS_INIT})
 target_link_libraries(zephyr PUBLIC ${Boost_LIBRARIES})
-target_link_libraries(zephyr PUBLIC Python3::Python Python3::NumPy)
+if (ZEPHYR_PYTHON)
+    target_link_libraries(zephyr PUBLIC Python3::Python Python3::NumPy)
+endif()
 target_link_libraries(zephyr PUBLIC Eigen3::Eigen)
 
 target_include_directories(zephyr PUBLIC

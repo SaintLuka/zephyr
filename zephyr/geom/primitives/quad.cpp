@@ -80,9 +80,8 @@ double Quad::volume_as() const {
 
         V -= (v2.x() - v1.x()) * (v2.y() * v2.y() + v2.y() * v1.y() + v1.y() * v1.y());
     }
-    V *= M_PI / 3.0;
 
-    return V;
+    return V / 6.0;
 }
 
 Vector3d Quad::centroid(double area) const {
@@ -126,7 +125,7 @@ Vector3d Quad::centroid_as(double vol_as) const {
         C.y() -= (std::pow(v1.y(), 3) + std::pow(v1.y(), 2) * v2.y() +
                   std::pow(v2.y(), 3) + std::pow(v2.y(), 2) * v1.y()) * (v2.x() - v1.x());
     }
-    C *= M_PI / (6.0 * vol_as);
+    C /= (12.0 * vol_as);
 
     return C;
 }

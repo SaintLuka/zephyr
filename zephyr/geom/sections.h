@@ -1,5 +1,5 @@
 /// @file Несколько простых утилит для поиска сечений в прямоугольниках и квадратах
-
+#pragma once
 #include <zephyr/geom/vector.h>
 
 namespace zephyr::geom {
@@ -22,6 +22,15 @@ double volume_fraction(const Vector3d& n, double p, double a = 1.0, double b = 1
 /// @return Возвращает расстояние от центра прямоугольника до прямой со знаком,
 /// то есть коэффициент 'p' в уравнении прямой (r, n) = p.
 double find_section(const Vector3d& n, double alpha, double a = 1.0, double b = 1.0);
+
+/// @brief Эвристика для face_fraction (шаблон V3)
+double face_fraction_v3(double a1, double a2);
+
+/// @brief Эвристика для face_fraction (шаблон V5)
+double face_fraction_v5(double a1, double a2);
+
+/// @brief Эвристика для face_fraction (формула Серёжкина)
+double face_fraction_s(double a1, double a2);
 
 /// @brief Доля разбиения грани для пары соседствующих квадратных ячеек.
 /// @param a1, a2 Объемные доли тела в двух соседних квадратных ячейках.

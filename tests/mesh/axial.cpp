@@ -59,7 +59,7 @@ double calc_volume(EuMesh& mesh, bool axial) {
     for (auto &cell: mesh) {
         volume += cell.volume(axial);
     }
-    return volume;
+    return axial ? 2.0 * M_PI * volume : volume;
 }
 
 int main() {

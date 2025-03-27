@@ -188,6 +188,19 @@ PState::PState(double density, const Vector3d &velocity, double pressure,
       densities(rhos) {
 }
 
+PState::PState(double density, const Vector3d &velocity, double pressure,
+       const Fractions &mass_frac,  const MixturePT &mixture)
+    : density(density),
+      velocity(velocity),
+      pressure(pressure),
+      mass_frac(mass_frac) {
+
+    auto[rhos, e, T] = mixture.get_reT(density, pressure, mass_frac);
+    densities   = rhos;
+    energy      = e;
+    temperature = T;
+}
+
 PState::PState(const QState &q, const phys::MixturePT &mixture,
                double P0, double T0, const ScalarSet& rhos0) {
 
@@ -236,7 +249,7 @@ std::ostream &operator<<(std::ostream &os, const PState &state) {
             "ρ: %.5f,  v: {%+.5e, %+.5e, %+.5e},  P: %+.5e,  e: %+.5e,  T: %+.5e,  ") %
           state.density % state.velocity.x() % state.velocity.y() % state.velocity.z() %
           state.pressure % state.energy % state.temperature;
-    os << boost::format("β: %1%,  ϱ: %2%") % state.mass_frac % state.mass_frac;
+    os << boost::format("β: %1%,  ϱ: %2%") % state.mass_frac % state.densities;
     return os;
 }
 
@@ -288,6 +301,23 @@ std::pair<mmf::PState, mmf::PState> PState::split(const MixturePT& mixture, int 
             zB.densities[i] = densities[i];
             zB.mass_frac[i] = mass_frac[i] / beta_B;
         }
+    }
+
+    // Случай небольших объемных долей. Формулы выше математически верны,
+    // но работают неточно, что приводит к ошибкам.
+    if (beta_B < 1.0e-12) {
+        zB.mass_frac.normalize();
+
+        double mix_vol = 0.0;
+        double mix_e = 0.0;
+        for (int i = 0; i < Fractions::size(); ++i) {
+            if (zB.mass_frac.has(i)) {
+                mix_vol += zB.mass_frac[i] / zB.densities[i];
+                mix_e += zB.mass_frac[i] * mixture[i].energy_rT(zB.densities[i], zB.temperature);
+            }
+        }
+        zB.density = 1.0 / mix_vol;
+        zB.energy  = mix_e;
     }
 
     return {zA, zB};

@@ -65,7 +65,9 @@ void set_flags(Mesh &mesh) {
 
 int main() {
     mpi::init();
-    threads::on(8);
+    threads::on();
+
+    threads::info();
 
     // Тестовая задача
     SedovBlast3D test({.gamma=1.4, .rho0=1.0, .E=1.0});
@@ -149,8 +151,13 @@ int main() {
     }
     init_cells(mesh);
 
+    Stopwatch sw_update;
+    Stopwatch sw_flags;
+    Stopwatch sw_grad;
+    Stopwatch sw_refine;
+
     Stopwatch elapsed(true);
-    while (curr_time < test.max_time()) {
+    while (n_step < 100 && curr_time < test.max_time()) {
         if (curr_time >= next_write) {
             mpi::cout << "\tStep: " << std::setw(6) << n_step << ";"
                       << "\tTime: " << std::setw(10) << std::setprecision(5) << curr_time << "\n";
@@ -161,22 +168,41 @@ int main() {
         // Точное завершение в end_time
         solver.set_max_dt(test.max_time() - curr_time);
 
+        sw_update.resume();
         // Обновляем слои
         solver.update(mesh);
+        sw_update.stop();
+
+        sw_flags.resume();
         set_flags(mesh);
+        sw_flags.stop();
 
         // Для переноса по градиентам
+        sw_grad.resume();
         solver.compute_grad(mesh);
+        sw_grad.stop();
+
+        sw_refine.resume();
         mesh.refine();
+        sw_refine.stop();
 
         curr_time += solver.dt();
         n_step += 1;
     }
-    pvd.save(mesh, curr_time);
     elapsed.stop();
+    pvd.save(mesh, curr_time);
 
     mpi::cout << "\nElapsed time:   " << elapsed.extended_time()
               << " ( " << elapsed.milliseconds() << " ms)\n";
+
+    mpi::cout << "  Update time:   " << sw_update.extended_time()
+              << " ( " << sw_update.milliseconds() << " ms)\n";
+    mpi::cout << "  Flags  time:   " << sw_flags.extended_time()
+              << " ( " << sw_flags.milliseconds() << " ms)\n";
+    mpi::cout << "  Gradient   :   " << sw_grad.extended_time()
+              << " ( " << sw_grad.milliseconds() << " ms)\n";
+    mpi::cout << "  Refine time:   " << sw_refine.extended_time()
+              << " ( " << sw_refine.milliseconds() << " ms)\n";
 
     mpi::finalize();
     return 0;
