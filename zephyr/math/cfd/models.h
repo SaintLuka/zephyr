@@ -178,6 +178,10 @@ struct PState {
     PState(double density, const Vector3d &velocity, double pressure, double energy,
            double temperature, const Fractions &mass_frac, const ScalarSet& densities);
 
+    /// @brief Инициализация с частичным заданием параметров и УрС
+    PState(double density, const Vector3d &velocity, double pressure,
+            const Fractions &mass_frac,  const MixturePT &mixture);
+
     /// @brief Инициализация из консервативного вектора состояния,
     /// давление, температура и объемные доли определяются из уравнения
     /// состояния смеси (PT - замыкание).
@@ -216,7 +220,7 @@ struct PState {
 
     inline double alpha(int idx) const {
         return std::isnan(densities[idx]) ? 0.0 :
-               mass_frac[idx] * density / densities[idx];
+               std::max(0.0, std::min(mass_frac[idx] * density / densities[idx], 1.0));
     }
 
     // Квадрат модуля скорости

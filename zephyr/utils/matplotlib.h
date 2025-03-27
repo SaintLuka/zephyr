@@ -1,5 +1,9 @@
 #pragma once
 
+#include <zephyr/configuration.h>
+
+#ifdef ZEPHYR_PYTHON
+
 // Python headers must be included before any system headers, since
 // they define _POSIX_C_SOURCE
 #include <Python.h>
@@ -3014,3 +3018,5 @@ private:
 
 } // end namespace matplotlib
 }
+
+#endif

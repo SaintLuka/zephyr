@@ -188,11 +188,11 @@ public:
     /// @brief Обмен слоев
     void swap(Mesh &mesh);
 
-    Flux calc_flux(const PState& zL, const PState& zR, double hL, double hR, int iA, double a_sig, double dt);
+    Flux calc_crp_flux(const PState& zL, const PState& zR, double hL, double hR, int iA, double a_sig, double dt);
 
-    Flux top_calc_flux(mesh::EuCell& cell, mesh::EuFace& face,
-                       const PState& z_L, const PState& z_R,
-                       double h_L, double h_R, double dt);
+    Flux calc_flux(mesh::EuCell& cell, mesh::EuFace& face,
+                   const PState& z_L, const PState& z_R,
+                   double h_L, double h_R, double dt);
 
     //double alpha_sigma(Cell& cell_L, Cell& cell_R, mesh::Face& face, int idx) const;
 

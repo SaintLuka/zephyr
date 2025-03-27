@@ -77,7 +77,7 @@ public:
 
     /// @brief Площадь/длина обычной грани или грани осесимметричной ячейки
     inline double get_area(bool axial = false) const { 
-        return axial ? area_alt : area; 
+        return axial ? area_alt : area;
     }
 
     /// @brief Число вершин грани

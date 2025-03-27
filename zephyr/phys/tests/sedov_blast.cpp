@@ -4,10 +4,6 @@
 
 #include <zephyr/phys/tests/sedov_blast.h>
 
-#include <zephyr/utils/matplotlib.h>
-
-namespace plt = zephyr::utils::matplotlib;
-
 namespace zephyr::phys {
 
 SedovBlast3D::SedovBlast3D(const params& p) {

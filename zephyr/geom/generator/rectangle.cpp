@@ -13,6 +13,11 @@ Rectangle::Rectangle(const Json& config)
       m_xmin(0.0), m_xmax(1.0), m_ymin(0.0), m_ymax(1.0), m_nx(0), m_ny(0),
       m_voronoi(false) {
 
+    m_axial = false;
+    if (config["axial"]) {
+        m_axial = config["axial"].as<bool>();
+    }
+
     if (!config["geometry"]) {
         throw std::runtime_error("Rectangle config doesn't contain key 'geometry'");
     }

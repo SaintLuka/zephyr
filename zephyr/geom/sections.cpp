@@ -31,16 +31,55 @@ double find_section(const Vector3d &n, double alpha, double a, double b) {
     }
 }
 
-double face_fraction(double a1, double a2) {
-    double a_min, a_max;
+namespace {
+
+// Минимум и максимум, но не выходя за пределы [0, 1]
+inline std::tuple<double, double> minmax_unit(double a1, double a2) {
     if (a1 < a2) {
-        a_min = std::max(0.0, a1);
-        a_max = std::min(a2, 1.0);
+        return {std::max(0.0, a1), std::min(a2, 1.0)};
+    } else {
+        return {std::max(0.0, a2), std::min(a1, 1.0)};
     }
-    else {
-        a_min = std::max(0.0, a2);
-        a_max = std::min(a1, 1.0);
+}
+
+}
+
+double face_fraction_v3(double a1, double a2) {
+    auto [a_min, a_max] = minmax_unit(a1, a2);
+
+    if (a_min == 0.0) return 0.0;
+    if (a_max == 1.0) return 1.0;
+
+    if (a1 + a2 < 1.0) return a_max;
+    if (a1 + a2 > 1.0) return a_min;
+
+    return 0.5 * (a1 + a2);
+}
+
+double face_fraction_v5(double a1, double a2) {
+    auto [a_min, a_max] = minmax_unit(a1, a2);
+
+    if (a_min == 0.0) return 0.0;
+    if (a_max == 1.0) return 1.0;
+
+    return 0.5 * (a1 + a2);
+}
+
+double face_fraction_s(double a1, double a2) {
+    auto [a_min, a_max] = minmax_unit(a1, a2);
+
+    double a_sig = a_min / (1.0 - (a_max - a_min));
+
+    // Случай a_min = 0, a_max = 1
+    if (std::isnan(a_sig)) {
+        a_sig = 0.5;
     }
+
+    return  between(a_sig, a_min, a_max);
+}
+
+double face_fraction(double a1, double a2) {
+    auto [a_min, a_max] = minmax_unit(a1, a2);
 
     if (3.0 * a_min >= a_max && a_min >= 3.0 * a_max - 2.0) {
         return 0.5 * (a_min + a_max);
@@ -60,7 +99,7 @@ double face_fraction(double a1, double a2) {
 }
 
 double face_fraction_cos(double a1, double a2) {
-    auto[a_min, a_max] = minmax(a1, a2);
+    auto[a_min, a_max] = minmax_unit(a1, a2);
 
     double tg; // модуль тангенса
     if (3.0 * a_min >= a_max && a_min >= 3.0 * a_max - 2.0) {

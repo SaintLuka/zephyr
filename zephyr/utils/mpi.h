@@ -109,6 +109,18 @@ public:
     template <class T>
     static std::vector<T> sum(const std::vector<T>& values);
 
+    /// @brief Номер процесса и значение
+    template <class T>
+    struct value_rank { T value; int rank; };
+
+    /// @brief Минимальное значение и номер процесса, на котором достигается
+    template <class T>
+    static value_rank<T> argmin(const T& value);
+
+    /// @brief Максимальное значение и номер процесса, на котором достигается
+    template <class T>
+    static value_rank<T> argmax(const T& value);
+
     /// @}
 
     /// @{
@@ -221,6 +233,24 @@ std::vector<T> mpi::sum(const std::vector<T>& values) {
     MPI_Allreduce(values.data(), g_values.data(), int(values.size()),
                   mpi_type<T>(), MPI_SUM, comm());
     return g_values;
+}
+
+template <class T>
+mpi::value_rank<T> mpi::argmin(const T& value) {
+    static_assert(std::is_same<T, double>::value, "Only doubles");
+    mpi::value_rank<T> in {.value=value, .rank=rank()};
+    mpi::value_rank<T> out{.value=value, .rank=rank()};
+    MPI_Allreduce(&in, &out, 1, MPI_DOUBLE_INT, MPI_MINLOC, MPI_COMM_WORLD);
+    return out;
+}
+
+template <class T>
+mpi::value_rank<T> mpi::argmax(const T& value) {
+    static_assert(std::is_same<T, double>::value, "Only doubles");
+    mpi::value_rank<T> in {.value=value, .rank=rank()};
+    mpi::value_rank<T> out{.value=value, .rank=rank()};
+    MPI_Allreduce(&in, &out, 1, MPI_DOUBLE_INT, MPI_MAXLOC, MPI_COMM_WORLD);
+    return out;
 }
 
 template <class T>
@@ -351,6 +381,20 @@ public:
     template <class T>
     static std::vector<T> sum(const std::vector<T>& values) { return values; }
 
+    /// @brief Номер процесса и значение
+    template <class T>
+    struct value_rank { T value; int rank; };
+
+    /// @brief Минимальное значение и номер процесса, на котором достигается
+    static value_rank<double> argmin(double value) {
+        return {.value=value, .rank=rank()};
+    }
+
+    /// @brief Максимальное значение и номер процесса, на котором достигается
+    static value_rank<double> argmax(double value) {
+        return {.value=value, .rank=rank()};
+    }
+
     /// @}
 
     /// @{
@@ -389,4 +433,3 @@ public:
 } // namespace zephyr::utils
 
 #endif
-

@@ -1,4 +1,5 @@
 list(APPEND PROBLEMS mmf_advection)
+list(APPEND PROBLEMS mmf_bubble_collapse)
 list(APPEND PROBLEMS mmf_test_1D)
 list(APPEND PROBLEMS mmf_triple_point)
 

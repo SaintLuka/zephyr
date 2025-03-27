@@ -103,6 +103,13 @@ public:
     AmrStorage &aliens() { return m_aliens; }
 
 
+    /// @brief Сетка с аксиальной симметрией?
+    bool axial() const { return m_locals[0].axial; }
+
+    /// @brief Размерность сетки
+    int dimension() const { return m_locals[0].dim; }
+
+
     /// @brief Проверить базовую сетку после создания.
     /// @return -1, если сетка не подходит для адаптации.
     int check_base();
@@ -137,7 +144,7 @@ public:
     /// @brief Параллельно по тредам посчитать минимум
     template<int n_tasks_per_thread = 10, class Func,
             class Value = typename std::result_of<Func(EuCell&)>::type>
-    auto min(const Value &init, Func &&func)
+    auto min(Func &&func, const Value &init)
     -> typename std::enable_if<!std::is_void<Value>::value, Value>::type {
         return threads::min<n_tasks_per_thread>(begin(), end(), init, std::forward<Func>(func));
     }
@@ -148,6 +155,38 @@ public:
     auto min(Func &&func)
     -> typename std::enable_if<std::is_arithmetic<Value>::value, Value>::type {
         return threads::min<n_tasks_per_thread>(begin(), end(), std::forward<Func>(func));
+    }
+
+    /// @brief Параллельно по тредам посчитать максимум
+    template<int n_tasks_per_thread = 10, class Func,
+            class Value = typename std::result_of<Func(EuCell&)>::type>
+    auto max(Func &&func, const Value &init)
+    -> typename std::enable_if<!std::is_void<Value>::value, Value>::type {
+        return threads::max<n_tasks_per_thread>(begin(), end(), init, std::forward<Func>(func));
+    }
+
+    /// @brief Параллельно по тредам посчитать минимум
+    template<int n_tasks_per_thread = 10, class Func,
+            class Value = typename std::result_of<Func(EuCell&)>::type>
+    auto max(Func &&func)
+    -> typename std::enable_if<std::is_arithmetic<Value>::value, Value>::type {
+        return threads::max<n_tasks_per_thread>(begin(), end(), std::forward<Func>(func));
+    }
+
+    /// @brief Параллельно по тредам выполнить суммирование
+    template<int n_tasks_per_thread = 10, class Func,
+            class Value = typename std::result_of<Func(EuCell&)>::type>
+    auto sum(Func &&func, const Value &init)
+    -> typename std::enable_if<!std::is_void<Value>::value, Value>::type {
+        return threads::sum<n_tasks_per_thread>(begin(), end(), init, std::forward<Func>(func));
+    }
+
+    /// @brief Параллельно по тредам выполнить свёртку
+    template<int n_tasks_per_thread = 10, class Func,
+            class Value = typename std::result_of<Func(EuCell&)>::type>
+    auto reduce(Func &&func, const Value &init)
+    -> typename std::enable_if<!std::is_void<Value>::value, Value>::type {
+        return threads::reduce<n_tasks_per_thread>(begin(), end(), init, std::forward<Func>(func));
     }
 
     /// @brief Ссылка на декомпозицию

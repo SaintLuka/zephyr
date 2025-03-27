@@ -324,7 +324,6 @@ void balance_flags_slow(AmrStorage &locals, AmrStorage &aliens,
 
         changed = flag_balancing_step(locals, vicinity_list);
         changed = mpi::max(changed);
-        mpi::barrier();
     }
     flag_balancing_timer.stop();
 

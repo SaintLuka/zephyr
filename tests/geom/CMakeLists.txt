@@ -20,6 +20,14 @@ if (ZEPHYR_TESTS_ALL)
     endforeach()
 endif()
 
+# Can't compile targets without python
+if (NOT ZEPHYR_PYTHON)
+    list(REMOVE_ITEM TESTS crp_interface)
+    list(REMOVE_ITEM TESTS curves)
+    list(REMOVE_ITEM TESTS polygon_clip)
+    list(REMOVE_ITEM TESTS splines)
+endif()
+
 if (TESTS)
     message(STATUS "Build geom tests:\n   ${TESTS}")
 endif()

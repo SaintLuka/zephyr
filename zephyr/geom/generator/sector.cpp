@@ -13,6 +13,11 @@ namespace zephyr::geom::generator {
 Sector::Sector(const Json& config)
         : Generator("sector"), m_r2(-1.0), m_r1(-1.0), m_angle(-1.0), m_hole(false) {
 
+    m_axial = false;
+    if (config["axial"]) {
+        m_axial = config["axial"].as<bool>();
+    }
+
     if (!config["geometry"]) {
         throw std::runtime_error("Sector config doesn't contain key 'geometry'");
     }

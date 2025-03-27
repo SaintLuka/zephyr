@@ -265,28 +265,19 @@ double AmrCell::approx_vol_fraction(const std::function<double(const Vector3d &)
         if (adaptive) {
             int sum = 0;
             // Угловые точки, вес = 1
-            if (inside(vertices.vs<-1, -1>()))
-                sum += 1;
-            if (inside(vertices.vs<-1, +1>()))
-                sum += 1;
-            if (inside(vertices.vs<+1, +1>()))
-                sum += 1;
-            if (inside(vertices.vs<+1, -1>()))
-                sum += 1;
+            if (inside(vertices.vs<-1, -1>())) sum += 1;
+            if (inside(vertices.vs<-1, +1>())) sum += 1;
+            if (inside(vertices.vs<+1, +1>())) sum += 1;
+            if (inside(vertices.vs<+1, -1>())) sum += 1;
 
             // Ребра, вес = 2
-            if (inside(vertices.vs<0, -1>()))
-                sum += 2;
-            if (inside(vertices.vs<0, +1>()))
-                sum += 2;
-            if (inside(vertices.vs<-1, 0>()))
-                sum += 2;
-            if (inside(vertices.vs<+1, 0>()))
-                sum += 2;
+            if (inside(vertices.vs<0, -1>())) sum += 2;
+            if (inside(vertices.vs<0, +1>())) sum += 2;
+            if (inside(vertices.vs<-1, 0>())) sum += 2;
+            if (inside(vertices.vs<+1, 0>())) sum += 2;
 
             // Центр, вес = 3
-            if (inside(vertices.vs<0, 0>()))
-                sum += 4;
+            if (inside(vertices.vs<0, 0>())) sum += 4;
 
             if (sum == 0) {
                 return 0.0;
@@ -324,7 +315,56 @@ double AmrCell::approx_vol_fraction(const std::function<double(const Vector3d &)
     }
     else {
         // Трехмерная ячейка
-        throw std::runtime_error("AmrCell::approx_vol_fraction #1");
+        if (adaptive) {
+            int sum = 0;
+            // Угловые точки, вес = 1
+            if (inside(vertices.vs<-1, -1, -1>())) sum += 1;
+            if (inside(vertices.vs<+1, -1, -1>())) sum += 1;
+            if (inside(vertices.vs<-1, +1, -1>())) sum += 1;
+            if (inside(vertices.vs<+1, +1, -1>())) sum += 1;
+            if (inside(vertices.vs<-1, -1, +1>())) sum += 1;
+            if (inside(vertices.vs<+1, -1, +1>())) sum += 1;
+            if (inside(vertices.vs<-1, +1, +1>())) sum += 1;
+            if (inside(vertices.vs<+1, +1, +1>())) sum += 1;
+
+            // Ребра, вес = 2
+            if (inside(vertices.vs<-1, -1, 0>())) sum += 2;
+            if (inside(vertices.vs<+1, -1, 0>())) sum += 2;
+            if (inside(vertices.vs<-1, +1, 0>())) sum += 2;
+            if (inside(vertices.vs<+1, +1, 0>())) sum += 2;
+            if (inside(vertices.vs<-1, 0, -1>())) sum += 2;
+            if (inside(vertices.vs<+1, 0, -1>())) sum += 2;
+            if (inside(vertices.vs<-1, 0, +1>())) sum += 2;
+            if (inside(vertices.vs<+1, 0, +1>())) sum += 2;
+            if (inside(vertices.vs<0, -1, -1>())) sum += 2;
+            if (inside(vertices.vs<0, +1, -1>())) sum += 2;
+            if (inside(vertices.vs<0, -1, +1>())) sum += 2;
+            if (inside(vertices.vs<0, +1, +1>())) sum += 2;
+
+            // Грани, вес = 4
+            if (inside(vertices.vs<-1, 0, 0>())) sum += 4;
+            if (inside(vertices.vs<+1, 0, 0>())) sum += 4;
+            if (inside(vertices.vs<0, -1, 0>())) sum += 4;
+            if (inside(vertices.vs<0, +1, 0>())) sum += 4;
+            if (inside(vertices.vs<0, 0, -1>())) sum += 4;
+            if (inside(vertices.vs<0, 0, +1>())) sum += 4;
+
+            // Центр, вес = 8
+            if (inside(vertices.vs<0, 0, 0>())) sum += 8;
+
+            if (sum == 0) {
+                return 0.0;
+            }
+            else if (sum == 64) {
+                return 1.0;
+            }
+            else {
+                return 0.015625 * sum; // sum / 64.0
+            }
+        }
+        else {
+            throw std::runtime_error("Approx volume fraction error #1");
+        };
     }
 }
 

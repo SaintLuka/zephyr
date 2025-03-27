@@ -51,7 +51,7 @@ ORB::ORB(Box domain, const utils::Json& config)
     if (config["type"]) {
         type = config["type"].as<std::string>();
     } else {
-        type = domain.size().z() > 1.0e-5 ? "XYZ" : "XY";
+        type = domain.is_2D() ? "XY" : "XYZ";
     }
 
     if (config["proc_nx"]) {

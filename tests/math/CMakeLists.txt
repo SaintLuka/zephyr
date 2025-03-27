@@ -14,6 +14,12 @@ if (ZEPHYR_TESTS_ALL)
     endforeach()
 endif()
 
+# Can't compile targets without python
+if (NOT ZEPHYR_PYTHON)
+    list(REMOVE_ITEM TESTS asigma)
+    list(REMOVE_ITEM TESTS weno)
+endif()
+
 if (TESTS)
     message(STATUS "Build math tests:\n   ${TESTS}")
 endif()

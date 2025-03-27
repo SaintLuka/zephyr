@@ -35,6 +35,20 @@ void threads::on(int count) {
     }
 }
 
+void threads::info() {
+    if (mpi::single()) {
+        std::cout << "Threads count: " << threads::count() << "\n\n";
+    }
+    else {
+        mpi::cout << "MPI processes: " << mpi::size() << "\n";
+        mpi::for_each([]() {
+            std::cout << "  " << "Threads count: " << threads::count() << "\n";
+            std::cout.flush();
+        });
+        mpi::cout << "\n";
+    }
+}
+
 void threads::off() {
     n_threads = 1;
     pool = nullptr;

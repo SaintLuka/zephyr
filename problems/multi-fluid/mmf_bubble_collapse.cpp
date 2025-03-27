@@ -22,6 +22,7 @@ using namespace zephyr::math;
 using namespace zephyr::math::mmf;
 
 using zephyr::mesh::EuMesh;
+using zephyr::mesh::EuCell;
 
 using zephyr::utils::Stopwatch;
 
@@ -47,22 +48,86 @@ double get_normal_x(AmrStorage::Item &cell) { return cell(U).n[0].x(); }
 double get_normal_y(AmrStorage::Item &cell) { return cell(U).n[0].y(); }
 
 
+void initialize(EuMesh& mesh, const MixturePT& mixture) {
+    PState z_air(
+            1.0_kg_m3,          // density
+            Vector3d::Zero(),   // velocity
+            1.0_bar,            // pressure
+            Fractions::Pure(0), // mass fractions
+            mixture);
+
+    PState z_water(
+            1000.0_kg_m3,       // density
+            Vector3d::Zero(),   // velocity
+            1.0_bar,            // pressure
+            Fractions::Pure(1), // mass fractions
+            mixture);
+
+    PState z_shock(
+            1323.65_kg_m3,          // density
+            {681.58_m_s, 0.0, 0.0}, // velocity
+            1.9e4_bar,              // pressure
+            Fractions::Pure(1),     // mass fractions
+            mixture);
+
+    double r = 3.0_mm;
+    double x_bubble = 6.0_mm;
+    double y_bubble = 6.0_mm;
+    double x_shock  = 0.6_mm;
+
+    Vector3d bubble_center = {x_bubble, y_bubble, 0};
+    auto in_water = [bubble_center, r](const Vector3d &v) -> bool {
+        return (v - bubble_center).norm() > r;
+    };
+
+    mesh.for_each([&](EuCell &cell) {
+        if (cell.center().x() < x_shock) {
+            cell(U).set_state(z_shock);
+            return;
+        }
+
+        double vol_frac1 = cell.approx_vol_fraction(in_water);
+        if (vol_frac1 == 0.0 || vol_frac1 == 1.0) {
+            // Чистое вещество
+            cell(U).set_state(vol_frac1 > 0.5 ? z_water : z_air);
+        }
+        else {
+            // Граница веществ
+            double vol_frac0 = cell.polygon().disk_clip_area(bubble_center, r) / cell.volume();
+            double vol_frac1 = 1.0 - vol_frac0;
+
+
+            mmf::PState &z0 = z_air;
+            mmf::PState &z1 = z_water;
+
+            // rho = sum a_i rho_i
+            double    density   = vol_frac0 * z0.density + vol_frac1 * z1.density;
+            Fractions mass_frac = {vol_frac0 * z0.density / density, vol_frac1 * z1.density / density};
+            mass_frac.normalize();
+            Vector3d  velocity  = mass_frac[0] * z0.velocity + mass_frac[1] * z1.velocity;
+            double    pressure  = vol_frac0 * z0.pressure + vol_frac1 * z1.pressure;
+
+            PState z(density, velocity, pressure, mass_frac, mixture);
+
+            cell(U).set_state(z);
+        }
+    });
+}
+
+
 int main() {
-    zephyr::utils::threads::on();
+    zephyr::utils::threads::off();
 
-    // Материал
-    Eos::Ptr sg1 = IdealGas::create(1.4, 1.0);
-    Eos::Ptr sg2 = IdealGas::create(1.5, 1.0);
-    Eos::Ptr sg3 = IdealGas::create(1.5, 1.0);
+    // Материалы
+    Eos::Ptr air = IdealGas::create("Air");
+    Eos::Ptr water = StiffenedGas::create("Water");
 
-    // Формальная смесь
-    MixturePT mixture = {sg1, sg2, sg3};
+    // Смесь
+    MixturePT mixture = {air, water};
 
     // Файл для записи
-    PvdFile pvd("TP", "output");
-    PvdFile pvd_body0("body0", "output");
-    PvdFile pvd_body1("body1", "output");
-    PvdFile pvd_body2("body2", "output");
+    PvdFile pvd("BC", "output");
+    PvdFile pvd_bubble("bubble", "output");
 
     // Переменные для сохранения
     pvd.variables += {"cln", get_cln};
@@ -81,11 +146,10 @@ int main() {
     pvd.variables += {"n.x", get_normal_x};
     pvd.variables += {"n.y", get_normal_y};
 
-
     // Создаем одномерную сетку
-    Rectangle gen(0.0, 7.0, 0.0, 3.0);
-    gen.set_nx(700);
-    gen.set_boundaries({.left=Boundary::WALL, .right=Boundary::WALL,
+    Rectangle gen(0.0_cm, 1.2_cm, 0.0_cm, 1.2_cm);
+    gen.set_nx(120);
+    gen.set_boundaries({.left=Boundary::ZOE, .right=Boundary::WALL,
                         .bottom=Boundary::WALL, .top=Boundary::WALL});
 
     // Создать сетку
@@ -99,64 +163,25 @@ int main() {
     solver.set_crp_mode(CrpMode::PLIC);
     solver.set_splitting(DirSplit::SIMPLE);
 
-    double R_max = 1.0;
-    double R_min = 0.125;
-    double P_max = 1.0;
-    double P_min = 0.1;
-
-    double x_barrier = 1.0;
-    double y_barrier = 1.5;
-
-    for (auto cell: mesh) {
-        Vector3d v = cell.center();
-
-        PState z = PState::Zero();
-        if (v.x() > x_barrier && v.y() < y_barrier) {
-            z.density   = R_max;
-            z.pressure  = P_min;
-            z.mass_frac = Fractions::Pure(0);
-            z.densities = ScalarSet::Pure(0, R_max);
-        }
-        else if (v.x() < x_barrier) {
-            z.density   = R_max;
-            z.pressure  = P_max;
-            z.mass_frac = Fractions::Pure(1);
-            z.densities = ScalarSet::Pure(1, R_max);
-        }
-        else {
-            z.density   = R_min;
-            z.pressure  = P_min;
-            z.mass_frac = Fractions::Pure(2);
-            z.densities = ScalarSet::Pure(2, R_min);
-        }
-
-        z.energy      = mixture.energy_rP     (z.density, z.pressure, z.mass_frac);
-        z.temperature = mixture.temperature_rP(z.density, z.pressure, z.mass_frac);
-
-        cell(U).set_state(z);
-    }
+    initialize(mesh, mixture);
 
     size_t n_step = 0;
     double curr_time = 0.0;
     double next_write = 0.0;
-    double max_time = 5.0;
+    double max_time = 2.0 * 4.5_us;
 
     Stopwatch elapsed(true);
     while (curr_time < max_time) {
         if (curr_time >= next_write) {
             std::cout << "\tStep: " << std::setw(6) << n_step << ";"
-                      << "\tTime: " << std::setw(6) << std::setprecision(3) << curr_time << "\n";
+                      << "\tTime: " << std::setw(6) << std::setprecision(3) << 1.0e6 * curr_time << " us\n";
             pvd.save(mesh, curr_time);
 
             solver.interface_recovery(mesh);
-            auto body_mesh0 = solver.body(mesh, 0);
-            auto body_mesh1 = solver.body(mesh, 1);
-            auto body_mesh2 = solver.body(mesh, 2);
-            pvd_body0.save(body_mesh0, curr_time);
-            pvd_body1.save(body_mesh1, curr_time);
-            pvd_body2.save(body_mesh2, curr_time);
+            auto bubble = solver.body(mesh, 0);
+            pvd_bubble.save(bubble, curr_time);
 
-            next_write += max_time / 50;
+            next_write += 0.0; //max_time / 50;
         }
 
         // Точное завершение в end_time
@@ -171,12 +196,8 @@ int main() {
     pvd.save(mesh, max_time);
 
     solver.interface_recovery(mesh);
-    auto body_mesh0 = solver.body(mesh, 0);
-    auto body_mesh1 = solver.body(mesh, 1);
-    auto body_mesh2 = solver.body(mesh, 2);
-    pvd_body0.save(body_mesh0, max_time);
-    pvd_body1.save(body_mesh1, max_time);
-    pvd_body2.save(body_mesh2, max_time);
+    auto bubble = solver.body(mesh, 0);
+    pvd_bubble.save(bubble, max_time);
 
     elapsed.stop();
 
