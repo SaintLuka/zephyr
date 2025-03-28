@@ -9,14 +9,11 @@
 #ifdef ZEPHYR_MPI
 
 #include <mpi.h>
+#include "mpi_type.h"
 
 // Нормальная параллельная версия обертки mpi
 
 namespace zephyr::utils {
-
-// Надо придумать, как это изящнее реализовать
-template<class T>
-static MPI_Datatype mpi_type();
 
 /// @brief Статический класс. Упрощенная обертка для mpi.
 class mpi {
@@ -283,15 +280,6 @@ void mpi::all_to_all(const std::vector<T>& send, std::vector<T>& recv) {
     recv.resize(size());
     MPI_Alltoall(send.data(), 1, mpi_type<T>(), recv.data(), 1, mpi_type<T>(), comm());
 }
-
-template <>
-MPI_Datatype mpi_type<int>() { return MPI_INT; }
-
-template <>
-MPI_Datatype mpi_type<unsigned char>() { return MPI_BYTE; }
-
-template <>
-MPI_Datatype mpi_type<double>() { return MPI_DOUBLE; }
 
 } // namespace zephyr::utils
 
