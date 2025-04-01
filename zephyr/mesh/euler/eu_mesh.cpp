@@ -51,6 +51,8 @@ EuMesh::EuMesh(const Json& config, size_t datasize)
             set_decomposition("XY");
         }
     }
+
+    m_tourism.init_mpi_type(m_locals.itemsize());
 }
 
 void EuMesh::initialize(const Grid& grid) {

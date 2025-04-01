@@ -157,19 +157,20 @@ void EuMesh::migrate() {
 	m_locals.resize(new_size);
 
 	// Считаем вспомогательные для отправки массивы
-	for(int i=0; i<size; ++i)
-		m_migration.m_send_counts[i] = m_migration.m_i[i] * migrants.itemsize();
+	for(int i = 0; i < size; ++i)
+		m_migration.m_send_counts[i] = m_migration.m_i[i];
 	for(int i = 1; i < size; ++i)
 		m_migration.m_send_offsets[i] = m_migration.m_send_offsets[i - 1] + m_migration.m_send_counts[i - 1];
-	for(int i=0; i<size; ++i)
-		m_migration.m_recv_counts[i] = m_migration.m[rank + size * i] * migrants.itemsize();
-	for(int i=1; i<size; ++i)
+	for(int i = 0; i < size; ++i)
+		m_migration.m_recv_counts[i] = m_migration.m[rank + size * i];
+	for(int i = 1; i < size; ++i)
 		m_migration.m_recv_offsets[i] = m_migration.m_recv_offsets[i - 1] + m_migration.m_recv_counts[i - 1];
 	
 	// Отправляем всем процессам соостветствующие
+	// printf("calling...\n");
 	MPI_Alltoallv(
-		migrants.item(0).ptr(), m_migration.m_send_counts.data(), m_migration.m_send_offsets.data(), MPI_BYTE,
-		m_locals.item(0).ptr(), m_migration.m_recv_counts.data(), m_migration.m_recv_offsets.data(), MPI_BYTE, 
+		migrants.item(0).ptr(), m_migration.m_send_counts.data(), m_migration.m_send_offsets.data(), m_tourism.get_mpi_type(),
+		m_locals.item(0).ptr(), m_migration.m_recv_counts.data(), m_migration.m_recv_offsets.data(), m_tourism.get_mpi_type(), 
 		mpi::comm()
 	);
 

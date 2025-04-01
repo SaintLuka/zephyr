@@ -40,6 +40,7 @@ public:
     template <class T>
     EuMesh(const Grid& grid, const T& val) : m_locals(0, val), m_aliens(0, val) {
         if (mpi::master()) { initialize(grid); }
+        m_tourism.init_mpi_type(m_locals.itemsize());
     }
 
     /// @brief Конструктор сетки из генератора
@@ -48,6 +49,7 @@ public:
     template<class T>
     EuMesh(Generator *gen, const T &val) : m_locals(0, val), m_aliens(0, val) {
         if (mpi::master()) { initialize(gen->make()); }
+        m_tourism.init_mpi_type(m_locals.itemsize());
     }
 
     /// @brief Конструктор сетки из генератора

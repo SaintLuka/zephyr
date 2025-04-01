@@ -5,6 +5,7 @@
 
 namespace zephyr::mesh {
 
+using namespace zephyr::utils;
 using zephyr::utils::mpi;
 
 /// @brief Поля данных для отправки
@@ -28,7 +29,10 @@ public:
 	    m_recv_offsets(mpi::size(), 0),
         m_border_indices(mpi::size(), std::vector<int>())
     {}
-    ~Tourism() = default;
+    ~Tourism();
+
+    void init_mpi_type(int size);
+    MPI_Datatype get_mpi_type() const;
 
     // Должно вызываться в начале build_aliens
     // Зануляет переменные, которые нужно занулить
@@ -44,6 +48,7 @@ public:
     // 
     void build_border(AmrStorage& locals, AmrStorage& aliens);
 
+    MPI_Datatype m_item_mpi_type = nullptr;
 private:
     std::vector<int> m_count_to_send;
     std::vector<int> m_count_to_recv;
@@ -51,17 +56,14 @@ private:
     std::vector<int> m_send_offsets;
     std::vector<int> m_recv_offsets;
 
-#ifdef ZEPHYR_MPI 
-    std::vector<MPI_Request> m_requests_send;
-    std::vector<MPI_Request> m_requests_recv;
-#endif
-
     std::vector<std::vector<int>> m_border_indices;
 
     AmrStorage m_border;
-
-#ifdef ZEPHYR_MPI
+#ifdef ZEPHYR_MPI 
+    std::vector<MPI_Request> m_requests_send;
+    std::vector<MPI_Request> m_requests_recv;
     std::vector<MPI_Status> m_status;
+
 #endif
 };
 

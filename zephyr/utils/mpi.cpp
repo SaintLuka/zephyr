@@ -22,8 +22,6 @@ void mpi::init() {
     MPI_Comm_size(MPI_COMM_WORLD, &g_size);
     MPI_Comm_rank(MPI_COMM_WORLD, &g_rank);
 
-    MPITypeManager::commit_types();
-
     auto names = proc_names();
     std::string my_name = names[g_rank];
 
@@ -37,6 +35,10 @@ void mpi::init() {
 
 void mpi::finalize() {
     MPI_Finalize();
+}
+
+void mpi_free_type(MPI_Datatype& type) {
+    MPI_Type_free(&type);
 }
 
 int mpi::rank() {

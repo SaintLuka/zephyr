@@ -9,7 +9,6 @@
 #ifdef ZEPHYR_MPI
 
 #include <mpi.h>
-#include "mpi_type.h"
 
 // Нормальная параллельная версия обертки mpi
 
@@ -153,6 +152,31 @@ public:
 
     /// @}
 };
+
+template<class T>
+static MPI_Datatype mpi_type();
+
+template <> MPI_Datatype mpi_type<int>() { return MPI_INT; }
+template <> MPI_Datatype mpi_type<unsigned char>() { return MPI_BYTE; }
+template <> MPI_Datatype mpi_type<char>() { return MPI_BYTE; }
+template <> MPI_Datatype mpi_type<double>() { return MPI_DOUBLE; }
+template <> MPI_Datatype mpi_type<float>() { return MPI_FLOAT; }
+template <> MPI_Datatype mpi_type<long>() { return MPI_LONG; }
+template <> MPI_Datatype mpi_type<short>() { return MPI_SHORT; }
+
+template<class T>
+MPI_Datatype mpi_register_contiguous_type(int count) {
+    MPI_Datatype out;
+    MPI_Type_contiguous(
+        count,
+        mpi_type<T>(),
+        &out
+    );
+    MPI_Type_commit(&out);
+    return out;
+}
+
+void mpi_free_type(MPI_Datatype& type);
 
 template <class F>
 void mpi::for_each(F&& f) {
