@@ -51,7 +51,7 @@ double calc_loads(Mesh& mesh) {
 }
 
 int main() {
-    mpi::init();
+    mpi::handler init;
 
     // Файл для записи
     PvdFile pvd("mesh", "output");
@@ -147,6 +147,5 @@ int main() {
     mpi::cout << "\nElapsed time:   " << elapsed.extended_time()
               << " ( " << elapsed.milliseconds() << " ms)\n";
 
-    mpi::finalize();
     return 0;
 }

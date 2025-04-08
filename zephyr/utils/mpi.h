@@ -19,15 +19,17 @@ class mpi {
 public:
 
     /// @{
-    /// @name Некоторое пояснение к обычной группе? Базовые функции, да как это работает???
+    /// @name Базовые функции
 
-    /// @brief Инициализация mpi
-    static void init();
+    /// @brief Создается в начале функции main. Конструктор вызывает
+    /// MPI_Init(argc, argv), деструктор вызывает MPI_Finalize()
+    struct handler {
+        handler();
+        handler(int& argc, char**& argv);
+        ~handler();
+    };
 
-    /// @brief Завершение
-    static void finalize();
-
-    // @brief Rfrjuj [thf Ранг процесса
+    // @brief Ранг процесса
     static int rank();
 
     /// @brief Ранг процесса в виде строки
@@ -319,20 +321,20 @@ public:
     /// @{
     /// @name Базовые функции MPI
 
-    /// @brief Инициализация mpi
-    static void init() { };
-
-    /// @brief Завершение
-    static void finalize() { };
+    /// @brief Создается в начале функции main
+    struct handler {
+        handler() { }
+        handler(int& argc, char**& argv) { }
+    };
 
     /// @brief Ранг процесса
     static constexpr int rank() { return 0; }
 
     /// @brief Ранг процесса в виде строки
-    static std::string srank() { return "0"; };
+    static std::string srank() { return "0"; }
 
     /// @brief Число процессов
-    static constexpr int size() { return 1; };
+    static constexpr int size() { return 1; }
     
     /// @brief Число задач на узел
     static constexpr int n_tasks() { return 1; }

@@ -4,7 +4,7 @@
 using zephyr::utils::mpi;
 
 int main() {
-    mpi::init();
+    mpi::handler init;
 
     mpi::cout << "Hello from master process\n";
 
@@ -12,6 +12,5 @@ int main() {
         std::cout << "Hello from " << mpi::rank() << " / " << mpi::size() << "\n";
     });
 
-    mpi::finalize();
     return 0;
 }

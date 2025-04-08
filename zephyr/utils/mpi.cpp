@@ -11,14 +11,14 @@ static int g_tasks = 1;
 // Собирает уникальные имена процессоров/узлов
 std::vector<std::string> proc_names();
 
-void mpi::init() {
+void mpi_init(int& argc, char**& argv) {
     int flag;
     MPI_Initialized(&flag);
     if (flag) {
         return;
     }
 
-    MPI_Init(nullptr, nullptr);
+    MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &g_size);
     MPI_Comm_rank(MPI_COMM_WORLD, &g_rank);
 
@@ -33,8 +33,23 @@ void mpi::init() {
     }
 }
 
-void mpi::finalize() {
-    MPI_Finalize();
+mpi::handler::handler() {
+    int argc = 0;
+    char** argv = nullptr;
+
+    mpi_init(argc, argv);
+}
+
+mpi::handler::handler(int &argc, char **&argv) {
+    mpi_init(argc, argv);
+}
+
+mpi::handler::~handler() {
+    int flag;
+    MPI_Finalized(&flag);
+    if (!flag) {
+        MPI_Finalize();
+    }
 }
 
 void mpi_free_type(MPI_Datatype& type) {

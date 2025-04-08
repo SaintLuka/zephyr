@@ -45,7 +45,7 @@ double get_e(AmrStorage::Item& cell) { return cell(U).energy; }
 
 
 int main() {
-    mpi::init();
+    mpi::handler init;
     threads::on(6);
 
     // Тестовая задача
@@ -156,6 +156,5 @@ int main() {
     CsvFile csv("test2D.csv", 5, pvd.variables);
     csv.save(mesh);
 
-    mpi::finalize();
     return 0;
 }

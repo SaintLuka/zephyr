@@ -63,6 +63,11 @@ public:
         return m_size;
     }
 
+    /// @brief  Вместимость текущего буфера
+    inline size_t capacity() const {
+        return m_data.capacity() / m_itemsize;
+    }
+
     /// @brief Размер данных элемента хранилища в байтах
     inline size_t datasize() const {
         return m_itemsize - sizeof(Geom);
@@ -77,6 +82,11 @@ public:
     inline void resize(size_t new_size) {
         m_size = new_size;
         m_data.resize(m_size * size_t(m_itemsize));
+    }
+
+    /// @brief A non-binding request to reduce capacity() to size()
+    inline void shrink_to_fit() {
+        m_data.shrink_to_fit();
     }
 
     /// @brief Скопировать элемент хранилища с индексом from в элемент

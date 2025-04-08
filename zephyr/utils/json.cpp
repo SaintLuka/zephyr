@@ -4,11 +4,11 @@
 #include <cstdio>
 #include <limits>
 #include <fstream>
+#include <iostream>
 
 #include <boost/program_options.hpp>
 
 #include <zephyr/utils/json.h>
-#include <zephyr/utils/mpi.h>
 
 namespace po = boost::program_options;
 
@@ -287,32 +287,24 @@ Json::Json(const Json::object &values) : m_ptr(make_shared<JsonObject>(values)) 
 Json::Json(Json::object &&values) : m_ptr(make_shared<JsonObject>(move(values))) {}
 
 Json Json::load(const std::string& filename) {
-    mpi::init();
-
     Json config;
-    for(int r = 0; r < mpi::size(); ++r) {
-        mpi::barrier();
-        if (r != mpi::rank()) {
-            continue;
+    std::ifstream config_dc(filename, std::ios::in);
+
+    if (config_dc) {
+        string errors;
+        string config_str = string(std::istreambuf_iterator<char>(config_dc),
+                                   std::istreambuf_iterator<char>());
+
+        config = Json::parse(config_str, errors);
+
+        if (!errors.empty()) {
+            throw std::runtime_error("Json::load(filename) error: .json syntax is incorrect: " + errors);
         }
-        std::ifstream config_dc(filename, std::ios::in);
-
-        if (config_dc) {
-            string errors;
-            string config_str = string(std::istreambuf_iterator<char>(config_dc),
-                                       std::istreambuf_iterator<char>());
-
-            config = Json::parse(config_str, errors);
-
-            if (!errors.empty()) {
-                throw std::runtime_error("Json::load(filename) error: .json syntax is incorrect: " + errors);
-            }
-        } else {
-            throw std::runtime_error("Json::load(filename) error: can't open file: \"" + filename + "\"");
-        }
-
-        config_dc.close();
+    } else {
+        throw std::runtime_error("Json::load(filename) error: can't open file: \"" + filename + "\"");
     }
+
+    config_dc.close();
 
     return config;
 }

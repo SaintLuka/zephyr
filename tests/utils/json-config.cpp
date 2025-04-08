@@ -16,7 +16,7 @@ struct U {
 
 // TODO: Написать тест нормально
 int main(int argc, char** argv) {
-    mpi::init();
+    mpi::handler init;
 
     Json config = Json::load(argc, argv, "json-config.json");
 
@@ -26,6 +26,5 @@ int main(int argc, char** argv) {
 
     pvd.save(mesh, 0.0);
 
-    mpi::finalize();
     return 0;
 }

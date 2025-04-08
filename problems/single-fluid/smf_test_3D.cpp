@@ -64,7 +64,7 @@ void set_flags(Mesh &mesh) {
 }
 
 int main() {
-    mpi::init();
+    mpi::handler init;
     threads::on();
 
     threads::info();
@@ -124,14 +124,14 @@ int main() {
     // Генератор сетки (с граничными условиями) дает тест,
     // число ячеек можно задать
     Cuboid gen = Cuboid(0.0, 1.0, 0.0, 1.0, 0.0, 1.0);
-    gen.set_nx(10);
+    gen.set_nx(100);
     gen.set_boundaries({.left=Boundary::WALL, .right=Boundary::ZOE,
                         .bottom=Boundary::WALL, .top=Boundary::ZOE,
                         .back=Boundary::WALL, .front=Boundary::ZOE});
 
     // Создать сетку
     EuMesh mesh(gen, U);
-    mesh.set_decomposition("XY");
+    mesh.set_decomposition("XYZ");
 
     // Создать решатель
     SmFluid solver(eos);
@@ -141,7 +141,7 @@ int main() {
     solver.set_method(Fluxes::HLLC_M);
 
     // Сеточная адаптация
-    mesh.set_max_level(4);
+    mesh.set_max_level(0);
     mesh.set_distributor(solver.distributor());
 
     for (int k = 0; k < mesh.max_level() + 3; ++k) {
@@ -204,6 +204,5 @@ int main() {
     mpi::cout << "  Refine time:   " << sw_refine.extended_time()
               << " ( " << sw_refine.milliseconds() << " ms)\n";
 
-    mpi::finalize();
     return 0;
 }

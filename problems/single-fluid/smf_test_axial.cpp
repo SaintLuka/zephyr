@@ -90,7 +90,7 @@ NodeStorage centers(EuMesh& mesh) {
 }
 
 int main() {
-    mpi::init();
+    mpi::handler init;
     threads::on();
 
     // Тестовая задача
@@ -205,6 +205,5 @@ int main() {
     mpi::cout << "\nElapsed time:   " << elapsed.extended_time()
               << " ( " << elapsed.milliseconds() << " ms)\n";
 
-    mpi::finalize();
     return 0;
 }

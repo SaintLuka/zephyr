@@ -43,8 +43,10 @@ void EuMesh::set_decomposition(Decomposition::Ref decmp, bool update) {
     m_decomp = decmp;
     if (update) {
         // вызываю, чтобы инициализировать m_tourism
-        build_aliens();
+    	build_aliens();
         redistribute();
+
+    	m_locals.shrink_to_fit(); // TODO: Проверить другие тяжелые массивы
     }
 #endif
 
