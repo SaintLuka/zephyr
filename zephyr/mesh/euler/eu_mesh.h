@@ -13,7 +13,7 @@
 #include <zephyr/mesh/euler/eu_cell.h>
 
 #include <zephyr/mesh/euler/tourism.h>
-#include <zephyr/mesh/euler/migration_service.h>
+#include <zephyr/mesh/euler/migration.h>
 
 #include <zephyr/mesh/decomp/ORB.h>
 
@@ -40,7 +40,7 @@ public:
     template <class T>
     EuMesh(const Grid& grid, const T& val) : m_locals(0, val), m_aliens(0, val) {
         if (mpi::master()) { initialize(grid); }
-        m_tourism.init_mpi_type(m_locals.itemsize());
+        if_mpi( m_tourism.init_types(m_locals) );
     }
 
     /// @brief Конструктор сетки из генератора
@@ -49,7 +49,7 @@ public:
     template<class T>
     EuMesh(Generator *gen, const T &val) : m_locals(0, val), m_aliens(0, val) {
         if (mpi::master()) { initialize(gen->make()); }
-        m_tourism.init_mpi_type(m_locals.itemsize());
+        if_mpi( m_tourism.init_types(m_locals) );
     }
 
     /// @brief Конструктор сетки из генератора
@@ -299,14 +299,13 @@ public:
     AmrStorage m_locals;  ///< Локальные ячейки
     AmrStorage m_aliens;  ///< Ячейки с других процессов
 
-    /// @brief Все данные, связанные с обменными слоями
-    Tourism    m_tourism;
-
     /// @brief Метод декомпозиции
     Decomposition::Ptr m_decomp = nullptr;
 
-    /// @brief Все данные, связанные с пересылкой ячеек
-    MigrationService m_migration;
+#ifdef ZEPHYR_MPI
+    Tourism   m_tourism;    ///< Построение обменных слоев и обмены
+    Migration m_migration;  ///< Пересылка ячеек при изменении декомпозиции
+#endif
 
     /// @brief Массив уникальных узлов. Используется в редких алгоритмах,
     /// по умолчанию пустой, заполняются при вызове функции collect_nodes().

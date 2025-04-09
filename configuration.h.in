@@ -1,3 +1,9 @@
 #cmakedefine ZEPHYR_MPI
 #cmakedefine ZEPHYR_EIGEN
 #cmakedefine ZEPHYR_PYTHON
+
+#ifdef ZEPHYR_MPI
+    #define if_mpi(...) __VA_ARGS__
+#else
+    #define if_mpi(...)
+#endif

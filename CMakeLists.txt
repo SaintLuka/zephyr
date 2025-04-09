@@ -87,11 +87,11 @@ install(FILES
     DESTINATION include/${PROJECT_NAME}
     )
 
-if (ZEPHYR_TESTS)
+if (ZEPHYR_TESTS OR ZEPHYR_TESTS_ALL)
     add_subdirectory(tests)
 endif()
 
-if (ZEPHYR_PROBLEMS)
+if (ZEPHYR_PROBLEMS OR ZEPHYR_PROBLEMS_ALL)
     add_subdirectory(problems)
 endif()
 

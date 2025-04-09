@@ -65,12 +65,13 @@ void set_flags(Mesh &mesh) {
 
 int main() {
     mpi::handler init;
-    threads::on();
+    threads::off();
 
     threads::info();
 
     // Тестовая задача
     SedovBlast3D test({.gamma=1.4, .rho0=1.0, .E=1.0});
+
 
     // Уравнение состояния
     IdealGas::Ptr eos = test.eos;
@@ -121,8 +122,7 @@ int main() {
                           return test.energy(cell.center.norm(), curr_time);
                       }};
 
-    // Генератор сетки (с граничными условиями) дает тест,
-    // число ячеек можно задать
+    // Генератор сетки
     Cuboid gen = Cuboid(0.0, 1.0, 0.0, 1.0, 0.0, 1.0);
     gen.set_nx(100);
     gen.set_boundaries({.left=Boundary::WALL, .right=Boundary::ZOE,

@@ -1,3 +1,4 @@
+
 #include <zephyr/utils/mpi.h>
 
 namespace zephyr::utils {
@@ -122,6 +123,43 @@ std::vector<std::string> proc_names() {
 }
 
 mpi::master_stream mpi::cout = {};
+
+namespace {
+
+// Удаление MPI-типа, выполняет MPI_Type_free, а затем удаляет указатель на
+// MPI_Datatype, добавляется к std::shared_ptr<MPI_Datatype>.
+void free_deleter(MPI_Datatype *ptr) {
+    MPI_Type_free(ptr);
+    delete (ptr);
+}
+}
+
+mpi::datatype::datatype(MPI_Datatype* dtype) {
+    m_ptr = std::shared_ptr<MPI_Datatype>(dtype, free_deleter);
+}
+
+mpi::datatype::datatype(nullptr_t null) : m_ptr(nullptr) { }
+
+mpi::datatype::datatype(MPI_Datatype dtype) : m_ptr(nullptr) {
+    if (dtype != MPI_DATATYPE_NULL) {
+        m_ptr = std::make_shared<MPI_Datatype>(dtype);
+    }
+}
+
+mpi::datatype mpi::datatype::contiguous(int count, MPI_Datatype oldtype) {
+    MPI_Datatype *newtype = new MPI_Datatype(MPI_DATATYPE_NULL);
+    MPI_Type_contiguous(count, oldtype, newtype);
+    MPI_Type_commit(newtype);
+    return mpi::datatype(newtype);
+}
+
+mpi::datatype mpi::datatype::hvector(int count, int blocklength,
+        MPI_Aint stride, MPI_Datatype oldtype) {
+    MPI_Datatype *newtype = new MPI_Datatype(MPI_DATATYPE_NULL);
+    MPI_Type_create_hvector(count, blocklength, stride, oldtype, newtype);
+    MPI_Type_commit(newtype);
+    return mpi::datatype(newtype);
+}
 
 #else
 

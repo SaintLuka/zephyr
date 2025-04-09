@@ -1,27 +1,39 @@
-#include "tourism.h"
+#include <zephyr/mesh/euler/tourism.h>
 
 namespace zephyr::mesh {
 
-void Tourism::reset() {
-    m_recv_offsets[0] = 0;
-    m_send_offsets[0] = 0;
+#ifdef ZEPHYR_MPI
 
-    for(int r = 0; r<m_border_indices.size(); ++r)
-        m_border_indices[r].clear();
+Tourism::Tourism() :
+        m_requests_recv(mpi::size()),
+        m_requests_send(mpi::size()),
+        m_count_to_send(mpi::size()),
+        m_count_to_recv(mpi::size()),
+        m_send_offsets(mpi::size(), 0),
+        m_recv_offsets(mpi::size(), 0),
+        m_border_indices(mpi::size(), std::vector<int>())
+{}
+
+void Tourism::shrink_to_fit() {
+    m_requests_recv.shrink_to_fit();
+    m_requests_send.shrink_to_fit();
+    m_count_to_send.shrink_to_fit();
+    m_count_to_recv.shrink_to_fit();
+    m_send_offsets.shrink_to_fit();
+    m_recv_offsets.shrink_to_fit();
+    m_border_indices.shrink_to_fit();
 }
 
-void Tourism::init_mpi_type(int size) {
-    if(m_item_mpi_type)
-        mpi_free_type(m_item_mpi_type);
-    m_item_mpi_type = mpi_register_contiguous_type<char>(size);
+void Tourism::init_types(const AmrStorage& locals) {
+    m_border = locals.same();
+    m_item_mpi_type = mpi::datatype::contiguous(locals.itemsize());
 }
 
-MPI_Datatype Tourism::get_mpi_type() const {
+mpi::datatype Tourism::get_mpi_type() const {
     return m_item_mpi_type;
 }
 
 void Tourism::send(const AmrStorage& locals, Post post) {
-#ifdef ZEPHYR_MPI
     const int size = mpi::size();
     const int rank = mpi::rank();
 
@@ -46,13 +58,14 @@ void Tourism::send(const AmrStorage& locals, Post post) {
             );
         }
     }
-#endif
 }
 
 void Tourism::recv(AmrStorage& aliens, Post post) {
-#ifdef ZEPHYR_MPI
     const int size = mpi::size();
     const int rank = mpi::rank();
+
+    // Расширим буфер, если необходимо
+    aliens.resize(m_recv_offsets[size - 1] + m_count_to_recv[size - 1]);
 
     for (int i = 0; i < size; ++i) {
         if (i != rank && m_count_to_recv[i] != 0) {
@@ -73,22 +86,29 @@ void Tourism::recv(AmrStorage& aliens, Post post) {
             MPI_Wait(&m_requests_recv[i], MPI_STATUSES_IGNORE);
         }
     }
-#endif
 }
 
-void Tourism::build_border(AmrStorage& locals, AmrStorage& aliens){
-#ifdef ZEPHYR_MPI
+void Tourism::build_border(AmrStorage& locals){
     const int size = mpi::size();
     const int rank = mpi::rank();
+
+    // Очистить списки и смещения
+    m_recv_offsets[0] = 0;
+    m_send_offsets[0] = 0;
+
+    for (auto &border_indices : m_border_indices)
+        border_indices.clear();
 
     // Заполняем m_border_indices
     for (auto& cell: locals) {
         // build alien можно вызвать для не совсем нормальной сетки
         if (cell.is_undefined())
             continue;
+
         for (auto& face: cell.faces) {
             if(face.is_undefined()) 
                 continue;
+
             auto& border_indices = m_border_indices[face.adjacent.rank];
             if(face.adjacent.rank != rank && (border_indices.empty() || border_indices.back() != cell.index))
                 border_indices.push_back(cell.index);
@@ -112,8 +132,6 @@ void Tourism::build_border(AmrStorage& locals, AmrStorage& aliens){
     }
     // Заполняем m_border
     int border_size = m_send_offsets[size - 1] + m_count_to_send[size - 1];
-    // [!] штука ниже мне не нравится, но как сделать иначе?
-    m_border = locals;
     m_border.resize(border_size);
 
     int temp_border_it = 0;
@@ -125,14 +143,52 @@ void Tourism::build_border(AmrStorage& locals, AmrStorage& aliens){
             ++temp_border_it;
         }
     }
+}
 
-    aliens.resize(m_recv_offsets[size - 1] + m_count_to_recv[size - 1]);
+void Tourism::build_aliens(AmrStorage& locals, AmrStorage& aliens) {
+    const int rank = mpi::rank();
+
+    build_border(locals);
+
+    // Отправляем locals
+    send(locals);
+
+    for (auto &cell : locals) {
+        for (auto &face : cell.faces) {
+            if (face.is_undefined())
+                continue;
+
+            if (face.adjacent.rank == rank)
+                face.adjacent.alien = -1;
+        }
+    }
+
+    // Получам в aliens
+    recv(aliens);
+
+    int al_it = 0;
+    for (auto &cell: aliens) {
+        for (auto &face : cell.faces) {
+            if (face.is_undefined())
+                continue;
+
+            if (face.adjacent.index != -1 && face.adjacent.rank == rank) {
+                //printf("I: %d\n", face.adjacent.index);
+                auto &curr_cell = locals[face.adjacent.index];
+                for (auto &l_face : curr_cell.faces) {
+                    if (l_face.adjacent.rank == cell.rank && l_face.adjacent.index == cell.index) {
+                        l_face.adjacent.alien = al_it;
+                        break;
+                    }
+                }
+            }
+        }
+        ++al_it;
+    }
+
+    // [?] если m_border_indices[r].size() == m_count_to_send[r], то зачем второе вообще нужно?
+}
+
 #endif
-}
-
-Tourism::~Tourism(){
-    if(m_item_mpi_type)
-        mpi_free_type(m_item_mpi_type);
-}
 
 } // namespace zephyr::mesh

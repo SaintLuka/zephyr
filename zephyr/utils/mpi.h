@@ -3,11 +3,11 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <memory>
 
 #include <zephyr/configuration.h>
 
 #ifdef ZEPHYR_MPI
-
 #include <mpi.h>
 
 // Нормальная параллельная версия обертки mpi
@@ -153,18 +153,51 @@ public:
     static void all_to_all(const std::vector<T>& send, std::vector<T>& recv);
 
     /// @}
+
+    /// @brief Простая обёртка для MPI-типов
+    struct datatype {
+    public:
+        /// @brief Нулевой тип
+        datatype() = default;
+
+        /// @brief Нулевой тип
+        datatype(nullptr_t null);
+
+        /// @brief Примитивный (неуправляемый) тип
+        datatype(MPI_Datatype dtype);
+
+        /// @brief Приведение к MPI-типу
+        operator MPI_Datatype () const {
+            return m_ptr ? *m_ptr : MPI_DATATYPE_NULL;
+        }
+
+        /// @brief Создать MPI_Type_contiguous
+        static datatype contiguous(int count, MPI_Datatype oldtype = MPI_BYTE);
+
+        /// @brief Создать MPI_Type_hvector
+        static datatype hvector(int count, int blocklength, MPI_Aint stride,
+                MPI_Datatype oldtype = MPI_BYTE);
+
+    private:
+        /// @brief Приватный конструктор, после создания типа указатель переходит
+        /// на хранение в shared_ptr. Создавать datatype допускается только через
+        /// статические функции "конструкторы": contoguous, hvector...
+        explicit datatype(MPI_Datatype* dtype);
+
+        std::shared_ptr<MPI_Datatype> m_ptr = nullptr;
+    };
 };
 
 template<class T>
 static MPI_Datatype mpi_type();
 
-template <> MPI_Datatype mpi_type<int>() { return MPI_INT; }
-template <> MPI_Datatype mpi_type<unsigned char>() { return MPI_BYTE; }
-template <> MPI_Datatype mpi_type<char>() { return MPI_BYTE; }
+template <> MPI_Datatype mpi_type<int>()    { return MPI_INT;    }
 template <> MPI_Datatype mpi_type<double>() { return MPI_DOUBLE; }
-template <> MPI_Datatype mpi_type<float>() { return MPI_FLOAT; }
-template <> MPI_Datatype mpi_type<long>() { return MPI_LONG; }
-template <> MPI_Datatype mpi_type<short>() { return MPI_SHORT; }
+template <> MPI_Datatype mpi_type<float>()  { return MPI_FLOAT;  }
+template <> MPI_Datatype mpi_type<long>()   { return MPI_LONG;   }
+template <> MPI_Datatype mpi_type<short>()  { return MPI_SHORT;  }
+template <> MPI_Datatype mpi_type<char>()   { return MPI_BYTE;   }
+template <> MPI_Datatype mpi_type<unsigned char>() { return MPI_BYTE; }
 
 template<class T>
 MPI_Datatype mpi_register_contiguous_type(int count) {

@@ -84,10 +84,11 @@ public:
         m_data.resize(m_size * size_t(m_itemsize));
     }
 
+    /// @brief Создать пустое хранилище с таким же размером данных
+    inline Storage same() const { return Storage(0, true, datasize()); }
+
     /// @brief A non-binding request to reduce capacity() to size()
-    inline void shrink_to_fit() {
-        m_data.shrink_to_fit();
-    }
+    inline void shrink_to_fit() { m_data.shrink_to_fit(); }
 
     /// @brief Скопировать элемент хранилища с индексом from в элемент
     /// хранилища с индексом to (геометрия и данные).

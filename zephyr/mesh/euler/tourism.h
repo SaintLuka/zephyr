@@ -1,7 +1,8 @@
 #pragma once
 #include <vector>
-#include <zephyr/mesh/euler/amr_storage.h>
+
 #include <zephyr/utils/mpi.h>
+#include <zephyr/mesh/euler/amr_storage.h>
 
 namespace zephyr::mesh {
 
@@ -16,40 +17,39 @@ enum class Post : int {
     // ...
 };
 
-class Tourism {
-public:
-    Tourism() :
 #ifdef ZEPHYR_MPI
-        m_requests_recv(mpi::size()),
-        m_requests_send(mpi::size()),
-#endif
-	    m_count_to_send(mpi::size()),
-	    m_count_to_recv(mpi::size()),
-	    m_send_offsets(mpi::size(), 0),
-	    m_recv_offsets(mpi::size(), 0),
-        m_border_indices(mpi::size(), std::vector<int>())
-    {}
-    ~Tourism();
 
-    void init_mpi_type(int size);
-    MPI_Datatype get_mpi_type() const;
+/// @brief Поддерживает согласованные обменные слои
+class Tourism final {
+public:
+    Tourism();
 
-    // Должно вызываться в начале build_aliens
-    // Зануляет переменные, которые нужно занулить
-    void reset();
+    /// @brief Синхронизует размеры типов с основным хранилищем,
+    /// также инициализирует MPI-типы для пересылок?
+    void init_types(const AmrStorage& locals);
 
-    // Должен быть готов: m_tourism
-    // Отправляет m_tourism.m_border -> aliens
+    /// @brief Сжать массивы до актуальных размеров
+    void shrink_to_fit();
+
+    mpi::datatype get_mpi_type() const;
+
+    // Должен быть готов m_border, отправляет m_border -> aliens
     void send(const AmrStorage& locals, Post post = Post::FULL);
     
     // Получает aliens
     void recv(AmrStorage& aliens, Post post = Post::FULL);
 
-    // 
-    void build_border(AmrStorage& locals, AmrStorage& aliens);
+    // Построить обменный слой (список border)
+    void build_aliens(AmrStorage& locals, AmrStorage& aliens);
 
-    MPI_Datatype m_item_mpi_type = nullptr;
 private:
+    // Построить обменный слой (список border)
+    void build_border(AmrStorage& locals);
+
+    AmrStorage m_border;
+
+    mpi::datatype m_item_mpi_type = nullptr;
+
     std::vector<int> m_count_to_send;
     std::vector<int> m_count_to_recv;
 
@@ -58,13 +58,10 @@ private:
 
     std::vector<std::vector<int>> m_border_indices;
 
-    AmrStorage m_border;
-#ifdef ZEPHYR_MPI 
     std::vector<MPI_Request> m_requests_send;
     std::vector<MPI_Request> m_requests_recv;
-    std::vector<MPI_Status> m_status;
+};
 
 #endif
-};
 
 } // namespace zephyr::mesh

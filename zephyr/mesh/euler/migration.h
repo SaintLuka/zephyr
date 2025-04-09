@@ -6,29 +6,8 @@ namespace zephyr::mesh {
 
 using zephyr::utils::mpi;
 
-/// @brief Матрица пересылок
-struct Router {
-
-    int& operator()(int i, int j) {
-        return m_data1[0];
-    };
-
-    void sync() {
-
-    }
-
-    // Какой лучше? Двумерный массив из boost не хочу
-    std::vector<int> m_data1;
-    std::vector<std::vector<int>> m_data2;
-
-};
-
-
-class MigrationService {
+class Migration {
 public:
-
-    Router m_router;
-
     std::vector<int> m_send_counts;
     std::vector<int> m_send_offsets;
     std::vector<int> m_recv_counts;
@@ -42,7 +21,7 @@ public:
     std::vector<int> m_sum;
     std::vector<int> m;
 
-    MigrationService() : 
+    Migration() :
         m(mpi::size(), 0),
         m_sum(mpi::size(), 0),
         m_i(mpi::size(), 0),
@@ -63,9 +42,11 @@ public:
         m_send_offsets[0] = 0;
     }
 
-#ifdef ZEPHYR_MPI
-    std::vector<MPI_Status> m_status;
-#endif
+    /// @brief Сжать массивы до актуальных размеров
+    void clear() {
+        m_migrants.resize(0);
+        m_migrants.shrink_to_fit();
+    }
 };
 
 } // namespace zephyr::mesh

@@ -46,7 +46,11 @@ void EuMesh::set_decomposition(Decomposition::Ref decmp, bool update) {
     	build_aliens();
         redistribute();
 
-    	m_locals.shrink_to_fit(); // TODO: Проверить другие тяжелые массивы
+        // Вероятно, первый (и единстивенный) redistribute, почистим память
+    	m_locals.shrink_to_fit();
+    	m_aliens.shrink_to_fit();
+    	m_tourism.shrink_to_fit();
+    	m_migration.clear();
     }
 #endif
 
@@ -179,54 +183,11 @@ void EuMesh::migrate() {
 #endif
 }
 
-/// @brief 
-/// Заполняет m_tourism
 void EuMesh::build_aliens() {
 #ifdef ZEPHYR_MPI
-	int size = mpi::size();
-	int rank = mpi::rank();
+    if (mpi::single()) return;
 
-	m_tourism.reset();
-
-	m_tourism.build_border(m_locals, m_aliens);
-
-	// Отправляем 
-    m_tourism.send(m_locals);
-
-	for(auto& cell : m_locals){
-		for(auto& face : cell.faces){
-			if (face.is_undefined()) 
-				continue;
-				
-			if(face.adjacent.rank == rank)
-				face.adjacent.alien = -1;
-		}
-	}
-
-	// Получам в aliens
-    m_tourism.recv(m_aliens);
-
-	int al_it = 0;
-	for(auto& cell : m_aliens){
-		for(auto& face : cell.faces){
-			if (face.is_undefined()) 
-				continue;
-
-			if(face.adjacent.index != -1 && face.adjacent.rank == rank){
-				//printf("I: %d\n", face.adjacent.index);
-				auto& curr_cell = m_locals[face.adjacent.index];
-				for(auto& l_face : curr_cell.faces){
-					if(l_face.adjacent.rank == cell.rank && l_face.adjacent.index == cell.index){
-						l_face.adjacent.alien = al_it;
-						break;
-					}
-				}
-			}
-		}
-		++al_it;
-	}	
-
-	// [?] если m_border_indices[r].size() == m_count_to_send[r], то зачем второе вообще нужно?
+    m_tourism.build_aliens(m_locals, m_aliens);
 #endif
 }
 
