@@ -9,9 +9,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS_DEBUG   "-Wno-attributes -Wno-unused-result -O0 -g")
 set(CMAKE_CXX_FLAGS_RELEASE "-Wno-attributes -Wno-unused-result -O3")
 
-if (NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
-endif()
+set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type: Release / Debug")
+set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS Release Debug)
 
 option(ZEPHYR_DOXYGEN      "Create docs"        OFF)
 option(ZEPHYR_EIGEN        "Use Eigen library"  ON)
@@ -22,13 +21,35 @@ option(ZEPHYR_PYTHON       "Use python libs"    ON)
 option(ZEPHYR_TESTS        "Build tests"        ON)
 option(ZEPHYR_TESTS_ALL    "Build ALL tests"    OFF)
 
+set(THREADS_TYPE "STD" CACHE STRING "Choose thread style: STD, OpenMP, TBB")
+set_property(CACHE THREADS_TYPE PROPERTY STRINGS STD OpenMP TBB)
+if (${THREADS_TYPE} STREQUAL TBB)
+    message(STATUS "Use TBB")
+    set(ZEPHYR_TBB ON)
+elseif (${THREADS_TYPE} STREQUAL OpenMP)
+    message(STATUS "Use OpenMP")
+    set(ZEPHYR_OPENMP ON)
+else ()
+    message(STATUS "Use standard threads")
+    set(ZEPHYR_STD_THREADS ON)
+endif ()
+
 configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/configuration.h.in
     ${CMAKE_CURRENT_BINARY_DIR}/zephyr/configuration.h
 )
 
-find_package(Threads REQUIRED)
+if (ZEPHYR_TBB)
+    find_package(TBB REQUIRED)
+elseif (ZEPHYR_OPENMP)
+    find_package(OpenMP)
+else ()
+    find_package(Threads REQUIRED)
+endif ()
 find_package(Eigen3  REQUIRED)
+if(POLICY CMP0167)
+    cmake_policy(SET CMP0167 NEW)
+endif()
 find_package(Boost   COMPONENTS program_options REQUIRED)
 if (ZEPHYR_PYTHON)
     find_package(Python3 COMPONENTS Interpreter Development NumPy REQUIRED)
@@ -41,7 +62,13 @@ set(BUILD_SHARED_LIBS YES)
 
 # Тип компиляции (SHARED/STATIC) пропущен, полагаемся на переменную BUILD_SHARED_LIBS
 add_library(zephyr ${ZEPHYR_SOURCES})
-target_link_libraries(zephyr PUBLIC ${CMAKE_THREAD_LIBS_INIT})
+if (ZEPHYR_TBB)
+    target_link_libraries(zephyr PUBLIC TBB::tbb)
+elseif (ZEPHYR_OPENMP)
+    target_link_libraries(zephyr PUBLIC OpenMP::OpenMP_CXX)
+else ()
+    target_link_libraries(zephyr PUBLIC ${CMAKE_THREAD_LIBS_INIT})
+endif ()
 target_link_libraries(zephyr PUBLIC ${Boost_LIBRARIES})
 if (ZEPHYR_PYTHON)
     target_link_libraries(zephyr PUBLIC Python3::Python Python3::NumPy)
@@ -87,11 +114,11 @@ install(FILES
     DESTINATION include/${PROJECT_NAME}
     )
 
-if (ZEPHYR_TESTS OR ZEPHYR_TESTS_ALL)
+if (${ZEPHYR_TESTS} OR ${ZEPHYR_TESTS_ALL})
     add_subdirectory(tests)
 endif()
 
-if (ZEPHYR_PROBLEMS OR ZEPHYR_PROBLEMS_ALL)
+if (${ZEPHYR_PROBLEMS} OR ${ZEPHYR_PROBLEMS_ALL})
     add_subdirectory(problems)
 endif()
 

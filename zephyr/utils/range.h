@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+
 namespace zephyr::utils {
 
 /// @brief Простой класс для представления диапазона чисел.
@@ -31,18 +33,28 @@ public:
         T m_val; ///< Значение из диапазона
 
     public:
+        /// @brief Категория random_access
+        using iterator_category = std::random_access_iterator_tag;
+        using difference_type   = std::ptrdiff_t;
+        using value_type = T;
+        using pointer    = T*;
+        using reference  = T;
+
         iterator(const T &val) : m_val(val) {}
 
         inline operator T() { return m_val; }
 
         /// @brief Получить значение
-        const T &operator*() const { return m_val; }
+        T operator*() const { return m_val; }
 
         /// @brief Инкремент
         inline void operator++() { ++m_val; }
 
         /// @brief Инкремент
         inline void operator++(int) { ++m_val; }
+
+        /// @brief Смещение по индексу
+        T operator[](difference_type n) const { return m_val + n; }
 
         /// @brief Инкремент на шаг step
         inline void operator+=(size_t step) { m_val += step; }
@@ -58,12 +70,12 @@ public:
         }
 
         /// @brief Сравнение
-        inline bool operator!=(const iterator &other) {
+        inline bool operator!=(const iterator &other) const {
             return m_val != other.m_val;
         }
 
         /// @brief Сравнение
-        inline bool operator<(const iterator &other) {
+        inline bool operator<(const iterator &other) const {
             return m_val < other.m_val;
         }
     };

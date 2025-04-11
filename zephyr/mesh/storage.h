@@ -186,6 +186,12 @@ public:
     /// @brief Итератор по элементам хранилища
     class Iterator {
     public:
+        using iterator_category = std::random_access_iterator_tag;
+        using difference_type = std::ptrdiff_t;
+        using value_type = Item&;
+        using pointer    = Item*;
+        using reference  = Item&;
+
         /// @brief Создание нулевого итератора из nullptr
         inline Iterator(std::nullptr_t null)
                 : m_ptr(nullptr), m_itemsize(0) { }
@@ -230,6 +236,12 @@ public:
             return *this;
         }
 
+        /// @brief Префиксный декремент (++it)
+        inline Iterator &operator--() {
+            m_ptr -= m_itemsize;
+            return *this;
+        }
+
         /// @brief Сдвиг итератора (it += step)
         inline Iterator &operator+=(size_t step) {
             m_ptr += step * m_itemsize;
@@ -244,6 +256,11 @@ public:
         /// @brief Расстояние между парой итераторов
         inline size_t operator-(const Iterator &it) const {
             return (m_ptr - it.m_ptr) / m_itemsize;
+        }
+
+        /// @brief Разыменование со сдвигом
+        inline Item& operator[](size_t idx) const {
+            return *reinterpret_cast<Item *>(m_ptr + idx * m_itemsize);
         }
 
         // Решил не мелочиться и реализовать все операции сравнения

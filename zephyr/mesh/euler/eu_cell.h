@@ -14,6 +14,13 @@ namespace zephyr::mesh {
 class EuCell {
     using Vector3d = zephyr::geom::Vector3d;
 public:
+
+    using iterator_category = std::random_access_iterator_tag;
+    using difference_type = std::ptrdiff_t;
+    using value_type = EuCell;
+    using pointer    = EuCell*;
+    using reference  = EuCell&;
+
     // Конструкторы
 
     /// @brief Конструктор копирования
@@ -21,6 +28,12 @@ public:
 
     /// @brief Конструктор перемещения
     EuCell(EuCell &&cell) = default;
+
+    /// Требует TBB, parallel reduce
+    EuCell& operator=(const EuCell &cell) {
+        m_it = cell.m_it;
+        return *this;
+    }
 
     /// @brief Основной конструктор. Взять ячейку из хранилища по индексу.
     /// Ячейка может быть из locals или из aliens. Если индекс меньше
@@ -50,6 +63,12 @@ public:
         return *this;
     }
 
+    /// @brief Предыдущая ячейка
+    inline EuCell &operator--() {
+        --m_it;
+        return *this;
+    }
+
     /// @brief Ячейка через step
     inline EuCell &operator+=(int step) {
         m_it += step;
@@ -69,13 +88,25 @@ public:
     }
 
     /// @brief Оператор сравнения
-    bool operator<(const EuCell& cell) {
+    bool operator<(const EuCell& cell) const {
         return m_it < cell.m_it;
     }
 
     /// @brief Оператор сравнения
-    bool operator!=(const EuCell& cell) {
+    bool operator!=(const EuCell& cell) const {
         return m_it != cell.m_it;
+    }
+
+    /// @brief Оператор сравнения
+    bool operator==(const EuCell& cell) const {
+        return m_it == cell.m_it;
+    }
+
+    /// @brief  Оператор доступа как для указателя (random access iterator)
+    EuCell operator[](size_t idx) const {
+        EuCell cell(*this);
+        cell.m_it += idx;
+        return cell;
     }
 
 

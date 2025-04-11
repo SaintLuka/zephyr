@@ -31,6 +31,7 @@
 #include <iomanip>
 #include <cmath>
 
+#include <array>
 #include <vector>
 #include <boost/container/small_vector.hpp>
 #include <boost/container/static_vector.hpp>

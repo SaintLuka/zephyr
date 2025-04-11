@@ -84,7 +84,7 @@ double mean(std::vector<std::pair<Element, Data>>& elements) {
     return res / elements.size();
 }
 
-void foo_range(int idx, std::vector<Element>& elems, std::vector<Data>& datas) {
+void foo_range(size_t idx, std::vector<Element>& elems, std::vector<Data>& datas) {
     elems[idx].interact(datas[idx]);
 }
 

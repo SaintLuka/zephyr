@@ -1,6 +1,12 @@
+#pragma once
+
 #cmakedefine ZEPHYR_MPI
 #cmakedefine ZEPHYR_EIGEN
 #cmakedefine ZEPHYR_PYTHON
+
+#cmakedefine ZEPHYR_TBB
+#cmakedefine ZEPHYR_OPENMP
+#cmakedefine ZEPHYR_STD_THREADS
 
 #ifdef ZEPHYR_MPI
     #define if_mpi(...) __VA_ARGS__

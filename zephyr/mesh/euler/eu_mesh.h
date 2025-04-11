@@ -145,7 +145,7 @@ public:
 
     /// @brief Параллельно по тредам посчитать минимум
     template<int n_tasks_per_thread = 10, class Func,
-            class Value = typename std::result_of<Func(EuCell&)>::type>
+            typename Value = std::invoke_result_t<Func, EuCell&>>
     auto min(Func &&func, const Value &init)
     -> typename std::enable_if<!std::is_void<Value>::value, Value>::type {
         return threads::min<n_tasks_per_thread>(begin(), end(), init, std::forward<Func>(func));
@@ -153,7 +153,7 @@ public:
 
     /// @brief Параллельно по тредам посчитать минимум
     template<int n_tasks_per_thread = 10, class Func,
-            class Value = typename std::result_of<Func(EuCell&)>::type>
+            typename Value = std::invoke_result_t<Func, EuCell&>>
     auto min(Func &&func)
     -> typename std::enable_if<std::is_arithmetic<Value>::value, Value>::type {
         return threads::min<n_tasks_per_thread>(begin(), end(), std::forward<Func>(func));
@@ -161,7 +161,7 @@ public:
 
     /// @brief Параллельно по тредам посчитать максимум
     template<int n_tasks_per_thread = 10, class Func,
-            class Value = typename std::result_of<Func(EuCell&)>::type>
+            typename Value = std::invoke_result_t<Func, EuCell&>>
     auto max(Func &&func, const Value &init)
     -> typename std::enable_if<!std::is_void<Value>::value, Value>::type {
         return threads::max<n_tasks_per_thread>(begin(), end(), init, std::forward<Func>(func));
@@ -169,7 +169,7 @@ public:
 
     /// @brief Параллельно по тредам посчитать минимум
     template<int n_tasks_per_thread = 10, class Func,
-            class Value = typename std::result_of<Func(EuCell&)>::type>
+            typename Value = std::invoke_result_t<Func, EuCell&>>
     auto max(Func &&func)
     -> typename std::enable_if<std::is_arithmetic<Value>::value, Value>::type {
         return threads::max<n_tasks_per_thread>(begin(), end(), std::forward<Func>(func));
@@ -177,7 +177,7 @@ public:
 
     /// @brief Параллельно по тредам выполнить суммирование
     template<int n_tasks_per_thread = 10, class Func,
-            class Value = typename std::result_of<Func(EuCell&)>::type>
+            typename Value = std::invoke_result_t<Func, EuCell&>>
     auto sum(Func &&func, const Value &init)
     -> typename std::enable_if<!std::is_void<Value>::value, Value>::type {
         return threads::sum<n_tasks_per_thread>(begin(), end(), init, std::forward<Func>(func));
@@ -185,7 +185,7 @@ public:
 
     /// @brief Параллельно по тредам выполнить свёртку
     template<int n_tasks_per_thread = 10, class Func,
-            class Value = typename std::result_of<Func(EuCell&)>::type>
+            typename Value = std::invoke_result_t<Func, EuCell&>>
     auto reduce(Func &&func, const Value &init)
     -> typename std::enable_if<!std::is_void<Value>::value, Value>::type {
         return threads::reduce<n_tasks_per_thread>(begin(), end(), init, std::forward<Func>(func));
