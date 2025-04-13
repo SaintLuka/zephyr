@@ -195,22 +195,25 @@ public:
     // Далее простые get/set функции
 
     /// @brief Размерность ячейки
-    inline const int& dim() const { return m_it->dim; }
+    inline int dim() const { return m_it->dim; }
 
     /// @brief Индекс среди базовых ячеек
-    inline const int& b_idx() const { return m_it->b_idx; }
+    inline int b_idx() const { return m_it->b_idx; }
 
     /// @brief Индекс ячейки на z-кривой
-    inline const int& z_idx() const { return m_it->z_idx; }
+    inline int z_idx() const { return m_it->z_idx; }
+
+    /// @brief Индекс ячейки на z-кривой
+    inline int index() const { return m_it->index; }
 
     /// @brief Индекс новой ячейки (в алгоритмах)
-    inline const int& next() const { return m_it->next; }
+    inline int next() const { return m_it->next; }
 
     /// @brief Уровень адаптации ячейки (0 для базовой)
-    inline const int& level() const { return m_it->level; }
+    inline int level() const { return m_it->level; }
 
     /// @brief Желаемый флаг адаптации
-    inline const int& flag() const { return m_it->flag; }
+    inline int flag() const { return m_it->flag; }
 
     /// @brief Желаемый флаг адаптации
     inline void set_flag(int flag) { m_it->flag = flag; }

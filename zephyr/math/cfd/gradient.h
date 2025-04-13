@@ -180,7 +180,7 @@ Grad<State> LSM(Cell &cell,
     Matrix3d A = Matrix3d::Zero();
 
     for (auto &face: cell.faces()) {
-        const Vector3d &normal = face.normal();
+        auto &normal = face.normal();
 
         State zn;
         Vector3d dr;

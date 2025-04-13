@@ -9,7 +9,7 @@
 
 #include <zephyr/phys/tests/sedov_blast.h>
 
-#include <zephyr/math/solver/sm_fluid.h>
+#include <zephyr/math/solver/sm_fluid_soa.h>
 
 #include <zephyr/io/pvd_file.h>
 
@@ -24,28 +24,18 @@ using namespace zephyr::math::smf;
 
 using zephyr::mesh::generator::Cuboid;
 using zephyr::mesh::EuMesh;
-using zephyr::math::SmFluid;
+using zephyr::math::SmFluidSoA;
 
 using zephyr::utils::mpi;
 using zephyr::utils::threads;
 using zephyr::utils::Stopwatch;
 
-
-// Для быстрого доступа по типу
-SmFluid::State U;
-
-/// Переменные для сохранения
-double get_lvl(AmrStorage::Item& cell) { return cell.level; }
-double get_rho(AmrStorage::Item& cell) { return cell(U).density; }
-double get_v(AmrStorage::Item& cell) { return cell(U).velocity.norm(); }
-double get_p(AmrStorage::Item& cell) { return cell(U).pressure; }
-double get_e(AmrStorage::Item& cell) { return cell(U).energy; }
-
 // Критерий адаптации подобран под задачу.
 // Адаптация ячеек с плотностью выше 1.5.
 void set_flags(Mesh &mesh) {
+    return;
     if (!mesh.is_adaptive()) return;
-
+/*
     mesh.for_each([](Cell& cell) {
         const double threshold = 1.5;
 
@@ -61,6 +51,7 @@ void set_flags(Mesh &mesh) {
         }
         cell.set_flag(-1);
     });
+    */
 }
 
 int main(int argc, char** argv) {
@@ -78,17 +69,6 @@ int main(int argc, char** argv) {
     double t0 = 0.1;   // test.time_by_radius(0.4);
     test.finish = 0.7; // test.time_by_radius(0.9);
 
-    auto init_cells = [&](Mesh& mesh) {
-        mesh.for_each([&](Cell& cell) {
-            double r = cell.center().norm();
-            Vector3d n = cell.center() / r;
-            cell(U).density  = test.density (r, t0);
-            cell(U).velocity = test.velocity(r, t0) * n;
-            cell(U).pressure = std::max(test.pressure(r, t0), 1.0e-3);
-            cell(U).energy   = eos->energy_rP(cell(U).density, cell(U).pressure);
-        });
-    };
-
     // Файл для записи
     PvdFile pvd("Sedov", "output");
     pvd.unique_nodes = false;
@@ -97,12 +77,47 @@ int main(int argc, char** argv) {
     double curr_time = t0;
     double next_write = t0;
 
+
+    // Генератор сетки
+    Cuboid gen = Cuboid(0.0, 1.0, 0.0, 1.0, 0.0, 1.0);
+    gen.set_nx(100);
+    gen.set_boundaries({.left=Boundary::WALL, .right=Boundary::ZOE,
+                        .bottom=Boundary::WALL, .top=Boundary::ZOE,
+                        .back=Boundary::WALL, .front=Boundary::ZOE});
+
+    // Создать сетку
+    EuMesh mesh(gen, SmFluidSoA::datatype());
+    mesh.set_decomposition("XYZ");
+
+    // Создать решатель
+    SmFluidSoA solver(eos);
+    solver.set_accuracy(2);
+    solver.set_CFL(0.5);
+    solver.set_limiter("MC");
+    solver.set_method(Fluxes::HLLC_M);
+
+    // Сеточная адаптация
+    mesh.set_max_level(0);
+    mesh.set_distributor(solver.distributor());
+
     // Переменные для сохранения
     pvd.variables = {"level"};
-    pvd.variables += {"rho", get_rho};
-    pvd.variables += {"v", get_v};
-    pvd.variables += {"p", get_p};
-    pvd.variables += {"e", get_e};
+    pvd.variables += {"rho",
+                      [&solver](const AmrStorage::Item& cell) -> double {
+                          return solver.curr[cell.index].density;
+                      }};
+    pvd.variables += {"v",
+                      [&solver](const AmrStorage::Item& cell) -> double {
+                          return solver.curr[cell.index].velocity.x();
+                      }};
+    pvd.variables += {"p",
+                      [&solver](const AmrStorage::Item& cell) -> double {
+                          return solver.curr[cell.index].pressure;
+                      }};
+    pvd.variables += {"e",
+                      [&solver](const AmrStorage::Item& cell) -> double {
+                          return solver.curr[cell.index].energy;
+                      }};
     pvd.variables += {"rho_exact",
                       [&test, &curr_time](const AmrStorage::Item &cell) -> double {
                           return test.density(cell.center.norm(), curr_time);
@@ -120,27 +135,26 @@ int main(int argc, char** argv) {
                           return test.energy(cell.center.norm(), curr_time);
                       }};
 
-    // Генератор сетки
-    Cuboid gen = Cuboid(0.0, 1.0, 0.0, 1.0, 0.0, 1.0);
-    gen.set_nx(100);
-    gen.set_boundaries({.left=Boundary::WALL, .right=Boundary::ZOE,
-                        .bottom=Boundary::WALL, .top=Boundary::ZOE,
-                        .back=Boundary::WALL, .front=Boundary::ZOE});
+    auto init_cells = [&](Mesh& mesh) {
+        solver.curr.resize(mesh.n_cells());
+        solver.half.resize(mesh.n_cells());
+        solver.next.resize(mesh.n_cells());
+        solver.d_dx.resize(mesh.n_cells());
+        solver.d_dy.resize(mesh.n_cells());
+        solver.d_dz.resize(mesh.n_cells());
 
-    // Создать сетку
-    EuMesh mesh(gen, U);
-    mesh.set_decomposition("XYZ");
+        mesh.for_each([&](Cell& cell) {
+            double r = cell.center().norm();
+            Vector3d n = cell.center() / r;
+            PState z;
+            z.density  = test.density (r, t0);
+            z.velocity = test.velocity(r, t0) * n;
+            z.pressure = std::max(test.pressure(r, t0), 1.0e-3);
+            z.energy   = eos->energy_rP(z.density, z.pressure);
 
-    // Создать решатель
-    SmFluid solver(eos);
-    solver.set_accuracy(2);
-    solver.set_CFL(0.5);
-    solver.set_limiter("MC");
-    solver.set_method(Fluxes::HLLC_M);
-
-    // Сеточная адаптация
-    mesh.set_max_level(0);
-    mesh.set_distributor(solver.distributor());
+            solver.curr[cell.geom().index] = z;
+        });
+    };
 
     for (int k = 0; k < mesh.max_level() + 3; ++k) {
         init_cells(mesh);
@@ -162,7 +176,6 @@ int main(int argc, char** argv) {
             mpi::cout << "\tStep: " << std::setw(6) << n_step << ";"
                       << "\tTime: " << std::setw(10) << std::setprecision(5) << curr_time << "\n";
         }
-
         // Точное завершение в end_time
         solver.set_max_dt(test.max_time() - curr_time);
 
