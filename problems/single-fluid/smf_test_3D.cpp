@@ -63,15 +63,13 @@ void set_flags(Mesh &mesh) {
     });
 }
 
-int main() {
-    mpi::handler init;
-    threads::off();
-
+int main(int argc, char** argv) {
+    mpi::handler init(argc, argv);
+    threads::init(argc, argv);
     threads::info();
 
     // Тестовая задача
     SedovBlast3D test({.gamma=1.4, .rho0=1.0, .E=1.0});
-
 
     // Уравнение состояния
     IdealGas::Ptr eos = test.eos;
@@ -195,13 +193,13 @@ int main() {
     mpi::cout << "\nElapsed time:   " << elapsed.extended_time()
               << " ( " << elapsed.milliseconds() << " ms)\n";
 
-    mpi::cout << "  Update time:   " << sw_update.extended_time()
+    mpi::cout << "  Update time:  " << sw_update.extended_time()
               << " ( " << sw_update.milliseconds() << " ms)\n";
-    mpi::cout << "  Flags  time:   " << sw_flags.extended_time()
+    mpi::cout << "  Flags  time:  " << sw_flags.extended_time()
               << " ( " << sw_flags.milliseconds() << " ms)\n";
-    mpi::cout << "  Gradient   :   " << sw_grad.extended_time()
+    mpi::cout << "  Gradient   :  " << sw_grad.extended_time()
               << " ( " << sw_grad.milliseconds() << " ms)\n";
-    mpi::cout << "  Refine time:   " << sw_refine.extended_time()
+    mpi::cout << "  Refine time:  " << sw_refine.extended_time()
               << " ( " << sw_refine.milliseconds() << " ms)\n";
 
     return 0;

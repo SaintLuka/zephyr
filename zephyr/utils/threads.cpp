@@ -1,9 +1,13 @@
 #include <memory>
 #include <thread>
 #include <cmath>
+#include <cstring>
+#include <boost/program_options.hpp>
 
 #include <zephyr/utils/mpi.h>
 #include <zephyr/utils/threads.h>
+
+namespace po = boost::program_options;
 
 namespace zephyr::utils {
 
@@ -37,6 +41,7 @@ void threads::on(int count) {
     n_threads = std::max(1, std::min(count, recommended()));
 
 #ifdef ZEPHYR_TBB
+    // ЗАВИСАЕТ НА НЕКОТОРЫХ МАШИНАХ!!!
     m_control = tbb::global_control(tbb::global_control::max_allowed_parallelism, n_threads);
 #endif
 
@@ -51,6 +56,49 @@ void threads::on(int count) {
         pool = std::make_unique<ThreadPool>(n_threads);
     }
 #endif
+}
+
+namespace {
+po::variables_map parse_options(int argc, char **argv) {
+    po::options_description description;
+
+    description.add_options()("threads,t", po::value<std::string>()->default_value("on"));
+
+    po::variables_map vm;
+    po::store(po::command_line_parser(argc, argv).options(description).allow_unregistered().run(), vm);
+    po::notify(vm);
+
+    return vm;
+}
+}
+
+void threads::init(int argc, char** argv) {
+    auto opts = parse_options(argc, argv);
+    std::string arg = opts["threads"].as<std::string>();
+
+    if (arg == "on") {
+        threads::on();
+        return;
+    }
+    if (arg == "off") {
+        threads::off();
+        return;
+    }
+
+    int count;
+    try {
+        count = std::stoi(arg);
+    }
+    catch (std::exception &e) {
+        throw std::runtime_error("Wrong command line argument threads=" + arg);
+    }
+
+    if (count < 0) {
+        std::cerr << "Incorrect command line argument threads=" << count << "; threads::on();\n";
+    }
+    else {
+        threads::on(count);
+    }
 }
 
 void threads::info() {

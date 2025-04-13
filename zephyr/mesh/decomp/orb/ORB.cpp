@@ -50,6 +50,11 @@ ORB::ORB(Box domain, const utils::Json& config)
     std::string type;
     if (config["type"]) {
         type = config["type"].as<std::string>();
+
+        // Попытка разбить двумерную сетку по оси Z приводит к ошибке
+        if (domain.is_2D()) {
+            type.erase(type.find('Z'), 1);
+        }
     } else {
         type = domain.is_2D() ? "XY" : "XYZ";
     }

@@ -46,14 +46,32 @@ void EuMesh::set_decomposition(Decomposition::Ref decmp, bool update) {
     	build_aliens();
         redistribute();
 
-        // Вероятно, первый (и единстивенный) redistribute, почистим память
+        // Вероятно, первый (и единственный) redistribute, почистим память
     	m_locals.shrink_to_fit();
     	m_aliens.shrink_to_fit();
     	m_tourism.shrink_to_fit();
     	m_migration.clear();
     }
 #endif
+}
 
+void EuMesh::prebalancing(int n_iters) {
+#ifdef ZEPHYR_MPI
+    if (mpi::single()) { return; }
+
+    for (int i = 0; i < n_iters; ++i) {
+        balancing();
+    }
+#endif
+}
+
+void EuMesh::balancing() {
+#ifdef ZEPHYR_MPI
+    if (mpi::single()) { return; }
+
+    double load = m_locals.size();
+    balancing(load);
+#endif
 }
 
 void EuMesh::balancing(double load){
@@ -62,6 +80,7 @@ void EuMesh::balancing(double load){
 
 	auto ws = mpi::all_gather(load);
 	m_decomp->balancing(ws);
+	redistribute();
 #endif
 }
 

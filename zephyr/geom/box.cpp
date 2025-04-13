@@ -43,11 +43,11 @@ Vector3d Box::size() const {
 }
 
 bool Box::is_2D() const {
-    return vmax.z() == vmin.z();
+    return std::abs(vmax.z() - vmin.z()) <  1.0e-6 * std::abs(vmax.x() - vmin.x());
 }
 
 bool Box::is_3D() const {
-    return vmax.z() > vmin.z();
+    return std::abs(vmax.z() - vmin.z()) >= 1.0e-6 * std::abs(vmax.x() - vmin.x());
 }
 
 double Box::diameter() const {
@@ -130,7 +130,7 @@ QuasiRandom2D Box::quasiRandom2D() const {
 std::ostream& operator<<(std::ostream& os, const Box& box) {
     os << "[" << box.vmax.x() << ", " << box.vmax.x() << "] × [" <<
        box.vmax.x() << ", " << box.vmax.x() << "]";
-    if (box.vmax.z() - box.vmin.z() > 0.0) {
+    if (box.is_3D()) {
         os << " × [" << box.vmax.z() << ", " << box.vmax.z() << "]";
     }
     return os;

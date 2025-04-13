@@ -308,21 +308,18 @@ Json Json::load(const std::string& filename) {
 
     return config;
 }
+namespace {
+po::variables_map parse_options(int argc, char **argv) {
+    po::options_description description;
 
-po::variables_map parse_options(int argc, char ** argv) {
-    po::options_description description("zephyr");
-
-    description.add_options()
-            ("config,c", po::value<std::string>()->default_value(""),
-             "configuration file path")
-            ("restart,r", po::value<std::string>()->default_value(""),
-             "path to checkpoint file");
+    description.add_options()("config,c", po::value<std::string>()->default_value(""));
 
     po::variables_map vm;
     po::store(po::command_line_parser(argc, argv).options(description).allow_unregistered().run(), vm);
     po::notify(vm);
 
     return vm;
+}
 }
 
 Json Json::load(int argc, char** argv, const std::string& default_filename) {

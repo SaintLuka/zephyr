@@ -32,6 +32,7 @@
 #include <cmath>
 
 #include <array>
+#include <functional>
 #include <vector>
 #include <boost/container/small_vector.hpp>
 #include <boost/container/static_vector.hpp>

@@ -227,6 +227,13 @@ public:
     /// данные с других процессов. Последовательное выволнение send и recv
     void sync(Post post = Post::FULL);
 
+    /// @brief Предбалансировка по числу ячеек
+    /// @param n_iters Количество итераций балансировки
+    void prebalancing(int n_iters);
+
+    /// @brief Балансирует нагрузку по числу ячеек
+    void balancing();
+
     /// @brief Балансирует нагрузку согласно decomposition
     void balancing(double load);
 
@@ -289,7 +296,7 @@ public:
 
 public:
     /// @brief Собрать обменные слои (aliens и сопутствующие члены),
-    /// не обязательно с пересылкой актуальных данных
+    /// принимаются актуальные данные с border слоя.
     void build_aliens();
 
 

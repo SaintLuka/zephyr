@@ -20,6 +20,8 @@ EuMesh::EuMesh(const Json& config, size_t datasize)
         initialize(gen->make());
     }
 
+    if_mpi( m_tourism.init_types(m_locals) );
+
     m_max_level = 0;
     if (config["max_level"]) {
         m_max_level = std::max(0, config["max_level"].as<int>());
@@ -35,7 +37,7 @@ EuMesh::EuMesh(const Json& config, size_t datasize)
         }
     }
 
-    // Если есть декомпозиция, то задать задать
+    // Если есть декомпозиция, то использовать
     if (!mpi::single()) {
         geom::Box domain = bbox();
 
@@ -43,16 +45,20 @@ EuMesh::EuMesh(const Json& config, size_t datasize)
             // Там все свойства декомпозиции автоматически ставятся
             m_decomp = Decomposition::create(domain, config["decomp"]);
 
-            build_aliens();
-            redistribute();
+            //set_decomposition("XY");
+            set_decomposition(m_decomp, true);
         }
         else {
+            // Определяем размерность сетки
+            int dim = m_locals.empty() ? 0 : m_locals[0].dim;
+            dim = mpi::max(dim);
+
+            assert((dim == 2 || dim == 3) && "Strange dimension, Mesh::Mesh()");
+
             // По умолчанию что-то такое
-            set_decomposition("XY");
+            set_decomposition(dim < 3 ? "XY" : "XYZ");
         }
     }
-
-    if_mpi( m_tourism.init_types(m_locals) );
 }
 
 void EuMesh::initialize(const Grid& grid) {

@@ -29,6 +29,11 @@ static const int default_min_elements_per_task = 500;
 /// @brief Статический класс. Упрощенный интерфейс для многопоточности.
 class threads {
 public:
+    /// @brief Инициализация аргументами командной строки, варианты:
+    /// --threads=on   -t on   (эквивалентно threads::on(), по умолчанию)
+    /// --threads=off  -t off  (эквивалентно threads::off() )
+    /// --threads=N    -t N    (эквивалентно threads::on(N) )
+    static void init(int argc, char** argv);
 
     /// @brief Рекомендуемое число тредов, используется
     /// по умолчанию при вызове on().
@@ -307,11 +312,11 @@ auto threads::min(Iter begin, Iter end, const Value &init, Func &&func, Args &&.
 #endif
 
 #ifdef ZEPHYR_OPENMP
-    //#pragma omp declare reduction(minValue:Value: \
-    //omp_out = omp_in < omp_out ? omp_in : omp_out)
+    #pragma omp declare reduction(minValue:Value: \
+    omp_out = omp_in < omp_out ? omp_in : omp_out)
 
     Value min_val = init;
-    #pragma omp parallel for reduction(min:min_val)
+    #pragma omp parallel for reduction(minValue:min_val)
     for (Iter it = begin; it < end; ++it) {
         Value temp = func(*it, std::forward<Args>(args)...);
         if (temp < min_val) min_val = temp;
@@ -376,7 +381,7 @@ auto threads::max(Iter begin, Iter end, const Value &init, Func &&func, Args &&.
     return std::transform_reduce(std::execution::par,
         begin, end, init,
         [](auto a, auto b) { return a > b ? a : b; },
-        [&func, &args...](auto elem) -> Value {
+        [&func, &args...](DeRef elem) -> Value {
             return func(elem, std::forward<Args>(args)...);
         });
 #endif
@@ -446,8 +451,6 @@ template<int n_tpt, int min_ept,
         class Iter, class Func, class ...Args, class DeRef, class Value>
 auto threads::partial_sum(Iter begin, Iter end, const Value &init, Func &&func, Args &&... args)
 -> typename std::enable_if<!std::is_void<Value>::value, std::vector<Value>>::type {
-
-
 #ifdef ZEPHYR_STD_THREADS
     auto bin_function =
             [&init, &func, &args...](const Iter &a, const Iter &b) -> Value {
