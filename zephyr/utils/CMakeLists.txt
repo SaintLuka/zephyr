@@ -2,6 +2,7 @@ set(ZEPHYR_UTILS_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/json.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/mpi.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/threads.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/storage.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/stopwatch.cpp
     PARENT_SCOPE)
 
@@ -14,5 +15,6 @@ install(FILES
     threads.h
     range.h
     stopwatch.h
+    storage.h
     DESTINATION
     include/${PROJECT_NAME}/utils)

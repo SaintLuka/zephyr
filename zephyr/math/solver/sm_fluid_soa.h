@@ -1,6 +1,7 @@
 #pragma once
 
 #include <zephyr/mesh/mesh.h>
+#include <zephyr/mesh/euler/soa_mesh.h>
 #include <zephyr/phys/matter/eos/eos.h>
 #include <zephyr/math/cfd/fluxes.h>
 #include <zephyr/math/cfd/limiter.h>
@@ -12,6 +13,8 @@ using zephyr::mesh::Mesh;
 using zephyr::mesh::Distributor;
 using zephyr::geom::Vector3d;
 using zephyr::phys::Eos;
+
+using zephyr::mesh::SoaMesh;
 
 using namespace smf;
 
@@ -68,7 +71,7 @@ public:
     void set_max_dt(double dt);
 
     /// @brief Выполнить шаг интегрирования по времени
-    void update(Mesh &mesh);
+    void update(Mesh &eu_mesh, SoaMesh& mesh);
 
     /// @brief Установить флаги адаптации
     void set_flags(Mesh& mesh);
@@ -80,25 +83,22 @@ public:
 
     /// @brief Посчитать шаг интегрирования по времени с учетом
     /// условия Куранта
-    void compute_dt(Mesh &mesh);
+    void compute_dt(SoaMesh& smesh);
 
     /// @brief Расчёт потоков
-    void fluxes(Mesh &mesh);
+    void fluxes(Mesh &mesh, SoaMesh& smesh);
 
     /// @brief Обновление ячеек
-    void swap(Mesh &mesh);
+    void swap(SoaMesh& smesh);
 
     /// @brief Вычислить производные
-    void compute_grad(Mesh &mesh);
-
-    /// @brief Вычислить производные
-    void compute_grad(Mesh &mesh, const std::function<smf::PState(Cell &)> &get_state);
+    void compute_grad(SoaMesh& mesh);
 
     /// @brief Вычислить потоки на стадии предиктора
-    void fluxes_stage1(Mesh &mesh);
+    void fluxes_stage1(SoaMesh& mesh);
 
     /// @brief Вычислить потоки на стадии корректора
-    void fluxes_stage2(Mesh &mesh);
+    void fluxes_stage2(SoaMesh& mesh);
 
 protected:
     Eos::Ptr m_eos;          ///< Уравнение состояния

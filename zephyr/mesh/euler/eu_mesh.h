@@ -247,6 +247,12 @@ public:
     /// @brief Найти описывающий параллелепипед (Bounding box)
     geom::Box bbox();
 
+    /// @brief Сортировка блоками
+    void random_sorting();
+
+    /// @brief Сортировка блоками
+    void block_sorting(int nx, int ny, int nz = 1);
+
     /// @brief Заполнен ли массив с уникальными узлами?
     bool has_nodes() const;
 

@@ -80,6 +80,10 @@ public:
         return axial ? area_alt : area;
     }
 
+    inline Vector3d symm_point(const Vector3d& p) const {
+        return p + 2.0 * (center - p).dot(normal) * normal;
+    }
+
     /// @brief Число вершин грани
     /// Для граней двумерных ячеек равно двум,
     /// для граней трехмерных ячеек: 3 или 4.

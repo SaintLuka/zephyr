@@ -19,7 +19,7 @@ namespace smf {
 struct QState;
 
 /// @brief Примитивный вектор состояния
-struct alignas(64) PState {
+struct PState {
     double   density;  ///< Плотность
     Vector3d velocity; ///< Скорость
     double   pressure; ///< Давление

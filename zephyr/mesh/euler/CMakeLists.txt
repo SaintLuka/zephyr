@@ -15,6 +15,7 @@ install(FILES
     eu_face.h
     eu_cell.h
     eu_mesh.h
+    soa_mesh.h
     migration.h
     tourism.h
     DESTINATION

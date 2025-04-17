@@ -22,6 +22,10 @@ public:
     /// сама ячейка
     EuCell neib() const;
 
+    /// @brief Индекс соседа, мне для soa
+    int neib_index() const;
+    Vector3d neib_center() const;
+
     /// @brief Ссылка на данные соседней ячейки через грань
     /// @details При отсутствии соседа возвращает данные текущей ячейки.
     template <class T>

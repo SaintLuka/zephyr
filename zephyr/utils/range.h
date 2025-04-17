@@ -53,6 +53,12 @@ public:
         /// @brief Инкремент
         inline void operator++(int) { ++m_val; }
 
+        /// @brief Декремент
+        inline void operator--() { --m_val; }
+
+        /// @brief Декремент
+        inline void operator--(int) { --m_val; }
+
         /// @brief Смещение по индексу
         T operator[](difference_type n) const { return m_val + n; }
 

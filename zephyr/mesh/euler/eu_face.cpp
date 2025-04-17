@@ -31,6 +31,15 @@ EuCell EuFace::neib() const {
     return m_face->is_boundary() ? m_cell : m_cell.neib(*m_face);
 }
 
+int EuFace::neib_index() const {
+    return m_face->is_boundary() ? m_cell.index() : m_face->adjacent.index;
+}
+
+Vector3d EuFace::neib_center() const {
+    //return neib().center();
+    return m_face->is_boundary() ? m_cell.center() : m_cell[m_face->adjacent.index - m_cell.index()].center();
+}
+
 const Byte* EuFace::neib_data() const {
     return m_cell.neib_data(*m_face);
 }

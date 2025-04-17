@@ -122,7 +122,7 @@ int main(int argc, char** argv) {
 
     // Генератор сетки
     Cuboid gen = Cuboid(0.0, 1.0, 0.0, 1.0, 0.0, 1.0);
-    gen.set_nx(100);
+    gen.set_nx(20);
     gen.set_boundaries({.left=Boundary::WALL, .right=Boundary::ZOE,
                         .bottom=Boundary::WALL, .top=Boundary::ZOE,
                         .back=Boundary::WALL, .front=Boundary::ZOE});
@@ -130,6 +130,7 @@ int main(int argc, char** argv) {
     // Создать сетку
     EuMesh mesh(gen, U);
     mesh.set_decomposition("XYZ");
+    mesh.block_sorting(4, 4, 8);
 
     // Создать решатель
     SmFluid solver(eos);
@@ -157,8 +158,8 @@ int main(int argc, char** argv) {
     pvd.save(mesh, 0.0);
 
     Stopwatch elapsed(true);
-    while (n_step < 100 && curr_time < test.max_time()) {
-        if (n_step % 10 == 0) {
+    while (n_step < 10000 && curr_time < test.max_time()) {
+        if (n_step % 100 == 0) {
             mpi::cout << "\tStep: " << std::setw(6) << n_step << ";"
                       << "\tTime: " << std::setw(10) << std::setprecision(5) << curr_time << "\n";
         }
@@ -171,18 +172,18 @@ int main(int argc, char** argv) {
         solver.update(mesh);
         sw_update.stop();
 
-        sw_flags.resume();
-        set_flags(mesh);
-        sw_flags.stop();
+        //sw_flags.resume();
+        //set_flags(mesh);
+        //sw_flags.stop();
 
         // Для переноса по градиентам
-        sw_grad.resume();
-        solver.compute_grad(mesh);
-        sw_grad.stop();
+        //sw_grad.resume();
+        //solver.compute_grad(mesh);
+        //sw_grad.stop();
 
-        sw_refine.resume();
-        mesh.refine();
-        sw_refine.stop();
+        //sw_refine.resume();
+        //mesh.refine();
+        //sw_refine.stop();
 
         curr_time += solver.dt();
         n_step += 1;
@@ -197,8 +198,8 @@ int main(int argc, char** argv) {
               << " ( " << sw_update.milliseconds() << " ms)\n";
     //mpi::cout << "  Flags  time:  " << sw_flags.extended_time()
     //          << " ( " << sw_flags.milliseconds() << " ms)\n";
-    mpi::cout << "  Gradient   :  " << sw_grad.extended_time()
-              << " ( " << sw_grad.milliseconds() << " ms)\n";
+    //mpi::cout << "  Gradient   :  " << sw_grad.extended_time()
+    //          << " ( " << sw_grad.milliseconds() << " ms)\n";
     //mpi::cout << "  Refine time:  " << sw_refine.extended_time()
     //          << " ( " << sw_refine.milliseconds() << " ms)\n";
 

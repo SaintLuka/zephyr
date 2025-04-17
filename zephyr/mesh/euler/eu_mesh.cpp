@@ -97,8 +97,7 @@ geom::Box EuMesh::bbox() {
         }
     }
 
-    geom::Box box2;
-
+    geom::Box box2(box1);
 #ifdef ZEPHYR_MPI
     if (!mpi::single()) {
         // Покомпонентный минимум/максимум
@@ -106,8 +105,123 @@ geom::Box EuMesh::bbox() {
         MPI_Allreduce(box1.vmax.data(), box2.vmax.data(), 3, MPI_DOUBLE, MPI_MAX, mpi::comm());
     }
 #endif
-
     return box2;
+}
+
+namespace {
+void swap_elements(AmrStorage& s, int i, int j, Byte* temp) {
+    Byte* ptr1 = s[i].ptr();
+    Byte* ptr2 = s[j].ptr();
+
+    std::memcpy(temp, ptr1, s.itemsize());
+    std::memcpy(ptr1, ptr2, s.itemsize());
+    std::memcpy(ptr2, temp, s.itemsize());
+}
+}
+
+void EuMesh::random_sorting() {
+    if (!mpi::single()) {
+        throw std::runtime_error("block_sorting only for single process");
+    }
+
+    std::vector<int> next(m_locals.size());
+    for (size_t i = 0; i < m_locals.size(); ++i) {
+        next[i] = i;
+    }
+
+
+    std::mt19937 gen(13);
+
+    std::shuffle(next.begin(), next.end(), gen);
+
+    for (size_t i = 0; i < m_locals.size(); ++i) {
+        m_locals[i].next = next[i];
+    }
+
+
+    for (auto& cell: m_locals) {
+        for (auto& face: cell.faces) {
+            if (!face.is_undefined() && !face.is_boundary() && face.adjacent.index < m_locals.size()) {
+                face.adjacent.index = m_locals[face.adjacent.index].next;
+            }
+        }
+    }
+
+    std::vector<Byte> temp(m_locals.itemsize());
+    for (int i = 0; i < m_locals.size(); ++i) {
+        // Пока текущий элемент не на своём месте
+        while (m_locals[i].next != i) {
+            // Меняем местами текущий элемент и тот, который должен быть на его месте
+            int j = m_locals[i].next;
+            swap_elements(m_locals, i, j, temp.data());
+        }
+    }
+
+    for (int i = 0; i < m_locals.size(); ++i) {
+        m_locals[i].index = m_locals[i].next = i;
+    }
+}
+
+void EuMesh::block_sorting(int nx, int ny, int nz) {
+    if (!mpi::single()) {
+        throw std::runtime_error("block_sorting only for single process");
+    }
+
+    Box box = bbox();
+    if (box.is_2D()) {
+        nz = 1;
+    }
+
+    auto get_n = [nx, ny, nz](int i, int j, int k) -> int {
+        i = (i + nx) % nx;
+        j = (j + ny) % ny;
+        k = (k + nz) % nz;
+        return nz * (ny * i + j) + k;
+    };
+
+    std::vector<int> blocks(nx * ny * nz, 0);
+    for (auto& cell: m_locals) {
+        int i = nx == 1 ? 0 : int(std::floor(nx * (cell.center.x() - box.vmin.x()) / box.size().x()));
+        int j = ny == 1 ? 0 : int(std::floor(ny * (cell.center.y() - box.vmin.y()) / box.size().y()));
+        int k = nz == 1 ? 0 : int(std::floor(nz * (cell.center.z() - box.vmin.z()) / box.size().z()));
+
+        int n = get_n(i, j, k);
+        cell.rank = n;
+        cell.next = blocks[n];
+        blocks[n] += 1;
+    }
+
+    std::vector<int> offsets(nx * ny * nz + 1, 0);
+    for (int i = 0; i < nx * ny * nz; ++i) {
+        offsets[i + 1] = offsets[i] + blocks[i];
+    }
+
+    for (auto& cell: m_locals) {
+        cell.next += offsets[cell.rank];
+        cell.rank = mpi::rank();
+    }
+
+    for (auto& cell: m_locals) {
+        for (auto& face: cell.faces) {
+            if (!face.is_undefined() && !face.is_boundary() && face.adjacent.index < m_locals.size()) {
+                face.adjacent.index = m_locals[face.adjacent.index].next;
+            }
+        }
+    }
+
+    std::vector<Byte> temp(m_locals.itemsize());
+    for (int i = 0; i < m_locals.size(); ++i) {
+        // Пока текущий элемент не на своём месте
+        while (m_locals[i].next != i) {
+            // Меняем местами текущий элемент и тот, который должен быть на его месте
+            int j = m_locals[i].next;
+            swap_elements(m_locals, i, j, temp.data());
+        }
+    }
+
+    for (int i = 0; i < m_locals.size(); ++i) {
+        m_locals[i].index = m_locals[i].next = i;
+    }
 }
 
 bool EuMesh::has_nodes() const {

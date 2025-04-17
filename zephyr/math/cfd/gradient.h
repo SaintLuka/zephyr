@@ -5,10 +5,12 @@
 #include <zephyr/mesh/cell.h>
 #include <zephyr/mesh/mesh.h>
 #include <zephyr/math/cfd/limiter.h>
+#include <zephyr/mesh/euler/soa_mesh.h>
 
 namespace zephyr::math::gradient {
 
 using zephyr::mesh::Cell;
+using zephyr::mesh::SoaMesh;
 using zephyr::mesh::Boundary;
 
 using namespace geom;
@@ -223,12 +225,76 @@ Grad<State> LSM(Cell &cell,
     return grad;
 }
 
+/// @brief Метод наименьших квадратов (SoA версия)
+template<class State>
+Grad<State> LSM(SoaMesh &mesh, size_t ic,
+                const State* states,
+                const GetBoundary<State> &boundary_value) {
+    using Array = ei_vec<State>;
+
+    // Делает матрицу A безразмерной
+    double w0 = mesh.dim < 3 ? 1.0 : 1.0 / mesh.cell_size(ic);
+
+    State zc = states[ic];
+    Vector3d cell_c = mesh.cell_center(ic);
+
+    Array Fx = Array::Zero();
+    Array Fy = Array::Zero();
+    Array Fz = Array::Zero();
+    Matrix3d A = Matrix3d::Zero();
+
+    for (size_t k: mesh.cell_faces(ic)) {
+        if (mesh.is_undefined_face(k)) { continue; }
+
+        auto &normal = mesh.face.normal[k];
+
+        State zn;
+        Vector3d dr;
+        if (!mesh.is_boundary_face(k)) {
+            size_t jc = mesh.face.adjacent[k].index;
+            zn = states[jc];
+            dr = mesh.cell_center(jc) - cell_c;
+        } else {
+            zn = boundary_value(zc, normal, mesh.face.boundary[k]);
+            dr = mesh.face_symm_point(k, cell_c) - cell_c;
+        }
+
+        Vector3d drn = dr.dot(normal) * normal;
+
+        double w = w0 * mesh.face.area[k] / std::pow(drn.norm(), 3);
+
+        A += w * drn * dr.transpose();
+
+        Array dF = (Array &) zn - (Array &) zc;
+
+        Fx += w * dF * drn.x();
+        Fy += w * dF * drn.y();
+        Fz += w * dF * drn.z();
+    }
+
+    // Матрица A безразмерная, коэффициенты порядка единиц
+    if (std::abs(A(2, 2)) < 1e-8) {
+        A(2, 2) = 1.0; // Случай 2D
+        if (std::abs(A(1, 1)) < 1e-8) {
+            A(1, 1) = 1.0; // Случай 1D
+        }
+    }
+
+    Matrix3d B = A.inverse();
+
+    Grad<State> grad;
+    grad.x_arr() = B(0, 0) * Fx + B(0, 1) * Fy + B(0, 2) * Fz;
+    grad.y_arr() = B(1, 0) * Fx + B(1, 1) * Fy + B(1, 2) * Fz;
+    grad.z_arr() = B(2, 0) * Fx + B(2, 1) * Fy + B(2, 2) * Fz;
+    return grad;
+}
+
 /// @brief Ограничитель градиента (классическая версия)
 template<class State>
 Grad<State> limiting_orig(Cell &cell, const Limiter& limiter,
-                     const Grad<State> &grad,
-                     const GetState<State> &get_state,
-                     const GetBoundary<State> &boundary_value) {
+                          const Grad<State> &grad,
+                          const GetState<State> &get_state,
+                          const GetBoundary<State> &boundary_value) {
     using Array = ei_arr<State>;
 
     State zc = get_state(cell);
@@ -321,6 +387,75 @@ Grad<State> limiting(Cell &cell, const Limiter& limiter,
         Vector3d drn = dr.dot(normal) * normal;
 
         double w = w0 * face.area() / std::pow(drn.norm() , 3);
+
+        A += w * drn * dr.transpose();
+
+        Array dF_p = (Array &) zn - (Array &) zc;
+        Array du_n = grad.x_arr() * dr.x() + grad.y_arr() * dr.y() + grad.z_arr() * dr.z();
+        Array dF_m = 2.0 * du_n - dF_p;
+
+        Array dF_lim = limiter(dF_m, dF_p) * dF_p;
+
+        Fx += w * dF_lim * drn.x();
+        Fy += w * dF_lim * drn.y();
+        Fz += w * dF_lim * drn.z();
+    }
+
+    // Матрица A безразмерная, коэффициенты порядка единиц
+    if (std::abs(A(2, 2)) < 1e-8) {
+        A(2, 2) = 1.0; // Случай 2D
+        if (std::abs(A(1, 1)) < 1e-8) {
+            A(1, 1) = 1.0; // Случай 1D
+        }
+    }
+
+    Matrix3d B = A.inverse();
+
+    Grad<State> lim_grad;
+    lim_grad.x_arr() = B(0, 0) * Fx + B(0, 1) * Fy + B(0, 2) * Fz;
+    lim_grad.y_arr() = B(1, 0) * Fx + B(1, 1) * Fy + B(1, 2) * Fz;
+    lim_grad.z_arr() = B(2, 0) * Fx + B(2, 1) * Fy + B(2, 2) * Fz;
+    return lim_grad;
+}
+
+/// @brief Метод наименьших квадратов (SoA версия)
+template<class State>
+Grad<State> limiting(SoaMesh& mesh, size_t ic, const Limiter& limiter,
+                     const Grad<State> &grad,
+                     const State* states,
+                     const GetBoundary<State> &boundary_value) {
+    using Array = ei_arr<State>;
+
+    // Делает матрицу A безразмерной
+    double w0 = mesh.dim < 3 ? 1.0 : 1.0 / mesh.cell_size(ic);
+
+    State zc = states[ic];
+    Vector3d cell_c = mesh.cell_center(ic);
+
+    Array Fx = Array::Zero();
+    Array Fy = Array::Zero();
+    Array Fz = Array::Zero();
+
+    Matrix3d A = Matrix3d::Zero();
+    for (auto k: mesh.cell_faces(ic)) {
+        if (mesh.is_undefined_face(k)) { continue; }
+
+        const Vector3d &normal = mesh.face.normal[k];
+
+        State zn;
+        Vector3d dr;
+        if (!mesh.is_boundary_face(k)) {
+            size_t jc = mesh.face.adjacent[k].index;
+            zn = states[jc];
+            dr = mesh.cell_center(jc) - cell_c;
+        } else {
+            zn = boundary_value(zc, normal, mesh.face.boundary[k]);
+            dr = mesh.face_symm_point(k, cell_c) - cell_c;
+        }
+
+        Vector3d drn = dr.dot(normal) * normal;
+
+        double w = w0 * mesh.face_area(k) / std::pow(drn.norm() , 3);
 
         A += w * drn * dr.transpose();
 
