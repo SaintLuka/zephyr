@@ -145,6 +145,11 @@ void Variable::write(AmrStorage::Item& elem, void* out) const {
     m_amr_func(elem, out);
 }
 
+void Variable::write(QCell& elem, void* out) const {
+    assert(m_soa_func != nullptr);
+    m_soa_func(elem, out);
+}
+
 void Variable::write(CellStorage::Item& elem, void* out) const {
     assert(m_cell_func != nullptr);
     m_cell_func(elem, out);
@@ -158,8 +163,13 @@ void Variable::write(NodeStorage::Item& elem, void* out) const {
 std::string Variable::name() const {
     return m_name;
 }
+
 bool Variable::is_eu_cell() const {
     return m_amr_func != nullptr;
+}
+
+bool Variable::is_soa_cell() const {
+    return m_soa_func != nullptr;
 }
 
 bool Variable::is_lag_cell() const {

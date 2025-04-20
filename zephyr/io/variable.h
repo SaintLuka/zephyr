@@ -7,6 +7,7 @@
 
 #include <zephyr/mesh/euler/amr_storage.h>
 #include <zephyr/mesh/lagrange/mov_storage.h>
+#include <zephyr/mesh/euler/soa_mesh.h>
 
 #include <zephyr/io/vtk_type.h>
 
@@ -33,6 +34,9 @@ using WriteCellItem = std::function<void(CellStorage::Item&, T*)>;
 
 template <typename T>
 using WriteNodeItem = std::function<void(NodeStorage::Item&, T*)>;
+
+template <typename T>
+using WriteSoaCell = std::function<void(mesh::QCell&, T*)>;
 
 /// @brief Класс для записи переменных в VTU файл, каждой переменной для
 /// записи должен соответствовать экземпляр Variable.
@@ -83,6 +87,19 @@ public:
     template<class T>
     Variable(const char *name,
              int n_components,
+             const WriteSoaCell<T> &func) {
+
+        m_name = name;
+        m_type = VtkType::get<T>();
+        m_n_components = n_components;
+        m_soa_func = [func](mesh::QCell &cell, void *out) {
+            func(cell, (T *) out);
+        };
+    }
+
+    template<class T>
+    Variable(const char *name,
+             int n_components,
              const WriteCellItem<T> &func) {
 
         m_name = name;
@@ -112,6 +129,10 @@ public:
             : Variable(name.c_str(), n_components, func) {}
 
     template<class T>
+    Variable(const std::string &name, int n_components, const WriteSoaCell<T> &func)
+            : Variable(name.c_str(), n_components, func) {}
+
+    template<class T>
     Variable(const std::string &name, int n_components, const WriteCellItem<T> &func)
             : Variable(name.c_str(), n_components, func) {}
 
@@ -124,6 +145,9 @@ public:
 
     /// @brief Переменная эйлеровой ячейки
     bool is_eu_cell() const;
+
+    /// @brief Переменная эйлеровой ячейки
+    bool is_soa_cell() const;
 
     /// @brief Переменная лагранжевой ячейки
     bool is_lag_cell() const;
@@ -147,6 +171,9 @@ public:
     void write(AmrStorage::Item &cell, void *out) const;
 
     /// @brief Основная функция класса. Запись переменной из ячейки в поток.
+    void write(mesh::QCell &cell, void *out) const;
+
+    /// @brief Основная функция класса. Запись переменной из ячейки в поток.
     void write(CellStorage::Item &cell, void *out) const;
 
     /// @brief Основная функция класса. Запись переменной из ячейки в поток.
@@ -160,7 +187,8 @@ private:
     // Три функции записи для разных типов элементов,
     // в каждом экземпляре актуальна только одна.
 
-    WriteAmrItem<void>  m_amr_func = nullptr;
+    WriteAmrItem<void> m_amr_func = nullptr;
+    WriteSoaCell<void> m_soa_func = nullptr;
     WriteCellItem<void> m_cell_func = nullptr;
     WriteNodeItem<void> m_node_func = nullptr;
 };

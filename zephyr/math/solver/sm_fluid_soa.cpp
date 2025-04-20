@@ -4,6 +4,7 @@
 #include <zephyr/math/cfd/gradient.h>
 #include <zephyr/math/cfd/models.h>
 #include <zephyr/math/cfd/limiter.h>
+#include <zephyr/mesh/euler/soa_mesh.h>
 
 namespace zephyr::math {
 
@@ -59,8 +60,6 @@ void SmFluidSoA::set_max_dt(double dt) {
     m_max_dt = dt;
 }
 
-#define get_current_sm ([this](Cell& cell) -> auto { return curr[cell.index()]; })
-
 namespace {
 PState boundary_value(const PState &zc, const Vector3d &normal, Boundary flag) {
     if (flag != Boundary::WALL) {
@@ -81,7 +80,7 @@ void SmFluidSoA::update(Mesh &eu_mesh, SoaMesh& mesh) {
 
     if (m_acc == 1) {
         eu_mesh.sync();
-        fluxes(eu_mesh, mesh);
+        fluxes(mesh);
     }
     else {
         eu_mesh.sync();
@@ -97,11 +96,11 @@ void SmFluidSoA::update(Mesh &eu_mesh, SoaMesh& mesh) {
     swap(mesh);
 }
 
-void SmFluidSoA::compute_dt(SoaMesh& smesh) {
-    double dt = smesh.min(
-        [this, &smesh](size_t ic) -> double {
-            double c = m_eos->sound_speed_rP(curr[ic].density, curr[ic].pressure);
-            return smesh.cell_diameter(ic) / (curr[ic].velocity.norm() + c);
+void SmFluidSoA::compute_dt(SoaMesh& mesh) {
+    double dt = mesh.min2(
+        [this](mesh::QCell& cell) -> double {
+            double c = m_eos->sound_speed_rP(cell(curr).density, cell(curr).pressure);
+            return cell.diameter() / (cell(curr).velocity.norm() + c);
         }, std::numeric_limits<double>::infinity());
 
     dt = std::min(m_CFL * dt, m_max_dt);
@@ -109,20 +108,20 @@ void SmFluidSoA::compute_dt(SoaMesh& smesh) {
 }
 
 void SmFluidSoA::compute_grad(SoaMesh& mesh)  {
-    mesh.for_each([this, &mesh](size_t ic) {
-        auto grad = gradient::LSM<smf::PState>(mesh, ic, curr.data(), boundary_value);
-        grad = gradient::limiting<smf::PState>(mesh, ic, m_limiter, grad, curr.data(), boundary_value);
+    mesh.for_each2([this, &mesh](mesh::QCell& cell) {
+        auto grad = gradient::LSM<smf::PState>(cell, mesh.cells.data(curr), boundary_value);
+        grad = gradient::limiting<smf::PState>(cell, m_limiter, grad, mesh.cells.data(curr), boundary_value);
 
-        d_dx[ic] = grad.x;
-        d_dy[ic] = grad.y;
-        d_dz[ic] = grad.z;
+        cell(d_dx) = grad.x;
+        cell(d_dy) = grad.y;
+        cell(d_dz) = grad.z;
     });
 }
 
-void SmFluidSoA::fluxes(Mesh &mesh, SoaMesh& smesh) {
-    mesh.for_each([this](Cell &cell) {
+void SmFluidSoA::fluxes(SoaMesh &mesh) {
+    mesh.for_each2([this](mesh::QCell &cell) {
         // Примитивный вектор в ячейке
-        PState z_c = curr[cell.index()];
+        PState z_c = cell(curr);
 
         // Консервативный вектор в ячейке
         QState q_c(z_c);
@@ -136,7 +135,7 @@ void SmFluidSoA::fluxes(Mesh &mesh, SoaMesh& smesh) {
             // Примитивный вектор соседа
             PState z_n;
             if (!face.is_boundary()) {
-                z_n = curr[face.neib().index()];
+                z_n = face.neib()(curr);
             } else {
                 z_n = boundary_value(z_c, normal, face.flag());
             }
@@ -168,50 +167,44 @@ void SmFluidSoA::fluxes(Mesh &mesh, SoaMesh& smesh) {
         }
 
         // Новое значение примитивных переменных
-        next[cell.index()] = PState(q_c, *m_eos);
+        cell(next) = PState(q_c, *m_eos);
     });
 }
 
 void SmFluidSoA::fluxes_stage1(SoaMesh& mesh)  {
-    mesh.for_each([this, &mesh](size_t ic) {
+    mesh.for_each2([this](mesh::QCell& cell) {
         // Центр ячейки
-        auto& cell_c = mesh.cell.center[ic];
+        auto& cell_c = cell.center();
 
         // Примитивный вектор в ячейке
-        PState z_c = curr[ic];
+        PState z_c = cell(curr);
 
         // Консервативный вектор в ячейке
         QState q_c(z_c);
 
         // Переменная для потока
         Flux flux;
-        for (size_t k: mesh.cell_faces(ic)) {
-            if (mesh.is_undefined_face(k)) {
-                continue;
-            }
-
+        for (auto face: cell.faces()) {
             // Внешняя нормаль и центр грани
-            auto &normal = mesh.face.normal[k];
-            auto &face_c = mesh.face.center[k];
-
-            // Возвращает саму ячейку, если соседа не существует
-            size_t jc = mesh.face.adjacent[k].index;
+            auto &normal = face.normal();
+            auto &face_c = face.center();
 
             // Примитивный вектор соседа
             PState z_n;
             Vector3d neib_c;
-            if (!mesh.is_boundary_face(k)) {
-                neib_c = mesh.cell_center(jc);
-                z_n    = curr[jc];
+            auto neib = face.neib();
+            if (!face.is_boundary()) {
+                neib_c = neib.center();
+                z_n    = neib(curr);
             }
             else {
-                neib_c = mesh.face_symm_point(k, cell_c);
-                z_n = boundary_value(z_c, normal, mesh.face.boundary[k]);
+                neib_c = face.symm_point(cell_c);
+                z_n = boundary_value(z_c, normal, face.flag());
             }
 
             auto face_extra = FaceExtra::Direct(
-                    z_c, d_dx[ic], d_dy[ic], d_dz[ic],
-                    z_n, d_dx[jc], d_dy[jc], d_dz[jc],
+                    z_c, cell(d_dx), cell(d_dy), cell(d_dz),
+                    z_n, neib(d_dx), neib(d_dy), neib(d_dz),
                     cell_c, neib_c, face_c);
 
             // Интерполяция на грань со стороны ячейки
@@ -231,68 +224,65 @@ void SmFluidSoA::fluxes_stage1(SoaMesh& mesh)  {
             loc_flux.to_global(normal);
 
             // Суммируем поток
-            flux.arr() += loc_flux.arr() * mesh.face_area(k, m_axial);
+            flux.arr() += loc_flux.arr() * face.area(m_axial);
         }
 
         // Обновляем значение в ячейке (консервативные переменные)
-        q_c.arr() -= (0.5 * m_dt / mesh.cell_volume(ic, m_axial)) * flux.arr();
+        q_c.arr() -= (0.5 * m_dt / cell.volume(m_axial)) * flux.arr();
 
         if (m_axial) {
-            double coeff = mesh.cell_volume(ic) / mesh.cell_volume(ic, m_axial);
+            double coeff = cell.volume() / cell.volume(m_axial);
             q_c.momentum.y() += 0.5 * coeff * z_c.pressure * m_dt;
         }
 
         // Значение примитивных переменных на полушаге
-        half[ic] = PState(q_c, *m_eos);
+        cell(half) = PState(q_c, *m_eos);
     });
 }
 
-void SmFluidSoA::fluxes_stage2(SoaMesh& mesh)  {
-    mesh.for_each([this, &mesh](int ic) {
+void SmFluidSoA::fluxes_stage2(SoaMesh& mesh) {
+    mesh.for_each2([this](mesh::QCell& cell) {
         // Центр ячейки
-        auto& cell_c = mesh.cell_center(ic);
+        auto& cell_c = cell.center();
 
         // Примитивный вектор на полуслое
-        PState z_c = curr[ic];
+        PState z_c = cell(curr);
 
         // Примитивный вектор на полуслое
-        PState z_ch = half[ic];
+        PState z_ch = cell(half);
 
         // Консервативный вектор в ячейке на прошлом шаге
         QState q_c(z_c);
 
         // Переменная для потока (суммирование по промежуточным)
         Flux flux;
-        for (size_t k: mesh.cell_faces(ic)) {
-            if (mesh.is_undefined_face(k)) {
-                continue;
-            }
-
+        for (auto& face: cell.faces()) {
             // Внешняя нормаль и центр грани
-            auto& normal = mesh.face.normal[k];
-            auto& face_c = mesh.face.center[k];
+            auto& normal = face.normal();
+            auto& face_c = face.center();
 
             // Возвращает саму ячейку, если соседа не существует
-            int jc = mesh.face.adjacent[k].index;
+            int jc = face.neib_index();
 
             // Примитивный вектор соседа (на предыдущем и на полуслое)
             PState z_n, z_nh;
             Vector3d neib_c;
-            if (!mesh.is_boundary_face(k)) {
-                neib_c = mesh.cell_center(jc);
-                z_n    = curr[jc];
-                z_nh   = half[jc];
+            auto neib = face.neib();
+            if (!face.is_boundary()) {
+                neib_c = neib.center();
+                z_n    = neib(curr);
+                z_nh   = neib(half);
             }
             else {
-                neib_c = mesh.face_symm_point(k, cell_c);
-                z_n    = boundary_value(z_c, normal, mesh.face.boundary[k]);
-                z_nh   = boundary_value(z_ch, normal, mesh.face.boundary[k]);
+                neib_c = face.symm_point(cell_c);
+                z_n    = boundary_value(z_c, normal, face.flag());
+                z_nh   = boundary_value(z_ch, normal, face.flag());
             }
 
             // Параметры интерполяции с предыдущего (!) слоя
             auto face_extra = FaceExtra::Direct(
-                    z_c, d_dx[ic], d_dy[ic], d_dz[ic],
-                    z_n, d_dx[jc], d_dy[jc], d_dz[jc],
+                    z_c, cell(d_dx), cell(d_dy), cell(d_dz),
+                    z_n, neib(d_dx), neib(d_dy), neib(d_dz),
                     cell_c, neib_c, face_c);
 
             // Интерполяция на грань со стороны ячейки
@@ -306,7 +296,7 @@ void SmFluidSoA::fluxes_stage2(SoaMesh& mesh)  {
 
             // Интерполяция на грань со стороны соседа
             PState zp;
-            if (!mesh.is_boundary_face(k)) {
+            if (!face.is_boundary()) {
                 zp = face_extra.p(z_nh);
 
                 // Восстанавливаем после интерполяции
@@ -316,7 +306,7 @@ void SmFluidSoA::fluxes_stage2(SoaMesh& mesh)  {
                 if (zp.is_bad(*m_eos)) { zp = z_nh; }
             }
             else {
-                zp = boundary_value(zm, normal, mesh.face.boundary[k]);
+                zp = boundary_value(zm, normal, face.flag());
             }
 
             // Переводим в локальную систему координат
@@ -328,19 +318,19 @@ void SmFluidSoA::fluxes_stage2(SoaMesh& mesh)  {
             loc_flux.to_global(normal);
 
             // Суммируем поток
-            flux.arr() += loc_flux.arr() * mesh.face_area(m_axial);
+            flux.arr() += loc_flux.arr() * face.area(m_axial);
         }
 
         // Обновляем значение в ячейке (консервативные переменные)
-        q_c.arr() -= (m_dt / mesh.cell_volume(ic, m_axial)) * flux.arr();
+        q_c.arr() -= (m_dt / cell.volume(m_axial)) * flux.arr();
 
         if (m_axial) {
-            double coeff = mesh.cell_volume(ic) / mesh.cell_volume(ic, m_axial);
+            double coeff = cell.volume() / cell.volume(m_axial);
             q_c.momentum.y() += coeff * z_ch.pressure * m_dt;
         }
 
         // Значение примитивных переменных на новом слое
-        next[ic] = PState(q_c, *m_eos);
+        cell(next) = PState(q_c, *m_eos);
     });
 }
 

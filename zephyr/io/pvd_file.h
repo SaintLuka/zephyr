@@ -69,7 +69,17 @@ public:
     /// @brief Записать хранилище (или часть, при распределенном счете) в один
     /// файл VTU (или набор VTU), затем обновить PVD файл.
     /// Используется функция VtuFile::write
+    void save(mesh::SoaMesh& mesh, double timestep);
+
+    /// @brief Записать хранилище (или часть, при распределенном счете) в один
+    /// файл VTU (или набор VTU), затем обновить PVD файл.
+    /// Используется функция VtuFile::write
     void save(AmrStorage& elements, double timestep);
+
+    /// @brief Записать хранилище (или часть, при распределенном счете) в один
+    /// файл VTU (или набор VTU), затем обновить PVD файл.
+    /// Используется функция VtuFile::write
+    void save(mesh::SoaCell& elements, double timestep);
 
     /// @brief Записать хранилище (или часть, при распределенном счете) в один
     /// файл VTU (или набор VTU), затем обновить PVD файл.

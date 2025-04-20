@@ -149,6 +149,14 @@ public:
     }
 
     /// @brief Упрощенный вариант для добавления double полей
+    void append(const std::string& name, std::function<double(mesh::QCell&)> f) {
+        m_list.emplace_back(name, 1, WriteSoaCell<double>(
+                [f](mesh::QCell& cell, double *out) {
+                    out[0] = f(cell);
+                }));
+    }
+
+    /// @brief Упрощенный вариант для добавления double полей
     void append(const std::string& name, std::function<double(CellStorage::Item&)> f) {
         m_list.emplace_back(name, 1, WriteCellItem<double>(
                 [f](CellStorage::Item& cell, double *out) {
@@ -169,6 +177,14 @@ public:
     /// @param func Некоторая функция, которая для произвольной ячейки выдает
     /// значение переменной
     void operator+=(std::pair<std::string, std::function<double(AmrStorage::Item&)>> p) {
+        append(p.first, p.second);
+    }
+
+    /// @brief Упрощенный синтаксис для добавления полей типа double
+    /// @param name Название переменной
+    /// @param func Некоторая функция, которая для произвольной ячейки выдает
+    /// значение переменной
+    void operator+=(std::pair<std::string, std::function<double(mesh::QCell&)>> p) {
         append(p.first, p.second);
     }
 

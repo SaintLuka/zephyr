@@ -26,12 +26,21 @@ public:
 
     struct State { };
 
+    mesh::Storable<PState> curr;
+    mesh::Storable<PState> half;
+    mesh::Storable<PState> next;
+    mesh::Storable<PState> d_dx;
+    mesh::Storable<PState> d_dy;
+    mesh::Storable<PState> d_dz;
+
+    /*
     std::vector<PState> curr;
     std::vector<PState> half;
     std::vector<PState> next;
     std::vector<PState> d_dx;
     std::vector<PState> d_dy;
     std::vector<PState> d_dz;
+     */
 
     /// @brief Получить экземпляр расширенного вектора состояния
     static State datatype();
@@ -86,7 +95,7 @@ public:
     void compute_dt(SoaMesh& smesh);
 
     /// @brief Расчёт потоков
-    void fluxes(Mesh &mesh, SoaMesh& smesh);
+    void fluxes(SoaMesh& mesh);
 
     /// @brief Обновление ячеек
     void swap(SoaMesh& smesh);

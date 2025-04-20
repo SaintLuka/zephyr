@@ -6,6 +6,7 @@ set(ZEPHYR_MESH_EULER_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/eu_mesh_check.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/eu_mesh_refine.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/eu_mesh_decomp.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/soa_mesh.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/tourism.cpp
     PARENT_SCOPE)
 

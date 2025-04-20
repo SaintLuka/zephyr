@@ -168,7 +168,16 @@ void PvdFile::save(mesh::EuMesh& mesh, double timestep) {
     }
 }
 
+void PvdFile::save(mesh::SoaMesh& mesh, double timestep) {
+    save(mesh.cells, timestep);
+}
+
 void PvdFile::save(AmrStorage& elements, double timestep) {
+    VtuFile::save(get_filename(), elements, variables, hex_only, polyhedral, filter);
+    update_pvd(timestep);
+}
+
+void PvdFile::save(mesh::SoaCell& elements, double timestep) {
     VtuFile::save(get_filename(), elements, variables, hex_only, polyhedral, filter);
     update_pvd(timestep);
 }

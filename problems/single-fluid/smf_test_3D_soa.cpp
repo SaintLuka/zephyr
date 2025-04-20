@@ -95,6 +95,8 @@ int main(int argc, char** argv) {
 
     SoaMesh soa_mesh(mesh);
 
+    using zephyr::mesh::QCell;
+
     // Создать решатель
     SmFluidSoA solver(eos);
     solver.set_accuracy(2);
@@ -107,49 +109,37 @@ int main(int argc, char** argv) {
     mesh.set_distributor(solver.distributor());
 
     // Переменные для сохранения
-    pvd.variables = {"rank", "index", "level"};
-    pvd.variables += {"rho",
-                      [&solver](const AmrStorage::Item& cell) -> double {
-                          return solver.curr[cell.index].density;
+    //pvd.variables = {"rank", "index", "level"};
+    pvd.variables += {"rho", [&solver](QCell& cell) -> double { return cell(solver.curr).density; }};
+    pvd.variables += {"v", [&solver](QCell& cell) -> double { return cell(solver.curr).velocity.norm(); }};
+    pvd.variables += {"P", [&solver](QCell& cell) -> double { return cell(solver.curr).pressure; }};
+    pvd.variables += {"e", [&solver](QCell& cell) -> double { return cell(solver.curr).energy; }};
+    pvd.variables += {"rho.exact",
+                      [&test, &curr_time](QCell &cell) -> double {
+                          return test.density(cell.center().norm(), curr_time);
                       }};
-    pvd.variables += {"v",
-                      [&solver](const AmrStorage::Item& cell) -> double {
-                          return solver.curr[cell.index].velocity.x();
+    pvd.variables += {"v.exact",
+                      [&test, &curr_time](QCell &cell) -> double {
+                          return test.velocity(cell.center().norm(), curr_time);
                       }};
-    pvd.variables += {"p",
-                      [&solver](const AmrStorage::Item& cell) -> double {
-                          return solver.curr[cell.index].pressure;
+    pvd.variables += {"P.exact",
+                      [&test, &curr_time](QCell &cell) -> double {
+                          return test.pressure(cell.center().norm(), curr_time);
                       }};
-    pvd.variables += {"e",
-                      [&solver](const AmrStorage::Item& cell) -> double {
-                          return solver.curr[cell.index].energy;
-                      }};
-    pvd.variables += {"rho_exact",
-                      [&test, &curr_time](const AmrStorage::Item &cell) -> double {
-                          return test.density(cell.center.norm(), curr_time);
-                      }};
-    pvd.variables += {"v_exact",
-                      [&test, &curr_time](const AmrStorage::Item &cell) -> double {
-                          return test.velocity(cell.center.norm(), curr_time);
-                      }};
-    pvd.variables += {"p_exact",
-                      [&test, &curr_time](const AmrStorage::Item &cell) -> double {
-                          return test.pressure(cell.center.norm(), curr_time);
-                      }};
-    pvd.variables += {"e_exact",
-                      [&test, &curr_time](const AmrStorage::Item &cell) -> double {
-                          return test.energy(cell.center.norm(), curr_time);
+    pvd.variables += {"e.exact",
+                      [&test, &curr_time](QCell &cell) -> double {
+                          return test.energy(cell.center().norm(), curr_time);
                       }};
 
-    auto init_cells = [&](Mesh& mesh) {
-        solver.curr.resize(mesh.n_cells());
-        solver.half.resize(mesh.n_cells());
-        solver.next.resize(mesh.n_cells());
-        solver.d_dx.resize(mesh.n_cells());
-        solver.d_dy.resize(mesh.n_cells());
-        solver.d_dz.resize(mesh.n_cells());
+    solver.curr = soa_mesh.add_data<PState>("curr");
+    solver.half = soa_mesh.add_data<PState>("half");
+    solver.next = soa_mesh.add_data<PState>("next");
+    solver.d_dx = soa_mesh.add_data<PState>("d_dx");
+    solver.d_dy = soa_mesh.add_data<PState>("d_dy");
+    solver.d_dz = soa_mesh.add_data<PState>("d_dz");
 
-        mesh.for_each([&](Cell& cell) {
+    auto init_cells = [&](SoaMesh& mesh) {
+        mesh.for_each2([&](QCell& cell) {
             double r = cell.center().norm();
             Vector3d n = cell.center() / r;
             PState z;
@@ -158,27 +148,30 @@ int main(int argc, char** argv) {
             z.pressure = std::max(test.pressure(r, t0), 1.0e-3);
             z.energy   = eos->energy_rP(z.density, z.pressure);
 
-            solver.curr[cell.geom().index] = z;
+            cell(solver.curr) = z;
         });
     };
 
     for (int k = 0; k < mesh.max_level() + 3; ++k) {
-        init_cells(mesh);
-        set_flags(mesh);
+        init_cells(soa_mesh);
         mesh.refine();
     }
-    init_cells(mesh);
+    init_cells(soa_mesh);
 
     Stopwatch sw_update;
     Stopwatch sw_flags;
-    Stopwatch sw_grad;
     Stopwatch sw_refine;
 
-    pvd.save(mesh, 0.0);
+    Stopwatch sw_step;
+    Stopwatch sw_grad;
+    Stopwatch sw_flux1;
+    Stopwatch sw_flux2;
+
+    pvd.save(soa_mesh, 0.0);
 
     Stopwatch elapsed(true);
     while (n_step < 10000 && curr_time < test.max_time()) {
-        if (n_step % 100 == 0) {
+        if (n_step % 10 == 0) {
             mpi::cout << "\tStep: " << std::setw(6) << n_step << ";"
                       << "\tTime: " << std::setw(10) << std::setprecision(5) << curr_time << "\n";
         }
@@ -187,7 +180,24 @@ int main(int argc, char** argv) {
 
         // Обновляем слои
         sw_update.resume();
-        solver.update(mesh, soa_mesh);
+
+        sw_step.resume();
+        solver.compute_dt(soa_mesh);
+        sw_step.stop();
+
+        sw_grad.resume();
+        solver.compute_grad(soa_mesh);
+        sw_grad.stop();
+
+        sw_flux1.resume();
+        solver.fluxes_stage1(soa_mesh);
+        sw_flux1.stop();
+
+        sw_flux2.resume();
+        solver.fluxes_stage2(soa_mesh);
+        solver.swap(soa_mesh);
+        sw_flux2.stop();
+
         sw_update.stop();
 
         //sw_flags.resume();
@@ -207,17 +217,25 @@ int main(int argc, char** argv) {
         n_step += 1;
     }
     elapsed.stop();
-    pvd.save(mesh, 1.0);
+    pvd.save(soa_mesh, 1.0);
 
     mpi::cout << "\nElapsed time:   " << elapsed.extended_time()
               << " ( " << elapsed.milliseconds() << " ms)\n";
 
     mpi::cout << "  Update time:  " << sw_update.extended_time()
               << " ( " << sw_update.milliseconds() << " ms)\n";
-    //mpi::cout << "  Flags  time:  " << sw_flags.extended_time()
-    //          << " ( " << sw_flags.milliseconds() << " ms)\n";
+    mpi::cout << "  Compute dt :  " << sw_step.extended_time()
+              << " ( " << sw_step.milliseconds() << " ms)\n";
     mpi::cout << "  Gradient   :  " << sw_grad.extended_time()
               << " ( " << sw_grad.milliseconds() << " ms)\n";
+    mpi::cout << "  Fluxes 1   :  " << sw_flux1.extended_time()
+              << " ( " << sw_flux1.milliseconds() << " ms)\n";
+    mpi::cout << "  Fluxes 2   :  " << sw_flux2.extended_time()
+              << " ( " << sw_flux2.milliseconds() << " ms)\n";
+    //mpi::cout << "  Flags  time:  " << sw_flags.extended_time()
+    //          << " ( " << sw_flags.milliseconds() << " ms)\n";
+    //mpi::cout << "  Gradient   :  " << sw_grad.extended_time()
+    //          << " ( " << sw_grad.milliseconds() << " ms)\n";
     //mpi::cout << "  Refine time:  " << sw_refine.extended_time()
     //          << " ( " << sw_refine.milliseconds() << " ms)\n";
 

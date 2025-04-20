@@ -227,41 +227,38 @@ Grad<State> LSM(Cell &cell,
 
 /// @brief Метод наименьших квадратов (SoA версия)
 template<class State>
-Grad<State> LSM(SoaMesh &mesh, size_t ic,
-                const State* states,
+Grad<State> LSM(mesh::QCell& cell, const State* states,
                 const GetBoundary<State> &boundary_value) {
     using Array = ei_vec<State>;
 
     // Делает матрицу A безразмерной
-    double w0 = mesh.dim < 3 ? 1.0 : 1.0 / mesh.cell_size(ic);
+    double w0 = cell.dim() < 3 ? 1.0 : 1.0 / cell.linear_size();
 
-    State zc = states[ic];
-    Vector3d cell_c = mesh.cell_center(ic);
+    State zc = states[cell.index()];
+    Vector3d cell_c = cell.center();
 
     Array Fx = Array::Zero();
     Array Fy = Array::Zero();
     Array Fz = Array::Zero();
     Matrix3d A = Matrix3d::Zero();
 
-    for (size_t k: mesh.cell_faces(ic)) {
-        if (mesh.is_undefined_face(k)) { continue; }
-
-        auto &normal = mesh.face.normal[k];
+    for (auto& face: cell.faces()) {
+        auto &normal = face.normal();
 
         State zn;
         Vector3d dr;
-        if (!mesh.is_boundary_face(k)) {
-            size_t jc = mesh.face.adjacent[k].index;
+        if (!face.is_boundary()) {
+            size_t jc = face.neib_index();
             zn = states[jc];
-            dr = mesh.cell_center(jc) - cell_c;
+            dr = face.neib_center() - cell_c;
         } else {
-            zn = boundary_value(zc, normal, mesh.face.boundary[k]);
-            dr = mesh.face_symm_point(k, cell_c) - cell_c;
+            zn = boundary_value(zc, normal, face.flag());
+            dr = face.symm_point(cell_c) - cell_c;
         }
 
         Vector3d drn = dr.dot(normal) * normal;
 
-        double w = w0 * mesh.face.area[k] / std::pow(drn.norm(), 3);
+        double w = w0 * face.area() / std::pow(drn.norm(), 3);
 
         A += w * drn * dr.transpose();
 
@@ -420,42 +417,39 @@ Grad<State> limiting(Cell &cell, const Limiter& limiter,
 
 /// @brief Метод наименьших квадратов (SoA версия)
 template<class State>
-Grad<State> limiting(SoaMesh& mesh, size_t ic, const Limiter& limiter,
+Grad<State> limiting(mesh::QCell& cell, const Limiter& limiter,
                      const Grad<State> &grad,
                      const State* states,
                      const GetBoundary<State> &boundary_value) {
     using Array = ei_arr<State>;
 
     // Делает матрицу A безразмерной
-    double w0 = mesh.dim < 3 ? 1.0 : 1.0 / mesh.cell_size(ic);
+    double w0 = cell.dim() < 3 ? 1.0 : 1.0 / cell.linear_size();
 
-    State zc = states[ic];
-    Vector3d cell_c = mesh.cell_center(ic);
+    State zc = states[cell.index()];
+    Vector3d cell_c = cell.center();
 
     Array Fx = Array::Zero();
     Array Fy = Array::Zero();
     Array Fz = Array::Zero();
 
     Matrix3d A = Matrix3d::Zero();
-    for (auto k: mesh.cell_faces(ic)) {
-        if (mesh.is_undefined_face(k)) { continue; }
-
-        const Vector3d &normal = mesh.face.normal[k];
+    for (auto& face: cell.faces()) {
+        auto& normal = face.normal();
 
         State zn;
         Vector3d dr;
-        if (!mesh.is_boundary_face(k)) {
-            size_t jc = mesh.face.adjacent[k].index;
-            zn = states[jc];
-            dr = mesh.cell_center(jc) - cell_c;
+        if (!face.is_boundary()) {
+            zn = states[face.neib_index()];
+            dr = face.neib_center() - cell_c;
         } else {
-            zn = boundary_value(zc, normal, mesh.face.boundary[k]);
-            dr = mesh.face_symm_point(k, cell_c) - cell_c;
+            zn = boundary_value(zc, normal, face.flag());
+            dr = face.symm_point(cell_c) - cell_c;
         }
 
         Vector3d drn = dr.dot(normal) * normal;
 
-        double w = w0 * mesh.face_area(k) / std::pow(drn.norm() , 3);
+        double w = w0 * face.area() / std::pow(drn.norm() , 3);
 
         A += w * drn * dr.transpose();
 

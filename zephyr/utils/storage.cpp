@@ -2,7 +2,7 @@
 
 namespace zephyr::utils {
 
-void Storage::resize(size_t new_size) {
+void SoaStorage::resize(size_t new_size) {
     m_size = new_size;
     resize_basic(new_size);
 
@@ -13,12 +13,12 @@ void Storage::resize(size_t new_size) {
     }
 }
 
-void Storage::print() const {
+void SoaStorage::print() const {
     if (empty()) {
-        std::cout << "Storage is empty\n";
+        std::cout << "SoaStorage is empty\n";
     }
     else {
-        std::cout << "Storage contains " << size() << " elements\n";
+        std::cout << "SoaStorage contains " << size() << " elements\n";
     }
     int count = print_basic();
 

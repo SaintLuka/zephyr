@@ -1,4 +1,4 @@
-/// @file smf_test_axial.cpp
+QCell /// @file smf_test_axial.cpp
 /// @brief Сферический взрыв на двумерной адаптивной сетке с осевой симметрией.
 
 #include <iostream>

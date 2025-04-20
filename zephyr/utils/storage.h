@@ -14,7 +14,7 @@
 
 namespace zephyr::utils {
 
-/// @brief Простая структура для доступа к полям Storage
+/// @brief Простая структура для доступа к полям SoaStorage
 template<typename T>
 struct Storable {
 public:
@@ -24,7 +24,7 @@ public:
     Storable<T> operator[](int shift) const { return {idx + shift}; }
 };
 
-/// @class Storage storage.h
+/// @class SoaStorage storage.h
 /// @brief Класс для хранения разнородных данных в форме SoA (Structure of Arrays),
 ///
 /// Все данные хранятся в массивах одинаковой длины, памятью управляют простые
@@ -33,10 +33,10 @@ public:
 /// std::vector<int>, std::vector<double>. Сложные пользовательские типы
 /// добавляются в хранилище в виде байтовых массивов std::vector<std::byte>.
 /// Пользовательские типы должны быть кратны 4 байтам и ограничены по размеру.
-class Storage final {
+class SoaStorage final {
 public:
     /// @brief Пустое хранилище заданного размера
-    explicit Storage(size_t size = 0) : m_size(size) { }
+    explicit SoaStorage(size_t size = 0) : m_size(size) { }
 
     /// @brief Размер массивов данных равен нулю? (даже если данных нет)
     inline bool empty() const { return m_size == 0; }
@@ -118,7 +118,7 @@ private:
     //          Описание базовых и пользовательских типов + функции
     // ========================================================================
 
-    // Кортеж с базовыми типами, доступными для хранения в Storage
+    // Кортеж с базовыми типами, доступными для хранения в SoaStorage
     using basic_types_t = std::tuple<
             short, unsigned short, int, unsigned int,
             long, unsigned long, long long, unsigned long long,
@@ -162,7 +162,7 @@ private:
     static constexpr int custom_type_max_sizeof = type_alignment * n_custom_types;
 
     // Индекс пользовательского типа данных, возвращает -1, если тип нельзя
-    // поместить в Storage по некоторым причинам (выравнивание / размер).
+    // поместить в SoaStorage по некоторым причинам (выравнивание / размер).
     template <typename T>
     static constexpr int custom_type_index() {
         if constexpr (is_basic_type<T>()) {
@@ -201,7 +201,7 @@ private:
                       "В данном контексте допускается только пользовательский тип");
     }
 
-    // Тип можно ли сохранить в Storage
+    // Тип можно ли сохранить в SoaStorage
     template <typename T>
     static constexpr void assert_storable_type() {
         if constexpr (!is_basic_type<T>()) {
@@ -221,13 +221,10 @@ private:
     template<typename T>
     using vec_of_vec = std::vector<std::vector<T>>;
 
-    // Генерация кортежа двойных массивов с базовыми типами
     template<typename... Ts>
     static auto to_vec_of_vec_tuple(const std::tuple<Ts...> &)
     -> std::tuple<vec_of_vec<Ts>...> { return {}; }
 
-    /// @brief Кортеж двойных массивов с базовыми типами:
-    /// std::tuple< vec_of_vec<short>, vec_of_vec<unsigned short>, ... >
     using vec_of_vec_types = decltype(to_vec_of_vec_tuple(basic_types_t{}));
 
     // ========================================================================
@@ -363,7 +360,7 @@ private:
 
 // Название базового типа
 template <typename T>
-std::string Storage::basic_type_name() {
+std::string SoaStorage::basic_type_name() {
     if constexpr (std::is_same_v<T, short>) {
         return "short";
     } else if constexpr (std::is_same_v<T, unsigned short>) {
@@ -395,12 +392,12 @@ std::string Storage::basic_type_name() {
 
 // Название хранимого типа по индексу в кортеже
 template<int I>
-std::string Storage::basic_type_name() {
+std::string SoaStorage::basic_type_name() {
     return basic_type_name<std::tuple_element_t<I, basic_types_t>>();
 }
 
 template<typename T>
-Storable<T> Storage::add(const std::string &name) {
+Storable<T> SoaStorage::add(const std::string &name) {
     assert_storable_type<T>();
 
     int c = type_count<T>();
@@ -413,7 +410,7 @@ Storable<T> Storage::add(const std::string &name) {
 
     // Проверка на наличие массива данных с таким именем
     if (contain<T>(name)) {
-        throw std::runtime_error("Storage::add() error: Storage contains name '" + name + "' already");
+        throw std::runtime_error("SoaStorage::add() error: SoaStorage contains name '" + name + "' already");
     }
     names<T>().push_back(name);
 
@@ -421,7 +418,7 @@ Storable<T> Storage::add(const std::string &name) {
 }
 
 template<typename T>
-Storable<T> Storage::add(const std::string &name, int count) {
+Storable<T> SoaStorage::add(const std::string &name, int count) {
     assert_storable_type<T>();
 
     int c = type_count<T>();
@@ -439,7 +436,7 @@ Storable<T> Storage::add(const std::string &name, int count) {
 
     // Проверка на наличие массива данных с таким именем
     if (contain<T>(name)) {
-        throw std::runtime_error("Storage::add() error: Storage contains name '" + name + "' already");
+        throw std::runtime_error("SoaStorage::add() error: SoaStorage contains name '" + name + "' already");
     }
     for (int i = 0; i < count; ++i) {
         names<T>().push_back(name);
