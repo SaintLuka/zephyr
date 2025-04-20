@@ -97,7 +97,7 @@ void SmFluidSoA::update(Mesh &eu_mesh, SoaMesh& mesh) {
 }
 
 void SmFluidSoA::compute_dt(SoaMesh& mesh) {
-    double dt = mesh.min2(
+    double dt = mesh.min(
         [this](mesh::QCell& cell) -> double {
             double c = m_eos->sound_speed_rP(cell(curr).density, cell(curr).pressure);
             return cell.diameter() / (cell(curr).velocity.norm() + c);
@@ -108,7 +108,7 @@ void SmFluidSoA::compute_dt(SoaMesh& mesh) {
 }
 
 void SmFluidSoA::compute_grad(SoaMesh& mesh)  {
-    mesh.for_each2([this, &mesh](mesh::QCell& cell) {
+    mesh.for_each([this, &mesh](mesh::QCell& cell) {
         auto grad = gradient::LSM<smf::PState>(cell, mesh.cells.data(curr), boundary_value);
         grad = gradient::limiting<smf::PState>(cell, m_limiter, grad, mesh.cells.data(curr), boundary_value);
 
@@ -119,7 +119,7 @@ void SmFluidSoA::compute_grad(SoaMesh& mesh)  {
 }
 
 void SmFluidSoA::fluxes(SoaMesh &mesh) {
-    mesh.for_each2([this](mesh::QCell &cell) {
+    mesh.for_each([this](mesh::QCell &cell) {
         // Примитивный вектор в ячейке
         PState z_c = cell(curr);
 
@@ -172,7 +172,7 @@ void SmFluidSoA::fluxes(SoaMesh &mesh) {
 }
 
 void SmFluidSoA::fluxes_stage1(SoaMesh& mesh)  {
-    mesh.for_each2([this](mesh::QCell& cell) {
+    mesh.for_each([this](mesh::QCell& cell) {
         // Центр ячейки
         auto& cell_c = cell.center();
 
@@ -241,7 +241,7 @@ void SmFluidSoA::fluxes_stage1(SoaMesh& mesh)  {
 }
 
 void SmFluidSoA::fluxes_stage2(SoaMesh& mesh) {
-    mesh.for_each2([this](mesh::QCell& cell) {
+    mesh.for_each([this](mesh::QCell& cell) {
         // Центр ячейки
         auto& cell_c = cell.center();
 

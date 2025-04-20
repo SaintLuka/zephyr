@@ -20,6 +20,10 @@ Variable::Variable(const char* name)
             auto out = (int32_t *) arg;
             out[0] = cell.rank;
         };
+        m_soa_func = [](QCell& cell, void *arg) {
+            auto out = (int32_t *) arg;
+            out[0] = cell.rank();
+        };
     }
     else if (!std::strcmp(name, "index")) {
         m_type = VtkType::Int32;
@@ -28,6 +32,10 @@ Variable::Variable(const char* name)
         m_amr_func = [](AmrStorage::Item& cell, void *arg) {
             auto out = (int32_t *) arg;
             out[0] = cell.index;
+        };
+        m_soa_func = [](QCell& cell, void *arg) {
+            auto out = (int32_t *) arg;
+            out[0] = cell.index();
         };
     }
     else if (!std::strcmp(name, "level")) {
@@ -38,6 +46,10 @@ Variable::Variable(const char* name)
             auto out = (int8_t *) arg;
             out[0] = cell.level;
         };
+        m_soa_func = [](QCell& cell, void *arg) {
+            auto out = (int8_t *) arg;
+            out[0] = cell.level();
+        };
     }
     else if (!std::strcmp(name, "next")) {
         m_type = VtkType::Int32;
@@ -46,6 +58,10 @@ Variable::Variable(const char* name)
         m_amr_func = [](AmrStorage::Item& cell, void *arg) {
             auto out = (int32_t *) arg;
             out[0] = cell.next;
+        };
+        m_soa_func = [](QCell& cell, void *arg) {
+            auto out = (int32_t *) arg;
+            out[0] = cell.next();
         };
     }
     else if (!std::strcmp(name, "flag")) {
@@ -56,6 +72,10 @@ Variable::Variable(const char* name)
             auto out = (int8_t *) arg;
             out[0] = cell.flag;
         };
+        m_soa_func = [](QCell& cell, void *arg) {
+            auto out = (int8_t *) arg;
+            out[0] = cell.flag();
+        };
     }
     else if (!std::strcmp(name, "b_idx")) {
         m_type = VtkType::Int32;
@@ -65,6 +85,10 @@ Variable::Variable(const char* name)
             auto out = (int32_t *) arg;
             out[0] = cell.b_idx;
         };
+        m_soa_func = [](QCell& cell, void *arg) {
+            auto out = (int32_t *) arg;
+            out[0] = cell.b_idx();
+        };
     }
     else if (!std::strcmp(name, "z_idx")) {
         m_type = VtkType::Int32;
@@ -73,6 +97,10 @@ Variable::Variable(const char* name)
         m_amr_func = [](AmrStorage::Item& cell, void *arg) {
             auto out = (int32_t *) arg;
             out[0] = cell.z_idx;
+        };
+        m_soa_func = [](QCell& cell, void *arg) {
+            auto out = (int32_t *) arg;
+            out[0] = cell.z_idx();
         };
     }
     else if (!std::strcmp(name, "face.rank")) {

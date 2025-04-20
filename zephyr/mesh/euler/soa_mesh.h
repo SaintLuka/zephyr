@@ -24,11 +24,11 @@ public:
     using Boundary = zephyr::geom::Boundary;
 
     SoaCell* m_cells;
-    index_t face_idx;
+    index_t iface;
 
 public:
-    QFace(SoaCell* cell, index_t face_idx)
-        : m_cells(cell), face_idx(face_idx) { }
+    QFace(SoaCell* cell, index_t iface)
+        : m_cells(cell), iface(iface) { }
 
     /// @brief Является ли грань граничной?
     bool is_boundary() const;
@@ -86,25 +86,25 @@ public:
 class FaceIt {
 public:
     SoaCell* m_cells;
-    index_t face_idx;
+    index_t iface;
     index_t face_end;
     Direction m_dir;
 
 public:
     /// @brief Изолированная грань на стороне side,
     /// не позволяет обходить грани
-    FaceIt(SoaCell* cells, index_t face_idx, index_t face_end, Direction dir = Direction::ANY)
-            : m_cells(cells), face_idx(face_idx), face_end(face_end), m_dir(dir) {
-        while (face_idx < face_end && to_skip(m_dir)) {
-            face_idx += 1;
+    FaceIt(SoaCell* cells, index_t iface, index_t face_end, Direction dir = Direction::ANY)
+            : m_cells(cells), iface(iface), face_end(face_end), m_dir(dir) {
+        while (iface < face_end && to_skip(m_dir)) {
+            iface += 1;
         }
     }
 
     FaceIt &operator++() {
         do {
             // Доработать, не забыть
-            face_idx += 1;
-        } while (face_idx < face_end && to_skip(m_dir));
+            iface += 1;
+        } while (iface < face_end && to_skip(m_dir));
         return *this;
     }
 
@@ -113,12 +113,12 @@ public:
     /// не совпадает с выбраным направлением
     bool to_skip(Direction dir) const;
 
-    bool operator!=(const FaceIt &iface) const {
-        return face_idx != iface.face_idx;
+    bool operator!=(const FaceIt &face) const {
+        return iface != face.iface;
     }
 
     QFace operator[](Side s) const {
-        return QFace(m_cells, face_idx + s);
+        return QFace(m_cells, iface + s);
     }
 
     // Лайфках, начало структур совпадает
@@ -132,11 +132,11 @@ public:
     FaceIt m_beg, m_end;
 
     FacesIts(SoaCell* cells,
-             index_t face_idx_beg,
-             index_t face_idx_end,
+             index_t iface_beg,
+             index_t iface_end,
              Direction dir = Direction::ANY)
-            : m_beg(cells, face_idx_beg, face_idx_end, dir),
-              m_end(cells, face_idx_end, face_idx_end, dir) { }
+            : m_beg(cells, iface_beg, iface_end, dir),
+              m_end(cells, iface_end, iface_end, dir) { }
 
     FaceIt begin() const { return m_beg; }
 
@@ -167,11 +167,19 @@ public:
     /// @brief Ранг, которому принадлежит ячейка
     inline int rank() const;
 
+    inline index_t b_idx() const;
+
+    inline index_t z_idx() const;
+
     /// @brief Индекс ячейки на z-кривой
     inline index_t index() const;
 
     /// @brief Индекс новой ячейки (в алгоритмах)
     inline index_t next() const;
+
+    inline index_t flag() const;
+
+    inline index_t level() const;
 
     template <typename T>
     inline T& operator()(Storable<T> type);
@@ -186,6 +194,8 @@ public:
     inline double linear_size() const;
 
     double diameter() const;
+
+    inline void set_flag(int flag);
 
     template <int dim>
     inline typename std::conditional<dim < 3, const SqQuad&, const SqCube&>::type
@@ -265,13 +275,20 @@ public:
 /// теоретически, все функции тоже можно просто скопировать.
 class SoaCell final {
 public:
+
+    SoaCell() = default;
+
     // Копируется из EuMesh
     SoaCell(AmrStorage &locals);
 
     // Число ячеек
     index_t n_cells;
 
-    index_t size() const { return n_cells; }
+    inline bool empty() const { return n_cells == 0; }
+
+    inline index_t size() const { return n_cells; }
+
+    void initialize(AmrStorage &locals);
 
     // Общие данные ячеек
 
@@ -304,6 +321,25 @@ public:
     std::vector<index_t>   face_begin;
     std::vector<index_t>   node_begin;
 
+
+    int face_count(index_t ic) const {
+        int count = 0;
+        for (index_t iface = face_begin[ic]; iface < face_begin[ic+1]; ++iface) {
+            if (faces.is_actual(iface)) {
+                ++count;
+            }
+        }
+        return count;
+    }
+
+    inline double get_volume(index_t ic, bool axial) const {
+        return axial ? volume_alt[ic] : volume[ic];
+    }
+
+    inline double linear_size(index_t ic) const {
+        return dim < 3 ? std::sqrt(volume[ic]) : std::cbrt(volume[ic]);
+    }
+
     /// @brief Аналог BFaces развернутый в структуру массивов
     struct SoaFace {
         std::vector<Boundary> boundary;  ///< Тип граничного условия
@@ -327,58 +363,59 @@ public:
         }
 
         /// @brief Является ли грань граничной?
-        inline bool is_boundary(index_t face_idx) const {
-            return boundary[face_idx] != Boundary::ORDINARY &&
-                   boundary[face_idx] != Boundary::PERIODIC &&
-                   boundary[face_idx] != Boundary::UNDEFINED;
+        inline bool is_boundary(index_t iface) const {
+            return boundary[iface] != Boundary::ORDINARY &&
+                   boundary[iface] != Boundary::PERIODIC &&
+                   boundary[iface] != Boundary::UNDEFINED;
         }
 
         /// @brief Является ли грань актуальной?
-        inline bool is_actual(index_t face_idx) const {
-            return boundary[face_idx] != Boundary::UNDEFINED;
+        inline bool is_actual(index_t iface) const {
+            return boundary[iface] != Boundary::UNDEFINED;
         }
 
         /// @return 'true', если грань не актуальна
-        inline bool is_undefined(index_t face_idx) const {
-            return boundary[face_idx] == Boundary::UNDEFINED;
+        inline bool is_undefined(index_t iface) const {
+            return boundary[iface] == Boundary::UNDEFINED;
         }
 
         /// @brief Установить неопределенную грань
-        inline void set_undefined(index_t face_idx) {
-            boundary[face_idx] = Boundary::UNDEFINED;
-            adjacent[face_idx].rank  = -1;
-            adjacent[face_idx].index = -1;
-            adjacent[face_idx].alien = -1;
+        inline void set_undefined(index_t iface) {
+            boundary[iface] = Boundary::UNDEFINED;
+            adjacent[iface].rank  = -1;
+            adjacent[iface].index = -1;
+            adjacent[iface].alien = -1;
         }
 
         /// @brief Внешняя нормаль грани на площадь
-        inline Vector3d area_n(index_t face_idx) const { return area[face_idx] * normal[face_idx]; }
+        inline Vector3d area_n(index_t iface) const { return area[iface] * normal[iface]; }
 
         /// @brief Площадь/длина обычной грани или грани осесимметричной ячейки
-        inline double get_area(index_t face_idx, bool axial = false) const {
-            return axial ? area_alt[face_idx] : area[face_idx];
+        inline double get_area(index_t iface, bool axial = false) const {
+            return axial ? area_alt[iface] : area[iface];
         }
 
-        inline Vector3d symm_point(index_t face_idx, const Vector3d& p) const {
-            return p + 2.0 * (center[face_idx] - p).dot(normal[face_idx]) * normal[face_idx];
+        inline Vector3d symm_point(index_t iface, const Vector3d& p) const {
+            return p + 2.0 * (center[iface] - p).dot(normal[iface]) * normal[iface];
         }
+
 
         /// @brief Пропустить грань?
         /// @return 'true' если грань неопределена или
         /// не совпадает с выбраным направлением
-        inline bool to_skip(index_t face_idx, Direction dir) const {
-            if (boundary[face_idx] == Boundary::UNDEFINED) {
+        inline bool to_skip(index_t iface, Direction dir) const {
+            if (boundary[iface] == Boundary::UNDEFINED) {
                 return true;
             }
             switch (dir) {
                 case Direction::ANY:
                     return false;
                 case Direction::X:
-                    return std::abs(normal[face_idx].x()) < 0.7;
+                    return std::abs(normal[iface].x()) < 0.7;
                 case Direction::Y:
-                    return std::abs(normal[face_idx].y()) < 0.7;
+                    return std::abs(normal[iface].y()) < 0.7;
                 case Direction::Z:
-                    return std::abs(normal[face_idx].z()) < 0.7;
+                    return std::abs(normal[iface].z()) < 0.7;
                 default:
                     return false;
             }
@@ -423,6 +460,19 @@ public:
     /// @brief Устанавливает index = -1 (ячейка вне сетки)
     inline void set_undefined(index_t ic) { index[ic] = -1; }
 
+    void print_info(index_t ic) const;
+
+    void visualize(index_t ic, std::string filename) const;
+
+    int check_geometry(index_t ic) const;
+
+    int check_base_face_orientation(index_t ic) const;
+
+    int check_base_vertices_order(index_t ic) const;
+
+    int check_complex_faces(index_t ic) const;
+
+    int check_connectivity(int ic) const;
 
 
     void resize(index_t n_cells, index_t faces_per_cell, index_t nodes_per_cell);
@@ -431,6 +481,31 @@ public:
 class SoaMesh {
 public:
     SoaCell cells;
+
+    int m_max_level = 0;
+    Distributor distributor;
+
+    /// @brief Установить максимальный допустимый уровень адаптации (>= 0)
+    void set_max_level(int max_level);
+
+    int max_level() const;
+
+    bool is_adaptive() const;
+
+    /// @brief Установить распределитель данных при адаптации
+    void set_distributor(Distributor distr);
+
+    void init_amr();
+
+    void balance_flags();
+
+    void apply_flags();
+
+    void refine();
+
+    int check_base();
+
+    int check_refined();
 
     CellIt begin() { return {&cells, 0}; }
 
@@ -451,47 +526,23 @@ public:
     // Преобразовать из классической сетки
     SoaMesh(EuMesh &mesh);
 
+    SoaMesh(Generator& gen);
+
     void to_eu_mesh(EuMesh &mesh) const;
 
 
     template<int n_tasks_per_thread = 10, class Func, class... Args>
     void for_each(Func &&func, Args&&... args) {
-        utils::range<index_t> range(cells.size());
-
-        threads::for_each<n_tasks_per_thread>(range.begin(), range.end(),
-                std::forward<Func>(func), std::forward<Args>(args)...);
-    }
-
-    template<int n_tasks_per_thread = 10, class Func, class... Args>
-    void for_each2(Func &&func, Args&&... args) {
         threads::for_each<n_tasks_per_thread>(begin(), end(),
                 std::forward<Func>(func), std::forward<Args>(args)...);
     }
 
     /// @brief Параллельно по тредам посчитать минимум
     template<int n_tasks_per_thread = 10, class Func,
-            typename Value = std::invoke_result_t<Func, index_t&>>
+            typename Value = std::invoke_result_t<Func, QCell>>
     auto min(Func &&func, const Value &init)
     -> typename std::enable_if<!std::is_void<Value>::value, Value>::type {
-        utils::range<index_t> range(cells.size());
-        return threads::min<n_tasks_per_thread>(range.begin(), range.end(), init, std::forward<Func>(func));
-    }
-
-    /// @brief Параллельно по тредам посчитать минимум
-    template<int n_tasks_per_thread = 10, class Func,
-            typename Value = std::invoke_result_t<Func, QCell>>
-    auto min2(Func &&func, const Value &init)
-    -> typename std::enable_if<!std::is_void<Value>::value, Value>::type {
         return threads::min<n_tasks_per_thread>(begin(), end(), init, std::forward<Func>(func));
-    }
-
-    /// @brief Параллельно по тредам посчитать минимум
-    template<int n_tasks_per_thread = 10, class Func,
-            typename Value = std::invoke_result_t<Func, index_t&>>
-    auto min(Func &&func)
-    -> typename std::enable_if<std::is_arithmetic<Value>::value, Value>::type {
-        utils::range<index_t> range(cells.size());
-        return threads::min<n_tasks_per_thread>(range.begin(), range.end(), std::forward<Func>(func));
     }
 };
 
@@ -504,9 +555,19 @@ inline bool QCell::adaptive() const { return m_cells->adaptive; }
 
 inline int QCell::rank() const { return m_cells->rank[cell_idx]; }
 
+inline int QCell::flag() const { return m_cells->flag[cell_idx]; }
+
+inline int QCell::level() const { return m_cells->level[cell_idx]; }
+
+inline index_t QCell::b_idx() const { return m_cells->b_idx[cell_idx]; }
+
+inline index_t QCell::z_idx() const { return m_cells->z_idx[cell_idx]; }
+
 inline index_t QCell::index() const { return m_cells->index[cell_idx]; }
 
 inline index_t QCell::next() const { return m_cells->next[cell_idx]; }
+
+inline void QCell::set_flag(int flag) { m_cells->flag[cell_idx] = flag; }
 
 template <typename T>
 inline T& QCell::operator()(Storable<T> type) {
@@ -522,13 +583,11 @@ inline double QCell::volume() const {
 }
 
 inline double QCell::volume(bool axial) const {
-    return axial ? m_cells->volume_alt[cell_idx] : m_cells->volume[cell_idx];
+    return m_cells->get_volume(cell_idx, axial);
 }
 
 inline double QCell::linear_size() const {
-    return m_cells->dim < 3 ?
-           std::sqrt(m_cells->volume[cell_idx]) :
-           std::cbrt(m_cells->volume[cell_idx]);
+    return m_cells->linear_size(cell_idx);
 }
 
 template <int dim>
