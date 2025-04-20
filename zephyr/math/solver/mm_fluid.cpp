@@ -4,6 +4,7 @@
 #include <zephyr/math/cfd/gradient.h>
 #include <zephyr/math/cfd/models.h>
 #include <zephyr/geom/sections.h>
+#include <zephyr/utils/mpi.h>
 
 namespace zephyr::math {
 
@@ -11,6 +12,7 @@ using mesh::AmrStorage;
 using namespace geom;
 using namespace mmf;
 using zephyr::utils::threads;
+using zephyr::utils::mpi;
 
 static const MmFluid::State U = MmFluid::datatype();
 
@@ -159,14 +161,17 @@ void MmFluid::integrate(Mesh &mesh, double dt, Direction dir) {
     if (m_acc == 1) {
         if (m_crp_mode == CrpMode::MUSCL) {
             // Для MUSCL нужен градиент объемных долей
+            mesh.sync();
             fractions_grad(mesh, get_current_a);
         }
         else if (m_crp_mode == CrpMode::PLIC) {
             // Для PLIC нужна реконструкция
+            mesh.sync();
             interface_recovery(mesh);
         }
 
         // Расчет потоков
+        mesh.sync();
         fluxes(mesh, dt, dir);
     }
     else {
@@ -174,18 +179,23 @@ void MmFluid::integrate(Mesh &mesh, double dt, Direction dir) {
 
         if (m_crp_mode == CrpMode::MUSCL) {
             // Для MUSCL нужен градиент объемных долей
+            mesh.sync();
             fractions_grad(mesh, get_current_a);
         }
         else if (m_crp_mode == CrpMode::PLIC) {
             // Для PLIC нужна реконструкция
+            mesh.sync();
             interface_recovery(mesh);
         }
 
+        mesh.sync();
         fluxes_stage1(mesh, dt, dir);
 
+        mesh.sync();
         fluxes_stage2(mesh, dt, dir);
     }
 
+    mesh.sync();
     swap(mesh);
 }
 
@@ -213,6 +223,7 @@ void MmFluid::compute_dt(Mesh &mesh) {
     });
 
     m_dt = std::min(m_CFL * dt, m_max_dt);
+    m_dt = mpi::min(m_dt);
 }
 
 namespace {

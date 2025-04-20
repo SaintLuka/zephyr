@@ -15,6 +15,7 @@
 #include <zephyr/io/csv_file.h>
 
 #include <zephyr/utils/stopwatch.h>
+#include <zephyr/utils/mpi.h>
 
 using namespace zephyr::io;
 using namespace zephyr::phys;
@@ -24,6 +25,8 @@ using namespace zephyr::math::mmf;
 using zephyr::mesh::EuMesh;
 
 using zephyr::utils::Stopwatch;
+using zephyr::utils::threads;
+using zephyr::utils::mpi;
 
 
 // Для быстрого доступа по типу
@@ -47,8 +50,9 @@ double get_normal_x(AmrStorage::Item &cell) { return cell(U).n[0].x(); }
 double get_normal_y(AmrStorage::Item &cell) { return cell(U).n[0].y(); }
 
 
-int main() {
-    zephyr::utils::threads::on();
+int main(int argc, char** argv) {
+    mpi::handler init(argc, argv);
+    threads::off();
 
     // Материал
     Eos::Ptr sg1 = IdealGas::create(1.4, 1.0);
@@ -81,7 +85,6 @@ int main() {
     pvd.variables += {"n.x", get_normal_x};
     pvd.variables += {"n.y", get_normal_y};
 
-
     // Создаем одномерную сетку
     Rectangle gen(0.0, 7.0, 0.0, 3.0);
     gen.set_nx(700);
@@ -90,6 +93,7 @@ int main() {
 
     // Создать сетку
     EuMesh mesh(gen, U);
+    mesh.set_decomposition("XY");
 
     // Создать решатель
     MmFluid solver(mixture);
@@ -144,7 +148,7 @@ int main() {
     Stopwatch elapsed(true);
     while (curr_time < max_time) {
         if (curr_time >= next_write) {
-            std::cout << "\tStep: " << std::setw(6) << n_step << ";"
+            mpi::cout << "\tStep: " << std::setw(6) << n_step << ";"
                       << "\tTime: " << std::setw(6) << std::setprecision(3) << curr_time << "\n";
             pvd.save(mesh, curr_time);
 
@@ -180,7 +184,7 @@ int main() {
 
     elapsed.stop();
 
-    std::cout << "\nElapsed:      " << elapsed.extended_time()
+    mpi::cout << "\nElapsed:      " << elapsed.extended_time()
               << " ( " << elapsed.milliseconds() << " ms)\n";
 
     return 0;
