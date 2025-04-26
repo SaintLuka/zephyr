@@ -93,6 +93,9 @@ public:
     /// @brief Число ячеек по оси Y
     int ny() const;
 
+    /// @brief Граничные условия
+    Boundaries bounds() const;
+
     /// @brief Есть ли периодичность по оси X?
     bool periodic_along_x() const;
 

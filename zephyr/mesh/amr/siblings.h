@@ -14,18 +14,18 @@ namespace zephyr { namespace mesh { namespace amr {
 /// @brief Сторона, по которой необходимо пройти, чтобы от одного сиблинга
 /// перейти к следующему. Детали можно найти в файле _ascii.h
 template <int dim>
-inline std::array<Side, CpC(dim)> side_to_next_sibling();
+inline std::array<Side3D, CpC(dim)> side_to_next_sibling();
 
 template <>
-inline std::array<Side, 4> side_to_next_sibling<2>() {
-    return {Side::RIGHT, Side::TOP, Side::BOTTOM, Side::LEFT};
+inline std::array<Side3D, 4> side_to_next_sibling<2>() {
+    return {Side3D::RIGHT, Side3D::TOP, Side3D::BOTTOM, Side3D::LEFT};
 }
 
 template <>
-inline std::array<Side, 8> side_to_next_sibling<3>() {
+inline std::array<Side3D, 8> side_to_next_sibling<3>() {
     return {
-            Side::RIGHT, Side::TOP, Side::FRONT, Side::LEFT,
-            Side::BACK, Side::LEFT, Side::RIGHT, Side::BOTTOM,
+            Side3D::RIGHT, Side3D::TOP, Side3D::FRONT, Side3D::LEFT,
+            Side3D::BACK, Side3D::LEFT, Side3D::RIGHT, Side3D::BOTTOM,
     };
 }
 
@@ -40,7 +40,7 @@ inline std::array<Side, 8> side_to_next_sibling<3>() {
 ///  - Все сиблинги хотят огрубиться.
 template <int dim>
 bool can_coarse(AmrStorage& cells, int ic) {
-    std::array<Side, CpC(dim)> sides = side_to_next_sibling<dim>();
+    std::array<Side3D, CpC(dim)> sides = side_to_next_sibling<dim>();
 
     if (cells[ic].flag >= 0) {
         // Сама ячейка не хочет огрубляться
@@ -97,7 +97,7 @@ bool can_coarse(AmrStorage& cells, int ic) {
 /// к следующему, что позволяет прервать функцию, не обходя всех сиблингов
 template <int dim>
 bool can_coarse(const AmrCell& main_cell, const AmrStorage& cells) {
-    const std::array<Side, CpC(dim)> sides = side_to_next_sibling<dim>();
+    const std::array<Side3D, CpC(dim)> sides = side_to_next_sibling<dim>();
 
     if (main_cell.flag >= 0) {
         // Сама ячейка не хочет огрубляться
@@ -149,7 +149,7 @@ bool can_coarse(const AmrCell& main_cell, const AmrStorage& cells) {
 /// @param ic Целевая ячейка (от которой запрос)
 template<int dim>
 std::array<int, CpC(dim) - 1> get_siblings(AmrStorage &cells, int ic) {
-    const std::array<Side, CpC(dim)> sides = side_to_next_sibling<dim>();
+    const std::array<Side3D, CpC(dim)> sides = side_to_next_sibling<dim>();
 
     std::array<int, CpC(dim) - 1> siblings;
 
@@ -244,7 +244,7 @@ std::array<int, CpC(dim) - 1> get_siblings(AmrStorage &cells, int ic) {
 /// @param locals Хранилище ячеек
 template<int dim>
 std::array<int, CpC(dim) - 1> get_siblings(const AmrCell& main_cell, AmrStorage &locals) {
-    const std::array<Side, CpC(dim)> sides = side_to_next_sibling<dim>();
+    const std::array<Side3D, CpC(dim)> sides = side_to_next_sibling<dim>();
 
     std::array<int, CpC(dim) - 1> siblings;
 

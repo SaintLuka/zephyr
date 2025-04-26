@@ -16,4 +16,7 @@ inline constexpr int CpC(int dim) { return dim < 3 ? 4 : 8; }
 /// @brief Количество подграней.
 inline constexpr int FpF(int dim) { return dim < 3 ? 2 : 4; }
 
+/// @brief Полное число вершин ячейки.
+inline constexpr int VpC(int dim) { return dim < 3 ? 9 : 27; }
+
 } // namespace zephyr::mesh

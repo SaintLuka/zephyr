@@ -215,6 +215,10 @@ int Rectangle::ny() const {
     return m_ny;
 }
 
+Rectangle::Boundaries Rectangle::bounds() const {
+    return m_bounds;
+}
+
 bool Rectangle::periodic_along_x() const {
     return m_bounds.left == Boundary::PERIODIC || m_bounds.right == Boundary::PERIODIC;
 }

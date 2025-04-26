@@ -1,4 +1,4 @@
-#include <zephyr/mesh/primitives/side.h>
+#include <zephyr/mesh/primitives/Side3D.h>
 #include <zephyr/mesh/primitives/amr_cell.h>
 #include <zephyr/mesh/euler/eu_cell.h>
 
@@ -74,7 +74,7 @@ const Byte* EuCell::neib_data(const BFace& face) const {
     }
 }
 
-EuFace EuCell::face(Side side) const {
+EuFace EuCell::face(Side3D side) const {
     return EuFace(*this, side);
 }
 

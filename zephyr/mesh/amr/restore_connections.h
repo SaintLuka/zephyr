@@ -190,7 +190,7 @@ void restore_connections_one(AmrStorage::Item& cell,
             }
         }
         if (!found) {
-            std::cout << "Can't find neighbor through the " << side_to_string(Side(i % 6))
+            std::cout << "Can't find neighbor through the " << side_to_string(Side3D(i % 6))
                       << " face (" << i / 6 << ")\n";
             //amr::print_cell_info(locals, aliens, ic);
             throw std::runtime_error("Can't find neighbor");

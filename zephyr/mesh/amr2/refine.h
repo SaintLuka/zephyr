@@ -14,46 +14,53 @@
 namespace zephyr::mesh::amr2 {
 
 /// @brief Создать геометрию дочернх ячеек по родительской ячейке
-/// @param cube Родительская ячейка
-/// @return Массив с дочерними ячейками
+/// @param ic Позиция для размещения дочерних
+/// @param shape Родительская ячейка
 template <int dim>
-std::array<AmrCell, CpC(dim)> create_children(const SqCube& cube, bool axial);
+void create_children(index_t ic, SoaCell& cells, const SqMap<dim>& shape);
 
 /// @brief Создать геометрию дочерних ячеек по родительским вершинам (2D)
-/// @param cube Вершины родительской ячейки
-/// @return Массив с дочерними ячейками
+/// @param quad Вершины родительской ячейки
 template <>
-std::array<AmrCell, CpC(2)> create_children<2>(const SqCube& cube, bool axial) {
-    auto quads = cube.as2D().children();
-    return {AmrCell(quads[0], axial), AmrCell(quads[1], axial),
-            AmrCell(quads[2], axial), AmrCell(quads[3], axial)};
+inline void create_children<2>(index_t ic, SoaCell& cells, const SqQuad& quad) {
+    auto quads = quad.children();
+    cells.add_cell(ic + 0, quads[0], cells.axial);
+    cells.add_cell(ic + 1, quads[1], cells.axial);
+    cells.add_cell(ic + 2, quads[2], cells.axial);
+    cells.add_cell(ic + 3, quads[3], cells.axial);
 }
 
 /// @brief Создать геометрию дочернх ячеек по родительским вершинам (3D)
 /// @param cube Вершины родительской ячейки
-/// @return Массив с дочерними ячейками
 template <>
-std::array<AmrCell, CpC(3)> create_children<3>(const SqCube& cube, bool axial) {
+inline void create_children<3>(index_t ic, SoaCell& cells, const SqCube& cube) {
     auto cubes = cube.children();
-    return {
-            AmrCell(cubes[0]), AmrCell(cubes[1]), AmrCell(cubes[2]), AmrCell(cubes[3]),
-            AmrCell(cubes[4]), AmrCell(cubes[5]), AmrCell(cubes[6]), AmrCell(cubes[7])
-    };
+    cells.add_cell(ic + 0, cubes[0]);
+    cells.add_cell(ic + 1, cubes[1]);
+    cells.add_cell(ic + 2, cubes[2]);
+    cells.add_cell(ic + 3, cubes[3]);
+    cells.add_cell(ic + 4, cubes[4]);
+    cells.add_cell(ic + 5, cubes[5]);
+    cells.add_cell(ic + 6, cubes[6]);
+    cells.add_cell(ic + 7, cubes[7]);
 }
 
 /// @brief Связать грани соседних дочерних ячеек
-/// @param children Набор дочерних ячеек
-/// @param first_index Индекс первой ячейки
+/// @param ic Индекс первой ячейки
 /// Помним, что все дочерние ячейки будут располагаться последовательно,
-/// нумерация начнется с first_index.
+/// нумерация начнется с ic.
 template <int dim>
-void link_siblings(std::array<AmrCell, CpC(dim)>& children, int first_index);
+void link_siblings(index_t ic, SoaCell& cells);
 
-#define subs2D(i, j, x, y) (children[Quad::iss<i, j>()].faces[side_by_dir<x, y>()].adjacent.index = first_index + Quad::iss<i + 2 * x, j + 2 * y>())
-#define subs3D(i, j, k, x, y, z) (children[Cube::iss<i, j, k>()].faces[side_by_dir<x, y, z>()].adjacent.index = first_index + Cube::iss<i + 2 * x, j + 2 * y, k + 2 * z>())
+// OLD VERSION
+//#define subs2D(i, j, x, y) (children[Quad::iss<i, j>()].faces[side_by_dir<x, y>()].adjacent.index = first_index + Quad::iss<i + 2 * x, j + 2 * y>())
+//#define subs3D(i, j, k, x, y, z) (children[Cube::iss<i, j, k>()].faces[side_by_dir<x, y, z>()].adjacent.index = first_index + Cube::iss<i + 2 * x, j + 2 * y, k + 2 * z>())
+
+#define subs2D(i, j, x, y) (cells.faces.adjacent.local_index[cells.face_begin[ic] + Quad::iss<i, j>()] = ic + Quad::iss<i + 2 * x, j + 2 * y>())
+#define subs3D(i, j, k, x, y, z) (cells.faces.adjacent.local_index[cells.face_begin[ic] + Cube::iss<i, j, k>()] = ic + Cube::iss<i + 2 * x, j + 2 * y, k + 2 * z>())
 
 template <>
-void link_siblings<2>(std::array<AmrCell, CpC(2)>& children, int first_index) {
+inline void link_siblings<2>(index_t ic, SoaCell& cells) {
     subs2D(-1, -1, +1, 0);
     subs2D(-1, -1, 0, +1);
 
@@ -68,7 +75,7 @@ void link_siblings<2>(std::array<AmrCell, CpC(2)>& children, int first_index) {
 }
 
 template <>
-void link_siblings<3>(std::array<AmrCell, CpC(3)>& children, int first_index) {
+inline void link_siblings<3>(index_t ic, SoaCell& cells) {
     subs3D(-1, -1, -1, +1, 0, 0);
     subs3D(-1, -1, -1, 0, +1, 0);
     subs3D(-1, -1, -1, 0, 0, +1);
@@ -103,42 +110,42 @@ void link_siblings<3>(std::array<AmrCell, CpC(3)>& children, int first_index) {
 }
 
 template <int dim>
-void check_link(std::array<AmrCell, CpC(dim)>& children, AmrCell &parent) {
+void check_link(index_t ip, index_t main_child, SoaCell& cells) {
     // Проверяем, что внутренние ячейки связаны верно
-    for (int c1 = 0; c1 < CpC(dim); ++c1) {
-        auto& child1 = children[c1];
+    for (int i1 = 0; i1 < CpC(dim); ++i1) {
+        index_t c1 = main_child + i1;
 
         int count_sibs = 0;
         for (int side1 = 0; side1 < FpC(dim); ++side1) {
-            auto& face1 = child1.faces[side1];
+            index_t face1 = cells.face_begin[c1] + side1;
 
             // Грань наружу, пропускаем
-            if ((parent.center - child1.center).dot(face1.normal) < 0.0)
+            if ((cells.center[ip] - cells.center[c1]).dot(cells.faces.normal[face1]) < 0.0)
                 continue;
 
             ++count_sibs;
 
             // Локальный индекс брата
-            int c2 = face1.adjacent.index - parent.next;
+            int i2 = cells.faces.adjacent.local_index[face1] - main_child;
 
-            scrutiny_check(0 <= c1 && c1 < CpC(dim), "bro index in range [0, CpC(dim))")
-            scrutiny_check(c1 != c2, "bro index != my index")
+            scrutiny_check(0 <= i1 && i1 < CpC(dim), "bro index in range [0, CpC(dim))")
+            scrutiny_check(i1 != i2, "bro index != my index")
 
             // Обходим грани брата
-            auto& child2 = children[c2];
+            index_t c2 = main_child + i2;
 
             int side2 = 0;
             for (; side2 < FpC(dim); ++side2) {
-                auto &face2 = child2.faces[side2];
+                index_t face2 = cells.face_begin[c2] + side2;
 
-                if ((face1.center - face2.center).norm() < 1.0e-5 * parent.linear_size()) {
+                if ((cells.faces.center[face1] - cells.faces.center[face2]).norm() < 1.0e-5 * cells.linear_size(ip)) {
                     break;
                 }
             }
             // Нашли соответствующую грань, должен быть искомый
             scrutiny_check(side2 < FpC(dim), "not found bro")
-            int c3 = child2.faces[side2].adjacent.index - parent.next;
-            scrutiny_check(c1 == c3, "Bad link")
+            index_t i3 = cells.faces.adjacent.local_index[cells.face_begin[c2] + side2] - main_child;
+            scrutiny_check(i1 == i3, "Bad link")
         }
 
         // Число братьев через грань равно размерности
@@ -149,64 +156,75 @@ void check_link(std::array<AmrCell, CpC(dim)>& children, AmrCell &parent) {
     }
 }
 
-/// @brief Создать дочерние ячейки
-/// @param cell Родительская ячейка
-/// @param ic Индекс родительской ячейки
-/// @return Массив с дочерними ячейками, дочерние ячейки имеют законченный вид
+/// @brief Создать дочерние ячейки на выделенном месте по порядку
+/// @return Массив индексов дочерних ячеек, дочерние ячейки имеют законченный вид
 /// (необходимое число граней, правильную линковку (на старные ячейки))
 template<int dim>
-std::array<AmrCell, CpC(dim)> get_children(AmrCell &cell) {
+index_t make_children(index_t ip, SoaCell &cells) {
     const auto children_by_side = get_children_by_side<dim>();
 
-    auto children = create_children<dim>(cell.vertices, cell.axial);
+    auto& adj = cells.faces.adjacent;
+
+    index_t main_child = cells.next[ip];
+    index_t p_face = cells.face_begin[ip];
+
+    create_children<dim>(main_child, cells, cells.get_vertices<dim>(ip));
 
     for (int i = 0; i < CpC(dim); ++i) {
-        auto& child = children[i];
+        index_t ich = main_child + i;
 
-        child.rank  = cell.rank;
-        child.index = cell.next + i;
+        cells.rank[ich]  = cells.rank[ip];
+        cells.owner_index[ich] = ich;
 
-        child.next = cell.next + i;
-        child.flag = 0;
-        child.b_idx = cell.b_idx;
-        child.level = cell.level + 1;
-        child.z_idx = CpC(dim) * cell.z_idx + i;
+        cells.next[ich] = ich;
+        cells.flag[ich] = 0;
+        cells.b_idx[ich] = cells.b_idx[ip];
+        cells.level[ich] = cells.level[ip] + 1;
+        cells.z_idx[ich] = CpC(dim) * cells.z_idx[ip] + i;
 
         // По умолчанию дети ссылаются на родительскую ячейку
         // зачем этот код? Потом все изменяются
         for (int s = 0; s < FpC(dim); ++s) {
-            child.faces[s].adjacent.rank  = cell.rank;
-            child.faces[s].adjacent.index = cell.index;
-            child.faces[s].adjacent.alien = -1;
+            adj.rank[cells.face_begin[ich] + s]        = cells.rank[ip];
+            adj.owner_index[cells.face_begin[ich] + s] = cells.owner_index[ip];
+            adj.local_index[cells.face_begin[ich] + s] = cells.owner_index[ip];
         }
     }
 
     // Далее необходимо связать дочерние ячейки с соседями
     for (int side = 0; side < FpC(dim); ++side) {
         // Выставить граничный флаг
-        auto flag = cell.faces[side].boundary;
+        auto flag = cells.faces.boundary[p_face + side];
         for (int i: children_by_side[side]) {
-            children[i].faces[side].boundary = flag;
+            index_t ich = main_child + i;
+            cells.faces.boundary[cells.face_begin[ich] + side] = flag;
         }
 
-        if (cell.faces[side + 6].is_undefined()) {
+        if (cells.faces.is_undefined(p_face + side + 6)) {
             // Ячейка имела простую грань
-            auto adj = cell.faces[side].adjacent;
             for (int i: children_by_side[side]) {
-                children[i].faces[side].adjacent = adj;
+                index_t ich = main_child + i;
+                index_t ch_face = cells.face_begin[ich] + side;
+
+                adj.rank[ch_face]        = adj.rank[p_face + side];
+                adj.owner_index[ch_face] = adj.owner_index[p_face + side];
+                adj.local_index[ch_face] = adj.local_index[p_face + side];
             }
         } else {
             // Ячейка имела сложную грань
             for (int i: children_by_side[side]) {
-                BFace &child_face = children[i].faces[side];
-                auto child_fc = child_face.center;
+                index_t ich = main_child + i;
+                index_t ch_face = cells.face_begin[ich] + side;
+
+                auto child_fc = cells.faces.center[ch_face];
 
                 for (auto s: subface_sides<dim>(side)) {
-                    BFace& cell_face = cell.faces[s];
-                    auto cell_fc = cell_face.center;
+                    auto cell_fc = cells.faces.center[p_face];
 
-                    if ((child_fc - cell_fc).norm() < 1.0e-5 * cell.linear_size()) {
-                        child_face.adjacent = cell_face.adjacent;
+                    if ((child_fc - cell_fc).norm() < 1.0e-5 * cells.linear_size(ip)) {
+                        adj.rank[ch_face]        = adj.rank[p_face + side];
+                        adj.owner_index[ch_face] = adj.owner_index[p_face + side];
+                        adj.local_index[ch_face] = adj.local_index[p_face + side];
                         break;
                     }
                 }
@@ -215,13 +233,13 @@ std::array<AmrCell, CpC(dim)> get_children(AmrCell &cell) {
     }
 
     // Свяжем внутренние ячейки
-    link_siblings<dim>(children, cell.next);
+    link_siblings<dim>(main_child, cells);
 
 #if SCRUTINY
-    check_link<dim>(children, cell);
+    check_link<dim>(ip, main_child, cells);
 #endif
 
-    return children;
+    return main_child;
 }
 
 /// @brief Возвращает итераторы дочерних ячеек
@@ -259,66 +277,63 @@ Children select_children<3>(
 
 /// @brief Производит разбиение ячейки, дочерние ячейки помещает в AmrStorage
 /// @param parent Родительская ячейка в хранилище
-/// @param locals Хранилище ячеек
+/// @param cells Хранилище ячеек
 /// @param op Оператор разделения данных
 /// @details Дочерние ячейки правильно ссылаются друг на друга, на гранях
 /// adjacent указан на старые ячейки.
 template<int dim>
-void refine_cell(AmrStorage::Item& parent, AmrStorage &locals, AmrStorage &aliens, int rank, const Distributor& op) {
-    auto children = get_children<dim>(parent);
+void refine_cell(index_t ip, SoaCell &cells, int rank, const Distributor& op) {
+    auto main_child = make_children<dim>(ip, cells);
+
+    auto& adj = cells.faces.adjacent;
 
     for (int i = 0; i < CpC(dim); ++i) {
 #if SCRUTINY
-        if (parent.next + i < 0 || parent.next + i >= locals.size()) {
+        if (main_child + i < 0 || main_child + i >= cells.n_cells()) {
             throw std::runtime_error("[parent.next + i] out of range (refine_cell)");
         }
 #endif
-
-        AmrCell& child = locals[parent.next + i];
-
-        // Возможна оптимизация (!), создавать дочерние ячейки сразу
-        // на нужном месте в хранилище
-        locals[parent.next + i] = children[i];
+        index_t ich = main_child + i;
 
         for (int s = 0; s < FpC(dim); ++s) {
-            BFace &f1 = child.faces[s];
-            if (f1.is_undefined() or f1.is_boundary()) {
+            index_t iface = cells.face_begin[ich] + s;
+            if (cells.faces.is_undefined(iface) or
+                cells.faces.is_boundary(iface)) {
                 continue;
             }
 
-            auto adj = f1.adjacent;
             int nei_wanted_lvl = 0;
-            if (adj.rank == rank) {
+            if (adj.rank[iface] == rank) {
                 // Локальная ячейка
 #if SCRUTINY
-                if (adj.index < 0 || adj.index >= locals.size()) {
+                if (adj.local_index[iface] < 0 || adj.local_index[iface] >= cells.n_cells()) {
                     throw std::runtime_error("adjacent.index out of range (refine_cell)");
                 }
 #endif
-                auto& neib = locals[adj.index];
-                nei_wanted_lvl = neib.level + neib.flag;
+                index_t neib_idx = adj.local_index[iface];
+                nei_wanted_lvl = cells.level[neib_idx] + cells.flag[neib_idx];
             }
             else {
                 // Удаленная ячейка
 #if SCRUTINY
-                if (adj.alien < 0 || adj.alien >= aliens.size()) {
+                if (adj.owner_index[iface] < 0 || adj.local_index[iface] >= cells.n_cells()) {
                     throw std::runtime_error("adjacent.alien out of range (refine_cell)");
                 }
 #endif
-                auto& neib = aliens[adj.alien];
-                nei_wanted_lvl = neib.level + neib.flag;
+                index_t neib_idx = adj.local_index[iface];
+                nei_wanted_lvl = cells.level[neib_idx] + cells.flag[neib_idx];
             }
 
-            if (nei_wanted_lvl > child.level) {
-                split_face<dim>(child, Side(s));
+            if (nei_wanted_lvl > cells.level[ich]) {
+                split_face<dim>(iface, cells.faces, cells.get_vertices<dim>(ich), s, cells.axial);
             }
         }
     }
 
-    auto children2 = select_children<dim>(locals, children);
-    op.split(parent, children2);
+    //auto children2 = select_children<dim>(cells, children);
+    //op.split(parent, children2);
 
-    parent.set_undefined();
+    cells.set_undefined(ip);
 }
 
 } // namespace zephyr::mesh::amr2

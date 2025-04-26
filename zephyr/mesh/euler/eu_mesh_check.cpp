@@ -1,6 +1,6 @@
 #include <zephyr/utils/mpi.h>
 
-#include <zephyr/mesh/primitives/side.h>
+#include <zephyr/mesh/primitives/Side3D.h>
 #include <zephyr/mesh/primitives/amr_cell.h>
 #include <zephyr/mesh/primitives/bfaces.h>
 #include <zephyr/mesh/primitives/decomposition.h>

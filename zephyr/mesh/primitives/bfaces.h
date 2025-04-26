@@ -1,7 +1,7 @@
 #pragma once
 
 #include <zephyr/geom/cell_type.h>
-#include <zephyr/mesh/primitives/side.h>
+#include <zephyr/mesh/primitives/Side3D.h>
 #include <zephyr/mesh/primitives/bface.h>
 
 namespace zephyr::mesh {

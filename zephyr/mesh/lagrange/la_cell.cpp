@@ -1,4 +1,4 @@
-#include <zephyr/mesh/primitives/side.h>
+#include <zephyr/mesh/primitives/Side3D.h>
 #include <zephyr/mesh/primitives/mov_cell.h>
 #include <zephyr/mesh/lagrange/la_cell.h>
 

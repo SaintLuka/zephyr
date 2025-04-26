@@ -373,12 +373,12 @@ Grid Cuboid::make() {
 
         auto ordinary = Boundary::ORDINARY;
 
-        g_cell.faces[Side::L].boundary = i > 0 ? ordinary : m_bounds.left;
-        g_cell.faces[Side::R].boundary = i < m_nx - 1 ? ordinary : m_bounds.right;
-        g_cell.faces[Side::B].boundary = j > 0 ? ordinary : m_bounds.bottom;
-        g_cell.faces[Side::T].boundary = j < m_ny - 1 ? ordinary : m_bounds.top;
-        g_cell.faces[Side::X].boundary = k > 0 ? ordinary : m_bounds.back;
-        g_cell.faces[Side::F].boundary = k < m_nz - 1 ? ordinary : m_bounds.front;
+        g_cell.faces[Side3D::L].boundary = i > 0 ? ordinary : m_bounds.left;
+        g_cell.faces[Side3D::R].boundary = i < m_nx - 1 ? ordinary : m_bounds.right;
+        g_cell.faces[Side3D::B].boundary = j > 0 ? ordinary : m_bounds.bottom;
+        g_cell.faces[Side3D::T].boundary = j < m_ny - 1 ? ordinary : m_bounds.top;
+        g_cell.faces[Side3D::X].boundary = k > 0 ? ordinary : m_bounds.back;
+        g_cell.faces[Side3D::F].boundary = k < m_nz - 1 ? ordinary : m_bounds.front;
 
         cells[n].geom() = g_cell;
     }

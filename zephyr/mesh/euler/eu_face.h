@@ -16,7 +16,7 @@ public:
 
     /// @brief Изолированная грань на стороне side,
     /// не позволяет обходить грани
-    EuFace(const EuCell &cell, Side side);
+    EuFace(const EuCell &cell, Side3D side);
 
     /// @brief Ячейка по внешней нормали, на границе сетки возвращается
     /// сама ячейка

@@ -5,19 +5,19 @@ namespace zephyr::mesh {
 BFaces::BFaces(CellType ctype, int count) {
     switch (ctype) {
         case CellType::AMR2D:
-            m_faces[Side::L].vertices = face_indices::sf<2, Side::L>();
-            m_faces[Side::R].vertices = face_indices::sf<2, Side::R>();
-            m_faces[Side::B].vertices = face_indices::sf<2, Side::B>();
-            m_faces[Side::T].vertices = face_indices::sf<2, Side::T>();
+            m_faces[Side3D::L].vertices = face_indices::sf<2, Side3D::L>();
+            m_faces[Side3D::R].vertices = face_indices::sf<2, Side3D::R>();
+            m_faces[Side3D::B].vertices = face_indices::sf<2, Side3D::B>();
+            m_faces[Side3D::T].vertices = face_indices::sf<2, Side3D::T>();
             break;
 
         case CellType::AMR3D:
-            m_faces[Side::L].vertices = face_indices::sf<3, Side::L>();
-            m_faces[Side::R].vertices = face_indices::sf<3, Side::R>();
-            m_faces[Side::B].vertices = face_indices::sf<3, Side::B>();
-            m_faces[Side::T].vertices = face_indices::sf<3, Side::T>();
-            m_faces[Side::X].vertices = face_indices::sf<3, Side::X>();
-            m_faces[Side::F].vertices = face_indices::sf<3, Side::F>();
+            m_faces[Side3D::L].vertices = face_indices::sf<3, Side3D::L>();
+            m_faces[Side3D::R].vertices = face_indices::sf<3, Side3D::R>();
+            m_faces[Side3D::B].vertices = face_indices::sf<3, Side3D::B>();
+            m_faces[Side3D::T].vertices = face_indices::sf<3, Side3D::T>();
+            m_faces[Side3D::X].vertices = face_indices::sf<3, Side3D::X>();
+            m_faces[Side3D::F].vertices = face_indices::sf<3, Side3D::F>();
             break;
 
         case CellType::TRIANGLE:

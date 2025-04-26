@@ -310,7 +310,7 @@ void refine_cell(AmrStorage::Item& parent, AmrStorage &locals, AmrStorage &alien
             }
 
             if (nei_wanted_lvl > child.level) {
-                split_face<dim>(child, Side(s));
+                split_face<dim>(child, Side3D(s));
             }
         }
     }

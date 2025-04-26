@@ -100,7 +100,7 @@ void retain_cell(AmrCell& cell, AmrStorage &locals, AmrStorage& aliens) {
                 for (int s: sides) {
                     cell.faces[s].adjacent = adj;
                 }
-                merge_faces<dim>(cell, Side(side));
+                merge_faces<dim>(cell, Side3D(side));
             }
 
             // Сосед ничего не делает - ничего не делаем

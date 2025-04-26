@@ -33,11 +33,11 @@ struct PartStatistics {
     }
 };
 
-inline PartStatistics cell_statistics(AmrStorage::Item& cell) {
-    if (!cell.flag) {
+inline PartStatistics cell_statistics(int flag) {
+    if (!flag) {
         return {.n_retain=1};
     } else {
-        if (cell.flag > 0) {
+        if (flag > 0) {
             return {.n_refine=1};
         } else {
             return {.n_coarse=1};
@@ -67,26 +67,24 @@ struct Statistics {
     /// @brief Конструктор, однопоточный сбор статистики
     /// @details В многопоточном режиме данные получаются после объединения 
     /// статистики с разных потоков
-    explicit Statistics(AmrStorage &cells) {
-        n_cells = cells.size();
+    explicit Statistics(SoaCell &cells) {
+        n_cells = cells.n_locals();
 
         scrutiny_check(n_cells >= 0, "Empty AmrStorage statistics");
 
         PartStatistics ps = threads::sum(
-                cells.begin(), cells.end(), {}, cell_statistics);
+                cells.flag.cbegin(), cells.flag.cend(), {}, cell_statistics);
 
         n_coarse = ps.n_coarse;
         n_retain = ps.n_retain;
         n_refine = ps.n_refine;
 
         // Пересчитаем завимисые величины
-        int dim = cells[0].dim;
-
-        scrutiny_check(n_coarse % CpC(dim) == 0, "Refiner::apply() error #2")
+        scrutiny_check(n_coarse % CpC(cells.dim) == 0, "Refiner::apply() error #2")
         scrutiny_check(n_retain + n_refine + n_coarse == n_cells, "Refiner::apply() error #1");
 
-        n_parents =  n_coarse / CpC(dim);
-        n_children = n_refine * CpC(dim);
+        n_parents =  n_coarse / CpC(cells.dim);
+        n_children = n_refine * CpC(cells.dim);
 
         n_cells_large = n_cells + n_parents + n_children;
         n_cells_short = n_retain + n_children + n_parents;

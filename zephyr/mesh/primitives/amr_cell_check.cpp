@@ -4,7 +4,7 @@
 #include <iomanip>
 
 #include <zephyr/geom/primitives/cube.h>
-#include <zephyr/mesh/primitives/side.h>
+#include <zephyr/mesh/primitives/Side3D.h>
 #include <zephyr/mesh/primitives/decomposition.h>
 #include <zephyr/mesh/primitives/amr_cell.h>
 
@@ -188,10 +188,10 @@ int AmrCell::check_geometry() const {
 
 int AmrCell::check_base_face_orientation() const {
     if (dim == 2) {
-        Vector3d nx1 = faces[Side::L].normal;
-        Vector3d nx2 = faces[Side::R].normal;
-        Vector3d ny1 = faces[Side::B].normal;
-        Vector3d ny2 = faces[Side::T].normal;
+        Vector3d nx1 = faces[Side3D::L].normal;
+        Vector3d nx2 = faces[Side3D::R].normal;
+        Vector3d ny1 = faces[Side3D::B].normal;
+        Vector3d ny2 = faces[Side3D::T].normal;
 
         if (nx1.dot(nx2) > -0.8) {
             std::cout << "\tOpposite outward normals (left-right) are co-directed\n";
@@ -214,12 +214,12 @@ int AmrCell::check_base_face_orientation() const {
             return -1;
         }
     } else {
-        Vector3d nx1 = faces[Side::L].normal;
-        Vector3d nx2 = faces[Side::R].normal;
-        Vector3d ny1 = faces[Side::B].normal;
-        Vector3d ny2 = faces[Side::T].normal;
-        Vector3d nz1 = faces[Side::X].normal;
-        Vector3d nz2 = faces[Side::F].normal;
+        Vector3d nx1 = faces[Side3D::L].normal;
+        Vector3d nx2 = faces[Side3D::R].normal;
+        Vector3d ny1 = faces[Side3D::B].normal;
+        Vector3d ny2 = faces[Side3D::T].normal;
+        Vector3d nz1 = faces[Side3D::X].normal;
+        Vector3d nz2 = faces[Side3D::F].normal;
 
         if (nx1.dot(nx2) > -0.8) {
             std::cout << "\tOpposite outward normals (left-right) are co-directed\n";
@@ -260,7 +260,7 @@ int AmrCell::check_base_vertices_order() const {
         bool bad = false;
 
         // Индекс пересечения двух граней
-        auto cross_face = [](const BFaces& faces, Side side1, Side side2) -> int {
+        auto cross_face = [](const BFaces& faces, Side3D side1, Side3D side2) -> int {
             auto& face1 = faces[side1];
             auto& face2 = faces[side2];
             if (face1.is_undefined()) {
@@ -299,21 +299,21 @@ int AmrCell::check_base_vertices_order() const {
         }
 
         // Пересечения граней по нужным вершинам
-        if (cross_face(faces, Side::LEFT0, Side::BOTTOM0) != SqQuad::iss<-1, -1>()) {
+        if (cross_face(faces, Side3D::LEFT[0], Side3D::BOTTOM[0]) != SqQuad::iss<-1, -1>()) {
             bad = true;
         }
-        if (cross_face(faces, Side::LEFT0, Side::TOP) != SqQuad::iss<-1, +1>() &&
-            cross_face(faces, Side::LEFT1, Side::TOP) != SqQuad::iss<-1, +1>()) {
+        if (cross_face(faces, Side3D::LEFT[0], Side3D::TOP) != SqQuad::iss<-1, +1>() &&
+            cross_face(faces, Side3D::LEFT[1], Side3D::TOP) != SqQuad::iss<-1, +1>()) {
             bad = true;
         }
-        if (cross_face(faces, Side::RIGHT, Side::BOTTOM0) != SqQuad::iss<+1, -1>() &&
-            cross_face(faces, Side::RIGHT, Side::BOTTOM1) != SqQuad::iss<+1, -1>()) {
+        if (cross_face(faces, Side3D::RIGHT, Side3D::BOTTOM[0]) != SqQuad::iss<+1, -1>() &&
+            cross_face(faces, Side3D::RIGHT, Side3D::BOTTOM[1]) != SqQuad::iss<+1, -1>()) {
             bad = true;
         }
-        if (cross_face(faces, Side::RIGHT0, Side::TOP0) != SqQuad::iss<+1, +1>() &&
-            cross_face(faces, Side::RIGHT0, Side::TOP1) != SqQuad::iss<+1, +1>() &&
-            cross_face(faces, Side::RIGHT1, Side::TOP0) != SqQuad::iss<+1, +1>() &&
-            cross_face(faces, Side::RIGHT1, Side::TOP1) != SqQuad::iss<+1, +1>()) {
+        if (cross_face(faces, Side3D::RIGHT[0], Side3D::TOP[0]) != SqQuad::iss<+1, +1>() &&
+            cross_face(faces, Side3D::RIGHT[0], Side3D::TOP[1]) != SqQuad::iss<+1, +1>() &&
+            cross_face(faces, Side3D::RIGHT[1], Side3D::TOP[0]) != SqQuad::iss<+1, +1>() &&
+            cross_face(faces, Side3D::RIGHT[1], Side3D::TOP[1]) != SqQuad::iss<+1, +1>()) {
             bad = true;
         }
 
@@ -331,7 +331,7 @@ int AmrCell::check_base_vertices_order() const {
         bool bad = false;
 
         // Индекс пересечения трех граней
-        auto cross_face = [](const BFaces& faces, Side side1, Side side2, Side side3) -> int {
+        auto cross_face = [](const BFaces& faces, Side3D side1, Side3D side2, Side3D side3) -> int {
             auto& face1 = faces[side1];
             auto& face2 = faces[side2];
             auto& face3 = faces[side3];

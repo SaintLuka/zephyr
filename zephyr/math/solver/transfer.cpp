@@ -674,7 +674,7 @@ void Transfer::update_WENO(EuMesh& mesh, Direction dir) {
 
             // LEFT
             if (dir == Direction::X || dir == Direction::ANY) {
-                auto face = cell.face(Side::L);
+                auto face = cell.face(Side3D::L);
                 auto neib = face.neib();
                 double vn = velocity(face.center()).dot(face.normal());
 
@@ -700,7 +700,7 @@ void Transfer::update_WENO(EuMesh& mesh, Direction dir) {
 
             // RIGHT
             if (dir == Direction::X || dir == Direction::ANY) {
-                auto face = cell.face(Side::R);
+                auto face = cell.face(Side3D::R);
                 auto neib = face.neib();
                 double vn = velocity(face.center()).dot(face.normal());
 
@@ -727,7 +727,7 @@ void Transfer::update_WENO(EuMesh& mesh, Direction dir) {
 
             // BOTTOM
             if (dir == Direction::Y || dir == Direction::ANY) {
-                auto face = cell.face(Side::B);
+                auto face = cell.face(Side3D::B);
                 auto neib = face.neib();
                 double vn = velocity(face.center()).dot(face.normal());
 
@@ -754,7 +754,7 @@ void Transfer::update_WENO(EuMesh& mesh, Direction dir) {
 
             // TOP
             if (dir == Direction::Y || dir == Direction::ANY) {
-                auto face = cell.face(Side::T);
+                auto face = cell.face(Side3D::T);
                 auto neib = face.neib();
                 double vn = velocity(face.center()).dot(face.normal());
 

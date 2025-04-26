@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <zephyr/mesh/primitives/side.h>
+#include <zephyr/mesh/primitives/Side3D.h>
 #include <zephyr/mesh/primitives/amr_cell.h>
 #include <zephyr/mesh/amr/common.h>
 
@@ -28,12 +28,12 @@ void split_face_prepare(BFaces& faces) {
 /// @brief Устанавливает на новых подгранях индексы вершин.
 template <int dim, int side>
 void split_face_indices(BFaces& faces) {
-    faces[side].vertices = face_indices::cf<dim, Side(side)>();
-    faces[side + 6].vertices = face_indices::cf<dim, Side(side + 6)>();
+    faces[side].vertices = face_indices::cf<dim, Side3D(side)>();
+    faces[side + 6].vertices = face_indices::cf<dim, Side3D(side + 6)>();
 
     if (dim > 2) {
-        faces[side + 12].vertices = face_indices::cf<dim, Side(side + 12)>();
-        faces[side + 18].vertices = face_indices::cf<dim, Side(side + 18)>();
+        faces[side + 12].vertices = face_indices::cf<dim, Side3D(side + 12)>();
+        faces[side + 18].vertices = face_indices::cf<dim, Side3D(side + 18)>();
     }
 }
 
@@ -118,17 +118,17 @@ void split_face(BFaces& faces, SqCube& vertices, int side, bool axial);
 template <>
 void split_face<2>(BFaces& faces, SqCube& vertices, int side, bool axial) {
     switch (side) {
-        case Side::LEFT:
-            split_face<2, Side::L>(faces, vertices, axial);
+        case Side3D::LEFT:
+            split_face<2, Side3D::L>(faces, vertices, axial);
             break;
-        case Side::RIGHT:
-            split_face<2, Side::R>(faces, vertices, axial);
+        case Side3D::RIGHT:
+            split_face<2, Side3D::R>(faces, vertices, axial);
             break;
-        case Side::BOTTOM:
-            split_face<2, Side::B>(faces, vertices, axial);
+        case Side3D::BOTTOM:
+            split_face<2, Side3D::B>(faces, vertices, axial);
             break;
         default:
-            split_face<2, Side::T>(faces, vertices, axial);
+            split_face<2, Side3D::T>(faces, vertices, axial);
             break;
     }
 }
@@ -136,23 +136,23 @@ void split_face<2>(BFaces& faces, SqCube& vertices, int side, bool axial) {
 template <>
 void split_face<3>(BFaces& faces, SqCube& vertices, int side, bool axial) {
     switch (side) {
-        case Side::LEFT:
-            split_face<3, Side::L>(faces, vertices);
+        case Side3D::LEFT:
+            split_face<3, Side3D::L>(faces, vertices);
             break;
-        case Side::RIGHT:
-            split_face<3, Side::R>(faces, vertices);
+        case Side3D::RIGHT:
+            split_face<3, Side3D::R>(faces, vertices);
             break;
-        case Side::BOTTOM:
-            split_face<3, Side::B>(faces, vertices);
+        case Side3D::BOTTOM:
+            split_face<3, Side3D::B>(faces, vertices);
             break;
-        case Side::TOP:
-            split_face<3, Side::T>(faces, vertices);
+        case Side3D::TOP:
+            split_face<3, Side3D::T>(faces, vertices);
             break;
-        case Side::BACK:
-            split_face<3, Side::X>(faces, vertices);
+        case Side3D::BACK:
+            split_face<3, Side3D::X>(faces, vertices);
             break;
         default:
-            split_face<3, Side::F>(faces, vertices);
+            split_face<3, Side3D::F>(faces, vertices);
             break;
     }
 }
@@ -165,7 +165,7 @@ void split_face(AmrCell& cell, int side) {
 }
 
 /// @brief Объединяет подграни в одну грань на стороне side
-template<int dim, Side side>
+template<int dim, int side>
 void merge_faces(AmrCell& cell) {
     auto &faces = cell.faces;
     auto &vertices = cell.vertices;
@@ -184,46 +184,46 @@ void merge_faces(AmrCell& cell) {
 
 /// @brief Объединяет подграни в одну грань на стороне side
 template<int dim>
-void merge_faces(AmrCell& cell, Side side);
+void merge_faces(AmrCell& cell, Side3D side);
 
 template<>
-void merge_faces<2>(AmrCell& cell, Side side) {
+void merge_faces<2>(AmrCell& cell, Side3D side) {
     switch (side) {
-        case Side::LEFT:
-            merge_faces<2, Side::L>(cell);
+        case Side3D::LEFT:
+            merge_faces<2, Side3D::L>(cell);
             break;
-        case Side::RIGHT:
-            merge_faces<2, Side::R>(cell);
+        case Side3D::RIGHT:
+            merge_faces<2, Side3D::R>(cell);
             break;
-        case Side::BOTTOM:
-            merge_faces<2, Side::B>(cell);
+        case Side3D::BOTTOM:
+            merge_faces<2, Side3D::B>(cell);
             break;
         default:
-            merge_faces<2, Side::T>(cell);
+            merge_faces<2, Side3D::T>(cell);
             break;
     }
 }
 
 template<>
-void merge_faces<3>(AmrCell& cell, Side side) {
+void merge_faces<3>(AmrCell& cell, Side3D side) {
     switch (side) {
-        case Side::LEFT:
-            merge_faces<3, Side::L>(cell);
+        case Side3D::LEFT:
+            merge_faces<3, Side3D::L>(cell);
             break;
-        case Side::RIGHT:
-            merge_faces<3, Side::R>(cell);
+        case Side3D::RIGHT:
+            merge_faces<3, Side3D::R>(cell);
             break;
-        case Side::BOTTOM:
-            merge_faces<3, Side::B>(cell);
+        case Side3D::BOTTOM:
+            merge_faces<3, Side3D::B>(cell);
             break;
-        case Side::TOP:
-            merge_faces<3, Side::T>(cell);
+        case Side3D::TOP:
+            merge_faces<3, Side3D::T>(cell);
             break;
-        case Side::BACK:
-            merge_faces<3, Side::X>(cell);
+        case Side3D::BACK:
+            merge_faces<3, Side3D::X>(cell);
             break;
         default:
-            merge_faces<3, Side::F>(cell);
+            merge_faces<3, Side3D::F>(cell);
             break;
     }
 }

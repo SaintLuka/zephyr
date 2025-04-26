@@ -55,16 +55,16 @@ void test_1D(TestFunc test) {
     // Установить начальные данные (средние величины в ячейках)
     for (int i = 0; i < cells.nx(); ++i) {
         auto cell = cells[i];
-        double x1 = cell.face(Side::L).x();
-        double x2 = cell.face(Side::R).x();
+        double x1 = cell.face(Side3D::L).x();
+        double x2 = cell.face(Side3D::R).x();
         cell(U).u = (test.integral(x2) - test.integral(x1)) / (x2 - x1);
     }
 
     // Посчитаем численную производную
     for (int i = 0; i < cells.nx(); ++i) {
         auto cell = cells[i];
-        auto neib_r = cell.face(Side::R).neib();
-        auto neib_l = cell.face(Side::L).neib();
+        auto neib_r = cell.face(Side3D::R).neib();
+        auto neib_l = cell.face(Side3D::L).neib();
         cell(U).du_dx = (neib_r(U).u - neib_l(U).u) / (neib_r.center().x() - neib_l.center().x());
     }
 
@@ -78,11 +78,11 @@ void test_1D(TestFunc test) {
 
     for (int i = 0; i < cells.nx(); ++i) {
         auto cell = cells[i];
-        auto neib_r = cell.face(Side::R).neib();
-        auto neib_l = cell.face(Side::L).neib();
+        auto neib_r = cell.face(Side3D::R).neib();
+        auto neib_l = cell.face(Side3D::L).neib();
 
-        double x1 = cell.face(Side::L).x();
-        double x2 = cell.face(Side::R).x();
+        double x1 = cell.face(Side3D::L).x();
+        double x2 = cell.face(Side3D::R).x();
 
         // Для внутренней реконструкции
         int M = 20;

@@ -147,6 +147,54 @@ Variable::Variable(const char* name)
             }
         };
     }
+    else if (!std::strcmp(name, "face2D.rank") || !std::strcmp(name, "face3D.rank")) {
+        m_type = VtkType::Int8;
+        int n_faces = !std::strcmp(name, "face2D.rank") ? 8 : 24;
+        m_n_components = n_faces;
+
+        m_soa_func = [n_faces](QCell& cell, void *arg) {
+            auto out = (int8_t *) arg;
+            for (int i = 0; i < n_faces; ++i) {
+                out[i] = cell.face(i).neib_rank();
+            }
+        };
+    }
+    else if (!std::strcmp(name, "face2D.loc_idx") || !std::strcmp(name, "face3D.loc_idx")) {
+        m_type = VtkType::Int32;
+        int n_faces = !std::strcmp(name, "face2D.loc_idx") ? 8 : 24;
+        m_n_components = n_faces;
+
+        m_soa_func = [n_faces](QCell& cell, void *arg) {
+            auto out = (int32_t *) arg;
+            for (int i = 0; i < n_faces; ++i) {
+                out[i] = cell.face(i).neib_index();
+            }
+        };
+    }
+    else if (!std::strcmp(name, "face2D.own_idx") || !std::strcmp(name, "face3D.own_idx")) {
+        m_type = VtkType::Int32;
+        int n_faces = !std::strcmp(name, "face2D.own_idx") ? 8 : 24;
+        m_n_components = n_faces;
+
+        m_soa_func = [n_faces](QCell& cell, void *arg) {
+            auto out = (int32_t *) arg;
+            for (int i = 0; i < n_faces; ++i) {
+                out[i] = cell.face(i).neib_owner_index();
+            }
+        };
+    }
+    else if (!std::strcmp(name, "face2D.boundary") || !std::strcmp(name, "face3D.boundary")) {
+        m_type = VtkType::Int8;
+        int n_faces = !std::strcmp(name, "face2D.boundary") ? 8 : 24;
+        m_n_components = n_faces;
+
+        m_soa_func = [n_faces](QCell& cell, void *arg) {
+            auto out = (int8_t *) arg;
+            for (int i = 0; i < n_faces; ++i) {
+                out[i] = (int8_t) cell.face(i).flag();
+            }
+        };
+    }
     else if (!std::strcmp(name, "coords") || !std::strcmp(name, "center")) {
         m_type = VtkType::Float32;
         m_n_components = 3;
@@ -156,6 +204,12 @@ Variable::Variable(const char* name)
             out[0] = float(cell.center.x());
             out[1] = float(cell.center.y());
             out[2] = float(cell.center.z());
+        };
+        m_soa_func = [](QCell& cell, void *arg) {
+            auto out = (float *) arg;
+            out[0] = float(cell.center().x());
+            out[1] = float(cell.center().y());
+            out[2] = float(cell.center().z());
         };
     }
     else {

@@ -17,19 +17,19 @@ namespace zephyr::mesh::amr2 {
 /// находятся на том же процессе, имеют такой же уровень адаптации как и
 /// ячейка, а также флаг адаптации -1.
 /// @param item Целевой элемент хранилища (из locals)
-/// @param locals Локальное хранилище ячеек
+/// @param cells Локальное хранилище ячеек
 /// @param max_level Максимальный уровень адаптации
 template<int dim>
-void base_restriction(AmrStorage::Item& cell, AmrStorage &locals, int max_level) {
-    scrutiny_check(cell.index < locals.size(), "base_restrictions: ic >= cells.size()")
+void base_restriction(index_t ic, SoaCell &cells, int max_level) {
+    scrutiny_check(ic < cells.n_locals(), "base_restrictions: ic >= cells.size()")
 
-    int flag = cell.flag;
+    int flag = cells.flag[ic];
     // Приводим к одному из трех значений { -1, 0, 1 }
     if (flag != 0) {
         flag = flag > 0 ? 1 : -1;
     }
 
-    int lvl = cell.level;
+    int lvl = cells.level[ic];
 
     if (lvl + flag < 0) {
         flag = 0;
@@ -40,33 +40,31 @@ void base_restriction(AmrStorage::Item& cell, AmrStorage &locals, int max_level)
     }
 
     if (flag < 0) {
-        if (!can_coarse<dim>(cell, locals)) {
+        if (!can_coarse<dim>(cells, ic)) {
             flag = 0;
         }
     }
 
-    cell.flag = flag;
+    cells.flag[ic] = flag;
 }
 
 /// @brief Выполняет функцию base_restriction для всех ячеек хранилища
-/// @param locals Хранилище ячеек
+/// @param cells Хранилище ячеек
 /// @param max_level Максимальный уровень адаптации
 template <int dim>
-void base_restrictions(AmrStorage &locals, int max_level) {
-    threads::for_each(
-            locals.begin(), locals.end(),
-            base_restriction<dim>, std::ref(locals), max_level);
+void base_restrictions(SoaCell &cells, int max_level) {
+    utils::range<index_t> range(cells.n_locals());
+    threads::for_each( range.begin(), range.end(),
+            base_restriction<dim>, std::ref(cells), max_level);
 }
 
 /// @brief Проверка соблюдения баланса флагов смежных ячеек.
 /// Уровни смежных ячеек после адаптации не должны отличаться не более,
 /// чем на один уровень.
 /// Функция вызывается только при включенной тщательной проверке.
-void check_flags(AmrStorage& locals, AmrStorage& aliens, int max_level) {
-    for(auto it = locals.begin(); it < locals.end(); ++it) {
-        auto& cell = *it;
-
-        int cell_wanted_lvl = cell.level + cell.flag;
+void check_flags(SoaCell& cells, int max_level) {
+    for (index_t ic = 0; ic < cells.n_locals(); ++ic) {
+        int cell_wanted_lvl = cells.level[ic] + cells.flag[ic];
 
         if (cell_wanted_lvl < 0 || cell_wanted_lvl > max_level) {
             std::string message = "Wanted level (" + std::to_string(cell_wanted_lvl) + ") "
@@ -75,31 +73,30 @@ void check_flags(AmrStorage& locals, AmrStorage& aliens, int max_level) {
             throw std::runtime_error(message);
         }
 
-        for (auto &face: cell.faces) {
-            if (face.is_undefined() || face.is_boundary()) {
+        for (auto iface: cells.faces_range(ic)) {
+            if (cells.faces.is_undefined(iface) ||
+                cells.faces.is_boundary(iface)) {
                 continue;
             }
 
-            auto &adj = face.adjacent;
+            index_t jc = cells.faces.adjacent.local_index[iface];
 
-            auto& neib = adj.rank == cell.rank ? locals[adj.index] : aliens[adj.alien];
-
-            int neib_wanted_lvl = neib.level + neib.flag;
+            int neib_wanted_lvl = cells.level[jc] + cells.flag[jc];
             if (std::abs(cell_wanted_lvl - neib_wanted_lvl) > 1) {
                 std::string message = "Adaptation flag balance is broken.";
                 std::cerr << message << "\n";
                 std::cout << "cell:\n";
-                cell.print_info();
+                cells.print_info(ic);
                 std::cout << "neib:\n";
-                neib.print_info();
+                cells.print_info(jc);
                 throw std::runtime_error(message);
             }
         }
 
-        if (cell.flag < 0) {
-            bool can = cell.dim < 3 ?
-                       can_coarse<2>(locals, it - locals.begin()) :
-                       can_coarse<3>(locals, it - locals.begin());
+        if (cells.flag[ic] < 0) {
+            bool can = cells.dim < 3 ?
+                       can_coarse<2>(cells, ic) :
+                       can_coarse<3>(cells, ic);
 
             if (!can) {
                 std::string message = "Not all siblings want to coarse.";

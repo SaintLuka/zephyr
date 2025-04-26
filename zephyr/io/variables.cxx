@@ -50,6 +50,20 @@ void Variables::append(const char* name) {
         m_list.emplace_back("face.index");
         m_list.emplace_back("face.boundary");
     }
+    else if (!std::strcmp(name, "faces2D")) {
+        // Для SoaMesh
+        m_list.emplace_back("face2D.rank");
+        m_list.emplace_back("face2D.loc_idx");
+        m_list.emplace_back("face2D.own_idx");
+        m_list.emplace_back("face2D.boundary");
+    }
+    else if (!std::strcmp(name, "faces3D")) {
+        // Для SoaMesh
+        m_list.emplace_back("face3D.rank");
+        m_list.emplace_back("face3D.loc_idx");
+        m_list.emplace_back("face3D.own_idx");
+        m_list.emplace_back("face3D.boundary");
+    }
     else {
         m_list.emplace_back(name);
     }

@@ -13,7 +13,7 @@ namespace zephyr::mesh::amr2 {
 
 /// @brief Восстанавливает связи у одной ячейки
 /// @param cell Целевая ячейка
-/// @param locals Локальные ячейки
+/// @param cells Локальные ячейки
 /// @param aliens Удаленные ячейки
 /// @param rank Ранг процесса
 /// @param count Статистика адаптации
@@ -34,72 +34,70 @@ namespace zephyr::mesh::amr2 {
 /// Грани через процессы остаются без изменений. Линковка граней между процессами
 /// происходит на последнем этапе алгоритма адапатции.
 template<int dim>
-void restore_connections_one(AmrStorage::Item& cell,
-        AmrStorage &locals, AmrStorage &aliens,
-        int rank, const Statistics &count) {
+void restore_connections_one(index_t ic, SoaCell& cells, int rank, const Statistics &count) {
 
     // Ячейка неактуальна, пропускаем
-    if (cell.is_undefined()) {
+    if (cells.is_undefined(ic)) {
         return;
     }
 
-    for (int i = 0; i < BFaces::max_count; ++i) {
-        auto &face1 = cell.faces[i];
-        if (face1.is_undefined() || face1.is_boundary()) {
+    auto& faces = cells.faces;
+
+    for (index_t iface: cells.faces_range(ic)) {
+        if (faces.is_undefined(iface) || faces.is_boundary(iface)) {
             continue;
         }
 
-        bool local_cell = face1.adjacent.alien < 0;
+        bool local_cell = faces.adjacent.rank[iface] != rank;
 
 #if SCRUTINY
         // Проверим индексы
         if (local_cell) {
-            if (face1.adjacent.index < 0 || face1.adjacent.index >= locals.size()) {
+            if (faces.adjacent.local_index[iface] < 0) {
                 throw std::runtime_error("Restore connections: out of range #1");
             }
         }
         else {
-            if (face1.adjacent.alien < 0 || face1.adjacent.alien >= aliens.size()) {
-                throw std::runtime_error("Restore connections: out of range #2");
+            if (faces.adjacent.owner_index[iface] < 0) {
+                throw std::runtime_error("Restore connections: out of range #3");
             }
         }
 #endif
 
         // Пропустить новые ячейки, если на них есть ссылка, значит всё
         // нормально, нам нужно переставить ссылки с ячеек, которые пропали.
-        if (local_cell && face1.adjacent.index > count.n_cells) {
+        if (local_cell && faces.adjacent.local_index[iface] > count.n_cells) {
             continue;
         }
 
-        const auto &old_neib = local_cell ?
-                locals[face1.adjacent.index] :
-                aliens[face1.adjacent.alien];
+        // Индекс старого соседа
+        index_t old_jc = faces.adjacent.local_index[iface];
 
         // Актуальный сосед через грань
-        if (old_neib.is_actual()) {
+        if (cells.is_actual(old_jc)) {
             continue;
         }
 
         // Сосед через грань ничего не делал - ничего не надо,
         // ссылки актуальны
-        if (old_neib.flag == 0) {
+        if (cells.flag[old_jc] == 0) {
             continue;
         }
 
         // Сосед через грань огрубился
-        if (old_neib.flag < 1) {
+        if (cells.flag[old_jc] < 1) {
             // Соседняя ячейка огрубляется
-            face1.adjacent.index = old_neib.next;
+            faces.adjacent.local_index[iface] = cells.next[old_jc];
             continue;
         }
 
 #if SCRUTINY
         // Поиск в родительской ячейке, такого не должно быть
-        if (old_neib.b_idx == cell.b_idx &&
-            old_neib.level == cell.level - 1 &&
-            old_neib.z_idx == cell.z_idx / CpC(dim)) {
-            std::cout << old_neib.rank << " " << old_neib.level << " " << old_neib.b_idx << " " << old_neib.z_idx << " ""\n";
-            std::cout << cell.rank << " " << cell.level << " " << cell.b_idx << " " << cell.z_idx << " ""\n";
+        if (cells.b_idx[old_jc] == cells.b_idx[ic] &&
+            cells.level[old_jc] == cells.level[ic] - 1 &&
+            cells.z_idx[old_jc] == cells.z_idx[ic] / CpC(dim)) {
+            std::cout << cells.rank[old_jc] << " " << cells.level[old_jc] << " " << cells.b_idx[old_jc] << " " << cells.z_idx[old_jc] << " ""\n";
+            std::cout << cells.rank[ic] << " " << cells.level[ic] << " " << cells.b_idx[ic] << " " << cells.z_idx[ic] << " ""\n";
             throw std::runtime_error("Search neib in parent cell");
         }
 #endif
@@ -110,10 +108,21 @@ void restore_connections_one(AmrStorage::Item& cell,
         // и есть индекс смежной дочерней ячейки (гениально)
         int nearest_j = -1;
         double dist = std::numeric_limits<double>::max();
-        if (dim == 2) {
-            Quad quad = old_neib.vertices.as2D().reduce();
+
+        // Прикол, так можно?
+        auto shape = cells.get_vertices<dim>(old_jc).reduce();
+        for (int j = 0; j < CpC(dim); ++j) {
+            double loc_dist = (shape[j] - faces.center[iface]).squaredNorm();
+            if (loc_dist < dist) {
+                dist = loc_dist;
+                nearest_j = j;
+            }
+        }
+        /*
+        if constexpr (dim == 2) {
+            Quad quad = cells.get_vertices<2>(old_jc).reduce();
             for (int j = 0; j < CpC(dim); ++j) {
-                double loc_dist = (quad[j] - face1.center).squaredNorm();
+                double loc_dist = (quad[j] - faces.center[iface]).squaredNorm();
                 if (loc_dist < dist) {
                     dist = loc_dist;
                     nearest_j = j;
@@ -121,34 +130,36 @@ void restore_connections_one(AmrStorage::Item& cell,
             }
         }
         else {
-            Cube cube = old_neib.vertices.reduce();
+            Cube cube = cells.get_vertices<3>(old_jc).reduce();
             for (int j = 0; j < CpC(dim); ++j) {
-                double loc_dist = (cube[j] - face1.center).squaredNorm();
+                double loc_dist = (cube[j] - faces.center[iface]).squaredNorm();
                 if (loc_dist < dist) {
                     dist = loc_dist;
                     nearest_j = j;
                 }
             }
         }
-        face1.adjacent.index = old_neib.next + nearest_j;
+        */
+        faces.adjacent.local_index[iface] = cells.next[old_jc] + nearest_j;
 
         // Но это не верно для периодического замыкания, дописать потом
-        scrutiny_check(face1.boundary != Boundary::PERIODIC, "Can't handle periodic")
+        scrutiny_check(faces.boundary[iface] != Boundary::PERIODIC, "Can't handle periodic")
 
 #if SCRUTINY
         // Проверяем, что здесь не ссылка на брата, брат должен быть установлен ранее
-        if (old_neib.b_idx == cell.b_idx &&
-            old_neib.level == cell.level - 1 &&
-            old_neib.z_idx == cell.z_idx / CpC(dim)) {
-            auto& bro = locals[face1.adjacent.index];
+        if (cells.b_idx[old_jc] == cells.b_idx[ic] &&
+            cells.level[old_jc] == cells.level[ic] - 1 &&
+            cells.z_idx[old_jc] == cells.z_idx[ic] / CpC(dim)) {
 
-            if (cell.b_idx == bro.b_idx && bro.z_idx == cell.z_idx) {
-                std::cout << old_neib.rank << " " << old_neib.level << " " << old_neib.b_idx << " " << old_neib.z_idx << " ""\n";
-                std::cout << cell.rank << " " << cell.level << " " << cell.b_idx << " " << cell.z_idx << " ""\n";
-                std::cout << bro.rank << " " << bro.level << " " << bro.b_idx << " " << bro.z_idx << " ""\n";
+            index_t bro_idx = faces.adjacent.local_index[iface];
+
+            if (cells.b_idx[ic] == cells.b_idx[bro_idx] && cells.z_idx[bro_idx] == cells.z_idx[ic]) {
+                std::cout << cells.rank[old_jc] << " " << cells.level[old_jc] << " " << cells.b_idx[old_jc] << " " << cells.z_idx[old_jc] << " ""\n";
+                std::cout << cells.rank[ic] << " " << cells.level[ic] << " " << cells.b_idx[ic] << " " << cells.z_idx[ic] << " ""\n";
+                std::cout << cells.rank[bro_idx] << " " << cells.level[bro_idx] << " " << cells.b_idx[bro_idx] << " " << cells.z_idx[bro_idx] << " ""\n";
                 throw std::runtime_error("Found same cell");
             }
-            if (cell.b_idx == bro.b_idx && old_neib.z_idx == bro.z_idx / CpC(dim)) {
+            if (cells.b_idx[ic] == cells.b_idx[bro_idx] && cells.z_idx[old_jc] == cells.z_idx[bro_idx] / CpC(dim)) {
                 throw std::runtime_error("Found brother");
             }
         }
@@ -157,29 +168,25 @@ void restore_connections_one(AmrStorage::Item& cell,
             continue;
         }
 
-        // Если ячейка локальная, то можем проверить полным обходом
-        // всех возможных соседей
+        // Если ячейка локальная, то можем проверить полным обходом всех возможных соседей
         bool found = false;
 
         int adj_index = -1;
 
         for (int j = 0; j < CpC(dim); ++j) {
-            auto jc = old_neib.next + j;
+            index_t jc = cells.next[old_jc] + j;
 
             if (jc > count.n_cells_large) {
                 continue;
             }
 
-            const auto &neib = locals[jc];
-            if (&neib == &cell) {
-                continue;
-            }
+            if (ic == jc) { continue; }
 
-            for (const auto &face2: neib.faces) {
-                if (face2.is_undefined())
+            for (const auto &jface: cells.faces_range(jc)) {
+                if (faces.is_undefined(jface))
                     continue;
 
-                if ((face1.center - face2.center).norm() < 1.0e-5 * cell.linear_size()) {
+                if ((faces.center[iface] - faces.center[jface]).norm() < 1.0e-5 * cells.linear_size(ic)) {
                     adj_index = jc;
                     found = true;
                     break;
@@ -190,25 +197,25 @@ void restore_connections_one(AmrStorage::Item& cell,
             }
         }
         if (!found) {
-            std::cout << "Can't find neighbor through the " << side_to_string(Side(i % 6))
+            index_t i = iface - cells.face_begin[ic];
+            std::cout << "Can't find neighbor through the " << side_to_string(Side3D(i % 6))
                       << " face (" << i / 6 << ")\n";
-            //amr2::print_cell_info(locals, aliens, ic);
+            cells.print_info(ic);
             throw std::runtime_error("Can't find neighbor");
         }
 
-        if (face1.adjacent.index != adj_index) {
-            std::cout << "mine.level: " << cell.level << "\n";
-            std::cout << "neib.level: " << old_neib.level << "\n";
+        if (faces.adjacent.local_index[iface] != adj_index) {
+            std::cout << "mine.level: " << cells.level[ic] << "\n";
+            std::cout << "neib.level: " << cells.level[old_jc] << "\n";
 
             std::cout << std::setprecision(2);
-            std::cout << "nearest_j: " << nearest_j << "; " << face1.adjacent.index - old_neib.next << "\n";
-            std::cout << "face1.n: " << face1.normal.transpose() << "\n";
-            std::cout << "face1.c: " << (face1.center - old_neib.center).transpose() << "\n";
-            std::cout << "face1.c: " << (face1.center).transpose() << "\n";
-            std::cout << "neib.c: " << (old_neib.center).transpose() << "\n";
+            std::cout << "nearest_j: " << nearest_j << "; " << faces.adjacent.local_index[iface] - cells.next[old_jc] << "\n";
+            std::cout << "face1.n: " << faces.normal[iface].transpose() << "\n";
+            std::cout << "face1.c: " << (faces.center[iface] - cells.center[old_jc]).transpose() << "\n";
+            std::cout << "face1.c: " << (faces.center[iface]).transpose() << "\n";
+            std::cout << "neib.c: " << cells.center[old_jc].transpose() << "\n";
             for (int k = 0; k < 8; ++k) {
-                std::cout << "  " << k << " child: " << (locals[old_neib.next + k].center - old_neib.center).transpose() << "\n";
-                std::cout << "  " << k << " vertx: " << (old_neib.vertices.reduce()[k] - old_neib.center).transpose() << "\n";
+                std::cout << "  " << k << " child: " << (cells.center[cells.next[old_jc] + k] - cells.center[old_jc]).transpose() << "\n";
             }
         }
 #endif
@@ -216,30 +223,26 @@ void restore_connections_one(AmrStorage::Item& cell,
 }
 
 /// @brief Устанавливает поле AmrCell.next в неопределенное состояние
-void set_undefined_next(AmrStorage::Item& cell) {
-    cell.next = -1;
+inline void set_undefined_next(index_t ic, std::vector<index_t> &next) {
+    next[ic] = -1;
 }
 
 /// @brief Восстанавливает связи (без MPI)
 /// @details см. restore_connections_partial
 template<int dim>
-void restore_connections(
-        AmrStorage &locals, AmrStorage& aliens,
-        int rank, const Statistics &count) {
+void restore_connections(SoaCell &cells, int rank, const Statistics &count) {
+    utils::range<index_t> r(count.n_cells_large);
 
-    threads::for_each<20>(
-            locals.begin(),
-            locals.iterator(count.n_cells_large),
+    threads::for_each<20>(r.begin(), r.end(),
             restore_connections_one<dim>,
-            std::ref(locals),
-            std::ref(aliens),
-            rank, std::ref(count)
+            std::ref(cells),
+            rank,
+            std::ref(count)
     );
 
-    threads::for_each(
-            locals.begin(),
-            locals.iterator(count.n_cells_large),
-            set_undefined_next);
+    threads::for_each(r.begin(), r.end(),
+            set_undefined_next,
+            std::ref(cells.next));
 }
 
 } // namespace zephyr

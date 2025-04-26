@@ -1,6 +1,6 @@
 #pragma once
 
-#include <zephyr/mesh/primitives/side.h>
+#include <zephyr/mesh/primitives/Side3D.h>
 #include <zephyr/mesh/primitives/bface.h>
 #include <zephyr/mesh/euler/amr_storage.h>
 #include <zephyr/mesh/euler/eu_face.h>
@@ -166,7 +166,7 @@ public:
 
     /// @brief Выбрать грань на стороне. Корректно работает
     /// для декартовых сеток без адаптации
-    EuFace face(Side side) const;
+    EuFace face(Side3D side) const;
 
     /// @brief Итератор по граням
     /// @param dir Выбрать грани по некоторым направлениям

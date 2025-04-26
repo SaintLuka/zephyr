@@ -13,37 +13,35 @@
 namespace zephyr::mesh::amr2 {
 
 /// @brief Вызывает для ячейки соответствующий метод адаптации
-/// @param locals Локальные ячейки
+/// @param cells Локальные ячейки
 /// @param aliens Удаленные ячейки
 /// @param rank Ранг текущего процесса
 /// @param op Оператор распределения данных при огрублении и разбиении
 template<int dim>
-void setup_geometry_one(AmrStorage::Item& cell, AmrStorage &locals, AmrStorage& aliens,
+void setup_geometry_one(index_t ic, SoaCell &cells,
         int rank, const Distributor& op) {
 
-    if (cell.flag == 0) {
-        retain_cell<dim>(cell, locals, aliens);
+    if (cells.flag[ic] == 0) {
+        retain_cell<dim>(ic, cells);
         return;
     }
 
-    if (cell.flag > 0) {
-        refine_cell<dim>(cell, locals, aliens, rank, op);
+    if (cells.flag[ic] > 0) {
+        refine_cell<dim>(ic, cells, rank, op);
         return;
     }
 
-    coarse_cell<dim>(cell, locals, aliens, rank, op);
+    coarse_cell<dim>(ic, cells, rank, op);
 }
 
 /// @brief Осуществляет проход по ячейкам и вызывает для них
 /// соответствующие методы адаптации (без MPI)
 template<int dim>
-void setup_geometry(AmrStorage &cells, const Statistics &count, const Distributor& op) {
-    static AmrStorage aliens{};
-
+void setup_geometry(SoaCell &cells, const Statistics &count, const Distributor& op) {
+    utils::range r(0, count.n_cells);
     threads::for_each<10>(
-            cells.begin(), cells.begin() + count.n_cells,
-            setup_geometry_one<dim>, std::ref(cells),
-            std::ref(aliens), 0, std::ref(op));
+            r.begin(), r.end(),
+            setup_geometry_one<dim>, std::ref(cells), 0, std::ref(op));
 }
 
 #ifdef ZEPHYR_MPI

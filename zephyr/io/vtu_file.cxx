@@ -1,6 +1,6 @@
 #include <fstream>
 
-#include <zephyr/mesh/primitives/side.h>
+#include <zephyr/mesh/primitives/Side3D.h>
 #include <zephyr/mesh/primitives/mov_node.h>
 #include <zephyr/mesh/primitives/amr_cell.h>
 #include <zephyr/mesh/primitives/mov_cell.h>
@@ -50,7 +50,7 @@ inline index_t count_cells(AmrStorage &cells, const Filter &filter) {
 }
 
 inline index_t count_cells(SoaCell &cells, const Filter &filter) {
-    return cells.size();
+    return cells.n_locals();
 }
 
 struct Handler {
@@ -70,10 +70,10 @@ struct Handler {
                 } else {
                     auto& faces = cell.faces;
 
-                    if (faces[Side::LEFT1].is_actual() ||
-                        faces[Side::RIGHT1].is_actual() ||
-                        faces[Side::BOTTOM1].is_actual() ||
-                        faces[Side::TOP1].is_actual()) {
+                    if (faces[Side3D::LEFT[1]].is_actual() ||
+                        faces[Side3D::RIGHT[1]].is_actual() ||
+                        faces[Side3D::BOTTOM[1]].is_actual() ||
+                        faces[Side3D::TOP[1]].is_actual()) {
                         return 7; // VTK_POLYGON
                     } else {
                         return 9; // VTK_QUAD
@@ -132,10 +132,8 @@ struct Handler {
                 } else {
                     auto faces = cell.faces();
 
-                    if (faces[Side::LEFT1].is_actual() ||
-                        faces[Side::RIGHT1].is_actual() ||
-                        faces[Side::BOTTOM1].is_actual() ||
-                        faces[Side::TOP1].is_actual()) {
+                    if (faces.complex(Side2D::L) || faces.complex(Side2D::R) ||
+                        faces.complex(Side2D::B) || faces.complex(Side2D::T)) {
                         return 7; // VTK_POLYGON
                     } else {
                         return 9; // VTK_QUAD
@@ -229,16 +227,16 @@ struct Handler {
                     auto& faces = cell.faces;
 
                     index_t n = 4;
-                    if (faces[Side::LEFT1].is_actual()) {
+                    if (faces[Side3D::LEFT[1]].is_actual()) {
                         n += 1;
                     }
-                    if (faces[Side::RIGHT1].is_actual()) {
+                    if (faces[Side3D::RIGHT[1]].is_actual()) {
                         n += 1;
                     }
-                    if (faces[Side::BOTTOM1].is_actual()) {
+                    if (faces[Side3D::BOTTOM[1]].is_actual()) {
                         n += 1;
                     }
-                    if (faces[Side::TOP1].is_actual()) {
+                    if (faces[Side3D::TOP[1]].is_actual()) {
                         n += 1;
                     }
                     return n;
@@ -265,16 +263,16 @@ struct Handler {
                     auto faces = cell.faces();
 
                     index_t n = 4;
-                    if (faces[Side::LEFT1].is_actual()) {
+                    if (faces.complex(Side2D::LEFT)) {
                         n += 1;
                     }
-                    if (faces[Side::RIGHT1].is_actual()) {
+                    if (faces.complex(Side2D::RIGHT)) {
                         n += 1;
                     }
-                    if (faces[Side::BOTTOM1].is_actual()) {
+                    if (faces.complex(Side2D::BOTTOM)) {
                         n += 1;
                     }
-                    if (faces[Side::TOP1].is_actual()) {
+                    if (faces.complex(Side2D::TOP)) {
                         n += 1;
                     }
                     return n;
@@ -335,22 +333,22 @@ struct Handler {
                     auto& faces = cell.faces;
 
                     file.write((byte_ptr) vertices.vs<-1, -1>().data(), 3 * sizeof(double));
-                    if (faces[Side::BOTTOM1].is_actual()) {
+                    if (faces[Side3D::BOTTOM[1]].is_actual()) {
                         file.write((byte_ptr) vertices.vs<0, -1>().data(), 3 * sizeof(double));
                     }
 
                     file.write((byte_ptr) vertices.vs<+1, -1>().data(), 3 * sizeof(double));
-                    if (faces[Side::RIGHT1].is_actual()) {
+                    if (faces[Side3D::RIGHT[1]].is_actual()) {
                         file.write((byte_ptr) vertices.vs<+1, 0>().data(), 3 * sizeof(double));
                     }
 
                     file.write((byte_ptr) vertices.vs<+1, +1>().data(), 3 * sizeof(double));
-                    if (faces[Side::TOP1].is_actual()) {
+                    if (faces[Side3D::TOP[1]].is_actual()) {
                         file.write((byte_ptr) vertices.vs<0, +1>().data(), 3 * sizeof(double));
                     }
 
                     file.write((byte_ptr) vertices.vs<-1, +1>().data(), 3 * sizeof(double));
-                    if (faces[Side::LEFT1].is_actual()) {
+                    if (faces[Side3D::LEFT[1]].is_actual()) {
                         file.write((byte_ptr) vertices.vs<-1, 0>().data(), 3 * sizeof(double));
                     }
                     return;
@@ -401,22 +399,22 @@ struct Handler {
                     const SqQuad& vertices = cell.get_vertices<2>();
 
                     file.write((byte_ptr) vertices.vs<-1, -1>().data(), 3 * sizeof(double));
-                    if (faces[Side::BOTTOM1].is_actual()) {
+                    if (faces.complex(Side2D::BOTTOM)) {
                         file.write((byte_ptr) vertices.vs<0, -1>().data(), 3 * sizeof(double));
                     }
 
                     file.write((byte_ptr) vertices.vs<+1, -1>().data(), 3 * sizeof(double));
-                    if (faces[Side::RIGHT1].is_actual()) {
+                    if (faces.complex(Side2D::RIGHT)) {
                         file.write((byte_ptr) vertices.vs<+1, 0>().data(), 3 * sizeof(double));
                     }
 
                     file.write((byte_ptr) vertices.vs<+1, +1>().data(), 3 * sizeof(double));
-                    if (faces[Side::TOP1].is_actual()) {
+                    if (faces.complex(Side2D::TOP)) {
                         file.write((byte_ptr) vertices.vs<0, +1>().data(), 3 * sizeof(double));
                     }
 
                     file.write((byte_ptr) vertices.vs<-1, +1>().data(), 3 * sizeof(double));
-                    if (faces[Side::LEFT1].is_actual()) {
+                    if (faces.complex(Side2D::LEFT)) {
                         file.write((byte_ptr) vertices.vs<-1, 0>().data(), 3 * sizeof(double));
                     }
                     return;
@@ -494,22 +492,22 @@ struct Handler {
                     std::array<index_t, 8> vals;
 
                     vals[n++] = nodes[SqQuad::iss<-1, -1>()];
-                    if (faces[Side::BOTTOM1].is_actual()) {
+                    if (faces[Side3D::BOTTOM[1]].is_actual()) {
                         vals[n++] = nodes[SqQuad::iss<0, -1>()];
                     }
 
                     vals[n++] = nodes[SqQuad::iss<+1, -1>()];
-                    if (faces[Side::RIGHT1].is_actual()) {
+                    if (faces[Side3D::RIGHT[1]].is_actual()) {
                         vals[n++] = nodes[SqQuad::iss<+1, 0>()];
                     }
 
                     vals[n++] = nodes[SqQuad::iss<+1, +1>()];
-                    if (faces[Side::TOP1].is_actual()) {
+                    if (faces[Side3D::TOP[1]].is_actual()) {
                         vals[n++] = nodes[SqQuad::iss<0, +1>()];
                     }
 
                     vals[n++] = nodes[SqQuad::iss<-1, +1>()];
-                    if (faces[Side::LEFT1].is_actual()) {
+                    if (faces[Side3D::LEFT[1]].is_actual()) {
                         vals[n++] = nodes[SqQuad::iss<-1, 0>()];
                     }
 
@@ -1387,7 +1385,7 @@ void VtuFile::save(
     mesh::SoaCell &cells, const Variables &variables,
     bool hex_only, bool polyhedral, const Filter &filter
 ) {
-    index_t n_cells = cells.size();
+    index_t n_cells = cells.n_locals();
 
     std::ofstream file(filename, std::ios::out | std::ios::binary);
     if (!file.is_open()) {

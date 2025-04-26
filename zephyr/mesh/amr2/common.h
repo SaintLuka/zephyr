@@ -6,7 +6,7 @@
 #pragma once
 
 #define SCRUTINY 1          ///< Тщательная проверка вычислений
-#define CHECK_PERFORMANCE 0 ///< Выводить производительность частей алгоритма
+#define CHECK_PERFORMANCE 1 ///< Выводить производительность частей алгоритма
 #define FAST_BALANCING 1    ///< Быстрая функция балансировки флагов
 
 #if SCRUTINY
@@ -18,6 +18,7 @@
 #endif
 
 #include <array>
+#include <zephyr/mesh/euler/soa_mesh.h>
 #include <zephyr/mesh/primitives/decomposition.h>
 
 namespace zephyr::mesh::amr2 {

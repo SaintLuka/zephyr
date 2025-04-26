@@ -9,7 +9,7 @@ using namespace zephyr::geom;
 
 namespace zephyr::mesh {
 
-EuFace::EuFace(const EuCell &cell, Side side)
+EuFace::EuFace(const EuCell &cell, Side3D side)
     : m_cell(cell),
       m_face(nullptr),
       m_end (nullptr),

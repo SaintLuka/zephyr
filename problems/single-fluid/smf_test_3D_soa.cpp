@@ -101,7 +101,7 @@ int main(int argc, char** argv) {
     solver.set_method(Fluxes::HLLC_M);
 
     // Сеточная адаптация
-    mesh.set_max_level(1);
+    mesh.set_max_level(0);
     mesh.set_distributor(solver.distributor());
 
     // Переменные для сохранения

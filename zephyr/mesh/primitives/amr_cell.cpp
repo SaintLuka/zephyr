@@ -1,6 +1,6 @@
 #include <zephyr/geom/geom.h>
 
-#include <zephyr/mesh/primitives/side.h>
+#include <zephyr/mesh/primitives/Side3D.h>
 #include <zephyr/mesh/primitives/amr_cell.h>
 
 using namespace zephyr::geom;
@@ -215,22 +215,22 @@ Polygon AmrCell::polygon() const {
         poly.reserve(8);
 
         poly += vertices.vs<-1, -1>();
-        if (!linear && faces[Side::BOTTOM1].is_actual()) {
+        if (!linear && faces[Side3D::BOTTOM[1]].is_actual()) {
             poly += vertices.vs<0, -1>();
         }
 
         poly += vertices.vs<+1, -1>();
-        if (!linear && faces[Side::RIGHT1].is_actual()) {
+        if (!linear && faces[Side3D::RIGHT[1]].is_actual()) {
             poly += vertices.vs<+1, 0>();
         }
 
         poly += vertices.vs<+1, +1>();
-        if (!linear && faces[Side::TOP1].is_actual()) {
+        if (!linear && faces[Side3D::TOP[1]].is_actual()) {
             poly += vertices.vs<0, +1>();
         }
 
         poly += vertices.vs<-1, +1>();
-        if (!linear && faces[Side::LEFT1].is_actual()) {
+        if (!linear && faces[Side3D::LEFT[1]].is_actual()) {
             poly += vertices.vs<-1, 0>();
         }
         return poly;

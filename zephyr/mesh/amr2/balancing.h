@@ -13,30 +13,25 @@
 namespace zephyr::mesh::amr2 {
 
 /// @brief Функция балансировки флагов верхнего уровня блээээт
-void balance_flags(AmrStorage &locals, int max_level) {
-    if (locals.empty())
-        return;
-
-    AmrStorage aliens;
-
-    auto dim = locals[0].dim;
+void balance_flags(SoaCell &cells, int max_level) {
+    if (cells.empty()) return;
 
 #if FAST_BALANCING
-    if (dim < 3) {
-        amr2::balance_flags_fast<2>(locals, max_level);
+    if (cells.dim < 3) {
+        amr2::balance_flags_fast<2>(cells, max_level);
     } else {
-        amr2::balance_flags_fast<3>(locals, max_level);
+        amr2::balance_flags_fast<3>(cells, max_level);
     }
 #else
     if (dim < 3) {
-        amr2::balance_flags_slow<2>(locals, aliens, max_level);
+        amr2::balance_flags_slow<2>(locals, max_level);
     } else {
-        amr2::balance_flags_slow<3>(locals, aliens, max_level);
+        amr2::balance_flags_slow<3>(locals, max_level);
     }
 #endif
 
 #if SCRUTINY
-    amr2::check_flags(locals, aliens, max_level);
+    amr2::check_flags(cells, max_level);
 #endif
 }
 

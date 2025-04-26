@@ -10,10 +10,16 @@
 #include <zephyr/utils/range.h>
 #include <zephyr/mesh/primitives/bface.h>
 
+#include <zephyr/geom/generator/rectangle.h>
+#include <zephyr/geom/generator/cuboid.h>
+
 namespace zephyr::mesh {
 class SoaMesh;
 class SoaCell;
 class QCell;
+
+using geom::generator::Rectangle;
+using geom::generator::Cuboid;
 
 using index_t = int;  // Для индексации примитивов
 
@@ -42,14 +48,16 @@ public:
     /// @brief Установить неопределенную грань
     void set_undefined();
 
-    const Adjacent &adjacent() const;
-
     /// @brief Ячейка по внешней нормали, на границе сетки возвращается
     /// сама ячейка
     QCell neib() const;
 
+    int neib_rank() const;
+
     /// @brief Индекс соседа, мне для soa
     index_t neib_index() const;
+
+    index_t neib_owner_index() const;
 
     Vector3d neib_center() const;
 
@@ -117,7 +125,8 @@ public:
         return iface != face.iface;
     }
 
-    QFace operator[](Side s) const {
+    template <int dim>
+    QFace operator[](Side<dim> s) const {
         return QFace(m_cells, iface + s);
     }
 
@@ -129,26 +138,34 @@ public:
 /// @brief Интерфейс для итерирования по граням ячейки
 struct FacesIts {
 public:
-    FaceIt m_beg, m_end;
+    SoaCell* m_cells;
+    index_t iface_beg, iface_end;
+    Direction m_dir;
 
     FacesIts(SoaCell* cells,
              index_t iface_beg,
              index_t iface_end,
              Direction dir = Direction::ANY)
-            : m_beg(cells, iface_beg, iface_end, dir),
-              m_end(cells, iface_end, iface_end, dir) { }
+            : m_cells(cells), iface_beg(iface_beg),
+              iface_end(iface_end), m_dir(dir) { }
 
-    FaceIt begin() const { return m_beg; }
+    FaceIt begin() const { return FaceIt(m_cells, iface_beg, iface_end, m_dir); }
 
-    FaceIt end() const { return m_end; }
+    FaceIt end() const { return FaceIt(m_cells, iface_end, iface_end, m_dir); }
 
-    QFace operator[](Side s) const {
-        return m_beg[s];
-    }
+    QFace operator[](int idx) const { return QFace(m_cells, iface_beg + idx); }
+
+    template <int dim>
+    QFace operator[](Side<dim> s) const { return QFace(m_cells, iface_beg + s); }
+
+    template <int dim>
+    bool complex(Side<dim> s) const;
+
+
 };
 
 /// @brief Классная ячейка
-struct QCell final {
+class QCell final {
 private:
     SoaCell* m_cells;  //< Указатель на сетку
     index_t   cell_idx;  //< Индекс ячейки
@@ -183,6 +200,16 @@ public:
 
     template <typename T>
     inline T& operator()(Storable<T> type);
+
+    inline QFace face(int idx) const;
+
+    inline QFace face(Side2D s) const;
+    inline QFace face(Side3D s) const;
+
+    inline bool complex_face(Side2D s) const;
+
+    inline bool complex_face(Side3D s) const;
+
 
 
     inline const Vector3d& center() const;
@@ -273,35 +300,56 @@ public:
 
 /// @brief Аналог AmrCell развернутый в структуру массивов,
 /// теоретически, все функции тоже можно просто скопировать.
+/// Три типа сеток.
+/// 1. Двумерная AMR сетка, по 8 граней, по 9 вершин на ячейку.
+/// 2. Трехмерная AMR сетка, по 24 грани, по 27 вершин на ячейку.
+/// 3. Неструктурированная/произвольная сетка. Произвольное число
+/// граней и вершин на ячейку, но вершины не склеиваются (не уникальны).
+/// На сетки третьего типа пока забьем.
 class SoaCell final {
 public:
-
     SoaCell() = default;
 
     // Копируется из EuMesh
     SoaCell(AmrStorage &locals);
 
     // Число ячеек
-    index_t n_cells;
+    index_t m_n_locals;
+    index_t m_n_cells;
 
-    inline bool empty() const { return n_cells == 0; }
+    inline bool empty() const { return m_n_locals == 0; }
 
-    inline index_t size() const { return n_cells; }
+    /// @brief Число локальных ячеек
+    inline index_t n_locals() const { return m_n_locals; }
+
+    /// @brief Полное число ячеек, включая ячейки с других процессов
+    inline index_t n_cells() const { return m_n_cells; }
+
+    /// @brief  Число ячеек с других процессов
+    inline index_t n_aliens() const { return m_n_cells - m_n_locals;}
 
     void initialize(AmrStorage &locals);
 
+    void initialize(const Rectangle& gen);
+
+    void initialize(const Cuboid& gen);
+
     // Общие данные ячеек
 
-    int  dim;       ///< Размерность ячейки
+    int dim;       ///< Размерность ячейки
+    int faces_per_cell;  ///< 8 или 24
+    int nodes_per_cell;  ///< 9 или 27
+
     bool adaptive;  ///< Адаптивная ячейка?
     bool linear;    ///< Линейная ячейка?
     bool axial;     ///< Осевая симметрия, см описание класса
 
     // Тип Element
 
-    std::vector<int> rank;   ///< Ранг процесса владельца (< 0 -- ошибка, не используется)
-    std::vector<index_t> index;  ///< Индекс элемента в локальном Storage (< 0 для неактивных, неопределенных элементов, элементов на удаление)
-    std::vector<index_t> next;   ///< Новый индекс в хранилище (в алгоритмах с перестановками)
+    std::vector<index_t> next;         ///< Новый индекс в хранилище (в алгоритмах с перестановками)
+
+    std::vector<int> rank;             ///< Ранг процесса владельца (< 0 -- ошибка, не используется)
+    std::vector<index_t> owner_index;  ///< Глобальный индекс элемента в локальном Storage (< 0 для неактивных, неопределенных элементов, элементов на удаление)
 
     // Величины, связаные с адаптацией
 
@@ -324,7 +372,7 @@ public:
 
     int face_count(index_t ic) const {
         int count = 0;
-        for (index_t iface = face_begin[ic]; iface < face_begin[ic+1]; ++iface) {
+        for (index_t iface: faces_range(ic)) {
             if (faces.is_actual(iface)) {
                 ++count;
             }
@@ -340,10 +388,22 @@ public:
         return dim < 3 ? std::sqrt(volume[ic]) : std::cbrt(volume[ic]);
     }
 
+
+    struct SoaAdjacent final {
+        std::vector<int> rank;
+        std::vector<index_t> owner_index;
+        std::vector<index_t> local_index;
+
+        void resize(index_t n_faces) {
+            rank.resize(n_faces);
+            owner_index.resize(n_faces);
+            local_index.resize(n_faces);
+        }
+    };
+
     /// @brief Аналог BFaces развернутый в структуру массивов
-    struct SoaFace {
+    struct SoaFace final {
         std::vector<Boundary> boundary;  ///< Тип граничного условия
-        std::vector<Adjacent> adjacent;  ///< Составной индекс смежной ячейки
         std::vector<Vector3d> normal;    ///< Внешняя нормаль к грани
         std::vector<Vector3d> center;    ///< Барицентр грани
         std::vector<double>   area;      ///< Площадь грани
@@ -351,6 +411,8 @@ public:
 
         /// @brief Список индексов вершин в массиве вершин ячейки
         std::vector<std::array<int, BFace::max_size>> vertices;
+
+        SoaAdjacent adjacent;
 
         void resize(index_t n_faces) {
             boundary.resize(n_faces);
@@ -382,9 +444,9 @@ public:
         /// @brief Установить неопределенную грань
         inline void set_undefined(index_t iface) {
             boundary[iface] = Boundary::UNDEFINED;
-            adjacent[iface].rank  = -1;
-            adjacent[iface].index = -1;
-            adjacent[iface].alien = -1;
+            adjacent.rank[iface]  = -1;
+            adjacent.owner_index[iface] = -1;
+            adjacent.local_index[iface] = -1;
         }
 
         /// @brief Внешняя нормаль грани на площадь
@@ -420,7 +482,12 @@ public:
                     return false;
             }
         }
+
+        /// Добавить грани, соответствующие ячейке
+        void insert(index_t iface, CellType ctype, int count = -1);
     };
+
+    void move_item(index_t ic);
 
     // Грани ячеек
     SoaFace faces;
@@ -433,7 +500,7 @@ public:
 
 
     template <int dim>
-    typename std::conditional<dim < 3, const SqQuad&, const SqCube&>::type
+    std::conditional_t<dim < 3, const SqQuad&, const SqCube&>
     get_vertices(index_t ic) const {
         if constexpr (dim < 3) {
             return *reinterpret_cast<const SqQuad*>(verts.data() + node_begin[ic]);
@@ -443,22 +510,65 @@ public:
         }
     }
 
+    template <int dim>
+    std::conditional_t<dim < 3, SqQuad&, SqCube&>
+    get_vertices(index_t ic) {
+        if constexpr (dim < 3) {
+            return *reinterpret_cast<SqQuad*>(verts.data() + node_begin[ic]);
+        }
+        else {
+            return *reinterpret_cast<SqCube*>(verts.data() + node_begin[ic]);
+        }
+    }
+
     CellIt begin() { return {this, 0}; }
 
-    CellIt end() { return {this, n_cells}; }
+    CellIt end() { return {this, n_locals()}; }
 
     QCell operator[](index_t cell_idx) {
         return {this, cell_idx};
     }
 
     /// @brief Актуальная ячейка?
-    inline bool is_actual(index_t ic) const { return index[ic] >= 0; }
+    inline bool is_actual(index_t ic) const { return owner_index[ic] >= 0; }
 
     /// @brief Ячейка к удалению
-    inline bool is_undefined(index_t ic) const { return index[ic] < 0; }
+    inline bool is_undefined(index_t ic) const { return owner_index[ic] < 0; }
 
     /// @brief Устанавливает index = -1 (ячейка вне сетки)
-    inline void set_undefined(index_t ic) { index[ic] = -1; }
+    inline void set_undefined(index_t ic) { owner_index[ic] = -1; }
+
+    // ФУНКЦИИ AmrCell по сути
+
+    // Конструкторы ячеек
+
+
+    /// @brief Двумерная простая
+    void add_cell(index_t ic, const Quad &quad);
+
+    /// @brief Двумерная с осевой симметрией
+    void add_cell(index_t ic, const Quad &quad, bool axial);
+
+    /// @brief Двумерная криволинейная
+    void add_cell(index_t ic, const SqQuad &quad);
+
+    /// @brief Двумерная криволинейная с осевой симметрией
+    void add_cell(index_t ic, const SqQuad &quad, bool axial);
+
+    /// @brief Трехмерная простая
+    void add_cell(index_t ic, const Cube &cube);
+
+    /// @brief Трехмерная криволинейная ячейка
+    void add_cell(index_t ic, const SqCube &cube);
+
+    /// @brief Двумерная полигональная ячейка. Не адаптивная ячейка, может
+    /// представлять четырехугольник, но вершины упорядочены иначе.
+    void add_cell(index_t ic, const Polygon &poly);
+
+    /// @brief Трехмрный многогранник. Не адаптивная ячейка, может
+    /// представлять куб, но вершины и грани упорядочены иначе.
+    void add_cell(index_t ic, Polyhedron poly);
+
 
     void print_info(index_t ic) const;
 
@@ -472,10 +582,14 @@ public:
 
     int check_complex_faces(index_t ic) const;
 
-    int check_connectivity(int ic) const;
+    int check_connectivity(index_t ic) const;
+
+    utils::range<index_t> faces_range(index_t ic) const {
+        return utils::range(face_begin[ic], face_begin[ic + 1]);
+    }
 
 
-    void resize(index_t n_cells, index_t faces_per_cell, index_t nodes_per_cell);
+    void resize(index_t n_cells);
 };
 
 class SoaMesh {
@@ -509,7 +623,7 @@ public:
 
     CellIt begin() { return {&cells, 0}; }
 
-    CellIt end() { return {&cells, cells.size()}; }
+    CellIt end() { return {&cells, cells.n_locals()}; }
 
     QCell operator[](index_t cell_idx) {
         return {&cells, cell_idx};
@@ -527,6 +641,10 @@ public:
     SoaMesh(EuMesh &mesh);
 
     SoaMesh(Generator& gen);
+
+    SoaMesh(const Rectangle& gen);
+
+    SoaMesh(const Cuboid& gen);
 
     void to_eu_mesh(EuMesh &mesh) const;
 
@@ -563,7 +681,7 @@ inline index_t QCell::b_idx() const { return m_cells->b_idx[cell_idx]; }
 
 inline index_t QCell::z_idx() const { return m_cells->z_idx[cell_idx]; }
 
-inline index_t QCell::index() const { return m_cells->index[cell_idx]; }
+inline index_t QCell::index() const { return m_cells->owner_index[cell_idx]; }
 
 inline index_t QCell::next() const { return m_cells->next[cell_idx]; }
 
@@ -595,6 +713,32 @@ inline
 typename std::conditional<dim < 3, const SqQuad&, const SqCube&>::type
 QCell::get_vertices() const {
     return m_cells->get_vertices<dim>(cell_idx);
+}
+
+template <int dim>
+bool FacesIts::complex(Side<dim> s) const {
+    return m_cells->is_actual(iface_beg + s[1]);
+}
+
+inline QFace QCell::face(int idx) const {
+    return QFace(m_cells, m_cells->face_begin[cell_idx] + idx);
+};
+
+
+inline QFace QCell::face(Side2D s) const {
+    return QFace(m_cells, m_cells->face_begin[cell_idx] + s);
+}
+
+inline QFace QCell::face(Side3D s) const {
+    return QFace(m_cells, m_cells->face_begin[cell_idx] + s);
+}
+
+inline bool QCell::complex_face(Side2D s) const {
+    return m_cells->faces.is_actual(m_cells->face_begin[cell_idx] + s[1]);
+}
+
+inline bool QCell::complex_face(Side3D s) const {
+    return m_cells->faces.is_actual(m_cells->face_begin[cell_idx] + s[1]);
 }
 
 }

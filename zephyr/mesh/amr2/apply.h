@@ -8,6 +8,7 @@
 
 #include <iomanip>
 
+#include <zephyr/mesh/euler/soa_mesh.h>
 #include <zephyr/mesh/amr2/common.h>
 #include <zephyr/mesh/amr2/statistics.h>
 #include <zephyr/mesh/amr2/setup_positions.h>
@@ -19,7 +20,7 @@
 
 namespace zephyr::mesh {
 // Сейчас нужно для MPI, там функция обменов
-class EuMesh;
+class SoaCell;
 }
 
 namespace zephyr::mesh::amr2 {
@@ -45,15 +46,13 @@ using utils::Stopwatch;
 /// часть старых ячеек (не листовых) являются неопределенными.
 /// Алгоритм осуществляет удаление данных ячеек.
 template<int dim>
-void apply_impl(AmrStorage &cells, const Distributor& op) {
+void apply_impl(SoaCell &cells, const Distributor& op) {
     static Stopwatch count_timer;
     static Stopwatch positions_timer;
     static Stopwatch geometry_timer;
     static Stopwatch connections_timer;
     static Stopwatch clean_timer;
     static Stopwatch sort_timer;
-
-    AmrStorage aliens;
 
     /// Этап 1. Сбор статистики
     count_timer.resume();
@@ -75,7 +74,7 @@ void apply_impl(AmrStorage &cells, const Distributor& op) {
 
     /// Этап 4. Восстановление соседства
     connections_timer.resume();
-    restore_connections<dim>(cells, aliens, 0, count);
+    restore_connections<dim>(cells, 0, count);
     connections_timer.stop();
 
     /// Этап 5. Удаление неопределенных ячеек
@@ -83,8 +82,8 @@ void apply_impl(AmrStorage &cells, const Distributor& op) {
     remove_undefined<dim>(cells, count);
     clean_timer.stop();
 
-    for (int idx = 0; idx < cells.size(); ++idx) {
-        cells[idx].index = idx;
+    for (index_t ic = 0; ic < cells.n_locals(); ++ic) {
+        cells.owner_index[ic] = ic;
     }
 
     /// Этап 6. Сортировка ячеек по уровням (не обязательно)
@@ -107,13 +106,11 @@ void apply_impl(AmrStorage &cells, const Distributor& op) {
 }
 
 /// @brief Автоматический выбор размерности
-void apply(AmrStorage &cells, const Distributor& op) {
+void apply(SoaCell &cells, const Distributor& op) {
     if (cells.empty())
         return;
 
-    auto dim = cells[0].dim;
-
-    if (dim < 3) {
+    if (cells.dim < 3) {
         amr2::apply_impl<2>(cells, op);
     }
     else {

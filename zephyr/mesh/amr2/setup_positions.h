@@ -23,7 +23,7 @@ namespace zephyr::mesh::amr2 {
 /// Алгоритм может выполняться как для всего хранилища, так и для части сетки
 /// в многопроцессорном режиме. Многопоточная реализация отсутствует.
 template<int dim>
-void setup_positions(AmrStorage &cells, const Statistics &count)
+void setup_positions(SoaCell &cells, const Statistics &count)
 {
     // TODO: Подумать над параллельной версией
     cells.resize(count.n_cells_large);
@@ -31,25 +31,23 @@ void setup_positions(AmrStorage &cells, const Statistics &count)
     int coarse_counter = count.n_cells;
     int refine_counter = count.n_cells + count.n_parents;
     for (int ic = 0; ic < count.n_cells; ++ic) {
-        AmrCell& cell = cells[ic];
-
-        if (cell.flag == 0) {
-            cell.next = ic;
+        if (cells.flag[ic] == 0) {
+            cells.next[ic] = ic;
             continue;
         }
 
-        if (cell.flag > 0) {
-            cell.next = refine_counter;
+        if (cells.flag[ic] > 0) {
+            cells.next[ic] = refine_counter;
             refine_counter += CpC(dim);
             continue;
         }
 
         // Главный ребенок собирает своих сиблингов
-        if (cell.z_idx % CpC(dim) == 0) {
+        if (cells.z_idx[ic] % CpC(dim) == 0) {
             auto sibs = get_siblings<dim>(cells, ic);
-            cell.next = coarse_counter;
-            for (int jc: sibs) {
-                cells[jc].next = coarse_counter;
+            cells.next[ic] = coarse_counter;
+            for (index_t jc: sibs) {
+                cells.next[jc] = coarse_counter;
             }
             ++coarse_counter;
         }

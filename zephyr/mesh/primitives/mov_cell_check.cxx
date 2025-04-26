@@ -29,7 +29,7 @@ void PolyCell::print_info() const {
         auto &face = faces[i];
         if (face.is_undefined()) continue;
 
-        std::cout << "\t\t\t" << side_to_string(Side(i % 6)) << " face (" << i / 6 << "):\n";
+        std::cout << "\t\t\t" << side_to_string(Side3D(i % 6)) << " face (" << i / 6 << "):\n";
         std::cout << "\t\t\t\tvertices:";
         for (int j = 0; j < (dim < 3 ? 2 : 4); ++j) {
             std::cout << " " << face.vertices[j];
@@ -177,10 +177,10 @@ int PolyCell::check_geometry() const {
 
 int PolyCell::check_base_face_orientation() const {
     if (dim == 2) {
-        Vector3d nx1 = faces[Side::L].normal;
-        Vector3d nx2 = faces[Side::R].normal;
-        Vector3d ny1 = faces[Side::B].normal;
-        Vector3d ny2 = faces[Side::T].normal;
+        Vector3d nx1 = faces[Side3D::L].normal;
+        Vector3d nx2 = faces[Side3D::R].normal;
+        Vector3d ny1 = faces[Side3D::B].normal;
+        Vector3d ny2 = faces[Side3D::T].normal;
 
         if (nx1.dot(nx2) > -0.8) {
             std::cout << "\tOpposite outward normals (left-right) are co-directed\n";
@@ -203,12 +203,12 @@ int PolyCell::check_base_face_orientation() const {
             return -1;
         }
     } else {
-        Vector3d nx1 = faces[Side::L].normal;
-        Vector3d nx2 = faces[Side::R].normal;
-        Vector3d ny1 = faces[Side::B].normal;
-        Vector3d ny2 = faces[Side::T].normal;
-        Vector3d nz1 = faces[Side::X].normal;
-        Vector3d nz2 = faces[Side::F].normal;
+        Vector3d nx1 = faces[Side3D::L].normal;
+        Vector3d nx2 = faces[Side3D::R].normal;
+        Vector3d ny1 = faces[Side3D::B].normal;
+        Vector3d ny2 = faces[Side3D::T].normal;
+        Vector3d nz1 = faces[Side3D::X].normal;
+        Vector3d nz2 = faces[Side3D::F].normal;
 
         if (nx1.dot(nx2) > -0.8) {
             std::cout << "\tOpposite outward normals (left-right) are co-directed\n";
@@ -288,21 +288,21 @@ int PolyCell::check_base_vertices_order() const {
         }
 
         // Пересечения граней по нужным вершинам
-        if (cross_face(faces, Side::LEFT0, Side::BOTTOM0) != iww(0, 0)) {
+        if (cross_face(faces, Side3D::LEFT[0], Side3D::BOTTOM[0]) != iww(0, 0)) {
             bad = true;
         }
-        if (cross_face(faces, Side::LEFT0, Side::TOP) != iww(0, 2) &&
-            cross_face(faces, Side::LEFT1, Side::TOP) != iww(0, 2)) {
+        if (cross_face(faces, Side3D::LEFT[0], Side3D::TOP) != iww(0, 2) &&
+            cross_face(faces, Side3D::LEFT[1], Side3D::TOP) != iww(0, 2)) {
             bad = true;
         }
-        if (cross_face(faces, Side::RIGHT, Side::BOTTOM0) != iww(2, 0) &&
-            cross_face(faces, Side::RIGHT, Side::BOTTOM1) != iww(2, 0)) {
+        if (cross_face(faces, Side3D::RIGHT, Side3D::BOTTOM[0]) != iww(2, 0) &&
+            cross_face(faces, Side3D::RIGHT, Side3D::BOTTOM[1]) != iww(2, 0)) {
             bad = true;
         }
-        if (cross_face(faces, Side::RIGHT0, Side::TOP0) != iww(2, 2) &&
-            cross_face(faces, Side::RIGHT0, Side::TOP1) != iww(2, 2) &&
-            cross_face(faces, Side::RIGHT1, Side::TOP0) != iww(2, 2) &&
-            cross_face(faces, Side::RIGHT1, Side::TOP1) != iww(2, 2)) {
+        if (cross_face(faces, Side3D::RIGHT[0], Side3D::TOP[0]) != iww(2, 2) &&
+            cross_face(faces, Side3D::RIGHT[0], Side3D::TOP[1]) != iww(2, 2) &&
+            cross_face(faces, Side3D::RIGHT[1], Side3D::TOP[0]) != iww(2, 2) &&
+            cross_face(faces, Side3D::RIGHT[1], Side3D::TOP[1]) != iww(2, 2)) {
             bad = true;
         }
 
