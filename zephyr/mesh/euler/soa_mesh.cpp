@@ -897,7 +897,7 @@ void SoaCell::visualize(index_t ic, std::string filename) const {
         file << "ax.plot(curve_Lx, curve_Ly, linestyle='dotted', color='green', linewidth=0.5)\n\n";
     }
 
-    for (int iface = face_begin[ic]; iface < face_begin[ic + 1]; ++iface) {
+    for (index_t iface: faces_range(ic)) {
         if (faces.is_undefined(iface)) {
             continue;
         }
@@ -933,7 +933,7 @@ void SoaCell::visualize(index_t ic, std::string filename) const {
 }
 
 int SoaCell::check_geometry(index_t ic) const {
-    for (index_t iface = face_begin[ic]; iface < face_begin[ic + 1]; ++iface) {
+    for (index_t iface: faces_range(ic)) {
         if (faces.is_undefined(iface)) continue;
 
         Vector3d fc(0.0, 0.0, 0.0);
@@ -1258,7 +1258,7 @@ int SoaCell::check_connectivity(index_t ic) const {
             continue;
         }
 
-        // Смежная ячейка
+        // Массив смежности
         auto& adj = faces.adjacent;
 
         // Простая граничная грань
@@ -1279,8 +1279,8 @@ int SoaCell::check_connectivity(index_t ic) const {
             return -1;
         }
 
-        if (adj.local_index[iface] < 0) {
-            std::cout << "\tUndefined neighbor\n";
+        if (adj.local_index[iface] < 0 || adj.local_index[iface] >= n_locals()) {
+            std::cout << "\tadjacent.local_index out of range\n";
             print_info(ic);
             return -1;
         }
@@ -1288,12 +1288,7 @@ int SoaCell::check_connectivity(index_t ic) const {
         if (adj.rank[iface] == mpi::rank()) {
             // Локальный сосед
             if (adj.owner_index[iface] != adj.local_index[iface]) {
-                std::cout << "\tadjacent.local != adjacent.index\n";
-                print_info(ic);
-                return -1;
-            }
-            if (adj.local_index[iface] >= n_locals()) {
-                std::cout << "\tLocal neighbor out of range\n";
+                std::cout << "\tadjacent.local_index != adjacent.owner_index for local cell\n";
                 print_info(ic);
                 return -1;
             }
@@ -1305,7 +1300,7 @@ int SoaCell::check_connectivity(index_t ic) const {
         }
         else {
             // Удаленная ячейка
-            if (adj.local_index[iface] < n_locals() || adj.local_index[iface] >= n_cells()) {
+            if (adj.local_index[iface] < n_locals()) {
                 std::cout << "\tRemote neighbor out of range\n";
                 print_info(ic);
                 return -1;
@@ -1357,8 +1352,8 @@ int SoaCell::check_connectivity(index_t ic) const {
                 return -1;
             }
             // Указывает на исходную ячейку
-            if (adj.owner_index[jface] != ic) {
-                std::cout << "\tWrong connection (index != ic)\n";
+            if (adj.local_index[jface] != ic || adj.owner_index[jface] != ic) {
+                std::cout << "\tWrong connection (local_index != ic)\n";
                 std::cout << "\tCurrent cell:\n";
                 print_info(ic);
                 std::cout << "\tNeighbor:\n";
@@ -1383,18 +1378,9 @@ int SoaCell::check_connectivity(index_t ic) const {
                 print_info(jc);
                 return -1;
             }
-            // Локальный сосед
-            if (adj.rank[iface] == mpi::rank() && adj.local_index[jface] != ic) {
-                std::cout << "\tWrong connection (alien >= 0)\n";
-                std::cout << "\tCurrent cell:\n";
-                print_info(ic);
-                std::cout << "\tNeighbor:\n";
-                print_info(jc);
-                return -1;
-            }
         }
         if (counter < 1) {
-            std::cout << "\tHas no neighbor across ordinary " << side_to_string(iface) << ")\n";
+            std::cout << "\tHas no neighbor across ordinary " << side_to_string(iface - face_begin[ic]) << "\n";
             print_info(ic);
             std::cout << "\tNeighbor:\n";
             print_info(jc);
@@ -1412,7 +1398,7 @@ int SoaCell::check_connectivity(index_t ic) const {
 
 int SoaMesh::check_base() {
     if (cells.empty()) {
-        if (mpi::single()) {
+        if constexpr (mpi::single()) {
             std::cout << "\tEmpty storage\n";
             return -1;
         } else {
@@ -1459,7 +1445,7 @@ int SoaMesh::check_base() {
         res = cells.check_geometry(ic);
         if (res < 0) return res;
 
-        // Грани правльно ориентированы
+        // Грани правильно ориентированы
         res = cells.check_base_face_orientation(ic);
         if (res < 0) return res;
 

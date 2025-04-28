@@ -30,6 +30,10 @@ int main() {
     SoaMesh mesh(gen);
     mesh.add_data<double>("value");
 
+    int res = mesh.check_base();
+    if (res < 0) {
+        std::cout << "Bad mesh check: " << res << "\n";
+    }
     VtuFile vtu("mesh.vtu");
     vtu.variables = {"faces2D", "rank", "level", "index", "flag", "b_idx", "z_idx"};
     vtu.save(mesh);

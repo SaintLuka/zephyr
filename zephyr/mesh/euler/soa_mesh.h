@@ -588,6 +588,10 @@ public:
         return utils::range(face_begin[ic], face_begin[ic + 1]);
     }
 
+    utils::range<index_t> nodes_range(index_t ic) const {
+        return utils::range(node_begin[ic], node_begin[ic + 1]);
+    }
+
 
     void resize(index_t n_cells);
 };
