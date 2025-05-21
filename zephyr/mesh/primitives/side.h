@@ -1,0 +1,212 @@
+#pragma once
+
+#include <array>
+#include <string>
+
+namespace zephyr::mesh {
+
+/// @brief Структура позволяет хранить индексы граней AMR-ячейки.
+/// В большинстве контекстов работает как простой enum Side : int,
+/// то есть позволяет получить Side2D::LEFT, Side3D::BACK, ...
+/// Также позволяет получить индексы подграней, к примеру,
+/// для трехмерной ячейки Side3D::BACK[0], Side3D::BACK[1], ...
+/// @tparam dim Размерность ячейки
+template <int dim>
+struct Side {
+    // Только двумерные и трехмерные
+    static_assert(dim == 2 || dim == 3);
+
+    /// @brief Именованные индексы простых граней
+    static constexpr Side LEFT   = 0;
+    static constexpr Side RIGHT  = 1;
+    static constexpr Side BOTTOM = 2;
+    static constexpr Side TOP    = 3;
+    static const     Side BACK; //=4; Только для dim == 3.
+    static const     Side FRONT;//=5; Только для dim == 3.
+
+    /// @brief Сокращенные имена граней (X = BACK)
+    static constexpr Side L = LEFT;
+    static constexpr Side R = RIGHT;
+    static constexpr Side B = BOTTOM;
+    static constexpr Side T = TOP;;
+    static const Side X;
+    static const Side F;
+
+    /// @brief Индекс грани
+    int val;
+
+    /// @brief Неявное создание из типа int
+    constexpr Side(int v) : val(v) {}
+
+    /// @brief Неявное преобразование в int
+    constexpr operator int() const { return val; }
+
+    /// @brief Число простых граней ячейки
+    static constexpr int count() { return 2 * dim; }
+
+    /// @brief Число подграней сложной грани
+    static constexpr int subfaces() { return dim == 2 ? 2 : 4; }
+
+    /// @brief Получить подгрань сложной грани
+    constexpr Side operator[](int idx) const {
+        return Side(val + count() * idx);
+    }
+
+    /// @brief Перечисление простых граней двумерной ячейки
+    static constexpr std::array<Side, count()> items() {
+        if constexpr (dim == 2) {
+            return {LEFT, RIGHT, BOTTOM, TOP};
+        } else {
+            return {LEFT, RIGHT, BOTTOM, TOP, BACK, FRONT};
+        }
+    }
+
+    /// @brief Получить сторону по нормальному вектору направления
+    /// Side3D::LEFT == Side3D::by_dir<-1, 0, 0>().
+    template <int i, int j, int k = 0>
+    static constexpr Side by_dir() {
+        if constexpr (i < 0 && j == 0 && k == 0) { return LEFT; }
+        if constexpr (i > 0 && j == 0 && k == 0) { return RIGHT; }
+        if constexpr (i == 0 && j < 0 && k == 0) { return BOTTOM; }
+        if constexpr (i == 0 && j > 0 && k == 0) { return TOP; }
+        if constexpr (i == 0 && j == 0 && k < 0) { return BACK; }
+        if constexpr (i == 0 && j == 0 && k > 0) { return FRONT; }
+        return -1;
+    }
+
+    /// @brief Преобразование в строку
+    std::string to_string() const {
+        std::string num = "[" + std::to_string(val / count()) + "]";
+        switch (val % count()) {
+            case 0: return "LEFT" + num;
+            case 1: return "RIGHT" + num;
+            case 2: return "BOTTOM" + num;
+            case 3: return "TOP" + num;
+            case 4: return "BACK" + num;
+            case 5: return "FRONT" + num;
+            default: return "STRANGE FACE";
+        }
+    }
+
+    // Для AMR-ячейки вершины и грани упорядочены определеным образом,
+    // поэтому индексы вершин на гранях заведомо известны.
+
+    /// @brief Индексы вершин простой грани в AMR-ячейке
+    /// sf -- Simple Face
+    constexpr std::array<int, 4> sf() const {
+        if constexpr (dim == 2) {
+            switch (val) {
+                case L: return {iss<-1, -1>(), iss<-1, +1>(), undef(), undef()};
+                case R: return {iss<+1, -1>(), iss<+1, +1>(), undef(), undef()};
+                case B: return {iss<-1, -1>(), iss<+1, -1>(), undef(), undef()};
+                case T: return {iss<-1, +1>(), iss<+1, +1>(), undef(), undef()};
+                default: return {undef(), undef(), undef(), undef()};
+            }
+        } else {
+            switch (val) {
+                case L: return {iss<-1, -1, -1>(), iss<-1, +1, -1>(), iss<-1, -1, +1>(), iss<-1, +1, +1>()};
+                case R: return {iss<+1, -1, -1>(), iss<+1, +1, -1>(), iss<+1, -1, +1>(), iss<+1, +1, +1>()};
+                case B: return {iss<-1, -1, -1>(), iss<+1, -1, -1>(), iss<-1, -1, +1>(), iss<+1, -1, +1>()};
+                case T: return {iss<-1, +1, -1>(), iss<+1, +1, -1>(), iss<-1, +1, +1>(), iss<+1, +1, +1>()};
+                case X: return {iss<-1, -1, -1>(), iss<+1, -1, -1>(), iss<-1, +1, -1>(), iss<+1, +1, -1>()};
+                case F: return {iss<-1, -1, +1>(), iss<+1, -1, +1>(), iss<-1, +1, +1>(), iss<+1, +1, +1>()};
+                default: return {undef(), undef(), undef(), undef()};
+            }
+        }
+    }
+
+    /// @brief Индексы вершин части составной грани AMR-ячейки
+    /// cf -- Complex Face
+    constexpr std::array<int, 4> cf() const {
+        if constexpr (dim == 2) {
+            switch (val) {
+                case L[0]: return {iss<-1,-1>(), iss<-1, 0>(), undef(), undef()};
+                case L[1]: return {iss<-1, 0>(), iss<-1,+1>(), undef(), undef()};
+                case R[0]: return {iss<+1,-1>(), iss<+1, 0>(), undef(), undef()};
+                case R[1]: return {iss<+1, 0>(), iss<+1,+1>(), undef(), undef()};
+                case B[0]: return {iss<-1,-1>(), iss< 0,-1>(), undef(), undef()};
+                case B[1]: return {iss< 0,-1>(), iss<+1,-1>(), undef(), undef()};
+                case T[0]: return {iss<-1,+1>(), iss< 0,+1>(), undef(), undef()};
+                case T[1]: return {iss< 0,+1>(), iss<+1,+1>(), undef(), undef()};
+                default:   return {undef(), undef(), undef(), undef()};
+            }
+        }
+        else {
+            switch (val) {
+                case L[0]: return {iss<-1,-1,-1>(), iss<-1, 0,-1>(), iss<-1,-1, 0>(), iss<-1, 0, 0>()};
+                case L[1]: return {iss<-1, 0,-1>(), iss<-1,+1,-1>(), iss<-1, 0, 0>(), iss<-1,+1, 0>()};
+                case L[2]: return {iss<-1,-1, 0>(), iss<-1, 0, 0>(), iss<-1,-1,+1>(), iss<-1, 0,+1>()};
+                case L[3]: return {iss<-1, 0, 0>(), iss<-1,+1, 0>(), iss<-1, 0,+1>(), iss<-1,+1,+1>()};
+                case R[0]: return {iss<+1,-1,-1>(), iss<+1, 0,-1>(), iss<+1,-1, 0>(), iss<+1, 0, 0>()};
+                case R[1]: return {iss<+1, 0,-1>(), iss<+1,+1,-1>(), iss<+1, 0, 0>(), iss<+1,+1, 0>()};
+                case R[2]: return {iss<+1,-1, 0>(), iss<+1, 0, 0>(), iss<+1,-1,+1>(), iss<+1, 0,+1>()};
+                case R[3]: return {iss<+1, 0, 0>(), iss<+1,+1, 0>(), iss<+1, 0,+1>(), iss<+1,+1,+1>()};
+                case B[0]: return {iss<-1,-1,-1>(), iss< 0,-1,-1>(), iss<-1,-1, 0>(), iss< 0,-1, 0>()};
+                case B[1]: return {iss< 0,-1,-1>(), iss<+1,-1,-1>(), iss< 0,-1, 0>(), iss<+1,-1, 0>()};
+                case B[2]: return {iss<-1,-1, 0>(), iss< 0,-1, 0>(), iss<-1,-1,+1>(), iss< 0,-1,+1>()};
+                case B[3]: return {iss< 0,-1, 0>(), iss<+1,-1, 0>(), iss< 0,-1,+1>(), iss<+1,-1,+1>()};
+                case T[0]: return {iss<-1,+1,-1>(), iss< 0,+1,-1>(), iss<-1,+1, 0>(), iss< 0,+1, 0>()};
+                case T[1]: return {iss< 0,+1,-1>(), iss<+1,+1,-1>(), iss< 0,+1, 0>(), iss<+1,+1, 0>()};
+                case T[2]: return {iss<-1,+1, 0>(), iss< 0,+1, 0>(), iss<-1,+1,+1>(), iss< 0,+1,+1>()};
+                case T[3]: return {iss< 0,+1, 0>(), iss<+1,+1, 0>(), iss< 0,+1,+1>(), iss<+1,+1,+1>()};
+                case X[0]: return {iss<-1,-1,-1>(), iss<0, -1,-1>(), iss<-1, 0,-1>(), iss< 0, 0,-1>()};
+                case X[1]: return {iss< 0,-1,-1>(), iss<+1,-1,-1>(), iss< 0, 0,-1>(), iss<+1, 0,-1>()};
+                case X[2]: return {iss<-1, 0,-1>(), iss< 0, 0,-1>(), iss<-1,+1,-1>(), iss< 0,+1,-1>()};
+                case X[3]: return {iss< 0, 0,-1>(), iss<+1, 0,-1>(), iss< 0,+1,-1>(), iss<+1,+1,-1>()};
+                case F[0]: return {iss<-1,-1,+1>(), iss< 0,-1,+1>(), iss<-1, 0,+1>(), iss< 0, 0,+1>()};
+                case F[1]: return {iss< 0,-1,+1>(), iss<+1,-1,+1>(), iss< 0, 0,+1>(), iss<+1, 0,+1>()};
+                case F[2]: return {iss<-1, 0,+1>(), iss< 0, 0,+1>(), iss<-1,+1,+1>(), iss< 0,+1,+1>()};
+                case F[3]: return {iss< 0, 0,+1>(), iss<+1, 0,+1>(), iss< 0,+1,+1>(), iss<+1,+1,+1>()};
+                default:   return {undef(), undef(), undef(), undef()};
+            }
+        }
+    }
+
+private:
+    /// @brief Неопределенный индекс вершины
+    static constexpr int undef() { return -1; }
+
+    /// @brief Индексация вершин в кубической AMR-ячейке. Повторяет индексацию функции SqCube::iss
+    template<int i, int j, int k = -1>
+    static constexpr int iss() {
+        static_assert(i * i <= 1 && j * j <= 1 && k * k <= 1, "Available indices: {-1, 0, 1}");
+        return 9 * (k + 1) + 3 * (j + 1) + i + 1;
+    }
+};
+
+// Инициализация только для Side<3>, ошибка компиляции при
+// попытке использовать Side<2>::BACK или Side2D::BACK.
+template <> constexpr Side<3> Side<3>::BACK  = 4;
+template <> constexpr Side<3> Side<3>::FRONT = 5;
+template <> constexpr Side<3> Side<3>::X = BACK;
+template <> constexpr Side<3> Side<3>::F = FRONT;
+
+using Side2D = Side<2>;
+using Side3D = Side<3>;
+
+/// @brief Вывод названия грани в поток
+template <int dim>
+std::ostream& operator<<(std::ostream& os, Side<dim> side) {
+    os << side.to_string();
+    return os;
+}
+
+/// @brief Индекс грани в строку, dim -- размерность
+inline std::string side_to_string(int s, int dim) {
+    return dim == 2 ? Side2D(s).to_string() : Side3D(s).to_string();
+}
+
+/// @brief Требуемый порядок граней
+static_assert(Side2D::LEFT   == 0, "Left   != 0");
+static_assert(Side2D::RIGHT  == 1, "Right  != 1");
+static_assert(Side2D::BOTTOM == 2, "Bottom != 2");
+static_assert(Side2D::TOP    == 3, "Top    != 3");
+
+static_assert(Side3D::LEFT   == 0, "Left   != 0");
+static_assert(Side3D::RIGHT  == 1, "Right  != 1");
+static_assert(Side3D::BOTTOM == 2, "Bottom != 2");
+static_assert(Side3D::TOP    == 3, "Top    != 3");
+static_assert(Side3D::BACK   == 4, "Back   != 4");
+static_assert(Side3D::FRONT  == 5, "Front  != 5");
+
+} // namespace zephyr::mesh

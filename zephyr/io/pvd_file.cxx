@@ -169,7 +169,7 @@ void PvdFile::save(mesh::EuMesh& mesh, double timestep) {
 }
 
 void PvdFile::save(mesh::SoaMesh& mesh, double timestep) {
-    save(mesh.cells, timestep);
+    save(mesh.m_locals, timestep);
 }
 
 void PvdFile::save(AmrStorage& elements, double timestep) {

@@ -8,10 +8,12 @@
 namespace zephyr::mesh {
 
 void SoaCell::resize(index_t n_cells) {
+    m_size = n_cells;
+
     // Поля ячеек по числу ячеек, логично
     next.resize(n_cells, -1);
     rank.resize(n_cells, -1);
-    owner_index.resize(n_cells, -1);
+    index.resize(n_cells, -1);
 
     center.resize(n_cells);
     volume.resize(n_cells);
@@ -41,12 +43,12 @@ inline double trimin(double x, double y, double z) {
 double QCell::diameter() const {
     if (m_cells->adaptive) {
         if (m_cells->dim == 2) {
-            const SqQuad& vertices = m_cells->get_vertices<2>(cell_idx);
+            const SqQuad& vertices = m_cells->get_vertices<2>(m_index);
             return std::sqrt(std::min(
                     (vertices.vs<+1, 0>() - vertices.vs<-1, 0>()).squaredNorm(),
                     (vertices.vs<0, +1>() - vertices.vs<0, -1>()).squaredNorm()));
         } else {
-            const SqCube& vertices = m_cells->get_vertices<3>(cell_idx);
+            const SqCube& vertices = m_cells->get_vertices<3>(m_index);
             return std::sqrt(trimin(
                     (vertices.vs<+1, 0, 0>() - vertices.vs<-1, 0, 0>()).squaredNorm(),
                     (vertices.vs<0, +1, 0>() - vertices.vs<0, -1, 0>()).squaredNorm(),
@@ -78,8 +80,8 @@ bool FaceIt::to_skip(Direction dir) const {
 
 FacesIts QCell::faces(Direction dir) {
     return FacesIts(m_cells,
-                    m_cells->face_begin[cell_idx],
-                    m_cells->face_begin[cell_idx + 1],
+                    m_cells->face_begin[m_index],
+                    m_cells->face_begin[m_index + 1],
                     dir);
 }
 
@@ -100,8 +102,8 @@ bool QFace::is_undefined() const {
 void QFace::set_undefined() {
     m_cells->faces.boundary[iface] = Boundary::UNDEFINED;
     m_cells->faces.adjacent.rank[iface]  = -1;
-    m_cells->faces.adjacent.owner_index[iface] = -1;
-    m_cells->faces.adjacent.local_index[iface] = -1;
+    m_cells->faces.adjacent.alien[iface] = -1;
+    m_cells->faces.adjacent.index[iface] = -1;
 }
 
 Vector3d QFace::symm_point(const Vector3d& p) const {
@@ -115,16 +117,16 @@ double QFace::area(bool axial) const {
 }
 
 QCell QFace::neib() const {
-    return {m_cells, neib_index()};
+    return {m_cells, adj_index()};
 }
 
 int QFace::neib_rank() const { return m_cells->faces.adjacent.rank[iface]; }
 
-index_t QFace::neib_index() const { return m_cells->faces.adjacent.local_index[iface]; }
+index_t QFace::adj_index() const { return m_cells->faces.adjacent.index[iface]; }
 
-index_t QFace::neib_owner_index() const { return m_cells->faces.adjacent.owner_index[iface]; }
+index_t QFace::adj_alien() const { return m_cells->faces.adjacent.alien[iface]; }
 
-Vector3d QFace::neib_center() const { return m_cells->center[neib_index()]; }
+Vector3d QFace::neib_center() const { return m_cells->center[adj_index()]; }
 
 Boundary QFace::flag() const { return m_cells->faces.boundary[iface]; }
 
@@ -140,21 +142,21 @@ inline double QFace::z() const { return center().z(); }
 
 
 SoaMesh::SoaMesh(EuMesh &mesh)
-    : cells(mesh.locals()) {
+    : m_locals(mesh.locals()) {
 
 }
 
 SoaMesh::SoaMesh(Generator &gen) {
     EuMesh mesh(gen, int{});
-    cells.initialize(mesh.locals());
+    m_locals.initialize(mesh.locals());
 }
 
 SoaMesh::SoaMesh(const Rectangle& gen) {
-    cells.initialize(gen);
+    m_locals.initialize(gen);
 }
 
 SoaMesh::SoaMesh(const Cuboid& gen) {
-    cells.initialize(gen);
+    m_locals.initialize(gen);
 }
 
 SoaCell::SoaCell(AmrStorage &locals) {
@@ -162,8 +164,7 @@ SoaCell::SoaCell(AmrStorage &locals) {
 }
 
 void SoaCell::initialize(AmrStorage &locals) {
-    m_n_cells  = locals.size();
-    m_n_locals = locals.size();
+    m_size = locals.size();
 
     if (locals.empty()) {
         throw std::runtime_error("SoaMesh: locals is empty");
@@ -185,13 +186,13 @@ void SoaCell::initialize(AmrStorage &locals) {
     index_t faces_per_cell = dim < 3 ? 8 : 24;
     index_t nodes_per_cell = dim < 3 ? 9 : 27;
 
-    resize(m_n_locals);
+    resize(m_size);
 
-    for (index_t ic = 0; ic < m_n_locals; ++ic) {
+    for (index_t ic = 0; ic < m_size; ++ic) {
         next[ic] = locals[ic].next;
 
         rank[ic] = locals[ic].rank;
-        owner_index[ic] = locals[ic].index;
+        index[ic] = locals[ic].index;
 
         center[ic] = locals[ic].center;
         volume[ic] = locals[ic].volume;
@@ -204,8 +205,8 @@ void SoaCell::initialize(AmrStorage &locals) {
 
             faces.boundary[iface] = locals[ic].faces[jf].boundary;
             faces.adjacent.rank[iface] = locals[ic].faces[jf].adjacent.rank;
-            faces.adjacent.owner_index[iface] = locals[ic].faces[jf].adjacent.index;
-            faces.adjacent.local_index[iface] = locals[ic].faces[jf].adjacent.index;
+            faces.adjacent.alien[iface] = locals[ic].faces[jf].adjacent.index;
+            faces.adjacent.index[iface] = locals[ic].faces[jf].adjacent.index;
             if (locals[ic].faces[jf].adjacent.alien >= 0) {
                 throw std::runtime_error("ALien soa mesh");
             }
@@ -221,10 +222,10 @@ void SoaCell::initialize(AmrStorage &locals) {
             verts[v_idx] = locals[ic].vertices[jn];
         }
     }
-    face_begin[m_n_locals] = m_n_locals * faces_per_cell;
-    node_begin[m_n_locals] = m_n_locals * nodes_per_cell;
+    face_begin[m_size] = m_size * faces_per_cell;
+    node_begin[m_size] = m_size * nodes_per_cell;
 
-    data.resize(m_n_locals);
+    data.resize(m_size);
 }
 
 void SoaCell::initialize(const Rectangle& gen) {
@@ -276,8 +277,7 @@ void SoaCell::initialize(const Rectangle& gen) {
         }
     };
 
-    m_n_cells  = nx * ny;
-    m_n_locals = nx * ny;
+    m_size = nx * ny;
 
     dim = 2;
     adaptive = true;
@@ -288,14 +288,14 @@ void SoaCell::initialize(const Rectangle& gen) {
     linear = true;
     axial = false;
 
-    resize(m_n_locals);
+    resize(m_size);
 
-    for (index_t ic = 0; ic < m_n_locals; ++ic) {
+    for (index_t ic = 0; ic < m_size; ++ic) {
         auto[i, j] = get_index_pair(ic);
 
         next[ic] = ic;
         rank[ic] = 0;
-        owner_index[ic] = ic;
+        index[ic] = ic;
 
         flag[ic] = 0;
         level[ic] = 0;
@@ -329,11 +329,11 @@ void SoaCell::initialize(const Rectangle& gen) {
         faces.boundary[iface + Side2D::B] = j > 0 ? Boundary::ORDINARY : gen.bounds().bottom;
         faces.boundary[iface + Side2D::T] = j < ny - 1 ? Boundary::ORDINARY : gen.bounds().top;
 
-        for (auto side: {Side2D::L, Side2D::R, Side2D::B, Side2D::T}) {
+        for (auto side: Side2D::items()) {
             faces.adjacent.rank[iface + side] = 0;
-            faces.adjacent.owner_index[iface + side] = neib_index(i, j, side);
-            faces.adjacent.local_index[iface + side] = neib_index(i, j, side);
-            faces.vertices[iface + side].fill(face_indices::undef());
+            faces.adjacent.index[iface + side] = neib_index(i, j, side);
+            faces.adjacent.alien[iface + side] = -1;
+            faces.vertices[iface + side].fill(-1);
         }
 
         faces.normal[iface + Side2D::L] = -Vector3d::UnitX();
@@ -351,10 +351,10 @@ void SoaCell::initialize(const Rectangle& gen) {
         faces.area[iface + Side2D::B] = hx;
         faces.area[iface + Side2D::T] = hx;
 
-        faces.vertices[iface + Side2D::L] = face_indices::sf<2, Side2D::L>();
-        faces.vertices[iface + Side2D::R] = face_indices::sf<2, Side2D::R>();
-        faces.vertices[iface + Side2D::B] = face_indices::sf<2, Side2D::B>();
-        faces.vertices[iface + Side2D::T] = face_indices::sf<2, Side2D::T>();
+        faces.vertices[iface + Side2D::L] = Side2D::L.sf();
+        faces.vertices[iface + Side2D::R] = Side2D::R.sf();
+        faces.vertices[iface + Side2D::B] = Side2D::B.sf();
+        faces.vertices[iface + Side2D::T] = Side2D::T.sf();
 
         for (index_t jn = 0; jn < nodes_per_cell; ++jn) {
             verts[ic * nodes_per_cell + jn] = quad[jn];
@@ -370,24 +370,24 @@ void SoaMesh::init_amr() {
     // Эта функция нифига не используется же?
     m_max_level = 0;
 
-    if (cells.empty()) {
+    if (m_locals.empty()) {
         return;
     }
 
     int rank = mpi::rank();
     int size = mpi::size();
 
-    auto cells_nums = mpi::all_gather(cells.n_locals());
+    auto cells_nums = mpi::all_gather(m_locals.size());
     std::vector<int> offset(size, 0);
     for (int r = 0; r < size - 1; ++r) {
         offset[r + 1] = offset[r] + cells_nums[r];
     }
 
-    for (int ic = 0; ic < cells.n_locals(); ++ic) {
-        cells.b_idx[ic] = offset[rank] + ic;
-        cells.z_idx[ic] = 0;
-        cells.level[ic] = 0;
-        cells.flag[ic] = 0;
+    for (int ic = 0; ic < m_locals.size(); ++ic) {
+        m_locals.b_idx[ic] = offset[rank] + ic;
+        m_locals.z_idx[ic] = 0;
+        m_locals.level[ic] = 0;
+        m_locals.flag[ic] = 0;
     }
 }
 
@@ -411,15 +411,14 @@ void SoaMesh::balance_flags() {
 #if SCRUTINY
     static bool first_time = true;
     if (first_time) {
-        int res = check_base();
-        if (res < 0) {
+        if (check_base() < 0) {
             throw std::runtime_error("Check base failed");
         }
         first_time = false;
     }
 #endif
-    if (mpi::single()) {
-        amr2::balance_flags(cells, m_max_level);
+    if constexpr (mpi::single()) {
+        amr2::balance_flags(m_locals, m_max_level);
     }
 #ifdef ZEPHYR_MPI
     else {
@@ -429,8 +428,8 @@ void SoaMesh::balance_flags() {
 }
 
 void SoaMesh::apply_flags() {
-    if (mpi::single()) {
-        amr2::apply(cells, distributor);
+    if constexpr (mpi::single()) {
+        amr2::apply(m_locals, distributor);
     }
 #ifdef ZEPHYR_MPI
     else {
@@ -439,9 +438,8 @@ void SoaMesh::apply_flags() {
 #endif
 
 #if SCRUTINY
-    int res = check_refined();
-    if (res < 0) {
-        throw std::runtime_error("Check refined failed");
+    if (check_refined() < 0) {
+        //throw std::runtime_error("Check refined failed");
     }
 #endif
 }
@@ -454,7 +452,7 @@ void SoaMesh::refine() {
     static Stopwatch full;
 
     // Для однопроцессорной версии при пустой сетке сразу выход
-    if (mpi::single() && cells.empty()) {
+    if (mpi::single() && m_locals.empty()) {
         throw std::runtime_error("EuMesh::refine() error: Empty mesh");
     }
 
@@ -482,21 +480,24 @@ void SoaMesh::refine() {
 }
 
 void SoaCell::SoaFace::insert(index_t iface, CellType ctype, int count) {
+    int n_faces = -1;
     switch (ctype) {
         case CellType::AMR2D:
-            vertices[iface + Side3D::L] = face_indices::sf<2, Side3D::L>();
-            vertices[iface + Side3D::R] = face_indices::sf<2, Side3D::R>();
-            vertices[iface + Side3D::B] = face_indices::sf<2, Side3D::B>();
-            vertices[iface + Side3D::T] = face_indices::sf<2, Side3D::T>();
+            vertices[iface + Side2D::L] = Side2D::L.sf();
+            vertices[iface + Side2D::R] = Side2D::R.sf();
+            vertices[iface + Side2D::B] = Side2D::B.sf();
+            vertices[iface + Side2D::T] = Side2D::T.sf();
+            n_faces = 8;
             break;
 
         case CellType::AMR3D:
-            vertices[iface + Side3D::L] = face_indices::sf<3, Side3D::L>();
-            vertices[iface + Side3D::R] = face_indices::sf<3, Side3D::R>();
-            vertices[iface + Side3D::B] = face_indices::sf<3, Side3D::B>();
-            vertices[iface + Side3D::T] = face_indices::sf<3, Side3D::T>();
-            vertices[iface + Side3D::X] = face_indices::sf<3, Side3D::X>();
-            vertices[iface + Side3D::F] = face_indices::sf<3, Side3D::F>();
+            vertices[iface + Side3D::L] = Side3D::L.sf();
+            vertices[iface + Side3D::R] = Side3D::R.sf();
+            vertices[iface + Side3D::B] = Side3D::B.sf();
+            vertices[iface + Side3D::T] = Side3D::T.sf();
+            vertices[iface + Side3D::X] = Side3D::X.sf();
+            vertices[iface + Side3D::F] = Side3D::F.sf();
+            n_faces = 24;
             break;
 
         case CellType::TRIANGLE:
@@ -511,10 +512,9 @@ void SoaCell::SoaFace::insert(index_t iface, CellType ctype, int count) {
                 throw std::runtime_error(message);
             }
             for (int i = 0; i < count; ++i) {
-                vertices[iface + i] = {i, (i + 1) % count,
-                                       face_indices::undef(),
-                                       face_indices::undef()};
+                vertices[iface + i] = {i, (i + 1) % count, -1, -1};
             }
+            n_faces = count;
             break;
 
         case CellType::POLYHEDRON:
@@ -525,6 +525,10 @@ void SoaCell::SoaFace::insert(index_t iface, CellType ctype, int count) {
             std::cerr << message << "\n";
             throw std::runtime_error(message);
     }
+
+    for (int i = 0; i < n_faces; ++i) {
+        set_undefined(iface + i);
+    }
 }
 
 void SoaCell::add_cell(index_t ic, const Quad& quad) {
@@ -534,7 +538,7 @@ void SoaCell::add_cell(index_t ic, const Quad& quad) {
     assert(!axial);
 
     rank[ic] = -1;
-    owner_index[ic] = -1;
+    index[ic] = -1;
 
     flag[ic] = 0;
     b_idx[ic] = -1;
@@ -545,9 +549,11 @@ void SoaCell::add_cell(index_t ic, const Quad& quad) {
     center[ic] = quad.centroid(volume[ic]);
 
     face_begin[ic] = 8 * ic;
+    face_begin[ic + 1] = 8 * (ic + 1);
     faces.insert(face_begin[ic], CellType::AMR2D);
 
     node_begin[ic] = 9 * ic;
+    node_begin[ic + 1] = 9 * (ic + 1);
     get_vertices<2>(ic) = SqQuad(quad);
 
     for (int iface = face_begin[ic]; iface < face_begin[ic] + 4; ++iface) {
@@ -563,14 +569,14 @@ void SoaCell::add_cell(index_t ic, const Quad& quad) {
     }
 }
 
-void SoaCell::add_cell(index_t ic, const Quad& quad, bool axial) {
+void SoaCell::add_cell(index_t ic, const Quad& quad, bool axial_) {
     assert(dim == 2);
     assert(adaptive);
     assert(linear);
-    assert(axial == axial);
+    assert(axial == axial_);
 
     rank[ic] = -1;
-    owner_index[ic] = -1;
+    index[ic] = -1;
 
     flag[ic] = 0;
     b_idx[ic] = -1;
@@ -594,9 +600,11 @@ void SoaCell::add_cell(index_t ic, const Quad& quad, bool axial) {
     }
 
     face_begin[ic] = 8 * ic;
+    face_begin[ic + 1] = 8 * (ic + 1);
     faces.insert(face_begin[ic], CellType::AMR2D);
 
     node_begin[ic] = 9 * ic;
+    node_begin[ic + 1] = 9 * (ic + 1);
     get_vertices<2>(ic) = SqQuad(quad);
 
     for (int i = node_begin[ic]; i < node_begin[ic + 1]; ++i) {
@@ -628,7 +636,7 @@ void SoaCell::add_cell(index_t ic, const SqQuad& quad) {
 }
 
 void SoaCell::add_cell(index_t ic, const SqQuad& quad, bool axial) {
-    add_cell(ic, quad, axial);
+    add_cell(ic, quad.reduce(), axial);
     //std::cerr << "Nonlinear AmrCells is not supported\n";
 }
 
@@ -639,7 +647,7 @@ void SoaCell::add_cell(index_t ic, const Cube& cube) {
     assert(!axial);
 
     rank[ic] = -1;
-    owner_index[ic] = -1;
+    index[ic] = -1;
 
     flag[ic] = 0;
     b_idx[ic] = -1;
@@ -649,10 +657,12 @@ void SoaCell::add_cell(index_t ic, const Cube& cube) {
     volume[ic] = cube.volume();
     center[ic] = cube.centroid(volume[ic]);
 
-    face_begin[ic] = 24 * ic;
+    face_begin[ic] = 24 * ic ;
+    face_begin[ic + 1] = 24 * (ic + 1);
     faces.insert(face_begin[ic], CellType::AMR3D);
 
     node_begin[ic] = 27 * ic;
+    node_begin[ic + 1] = 27 * (ic + 1);
     get_vertices<3>(ic) = SqCube(cube);
 
     for (int iface = face_begin[ic]; iface < face_begin[ic] + 6; ++iface) {
@@ -750,50 +760,49 @@ void SoaCell::add_cell(index_t ic, Polyhedron poly) {
 void SoaCell::move_item(index_t ic) {
     int jc = next[ic];
 
-    rank[ic] = rank[jc];
-    next[ic] = ic;
-    owner_index[ic] = ic;
+    rank[jc] = rank[ic];
+    next[jc] = jc;
+    index[jc] = jc;
 
-    flag[ic] = flag[jc];
-    level[ic] = level[jc];
-    b_idx[ic] = b_idx[jc];
-    z_idx[ic] = z_idx[jc];
+    flag[jc] = flag[ic];
+    level[jc] = level[ic];
+    b_idx[jc] = b_idx[ic];
+    z_idx[jc] = z_idx[ic];
 
-    center[ic] = center[jc];
-    volume[ic] = volume[jc];
+    center[jc] = center[ic];
+    volume[jc] = volume[ic];
 
-    volume_alt[ic] = volume_alt[jc];
+    volume_alt[jc] = volume_alt[ic];
 
-    for (index_t i = 0; i < face_begin[jc + 1] - face_begin[jc]; ++i) {
+    for (index_t i = 0; i < face_begin[ic + 1] - face_begin[ic]; ++i) {
         index_t iface = face_begin[ic] + i;
         index_t jface = face_begin[jc] + i;
 
-        faces.boundary[iface] = faces.boundary[jface];
-        faces.normal  [iface] = faces.normal  [jface];
-        faces.center  [iface] = faces.center  [jface];
-        faces.area    [iface] = faces.area    [jface];
-        faces.area_alt[iface] = faces.area_alt[jface];
-        faces.vertices[iface] = faces.vertices[jface];
+        faces.boundary[jface] = faces.boundary[iface];
+        faces.normal  [jface] = faces.normal  [iface];
+        faces.center  [jface] = faces.center  [iface];
+        faces.area    [jface] = faces.area    [iface];
+        faces.area_alt[jface] = faces.area_alt[iface];
+        faces.vertices[jface] = faces.vertices[iface];
 
-
-        faces.adjacent.rank[iface] = faces.adjacent.rank[jface];
-        faces.adjacent.owner_index[iface] = faces.adjacent.owner_index[jface];
-        faces.adjacent.local_index[iface] = faces.adjacent.local_index[jface];
+        faces.adjacent.rank [jface] = faces.adjacent.rank[iface];
+        faces.adjacent.index[jface] = faces.adjacent.index[iface];
+        faces.adjacent.alien[jface] = faces.adjacent.alien[iface];
     }
 
-    for (index_t i = 0; i < node_begin[jc + 1] - node_begin[jc]; ++i) {
-        index_t iv = face_begin[ic] + i;
-        index_t jv = face_begin[jc] + i;
-        verts[iv] = verts[jv];
+    for (index_t i = 0; i < node_begin[ic + 1] - node_begin[ic]; ++i) {
+        index_t jv = node_begin[jc] + i;
+        index_t iv = node_begin[ic] + i;
+        verts[jv] = verts[iv];
     }
 
-    set_undefined(jc);
+    set_undefined(ic);
 }
 
 void SoaCell::print_info(index_t ic) const {
     std::cout << "\t\tcenter: " << center[ic].transpose() << "\n";
     std::cout << "\t\trank:   " << rank[ic] << "\n";
-    std::cout << "\t\tindex:  " << owner_index[ic] << "\n";
+    std::cout << "\t\tindex:  " << index[ic] << "\n";
     std::cout << "\t\tsize:   " << linear_size(ic) << "\n";
     std::cout << "\t\tvolume: " << volume[ic] << "\n";
     std::cout << "\t\tflag:   " << flag[ic] << "\n";
@@ -803,17 +812,17 @@ void SoaCell::print_info(index_t ic) const {
     std::cout << "\t\tz_idx:  " << z_idx[ic] << "\n";
 
     std::cout << "\t\tcell.vertices:\n";
-    for (int i = node_begin[ic]; i < node_begin[ic + 1]; ++i) {
+    for (index_t i: nodes_range(ic)) {
         if (!verts[i].hasNaN()) {
-            std::cout << "\t\t\t" << i << ": " << verts[i].transpose() << "\n";
+            std::cout << "\t\t\t" << i - node_begin[ic] << ": " << verts[i].transpose() << "\n";
         }
     }
 
     std::cout << "\t\tcell.faces:\n";
-    for (int iface = face_begin[ic]; iface < face_begin[ic + 1]; ++iface) {
+    for (index_t iface: faces_range(ic)) {
         if (faces.is_undefined(iface)) continue;
 
-        std::cout << "\t\t\t" << side_to_string(iface) << ":\n";
+        std::cout << "\t\t\t" << side_to_string(iface - face_begin[ic], dim) << ":\n";
         std::cout << "\t\t\t\tvertices:";
         for (int j = 0; j < (dim < 3 ? 2 : 4); ++j) {
             std::cout << " " << faces.vertices[iface][j];
@@ -823,8 +832,8 @@ void SoaCell::print_info(index_t ic) const {
         std::cout << "\t\t\t\tarea:       " << faces.area[iface] << "\n";
         std::cout << "\t\t\t\tnormal:     " << faces.normal[iface].transpose() << "\n";
         std::cout << "\t\t\t\tadj.rank:   " << faces.adjacent.rank[iface] << "\n";
-        std::cout << "\t\t\t\tadj.index:  " << faces.adjacent.owner_index[iface] << "\n";
-        std::cout << "\t\t\t\tadj.alien:  " << faces.adjacent.local_index[iface] << "\n";
+        std::cout << "\t\t\t\tadj.index:  " << faces.adjacent.index[iface] << "\n";
+        std::cout << "\t\t\t\tadj.alien:  " << faces.adjacent.alien[iface] << "\n";
     }
 }
 
@@ -851,10 +860,7 @@ void SoaCell::visualize(index_t ic, std::string filename) const {
          << "            color=color)\n\n";
 
     // Основные точки
-    SqQuad map;
-    for (int i = node_begin[ic]; i < node_begin[ic + 1]; ++i) {
-        map[i] = verts[i];
-    }
+    SqQuad map = get_vertices<2>(ic);
 
     file << "fig = plt.figure(dpi=150, figsize=(8, 8))\n";
     file << "ax = fig.add_subplot()\n\n";
@@ -1033,13 +1039,18 @@ int SoaCell::check_base_face_orientation(index_t ic) const {
 }
 
 int SoaCell::check_base_vertices_order(index_t ic) const {
+    const double h = linear_size(ic);
+    auto close = [h](Vector3d& x, Vector3d& y) -> bool {
+        return (x - y).norm() < 1.0e-6 * h;
+    };
+
     if (dim == 2) {
-        SqQuad verts = get_vertices<2>(ic);
+        SqQuad quad = get_vertices<2>(ic);
 
         bool bad = false;
 
         // Индекс пересечения двух граней
-        auto cross_face = [this](index_t iface_base, Side3D side1, Side3D side2) -> int {
+        auto cross_face = [this](index_t iface_base, Side2D side1, Side2D side2) -> int {
             auto iface = iface_base + side1;
             auto jface = iface_base + side2;
             if (faces.is_undefined(iface)) {
@@ -1060,14 +1071,13 @@ int SoaCell::check_base_vertices_order(index_t ic) const {
 
         for (int i: {-1, 0}) {
             for (int j: {-1, 0}) {
-                Vector3d a = verts(i + 1, j) - verts(i, j);
-                Vector3d b = verts(i, j + 1) - verts(i, j);
+                Vector3d a = quad(i + 1, j) - quad(i, j);
+                Vector3d b = quad(i, j + 1) - quad(i, j);
 
-                Vector3d c = verts(i, j + 1) - verts(i + 1, j + 1);
-                Vector3d d = verts(i + 1, j) - verts(i + 1, j + 1);
+                Vector3d c = quad(i, j + 1) - quad(i + 1, j + 1);
+                Vector3d d = quad(i + 1, j) - quad(i + 1, j + 1);
 
-                if (a.cross(b).z() < 0.0 ||
-                    c.cross(d).z() < 0.0) {
+                if (a.cross(b).z() < 0.0 || c.cross(d).z() < 0.0) {
                     bad = true;
                     break;
                 }
@@ -1078,31 +1088,31 @@ int SoaCell::check_base_vertices_order(index_t ic) const {
         }
 
         // Пересечения граней по нужным вершинам
-        if (cross_face(face_begin[ic], Side3D::LEFT[0], Side3D::BOTTOM[0]) != SqQuad::iss<-1, -1>()) {
+        if (cross_face(face_begin[ic], Side2D::LEFT, Side2D::BOTTOM), SqQuad::iss<-1, -1>()) {
             bad = true;
         }
-        if (cross_face(face_begin[ic], Side3D::LEFT[0], Side3D::TOP) != SqQuad::iss<-1, +1>() &&
-            cross_face(face_begin[ic], Side3D::LEFT[1], Side3D::TOP) != SqQuad::iss<-1, +1>()) {
+        if (cross_face(face_begin[ic], Side2D::LEFT[0], Side2D::TOP) != SqQuad::iss<-1, +1>() &&
+            cross_face(face_begin[ic], Side2D::LEFT[1], Side2D::TOP) != SqQuad::iss<-1, +1>()) {
             bad = true;
         }
-        if (cross_face(face_begin[ic], Side3D::RIGHT, Side3D::BOTTOM[0]) != SqQuad::iss<+1, -1>() &&
-            cross_face(face_begin[ic], Side3D::RIGHT, Side3D::BOTTOM[1]) != SqQuad::iss<+1, -1>()) {
+        if (cross_face(face_begin[ic], Side2D::RIGHT, Side2D::BOTTOM[0]) != SqQuad::iss<+1, -1>() &&
+            cross_face(face_begin[ic], Side2D::RIGHT, Side2D::BOTTOM[1]) != SqQuad::iss<+1, -1>()) {
             bad = true;
         }
-        if (cross_face(face_begin[ic], Side3D::RIGHT[0], Side3D::TOP[0]) != SqQuad::iss<+1, +1>() &&
-            cross_face(face_begin[ic], Side3D::RIGHT[0], Side3D::TOP[1]) != SqQuad::iss<+1, +1>() &&
-            cross_face(face_begin[ic], Side3D::RIGHT[1], Side3D::TOP[0]) != SqQuad::iss<+1, +1>() &&
-            cross_face(face_begin[ic], Side3D::RIGHT[1], Side3D::TOP[1]) != SqQuad::iss<+1, +1>()) {
+        if (cross_face(face_begin[ic], Side2D::RIGHT[0], Side2D::TOP[0]) != SqQuad::iss<+1, +1>() &&
+            cross_face(face_begin[ic], Side2D::RIGHT[0], Side2D::TOP[1]) != SqQuad::iss<+1, +1>() &&
+            cross_face(face_begin[ic], Side2D::RIGHT[1], Side2D::TOP[0]) != SqQuad::iss<+1, +1>() &&
+            cross_face(face_begin[ic], Side2D::RIGHT[1], Side2D::TOP[1]) != SqQuad::iss<+1, +1>()) {
             bad = true;
         }
 
         if (bad) {
-            std::cout << "\tBad arrangement of vertices in cell\n";
+            std::cout << "\tBad arrangement of vertices in cell (2D)\n";
             print_info(ic);
             return -1;
         }
     } else {
-        SqCube verts = get_vertices<3>(ic);
+        SqCube cube = get_vertices<3>(ic);
 
         bool bad = false;
 
@@ -1137,13 +1147,13 @@ int SoaCell::check_base_vertices_order(index_t ic) const {
         for (int i: {-1, 0}) {
             for (int j: {-1, 0}) {
                 for (int k: {-1, 0}) {
-                    Vector3d a = verts(i + 1, j, k) - verts(i, j, k);
-                    Vector3d b = verts(i, j + 1, k) - verts(i, j, k);
-                    Vector3d c = verts(i, j, k + 1) - verts(i, j, k);
+                    Vector3d a = cube(i + 1, j, k) - cube(i, j, k);
+                    Vector3d b = cube(i, j + 1, k) - cube(i, j, k);
+                    Vector3d c = cube(i, j, k + 1) - cube(i, j, k);
 
-                    Vector3d A = verts(i + 1, j + 1, k + 1) - verts(i, j + 1, k + 1);
-                    Vector3d B = verts(i + 1, j + 1, k + 1) - verts(i + 1, j, k + 1);
-                    Vector3d C = verts(i + 1, j + 1, k + 1) - verts(i + 1, j + 1, k);
+                    Vector3d A = cube(i + 1, j + 1, k + 1) - cube(i, j + 1, k + 1);
+                    Vector3d B = cube(i + 1, j + 1, k + 1) - cube(i + 1, j, k + 1);
+                    Vector3d C = cube(i + 1, j + 1, k + 1) - cube(i + 1, j + 1, k);
 
                     if (a.dot(b.cross(c)) < 0.0 || A.dot(B.cross(C)) < 0.0) {
                         bad = true;
@@ -1162,7 +1172,7 @@ int SoaCell::check_base_vertices_order(index_t ic) const {
         // Пересечения граней по нужным вершинам ???
 
         if (bad) {
-            std::cout << "\tBad arrangement of vertices in cell\n";
+            std::cout << "\tBad arrangement of vertices in cell (3D)\n";
             print_info(ic);
             return -1;
         }
@@ -1173,15 +1183,15 @@ int SoaCell::check_base_vertices_order(index_t ic) const {
 
 int SoaCell::check_complex_faces(index_t ic) const {
     if (dim == 2) {
-        for (int s = 0; s < 4; ++s) {
-            auto iface1 = face_begin[ic] + s;
-            auto iface2 = face_begin[ic] + s + 6;
+        for (Side2D side: Side2D::items()) {
+            auto iface1 = face_begin[ic] + side;
+            auto iface2 = face_begin[ic] + side[1];
             if (faces.is_undefined(iface2)) {
                 continue;
             }
 
             if (std::abs(faces.normal[iface1].dot(faces.normal[iface2]) - 1.0) > 1.0e-2) {
-                std::cout << "\tSubfaces are not co-directed (" + side_to_string(s) + " side)\n";
+                std::cout << "\tSubfaces are not co-directed (" << side_to_string(side, dim) << ")\n";
                 print_info(ic);
                 return -1;
             }
@@ -1200,17 +1210,17 @@ int SoaCell::check_complex_faces(index_t ic) const {
             }
         }
     } else {
-        for (int s = 0; s < 6; ++s) {
-            auto iface1 = face_begin[ic] + s;
-            auto iface2 = face_begin[ic] + s + 6;
+        for (Side3D side: Side3D::items()) {
+            auto iface1 = face_begin[ic] + side;
+            auto iface2 = face_begin[ic] + side[1];
             if (faces.is_undefined(iface2)) {
                 continue;
             }
 
-            auto iface3 = face_begin[ic] + s + 12;
-            auto iface4 = face_begin[ic] + s + 18;
+            auto iface3 = face_begin[ic] + side[2];
+            auto iface4 = face_begin[ic] + side[3];
             if (faces.is_undefined(iface3) || faces.is_undefined(iface4)) {
-                std::cout << "\tComplex 3D face (" + side_to_string(s) + " side) has less than 4 subfaces\n";
+                std::cout << "\tComplex 3D face (" + side_to_string(side, dim) + " side) has less than 4 subfaces\n";
                 print_info(ic);
                 return -1;
             }
@@ -1219,7 +1229,7 @@ int SoaCell::check_complex_faces(index_t ic) const {
             double d2 = std::abs(faces.normal[iface1].dot(faces.normal[iface3]) - 1.0);
             double d3 = std::abs(faces.normal[iface1].dot(faces.normal[iface4]) - 1.0);
             if (d1 + d2 + d3 > 1.0e-5) {
-                std::cout << "\tSubfaces are not co-directed (" + side_to_string(s) + " side)\n";
+                std::cout << "\tSubfaces are not co-directed (" + side_to_string(side, dim) << ")\n";
                 print_info(ic);
                 return -1;
             }
@@ -1230,7 +1240,12 @@ int SoaCell::check_complex_faces(index_t ic) const {
 }
 
 int SoaCell::check_connectivity(index_t ic) const {
-    if (ic >= n_locals()) {
+    SoaCell aliens;
+    return check_connectivity(ic, aliens);
+}
+
+int SoaCell::check_connectivity(index_t ic, SoaCell& aliens) const {
+    if (ic >= m_size) {
         throw std::runtime_error("Данная проверка только для локальных ячеек!");
     }
 
@@ -1245,13 +1260,13 @@ int SoaCell::check_connectivity(index_t ic) const {
                 print_info(ic);
                 return -1;
             }
-            if (faces.adjacent.owner_index[iface] >= 0) {
+            if (faces.adjacent.index[iface] >= 0) {
                 std::cout << "\tUndefined face, adjacent.index >= 0\n";
                 print_info(ic);
                 return -1;
             }
-            if (faces.adjacent.local_index[iface] >= 0) {
-                std::cout << "\tUndefined face, adjacent.local >= 0\n";
+            if (faces.adjacent.alien[iface] >= 0) {
+                std::cout << "\tUndefined face, adjacent.alien >= 0\n";
                 print_info(ic);
                 return -1;
             }
@@ -1264,7 +1279,7 @@ int SoaCell::check_connectivity(index_t ic) const {
         // Простая граничная грань
         if (faces.is_boundary(iface)) {
             // Грань должна ссылаться на саму ячейку
-            if (adj.rank[iface] != rank[ic] || adj.owner_index[iface] != ic || adj.local_index[iface] != ic) {
+            if (adj.rank[iface] != rank[ic] || adj.index[iface] != ic || adj.alien[iface] >= 0) {
                 std::cout << "\tBoundary face should point to origin cell\n";
                 print_info(ic);
                 return -1;
@@ -1279,20 +1294,25 @@ int SoaCell::check_connectivity(index_t ic) const {
             return -1;
         }
 
-        if (adj.local_index[iface] < 0 || adj.local_index[iface] >= n_locals()) {
-            std::cout << "\tadjacent.local_index out of range\n";
+        if (adj.index[iface] < 0) {
+            std::cout << "\tadjacent.index out of range #1\n";
             print_info(ic);
             return -1;
         }
 
         if (adj.rank[iface] == mpi::rank()) {
             // Локальный сосед
-            if (adj.owner_index[iface] != adj.local_index[iface]) {
-                std::cout << "\tadjacent.local_index != adjacent.owner_index for local cell\n";
+            if (adj.index[iface] >= m_size) {
+                std::cout << "\tadjacent.index out of range #1\n";
                 print_info(ic);
                 return -1;
             }
-            if (adj.local_index[iface] == ic) {
+            if (adj.alien[iface] >= 0) {
+                std::cout << "\tadjacent.alien >= 0 for local cell\n";
+                print_info(ic);
+                return -1;
+            }
+            if (adj.index[iface] == ic) {
                 std::cout << "\tSelf reference\n";
                 print_info(ic);
                 return -1;
@@ -1300,14 +1320,16 @@ int SoaCell::check_connectivity(index_t ic) const {
         }
         else {
             // Удаленная ячейка
-            if (adj.local_index[iface] < n_locals()) {
-                std::cout << "\tRemote neighbor out of range\n";
+            if (adj.alien[iface] < 0 || adj.alien[iface] >= aliens.size()) {
+                std::cout << "\tadjacent.alien out of range for remote cell\n";
                 print_info(ic);
                 return -1;
             }
         }
 
-        index_t jc = adj.local_index[iface];
+        // Сосед может быть из aliens
+        index_t jc = adj.alien[iface] < 0 ? adj.index[iface] : adj.alien[iface];
+        const SoaCell& cells = adj.alien[iface] < 0 ? *this : aliens;
 
         Vector3d fc = faces.center[iface];
 
@@ -1315,17 +1337,17 @@ int SoaCell::check_connectivity(index_t ic) const {
         // и ссылаться на текущую ячейку
         int counter = 0;
 
-        for (index_t jface: faces_range(jc)) {
-            if (faces.is_undefined(jface)) {
+        for (index_t jface: cells.faces_range(jc)) {
+            if (cells.faces.is_undefined(jface)) {
                 continue;
             }
 
             // простая граничная грань
-            if (faces.is_boundary(jface)) {
+            if (cells.faces.is_boundary(jface)) {
                 continue;
             }
 
-            Vector3d nfc = faces.center[jface];
+            Vector3d nfc = cells.faces.center[jface];
             if ((fc - nfc).norm() > 1.0e-6 * linear_size(ic)) {
                 continue;
             }
@@ -1334,56 +1356,56 @@ int SoaCell::check_connectivity(index_t ic) const {
             ++counter;
 
             // нормали противоположны
-            if (std::abs(faces.normal[iface].dot(faces.normal[jface]) + 1.0) > 1.0e-6) {
+            if (std::abs(faces.normal[iface].dot(cells.faces.normal[jface]) + 1.0) > 1.0e-6) {
                 std::cout << "\tOpposite faces have not opposite normals\n";
                 std::cout << "\tCurrent cell:\n";
                 print_info(ic);
                 std::cout << "\tNeighbor:\n";
-                print_info(jc);
+                cells.print_info(jc);
                 return -1;
             }
             // площади совпадают
-            if (std::abs(faces.area[ic] - faces.area[jface]) > 1.0e-6 * linear_size(ic)) {
+            if (std::abs(faces.area[iface] - cells.faces.area[jface]) > 1.0e-6 * linear_size(ic)) {
                 std::cout << "\tOpposite faces have different area\n";
                 std::cout << "\tCurrent cell:\n";
                 print_info(ic);
                 std::cout << "\tNeighbor:\n";
-                print_info(jc);
+                cells.print_info(jc);
                 return -1;
             }
             // Указывает на исходную ячейку
-            if (adj.local_index[jface] != ic || adj.owner_index[jface] != ic) {
-                std::cout << "\tWrong connection (local_index != ic)\n";
+            if (cells.faces.adjacent.index[jface] != ic || cells.faces.adjacent.alien[jface] >= 0) {
+                std::cout << "\tWrong connection (index != ic)\n";
                 std::cout << "\tCurrent cell:\n";
                 print_info(ic);
                 std::cout << "\tNeighbor:\n";
-                print_info(jc);
+                cells.print_info(jc);
                 return -1;
             }
             // Ранг смежной (исходная) больше нуля
-            if (adj.rank[jface] < 0) {
+            if (cells.faces.adjacent.rank[jface] < 0) {
                 std::cout << "\tWrong adjacent (rank < 0)\n";
                 std::cout << "\tCurrent cell:\n";
                 print_info(ic);
                 std::cout << "\tNeighbor:\n";
-                print_info(jc);
+                cells.print_info(jc);
                 return -1;
             }
             // Ранг смежной (исходная) равен рангу процесса
-            if (adj.rank[jface] != mpi::rank()) {
+            if (cells.faces.adjacent.rank[jface] != mpi::rank()) {
                 std::cout << "\tWrong adjacent (rank)\n";
                 std::cout << "\tCurrent cell:\n";
                 print_info(ic);
                 std::cout << "\tNeighbor:\n";
-                print_info(jc);
+                cells.print_info(jc);
                 return -1;
             }
         }
         if (counter < 1) {
-            std::cout << "\tHas no neighbor across ordinary " << side_to_string(iface - face_begin[ic]) << "\n";
+            std::cout << "\tHas no neighbor across ordinary " << side_to_string(iface - face_begin[ic], dim) << "\n";
             print_info(ic);
             std::cout << "\tNeighbor:\n";
-            print_info(jc);
+            cells.print_info(jc);
             return -1;
         }
         if (counter > 1) {
@@ -1396,8 +1418,8 @@ int SoaCell::check_connectivity(index_t ic) const {
     return 0;
 }
 
-int SoaMesh::check_base() {
-    if (cells.empty()) {
+int SoaMesh::check_base() const {
+    if (m_locals.empty()) {
         if constexpr (mpi::single()) {
             std::cout << "\tEmpty storage\n";
             return -1;
@@ -1406,7 +1428,7 @@ int SoaMesh::check_base() {
         }
     }
 
-    auto dim = cells.dim;
+    auto dim = m_locals.dim;
 
     if (dim != 2 && dim != 3) {
         std::cout << "\tDimension is not 2 or 3\n";
@@ -1414,55 +1436,55 @@ int SoaMesh::check_base() {
     }
 
     int res = 0;
-    for (index_t ic = 0; ic < cells.n_locals(); ++ic) {
-        if (cells.owner_index[ic] < 0 || cells.owner_index[ic] != ic) {
+    for (index_t ic = 0; ic < m_locals.size(); ++ic) {
+        if (m_locals.index[ic] < 0 || m_locals.index[ic] != ic) {
             std::cout << "\tWrong cell index\n";
             return -1;
         }
 
-        if (cells.rank[ic] < 0 || cells.rank[ic] != mpi::rank()) {
+        if (m_locals.rank[ic] < 0 || m_locals.rank[ic] != mpi::rank()) {
             std::cout << "\tWrong cell rank\n";
             return -1;
         }
 
         // Число граней
         for (int i = 0; i < FpC(dim); ++i) {
-            if (cells.faces.is_undefined(cells.face_begin[ic] + i)) {
+            if (m_locals.faces.is_undefined(m_locals.face_begin[ic] + i)) {
                 std::cout << "\tCell has no one of main faces\n";
-                cells.print_info(ic);
+                m_locals.print_info(ic);
                 return -1;
             }
         }
-        if (cells.face_count(ic) > FpC(dim)) {
-            std::cout << "\tCell has too much faces (" << cells.face_count(ic) << ")\n";
-            cells.print_info(ic);
+        if (m_locals.face_count(ic) > FpC(dim)) {
+            std::cout << "\tCell has too much faces (" << m_locals.face_count(ic) << ")\n";
+            m_locals.print_info(ic);
             return -1;
         }
 
         // Число вершин ???
 
         // Правильное задание геометрии
-        res = cells.check_geometry(ic);
+        res = m_locals.check_geometry(ic);
         if (res < 0) return res;
 
         // Грани правильно ориентированы
-        res = cells.check_base_face_orientation(ic);
+        res = m_locals.check_base_face_orientation(ic);
         if (res < 0) return res;
 
         // Порядок основных вершин
-        res = cells.check_base_vertices_order(ic);
+        res = m_locals.check_base_vertices_order(ic);
         if (res < 0) return res;
 
         // Проверка смежности
-        res = cells.check_connectivity(ic);
+        res = m_locals.check_connectivity(ic);
         if (res < 0) return res;
     }
 
     return 0;
 }
 
-int SoaMesh::check_refined() {
-    if (cells.empty()) {
+int SoaMesh::check_refined() const {
+    if (m_locals.empty()) {
         if (mpi::single()) {
             std::cout << "\tEmpty storage\n";
             return -1;
@@ -1471,7 +1493,7 @@ int SoaMesh::check_refined() {
         }
     }
 
-    auto dim = cells.dim;
+    auto dim = m_locals.dim;
 
     if (dim != 2 && dim != 3) {
         std::cout << "\tDimension is not 2 or 3\n";
@@ -1479,61 +1501,61 @@ int SoaMesh::check_refined() {
     }
 
     int res = 0;
-    for (index_t ic = 0; ic < cells.n_locals(); ++ic) {
-        if (cells.is_undefined(ic)) {
+    for (index_t ic = 0; ic < m_locals.size(); ++ic) {
+        if (m_locals.is_undefined(ic)) {
             std::cout << "\tUndefined cell\n";
             return -1;
         }
 
-        if (cells.owner_index[ic] < 0 || cells.owner_index[ic] != ic) {
+        if (m_locals.index[ic] < 0 || m_locals.index[ic] != ic) {
             std::cout << "\tWrong cell index\n";
             return -1;
         }
 
-        if (cells.rank[ic] < 0 || cells.rank[ic] != mpi::rank()) {
+        if (m_locals.rank[ic] < 0 || m_locals.rank[ic] != mpi::rank()) {
             std::cout << "\tWrong cell rank\n";
             return -1;
         }
 
         // Число граней
         for (int i = 0; i < FpC(dim); ++i) {
-            if (cells.faces.is_undefined(cells.face_begin[ic] + i)) {
+            if (m_locals.faces.is_undefined(m_locals.face_begin[ic] + i)) {
                 std::cout << "\tCell has no one of main faces\n";
-                cells.print_info(ic);
+                m_locals.print_info(ic);
                 return -1;
             }
         }
 
         // Вершины дублируются
-        for (int i = cells.node_begin[ic]; i < cells.node_begin[ic + 1]; ++i) {
-            for (int j = i + 1; j < cells.node_begin[ic + 1]; ++j) {
-                double dist = (cells.verts[i] - cells.verts[j]).norm();
-                if (dist < 1.0e-5 * cells.linear_size(ic)) {
+        for (int i = m_locals.node_begin[ic]; i < m_locals.node_begin[ic + 1]; ++i) {
+            for (int j = i + 1; j < m_locals.node_begin[ic + 1]; ++j) {
+                double dist = (m_locals.verts[i] - m_locals.verts[j]).norm();
+                if (dist < 1.0e-5 * m_locals.linear_size(ic)) {
                     std::cout << "\tIdentical vertices\n";
-                    cells.print_info(ic);
+                    m_locals.print_info(ic);
                     return -1;
                 }
             }
         }
 
         // Правильное задание геометрии
-        res = cells.check_geometry(ic);
+        res = m_locals.check_geometry(ic);
         if (res < 0) return res;
 
         // Грани правльно ориентированы
-        res = cells.check_base_face_orientation(ic);
+        res = m_locals.check_base_face_orientation(ic);
         if (res < 0) return res;
 
         // Порядок основных вершин
-        res = cells.check_base_vertices_order(ic);
+        res = m_locals.check_base_vertices_order(ic);
         if (res < 0) return res;
 
         // Проверка сложных граней
-        res = cells.check_complex_faces(ic);
+        res = m_locals.check_complex_faces(ic);
         if (res < 0) return res;
 
         // Проверка смежности
-        res = cells.check_connectivity(ic);
+        res = m_locals.check_connectivity(ic);
         if (res < 0) return res;
     }
 

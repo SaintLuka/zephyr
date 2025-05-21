@@ -4,7 +4,7 @@
 #include <iomanip>
 
 #include <zephyr/geom/primitives/cube.h>
-#include <zephyr/mesh/primitives/Side3D.h>
+#include <zephyr/mesh/primitives/side.h>
 #include <zephyr/mesh/primitives/decomposition.h>
 #include <zephyr/mesh/primitives/amr_cell.h>
 
@@ -36,7 +36,7 @@ void AmrCell::print_info() const {
         auto &face = faces[i];
         if (face.is_undefined()) continue;
 
-        std::cout << "\t\t\t" << side_to_string(i) << ":\n";
+        std::cout << "\t\t\t" << side_to_string(i, dim) << ":\n";
         std::cout << "\t\t\t\tvertices:";
         for (int j = 0; j < (dim < 3 ? 2 : 4); ++j) {
             std::cout << " " << face.vertices[j];
@@ -405,7 +405,7 @@ int AmrCell::check_complex_faces() const {
             }
 
             if (std::abs(f1.normal.dot(f2.normal) - 1.0) > 1.0e-2) {
-                std::cout << "\tSubfaces are not co-directed (" + side_to_string(s) + " side)\n";
+                std::cout << "\tSubfaces are not co-directed (" + side_to_string(s, dim) + " side)\n";
                 print_info();
                 return -1;
             }
@@ -434,7 +434,7 @@ int AmrCell::check_complex_faces() const {
             auto f3 = faces[s + 12];
             auto f4 = faces[s + 18];
             if (f3.is_undefined() || f4.is_undefined()) {
-                std::cout << "\tComplex 3D face (" + side_to_string(s) + " side) has less than 4 subfaces\n";
+                std::cout << "\tComplex 3D face (" + side_to_string(s, dim) + " side) has less than 4 subfaces\n";
                 print_info();
                 return -1;
             }
@@ -443,7 +443,7 @@ int AmrCell::check_complex_faces() const {
             double d2 = std::abs(f1.normal.dot(f3.normal) - 1.0);
             double d3 = std::abs(f1.normal.dot(f4.normal) - 1.0);
             if (d1 + d2 + d3 > 1.0e-5) {
-                std::cout << "\tSubfaces are not co-directed (" + side_to_string(s) + " side)\n";
+                std::cout << "\tSubfaces are not co-directed (" + side_to_string(s, dim) + " side)\n";
                 print_info();
                 return -1;
             }

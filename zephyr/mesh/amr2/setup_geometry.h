@@ -1,7 +1,6 @@
-/// @file Файл содержит реализацию функции setup_geometry, которая создает новые ячейки.
+/// @brief Файл содержит реализацию функции setup_geometry, которая создает новые ячейки.
 /// Данный файл не устанавливается при установке zephyr, все изложенные описания
 /// алгоритмов и комментарии к функциям предназначены исключительно для разработчиков.
-
 #pragma once
 
 #include <zephyr/mesh/amr2/common.h>
@@ -13,35 +12,34 @@
 namespace zephyr::mesh::amr2 {
 
 /// @brief Вызывает для ячейки соответствующий метод адаптации
-/// @param cells Локальные ячейки
+/// @param locals Локальные ячейки
 /// @param aliens Удаленные ячейки
 /// @param rank Ранг текущего процесса
 /// @param op Оператор распределения данных при огрублении и разбиении
 template<int dim>
-void setup_geometry_one(index_t ic, SoaCell &cells,
+void setup_geometry_one(index_t ic, SoaCell &locals, SoaCell& aliens,
         int rank, const Distributor& op) {
 
-    if (cells.flag[ic] == 0) {
-        retain_cell<dim>(ic, cells);
+    if (locals.flag[ic] == 0) {
+        retain_cell<dim>(locals, aliens, ic);
         return;
     }
 
-    if (cells.flag[ic] > 0) {
-        refine_cell<dim>(ic, cells, rank, op);
+    if (locals.flag[ic] > 0) {
+        refine_cell<dim>(locals, ic, rank, op);
         return;
     }
 
-    coarse_cell<dim>(ic, cells, rank, op);
+    coarse_cell<dim>(locals, aliens, ic, rank, op);
 }
 
 /// @brief Осуществляет проход по ячейкам и вызывает для них
 /// соответствующие методы адаптации (без MPI)
 template<int dim>
-void setup_geometry(SoaCell &cells, const Statistics &count, const Distributor& op) {
-    utils::range r(0, count.n_cells);
-    threads::for_each<10>(
-            r.begin(), r.end(),
-            setup_geometry_one<dim>, std::ref(cells), 0, std::ref(op));
+void setup_geometry(SoaCell &locals, SoaCell& aliens, const Statistics &count, const Distributor& op) {
+    threads::parallel_for(index_t{0}, index_t{count.n_cells},
+        setup_geometry_one<dim>,
+        std::ref(locals), std::ref(aliens), 0, std::ref(op));
 }
 
 #ifdef ZEPHYR_MPI

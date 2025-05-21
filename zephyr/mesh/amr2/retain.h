@@ -13,62 +13,67 @@ namespace zephyr::mesh::amr2 {
 /// @brief Функция вызывается для ячеек с флагом адаптации = 0, хотя сама
 /// ячейка не разбивается и не огрубляется, у неё может измениться набор граней:
 /// какие-то грани могут объединиться, а часть разбиться.
-/// @param
-/// @param cells Хранилище локальных ячеек
-/// @param rank Ранг текущего процесса
+/// @param locals Хранилище локальных ячеек
 /// @param ic Индекс целевой ячейки
 /// @details Если какая-то грань разбивается, то adjacent у подграней
 /// выставляется со старой грани. Если подграни склеиваются, то adjacent
 /// у объединенной грани будет такой, какой был у старой грани.
 template<int dim>
-void retain_cell(index_t ic, SoaCell &cells) {
+void retain_cell(SoaCell &locals, SoaCell& aliens, index_t ic) {
     // Ячейка не требует разбиения, необходимо пройти по граням,
     // возможно, необходимо разбить грань или собрать
-    auto rank = cells.rank[ic];
-    auto lvl_c = cells.level[ic];
-    auto& adj = cells.faces.adjacent;
+    auto rank = locals.rank[ic];
+    auto lvl_c = locals.level[ic];
+    auto& adj = locals.faces.adjacent;
 
     for (int side = 0; side < FpC(dim); ++side) {
         auto sides = subface_sides<dim>(side);
 
-        index_t iface = cells.face_begin[ic] + side;
+        index_t iface = locals.face_begin[ic] + side;
 
-        if (cells.faces.is_undefined(iface) or
-            cells.faces.is_boundary(iface)) {
+        if (locals.faces.is_undefined(iface) ||
+            locals.faces.is_boundary(iface)) {
             continue;
         }
 #if SCRUTINY
-        if (adj.rank[iface] == rank && adj.local_index[iface] >= cells.n_locals()) {
+        if (adj.rank[iface] == rank && adj.index[iface] >= locals.size()) {
             std::cout << "AmrCell has no local neighbor through the " <<
-                      side_to_string(side % 6) << " side\n";
-            cells.print_info(ic);
+                      side_to_string(side, dim) << " side\n";
+            locals.print_info(ic);
             throw std::runtime_error("AmrCell has no local neighbor (retain_cell)");
         }
         if (adj.rank[iface] != rank &&
-            (adj.local_index[iface] < cells.n_locals() || adj.local_index[iface] >= cells.n_cells())) {
+            (adj.alien[iface] < 0 || adj.alien[iface] >= aliens.size())) {
             std::cout << "AmrCell has no remote neighbor through the " <<
-                side_to_string(side % 6) << " side\n";
-            cells.print_info(ic);
+                side_to_string(side, dim) << " side\n";
+            locals.print_info(ic);
             throw std::runtime_error("AmrCell has no remote neighbor (retain_cell)");
         }
 #endif
-        index_t jc = adj.local_index[iface];
-        auto lvl_n = cells.level[jc];
+        // Хранилище и индекс соседа
+        auto [neibs, jc] = locals.faces.get_neib(iface, locals, aliens);
+
+        auto lvl_n = neibs.level[jc];
 
         if (lvl_c == lvl_n) {
             // Сосед имеет такой же уровень
 #if SCRUTINY
             // Сложная грань вместо одинарной
             for (int i = 1; i < FpF(dim); ++i) {
-                if (cells.faces.is_actual(cells.face_begin[ic] + sides[i])) {
+                if (locals.faces.is_actual(locals.face_begin[ic] + sides[i])) {
+                    std::cout << "Imbalance: lvl_c == lvl_n, complex " << side_to_string(sides[i], dim) << "\n";
+                    std::cout << "MAIN CELL:\n";
+                    locals.print_info(ic);
+                    std::cout << "NEIB CELL:\n";
+                    neibs.print_info(jc);
                     throw std::runtime_error("Imbalance: lvl_c == lvl_n, complex face");
                 }
             }
 #endif
 
             // Сосед адаптируется
-            if (cells.flag[jc] > 0) {
-                split_face<dim>(ic, cells, side);
+            if (neibs.flag[jc] > 0) {
+                split_face<dim>(ic, locals, side);
             }
 
             // Сосед ничего не делает - ничего не делаем
@@ -82,31 +87,35 @@ void retain_cell(index_t ic, SoaCell &cells) {
             // Одинарная грань вместо сложной
             int counter = 0;
             for (int s: sides) {
-                if (cells.faces.is_actual(cells.face_begin[ic] + s)) {
+                if (locals.faces.is_actual(locals.face_begin[ic] + s)) {
                     ++counter;
                 }
             }
             if (counter != FpF(dim)) {
+                std::cout << "Current cell:\n";
+                locals.print_info(ic);
+                std::cout << "Neighbor:\n";
+                neibs.print_info(jc);
                 throw std::runtime_error("Imbalance: lvl_c < lvl_n, single face");
             }
 
             // Сосед не может разбиваться
-            if (cells.flag[jc] > 0) {
+            if (neibs.flag[jc] > 0) {
                 std::cout << "Current cell:\n";
-                cells.print_info(ic);
+                locals.print_info(ic);
                 std::cout << "Neighbor:\n";
-                cells.print_info(jc);
+                neibs.print_info(jc);
                 throw std::runtime_error("Imbalance None:Split");
             }
 #endif
             // Сосед огрубляется - объединяем грань
-            if (cells.flag[jc] < 0) {
+            if (neibs.flag[jc] < 0) {
                 for (int s: sides) {
-                    cells.faces.adjacent.rank[cells.face_begin[ic] + s] = adj.rank[iface];
-                    cells.faces.adjacent.local_index[cells.face_begin[ic] + s] = adj.local_index[iface];
-                    cells.faces.adjacent.owner_index[cells.face_begin[ic] + s] = adj.owner_index[iface];
+                    adj.rank [locals.face_begin[ic] + s] = adj.rank[iface];
+                    adj.index[locals.face_begin[ic] + s] = adj.index[iface];
+                    adj.alien[locals.face_begin[ic] + s] = adj.alien[iface];
                 }
-                merge_faces<dim>(ic, cells, Side3D(side));
+                merge_faces<dim>(ic, locals, Side<dim>(side));
             }
 
             // Сосед ничего не делает - ничего не делаем
@@ -117,13 +126,14 @@ void retain_cell(index_t ic, SoaCell &cells) {
 #if SCRUTINY
             // Сложная грань вместо одинарной
             for (int i = 1; i < FpF(dim); ++i) {
-                if (cells.faces.is_actual(cells.face_begin[ic] + sides[i])) {
+
+                if (locals.faces.is_actual(locals.face_begin[ic] + sides[i])) {
                     throw std::runtime_error("Imbalance: lvl_c > lvl_n, complex face");
                 }
             }
 
             // Сосед не может огрубляться
-            if (cells.flag[jc] < 0) {
+            if (neibs.flag[jc] < 0) {
                 throw std::runtime_error("Imbalance: lvl_c > lvl_n, flag_n = coarse");
             }
 #endif

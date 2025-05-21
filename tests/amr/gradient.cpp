@@ -3,10 +3,9 @@
 
 #include <iomanip>
 
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/euler/soa_mesh.h>
 #include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/io/pvd_file.h>
-#include <zephyr/io/variables.h>
 #include <zephyr/utils/stopwatch.h>
 
 using namespace zephyr;
@@ -16,20 +15,8 @@ using generator::Rectangle;
 using zephyr::io::PvdFile;
 using zephyr::utils::Stopwatch;
 
-
-struct _U_ {
-    int wanted;
-};
-
-_U_ U;
-
-double get_wanted(AmrStorage::Item& cell) {
-    return cell(U).wanted;
-}
-
-inline double sqr(double x) {
-    return x * x;
-}
+// Поле для хранения на сетке
+static Storable<int> wanted;
 
 Vector3d epitrochoid(double t) {
     double R = 0.6;
@@ -43,7 +30,7 @@ Vector3d epitrochoid(double t) {
 }
 
 // Периодическая функция времени, с периодом = 1
-void set_wanted(EuCell& cell, int level, double t) {
+void set_wanted(QCell& cell, int level, double t) {
     double phi = 10 * M_PI * t;
     Vector3d C = epitrochoid(phi);
     Vector3d T = epitrochoid(phi + 1.0e-6) - epitrochoid(phi - 1.0e-6); // касательная
@@ -56,17 +43,14 @@ void set_wanted(EuCell& cell, int level, double t) {
 
     double xi = std::max(0.0, 1.0 - dist / H);
 
-    int wanted = int(std::floor((level + 0.99) * sqr(sqr(sqr(xi)))));
-
-    cell(U).wanted = wanted;
+    cell(wanted) = int(std::floor((level + 0.99) * std::pow(xi, 8)));
 }
 
-void set_flag(EuCell& cell) {
-    int wanted = cell(U).wanted;
-    if (cell.level() < wanted) {
+void set_flag(QCell& cell) {
+    if (cell.level() < cell(wanted)) {
         cell.set_flag(1);
     }
-    else if (cell.level() == wanted) {
+    else if (cell.level() == cell(wanted)) {
         cell.set_flag(0);
     }
     else {
@@ -78,19 +62,19 @@ int main() {
     threads::on();
 
     PvdFile pvd("mesh", "output");
-    pvd.variables = {"index", "level"};
-    pvd.variables += { "wanted", get_wanted };
+    pvd.variables = {"rank", "index", "next", "level", "flag", "faces2D"};
+    pvd.variables += {"wanted", [](QCell& cell) -> double { return cell(wanted); }};
 
     Rectangle rect(-1.0, 1.0, -1.0, 1.0);
     rect.set_nx(20);
 
-    EuMesh mesh(rect, U);
+    SoaMesh mesh(rect);
+    wanted = mesh.add_data<int>("wanted");
 
     mesh.set_max_level(5);
 
-    int res = mesh.check_base();
-    if (res < 0) {
-        std::cout << "bad init mesh\n";
+    if (mesh.check_base() < 0) {
+        std::cout << "Bad init mesh\n";
         return 0;
     }
 
@@ -101,6 +85,10 @@ int main() {
         mesh.for_each(set_wanted, mesh.max_level(), 0.0);
         mesh.for_each(set_flag);
         mesh.refine();
+
+        //if (mesh.check_refined() < 0) {
+        //    throw std::runtime_error("Bad init refinement");
+        //}
     }
 
     Stopwatch elapsed;
@@ -109,8 +97,8 @@ int main() {
     Stopwatch sw_set_flags;
     Stopwatch sw_refine;
 
-    std::cout << "\nRUN\n";
-    elapsed.resume();
+    std::cout << "RUN\n";
+    elapsed.start();
     for (int step = 0; step < 1000; ++step) {
         sw_write.resume();
         if (step % 20 == 0) {
@@ -132,7 +120,7 @@ int main() {
         sw_refine.stop();
 
         //if (mesh.check_refined() < 0) {
-        //    throw std::runtime_error("Bad mesh");
+        //    throw std::runtime_error("Bad refined mesh");
         //}
     }
     elapsed.stop();
@@ -152,6 +140,5 @@ int main() {
     std::cout << "  Refine:     " << sw_refine.extended_time()
               << " ( " << sw_refine.milliseconds() << " ms)\n";
 
-    threads::off();
     return 0;
 }

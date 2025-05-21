@@ -1,6 +1,6 @@
 #include <fstream>
 
-#include <zephyr/mesh/primitives/Side3D.h>
+#include <zephyr/mesh/primitives/side.h>
 #include <zephyr/mesh/primitives/mov_node.h>
 #include <zephyr/mesh/primitives/amr_cell.h>
 #include <zephyr/mesh/primitives/mov_cell.h>
@@ -49,8 +49,8 @@ inline index_t count_cells(AmrStorage &cells, const Filter &filter) {
     return count;
 }
 
-inline index_t count_cells(SoaCell &cells, const Filter &filter) {
-    return cells.n_locals();
+inline index_t count_cells(SoaCell &locals, const Filter &filter) {
+    return locals.size();
 }
 
 struct Handler {
@@ -1333,7 +1333,7 @@ void VtuFile::save(mesh::SoaMesh &mesh) {
     //    save(mesh.locals(), mesh.nodes());
     //}
     //else {
-        save(mesh.cells);
+        save(mesh.m_locals);
     //}
 }
 
@@ -1382,10 +1382,10 @@ void VtuFile::save(
 
 void VtuFile::save(
     const std::string &filename,
-    mesh::SoaCell &cells, const Variables &variables,
+    mesh::SoaCell &locals, const Variables &variables,
     bool hex_only, bool polyhedral, const Filter &filter
 ) {
-    index_t n_cells = cells.n_locals();
+    index_t n_cells = locals.size();
 
     std::ofstream file(filename, std::ios::out | std::ios::binary);
     if (!file.is_open()) {
@@ -1393,9 +1393,9 @@ void VtuFile::save(
         return;
     }
 
-    write_mesh_header(file, cells, n_cells, variables, hex_only, polyhedral, filter);
-    write_mesh_primitives(file, cells, n_cells, variables, hex_only, polyhedral, filter);
-    write_cells_data(file, cells, n_cells, variables, filter);
+    write_mesh_header(file, locals, n_cells, variables, hex_only, polyhedral, filter);
+    write_mesh_primitives(file, locals, n_cells, variables, hex_only, polyhedral, filter);
+    write_cells_data(file, locals, n_cells, variables, filter);
 
     file.close();
 }

@@ -55,9 +55,9 @@ public:
     int neib_rank() const;
 
     /// @brief Индекс соседа, мне для soa
-    index_t neib_index() const;
+    index_t adj_index() const;
 
-    index_t neib_owner_index() const;
+    index_t adj_alien() const;
 
     Vector3d neib_center() const;
 
@@ -166,14 +166,20 @@ public:
 
 /// @brief Классная ячейка
 class QCell final {
-private:
+public:
     SoaCell* m_cells;  //< Указатель на сетку
-    index_t   cell_idx;  //< Индекс ячейки
+    index_t  m_index;  //< Индекс ячейки
+
+    // Нулевые значения валидны, при таких значениях нельзя перейти к соседней ячейке
+    SoaCell* m_locals = nullptr;
+    SoaCell* m_aliens = nullptr;
 
 public:
-    QCell(SoaCell* cells, index_t cell_idx)
-        : m_cells(cells), cell_idx(cell_idx) { }
-
+    QCell(SoaCell* cells, index_t index,
+          SoaCell* locals = nullptr,
+          SoaCell* aliens = nullptr)
+        : m_cells(cells), m_index(index),
+          m_locals(locals), m_aliens(aliens) { }
 
     /// @brief Размерность ячейки
     inline int dim() const;
@@ -235,66 +241,58 @@ public:
 struct CellIt final {
 private:
     SoaCell* m_cells;   //< Указатель на сетку
-    index_t   cell_idx;  //< Индекс ячейки
+    index_t  m_index;  //< Индекс ячейки
+
+    // Нулевые значения валидны, при таких значениях нельзя перейти к соседней ячейке
+    SoaCell* m_locals = nullptr;
+    SoaCell* m_aliens = nullptr;
 
 public:
     using iterator_category = std::random_access_iterator_tag;
-    using difference_type = std::ptrdiff_t;
+    using difference_type = index_t;
     using value_type = QCell;
     using pointer    = QCell*;
     using reference  = QCell&;
 
     // Конструктор
-    CellIt(SoaCell* cells, index_t cell_idx)
-       : m_cells(cells), cell_idx(cell_idx) { }
+    CellIt(SoaCell* cells, index_t index,
+        SoaCell* locals = nullptr,
+        SoaCell* aliens = nullptr)
+        : m_cells(cells), m_index(index),
+          m_locals(locals), m_aliens(aliens) { }
 
-    /// @brief Разыменование итератора (для цикла for)
-    inline QCell& operator*() {
-        // Грязноватый лайфхак
-        return *reinterpret_cast<QCell*>(this);
-    }
+    /// @brief Разыменование итератора (для цикла for), лайфхак
+    inline QCell& operator*() { return *reinterpret_cast<QCell*>(this); }
 
     /// @brief Инкремент
-    inline CellIt &operator++() { ++cell_idx; return *this; }
+    inline CellIt &operator++() { ++m_index; return *this; }
 
     /// @brief Декремент
-    inline CellIt &operator--() { --cell_idx; return *this; }
+    inline CellIt &operator--() { --m_index; return *this; }
 
     /// @brief Итератор через step
-    inline CellIt &operator+=(index_t step) {
-        cell_idx += step; return *this;
-    }
+    inline CellIt &operator+=(index_t step) { m_index += step; return *this; }
 
     /// @brief Итератор через step
-    inline CellIt operator+(index_t step) const {
-        return CellIt(m_cells, cell_idx + step);
-    }
+    inline CellIt operator+(index_t step) const { return CellIt(m_cells, m_index + step); }
 
     /// @brief Оператор доступа как для указателя
     /// (интерфейс random access iterator)
     inline QCell operator[](index_t offset) const {
-        return QCell(m_cells, cell_idx + offset);
+        return QCell(m_cells, m_index + offset, m_locals, m_aliens);
     }
 
     /// @brief Расстояние между двумя ячейками
-    inline ptrdiff_t operator-(const CellIt& cell) const {
-        return cell_idx - cell.cell_idx;
-    }
+    inline index_t operator-(const CellIt& cell) const { return m_index - cell.m_index; }
 
     /// @brief Оператор сравнения
-    inline bool operator<(const CellIt& cell) const {
-        return cell_idx < cell.cell_idx;
-    }
+    inline bool operator<(const CellIt& cell) const { return m_index < cell.m_index; }
 
     /// @brief Оператор сравнения
-    inline bool operator!=(const CellIt& cell) const {
-        return cell_idx != cell.cell_idx;
-    }
+    inline bool operator!=(const CellIt& cell) const { return m_index != cell.m_index; }
 
     /// @brief Оператор сравнения
-    inline bool operator==(const CellIt& cell) const {
-        return cell_idx == cell.cell_idx;
-    }
+    inline bool operator==(const CellIt& cell) const { return m_index == cell.m_index; }
 };
 
 
@@ -314,19 +312,13 @@ public:
     SoaCell(AmrStorage &locals);
 
     // Число ячеек
-    index_t m_n_locals;
-    index_t m_n_cells;
+    index_t m_size;
 
-    inline bool empty() const { return m_n_locals == 0; }
+    inline bool empty() const { return m_size == 0; }
 
-    /// @brief Число локальных ячеек
-    inline index_t n_locals() const { return m_n_locals; }
-
-    /// @brief Полное число ячеек, включая ячейки с других процессов
-    inline index_t n_cells() const { return m_n_cells; }
-
-    /// @brief  Число ячеек с других процессов
-    inline index_t n_aliens() const { return m_n_cells - m_n_locals;}
+    /// @brief Число ячеек
+    inline index_t size() const { return m_size; }
+    inline index_t n_cells() const { return m_size; }
 
     void initialize(AmrStorage &locals);
 
@@ -346,12 +338,12 @@ public:
 
     // Тип Element
 
-    std::vector<index_t> next;         ///< Новый индекс в хранилище (в алгоритмах с перестановками)
+    std::vector<index_t> next;   ///< Новый индекс в хранилище (в алгоритмах с перестановками)
 
-    std::vector<int> rank;             ///< Ранг процесса владельца (< 0 -- ошибка, не используется)
-    std::vector<index_t> owner_index;  ///< Глобальный индекс элемента в локальном Storage (< 0 для неактивных, неопределенных элементов, элементов на удаление)
+    std::vector<int> rank;       ///< Ранг процесса владельца (< 0 -- ошибка, не используется)
+    std::vector<index_t> index;  ///< Глобальный индекс элемента в локальном Storage (< 0 для неактивных, неопределенных элементов, элементов на удаление)
 
-    // Величины, связаные с адаптацией
+    // Величины, связанные с адаптацией
 
     std::vector<int> flag;   ///< Желаемый флаг адаптации
     std::vector<int> level;  ///< Уровень адаптации (0 для базовой)
@@ -380,6 +372,14 @@ public:
         return count;
     }
 
+    inline int max_faces(index_t ic) const {
+        return face_begin[ic + 1] - face_begin[ic];
+    }
+
+    inline int max_nodes(index_t ic) const {
+        return node_begin[ic + 1] - node_begin[ic];
+    }
+
     inline double get_volume(index_t ic, bool axial) const {
         return axial ? volume_alt[ic] : volume[ic];
     }
@@ -391,13 +391,13 @@ public:
 
     struct SoaAdjacent final {
         std::vector<int> rank;
-        std::vector<index_t> owner_index;
-        std::vector<index_t> local_index;
+        std::vector<index_t> index;
+        std::vector<index_t> alien;
 
         void resize(index_t n_faces) {
             rank.resize(n_faces);
-            owner_index.resize(n_faces);
-            local_index.resize(n_faces);
+            index.resize(n_faces);
+            alien.resize(n_faces);
         }
     };
 
@@ -445,8 +445,8 @@ public:
         inline void set_undefined(index_t iface) {
             boundary[iface] = Boundary::UNDEFINED;
             adjacent.rank[iface]  = -1;
-            adjacent.owner_index[iface] = -1;
-            adjacent.local_index[iface] = -1;
+            adjacent.alien[iface] = -1;
+            adjacent.index[iface] = -1;
         }
 
         /// @brief Внешняя нормаль грани на площадь
@@ -485,6 +485,26 @@ public:
 
         /// Добавить грани, соответствующие ячейке
         void insert(index_t iface, CellType ctype, int count = -1);
+
+        /// @brief Возвращает индекс из массива locals или aliens
+        inline index_t neib_index(index_t iface) const {
+            return adjacent.alien[iface] < 0 ? adjacent.index[iface] : adjacent.alien[iface];
+        }
+
+        /// @brief Возвращает ссылку на хранилище (locals или aliens), в котором
+        /// хранится соседняя ячейка
+        inline SoaCell& neib_storage(index_t iface, SoaCell& locals, SoaCell& aliens) const {
+            return adjacent.alien[iface] < 0 ? locals : aliens;
+        }
+
+        inline std::tuple<const SoaCell&, index_t> get_neib(index_t iface, SoaCell& locals, SoaCell& aliens) const {
+            if (adjacent.alien[iface] < 0) {
+                return {locals, adjacent.index[iface]};
+            }
+            else {
+                return {aliens, adjacent.alien[iface]};
+            }
+        }
     };
 
     void move_item(index_t ic);
@@ -521,22 +541,34 @@ public:
         }
     }
 
+    /// @brief Простая грань по стороне?
+    template <int dim>
+    inline bool simple_face(index_t ic, Side<dim> side) const {
+        return faces.is_undefined(face_begin[ic] + side[1]);
+    }
+
+    /// @brief Простая грань по стороне?
+    template <int dim>
+    inline bool complex_face(index_t ic, Side<dim> side) const {
+        return faces.is_actual(face_begin[ic] + side[1]);
+    }
+
     CellIt begin() { return {this, 0}; }
 
-    CellIt end() { return {this, n_locals()}; }
+    CellIt end() { return {this, size()}; }
 
     QCell operator[](index_t cell_idx) {
         return {this, cell_idx};
     }
 
     /// @brief Актуальная ячейка?
-    inline bool is_actual(index_t ic) const { return owner_index[ic] >= 0; }
+    inline bool is_actual(index_t ic) const { return index[ic] >= 0; }
 
     /// @brief Ячейка к удалению
-    inline bool is_undefined(index_t ic) const { return owner_index[ic] < 0; }
+    inline bool is_undefined(index_t ic) const { return index[ic] < 0; }
 
     /// @brief Устанавливает index = -1 (ячейка вне сетки)
-    inline void set_undefined(index_t ic) { owner_index[ic] = -1; }
+    inline void set_undefined(index_t ic) { index[ic] = -1; }
 
     // ФУНКЦИИ AmrCell по сути
 
@@ -584,6 +616,8 @@ public:
 
     int check_connectivity(index_t ic) const;
 
+    int check_connectivity(index_t ic, SoaCell& aliens) const;
+
     utils::range<index_t> faces_range(index_t ic) const {
         return utils::range(face_begin[ic], face_begin[ic + 1]);
     }
@@ -598,7 +632,8 @@ public:
 
 class SoaMesh {
 public:
-    SoaCell cells;
+    SoaCell m_locals;
+    SoaCell m_aliens;
 
     int m_max_level = 0;
     Distributor distributor;
@@ -621,22 +656,27 @@ public:
 
     void refine();
 
-    int check_base();
+    int check_base() const;
 
-    int check_refined();
+    int check_refined() const;
 
-    CellIt begin() { return {&cells, 0}; }
+    CellIt begin() { return {&m_locals, 0, &m_locals, &m_aliens}; }
 
-    CellIt end() { return {&cells, cells.n_locals()}; }
+    CellIt end() { return {&m_locals, m_locals.size(), &m_locals, &m_aliens}; }
 
     QCell operator[](index_t cell_idx) {
-        return {&cells, cell_idx};
+        return {&m_locals, cell_idx, &m_locals, &m_aliens};
     }
 
 
     template <typename T>
     Storable<T> add_data(const std::string& name) {
-        return cells.data.add<T>(name);
+        auto res1 = m_locals.data.add<T>(name);
+        auto res2 = m_aliens.data.add<T>(name);
+        if (res1.idx != res2.idx) {
+            throw std::runtime_error("add_data failed");
+        }
+        return res1;
     }
 
 
@@ -675,74 +715,74 @@ inline int QCell::dim() const { return m_cells->dim; }
 
 inline bool QCell::adaptive() const { return m_cells->adaptive; }
 
-inline int QCell::rank() const { return m_cells->rank[cell_idx]; }
+inline int QCell::rank() const { return m_cells->rank[m_index]; }
 
-inline int QCell::flag() const { return m_cells->flag[cell_idx]; }
+inline int QCell::flag() const { return m_cells->flag[m_index]; }
 
-inline int QCell::level() const { return m_cells->level[cell_idx]; }
+inline int QCell::level() const { return m_cells->level[m_index]; }
 
-inline index_t QCell::b_idx() const { return m_cells->b_idx[cell_idx]; }
+inline index_t QCell::b_idx() const { return m_cells->b_idx[m_index]; }
 
-inline index_t QCell::z_idx() const { return m_cells->z_idx[cell_idx]; }
+inline index_t QCell::z_idx() const { return m_cells->z_idx[m_index]; }
 
-inline index_t QCell::index() const { return m_cells->owner_index[cell_idx]; }
+inline index_t QCell::index() const { return m_cells->index[m_index]; }
 
-inline index_t QCell::next() const { return m_cells->next[cell_idx]; }
+inline index_t QCell::next() const { return m_cells->next[m_index]; }
 
-inline void QCell::set_flag(int flag) { m_cells->flag[cell_idx] = flag; }
+inline void QCell::set_flag(int flag) { m_cells->flag[m_index] = flag; }
 
 template <typename T>
 inline T& QCell::operator()(Storable<T> type) {
-    return m_cells->data(type)[cell_idx];
+    return m_cells->data(type)[m_index];
 }
 
 inline const Vector3d& QCell::center() const {
-    return m_cells->center[cell_idx];
+    return m_cells->center[m_index];
 }
 
 inline double QCell::volume() const {
-    return m_cells->volume[cell_idx];
+    return m_cells->volume[m_index];
 }
 
 inline double QCell::volume(bool axial) const {
-    return m_cells->get_volume(cell_idx, axial);
+    return m_cells->get_volume(m_index, axial);
 }
 
 inline double QCell::linear_size() const {
-    return m_cells->linear_size(cell_idx);
+    return m_cells->linear_size(m_index);
 }
 
 template <int dim>
 inline
 typename std::conditional<dim < 3, const SqQuad&, const SqCube&>::type
 QCell::get_vertices() const {
-    return m_cells->get_vertices<dim>(cell_idx);
+    return m_cells->get_vertices<dim>(m_index);
 }
 
 template <int dim>
 bool FacesIts::complex(Side<dim> s) const {
-    return m_cells->is_actual(iface_beg + s[1]);
+    return m_cells->faces.is_actual(iface_beg + s[1]);
 }
 
 inline QFace QCell::face(int idx) const {
-    return QFace(m_cells, m_cells->face_begin[cell_idx] + idx);
+    return QFace(m_cells, m_cells->face_begin[m_index] + idx);
 };
 
 
 inline QFace QCell::face(Side2D s) const {
-    return QFace(m_cells, m_cells->face_begin[cell_idx] + s);
+    return QFace(m_cells, m_cells->face_begin[m_index] + s);
 }
 
 inline QFace QCell::face(Side3D s) const {
-    return QFace(m_cells, m_cells->face_begin[cell_idx] + s);
+    return QFace(m_cells, m_cells->face_begin[m_index] + s);
 }
 
 inline bool QCell::complex_face(Side2D s) const {
-    return m_cells->faces.is_actual(m_cells->face_begin[cell_idx] + s[1]);
+    return m_cells->faces.is_actual(m_cells->face_begin[m_index] + s[1]);
 }
 
 inline bool QCell::complex_face(Side3D s) const {
-    return m_cells->faces.is_actual(m_cells->face_begin[cell_idx] + s[1]);
+    return m_cells->faces.is_actual(m_cells->face_begin[m_index] + s[1]);
 }
 
 }

@@ -109,8 +109,8 @@ void SmFluidSoA::compute_dt(SoaMesh& mesh) {
 
 void SmFluidSoA::compute_grad(SoaMesh& mesh)  {
     mesh.for_each([this, &mesh](mesh::QCell& cell) {
-        auto grad = gradient::LSM<smf::PState>(cell, mesh.cells.data(curr), boundary_value);
-        grad = gradient::limiting<smf::PState>(cell, m_limiter, grad, mesh.cells.data(curr), boundary_value);
+        auto grad = gradient::LSM<smf::PState>(cell, mesh.m_locals.data(curr), boundary_value);
+        grad = gradient::limiting<smf::PState>(cell, m_limiter, grad, mesh.m_locals.data(curr), boundary_value);
 
         cell(d_dx) = grad.x;
         cell(d_dy) = grad.y;
@@ -262,7 +262,7 @@ void SmFluidSoA::fluxes_stage2(SoaMesh& mesh) {
             auto& face_c = face.center();
 
             // Возвращает саму ячейку, если соседа не существует
-            int jc = face.neib_index();
+            int jc = face.adj_index();
 
             // Примитивный вектор соседа (на предыдущем и на полуслое)
             PState z_n, z_nh;

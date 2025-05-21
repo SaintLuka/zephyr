@@ -1,6 +1,6 @@
 #include <zephyr/geom/geom.h>
 
-#include <zephyr/mesh/primitives/Side3D.h>
+#include <zephyr/mesh/primitives/side.h>
 #include <zephyr/mesh/primitives/amr_cell.h>
 
 using namespace zephyr::geom;

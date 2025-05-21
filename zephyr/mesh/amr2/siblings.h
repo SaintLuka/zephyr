@@ -10,36 +10,33 @@
 
 namespace zephyr::mesh::amr2 {
 
-/// @brief Сторона, по которой необходимо пройти, чтобы от одного сиблинга
-/// перейти к следующему. Детали можно найти в файле _ascii.h
+// Сторона, по которой необходимо пройти, чтобы от одного сиблинга перейти
+// к следующему. Детали можно найти в файле _ascii.h
 template <int dim>
-inline std::array<Side3D, CpC(dim)> side_to_next_sibling();
-
-template <>
-inline std::array<Side3D, 4> side_to_next_sibling<2>() {
-    return {Side3D::RIGHT, Side3D::TOP, Side3D::BOTTOM, Side3D::LEFT};
-}
-
-template <>
-inline std::array<Side3D, 8> side_to_next_sibling<3>() {
-    return {
+inline constexpr std::array<Side3D, CpC(dim)> side_to_next_sibling() {
+    if constexpr (dim == 2) {
+        return {Side3D::RIGHT, Side3D::TOP, Side3D::BOTTOM, Side3D::LEFT};
+    }
+    else {
+        return {
             Side3D::RIGHT, Side3D::TOP, Side3D::FRONT, Side3D::LEFT,
-            Side3D::BACK, Side3D::LEFT, Side3D::RIGHT, Side3D::BOTTOM,
-    };
+            Side3D::BACK, Side3D::LEFT, Side3D::RIGHT, Side3D::BOTTOM
+        };
+    }
 }
 
-/// @return True если ячейка подходит для огрубления, иначе - false.
-/// @details Огрубление невозможно в следующих случаях:
-///  - Хотя бы один сиблинг на другом процессе.
-///  - Хотя бы один сиблинг имеет уровень выше (уже разбит).
-///  - Хотя бы один сиблинг не хочет огрубляться.
-/// Условия, когда огрубление возможно:
-///  - Все сиблинги находятся на одном процессе.
-///  - Все сиблинги имеют один уровень.
-///  - Все сиблинги хотят огрубиться.
+// True если ячейка подходит для огрубления, иначе - false.
+// Огрубление невозможно в следующих случаях:
+//  - Хотя бы один сиблинг на другом процессе.
+//  - Хотя бы один сиблинг имеет уровень выше (уже разбит).
+//  - Хотя бы один сиблинг не хочет огрубляться.
+// Условия, когда огрубление возможно:
+//  - Все сиблинги находятся на одном процессе.
+//  - Все сиблинги имеют один уровень.
+//  - Все сиблинги хотят огрубиться.
 template <int dim>
 bool can_coarse(SoaCell& cells, int ic) {
-    std::array<Side3D, CpC(dim)> sides = side_to_next_sibling<dim>();
+    const auto sides = side_to_next_sibling<dim>();
 
     const auto& adj = cells.faces.adjacent;
 
@@ -59,7 +56,11 @@ bool can_coarse(SoaCell& cells, int ic) {
             return false;
         }
 
-        index_t jc = adj.local_index[jface];
+        scrutiny_check(adj.alien[jface] < 0, "can coarse, bad adjacent #1")
+        scrutiny_check(adj.index[jface] >= 0, "can coarse, bad adjacent #2")
+        scrutiny_check(adj.index[jface] < cells.size(), "can coarse, bad adjacent #3")
+
+        index_t jc = adj.index[jface];
         if (cells.level[ic] != cells.level[jc]) {
             // Сосед другого уровня (точно не сиблинг)
             // Может быть потомком сиблинга более высокого уровня
@@ -80,64 +81,6 @@ bool can_coarse(SoaCell& cells, int ic) {
 #endif
 
         ic = jc;
-    }
-    return true;
-}
-
-/// @return True если ячейка подходит для огрубления, иначе - false.
-/// @details Огрубление невозможно в следующих случаях:
-///  - Хотя бы один сиблинг на другом процессе.
-///  - Хотя бы один сиблинг имеет уровень выше (уже разбит).
-///  - Хотя бы один сиблинг не хочет огрубляться.
-/// Условия, когда огрубление возможно:
-///  - Все сиблинги находятся на одном процессе.
-///  - Все сиблинги имеют один уровень.
-///  - Все сиблинги хотят огрубиться.
-///
-/// В фукнции используется сложная механика перехода от одного сиблинга
-/// к следующему, что позволяет прервать функцию, не обходя всех сиблингов
-template <int dim>
-bool can_coarse(const AmrCell& main_cell, const AmrStorage& cells) {
-    const std::array<Side3D, CpC(dim)> sides = side_to_next_sibling<dim>();
-
-    if (main_cell.flag >= 0) {
-        // Сама ячейка не хочет огрубляться
-        return false;
-    }
-
-    int ic = main_cell.index;
-    for (int i = 0; i < CpC(dim) - 1; ++i) {
-        const auto& cell = cells[ic];
-
-        // локальный z-индекс
-        auto z = cell.z_idx % CpC(dim);
-        auto adj = cell.faces[sides[z]].adjacent;
-
-        if (adj.rank != cell.rank) {
-            // Сосед на другом процессе
-            return false;
-        }
-
-        ic = adj.label;
-        const auto& neib = cells[ic];
-        if (neib.level != cell.level) {
-            // Сосед другого уровня (точно не сиблинг)
-            // Может быть потомком сиблинга более высокого уровня
-            return false;
-        }
-
-        if (neib.flag >= 0) {
-            // Сосед не хочет огрубляться
-            return false;
-        }
-
-#if SCRUTINY
-        auto zc = cell.z_idx / CpC(dim);
-        auto zn = neib.z_idx / CpC(dim);
-        if (zc != zn) {
-            throw std::runtime_error("siblings error #1");
-        }
-#endif
     }
     return true;
 }
@@ -173,18 +116,18 @@ std::array<int, CpC(dim) - 1> get_siblings(SoaCell &cells, index_t ic) {
         }
 
         // Сиблинг другого уровня
-        if (cells.level[adj.local_index[iface]] != cells.level[jc]) {
+        if (cells.level[adj.index[iface]] != cells.level[jc]) {
             throw std::runtime_error("get_siblings error: bad siblings #2");
         }
 
         auto zc = cells.z_idx[jc] / CpC(dim);
-        auto zn = cells.z_idx[adj.local_index[iface]] / CpC(dim);
+        auto zn = cells.z_idx[adj.index[iface]] / CpC(dim);
         if (zc != zn) {
             throw std::runtime_error("get_siblings error: bad siblings #3");
         }
 #endif
 
-        jc = adj.local_index[iface];
+        jc = adj.index[iface];
         siblings[i] = jc;
     }
 

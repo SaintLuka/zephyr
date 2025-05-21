@@ -4,7 +4,7 @@
 
 #include <iomanip>
 
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/euler/soa_mesh.h>
 #include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/io/pvd_file.h>
 #include <zephyr/utils/stopwatch.h>
@@ -16,28 +16,12 @@ using generator::Rectangle;
 using zephyr::io::PvdFile;
 using zephyr::utils::Stopwatch;
 
-
-struct _U_ {
-    int idx;
-    int bit;
-};
-
-_U_ U;
-
-double get_idx(AmrStorage::Item& cell) {
-    return cell(U).idx;
-}
-
-double get_bit(AmrStorage::Item& cell) {
-    return cell(U).bit;
-}
-
-inline double sqr(double x) {
-    return x * x;
-}
+// Поля для хранения на сетке
+static Storable<int> idx;
+static Storable<int> bit;
 
 // Периодическая функция времени, с периодом = 1
-int calc_idx(EuCell& cell, double t) {
+int calc_idx(QCell& cell, double t) {
     Vector3d c = cell.center();
 
     double r = c.norm();
@@ -49,24 +33,24 @@ int calc_idx(EuCell& cell, double t) {
     int n_parts = 12;
     double f1 = 0.5 * phi / M_PI + 0.02 * std::sin(12 * r);
     double f2 = 0.5 * phi / M_PI + 0.1 * r * r;
-    double sigma = sqr(std::sin(2 * M_PI * t));
+    double sigma = std::pow(std::sin(2 * M_PI * t), 2);
     double f3 = sigma * f1 + (1 - sigma) * f2;
 
     int a1 = (int(std::floor(n_parts * f3)) + n_parts) % n_parts;
 
-    double g1 = std::round(sqr(std::sin(5.0 * r*r - 2*M_PI*t)));
+    double g1 = std::round(std::pow(std::sin(5.0 * r*r - 2*M_PI*t), 2));
     int a2 = int(g1);
     return a1 + a2;
 }
 
-int calc_bit(EuCell& cell) {
-    int idx_c = cell(U).idx;
+int calc_bit(QCell& cell) {
+    int idx_c = cell(idx);
     for (auto& face: cell.faces()) {
         if (face.is_boundary()) {
             continue;
         }
 
-        int idx_n = face.neib()(U).idx;
+        int idx_n = face.neib()(idx);
         if (idx_c != idx_n) {
             return 1;
         }
@@ -74,32 +58,27 @@ int calc_bit(EuCell& cell) {
     return 0;
 }
 
-void set_index(EuCell& cell, double t) {
-    cell(U).idx = calc_idx(cell, t);
+void set_index(QCell& cell, double t) {
+    cell(idx) = calc_idx(cell, t);
 }
 
-void set_flag(EuCell& cell) {
-    cell(U).bit = calc_bit(cell);
-    cell.set_flag(cell(U).bit > 0 ? 1 : -1);
+void set_flag(QCell& cell) {
+    cell(bit) = calc_bit(cell);
+    cell.set_flag(cell(bit) > 0 ? 1 : -1);
 }
 
-int solution_step(EuMesh& mesh, double t = 0.0) {
+int solution_step(SoaMesh& mesh, double t = 0.0) {
     for (auto& cell: mesh) {
-        if (cell(U).bit > 0) {
-            cell.set_flag(1);
-        }
-        else {
-            cell.set_flag(-1);
-        }
+        set_flag(cell);
     }
 
     mesh.refine();
 
     for (auto cell: mesh) {
-        cell(U).idx = calc_idx(cell, t);
+        cell(idx) = calc_idx(cell, t);
     }
     for (auto cell: mesh) {
-        cell(U).bit = calc_bit(cell);
+        cell(bit) = calc_bit(cell);
     }
 
     return mesh.check_refined();
@@ -109,28 +88,37 @@ int main() {
     threads::on();
 
     PvdFile pvd("mesh", "output");
-    pvd.variables = {"index", "level"};
-    pvd.variables += { "idx", get_idx };
-    pvd.variables += { "bit", get_bit };
+    pvd.variables = {"rank", "index", "next", "level", "flag", "faces2D"};
+    pvd.variables += {"idx", [](QCell& cell) -> double { return cell(idx); }};
+    pvd.variables += {"bit", [](QCell& cell) -> double { return cell(bit); }};
 
     Rectangle rect(-1.0, 1.0, -1.0, 1.0);
     rect.set_nx(30);
 
-    EuMesh mesh(rect, U);
+    SoaMesh mesh(rect);
+    idx = mesh.add_data<int>("idx");
+    bit = mesh.add_data<int>("bit");
 
     mesh.set_max_level(4);
 
-    int res = mesh.check_base();
-    if (res < 0) {
-        std::cout << "bad init mesh\n";
+    if (mesh.check_base() < 0) {
+        std::cout << "Bad init mesh\n";
         return 0;
     }
 
     // Начальная адаптация
     std::cout << "Init refinement\n";
-    for (int lvl = 0; lvl < mesh.max_level() + 2; ++lvl) {
+    for (int lvl = 0; lvl < 3; ++lvl) {
         std::cout << "  Level " << lvl << "\n";
-        solution_step(mesh);
+
+        mesh.for_each(set_index, 0.0);
+        mesh.for_each(set_flag);
+        mesh.refine();
+
+        if (mesh.check_refined() < 0) {
+            std::cout << "Bad init refinement\n";
+            return 0;
+        }
     }
 
     Stopwatch elapsed;
@@ -139,8 +127,8 @@ int main() {
     Stopwatch sw_set_flags;
     Stopwatch sw_refine;
 
-    std::cout << "\nRUN\n";
-    elapsed.resume();
+    std::cout << "RUN\n";
+    elapsed.start();
     for (int step = 0; step <= 1000; ++step) {
         sw_write.resume();
         if (step % 20 == 0) {
@@ -162,7 +150,7 @@ int main() {
         sw_refine.stop();
 
         //if (mesh.check_refined() < 0) {
-        //    throw std::runtime_error("Bad mesh");
+        //    throw std::runtime_error("Bad refined mesh");
         //}
     }
     elapsed.stop();
@@ -182,6 +170,5 @@ int main() {
     std::cout << "  Refine:    " << sw_refine.extended_time()
               << " ( " << sw_refine.milliseconds() << " ms)\n";
 
-    threads::off();
     return 0;
 }

@@ -4,7 +4,7 @@
 
 #include <iomanip>
 
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/euler/soa_mesh.h>
 #include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/geom/generator/cuboid.h>
 #include <zephyr/io/pvd_file.h>
@@ -18,14 +18,7 @@ using generator::Cuboid;
 using zephyr::io::PvdFile;
 using zephyr::utils::Stopwatch;
 
-
-struct _U_ {
-    int val;
-};
-
-_U_ U;
-
-void set_flag(EuCell& cell) {
+void set_flag(QCell& cell) {
     const double p_coarse = 0.80;
     const double p_retain = 0.18;
 
@@ -46,7 +39,7 @@ int main() {
     threads::on();
 
     PvdFile pvd("mesh", "output");
-    pvd.variables = {"index", "level"};
+    pvd.variables = {"rank", "index", "next", "level", "flag", "faces2D"};
 
     Rectangle rect(-1.0, 1.0, -1.0, 1.0);
     rect.set_nx(50);
@@ -54,13 +47,12 @@ int main() {
     Cuboid cube(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
     cube.set_nx(10);
 
-    EuMesh mesh(rect, U);
+    SoaMesh mesh(rect);
 
     mesh.set_max_level(4);
 
-    int res = mesh.check_base();
-    if (res < 0) {
-        std::cout << "bad init mesh\n";
+    if (mesh.check_base() < 0) {
+        std::cout << "Bad init mesh\n";
         return 0;
     }
 
@@ -69,8 +61,8 @@ int main() {
     Stopwatch sw_set_flags;
     Stopwatch sw_refine;
 
-    elapsed.resume();
     std::cout << "RUN\n";
+    elapsed.start();
     for (int step = 0; step < 1000; ++step) {
         if (step % 20 == 0) {
             std::cout << "  Step " << std::setw(4) << step << " / 1000\n";
@@ -88,7 +80,7 @@ int main() {
         sw_refine.stop();
 
         //if (mesh.check_refined() < 0) {
-        //    throw std::runtime_error("Bad mesh");
+        //    throw std::runtime_error("Bad refined mesh");
         //}
     }
     elapsed.stop();
@@ -105,6 +97,5 @@ int main() {
     std::cout << "  Refine:    " << sw_refine.extended_time()
               << " ( " << sw_refine.milliseconds() << " ms)\n";
 
-    threads::off();
     return 0;
 }

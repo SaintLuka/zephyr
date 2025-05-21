@@ -1,6 +1,6 @@
 #include <zephyr/utils/mpi.h>
 
-#include <zephyr/mesh/primitives/Side3D.h>
+#include <zephyr/mesh/primitives/side.h>
 #include <zephyr/mesh/primitives/amr_cell.h>
 #include <zephyr/mesh/primitives/bfaces.h>
 #include <zephyr/mesh/primitives/decomposition.h>
@@ -216,7 +216,7 @@ int check_connectivity(AmrStorage &locals, int ic, AmrStorage& aliens) {
             }
         }
         if (counter < 1) {
-            std::cout << "\tHas no neighbor across ordinary " << side_to_string(iface) << ")\n";
+            std::cout << "\tHas no neighbor across ordinary " << side_to_string(iface, dim) << ")\n";
             cell.print_info();
             std::cout << "\tNeighbor:\n";
             locals[cell.faces[iface].adjacent.index].print_info();

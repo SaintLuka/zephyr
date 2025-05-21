@@ -1,15 +1,13 @@
-/// @file dense.cpp
 /// @brief Тестирование AMR на задачах с движением больших областей с высоким
 /// уровнем адаптации. Под большими областями понимаются области, которые имеют
 /// ту же меру размерности, что и сама область.
 
 #include <iomanip>
 
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/euler/soa_mesh.h>
 #include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/geom/primitives/polygon.h>
 #include <zephyr/io/pvd_file.h>
-#include <zephyr/io/variables.h>
 #include <zephyr/utils/stopwatch.h>
 
 using namespace zephyr;
@@ -19,20 +17,8 @@ using generator::Rectangle;
 using zephyr::io::PvdFile;
 using zephyr::utils::Stopwatch;
 
-
-struct _U_ {
-    int bit;
-};
-
-_U_ U;
-
-double get_bit(AmrStorage::Item& cell) {
-    return cell(U).bit;
-}
-
-inline double sqr(double x) {
-    return x * x;
-}
+// Поле для хранения на сетке
+static Storable<int> bit;
 
 /// @brief Пятиконечная звезда
 struct Star {
@@ -55,10 +41,10 @@ struct Star {
 
         double r2 = R;
         double r1 = 0.4 * R;
-        double r = r1 + (r2 - r1) * sqr(std::sin(0.5 * xi));
+        double r = r1 + (r2 - r1) * std::pow(std::sin(0.5 * xi), 2);
 
         double a = 0.9;
-        double xc = a * std::sqrt(2.0) * std::cos(xi) / (1.0 + sqr(std::sin(xi)));
+        double xc = a * std::sqrt(2.0) * std::cos(xi) / (1.0 + std::pow(std::sin(xi), 2));
         double yc = xc * std::sin(xi);
 
         for (int i = 0; i < 10; i += 2) {
@@ -74,31 +60,31 @@ struct Star {
     }
 };
 
-void set_index(EuCell& cell, Star& star) {
-    cell(U).bit = star.inside(cell.center());
+void set_index(QCell& cell, Star& star) {
+    cell(bit) = star.inside(cell.center());
 }
 
-void set_flag(EuCell& cell) {
-    cell.set_flag(cell(U).bit > 0 ? 1 : -1);
+void set_flag(QCell& cell) {
+    cell.set_flag(cell(bit) > 0 ? 1 : -1);
 }
 
 int main() {
     threads::on();
 
     PvdFile pvd("mesh", "output");
-    pvd.variables = {"index", "level"};
-    pvd.variables += { "bit", get_bit };
+    pvd.variables = {"rank", "index", "next", "level", "flag", "faces2D"};
+    pvd.variables += {"wanted", [](QCell& cell) -> double { return cell(bit); }};
 
     Rectangle rect(-2.0, 2.0, -1.0, 1.0);
     rect.set_nx(50);
 
-    EuMesh mesh(rect, U);
+    SoaMesh mesh(rect);
+    bit = mesh.add_data<int>("bit");
 
     mesh.set_max_level(5);
 
-    int res = mesh.check_base();
-    if (res < 0) {
-        std::cout << "bad init mesh\n";
+    if (mesh.check_base() < 0) {
+        std::cout << "Bad init mesh\n";
         return 0;
     }
 
@@ -112,6 +98,10 @@ int main() {
         mesh.for_each(set_index, star);
         mesh.for_each(set_flag);
         mesh.refine();
+
+        if (mesh.check_refined() < 0) {
+            throw std::runtime_error("Bad init refinement");
+        }
     }
 
     Stopwatch elapsed;
@@ -121,8 +111,8 @@ int main() {
     Stopwatch sw_set_flags;
     Stopwatch sw_refine;
 
-    std::cout << "\nRUN\n";
-    elapsed.resume();
+    std::cout << "RUN\n";
+    elapsed.start();
     for (int step = 0; step < 1000; ++step) {
         sw_write.resume();
         if (step % 20 == 0) {
@@ -148,7 +138,7 @@ int main() {
         sw_refine.stop();
 
         //if (mesh.check_refined() < 0) {
-        //    throw std::runtime_error("Bad mesh");
+        //    throw std::runtime_error("Bad refined mesh");
         //}
     }
     elapsed.stop();
@@ -171,6 +161,5 @@ int main() {
     std::cout << "  Refine:      " << sw_refine.extended_time()
               << " ( " << sw_refine.milliseconds() << " ms)\n";
 
-    threads::off();
     return 0;
 }

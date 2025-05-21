@@ -248,7 +248,7 @@ Grad<State> LSM(mesh::QCell& cell, const State* states,
         State zn;
         Vector3d dr;
         if (!face.is_boundary()) {
-            size_t jc = face.neib_index();
+            size_t jc = face.adj_index();
             zn = states[jc];
             dr = face.neib_center() - cell_c;
         } else {
@@ -440,7 +440,7 @@ Grad<State> limiting(mesh::QCell& cell, const Limiter& limiter,
         State zn;
         Vector3d dr;
         if (!face.is_boundary()) {
-            zn = states[face.neib_index()];
+            zn = states[face.adj_index()];
             dr = face.neib_center() - cell_c;
         } else {
             zn = boundary_value(zc, normal, face.flag());

@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <zephyr/mesh/primitives/Side3D.h>
+#include <zephyr/mesh/primitives/side.h>
 #include <zephyr/mesh/primitives/amr_cell.h>
 #include <zephyr/mesh/amr/common.h>
 
@@ -28,12 +28,12 @@ void split_face_prepare(BFaces& faces) {
 /// @brief Устанавливает на новых подгранях индексы вершин.
 template <int dim, int side>
 void split_face_indices(BFaces& faces) {
-    faces[side].vertices = face_indices::cf<dim, Side3D(side)>();
-    faces[side + 6].vertices = face_indices::cf<dim, Side3D(side + 6)>();
+    faces[side].vertices = Side3D(side).cf();
+    faces[side + 6].vertices = Side3D(side)[1].cf();
 
     if (dim > 2) {
-        faces[side + 12].vertices = face_indices::cf<dim, Side3D(side + 12)>();
-        faces[side + 18].vertices = face_indices::cf<dim, Side3D(side + 18)>();
+        faces[side + 12].vertices = Side3D(side)[2].cf();
+        faces[side + 18].vertices = Side3D(side)[3].cf();
     }
 }
 
@@ -170,7 +170,7 @@ void merge_faces(AmrCell& cell) {
     auto &faces = cell.faces;
     auto &vertices = cell.vertices;
 
-    faces[side].vertices = face_indices::sf<dim, side>();
+    faces[side].vertices = Side<dim>(side).sf();
 
     faces[side + 6].set_undefined();
 

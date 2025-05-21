@@ -3,7 +3,7 @@
 #include <zephyr/utils/mpi.h>
 #include <zephyr/geom/grid.h>
 
-#include <zephyr/mesh/primitives/Side3D.h>
+#include <zephyr/mesh/primitives/side.h>
 #include <zephyr/mesh/primitives/mov_node.h>
 #include <zephyr/mesh/primitives/amr_cell.h>
 #include <zephyr/mesh/primitives/mov_cell.h>

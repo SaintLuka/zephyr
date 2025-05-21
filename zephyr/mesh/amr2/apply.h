@@ -30,7 +30,7 @@ using utils::Stopwatch;
 /// @brief Функция выполняет непостредственную адаптацию ячеек в хранилище в
 /// соответствии с флагами адапатции. Предполагается, что флаги адаптации
 /// сбалансированы.
-/// @param cells Ссылка на хранилище ячеек
+/// @param locals Ссылка на хранилище ячеек
 /// @param op Осуществляет распределение данных
 /// @details Описание деталей алгоритма:
 /// Этап 1. Сбор данных о количестве ячеек для огрубления, разбиения и т. д.
@@ -46,7 +46,7 @@ using utils::Stopwatch;
 /// часть старых ячеек (не листовых) являются неопределенными.
 /// Алгоритм осуществляет удаление данных ячеек.
 template<int dim>
-void apply_impl(SoaCell &cells, const Distributor& op) {
+void apply_impl(SoaCell &locals, const Distributor& op) {
     static Stopwatch count_timer;
     static Stopwatch positions_timer;
     static Stopwatch geometry_timer;
@@ -54,9 +54,12 @@ void apply_impl(SoaCell &cells, const Distributor& op) {
     static Stopwatch clean_timer;
     static Stopwatch sort_timer;
 
+    static SoaCell aliens;
+
     /// Этап 1. Сбор статистики
     count_timer.resume();
-    Statistics count(cells);
+    const Statistics count(locals);
+    //count.print();
     count_timer.stop();
 
     // Нечего адаптировать
@@ -64,26 +67,26 @@ void apply_impl(SoaCell &cells, const Distributor& op) {
 
     /// Этап 2. Распределяем места для новых ячеек
     positions_timer.resume();
-    setup_positions<dim>(cells, count);
+    setup_positions<dim>(locals, count);
     positions_timer.stop();
 
     /// Этап 3. Восстановление геометрии
     geometry_timer.resume();
-    setup_geometry<dim>(cells, count, op);
+    setup_geometry<dim>(locals, aliens, count, op);
     geometry_timer.stop();
 
     /// Этап 4. Восстановление соседства
     connections_timer.resume();
-    restore_connections<dim>(cells, 0, count);
+    restore_connections<dim>(locals, aliens, 0, count);
     connections_timer.stop();
 
     /// Этап 5. Удаление неопределенных ячеек
     clean_timer.resume();
-    remove_undefined<dim>(cells, count);
+    remove_undefined<dim>(locals, count);
     clean_timer.stop();
 
-    for (index_t ic = 0; ic < cells.n_locals(); ++ic) {
-        cells.owner_index[ic] = ic;
+    for (index_t ic = 0; ic < locals.size(); ++ic) {
+        locals.index[ic] = ic;
     }
 
     /// Этап 6. Сортировка ячеек по уровням (не обязательно)
@@ -106,7 +109,7 @@ void apply_impl(SoaCell &cells, const Distributor& op) {
 }
 
 /// @brief Автоматический выбор размерности
-void apply(SoaCell &cells, const Distributor& op) {
+inline void apply(SoaCell &cells, const Distributor& op) {
     if (cells.empty())
         return;
 

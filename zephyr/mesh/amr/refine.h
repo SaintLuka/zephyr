@@ -49,11 +49,11 @@ std::array<AmrCell, CpC(3)> create_children<3>(const SqCube& cube, bool axial) {
 template <int dim>
 void link_siblings(std::array<AmrCell, CpC(dim)>& children, int first_index);
 
-#define subs2D(i, j, x, y) (children[Quad::iss<i, j>()].faces[side_by_dir<x, y>()].adjacent.index = first_index + Quad::iss<i + 2 * x, j + 2 * y>())
-#define subs3D(i, j, k, x, y, z) (children[Cube::iss<i, j, k>()].faces[side_by_dir<x, y, z>()].adjacent.index = first_index + Cube::iss<i + 2 * x, j + 2 * y, k + 2 * z>())
+#define subs2D(i, j, x, y) (children[Quad::iss<i, j>()].faces[Side2D::by_dir<x, y>()].adjacent.index = first_index + Quad::iss<i + 2 * x, j + 2 * y>())
+#define subs3D(i, j, k, x, y, z) (children[Cube::iss<i, j, k>()].faces[Side3D::by_dir<x, y, z>()].adjacent.index = first_index + Cube::iss<i + 2 * x, j + 2 * y, k + 2 * z>())
 
 template <>
-void link_siblings<2>(std::array<AmrCell, CpC(2)>& children, int first_index) {
+inline void link_siblings<2>(std::array<AmrCell, CpC(2)>& children, int first_index) {
     subs2D(-1, -1, +1, 0);
     subs2D(-1, -1, 0, +1);
 
@@ -68,7 +68,7 @@ void link_siblings<2>(std::array<AmrCell, CpC(2)>& children, int first_index) {
 }
 
 template <>
-void link_siblings<3>(std::array<AmrCell, CpC(3)>& children, int first_index) {
+inline void link_siblings<3>(std::array<AmrCell, CpC(3)>& children, int first_index) {
     subs3D(-1, -1, -1, +1, 0, 0);
     subs3D(-1, -1, -1, 0, +1, 0);
     subs3D(-1, -1, -1, 0, 0, +1);

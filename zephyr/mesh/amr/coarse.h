@@ -174,13 +174,13 @@ AmrCell get_parent(AmrStorage &locals, AmrStorage &aliens,
 #if SCRUTINY
         if (some_neib_rank == rank && some_neib_index >= locals.size()) {
             std::cout << "Child has no local neighbor through the " <<
-                      side_to_string(side % 6) << " side #1\n";
+                      side_to_string(side, dim) << " side #1\n";
             some_child.print_info();
             throw std::runtime_error("Child has no local neighbor (coarse_cell) #1");
         }
         if (some_neib_rank != rank && some_neib_ghost >= aliens.size()) {
             std::cout << "Child has no remote neighbor through the " <<
-                      side_to_string(side % 6) << " side #1\n";
+                      side_to_string(side, dim) << " side #1\n";
             some_child.print_info();
             throw std::runtime_error("Child has no remote neighbor (coarse_cell) #1");
         }
@@ -196,13 +196,13 @@ AmrCell get_parent(AmrStorage &locals, AmrStorage &aliens,
 
             if (adj.rank == rank && adj.index >= locals.size()) {
                 std::cout << "Child has no local neighbor through the " <<
-                          side_to_string(side % 6) << " side #2\n";
+                          side_to_string(side, dim) << " side #2\n";
                 child.print_info();
                 throw std::runtime_error("Child has no local neighbor (coarse_cell) #2");
             }
             if (adj.rank != rank && adj.alien >= aliens.size()) {
                 std::cout << "Child has no remote neighbor through the " <<
-                          side_to_string(side % 6) << " side #2\n";
+                          side_to_string(side, dim) << " side #2\n";
                 child.print_info();
                 throw std::runtime_error("Child has no remote neighbor (coarse_cell) #2");
             }
@@ -288,7 +288,7 @@ AmrCell get_parent(AmrStorage &locals, AmrStorage &aliens,
         }
 
         if (found.size() != FpF(dim)) {
-            std::cout << "Side: " << side_to_string(side) << "\n";
+            std::cout << "Side: " << side_to_string(side, dim) << "\n";
             std::cout << std::scientific << std::setprecision(6) << "\n";
             std::cout << "Parent:\n";
             std::cout << parent.vertices[parent.faces[side].vertices[0]].transpose() << ", "

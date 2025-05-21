@@ -1,6 +1,6 @@
 #pragma once
 
-#include <zephyr/mesh/primitives/Side3D.h>
+#include <zephyr/mesh/primitives/side.h>
 #include <zephyr/mesh/primitives/bface.h>
 #include <zephyr/mesh/euler/amr_storage.h>
 #include <zephyr/mesh/euler/eu_face.h>

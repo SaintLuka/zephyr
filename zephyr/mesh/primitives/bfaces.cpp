@@ -5,19 +5,19 @@ namespace zephyr::mesh {
 BFaces::BFaces(CellType ctype, int count) {
     switch (ctype) {
         case CellType::AMR2D:
-            m_faces[Side3D::L].vertices = face_indices::sf<2, Side3D::L>();
-            m_faces[Side3D::R].vertices = face_indices::sf<2, Side3D::R>();
-            m_faces[Side3D::B].vertices = face_indices::sf<2, Side3D::B>();
-            m_faces[Side3D::T].vertices = face_indices::sf<2, Side3D::T>();
+            m_faces[Side3D::L].vertices = Side2D::L.sf();
+            m_faces[Side3D::R].vertices = Side2D::R.sf();
+            m_faces[Side3D::B].vertices = Side2D::B.sf();
+            m_faces[Side3D::T].vertices = Side2D::T.sf();
             break;
 
         case CellType::AMR3D:
-            m_faces[Side3D::L].vertices = face_indices::sf<3, Side3D::L>();
-            m_faces[Side3D::R].vertices = face_indices::sf<3, Side3D::R>();
-            m_faces[Side3D::B].vertices = face_indices::sf<3, Side3D::B>();
-            m_faces[Side3D::T].vertices = face_indices::sf<3, Side3D::T>();
-            m_faces[Side3D::X].vertices = face_indices::sf<3, Side3D::X>();
-            m_faces[Side3D::F].vertices = face_indices::sf<3, Side3D::F>();
+            m_faces[Side3D::L].vertices = Side3D::L.sf();
+            m_faces[Side3D::R].vertices = Side3D::R.sf();
+            m_faces[Side3D::B].vertices = Side3D::B.sf();
+            m_faces[Side3D::T].vertices = Side3D::T.sf();
+            m_faces[Side3D::X].vertices = Side3D::X.sf();
+            m_faces[Side3D::F].vertices = Side3D::F.sf();
             break;
 
         case CellType::TRIANGLE:
@@ -32,9 +32,7 @@ BFaces::BFaces(CellType ctype, int count) {
                 throw std::runtime_error(message);
             }
             for (int i = 0; i < count; ++i) {
-                m_faces[i].vertices = {i, (i + 1) % count,
-                                       face_indices::undef(),
-                                       face_indices::undef()};
+                m_faces[i].vertices = {i, (i + 1) % count, -1, -1};
             }
             break;
 

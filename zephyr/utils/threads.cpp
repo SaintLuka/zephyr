@@ -1,7 +1,6 @@
 #include <memory>
 #include <thread>
 #include <cmath>
-#include <cstring>
 #include <boost/program_options.hpp>
 
 #include <zephyr/utils/mpi.h>
@@ -14,7 +13,7 @@ namespace zephyr::utils {
 int threads::n_threads = 1;
 
 #ifdef ZEPHYR_TBB
-tbb::global_control threads::m_control = tbb::global_control(tbb::global_control::max_allowed_parallelism, 1);
+std::unique_ptr<tbb::global_control> threads::m_control = nullptr;
 #endif
 
 #ifdef ZEPHYR_STD_THREADS
@@ -41,8 +40,11 @@ void threads::on(int count) {
     n_threads = std::max(1, std::min(count, recommended()));
 
 #ifdef ZEPHYR_TBB
-    // ЗАВИСАЕТ НА НЕКОТОРЫХ МАШИНАХ!!!
-    m_control = tbb::global_control(tbb::global_control::max_allowed_parallelism, n_threads);
+    if (n_threads < 2) {
+        m_control = nullptr;
+    } else {
+        m_control = std::make_unique<tbb::global_control>(tbb::global_control::max_allowed_parallelism, n_threads);
+    }
 #endif
 
 #ifdef ZEPHYR_OPENMP
@@ -118,7 +120,7 @@ void threads::info() {
 void threads::off() {
     n_threads = 1;
 #ifdef ZEPHYR_TBB
-    m_control = tbb::global_control(tbb::global_control::max_allowed_parallelism, 1);
+    m_control = nullptr;
 #endif
 
 #ifdef ZEPHYR_OPENMP
@@ -130,12 +132,5 @@ void threads::off() {
 #endif
 }
 
-bool threads::active() {
-    return n_threads > 1;
-}
-
-int threads::count() {
-    return n_threads;
-}
 
 } // namespace zephyr::utils

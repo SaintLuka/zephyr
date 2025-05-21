@@ -7,6 +7,7 @@
 #ifdef ZEPHYR_TBB
 #include <execution>
 #include <tbb/global_control.h>
+#include <tbb/parallel_for.h>
 #endif
 
 #ifdef ZEPHYR_OPENMP
@@ -50,11 +51,11 @@ public:
     /// @brief Выключить треды
     static void off();
 
-    /// @brief Многопоточность включена?
-    static bool active();
-
     /// @brief Число тредов
-    static int count();
+    static inline int count() { return n_threads; }
+
+    /// @brief Многопоточность выключена?
+    static inline bool disabled() { return n_threads < 2; }
 
     /// @brief Выводит информацию о параллельности
     static void info();
@@ -72,6 +73,17 @@ public:
             class Iter, class Func, class... Args,
             class DeRef = typename std::iterator_traits<Iter>::reference>
     static void for_each(Iter begin, Iter end, Func &&func, Args &&... args);
+
+    /// @brief Выполнить функцию для чисел в диапазоне [begin, end)
+    /// @param func Целевая функция, принимает аргументы (idx, Args...)
+    /// @param args Аргуметры функции
+    /// @details Целевая функция func в качестве аргументов принимает
+    /// индекс и набор аргументов Args..., целевая функция может иметь
+    /// возвращаемое значение, но оно игнорируется.
+    template<int n_tasks_per_thread = default_n_tasks_per_thread,
+            int min_elements_per_task = default_min_elements_per_task,
+            typename Index, class Func, class... Args>
+    static void parallel_for(Index begin, Index end, Func &&func, Args &&... args);
 
     /// @brief Минимизировать результаты выполенения функции на диапазоне элементов
     /// @param begin Итератор, указывающий на начало диапазона
@@ -227,7 +239,7 @@ public:
     static int n_threads;
 
 #ifdef ZEPHYR_TBB
-    static tbb::global_control m_control;
+    static std::unique_ptr<tbb::global_control> m_control;
 #endif
 
 #ifdef ZEPHYR_STD_THREADS
@@ -244,6 +256,14 @@ int get_n_tasks(int n_threads, int size) {
 template<int n_tpt, int min_ept,
         class Iter, class Func, class ...Args, class DeRef>
 void threads::for_each(Iter begin, Iter end, Func &&func, Args &&... args) {
+    if (threads::disabled()) {
+        // Последовательное выполнение
+        for (auto it = begin; it != end; ++it) {
+            func(*it, std::forward<Args>(args)...);
+        }
+        return;
+    }
+
 #ifdef ZEPHYR_TBB
     std::for_each(std::execution::par,
         begin, end,
@@ -274,12 +294,6 @@ void threads::for_each(Iter begin, Iter end, Func &&func, Args &&... args) {
     // Пустой диапазон
     if (size < 1) return;
 
-    // Выполняем последовательно
-    if (n_threads < 2) {
-        bin_function(begin, end);
-        return;
-    }
-
     int n_tasks = get_n_tasks<n_tpt, min_ept>(n_threads, size);
     size_t bin = size / n_tasks;
     std::vector<std::future<void>> results;
@@ -298,10 +312,77 @@ void threads::for_each(Iter begin, Iter end, Func &&func, Args &&... args) {
 #endif
 }
 
+template<int n_tpt, int min_ept, typename Index, class Func, class ...Args>
+void threads::parallel_for(Index begin, Index end, Func &&func, Args &&... args) {
+    if (threads::disabled()) {
+        // Последовательное выполнение
+        for (Index i = begin; i < end; ++i) {
+            func(i, std::forward<Args>(args)...);
+        }
+        return;
+    }
+
+#ifdef ZEPHYR_TBB
+    tbb::parallel_for(begin, end,
+            [&func, &args...](Index idx) {
+                func(idx, std::forward<Args>(args)...);
+            });
+    return;
+#endif
+
+#ifdef ZEPHYR_OPENMP
+    #pragma omp parallel for
+    for (Iter it = begin; it < ends; ++it) {
+        func(*it, std::forward<Args>(args)...);
+    }
+    return;
+#endif
+
+#ifdef ZEPHYR_STD_THREADS
+    auto bin_function =
+            [&func, &args...](Index from, Index to) {
+                for (Index idx = from; idx < to; ++idx) {
+                    func(idx, std::forward<Args>(args)...);
+                }
+            };
+
+    Index size = end - begin;
+
+    // Пустой диапазон
+    if (size < 1) return;
+
+    int n_tasks = get_n_tasks<n_tpt, min_ept>(n_threads, size);
+    size_t bin = size / n_tasks;
+    std::vector<std::future<void>> results;
+    results.reserve(n_tasks);
+
+    Index from = begin;
+    for (int i = 0; i < n_tasks - 1; ++i) {
+        results.emplace_back(pool->enqueue(bin_function, from, from + bin));
+        from += bin;
+    }
+    results.emplace_back(pool->enqueue(bin_function, from, end));
+
+    for (auto &result : results)
+        result.wait();
+    return;
+#endif
+}
+
 template<int n_tpt, int min_ept,
         class Iter, class Func, class ...Args, class DeRef, class Value>
 auto threads::min(Iter begin, Iter end, const Value &init, Func &&func, Args &&... args)
--> typename std::enable_if<!std::is_void<Value>::value, Value>::type {
+-> typename std::enable_if<!std::is_void<Value>::value, Value>::type {    // Выполняем последовательно
+    if (threads::disabled()) {
+        // Последовательное выполнение
+        Value res(init);
+        for (auto it = begin; it < end; ++it) {
+            Value temp = func(*it, std::forward<Args>(args)...);
+            if (temp < res) { res = temp; }
+        }
+        return res;
+    }
+
 #ifdef ZEPHYR_TBB
     return std::transform_reduce(std::execution::par,
         begin, end, init,
@@ -376,6 +457,15 @@ template<int n_tpt, int min_ept,
         class Iter, class Func, class ...Args, class DeRef, class Value>
 auto threads::max(Iter begin, Iter end, const Value &init, Func &&func, Args &&... args)
 -> typename std::enable_if<!std::is_void<Value>::value, Value>::type {
+    if (threads::disabled()) {
+        // Последовательное выполнение
+        Value res(init);
+        for (auto it = begin; it < end; ++it) {
+            Value temp = func(*it, std::forward<Args>(args)...);
+            if (temp > res) { res = temp; }
+        }
+        return res;
+    }
 
 #ifdef ZEPHYR_TBB
     return std::transform_reduce(std::execution::par,
@@ -450,7 +540,16 @@ auto threads::max(Iter begin, Iter end, const Value &init, Func &&func, Args &&.
 template<int n_tpt, int min_ept,
         class Iter, class Func, class ...Args, class DeRef, class Value>
 auto threads::partial_sum(Iter begin, Iter end, const Value &init, Func &&func, Args &&... args)
--> typename std::enable_if<!std::is_void<Value>::value, std::vector<Value>>::type {
+-> typename std::enable_if<!std::is_void<Value>::value, std::vector<Value>>::type {    // Выполняем последовательно
+    if (threads::disabled()) {
+        // Последовательное выполнение
+        Value res(init);
+        for (auto it = begin; it < end; ++it) {
+            res += func(*it, std::forward<Args>(args)...);
+        }
+        return {res};
+    }
+
 #ifdef ZEPHYR_STD_THREADS
     auto bin_function =
             [&init, &func, &args...](const Iter &a, const Iter &b) -> Value {
@@ -499,6 +598,15 @@ template<int n_tpt, int min_ept,
         class Iter, class Func, class ...Args, class DeRef, class Value>
 auto threads::sum(Iter begin, Iter end, const Value &init, Func &&func, Args &&... args)
 -> typename std::enable_if<!std::is_void<Value>::value, Value>::type {
+    if (threads::disabled()) {
+        // Последовательное выполнение
+        Value res(init);
+        for (auto it = begin; it < end; ++it) {
+            res += func(*it, std::forward<Args>(args)...);
+        }
+        return res;
+    }
+
 #ifdef ZEPHYR_TBB
     return std::transform_reduce(std::execution::par,
         begin, end, init,
@@ -534,11 +642,6 @@ auto threads::sum(Iter begin, Iter end, const Value &init, Func &&func, Args &&.
     // Пустой диапазон
     if (size < 1) return init;
 
-    // Выполняем последовательно
-    if (n_threads < 2) {
-        return bin_function(begin, end);
-    }
-
     int n_tasks = get_n_tasks<n_tpt, min_ept>(n_threads, size);
     size_t bin = size / n_tasks;
     std::vector<std::future<Value>> results;
@@ -563,6 +666,15 @@ template<int n_tpt, int min_ept,
         class Iter, class Func, class ...Args, class DeRef, class Value>
 auto threads::reduce(Iter begin, Iter end, const Value &init, Func &&func, Args &&... args)
 -> typename std::enable_if<!std::is_void<Value>::value, Value>::type {
+    if (threads::disabled()) {
+        // Последовательное выполнение
+        Value res(init);
+        for (auto it = begin; it < end; ++it) {
+            res &= func(*it, std::forward<Args>(args)...);
+        }
+        return res;
+    }
+
 #ifdef ZEPHYR_TBB
     return std::transform_reduce(std::execution::par,
         begin, end, init,
@@ -573,7 +685,7 @@ auto threads::reduce(Iter begin, Iter end, const Value &init, Func &&func, Args 
 #endif
 
 #ifdef ZEPHYR_OPENMP
-#pragma omp declare reduction(redValue:Value:omp_out &= omp_in)
+    #pragma omp declare reduction(redValue:Value:omp_out &= omp_in)
 
     Value reduced = init;
 #pragma omp parallel for reduction(redValue:reduced)
@@ -597,11 +709,6 @@ auto threads::reduce(Iter begin, Iter end, const Value &init, Func &&func, Args 
 
     // Пустой диапазон
     if (size < 1) return init;
-
-    // Выполняем последовательно
-    if (n_threads < 2) {
-        return bin_function(begin, end);
-    }
 
     int n_tasks = get_n_tasks<n_tpt, min_ept>(n_threads, size);
     size_t bin = size / n_tasks;

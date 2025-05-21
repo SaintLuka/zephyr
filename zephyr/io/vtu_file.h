@@ -81,7 +81,7 @@ public:
     /// @brief Статическая функция записи в файл. Полный аналог функции-члена
     /// класса save, но вызывается без экземпляра класса, все параметры записи
     /// передаются непосредственно как аргументы функции.
-    static void save(const std::string &filename, mesh::SoaCell &cells,
+    static void save(const std::string &filename, mesh::SoaCell &locals,
                      const Variables &variables,
                      bool hex_only   = false,
                      bool polyhedral = false,

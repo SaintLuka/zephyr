@@ -1,10 +1,10 @@
-/// @file Файл содержит операции разбиения и огрубления для граней ячейки.
+/// @brief Файл содержит операции разбиения и огрубления для граней ячейки.
 /// Данный файл не устанавливается при установке zephyr, все изложенные описания
 /// алгоритмов и комментарии к функциям предназначены исключительно для разработчиков.
 
 #pragma once
 
-#include <zephyr/mesh/primitives/Side3D.h>
+#include <zephyr/mesh/primitives/side.h>
 #include <zephyr/mesh/euler/soa_mesh.h>
 #include <zephyr/mesh/amr2/common.h>
 
@@ -16,35 +16,39 @@ using SqMap = std::conditional_t<dim < 3, SqQuad, SqCube>;
 
 /// @brief Устанавливает на новых подгранях значение adjacent и
 /// boundary со старой грани
-template <int dim, int side>
+template <int dim, int int_side>
 void split_face_prepare(index_t iface, SoaCell::SoaFace& faces) {
-    faces.boundary[iface + (side + 6)] = faces.boundary[side];
-    faces.adjacent.rank[iface + (side + 6)] = faces.adjacent.rank[side];
-    faces.adjacent.local_index[iface + (side + 6)] = faces.adjacent.local_index[side];
-    faces.adjacent.owner_index[iface + (side + 6)] = faces.adjacent.owner_index[side];
+    constexpr Side<dim> side{int_side};
+    
+    faces.boundary[iface + side[1]] = faces.boundary[iface + side];
+    faces.adjacent.rank [iface + side[1]] = faces.adjacent.rank [iface + side];
+    faces.adjacent.index[iface + side[1]] = faces.adjacent.index[iface + side];
+    faces.adjacent.alien[iface + side[1]] = faces.adjacent.alien[iface + side];
 
     if constexpr (dim > 2) {
-        faces.boundary[iface + (side + 12)] = faces.boundary[side];
-        faces.adjacent.rank[iface + (side + 12)] = faces.adjacent.rank[side];
-        faces.adjacent.local_index[iface + (side + 12)] = faces.adjacent.local_index[side];
-        faces.adjacent.owner_index[iface + (side + 12)] = faces.adjacent.owner_index[side];
+        faces.boundary[iface + side[2]] = faces.boundary[iface + side];
+        faces.adjacent.rank [iface + side[2]] = faces.adjacent.rank [iface + side];
+        faces.adjacent.index[iface + side[2]] = faces.adjacent.index[iface + side];
+        faces.adjacent.alien[iface + side[2]] = faces.adjacent.alien[iface + side];
 
-        faces.boundary[iface + (side + 18)] = faces.boundary[side];
-        faces.adjacent.rank[iface + (side + 18)] = faces.adjacent.rank[side];
-        faces.adjacent.local_index[iface + (side + 18)] = faces.adjacent.local_index[side];
-        faces.adjacent.owner_index[iface + (side + 18)] = faces.adjacent.owner_index[side];
+        faces.boundary[iface + side[3]] = faces.boundary[iface + side];
+        faces.adjacent.rank [iface + side[3]] = faces.adjacent.rank [iface + side];
+        faces.adjacent.index[iface + side[3]] = faces.adjacent.index[iface + side];
+        faces.adjacent.alien[iface + side[3]] = faces.adjacent.alien[iface + side];
     }
 }
 
 /// @brief Устанавливает на новых подгранях индексы вершин.
-template <int dim, int side>
+template <int dim, int int_side>
 void split_face_indices(index_t iface, SoaCell::SoaFace& faces) {
-    faces.vertices[iface + side] = face_indices::cf<dim, Side3D(side)>();
-    faces.vertices[iface + (side + 6)] = face_indices::cf<dim, Side3D(side + 6)>();
+    constexpr Side<dim> side{int_side};
+
+    faces.vertices[iface + side] = side.cf();
+    faces.vertices[iface + side[1]] = side[1].cf();
 
     if constexpr (dim > 2) {
-        faces.vertices[iface + (side + 12)] = face_indices::cf<dim, Side3D(side + 12)>();
-        faces.vertices[iface + (side + 18)] = face_indices::cf<dim, Side3D(side + 18)>();
+        faces.vertices[iface + side[2]] = side[2].cf();
+        faces.vertices[iface + side[3]] = side[3].cf();
     }
 }
 
@@ -92,15 +96,17 @@ inline void setup_face_features<3>(index_t iface, SoaCell::SoaFace& faces, const
 
 
 /// @brief Устанавливает нормали и площади новых подграней
-template <int dim>
+template <int dim, int side_in>
 void split_face_features(index_t iface, SoaCell::SoaFace& faces,
-    const SqMap<dim>& vertices, int side, bool axial) {
+    const SqMap<dim>& vertices, bool axial) {
+    constexpr Side<dim> side{side_in};
+
     setup_face_features<dim>(iface + side, faces, vertices, axial);
-    setup_face_features<dim>(iface + side + 6, faces, vertices, axial);
+    setup_face_features<dim>(iface + side[1], faces, vertices, axial);
 
     if constexpr (dim > 2) {
-        setup_face_features<dim>(iface + side, faces, vertices);
-        setup_face_features<dim>(iface + side, faces, vertices);
+        setup_face_features<dim>(iface + side[2], faces, vertices);
+        setup_face_features<dim>(iface + side[3], faces, vertices);
     }
 }
 
@@ -110,7 +116,7 @@ void split_face_features(index_t iface, SoaCell::SoaFace& faces,
 template <int dim, int side>
 void split_face(index_t iface, SoaCell::SoaFace& faces, const SqMap<dim>& vertices, bool axial = false) {
 #if SCRUTINY
-    if (faces.is_actual(iface + side + 6)) {
+    if (faces.is_actual(iface + Side<dim>(side)[1])) {
         throw std::runtime_error("Try to cut complex face");
     }
 #endif
@@ -119,35 +125,35 @@ void split_face(index_t iface, SoaCell::SoaFace& faces, const SqMap<dim>& vertic
 
     split_face_indices<dim, side>(iface, faces);
 
-    split_face_features<dim>(iface, faces, vertices, side, axial);
+    split_face_features<dim, side>(iface, faces, vertices, axial);
 }
 
 /// @brief Разбивает грань на стороне side на подграни.
 /// Устанавливает площади и нормали новых граней.
 /// Преобразует аргумент функции side в аргумент шаблона.
 template <int dim>
-void split_face(index_t iface, SoaCell::SoaFace& faces, const SqMap<dim>& vertices, int side, bool axial);
+void split_face(index_t iface, SoaCell::SoaFace& faces, const SqMap<dim>& vertices, Side<dim> side, bool axial);
 
 template <>
-inline void split_face<2>(index_t iface, SoaCell::SoaFace& faces, const SqQuad& vertices, int side, bool axial) {
+inline void split_face<2>(index_t iface, SoaCell::SoaFace& faces, const SqQuad& vertices, Side2D side, bool axial) {
     switch (side) {
-        case Side3D::LEFT:
-            split_face<2, Side3D::L>(iface, faces, vertices, axial);
+        case Side2D::LEFT:
+            split_face<2, Side2D::L>(iface, faces, vertices, axial);
             break;
-        case Side3D::RIGHT:
-            split_face<2, Side3D::R>(iface, faces, vertices, axial);
+        case Side2D::RIGHT:
+            split_face<2, Side2D::R>(iface, faces, vertices, axial);
             break;
-        case Side3D::BOTTOM:
-            split_face<2, Side3D::B>(iface, faces, vertices, axial);
+        case Side2D::BOTTOM:
+            split_face<2, Side2D::B>(iface, faces, vertices, axial);
             break;
         default:
-            split_face<2, Side3D::T>(iface, faces, vertices, axial);
+            split_face<2, Side2D::T>(iface, faces, vertices, axial);
             break;
     }
 }
 
 template <>
-inline void split_face<3>(index_t iface, SoaCell::SoaFace& faces, const SqCube& vertices, int side, bool axial) {
+inline void split_face<3>(index_t iface, SoaCell::SoaFace& faces, const SqCube& vertices, Side3D side, bool axial) {
     switch (side) {
         case Side3D::LEFT:
             split_face<3, Side3D::L>(iface, faces, vertices);
@@ -174,22 +180,24 @@ inline void split_face<3>(index_t iface, SoaCell::SoaFace& faces, const SqCube& 
 /// Устанавливает площади и нормали новых граней.
 template <int dim>
 void split_face(index_t ic, SoaCell& cells, int side) {
-    split_face<dim>(cells.face_begin[ic] + side, cells.faces, cells.get_vertices<dim>(ic), side, cells.axial);
+    split_face<dim>(cells.face_begin[ic], cells.faces, cells.get_vertices<dim>(ic), side, cells.axial);
 }
 
 /// @brief Объединяет подграни в одну грань на стороне side
-template<int dim, int side>
+template<int dim, int int_side>
 void merge_faces(index_t ic, SoaCell& cells) {
-    index_t iface  = cells.face_begin[ic] + side;
+    constexpr Side<dim> side{int_side};
+
+    const index_t iface  = cells.face_begin[ic];
     const SqMap<dim> &vertices = cells.get_vertices<dim>(ic);
 
-    cells.faces.vertices[iface + side] = face_indices::sf<dim, side>();
+    cells.faces.vertices[iface + side] = side.sf();
 
-    cells.faces.set_undefined(iface + (side + 6));
+    cells.faces.set_undefined(iface + side[1]);
 
     if constexpr (dim > 2) {
-        cells.faces.set_undefined(iface + (side + 12));
-        cells.faces.set_undefined(iface + (side + 18));
+        cells.faces.set_undefined(iface + side[2]);
+        cells.faces.set_undefined(iface + side[3]);
     }
 
     setup_face_features<dim>(iface + side, cells.faces, vertices, cells.axial);
@@ -197,22 +205,22 @@ void merge_faces(index_t ic, SoaCell& cells) {
 
 /// @brief Объединяет подграни в одну грань на стороне side
 template<int dim>
-void merge_faces(index_t ic, SoaCell& cells, Side3D side);
+void merge_faces(index_t ic, SoaCell& cells, Side<dim> side);
 
 template<>
-inline void merge_faces<2>(index_t ic, SoaCell& cells, Side3D side) {
+inline void merge_faces<2>(index_t ic, SoaCell& cells, Side2D side) {
     switch (side) {
-        case Side3D::LEFT:
-            merge_faces<2, Side3D::L>(ic, cells);
+        case Side2D::LEFT:
+            merge_faces<2, Side2D::L>(ic, cells);
             break;
-        case Side3D::RIGHT:
-            merge_faces<2, Side3D::R>(ic, cells);
+        case Side2D::RIGHT:
+            merge_faces<2, Side2D::R>(ic, cells);
             break;
-        case Side3D::BOTTOM:
-            merge_faces<2, Side3D::B>(ic, cells);
+        case Side2D::BOTTOM:
+            merge_faces<2, Side2D::B>(ic, cells);
             break;
         default:
-            merge_faces<2, Side3D::T>(ic, cells);
+            merge_faces<2, Side2D::T>(ic, cells);
             break;
     }
 }

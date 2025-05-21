@@ -37,13 +37,13 @@ void retain_cell(AmrCell& cell, AmrStorage &locals, AmrStorage& aliens) {
 #if SCRUTINY
         if (adj.rank == rank && adj.index >= locals.size()) {
             std::cout << "AmrCell has no local neighbor through the " <<
-                      side_to_string(side % 6) << " side\n";
+                      side_to_string(side, dim) << " side\n";
             cell.print_info();
             throw std::runtime_error("AmrCell has no local neighbor (retain_cell)");
         }
         if (adj.rank != rank && adj.alien >= aliens.size()) {
             std::cout << "AmrCell has no remote neighbor through the " <<
-                side_to_string(side % 6) << " side\n";
+                side_to_string(side, dim) << " side\n";
             cell.print_info();
             throw std::runtime_error("AmrCell has no remote neighbor (retain_cell)");
         }

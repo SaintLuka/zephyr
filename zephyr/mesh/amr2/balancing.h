@@ -10,10 +10,12 @@
 #include <zephyr/mesh/amr2/balancing_slow.h>
 #include <zephyr/mesh/amr2/balancing_fast.h>
 
+#include <zephyr/io/vtu_file.h>
+
 namespace zephyr::mesh::amr2 {
 
-/// @brief Функция балансировки флагов верхнего уровня блээээт
-void balance_flags(SoaCell &cells, int max_level) {
+/// @brief Функция балансировки флагов верхнего уровня
+inline void balance_flags(SoaCell &cells, int max_level) {
     if (cells.empty()) return;
 
 #if FAST_BALANCING
@@ -23,10 +25,10 @@ void balance_flags(SoaCell &cells, int max_level) {
         amr2::balance_flags_fast<3>(cells, max_level);
     }
 #else
-    if (dim < 3) {
-        amr2::balance_flags_slow<2>(locals, max_level);
+    if (cells.dim < 3) {
+        amr2::balance_flags_slow<2>(cells, max_level);
     } else {
-        amr2::balance_flags_slow<3>(locals, max_level);
+        amr2::balance_flags_slow<3>(cells, max_level);
     }
 #endif
 

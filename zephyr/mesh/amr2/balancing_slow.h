@@ -12,16 +12,14 @@
 
 namespace zephyr::mesh::amr2 {
 
-/// @struct Vicinity - окрестность, прикольное слово, да?
-/// @brief Простая структура, содержит ссылки на данные (уровни и флаги)
-/// сосдених ячеек и сиблингов, требуется для быстрого доступа к информации
-/// об обновлении соседей или сиблингов.
-/// Для ячеек с флагом = 1 данные не хранятся (нет необходимости), для
-/// ячеек с флагом = 0 не хранятся данные о сиблингах.
+// Окрестность ячейки. Структура содержит ссылки на данные (уровни и флаги)
+// соседних ячеек и сиблингов, используется для быстрого доступа к информации
+// об обновлении соседей или сиблингов.
+// Для ячеек с флагом = 1 данные не хранятся (нет необходимости), для
+// ячеек с флагом = 0 не хранятся данные о сиблингах.
 template<int dim>
 struct Vicinity {
 private:
-
     /// @brief Тип данных amr.flag
     using flag_type = int;
 
@@ -39,77 +37,78 @@ private:
     const flag_type *sibs_flags[max_sibs_size];   ///< Ссылки на флаги адаптации сиблингов
 
 public:
-
     int max_neib_wanted_level;                    ///< Максимальный желаемый уровень среди соседей
     int max_sibs_flag;                            ///< Максимальный флаг сиблинга
-
 
     /// @brief Конструктор по умолчанию - данные отсутствуют
     Vicinity() : neib_count(0), sibs_count(0) {};
 
     /// @brief Заполнение списков соседей для ячейки
-    /// @param cell Целевая ячейка, для которой определяется окрестность
+    /// @param ic Целевая ячейка, для которой определяется окрестность
     /// @param locals Ссылка на локальное хранилище
     /// @param aliens Ссылка на хранилище ячеек с других процессов
-    void setup(const AmrCell& cell, AmrStorage &locals, AmrStorage& aliens) {
-        scrutiny_check(cell.index < locals.size(), "setup: ic >= locals.size()")
+    void setup(index_t ic, SoaCell &locals, SoaCell& aliens) {
+        scrutiny_check(ic < locals.size(), "setup: ic >= locals.size()")
 
         neib_count = 0;
         sibs_count = 0;
 
         // Эти ячейки не интересуют
-        if (cell.flag > 0) {
+        if (locals.flag[ic] > 0) {
             return;
         }
 
+        auto &adj = locals.faces.adjacent;
+
         // Поиск соседей
-        for (auto &face: cell.faces) {
-            if (face.is_undefined() || face.is_boundary()) {
+        for (const auto iface: locals.faces_range(ic)) {
+            if (locals.faces.is_undefined(iface) ||
+                locals.faces.is_boundary(iface)) {
                 continue;
             }
 
-            auto &adj = face.adjacent;
 #if SCRUTINY
-            if (adj.rank == cell.rank) {
-                if (adj.index >= locals.size()) {
-                    std::cerr << "rank: " << adj.rank << "\n";
+            if (adj.rank[iface] == locals.rank[ic]) {
+                if (adj.index[iface] >= locals.size()) {
+                    std::cerr << "rank: " << adj.rank[iface] << "\n";
                     std::cerr << "locals.size: " << locals.size() << "\n";
-                    std::cerr << "adj.index: " << adj.index << "\n";
+                    std::cerr << "adj.index: " << adj.index[iface] << "\n";
                     throw std::runtime_error("Vicinity::setup error #11");
                 }
             } else {
-                if (adj.alien >= aliens.size()) {
+                if (adj.alien[iface] >= aliens.size()) {
                     throw std::runtime_error("Vicinity::setup error #2");
                 }
             }
 #endif
-            AmrCell& neib = adj.rank == cell.rank ? locals[adj.index] : aliens[adj.alien];
+            auto [neibs, jc] = locals.faces.get_neib(iface, locals, aliens);
 
-            neib_levels[neib_count] = neib.level;
-            neib_flags[neib_count] = &neib.flag;
+            neib_levels[neib_count] = neibs.level[jc];
+            neib_flags[neib_count] = &neibs.flag[jc];
             ++neib_count;
         }
         scrutiny_check(neib_count <= max_neibs_size, "nei_count > max_neibs_size")
 
         // Поиск сиблингов для ячеек с флагом -1
-        if (cell.flag  < 0) {
-            if (!can_coarse<dim>(cell, locals)) {
-                cell.print_info();
+        if (locals.flag[ic] < 0) {
+#if SCRUTINY
+            if (!can_coarse<dim>(locals, ic)) {
+                locals.print_info(ic);
             }
-            scrutiny_check(can_coarse<dim>(cell, locals), "Can't coarse")
+            scrutiny_check(can_coarse<dim>(locals, ic), "Can't coarse")
+#endif
 
             // Код выполняется только если can_coarse было истинно,
-            // поэтому можно не волноваться о начилии сиблингов
-            auto sibs = get_siblings<dim>(cell, locals);
+            // поэтому можно не волноваться о наличии сиблингов
+            auto sibs = get_siblings<dim>( locals, ic);
             for (auto is: sibs) {
                 scrutiny_check(is < locals.size(), "Vicinity: Sibling index out of range")
 
-                sibs_flags[sibs_count] = &locals[is].flag;
+                sibs_flags[sibs_count] = &locals.flag[is];
                 ++sibs_count;
             }
 
             scrutiny_check(sibs_count == max_sibs_size, "Wrong siblings count")
-
         }
     }
 
@@ -132,14 +131,14 @@ public:
         max_sibs_flag = -1;
         for (int i = 0; i < sibs_count; ++i) {
             scrutiny_check(sibs_flags[i] != nullptr, "Undefined neighbor")
-            max_sibs_flag = std::max(max_sibs_flag, int(*sibs_flags[i]));
+            max_sibs_flag = std::max(max_sibs_flag, static_cast<int>(*sibs_flags[i]));
         }
     }
 };
 
-/// @struct VicinityList - массив структур типа Vicinity.
-/// @brief Для ячеек с флагом = 1 данные не хранятся (нет необходимости),
-/// для ячеек с флагом = 0 не хранятся данные о сиблингах.
+// Массив структур типа Vicinity.
+// Для ячеек с флагом = 1 данные не хранятся (нет необходимости),
+// для ячеек с флагом = 0 не хранятся данные о сиблингах.
 template <int dim>
 struct VicinityList {
     std::vector<Vicinity<dim>> m_list;
@@ -151,23 +150,19 @@ struct VicinityList {
     /// @brief Конструктор построения окружения
     /// @param locals Ссылка на локальное хранилище
     /// @param aliens Ссылка на хранилище ячеек с других процессов
-    void fill(AmrStorage& locals, AmrStorage& aliens) {
+    void fill(SoaCell& locals, SoaCell& aliens) {
         m_list.resize(locals.size());
-        threads::for_each(
-                locals.begin(), locals.end(),
-                [this, &locals, &aliens](const AmrStorage::Item &item) {
-                    m_list[item.index].setup(item, locals, aliens);
+        threads::parallel_for(index_t{0}, index_t{locals.size()},
+                [this, &locals, &aliens](index_t ic) {
+                    m_list[ic].setup(ic, locals, aliens);
                 });
     }
 
     /// @brief Собрать актуальные данные о соседях и сиблингах для всех ячеек.
     /// Функция инициализирует max_neib_wanted_level и max_sibs_flag.
     void update() {
-        threads::for_each(
-                m_list.begin(), m_list.end(),
-                [](Vicinity<dim> &ca) {
-                    ca.update();
-                });
+        threads::for_each( m_list.begin(), m_list.end(),
+            [](Vicinity<dim> &ca) { ca.update(); });
     }
 
     /// @brief Оператор доступа к элементу списка
@@ -179,48 +174,48 @@ struct VicinityList {
 
 /// @brief Повышает флаг адаптации для ячейки, соседи которой убегают вперед
 /// (хотят уровень на 2 выше), а также для ячейки, которая хочет огрубиться
-/// в отличае от своих сиблингов.
+/// в отличие от своих сиблингов.
 /// @param cell Целевая ячейка
 /// @param locals Ссылка на локальное хранилище
 /// @param vicinity_list Ссылка на массив с окружением ячеек
 /// @return true если ячейка изменила свой флаг
 template <int dim>
-bool update_flag(AmrCell& cell, const VicinityList<dim>& vicinity_list) {
-    auto vicinity = vicinity_list[cell.index];
+bool update_flag(index_t ic, SoaCell& locals, const VicinityList<dim>& vicinity_list) {
+    scrutiny_check(ic < locals.size(), "update_flag error: ic >= locals.size()")
 
-    if (cell.flag > 0) {
-        return false;
-    }
+    if (locals.flag[ic] > 0) { return false; }
+
+    const auto& vicinity = vicinity_list[ic];
 
     // Максимальный желаемый уровень соседей
     auto neibs_wanted_lvl = vicinity.max_neib_wanted_level;
 
     // Ячейка не хочет меняться
-    if (cell.flag == 0) {
+    if (locals.flag[ic] == 0) {
         // Один из соседей хочет слишком высокий уровень
-        if (neibs_wanted_lvl > cell.level + 1) {
-            cell.flag = 1;
+        if (neibs_wanted_lvl > locals.level[ic] + 1) {
+            locals.flag[ic] = 1;
             return true;
         }
     } else {
         // Ячейка хочет огрубиться, cell.flag < 0
-        scrutiny_check(cell.flag < 0, "update_flag: wrong assumption")
+        scrutiny_check(locals.flag[ic] < 0, "update_flag: wrong assumption")
 
         // Один из соседей хочет слишком высокий уровень
-        if (neibs_wanted_lvl > cell.level + 1) {
-            cell.flag = 1;
+        if (neibs_wanted_lvl > locals.level[ic] + 1) {
+            locals.flag[ic] = 1;
             return true;
         }
 
         // Один из соседей хочет достаточно высокий уровень
-        if (neibs_wanted_lvl > cell.level) {
-            cell.flag = 0;
+        if (neibs_wanted_lvl > locals.level[ic]) {
+            locals.flag[ic] = 0;
             return true;
         }
 
         // Один из сиблингов не хочет огрубляться
         if (vicinity.max_sibs_flag > -1) {
-            cell.flag = 0;
+            locals.flag[ic] = 0;
             return true;
         }
     }
@@ -231,11 +226,12 @@ bool update_flag(AmrCell& cell, const VicinityList<dim>& vicinity_list) {
 /// @brief Выполняет функцию update_flag для всех ячеек
 /// @return true если хотя бы одна ячейка изменила свой флаг
 template <int dim>
-bool flag_balancing_step(AmrStorage& locals, const VicinityList<dim>& vicinity_list) {
+bool flag_balancing_step(SoaCell& locals, const VicinityList<dim>& vicinity_list) {
     // Функция max в данном контексте заменяет логическое "И"
+    utils::range<index_t> range(0, locals.size());
     return threads::max(
-            locals.begin(), locals.end(),
-            update_flag<dim>, std::ref(vicinity_list)
+            range.begin(), range.end(),
+            update_flag<dim>, std::ref(locals), std::ref(vicinity_list)
     );
 }
 
@@ -258,17 +254,19 @@ bool flag_balancing_step(AmrStorage& locals, const VicinityList<dim>& vicinity_l
 /// (и достаточно эффективно) реализуется многопоточность, также алгоритм легко
 /// обобщается на многопроцессорную систему.
 template<int dim>
-void balance_flags_slow(AmrStorage &locals, AmrStorage& aliens, int max_level) {
+void balance_flags_slow(SoaCell& locals, int max_level) {
     static Stopwatch base_restrictions_timer;
     static Stopwatch setup_vicinity_timer;
     static Stopwatch flag_balancing_timer;
 
-    // Делаем статическим, чтобы не выделять каждый раз память (гениально)
-    static VicinityList<dim> vicinity_list;
+    static SoaCell aliens;
 
     base_restrictions_timer.resume();
     base_restrictions<dim>(locals, max_level);
     base_restrictions_timer.stop();
+
+    // Делаем статическим, чтобы не выделять каждый раз память (гениально)
+    static VicinityList<dim> vicinity_list;
 
     setup_vicinity_timer.resume();
     vicinity_list.fill(locals, aliens);

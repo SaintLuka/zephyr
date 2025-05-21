@@ -19,6 +19,6 @@ install(FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/element.h
         ${CMAKE_CURRENT_SOURCE_DIR}/mov_cell.h
         ${CMAKE_CURRENT_SOURCE_DIR}/mov_node.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/Side3D.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/side.h
         DESTINATION include/${PROJECT_NAME}/mesh/primitives
 )

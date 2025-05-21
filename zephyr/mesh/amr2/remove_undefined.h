@@ -17,26 +17,27 @@ using zephyr::utils::Stopwatch;
 /// куда ячейка будет перемещена в дальнейшем
 /// @param cell Целевая ячейка
 /// @param locals Хранилище ячеек
-void change_adjacent_one1(AmrStorage::Item& cell, AmrStorage& locals) {
-    if (cell.is_undefined()) { return; }
+inline void change_adjacent_one1(index_t ic, SoaCell& locals) {
+    if (locals.is_undefined(ic)) { return; }
 
-    for (BFace &face: cell.faces) {
-        if (face.is_undefined()) {
+    for (auto iface: locals.faces_range(ic)) {
+        if (locals.faces.is_undefined(iface)) {
             continue;
         }
         // Граничные указывают на ячейку
-        if (face.is_boundary()) {
-            face.adjacent.index = cell.next;
+        if (locals.faces.is_boundary(iface)) {
+            locals.faces.adjacent.index[iface] = locals.next[ic];
             continue;
         }
 
-        scrutiny_check(face.adjacent.alien < 0,
+        scrutiny_check(locals.faces.adjacent.alien[iface] < 0,
                        "change_adjacent_one() error: only local neighbors")
 
-        scrutiny_check(face.adjacent.index >= 0 && face.adjacent.index < locals.size(),
+        scrutiny_check(locals.faces.adjacent.index[iface] >= 0 &&
+                       locals.faces.adjacent.index[iface] < locals.size(),
                        "change_adjacent_partial() error: adjacent.index out of range");
 
-        face.adjacent.index = locals[face.adjacent.index].next;
+        locals.faces.adjacent.index[iface] = locals.next[locals.faces.adjacent.index[iface]];
     }
 }
 
@@ -44,7 +45,7 @@ void change_adjacent_one1(AmrStorage::Item& cell, AmrStorage& locals) {
 /// для одной ячейки. Предполагается, что в поле element.next записан индекс,
 /// куда ячейка будет перемещена в дальнейшем
 /// @param cell Целевая ячейка
-void change_adjacent_one2(AmrStorage::Item& cell, AmrStorage& locals, AmrStorage& aliens) {
+inline void change_adjacent_one2(AmrStorage::Item& cell, AmrStorage& locals, AmrStorage& aliens) {
     if (cell.is_undefined()) { return; }
 
     for (BFace &face: cell.faces) {
@@ -78,13 +79,10 @@ void change_adjacent_one2(AmrStorage::Item& cell, AmrStorage& locals, AmrStorage
 /// element.next записан индекс, куда ячейка будет перемещена в дальнейшем
 /// @param cells Хранилище ячеек
 void change_adjacent(SoaCell& cells) {
-    throw std::runtime_error("change_adjacent() error: Not implemented");
-    /*
-    threads::for_each<5>(
-            cells.begin(), cells.end(),
+    threads::parallel_for(
+            index_t{0}, index_t{cells.size()},
             change_adjacent_one1,
             std::ref(cells));
-            */
 }
 
 /// @brief Функция меняет индексы соседей через грань на новые, выполняется
@@ -127,7 +125,7 @@ struct SwapLists {
     std::vector<index_t> actual_cells;
 
     /// @brief Конструктор
-    /// @param cells Хранилище ячеек
+    /// @param locals Хранилище ячеек
     /// @param max_index Максимальный индекс, который будет в массиве неопределенных
     /// ячеек, правильное задание - размер хранилища после удаления всех неопределенных
     /// элементов. Правильное задание параметра гарантирует, что будет выполняться
@@ -135,12 +133,12 @@ struct SwapLists {
     /// @param max_swap_count Максимальное число элементов, для которых может
     /// потребоваться перестановка, размеры списков ограничены данным числом.
     // TODO: Многопоточная версия конструктора
-    SwapLists(SoaCell& cells, index_t max_index, index_t max_swap_count) {
+    SwapLists(SoaCell& locals, index_t max_index, index_t max_swap_count) {
         if (max_swap_count < 1) { return; }
 
         undefined_cells.reserve(max_swap_count);
         for (index_t ic = 0; ic < max_index; ++ic) {
-            if (cells.is_undefined(ic)) {
+            if (locals.is_undefined(ic)) {
                 undefined_cells.push_back(ic);
                 if (undefined_cells.size() >= max_swap_count) {
                     break;
@@ -149,8 +147,8 @@ struct SwapLists {
         }
 
         actual_cells.reserve(undefined_cells.size());
-        for (index_t jc = cells.n_cells() - 1; jc >= 0; --jc) {
-            if (cells.is_actual(jc)) {
+        for (index_t jc = locals.size() - 1; jc >= 0; --jc) {
+            if (locals.is_actual(jc)) {
                 actual_cells.push_back(jc);
                 if (actual_cells.size() >= undefined_cells.size()) {
                     break;
@@ -164,25 +162,25 @@ struct SwapLists {
     /// транспозций пар элементов, при этом один элемент в паре должен быть актуальным,
     /// а один неопределенным, после перестановки актуальный элемент всегда должен
     /// оказываться ближе к началу списка, чем неопределенный
-    void check_mapping(SoaCell& cells) const {
-        for (index_t i = 0; i < cells.n_cells(); ++i) {
-            auto j = cells.next[i];
-            if (i != cells.next[j]) {
+    static void check_mapping(SoaCell& locals) {
+        for (index_t i = 0; i < locals.size(); ++i) {
+            auto j = locals.next[i];
+            if (i != locals.next[j]) {
                 // Перестановка не является транспозицией
-                std::cout << i << " " << cells.next[i] << "\n";
-                std::cout << j << " " << cells.next[j] << "\n";
+                std::cout << i << " " << locals.next[i] << "\n";
+                std::cout << j << " " << locals.next[j] << "\n";
                 throw std::runtime_error("Only swaps are allowed");
             }
             if (i != j) {
-                if (cells.is_actual(i) && cells.is_actual(j)) {
+                if (locals.is_actual(i) && locals.is_actual(j)) {
                     // Попытка обменять две актуальные ячейки
                     throw std::runtime_error("Swap two actual cells");
                 }
-                if (i < j && cells.is_actual(i)) {
+                if (i < j && locals.is_actual(i)) {
                     // Актуальня ячейка переносится только в начало
                     throw std::runtime_error("Wrong swap #1");
                 }
-                if (i > j && cells.is_undefined(i)) {
+                if (i > j && locals.is_undefined(i)) {
                     // Неопределенная ячейка переносится только в конец
                     throw std::runtime_error("Wrong swap #2");
                 }
@@ -194,42 +192,42 @@ struct SwapLists {
     /// @brief Устанавливает тождественную перестановку для части ячеек
     /// @param cells Хранилище ячеек
     /// @param from, to Диапазон ячеек в хранилище
-    void set_identical_mapping_partial(SoaCell& cells, index_t from, index_t to) const {
+    static void set_identical_mapping_partial(SoaCell& cells, index_t from, index_t to) {
         for (index_t ic = from; ic < to; ++ic) {
             cells.next[ic] = ic;
         }
     }
 
     /// @brief Устанавливает следующую позицию для части ячеек
-    /// @param cells Ссылка на хранилище ячеек
+    /// @param locals Ссылка на хранилище ячеек
     /// @param from, to Диапазон индексов в массивах actual_cells и undefined_cells
-    void set_swap_mapping_partial(SoaCell& cells, index_t from, index_t to) const {
+    void set_swap_mapping_partial(SoaCell& locals, const index_t from, const index_t to) const {
         for (index_t i = from; i < to; ++i) {
             scrutiny_check(i < actual_cells.size(),    "swap_mapping out of range #1")
             scrutiny_check(i < undefined_cells.size(), "swap_mapping out of range #2")
 
-            index_t ai = actual_cells[i];
-            index_t ui = undefined_cells[i];
+            const index_t ai = actual_cells[i];
+            const index_t ui = undefined_cells[i];
 
-            scrutiny_check(ai < cells.n_cells(), "swap_mapping out of range #3")
-            scrutiny_check(ui < cells.n_cells(), "swap_mapping out of range #4")
+            scrutiny_check(ai < locals.size(), "swap_mapping out of range #3")
+            scrutiny_check(ui < locals.size(), "swap_mapping out of range #4")
 
-            cells.next[ui] = ai;
-            cells.next[ai] = ui;
+            locals.next[ui] = ai;
+            locals.next[ai] = ui;
         }
     }
 
     /// @brief Устанавливает следующие позиции ячеек в однопоточном режиме
     /// @details После выполнения операции поле element.next у ячеек указывает
     /// на следующее положение ячейки в хранилище
-    void set_mapping(SoaCell& cells) const {
-        set_identical_mapping_partial(cells, 0, cells.n_cells());
+    void set_mapping(SoaCell& locals) const {
+        set_identical_mapping_partial(locals, 0, locals.size());
 
         if (actual_cells.empty()) { return; }
 
-        set_swap_mapping_partial(cells, 0, size());
+        set_swap_mapping_partial(locals, 0, size());
 #if SCRUTINY
-        check_mapping(cells);
+        check_mapping(locals);
 #endif
     }
 
@@ -283,7 +281,7 @@ struct SwapLists {
     /// заранее.
     void move_elements(SoaCell &cells) const {
         threads::for_each<5>(
-                undefined_cells.begin(), undefined_cells.end(),
+                actual_cells.begin(), actual_cells.end(),
                 move_cell, std::ref(cells));
     }
 
