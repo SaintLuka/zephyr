@@ -15,9 +15,9 @@ namespace zephyr::mesh::amr2 {
 
 /// @brief Создать геометрию дочерних ячеек по родительской ячейке
 /// @param ic Позиция для размещения дочерних
-/// @param shape Родительская ячейка (SqQuad или SqCube
+/// @param shape Родительская ячейка (SqQuad или SqCube)
 template <int dim>
-void create_children(index_t ic, SoaCell& cells, const SqMap<dim>& shape) {
+void create_children(index_t ic, AmrCells& cells, const SqMap<dim>& shape) {
     if constexpr (dim == 2) {
         auto quads = shape.children();
         cells.add_cell(ic + 0, quads[0], cells.axial);
@@ -43,13 +43,13 @@ void create_children(index_t ic, SoaCell& cells, const SqMap<dim>& shape) {
 /// Помним, что все дочерние ячейки будут располагаться последовательно,
 /// нумерация начнется с ic.
 template <int dim>
-void link_siblings(SoaCell& cells, index_t ic);
+void link_siblings(AmrCells& cells, index_t ic);
 
 #define subs2D(i, j, x, y) (cells.faces.adjacent.index[cells.face_begin[ic + Quad::iss<i, j>()] + Side2D::by_dir<x, y>()] = ic + Quad::iss<i + 2 * x, j + 2 * y>())
 #define subs3D(i, j, k, x, y, z) (cells.faces.adjacent.index[cells.face_begin[ic + Cube::iss<i, j, k>()] +  + Side3D::by_dir<x, y, z>()] = ic + Cube::iss<i + 2 * x, j + 2 * y, k + 2 * z>())
 
 template <>
-inline void link_siblings<2>(SoaCell& cells, index_t ic) {
+inline void link_siblings<2>(AmrCells& cells, index_t ic) {
     subs2D(-1, -1, +1, 0);
     subs2D(-1, -1, 0, +1);
 
@@ -64,7 +64,7 @@ inline void link_siblings<2>(SoaCell& cells, index_t ic) {
 }
 
 template <>
-inline void link_siblings<3>(SoaCell& cells, index_t ic) {
+inline void link_siblings<3>(AmrCells& cells, index_t ic) {
     subs3D(-1, -1, -1, +1, 0, 0);
     subs3D(-1, -1, -1, 0, +1, 0);
     subs3D(-1, -1, -1, 0, 0, +1);
@@ -99,7 +99,7 @@ inline void link_siblings<3>(SoaCell& cells, index_t ic) {
 }
 
 template <int dim>
-void check_link(SoaCell& cells, index_t ip, index_t child_beg) {
+void check_link(AmrCells& cells, index_t ip, index_t child_beg) {
     // Проверяем, что внутренние ячейки связаны верно
     for (int z1 = 0; z1 < CpC(dim); ++z1) {
         index_t c1 = child_beg + z1;
@@ -160,7 +160,7 @@ void check_link(SoaCell& cells, index_t ip, index_t child_beg) {
 /// Дочерние ячейки имеют законченный вид (необходимое число граней,
 /// правильную линковку на старые ячейки)
 template<int dim>
-index_t make_children(SoaCell &cells, index_t ip) {
+index_t make_children(AmrCells &cells, index_t ip) {
     const auto children_by_side = get_children_by_side<dim>();
 
     const index_t child_beg = cells.next[ip];
@@ -312,7 +312,7 @@ Children select_children<3>(
 /// @details Дочерние ячейки правильно ссылаются друг на друга, на гранях
 /// adjacent указан на старые ячейки.
 template<int dim>
-void refine_cell(SoaCell &locals, index_t ip, int rank, const Distributor& op) {
+void refine_cell(AmrCells &locals, index_t ip, int rank, const Distributor& op) {
     auto child_beg = make_children<dim>(locals, ip);
 
     auto& adj = locals.faces.adjacent;
@@ -325,7 +325,7 @@ void refine_cell(SoaCell &locals, index_t ip, int rank, const Distributor& op) {
 #endif
         index_t ich = child_beg + i;
 
-        for (Side<dim> s: Side<dim>::items()) {
+        for (auto s: Side<dim>::items()) {
             index_t iface = locals.face_begin[ich] + s;
             if (locals.faces.is_undefined(iface) or
                 locals.faces.is_boundary(iface)) {
@@ -361,8 +361,12 @@ void refine_cell(SoaCell &locals, index_t ip, int rank, const Distributor& op) {
         }
     }
 
-    //auto children2 = select_children<dim>(cells, children);
-    //op.split(parent, children2);
+    SoaChildren children(locals);
+    for (int i = 0; i < CpC(dim); ++i) {
+        children.index[i] = child_beg + i;
+    }
+    QCell parent(&locals, ip);
+    op.split_soa(parent, children);
 
     locals.set_undefined(ip);
 }

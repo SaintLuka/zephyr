@@ -17,7 +17,7 @@ using zephyr::utils::Stopwatch;
 /// куда ячейка будет перемещена в дальнейшем
 /// @param cell Целевая ячейка
 /// @param locals Хранилище ячеек
-inline void change_adjacent_one1(index_t ic, SoaCell& locals) {
+inline void change_adjacent_one1(index_t ic, AmrCells& locals) {
     if (locals.is_undefined(ic)) { return; }
 
     for (auto iface: locals.faces_range(ic)) {
@@ -78,7 +78,7 @@ inline void change_adjacent_one2(AmrStorage::Item& cell, AmrStorage& locals, Amr
 /// для всех ячеек в однопоточном режиме. Предполагается, что в поле
 /// element.next записан индекс, куда ячейка будет перемещена в дальнейшем
 /// @param cells Хранилище ячеек
-void change_adjacent(SoaCell& cells) {
+void change_adjacent(AmrCells& cells) {
     threads::parallel_for(
             index_t{0}, index_t{cells.size()},
             change_adjacent_one1,
@@ -89,7 +89,7 @@ void change_adjacent(SoaCell& cells) {
 /// для всех ячеек в однопоточном режиме. Предполагается, что в поле
 /// element.next записан индекс, куда ячейка будет перемещена в дальнейшем
 /// @param cells Хранилище ячеек
-void change_adjacent2(SoaCell& cells) {
+void change_adjacent2(AmrCells& cells) {
     throw std::runtime_error("change_adjacent() error: Not implemented");
     /*
     threads::for_each<5>(
@@ -104,8 +104,9 @@ void change_adjacent2(SoaCell& cells) {
 /// @details Данные актуальной ячейки перемещаются на место неактуальной
 /// ячейки, индексы смежности не изменяются, они должны быть выставлены
 /// заранее.
-inline void move_cell(index_t ic, SoaCell& cells) {
+inline void move_cell(index_t ic, AmrCells& cells) {
     cells.move_item(ic);
+    cells.copy_data(ic, cells.next[ic]);
 }
 
 /// @brief Вспомогательная структура, содержит два списка индексов: неопределенные
@@ -133,7 +134,7 @@ struct SwapLists {
     /// @param max_swap_count Максимальное число элементов, для которых может
     /// потребоваться перестановка, размеры списков ограничены данным числом.
     // TODO: Многопоточная версия конструктора
-    SwapLists(SoaCell& locals, index_t max_index, index_t max_swap_count) {
+    SwapLists(AmrCells& locals, index_t max_index, index_t max_swap_count) {
         if (max_swap_count < 1) { return; }
 
         undefined_cells.reserve(max_swap_count);
@@ -162,7 +163,7 @@ struct SwapLists {
     /// транспозций пар элементов, при этом один элемент в паре должен быть актуальным,
     /// а один неопределенным, после перестановки актуальный элемент всегда должен
     /// оказываться ближе к началу списка, чем неопределенный
-    static void check_mapping(SoaCell& locals) {
+    static void check_mapping(AmrCells& locals) {
         for (index_t i = 0; i < locals.size(); ++i) {
             auto j = locals.next[i];
             if (i != locals.next[j]) {
@@ -192,7 +193,7 @@ struct SwapLists {
     /// @brief Устанавливает тождественную перестановку для части ячеек
     /// @param cells Хранилище ячеек
     /// @param from, to Диапазон ячеек в хранилище
-    static void set_identical_mapping_partial(SoaCell& cells, index_t from, index_t to) {
+    static void set_identical_mapping_partial(AmrCells& cells, index_t from, index_t to) {
         for (index_t ic = from; ic < to; ++ic) {
             cells.next[ic] = ic;
         }
@@ -201,7 +202,7 @@ struct SwapLists {
     /// @brief Устанавливает следующую позицию для части ячеек
     /// @param locals Ссылка на хранилище ячеек
     /// @param from, to Диапазон индексов в массивах actual_cells и undefined_cells
-    void set_swap_mapping_partial(SoaCell& locals, const index_t from, const index_t to) const {
+    void set_swap_mapping_partial(AmrCells& locals, const index_t from, const index_t to) const {
         for (index_t i = from; i < to; ++i) {
             scrutiny_check(i < actual_cells.size(),    "swap_mapping out of range #1")
             scrutiny_check(i < undefined_cells.size(), "swap_mapping out of range #2")
@@ -220,7 +221,7 @@ struct SwapLists {
     /// @brief Устанавливает следующие позиции ячеек в однопоточном режиме
     /// @details После выполнения операции поле element.next у ячеек указывает
     /// на следующее положение ячейки в хранилище
-    void set_mapping(SoaCell& locals) const {
+    void set_mapping(AmrCells& locals) const {
         set_identical_mapping_partial(locals, 0, locals.size());
 
         if (actual_cells.empty()) { return; }
@@ -279,7 +280,7 @@ struct SwapLists {
     /// @details Данные актуальной ячейки перемещаются на место неактуальной
     /// ячейки, индексы смежности не изменяются, они должны быть выставлены
     /// заранее.
-    void move_elements(SoaCell &cells) const {
+    void move_elements(AmrCells &cells) const {
         threads::for_each<5>(
                 actual_cells.begin(), actual_cells.end(),
                 move_cell, std::ref(cells));
@@ -309,7 +310,7 @@ struct SwapLists {
 /// 5. Хранилище меняет размер, все неопределенные ячейки остаются за пределами
 /// хранилища.
 template<int dim>
-void remove_undefined(SoaCell &cells, const Statistics &count) {
+void remove_undefined(AmrCells &cells, const Statistics &count) {
     static Stopwatch create_swap_timer;
     static Stopwatch set_mapping_timer;
     static Stopwatch change_adjacent_timer;
@@ -351,7 +352,7 @@ void remove_undefined(SoaCell &cells, const Statistics &count) {
 }
 
 template<int dim>
-void remove_undefined(SoaCell& cells, const Statistics &count, EuMesh& mesh) {
+void remove_undefined(AmrCells& cells, const Statistics &count, EuMesh& mesh) {
     static Stopwatch create_swap_timer;
     static Stopwatch set_mapping_timer;
     static Stopwatch change_adjacent_timer;

@@ -1,4 +1,6 @@
 set(ZEPHYR_MESH_EULER_SRC
+    ${CMAKE_CURRENT_SOURCE_DIR}/amr_cells.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/amr_faces.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/distributor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/eu_face.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/eu_cell.cpp
@@ -11,6 +13,8 @@ set(ZEPHYR_MESH_EULER_SRC
     PARENT_SCOPE)
 
 install(FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/amr_cells.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/amr_faces.h
     amr_storage.h
     distributor.h
     eu_face.h

@@ -35,7 +35,7 @@ inline constexpr std::array<Side3D, CpC(dim)> side_to_next_sibling() {
 //  - Все сиблинги имеют один уровень.
 //  - Все сиблинги хотят огрубиться.
 template <int dim>
-bool can_coarse(SoaCell& cells, int ic) {
+bool can_coarse(AmrCells& cells, int ic) {
     const auto sides = side_to_next_sibling<dim>();
 
     const auto& adj = cells.faces.adjacent;
@@ -92,7 +92,7 @@ bool can_coarse(SoaCell& cells, int ic) {
 /// @param cells Хранилище ячеек
 /// @param ic Целевая ячейка (от которой запрос)
 template<int dim>
-std::array<int, CpC(dim) - 1> get_siblings(SoaCell &cells, index_t ic) {
+std::array<int, CpC(dim) - 1> get_siblings(AmrCells &cells, index_t ic) {
     const std::array<Side3D, CpC(dim)> sides = side_to_next_sibling<dim>();
 
     std::array<int, CpC(dim) - 1> siblings;

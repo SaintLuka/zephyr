@@ -7,7 +7,7 @@
 
 namespace zephyr::mesh {
 
-void SoaCell::resize(index_t n_cells) {
+void AmrCells::resize(index_t n_cells) {
     m_size = n_cells;
 
     // Поля ячеек по числу ячеек, логично
@@ -28,9 +28,20 @@ void SoaCell::resize(index_t n_cells) {
     z_idx.resize(n_cells);
     level.resize(n_cells);
 
+
+    int n_faces;
+    int n_nodes;
+    if (adaptive) {
+        n_faces = dim == 2 ? 8 : 24;
+        n_nodes = dim == 3 ? 9 : 27;
+    }
+    else {
+        throw std::runtime_error("Resize of unstructured mesh");
+    }
+
     // Поля граней и вершин пока так
-    faces.resize(n_cells * faces_per_cell);
-    verts.resize(n_cells * nodes_per_cell);
+    faces.resize(n_cells * n_faces);
+    verts.resize(n_cells * n_nodes);
 
     // Поля данных только для ячеек
     data.resize(n_cells);
@@ -61,21 +72,7 @@ double QCell::diameter() const {
 }
 
 bool FaceIt::to_skip(Direction dir) const {
-    if (m_cells->faces.boundary[iface] == Boundary::UNDEFINED) {
-        return true;
-    }
-    switch (dir) {
-        case Direction::ANY:
-            return false;
-        case Direction::X:
-            return std::abs(m_cells->faces.normal[iface].x()) < 0.7;
-        case Direction::Y:
-            return std::abs(m_cells->faces.normal[iface].y()) < 0.7;
-        case Direction::Z:
-            return std::abs(m_cells->faces.normal[iface].z()) < 0.7;
-        default:
-            return false;
-    }
+    return m_cells->faces.to_skip(iface, dir);
 }
 
 FacesIts QCell::faces(Direction dir) {
@@ -136,19 +133,17 @@ const Vector3d& QFace::center() const { return m_cells->faces.center[iface]; }
 
 double QFace::x() const { return center().x(); }
 
-inline double QFace::y() const { return center().y(); }
+double QFace::y() const { return center().y(); }
 
-inline double QFace::z() const { return center().z(); }
+double QFace::z() const { return center().z(); }
 
-
-SoaMesh::SoaMesh(EuMesh &mesh)
-    : m_locals(mesh.locals()) {
-
+void QCell::copy_data_to(QCell& dst) {
+    m_cells->copy_data(m_index, dst.m_cells, dst.m_index);
 }
 
-SoaMesh::SoaMesh(Generator &gen) {
-    EuMesh mesh(gen, int{});
-    m_locals.initialize(mesh.locals());
+
+SoaMesh::SoaMesh(const Strip& gen) {
+    m_locals.initialize(gen);
 }
 
 SoaMesh::SoaMesh(const Rectangle& gen) {
@@ -159,212 +154,6 @@ SoaMesh::SoaMesh(const Cuboid& gen) {
     m_locals.initialize(gen);
 }
 
-SoaCell::SoaCell(AmrStorage &locals) {
-    initialize(locals);
-}
-
-void SoaCell::initialize(AmrStorage &locals) {
-    m_size = locals.size();
-
-    if (locals.empty()) {
-        throw std::runtime_error("SoaMesh: locals is empty");
-    }
-
-    dim = locals[0].dim;
-    adaptive = locals[0].adaptive;
-
-    faces_per_cell = dim < 3 ? 8 : 24;
-    nodes_per_cell = dim < 3 ? 9 : 27;
-
-    if (!adaptive) {
-        throw std::runtime_error("SoaMesh: adaptive is empty");
-    }
-
-    linear = locals[0].linear;
-    axial = locals[0].axial;
-
-    index_t faces_per_cell = dim < 3 ? 8 : 24;
-    index_t nodes_per_cell = dim < 3 ? 9 : 27;
-
-    resize(m_size);
-
-    for (index_t ic = 0; ic < m_size; ++ic) {
-        next[ic] = locals[ic].next;
-
-        rank[ic] = locals[ic].rank;
-        index[ic] = locals[ic].index;
-
-        center[ic] = locals[ic].center;
-        volume[ic] = locals[ic].volume;
-        volume_alt[ic] = locals[ic].volume_alt;
-        face_begin[ic] = ic * faces_per_cell;
-        node_begin[ic] = ic * nodes_per_cell;
-
-        for (index_t jf = 0; jf < faces_per_cell; ++jf) {
-            index_t iface = ic * faces_per_cell + jf;
-
-            faces.boundary[iface] = locals[ic].faces[jf].boundary;
-            faces.adjacent.rank[iface] = locals[ic].faces[jf].adjacent.rank;
-            faces.adjacent.alien[iface] = locals[ic].faces[jf].adjacent.index;
-            faces.adjacent.index[iface] = locals[ic].faces[jf].adjacent.index;
-            if (locals[ic].faces[jf].adjacent.alien >= 0) {
-                throw std::runtime_error("ALien soa mesh");
-            }
-            faces.normal[iface] = locals[ic].faces[jf].normal;
-            faces.center[iface] = locals[ic].faces[jf].center;
-            faces.area[iface] = locals[ic].faces[jf].area;
-            faces.area_alt[iface] = locals[ic].faces[jf].area_alt;
-            faces.vertices[iface] = locals[ic].faces[jf].vertices;
-        }
-
-        for (index_t jn = 0; jn < nodes_per_cell; ++jn) {
-            index_t v_idx = ic * nodes_per_cell + jn;
-            verts[v_idx] = locals[ic].vertices[jn];
-        }
-    }
-    face_begin[m_size] = m_size * faces_per_cell;
-    node_begin[m_size] = m_size * nodes_per_cell;
-
-    data.resize(m_size);
-}
-
-void SoaCell::initialize(const Rectangle& gen) {
-    bool x_period = gen.periodic_along_x();
-    bool y_period = gen.periodic_along_y();
-
-    double xmin = gen.x_min();
-    double ymin = gen.y_min();
-    double xmax = gen.x_max();
-    double ymax = gen.y_max();
-
-    index_t nx = gen.nx();
-    index_t ny = gen.ny();
-
-    double hx = (xmax - xmin) / nx;
-    double hy = (ymax - ymin) / ny;
-
-    auto get_index = [=](index_t i, index_t j) -> index_t {
-        return i * ny + j;
-    };
-
-    auto get_index_pair = [=](index_t n) -> std::array<index_t, 2> {
-        return {n / ny, n % ny};
-    };
-
-    auto get_vertex = [=](index_t i, index_t j) -> Vector3d {
-        return {
-            xmin + ((xmax - xmin) * i) / nx,
-            ymin + ((ymax - ymin) * j) / ny,
-            0.0
-        };
-    };
-
-    auto neib_index = [=](index_t i, index_t j, Side2D side) -> index_t {
-        if (side == Side2D::LEFT) {
-            return i == 0 && !x_period ?  get_index(i, j) : get_index((i - 1 + nx) % nx, j);
-        }
-        else if (side == Side2D::RIGHT) {
-            return i == nx - 1 && !x_period ? get_index(i, j) : get_index((i + 1 + nx) % nx, j);
-        }
-        else if (side == Side2D::BOTTOM) {
-            return j == 0 && !y_period ? get_index(i, j) : get_index(i, (j - 1 + ny) % ny);
-        }
-        else if (side == Side2D::TOP) {
-            return j == ny - 1 && !y_period ? get_index(i, j): get_index(i, (j + 1 + ny) % ny);
-        }
-        else {
-            throw std::runtime_error("Strange side #142");
-        }
-    };
-
-    m_size = nx * ny;
-
-    dim = 2;
-    adaptive = true;
-
-    faces_per_cell = 8;
-    nodes_per_cell = 9;
-
-    linear = true;
-    axial = false;
-
-    resize(m_size);
-
-    for (index_t ic = 0; ic < m_size; ++ic) {
-        auto[i, j] = get_index_pair(ic);
-
-        next[ic] = ic;
-        rank[ic] = 0;
-        index[ic] = ic;
-
-        flag[ic] = 0;
-        level[ic] = 0;
-        b_idx[ic] = ic;
-        z_idx[ic] = 0;
-
-        SqQuad quad(
-            get_vertex(i, j),
-            get_vertex(i + 1, j),
-            get_vertex(i, j + 1),
-            get_vertex(i + 1, j + 1));
-
-        center[ic] = quad.vs<0, 0>();
-        volume[ic] = hx * hy;
-        volume_alt[ic] = NAN;
-        face_begin[ic] = ic * faces_per_cell;
-        node_begin[ic] = ic * nodes_per_cell;
-        face_begin[ic + 1] = face_begin[ic] + faces_per_cell;
-        node_begin[ic + 1] = face_begin[ic] + nodes_per_cell;
-
-        // INIT FACES
-        for (index_t iface: faces_range(ic)) {
-            faces.set_undefined(iface);
-            faces.area_alt[iface] = NAN;
-        }
-
-        index_t iface = ic * faces_per_cell;
-
-        faces.boundary[iface + Side2D::L] = i > 0 ? Boundary::ORDINARY : gen.bounds().left;
-        faces.boundary[iface + Side2D::R] = i < nx - 1 ? Boundary::ORDINARY : gen.bounds().right;
-        faces.boundary[iface + Side2D::B] = j > 0 ? Boundary::ORDINARY : gen.bounds().bottom;
-        faces.boundary[iface + Side2D::T] = j < ny - 1 ? Boundary::ORDINARY : gen.bounds().top;
-
-        for (auto side: Side2D::items()) {
-            faces.adjacent.rank[iface + side] = 0;
-            faces.adjacent.index[iface + side] = neib_index(i, j, side);
-            faces.adjacent.alien[iface + side] = -1;
-            faces.vertices[iface + side].fill(-1);
-        }
-
-        faces.normal[iface + Side2D::L] = -Vector3d::UnitX();
-        faces.normal[iface + Side2D::R] =  Vector3d::UnitX();
-        faces.normal[iface + Side2D::B] = -Vector3d::UnitY();
-        faces.normal[iface + Side2D::T] =  Vector3d::UnitY();
-
-        faces.center[iface + Side2D::L] = quad.vs<-1, 0>();
-        faces.center[iface + Side2D::R] = quad.vs<+1, 0>();
-        faces.center[iface + Side2D::B] = quad.vs<0, -1>();
-        faces.center[iface + Side2D::T] = quad.vs<0, +1>();
-
-        faces.area[iface + Side2D::L] = hy;
-        faces.area[iface + Side2D::R] = hy;
-        faces.area[iface + Side2D::B] = hx;
-        faces.area[iface + Side2D::T] = hx;
-
-        faces.vertices[iface + Side2D::L] = Side2D::L.sf();
-        faces.vertices[iface + Side2D::R] = Side2D::R.sf();
-        faces.vertices[iface + Side2D::B] = Side2D::B.sf();
-        faces.vertices[iface + Side2D::T] = Side2D::T.sf();
-
-        for (index_t jn = 0; jn < nodes_per_cell; ++jn) {
-            verts[ic * nodes_per_cell + jn] = quad[jn];
-        }
-    }
-}
-
-void SoaCell::initialize(const Cuboid& gen) {
-
-}
 
 void SoaMesh::init_amr() {
     // Эта функция нифига не используется же?
@@ -401,6 +190,14 @@ int SoaMesh::max_level() const {
 
 void SoaMesh::set_max_level(int max_level) {
     m_max_level = std::max(0, std::min(max_level, 15));
+}
+
+void SoaMesh::set_distributor(const std::string& name) {
+    if (name == "empty") {
+        distributor = Distributor::empty();
+    } else {
+        distributor = Distributor::simple();
+    }
 }
 
 void SoaMesh::set_distributor(Distributor distr) {
@@ -479,59 +276,8 @@ void SoaMesh::refine() {
 #endif
 }
 
-void SoaCell::SoaFace::insert(index_t iface, CellType ctype, int count) {
-    int n_faces = -1;
-    switch (ctype) {
-        case CellType::AMR2D:
-            vertices[iface + Side2D::L] = Side2D::L.sf();
-            vertices[iface + Side2D::R] = Side2D::R.sf();
-            vertices[iface + Side2D::B] = Side2D::B.sf();
-            vertices[iface + Side2D::T] = Side2D::T.sf();
-            n_faces = 8;
-            break;
 
-        case CellType::AMR3D:
-            vertices[iface + Side3D::L] = Side3D::L.sf();
-            vertices[iface + Side3D::R] = Side3D::R.sf();
-            vertices[iface + Side3D::B] = Side3D::B.sf();
-            vertices[iface + Side3D::T] = Side3D::T.sf();
-            vertices[iface + Side3D::X] = Side3D::X.sf();
-            vertices[iface + Side3D::F] = Side3D::F.sf();
-            n_faces = 24;
-            break;
-
-        case CellType::TRIANGLE:
-        case CellType::QUAD:
-            // определяем count и идем на CellType::POLYGON
-            count = ctype == CellType::TRIANGLE ? 3 : 4;
-
-        case CellType::POLYGON:
-            if (count < 0) {
-                std::string message = "BFaces::BFaces error(): set argument 'count' with CellType::POLYGON";
-                std::cerr << message << "\n";
-                throw std::runtime_error(message);
-            }
-            for (int i = 0; i < count; ++i) {
-                vertices[iface + i] = {i, (i + 1) % count, -1, -1};
-            }
-            n_faces = count;
-            break;
-
-        case CellType::POLYHEDRON:
-            break;
-
-        default:
-            std::string message = "BFaces::BFaces error(): not implemented for current CellType";
-            std::cerr << message << "\n";
-            throw std::runtime_error(message);
-    }
-
-    for (int i = 0; i < n_faces; ++i) {
-        set_undefined(iface + i);
-    }
-}
-
-void SoaCell::add_cell(index_t ic, const Quad& quad) {
+void AmrCells::add_cell(index_t ic, const Quad& quad) {
     assert(dim == 2);
     assert(adaptive);
     assert(linear);
@@ -569,7 +315,7 @@ void SoaCell::add_cell(index_t ic, const Quad& quad) {
     }
 }
 
-void SoaCell::add_cell(index_t ic, const Quad& quad, bool axial_) {
+void AmrCells::add_cell(index_t ic, const Quad& quad, bool axial_) {
     assert(dim == 2);
     assert(adaptive);
     assert(linear);
@@ -609,7 +355,7 @@ void SoaCell::add_cell(index_t ic, const Quad& quad, bool axial_) {
 
     for (int i = node_begin[ic]; i < node_begin[ic + 1]; ++i) {
         if (verts[i].z() != 0.0) {
-            throw std::runtime_error("SoaCell add axial cell, vertex.z != 0.0");
+            throw std::runtime_error("AmrCells add axial cell, vertex.z != 0.0");
         }
     }
 
@@ -630,17 +376,17 @@ void SoaCell::add_cell(index_t ic, const Quad& quad, bool axial_) {
     }
 }
 
-void SoaCell::add_cell(index_t ic, const SqQuad& quad) {
+void AmrCells::add_cell(index_t ic, const SqQuad& quad) {
     add_cell(ic, quad.reduce());
     //std::cerr << "Nonlinear AmrCells is not supported\n";
 }
 
-void SoaCell::add_cell(index_t ic, const SqQuad& quad, bool axial) {
+void AmrCells::add_cell(index_t ic, const SqQuad& quad, bool axial) {
     add_cell(ic, quad.reduce(), axial);
     //std::cerr << "Nonlinear AmrCells is not supported\n";
 }
 
-void SoaCell::add_cell(index_t ic, const Cube& cube) {
+void AmrCells::add_cell(index_t ic, const Cube& cube) {
     assert(dim == 3);
     assert(adaptive);
     assert(linear);
@@ -680,13 +426,13 @@ void SoaCell::add_cell(index_t ic, const Cube& cube) {
     }
 }
 
-void SoaCell::add_cell(index_t ic, const SqCube& cube) {
+void AmrCells::add_cell(index_t ic, const SqCube& cube) {
     add_cell(ic, cube.reduce());
     //std::cerr << "Nonlinear AmrCells is not supported\n";
 }
 
-void SoaCell::add_cell(index_t ic, const Polygon& poly) {
-    throw std::runtime_error("SoaCell::add_cell: Not implemented");
+void AmrCells::add_cell(index_t ic, const Polygon& poly) {
+    throw std::runtime_error("AmrCells::add_cell: Not implemented");
     /*
         : Element(0, 0), dim(2),
           adaptive(false), linear(true), axial(false),
@@ -710,8 +456,8 @@ void SoaCell::add_cell(index_t ic, const Polygon& poly) {
     */
 }
 
-void SoaCell::add_cell(index_t ic, Polyhedron poly) {
-    throw std::runtime_error("SoaCell::add_cell: Not implemented");
+void AmrCells::add_cell(index_t ic, Polyhedron poly) {
+    throw std::runtime_error("AmrCells::add_cell: Not implemented");
     /*
     : Element(0, 0), dim(3),
       adaptive(false), linear(true),
@@ -757,7 +503,7 @@ void SoaCell::add_cell(index_t ic, Polyhedron poly) {
     */
 }
 
-void SoaCell::move_item(index_t ic) {
+void AmrCells::move_item(index_t ic) {
     int jc = next[ic];
 
     rank[jc] = rank[ic];
@@ -799,7 +545,7 @@ void SoaCell::move_item(index_t ic) {
     set_undefined(ic);
 }
 
-void SoaCell::print_info(index_t ic) const {
+void AmrCells::print_info(index_t ic) const {
     std::cout << "\t\tcenter: " << center[ic].transpose() << "\n";
     std::cout << "\t\trank:   " << rank[ic] << "\n";
     std::cout << "\t\tindex:  " << index[ic] << "\n";
@@ -837,7 +583,7 @@ void SoaCell::print_info(index_t ic) const {
     }
 }
 
-void SoaCell::visualize(index_t ic, std::string filename) const {
+void AmrCells::visualize(index_t ic, std::string filename) const {
     if (filename.find(".py") == std::string::npos) {
         filename += ".py";
     }
@@ -938,7 +684,7 @@ void SoaCell::visualize(index_t ic, std::string filename) const {
     file << "plt.show()\n";
 }
 
-int SoaCell::check_geometry(index_t ic) const {
+int AmrCells::check_geometry(index_t ic) const {
     for (index_t iface: faces_range(ic)) {
         if (faces.is_undefined(iface)) continue;
 
@@ -974,7 +720,7 @@ int SoaCell::check_geometry(index_t ic) const {
     return 0;
 }
 
-int SoaCell::check_base_face_orientation(index_t ic) const {
+int AmrCells::check_base_face_orientation(index_t ic) const {
     if (dim == 2) {
         Vector3d nx1 = faces.normal[face_begin[ic] + Side3D::L];
         Vector3d nx2 = faces.normal[face_begin[ic] + Side3D::R];
@@ -1038,7 +784,7 @@ int SoaCell::check_base_face_orientation(index_t ic) const {
     return 0;
 }
 
-int SoaCell::check_base_vertices_order(index_t ic) const {
+int AmrCells::check_base_vertices_order(index_t ic) const {
     const double h = linear_size(ic);
     auto close = [h](Vector3d& x, Vector3d& y) -> bool {
         return (x - y).norm() < 1.0e-6 * h;
@@ -1181,7 +927,7 @@ int SoaCell::check_base_vertices_order(index_t ic) const {
     return 0;
 }
 
-int SoaCell::check_complex_faces(index_t ic) const {
+int AmrCells::check_complex_faces(index_t ic) const {
     if (dim == 2) {
         for (Side2D side: Side2D::items()) {
             auto iface1 = face_begin[ic] + side;
@@ -1239,12 +985,12 @@ int SoaCell::check_complex_faces(index_t ic) const {
     return 0;
 }
 
-int SoaCell::check_connectivity(index_t ic) const {
-    SoaCell aliens;
+int AmrCells::check_connectivity(index_t ic) const {
+    AmrCells aliens;
     return check_connectivity(ic, aliens);
 }
 
-int SoaCell::check_connectivity(index_t ic, SoaCell& aliens) const {
+int AmrCells::check_connectivity(index_t ic, AmrCells& aliens) const {
     if (ic >= m_size) {
         throw std::runtime_error("Данная проверка только для локальных ячеек!");
     }
@@ -1329,7 +1075,7 @@ int SoaCell::check_connectivity(index_t ic, SoaCell& aliens) const {
 
         // Сосед может быть из aliens
         index_t jc = adj.alien[iface] < 0 ? adj.index[iface] : adj.alien[iface];
-        const SoaCell& cells = adj.alien[iface] < 0 ? *this : aliens;
+        const AmrCells& cells = adj.alien[iface] < 0 ? *this : aliens;
 
         Vector3d fc = faces.center[iface];
 
@@ -1560,6 +1306,33 @@ int SoaMesh::check_refined() const {
     }
 
     return 0;
+}
+
+void AmrCells::copy_data(index_t from, index_t to) {
+    copy_data(from, this, to);
+}
+
+void AmrCells::copy_data(index_t from, AmrCells* dst, index_t to) {
+    data.copy_data(from, &dst->data, to);
+}
+
+Box SoaMesh::bbox() const {
+    Box box1 = Box::Empty(3);
+    for (auto& v: m_locals.verts) {
+        box1.capture(v);
+    }
+
+    Box box2(box1);
+
+#ifdef ZEPHYR_MPI
+    if (!mpi::single()) {
+        // Покомпонентный минимум/максимум
+        MPI_Allreduce(box1.vmin.data(), box2.vmin.data(), 3, MPI_DOUBLE, MPI_MIN, mpi::comm());
+        MPI_Allreduce(box1.vmax.data(), box2.vmax.data(), 3, MPI_DOUBLE, MPI_MAX, mpi::comm());
+    }
+#endif
+
+    return box2;
 }
 
 } // namespace zephyr::mesh

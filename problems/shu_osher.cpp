@@ -6,7 +6,7 @@
 
 #include <zephyr/geom/generator/strip.h>
 
-#include <zephyr/mesh/mesh.h>
+#include <zephyr/mesh/euler/soa_mesh.h>
 
 #include <zephyr/io/pvd_file.h>
 
@@ -19,45 +19,16 @@ using zephyr::geom::Box;
 using zephyr::geom::Boundary;
 using zephyr::geom::Vector3d;
 using zephyr::mesh::generator::Strip;
-using zephyr::mesh::AmrStorage;
-using zephyr::mesh::Mesh;
+using zephyr::mesh::SoaMesh;
+using zephyr::mesh::QCell;
 using zephyr::io::PvdFile;
 
 using namespace zephyr::phys;
 using namespace zephyr::math;
 using namespace zephyr::math::smf;
 
-struct _U_ {
-    double rho1, rho2;
-    Vector3d v1, v2;
-    double p1, p2;
-    double e1, e2;
-};
-
-// Для быстрого доступа по типу
-_U_ U;
-
-/// Переменные для сохранения
-double get_rho(AmrStorage::Item& cell) { return cell(U).rho1; }
-double get_u(AmrStorage::Item& cell) { return cell(U).v1.x(); }
-double get_v(AmrStorage::Item& cell) { return cell(U).v1.y(); }
-double get_w(AmrStorage::Item& cell) { return cell(U).v1.z(); }
-double get_p(AmrStorage::Item& cell) { return cell(U).p1; }
-double get_e(AmrStorage::Item& cell) { return cell(U).e1; }
-
 
 int main() {
-    // Файл для записи
-    PvdFile pvd("mesh", "output");
-
-    // Переменные для сохранения
-    pvd.variables += {"rho", get_rho};
-    pvd.variables += {"velocity.x", get_u};
-    pvd.variables += {"velocity.y", get_v};
-    pvd.variables += {"velocity.z", get_w};
-    pvd.variables += {"pressure", get_p};
-    pvd.variables += {"energy", get_e};
-
     // Тестовая задача
     ShuOsherTest test;
 
@@ -66,18 +37,32 @@ int main() {
 
     // Создаем одномерную сетку
     Strip gen(test.xmin(), test.xmax());
-    gen.set_size(1000);
+    gen.set_size(10000);
     gen.set_boundaries({.left = Boundary::ZOE, .right = Boundary::ZOE});
 
     // Создать сетку
-    Mesh mesh(gen, U);
+    SoaMesh mesh(gen);
+
+    // Переменные для хранения на сетке
+    auto [rho1, p1, e1] = mesh.append<double>("rho1", "p1", "e1");
+    auto [rho2, p2, e2] = mesh.append<double>("rho2", "p2", "e2");
+    auto [v1, v2]       = mesh.append<Vector3d>("v1", "v2");
+
+    // Файл для записи
+    PvdFile pvd("mesh", "output");
+
+    // Переменные для сохранения
+    pvd.variables += {"rho",    [rho1](QCell& cell) -> double { return cell(rho1); }};
+    pvd.variables += {"velocity", [v1](QCell& cell) -> double { return cell(v1).x(); }};
+    pvd.variables += {"pressure", [p1](QCell& cell) -> double { return cell(p1); }};
+    pvd.variables += {"energy",   [e1](QCell& cell) -> double { return cell(e1); }};
 
     // Заполняем начальные данные
     for (auto cell: mesh) {
-        cell(U).rho1 = test.density (cell.center());
-        cell(U).v1   = test.velocity(cell.center());
-        cell(U).p1   = test.pressure(cell.center());
-        cell(U).e1   = test.energy  (cell.center());
+        cell(rho1) = test.density (cell.center());
+        cell(v1)   = test.velocity(cell.center());
+        cell(p1)   = test.pressure(cell.center());
+        cell(e1)   = test.energy  (cell.center());
     }
 
     // Число Куранта
@@ -100,12 +85,12 @@ int main() {
 
         // Определяем dt
         double dt = std::numeric_limits<double>::max();
-        for (auto& cell: mesh) {
+        for (auto cell: mesh) {
             // скорость звука
-            double c = eos->sound_speed_rP(cell(U).rho1, cell(U).p1);
+            double c = eos->sound_speed_rP(cell(rho1), cell(p1));
             for (auto &face: cell.faces()) {
                 // Нормальная составляющая скорости
-                double vn = cell(U).v1.dot(face.normal());
+                double vn = cell(v1).dot(face.normal());
 
                 // Максимальное по модулю СЗ
                 double lambda = std::max(std::abs(vn + c), std::abs(vn - c));
@@ -117,9 +102,9 @@ int main() {
         dt *= CFL;
 
         // Расчет по некоторой схеме
-        for (auto& cell: mesh) {
+        for (auto cell: mesh) {
             // Примитивный вектор в ячейке
-            PState zc(cell(U).rho1, cell(U).v1, cell(U).p1, cell(U).e1);
+            PState zc(cell(rho1), cell(v1), cell(p1), cell(e1));
 
             // Консервативный вектор в ячейке
             QState qc(zc);
@@ -134,11 +119,10 @@ int main() {
                 PState zn(zc);
 
                 if (!face.is_boundary()) {
-                    auto neib  = face.neib();
-                    zn.density  = neib(U).rho1;
-                    zn.velocity = neib(U).v1;
-                    zn.pressure = neib(U).p1;
-                    zn.energy   = neib(U).e1;
+                    zn.density  = face.neib(rho1);
+                    zn.velocity = face.neib(v1);
+                    zn.pressure = face.neib(p1);
+                    zn.energy   = face.neib(e1);
                 }
 
                 // Значение на грани со стороны ячейки
@@ -163,19 +147,17 @@ int main() {
             // Новое значение примитивных переменных
             PState Zc(Qc, *eos);
 
-            cell(U).rho2 = Zc.density;
-            cell(U).v2   = Zc.velocity;
-            cell(U).p2   = Zc.pressure;
-            cell(U).e2   = Zc.energy;
+            cell(rho2) = Zc.density;
+            cell(v2)   = Zc.velocity;
+            cell(p2)   = Zc.pressure;
+            cell(e2)   = Zc.energy;
         }
 
         // Обновляем слои
-        for (auto& cell: mesh) {
-            std::swap(cell(U).rho1, cell(U).rho2);
-            std::swap(cell(U).v1, cell(U).v2);
-            std::swap(cell(U).p1, cell(U).p2);
-            std::swap(cell(U).e1, cell(U).e2);
-        }
+        mesh.swap(rho1, rho2);
+        mesh.swap(v1, v2);
+        mesh.swap(p1, p2);
+        mesh.swap(e1, e2);
 
         n_step += 1;
         time += dt;

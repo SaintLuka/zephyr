@@ -17,8 +17,8 @@ namespace zephyr::mesh::amr2 {
 /// @param rank Ранг текущего процесса
 /// @param op Оператор распределения данных при огрублении и разбиении
 template<int dim>
-void setup_geometry_one(index_t ic, SoaCell &locals, SoaCell& aliens,
-        int rank, const Distributor& op) {
+void setup_geometry_one(index_t ic, AmrCells &locals, AmrCells& aliens,
+                        int rank, const Distributor& op) {
 
     if (locals.flag[ic] == 0) {
         retain_cell<dim>(locals, aliens, ic);
@@ -36,7 +36,7 @@ void setup_geometry_one(index_t ic, SoaCell &locals, SoaCell& aliens,
 /// @brief Осуществляет проход по ячейкам и вызывает для них
 /// соответствующие методы адаптации (без MPI)
 template<int dim>
-void setup_geometry(SoaCell &locals, SoaCell& aliens, const Statistics &count, const Distributor& op) {
+void setup_geometry(AmrCells &locals, AmrCells& aliens, const Statistics &count, const Distributor& op) {
     threads::parallel_for(index_t{0}, index_t{count.n_cells},
         setup_geometry_one<dim>,
         std::ref(locals), std::ref(aliens), 0, std::ref(op));

@@ -65,7 +65,7 @@ struct Statistics {
     /// @brief Конструктор, однопоточный сбор статистики
     /// @details В многопоточном режиме данные получаются после объединения 
     /// статистики с разных потоков
-    explicit Statistics(SoaCell &locals) {
+    explicit Statistics(AmrCells &locals) {
         n_cells = locals.size();
 
         scrutiny_check(n_cells >= 0, "Empty AmrStorage statistics");

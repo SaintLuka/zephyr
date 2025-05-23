@@ -15,7 +15,7 @@
 namespace zephyr::mesh::amr2 {
 
 /// @brief Функция балансировки флагов верхнего уровня
-inline void balance_flags(SoaCell &cells, int max_level) {
+inline void balance_flags(AmrCells &cells, int max_level) {
     if (cells.empty()) return;
 
 #if FAST_BALANCING

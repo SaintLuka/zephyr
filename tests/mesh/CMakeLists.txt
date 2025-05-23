@@ -2,7 +2,8 @@
 #list(APPEND TESTS balancing)
 #list(APPEND TESTS mesh_generator)
 #list(APPEND TESTS movable_mesh)
-list(APPEND TESTS soamesh)
+list(APPEND TESTS soa-mesh)
+list(APPEND TESTS soa-storage)
 #list(APPEND TESTS voronoi)
 
 # Assume all files in direcory are tests
@@ -27,8 +28,7 @@ if (TESTS)
 endif()
 
 foreach(test IN LISTS TESTS)
-    add_executable(${test} ${test}.cpp
-            soamesh.cpp)
+    add_executable(${test} ${test}.cpp)
     target_include_directories(${test} PUBLIC zephyr)
     target_link_libraries(${test} PUBLIC zephyr)
     install(TARGETS ${test} DESTINATION tests/utils)

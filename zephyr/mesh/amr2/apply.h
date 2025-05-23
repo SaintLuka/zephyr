@@ -20,7 +20,7 @@
 
 namespace zephyr::mesh {
 // Сейчас нужно для MPI, там функция обменов
-class SoaCell;
+class AmrCells;
 }
 
 namespace zephyr::mesh::amr2 {
@@ -46,7 +46,7 @@ using utils::Stopwatch;
 /// часть старых ячеек (не листовых) являются неопределенными.
 /// Алгоритм осуществляет удаление данных ячеек.
 template<int dim>
-void apply_impl(SoaCell &locals, const Distributor& op) {
+void apply_impl(AmrCells &locals, const Distributor& op) {
     static Stopwatch count_timer;
     static Stopwatch positions_timer;
     static Stopwatch geometry_timer;
@@ -54,7 +54,7 @@ void apply_impl(SoaCell &locals, const Distributor& op) {
     static Stopwatch clean_timer;
     static Stopwatch sort_timer;
 
-    static SoaCell aliens;
+    static AmrCells aliens;
 
     /// Этап 1. Сбор статистики
     count_timer.resume();
@@ -109,7 +109,7 @@ void apply_impl(SoaCell &locals, const Distributor& op) {
 }
 
 /// @brief Автоматический выбор размерности
-inline void apply(SoaCell &cells, const Distributor& op) {
+inline void apply(AmrCells &cells, const Distributor& op) {
     if (cells.empty())
         return;
 

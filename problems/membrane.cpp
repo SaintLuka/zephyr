@@ -7,7 +7,7 @@
 
 #include <zephyr/geom/generator/rectangle.h>
 
-#include <zephyr/mesh/mesh.h>
+#include <zephyr/mesh/euler/soa_mesh.h>
 
 #include <zephyr/io/pvd_file.h>
 
@@ -23,9 +23,8 @@ using zephyr::geom::Box;
 using zephyr::geom::Boundary;
 using zephyr::geom::Vector3d;
 using zephyr::mesh::generator::Rectangle;
-using zephyr::mesh::AmrStorage;
-using zephyr::mesh::Mesh;
-using zephyr::mesh::Cell;
+using zephyr::mesh::SoaMesh;
+using zephyr::mesh::QCell;
 using zephyr::io::PvdFile;
 using zephyr::utils::Stopwatch;
 using zephyr::utils::threads;
@@ -34,62 +33,9 @@ using namespace zephyr::phys;
 using namespace zephyr::math;
 using namespace zephyr::math::smf;
 
-struct _U_ {
-    double rho1, rho2;
-    Vector3d v1, v2;
-    double p1, p2;
-    double e1, e2;
-
-    PState get_state1() const {
-        return {rho1, v1, p1, e1};
-    }
-
-    void set_state2(const PState& z) {
-        rho2 = z.density;
-        v2 = z.velocity;
-        p2 = z.pressure;
-        e2 = z.energy;
-    }
-
-    void swap() {
-        std::swap(rho1, rho2);
-        std::swap(v1, v2);
-        std::swap(p1, p2);
-        std::swap(e1, e2);
-    }
-};
-
-// Для быстрого доступа по типу
-_U_ U;
-
-/// Переменные для сохранения
-double get_rho(AmrStorage::Item& cell) { return cell(U).rho1; }
-double get_u(AmrStorage::Item& cell)   { return cell(U).v1.x(); }
-double get_v(AmrStorage::Item& cell)   { return cell(U).v1.y(); }
-double get_V(AmrStorage::Item& cell)   { return cell(U).v1.norm(); }
-double get_p(AmrStorage::Item& cell)   { return cell(U).p1 - 1.0_bar; }
-
-/// @brief Уровень звукового давления в дБ
-double get_spl(AmrStorage::Item& cell) {
-    return 20.0 * std::log(1.0 + std::abs(cell(U).p1 - 1.0_bar) / 20.0e-6_Pa) / std::log(10.0);
-}
-
-inline double sqr(double x) { return x*x; }
-
 int main() {
     // Включаем многопоточность
     threads::on();
-
-    // Файл для записи
-    PvdFile pvd("mesh", "output");
-
-    // Переменные для сохранения
-    pvd.variables += {"rho", get_rho};
-    pvd.variables += {"velocity.x", get_u};
-    pvd.variables += {"velocity.y", get_v};
-    pvd.variables += {"|velocity|", get_V};
-    pvd.variables += {"pressure", get_p};
-    pvd.variables += {"SPL", get_spl};
 
     // Тестовая задача
     IdealGas eos("Air");
@@ -101,18 +47,37 @@ int main() {
     Rectangle rect(0.0, 4.0, -2.0, 4.0, true);
     rect.set_nx(200);
     rect.set_boundaries({
-        .left   = Boundary::WALL, .right = Boundary::WALL,
-        .bottom = Boundary::WALL, .top   = Boundary::WALL});
+                                .left   = Boundary::WALL, .right = Boundary::WALL,
+                                .bottom = Boundary::WALL, .top   = Boundary::WALL});
 
     // Создать сетку
-    Mesh mesh(rect, U);
+    SoaMesh mesh(rect);
+
+    // Переменные для хранения на сетке
+    auto [rho1, p1, e1] = mesh.append<double>("rho1", "p1", "e1");
+    auto [rho2, p2, e2] = mesh.append<double>("rho2", "p2", "e2");
+    auto [v1, v2]       = mesh.append<Vector3d>("v1", "v2");
+
+    // Файл для записи
+    PvdFile pvd("mesh", "output");
+
+    // Переменные для сохранения
+    pvd.variables += {"rho", [rho1](QCell& cell) -> double { return cell(rho1); }};
+    pvd.variables += {"velocity.x", [v1](QCell& cell) -> double { return cell(v1).x(); }};
+    pvd.variables += {"velocity.y", [v1](QCell& cell) -> double { return cell(v1).y(); }};
+    pvd.variables += {"|velocity|", [v1](QCell& cell) -> double { return cell(v1).norm(); }};
+    pvd.variables += {"pressure",   [p1](QCell& cell) -> double { return cell(p1); }};
+    pvd.variables += {"SPL", [p1](QCell& cell) -> double {
+        // Уровень звукового давления в дБ
+        return 20.0 * std::log(1.0 + std::abs(cell(p1) - 1.0_bar) / 20.0e-6_Pa) / std::log(10.0);
+    }};
 
     // Заполняем начальные данные
     for (auto cell: mesh) {
-        cell(U).rho1 = R0;
-        cell(U).v1 = Vector3d(0.0, 0.0, 0.0);
-        cell(U).p1 = P0;
-        cell(U).e1 = eos.energy_rP(cell(U).rho1, cell(U).p1);
+        cell(rho1) = R0;
+        cell(v1) = Vector3d::Zero();
+        cell(p1) = P0;
+        cell(e1) = eos.energy_rP(cell(rho1), cell(p1));
     }
 
     // Число Куранта
@@ -145,14 +110,14 @@ int main() {
 
         // Определяем dt
         sw_dt.resume();
-        double dt = mesh.min([&](Cell& cell) -> double {
+        double dt = mesh.min([&](QCell cell) -> double {
             double dt = 1.0e300;
 
             // скорость звука
-            double c = eos.sound_speed_rP(cell(U).rho1, cell(U).p1);
+            double c = eos.sound_speed_rP(cell(rho1), cell(p1));
             for (auto &face: cell.faces()) {
                 // Нормальная составляющая скорости
-                double vn = cell(U).v1.dot(face.normal());
+                double vn = cell(v1).dot(face.normal());
 
                 // Максимальное по модулю СЗ
                 double lambda = std::max(std::abs(vn + c), std::abs(vn - c));
@@ -162,16 +127,15 @@ int main() {
             }
 
             return dt;
-        });
+        }, 1.0e300);
         dt *= CFL;
         sw_dt.stop();
 
         // Расчет по схеме CIR
         sw_flux.resume();
-        mesh.for_each([&](Cell& cell) {
-
+        mesh.for_each([&](QCell cell) {
             // Примитивный вектор в ячейке
-            PState zc = cell(U).get_state1();
+            PState zc(cell(rho1), cell(v1), cell(p1), cell(e1));
 
             // Консервативный вектор в ячейке
             QState qc(zc);
@@ -180,7 +144,7 @@ int main() {
             Flux flux;
             for (auto &face: cell.faces()) {
                 // Внешняя нормаль
-                auto normal = face.normal();
+                auto& normal = face.normal();
 
                 // Примитивный вектор соседа
                 PState zn(zc);
@@ -197,7 +161,7 @@ int main() {
                         // Амплитуда колебаний
                         double A = 0.0;
                         if (fabs(face.y()) < d) {
-                            A = sqr(std::cos(M_PI_2 * face.y() / d));
+                            A = std::pow(std::cos(M_PI_2 * face.y() / d), 2);
                         }
 
                         // Непосредственно колебание
@@ -209,7 +173,10 @@ int main() {
                         zn.velocity.x() += 1.0e-5 * R * T * A;
                     }
                 } else {
-                    zn = face.neib(U).get_state1();
+                    zn.density  = face.neib(rho1);
+                    zn.velocity = face.neib(v1);
+                    zn.pressure = face.neib(p1);
+                    zn.energy   = face.neib(e1);
                 }
 
                 // Значение на грани со стороны ячейки
@@ -232,15 +199,19 @@ int main() {
             // Новое значение примитивных переменных
             PState Zc(Qc, eos);
 
-            cell(U).set_state2(Zc);
+            cell(rho2) = Zc.density;
+            cell(v2)   = Zc.velocity;
+            cell(p2)   = Zc.pressure;
+            cell(e2)   = Zc.energy;
         });
         sw_flux.stop();
 
         // Обновляем слои
         sw_update.resume();
-        mesh.for_each([](Cell& cell) {
-            cell(U).swap();
-        });
+        mesh.swap(rho1, rho2);
+        mesh.swap(v1, v2);
+        mesh.swap(p1, p2);
+        mesh.swap(e1, e2);
         sw_update.stop();
 
         n_step += 1;

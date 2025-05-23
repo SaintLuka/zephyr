@@ -47,7 +47,7 @@ public:
     /// @param ic Целевая ячейка, для которой определяется окрестность
     /// @param locals Ссылка на локальное хранилище
     /// @param aliens Ссылка на хранилище ячеек с других процессов
-    void setup(index_t ic, SoaCell &locals, SoaCell& aliens) {
+    void setup(index_t ic, AmrCells &locals, AmrCells& aliens) {
         scrutiny_check(ic < locals.size(), "setup: ic >= locals.size()")
 
         neib_count = 0;
@@ -61,7 +61,7 @@ public:
         auto &adj = locals.faces.adjacent;
 
         // Поиск соседей
-        for (const auto iface: locals.faces_range(ic)) {
+        for (auto iface: locals.faces_range(ic)) {
             if (locals.faces.is_undefined(iface) ||
                 locals.faces.is_boundary(iface)) {
                 continue;
@@ -81,7 +81,7 @@ public:
                 }
             }
 #endif
-            auto [neibs, jc] = locals.faces.get_neib(iface, locals, aliens);
+            auto [neibs, jc] = adj.get_neib(iface, locals, aliens);
 
             neib_levels[neib_count] = neibs.level[jc];
             neib_flags[neib_count] = &neibs.flag[jc];
@@ -150,7 +150,7 @@ struct VicinityList {
     /// @brief Конструктор построения окружения
     /// @param locals Ссылка на локальное хранилище
     /// @param aliens Ссылка на хранилище ячеек с других процессов
-    void fill(SoaCell& locals, SoaCell& aliens) {
+    void fill(AmrCells& locals, AmrCells& aliens) {
         m_list.resize(locals.size());
         threads::parallel_for(index_t{0}, index_t{locals.size()},
                 [this, &locals, &aliens](index_t ic) {
@@ -180,7 +180,7 @@ struct VicinityList {
 /// @param vicinity_list Ссылка на массив с окружением ячеек
 /// @return true если ячейка изменила свой флаг
 template <int dim>
-bool update_flag(index_t ic, SoaCell& locals, const VicinityList<dim>& vicinity_list) {
+bool update_flag(index_t ic, AmrCells& locals, const VicinityList<dim>& vicinity_list) {
     scrutiny_check(ic < locals.size(), "update_flag error: ic >= locals.size()")
 
     if (locals.flag[ic] > 0) { return false; }
@@ -226,7 +226,7 @@ bool update_flag(index_t ic, SoaCell& locals, const VicinityList<dim>& vicinity_
 /// @brief Выполняет функцию update_flag для всех ячеек
 /// @return true если хотя бы одна ячейка изменила свой флаг
 template <int dim>
-bool flag_balancing_step(SoaCell& locals, const VicinityList<dim>& vicinity_list) {
+bool flag_balancing_step(AmrCells& locals, const VicinityList<dim>& vicinity_list) {
     // Функция max в данном контексте заменяет логическое "И"
     utils::range<index_t> range(0, locals.size());
     return threads::max(
@@ -254,12 +254,12 @@ bool flag_balancing_step(SoaCell& locals, const VicinityList<dim>& vicinity_list
 /// (и достаточно эффективно) реализуется многопоточность, также алгоритм легко
 /// обобщается на многопроцессорную систему.
 template<int dim>
-void balance_flags_slow(SoaCell& locals, int max_level) {
+void balance_flags_slow(AmrCells& locals, int max_level) {
     static Stopwatch base_restrictions_timer;
     static Stopwatch setup_vicinity_timer;
     static Stopwatch flag_balancing_timer;
 
-    static SoaCell aliens;
+    static AmrCells aliens;
 
     base_restrictions_timer.resume();
     base_restrictions<dim>(locals, max_level);

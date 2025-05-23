@@ -73,7 +73,8 @@ private:
     std::array<AmrStorage::Iterator, 8> data;
 };
 
-
+class QCell;
+class SoaChildren;
 
 /// @brief Класс содержит набор функций для огрубления и распределения
 // (физических) данных в ячейках при адаптации. Определяются пользователем.
@@ -84,9 +85,18 @@ struct Distributor {
     /// @brief Тип функции, объединяющей данные дочерних ячеек
     using merge_function = std::function<void(Children &, AmrStorage::Item&)>;
 
+    /// @brief Тип функции, распределяющей данные между дочерними ячейками
+    using split_function_soa = std::function<void(QCell&, SoaChildren&)>;
+
+    /// @brief Тип функции, объединяющей данные дочерних ячеек
+    using merge_function_soa = std::function<void(SoaChildren&, QCell&)>;
+
 
     split_function split;  ///< Распределение данным между дочерними
     merge_function merge;  ///< Объединение данных дочерних ячеек
+
+    split_function_soa split_soa;  ///< Распределение данным между дочерними
+    merge_function_soa merge_soa;  ///< Объединение данных дочерних ячеек
 
     /// @brief Конструктор по умолчанию. Определяет Distributor, который
     /// вообще ничего не делает

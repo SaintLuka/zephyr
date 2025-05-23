@@ -23,7 +23,7 @@ namespace zephyr::mesh::amr2 {
 /// Алгоритм может выполняться как для всего хранилища, так и для части сетки
 /// в многопроцессорном режиме. Многопоточная реализация отсутствует.
 template<int dim>
-void setup_positions(SoaCell &cells, const Statistics &count)
+void setup_positions(AmrCells &cells, const Statistics &count)
 {
     // TODO: Подумать над параллельной версией
     cells.resize(count.n_cells_large);

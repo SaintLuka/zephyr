@@ -17,7 +17,7 @@ using SqMap = std::conditional_t<dim < 3, SqQuad, SqCube>;
 /// @brief Устанавливает на новых подгранях значение adjacent и
 /// boundary со старой грани
 template <int dim, int int_side>
-void split_face_prepare(index_t iface, SoaCell::SoaFace& faces) {
+void split_face_prepare(index_t iface, AmrFaces& faces) {
     constexpr Side<dim> side{int_side};
     
     faces.boundary[iface + side[1]] = faces.boundary[iface + side];
@@ -40,7 +40,7 @@ void split_face_prepare(index_t iface, SoaCell::SoaFace& faces) {
 
 /// @brief Устанавливает на новых подгранях индексы вершин.
 template <int dim, int int_side>
-void split_face_indices(index_t iface, SoaCell::SoaFace& faces) {
+void split_face_indices(index_t iface, AmrFaces& faces) {
     constexpr Side<dim> side{int_side};
 
     faces.vertices[iface + side] = side.cf();
@@ -54,10 +54,10 @@ void split_face_indices(index_t iface, SoaCell::SoaFace& faces) {
 
 /// @brief Устанавливает нормали и площади новых подграней
 template <int dim>
-void setup_face_features(index_t iface, SoaCell::SoaFace& faces, const SqMap<dim>& vertices, bool axial = false);
+void setup_face_features(index_t iface, AmrFaces& faces, const SqMap<dim>& vertices, bool axial = false);
 
 template <>
-inline void setup_face_features<2>(index_t iface, SoaCell::SoaFace& faces, const SqQuad& vertices, bool axial) {
+inline void setup_face_features<2>(index_t iface, AmrFaces& faces, const SqQuad& vertices, bool axial) {
     // Точка внутри ячейки
     Vector3d C = vertices.vs<0, 0>();
 
@@ -76,7 +76,7 @@ inline void setup_face_features<2>(index_t iface, SoaCell::SoaFace& faces, const
 }
 
 template <>
-inline void setup_face_features<3>(index_t iface, SoaCell::SoaFace& faces, const SqCube& vertices, bool axial) {
+inline void setup_face_features<3>(index_t iface, AmrFaces& faces, const SqCube& vertices, bool axial) {
     // Точка внутри ячейки
     const Vector3d& C = vertices.vs<0, 0, 0>();
 
@@ -97,8 +97,8 @@ inline void setup_face_features<3>(index_t iface, SoaCell::SoaFace& faces, const
 
 /// @brief Устанавливает нормали и площади новых подграней
 template <int dim, int side_in>
-void split_face_features(index_t iface, SoaCell::SoaFace& faces,
-    const SqMap<dim>& vertices, bool axial) {
+void split_face_features(index_t iface, AmrFaces& faces,
+                         const SqMap<dim>& vertices, bool axial) {
     constexpr Side<dim> side{side_in};
 
     setup_face_features<dim>(iface + side, faces, vertices, axial);
@@ -114,7 +114,7 @@ void split_face_features(index_t iface, SoaCell::SoaFace& faces,
 /// Устанавливает площади и нормали новых граней.
 /// Размерность и сторона являются аргументами шаблона
 template <int dim, int side>
-void split_face(index_t iface, SoaCell::SoaFace& faces, const SqMap<dim>& vertices, bool axial = false) {
+void split_face(index_t iface, AmrFaces& faces, const SqMap<dim>& vertices, bool axial = false) {
 #if SCRUTINY
     if (faces.is_actual(iface + Side<dim>(side)[1])) {
         throw std::runtime_error("Try to cut complex face");
@@ -132,10 +132,10 @@ void split_face(index_t iface, SoaCell::SoaFace& faces, const SqMap<dim>& vertic
 /// Устанавливает площади и нормали новых граней.
 /// Преобразует аргумент функции side в аргумент шаблона.
 template <int dim>
-void split_face(index_t iface, SoaCell::SoaFace& faces, const SqMap<dim>& vertices, Side<dim> side, bool axial);
+void split_face(index_t iface, AmrFaces& faces, const SqMap<dim>& vertices, Side<dim> side, bool axial);
 
 template <>
-inline void split_face<2>(index_t iface, SoaCell::SoaFace& faces, const SqQuad& vertices, Side2D side, bool axial) {
+inline void split_face<2>(index_t iface, AmrFaces& faces, const SqQuad& vertices, Side2D side, bool axial) {
     switch (side) {
         case Side2D::LEFT:
             split_face<2, Side2D::L>(iface, faces, vertices, axial);
@@ -153,7 +153,7 @@ inline void split_face<2>(index_t iface, SoaCell::SoaFace& faces, const SqQuad& 
 }
 
 template <>
-inline void split_face<3>(index_t iface, SoaCell::SoaFace& faces, const SqCube& vertices, Side3D side, bool axial) {
+inline void split_face<3>(index_t iface, AmrFaces& faces, const SqCube& vertices, Side3D side, bool axial) {
     switch (side) {
         case Side3D::LEFT:
             split_face<3, Side3D::L>(iface, faces, vertices);
@@ -179,13 +179,13 @@ inline void split_face<3>(index_t iface, SoaCell::SoaFace& faces, const SqCube& 
 /// @brief Разбивает грань на стороне side на подграни.
 /// Устанавливает площади и нормали новых граней.
 template <int dim>
-void split_face(index_t ic, SoaCell& cells, int side) {
+void split_face(index_t ic, AmrCells& cells, int side) {
     split_face<dim>(cells.face_begin[ic], cells.faces, cells.get_vertices<dim>(ic), side, cells.axial);
 }
 
 /// @brief Объединяет подграни в одну грань на стороне side
 template<int dim, int int_side>
-void merge_faces(index_t ic, SoaCell& cells) {
+void merge_faces(index_t ic, AmrCells& cells) {
     constexpr Side<dim> side{int_side};
 
     const index_t iface  = cells.face_begin[ic];
@@ -205,10 +205,10 @@ void merge_faces(index_t ic, SoaCell& cells) {
 
 /// @brief Объединяет подграни в одну грань на стороне side
 template<int dim>
-void merge_faces(index_t ic, SoaCell& cells, Side<dim> side);
+void merge_faces(index_t ic, AmrCells& cells, Side<dim> side);
 
 template<>
-inline void merge_faces<2>(index_t ic, SoaCell& cells, Side2D side) {
+inline void merge_faces<2>(index_t ic, AmrCells& cells, Side2D side) {
     switch (side) {
         case Side2D::LEFT:
             merge_faces<2, Side2D::L>(ic, cells);
@@ -226,7 +226,7 @@ inline void merge_faces<2>(index_t ic, SoaCell& cells, Side2D side) {
 }
 
 template<>
-inline void merge_faces<3>(index_t ic, SoaCell& cells, Side3D side) {
+inline void merge_faces<3>(index_t ic, AmrCells& cells, Side3D side) {
     switch (side) {
         case Side3D::LEFT:
             merge_faces<3, Side3D::L>(ic, cells);

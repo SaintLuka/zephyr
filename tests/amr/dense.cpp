@@ -79,9 +79,10 @@ int main() {
     rect.set_nx(50);
 
     SoaMesh mesh(rect);
-    bit = mesh.add_data<int>("bit");
+    bit = mesh.add<int>("bit");
 
     mesh.set_max_level(5);
+    mesh.set_distributor("simple");
 
     if (mesh.check_base() < 0) {
         std::cout << "Bad init mesh\n";

@@ -58,7 +58,7 @@ public:
 
     /// @brief Базовая функция записи в файл. До вызова функции должен быть
     /// создан экземпляр класса и настроены опции записи.
-    void save(mesh::SoaCell &cells);
+    void save(mesh::AmrCells &cells);
 
     /// @brief Базовая функция записи в файл. До вызова функции должен быть
     /// создан экземпляр класса и настроены опции записи.
@@ -81,7 +81,7 @@ public:
     /// @brief Статическая функция записи в файл. Полный аналог функции-члена
     /// класса save, но вызывается без экземпляра класса, все параметры записи
     /// передаются непосредственно как аргументы функции.
-    static void save(const std::string &filename, mesh::SoaCell &locals,
+    static void save(const std::string &filename, mesh::AmrCells &locals,
                      const Variables &variables,
                      bool hex_only   = false,
                      bool polyhedral = false,

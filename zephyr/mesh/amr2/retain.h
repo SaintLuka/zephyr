@@ -19,7 +19,7 @@ namespace zephyr::mesh::amr2 {
 /// выставляется со старой грани. Если подграни склеиваются, то adjacent
 /// у объединенной грани будет такой, какой был у старой грани.
 template<int dim>
-void retain_cell(SoaCell &locals, SoaCell& aliens, index_t ic) {
+void retain_cell(AmrCells &locals, AmrCells& aliens, index_t ic) {
     // Ячейка не требует разбиения, необходимо пройти по граням,
     // возможно, необходимо разбить грань или собрать
     auto rank = locals.rank[ic];
@@ -51,7 +51,7 @@ void retain_cell(SoaCell &locals, SoaCell& aliens, index_t ic) {
         }
 #endif
         // Хранилище и индекс соседа
-        auto [neibs, jc] = locals.faces.get_neib(iface, locals, aliens);
+        auto [neibs, jc] = adj.get_neib(iface, locals, aliens);
 
         auto lvl_n = neibs.level[jc];
 

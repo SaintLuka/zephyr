@@ -96,10 +96,11 @@ int main() {
     rect.set_nx(30);
 
     SoaMesh mesh(rect);
-    idx = mesh.add_data<int>("idx");
-    bit = mesh.add_data<int>("bit");
+    idx = mesh.add<int>("idx");
+    bit = mesh.add<int>("bit");
 
     mesh.set_max_level(4);
+    mesh.set_distributor("simple");
 
     if (mesh.check_base() < 0) {
         std::cout << "Bad init mesh\n";
@@ -108,7 +109,7 @@ int main() {
 
     // Начальная адаптация
     std::cout << "Init refinement\n";
-    for (int lvl = 0; lvl < 3; ++lvl) {
+    for (int lvl = 0; lvl < mesh.max_level() + 2; ++lvl) {
         std::cout << "  Level " << lvl << "\n";
 
         mesh.for_each(set_index, 0.0);

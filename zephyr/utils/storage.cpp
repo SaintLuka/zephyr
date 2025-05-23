@@ -39,4 +39,26 @@ void SoaStorage::print() const {
     std::cout << "\n";
 }
 
+
+void SoaStorage::copy_data(size_t from, size_t to) {
+    copy_data(from, this, to);
+}
+
+void SoaStorage::copy_data(size_t from, SoaStorage* dst, size_t to) {
+    copy_basics(m_values1, from, dst->m_values1, to);
+
+    for (size_t i = 0; i < n_custom_types; ++i) {
+        if (!m_values2[i].empty() && m_values2[i].size() == dst->m_values2[i].size()) {
+            size_t datasize = custom_type_sizeof(i);
+            size_t count = m_values2[i].size();
+            for (size_t k = 0; k < count; ++k) {
+                std::memcpy(
+                        dst->m_values2[i][k].data() + datasize * to,
+                        m_values2[i][k].data() + datasize * from,
+                        datasize);
+            }
+        }
+    }
+}
+
 } // namespace zephyr::utils

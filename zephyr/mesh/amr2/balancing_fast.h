@@ -22,7 +22,7 @@ namespace zephyr::mesh::amr2 {
 /// Фактически структура осуществляет соритровку ячеек по уровням (блочная сортировка,
 /// работает за линейное время).
 struct CellsByLevelPartial {
-    SoaCell &cells;   ///< Ссылка на хранилище
+    AmrCells &cells;   ///< Ссылка на хранилище
     index_t from, to;  ///< Диапазон ячеек в хранилище
 
     std::vector<index_t> n_coarse; ///< Число ячеек каждого уровня, которые хотят огрубиться
@@ -35,12 +35,12 @@ struct CellsByLevelPartial {
     std::vector<std::vector<index_t>> retain;
 
     /// @brief Создание экземпляра класса
-    static CellsByLevelPartial create(SoaCell& cells, int max_level, index_t from, index_t to) {
+    static CellsByLevelPartial create(AmrCells& cells, int max_level, index_t from, index_t to) {
         return CellsByLevelPartial(cells, max_level, from, to);
     }
 
     /// @brief Конструктор класса
-    explicit CellsByLevelPartial(SoaCell& cells, int max_level, index_t from, index_t to)
+    explicit CellsByLevelPartial(AmrCells& cells, int max_level, index_t from, index_t to)
     : cells(cells), from(from), to(to) {
         set_count(max_level);
         sort_by_levels(max_level);
@@ -92,7 +92,7 @@ struct CellsByLevelPartial {
 /// только характеризует ячейки со всего хранилища. В многопоточном режиме строится
 /// на основе множества структур CellsByLevelPartial.
 struct CellsByLevel {
-    SoaCell &cells;   ///< Ссылка на хранилище
+    AmrCells &cells;   ///< Ссылка на хранилище
 
     std::vector<index_t> n_coarse; ///< Число ячеек каждого уровня, которые хотят огрубиться
     std::vector<index_t> n_retain; ///< Число ячеек каждого уровня, которые хотят сохраниться
@@ -106,7 +106,7 @@ struct CellsByLevel {
     /// @brief Однопоточный конструктор класса
     /// @details Вызывается конструктор CellsByLevelPartial для всего диапазона
     /// ячеек хранилища, затем данные перемещаются
-    CellsByLevel(SoaCell &cells, int max_level)
+    CellsByLevel(AmrCells &cells, int max_level)
             : cells(cells) {
         serial_constructor(max_level);
     }
@@ -165,7 +165,7 @@ private:
 
 /// @brief Обновляет флаг ячейки под индексом index, которая имеет флаг 0.
 /// Повышает флаг адаптации, если один из соседей хочет уровень на два выше
-inline void retain_update_flag(int ic, SoaCell &cells) {
+inline void retain_update_flag(int ic, AmrCells &cells) {
     scrutiny_check(ic < cells.size(), "round_1: cell_idx >= cells.size()")
     scrutiny_check(cells.flag[ic] == 0, "retain_update_flag: cell.flag != 0")
 
@@ -189,7 +189,7 @@ inline void retain_update_flag(int ic, SoaCell &cells) {
 /// Ставит флаг адаптации 0, если сосед хочет уровень на 1 выше,
 /// ставит флаг адаптации 1, если сосед хочет уровень на 2 выше,
 /// флаги сиблингов не рассматриваются.
-inline void coarse_update_flag(int ic, SoaCell &cells) {
+inline void coarse_update_flag(int ic, AmrCells &cells) {
     scrutiny_check(ic < cells.size(), "round_2/3: cell_idx >= cells.size()")
 
     if (cells.flag[ic] >= 0) {
@@ -220,7 +220,7 @@ inline void coarse_update_flag(int ic, SoaCell &cells) {
 /// @brief Обновляет флаг ячейки, которая имеет флаг -1.
 /// Ставит флаг адаптации 0, если один из сиблингов не хочет огрубляться.
 template <int dim>
-inline void coarse_update_flag_by_sibs(int ic, SoaCell &cells) {
+inline void coarse_update_flag_by_sibs(int ic, AmrCells &cells) {
     scrutiny_check(ic < cells.size(), "round_4: cell_idx >= cells.size()")
 
     if (cells.flag[ic] >= 0) {
@@ -243,7 +243,7 @@ inline void coarse_update_flag_by_sibs(int ic, SoaCell &cells) {
 /// уровень ячеек больше не меняется
 /// @param indices Индексы ячеек с флагом = 0 в хранилище
 /// @param cells Ссылка на хранилище
-void round_1(const std::vector<index_t> &indices, SoaCell &cells) {
+void round_1(const std::vector<index_t> &indices, AmrCells &cells) {
     threads::for_each(
             indices.begin(), indices.end(),
             retain_update_flag, std::ref(cells));
@@ -256,7 +256,7 @@ void round_1(const std::vector<index_t> &indices, SoaCell &cells) {
 /// флаги на данном обходе (сохранили флаг -1).
 /// @param indices Индексы ячеек с флагом = -1 в хранилище
 /// @param cells Ссылка на хранилище
-void round_2(const std::vector<index_t> &indices, SoaCell &cells) {
+void round_2(const std::vector<index_t> &indices, AmrCells &cells) {
     threads::for_each(
             indices.begin(), indices.end(),
             coarse_update_flag, std::ref(cells));
@@ -268,7 +268,7 @@ void round_2(const std::vector<index_t> &indices, SoaCell &cells) {
 /// обхода флаги ячеек ещё могут измениться (@see round_4).
 /// @param indices Индексы ячеек с исходным флагом = -1 в хранилище
 /// @param cells Ссылка на хранилище
-void round_3(const std::vector<index_t> &indices, SoaCell &cells) {
+void round_3(const std::vector<index_t> &indices, AmrCells &cells) {
     threads::for_each(
             indices.begin(), indices.end(),
             coarse_update_flag, std::ref(cells));
@@ -282,7 +282,7 @@ void round_3(const std::vector<index_t> &indices, SoaCell &cells) {
 /// @param indices Индексы ячеек с исходным флагом = -1 в хранилище
 /// @param cells Ссылка на хранилище
 template <int dim>
-void round_4(const std::vector<index_t> &indices, SoaCell &cells) {
+void round_4(const std::vector<index_t> &indices, AmrCells &cells) {
     threads::for_each(
             indices.begin(), indices.end(),
             coarse_update_flag_by_sibs<dim>, std::ref(cells));
@@ -308,7 +308,7 @@ void round_4(const std::vector<index_t> &indices, SoaCell &cells) {
 /// 4. На заключительном обходе координируются сиблинги, которые хотят
 /// огрубиться (@see round_4), флаги могут повыситься до 0.
 template <int dim>
-void balance_flags_fast(SoaCell& cells, int max_level) {
+void balance_flags_fast(AmrCells& cells, int max_level) {
     static Stopwatch restriction_timer;
     static Stopwatch sorting_timer;
     static Stopwatch round_timer_1;

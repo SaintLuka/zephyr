@@ -12,25 +12,23 @@
 
 namespace zephyr::mesh::amr2 {
 
-template<int dim>
-using Children2 = std::array<index_t, CpC(dim)>;
 
 /// @brief Возвращает итераторы дочерних ячеек по их индексам в хранилище
 /// @param locals Хранилище ячеек
 /// @param ic Индекс главной из дочерних ячеек (z_loc = 0)
 /// @return Массив итераторов дочерних ячеек
 template <int dim>
-Children2<dim> select_children(SoaCell& locals, int ic) {
+SoaChildren select_children(AmrCells& locals, int ic) {
     auto sibs = get_siblings<dim>(locals, ic);
 
     // Дочерние ячейки, упорядоченные по локальному z-индексу
-    Children2<dim> children;
-    children[0] = ic;
+    SoaChildren children(locals);
+    children.index[0] = ic;
     for (auto sib: sibs) {
         scrutiny_check(sib < locals.size(), "Vicinity: Sibling index out of range")
 
         auto z_loc = locals.z_idx[sib] % CpC(dim);
-        children[z_loc] = sib;
+        children.index[z_loc] = sib;
     }
 
 #if SCRUTINY
@@ -63,25 +61,25 @@ Children2<dim> select_children(SoaCell& locals, int ic) {
 /// @brief Вершины родительской ячейки (2D)
 template <int dim>
 std::enable_if_t<dim == 2, SqQuad>
-parent_vs(SoaCell& cells, Children2<dim>& children) {
+parent_vs(AmrCells& cells, SoaChildren& children) {
     return {
-        cells.verts[cells.node_begin[children[0]] + SqQuad::iss<-1, -1>()],
-        cells.verts[cells.node_begin[children[0]] + SqQuad::iss<+1, -1>()],
-        cells.verts[cells.node_begin[children[1]] + SqQuad::iss<+1, -1>()],
-        cells.verts[cells.node_begin[children[0]] + SqQuad::iss<-1, +1>()],
-        cells.verts[cells.node_begin[children[0]] + SqQuad::iss<+1, +1>()],
-        cells.verts[cells.node_begin[children[1]] + SqQuad::iss<+1, +1>()],
-        cells.verts[cells.node_begin[children[2]] + SqQuad::iss<-1, +1>()],
-        cells.verts[cells.node_begin[children[2]] + SqQuad::iss<+1, +1>()],
-        cells.verts[cells.node_begin[children[3]] + SqQuad::iss<+1, +1>()]
+        cells.verts[cells.node_begin[children.index[0]] + SqQuad::iss<-1, -1>()],
+        cells.verts[cells.node_begin[children.index[0]] + SqQuad::iss<+1, -1>()],
+        cells.verts[cells.node_begin[children.index[1]] + SqQuad::iss<+1, -1>()],
+        cells.verts[cells.node_begin[children.index[0]] + SqQuad::iss<-1, +1>()],
+        cells.verts[cells.node_begin[children.index[0]] + SqQuad::iss<+1, +1>()],
+        cells.verts[cells.node_begin[children.index[1]] + SqQuad::iss<+1, +1>()],
+        cells.verts[cells.node_begin[children.index[2]] + SqQuad::iss<-1, +1>()],
+        cells.verts[cells.node_begin[children.index[2]] + SqQuad::iss<+1, +1>()],
+        cells.verts[cells.node_begin[children.index[3]] + SqQuad::iss<+1, +1>()]
     };
 }
 
 /// @brief Вершины родительской ячейки (3D)
 template <int dim>
 std::enable_if_t<dim == 3, Cube>
-parent_vs(SoaCell& cells, Children2<dim>& children) {
-#define subtr3D(i, j, k) (cells.verts[cells.node_begin[children[Cube::iss<i, j, k>()]] + SqCube::iss<i, j, k>()])
+parent_vs(AmrCells& cells, SoaChildren& children) {
+#define subtr3D(i, j, k) (cells.verts[cells.node_begin[children.index[Cube::iss<i, j, k>()]] + SqCube::iss<i, j, k>()])
     return {
         subtr3D(-1, -1, -1),
         subtr3D(+1, -1, -1),
@@ -102,7 +100,7 @@ parent_vs(SoaCell& cells, Children2<dim>& children) {
 /// @param children Массив дочерних ячеек
 /// @return Полностью готовая родительская ячейка
 template<int dim, bool axial=false>
-void make_parent(SoaCell& locals, SoaCell& aliens, int rank, Children2<dim>& children, index_t ip) {
+void make_parent(AmrCells& locals, AmrCells& aliens, int rank, SoaChildren& children, index_t ip) {
     const auto children_by_side = get_children_by_side<dim>();
 
     if constexpr (dim == 2 && axial) {
@@ -113,20 +111,20 @@ void make_parent(SoaCell& locals, SoaCell& aliens, int rank, Children2<dim>& chi
 
     auto& adj = locals.faces.adjacent;
 
-    locals.rank[ip]  = locals.rank[children[0]];
-    locals.index[ip] = locals.next[children[0]];
-    locals.next[ip]  = locals.next[children[0]];
+    locals.rank[ip]  = locals.rank[children.index[0]];
+    locals.index[ip] = locals.next[children.index[0]];
+    locals.next[ip]  = locals.next[children.index[0]];
 
-    locals.b_idx[ip] = locals.b_idx[children[0]];
+    locals.b_idx[ip] = locals.b_idx[children.index[0]];
     locals.flag[ip]  = 0;
-    locals.level[ip] = locals.level[children[0]] - 1;
-    locals.z_idx[ip] = locals.z_idx[children[0]] / CpC(dim);
+    locals.level[ip] = locals.level[children.index[0]] - 1;
+    locals.z_idx[ip] = locals.z_idx[children.index[0]] / CpC(dim);
 
     /// Линкуем грани
     for (Side<dim> side: Side<dim>::items()) {
         index_t pface = locals.face_begin[ip];
 
-        index_t some_ch = children[children_by_side[side][0]];
+        index_t some_ch = children.index[children_by_side[side][0]];
         index_t some_face = locals.face_begin[some_ch] + side;
 
 #if SCRUTINY
@@ -168,7 +166,7 @@ void make_parent(SoaCell& locals, SoaCell& aliens, int rank, Children2<dim>& chi
         }
 #endif
 
-        auto [neibs, some_neib] = locals.faces.get_neib(some_face, locals, aliens);
+        auto [neibs, some_neib] = adj.get_neib(some_face, locals, aliens);
         auto some_neib_wanted_lvl = neibs.level[some_neib] + neibs.flag[some_neib];
 
 #if SCRUTINY
@@ -225,7 +223,7 @@ void make_parent(SoaCell& locals, SoaCell& aliens, int rank, Children2<dim>& chi
         // Центры граней дочерних ячеек
         std::array<Vector3d, FpF(dim)> cfaces;
         for (int i = 0; i < FpF(dim); ++i) {
-            index_t ich = children[children_by_side[side][i]];
+            index_t ich = children.index[children_by_side[side][i]];
             index_t iface = locals.face_begin[ich];
             if (locals.simple_face(ich, side)) {
                 // Простая грань
@@ -247,7 +245,7 @@ void make_parent(SoaCell& locals, SoaCell& aliens, int rank, Children2<dim>& chi
         /// Находим соответстиве между pfaces и cfaces
         double eps = 1.0e-3 * locals.linear_size(ip);
         for (int i = 0; i < FpF(dim); ++i) {
-            index_t ich = children[children_by_side[side][i]];
+            index_t ich = children.index[children_by_side[side][i]];
             index_t ch_face = locals.face_begin[ich] + side;
             for (int j = 0; j < FpF(dim); ++j) {
                 if ((pfaces[i] - cfaces[j]).norm() < eps) {
@@ -321,26 +319,27 @@ void make_parent(SoaCell& locals, SoaCell& aliens, int rank, Children2<dim>& chi
 /// @param locals Хранилище ячеек
 /// @param op Оператор огрубления данных
 template<int dim>
-void coarse_cell(SoaCell& cells, SoaCell& aliens, index_t ich, int rank, const Distributor& op) {
+void coarse_cell(AmrCells& locals, AmrCells& aliens, index_t ich, int rank, const Distributor& op) {
     // Функцию выполняет главный ребенок, остальные
     // выставляются на undefined и отдыхают
-    if (cells.z_idx[ich] % CpC(dim) != 0) {
-        cells.set_undefined(ich);
+    if (locals.z_idx[ich] % CpC(dim) != 0) {
+        locals.set_undefined(ich);
         return;
     }
 
-    auto children = select_children<dim>(cells, ich);
+    auto children = select_children<dim>(locals, ich);
 
-    index_t ip = cells.next[ich];
-    if (dim == 2 && cells.axial) {
-        make_parent<dim, true>(cells, aliens, rank, children, ip);
+    index_t ip = locals.next[ich];
+    if (dim == 2 && locals.axial) {
+        make_parent<dim, true>(locals, aliens, rank, children, ip);
     }
     else {
-        make_parent<dim>(cells, aliens, rank, children, ip);
+        make_parent<dim>(locals, aliens, rank, children, ip);
     }
-    //op.merge(children, parent);
+    QCell parent(&locals, ip);
+    op.merge_soa(children, parent);
 
-    cells.set_undefined(ich);
+    locals.set_undefined(ich);
 }
 
 } // namespace zephyr::mesh::amr2

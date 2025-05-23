@@ -177,7 +177,7 @@ void PvdFile::save(AmrStorage& elements, double timestep) {
     update_pvd(timestep);
 }
 
-void PvdFile::save(mesh::SoaCell& elements, double timestep) {
+void PvdFile::save(mesh::AmrCells& elements, double timestep) {
     VtuFile::save(get_filename(), elements, variables, hex_only, polyhedral, filter);
     update_pvd(timestep);
 }

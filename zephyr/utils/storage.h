@@ -109,11 +109,30 @@ public:
     template <typename T>
     inline const T* operator()(Storable<T> type) const { return data(type); }
 
+    /// @brief Скопировать все данные по индексу from
+    /// в хранилище dst по индексу to.
+    void copy_data(size_t from, size_t to);
+
+    /// @brief Скопировать все данные по индексу from
+    /// в хранилище dst по индексу to.
+    void copy_data(size_t from, SoaStorage* dst, size_t to);
+
+    /// @brief Поменять два массива данных местами
+    template <typename T>
+    void swap(const Storable<T>& type1, const Storable<T>& type2) {
+        if constexpr (is_basic_type<T>()) {
+            std::swap(basic_values<T>()[type1.idx], basic_values<T>()[type2.idx]);
+        }
+        else {
+            std::swap(custom_values<T>()[type1.idx], custom_values<T>()[type2.idx]);
+        }
+    }
+
     /// @brief Вывести в консоль массивы данных, массивы пользовательских
     /// типов не выводятся, только имена и размеры типов данных
     void print() const;
 
-private:
+public:
     // ========================================================================
     //          Описание базовых и пользовательских типов + функции
     // ========================================================================
@@ -329,10 +348,18 @@ private:
                     std::cout << "]\n";
                 }
                 else {
-                    for (int i = 0; i < vec.size() - 1; ++i) {
-                        std::cout << vec[i] << ", ";
+                    if constexpr (I == basic_type_index<geom::Vector3d>()) {
+                        for (int i = 0; i < vec.size() - 1; ++i) {
+                            std::cout << "{" << vec[i].transpose() << "}, ";
+                        }
+                        std::cout << "{" << vec.back().transpose() << "}]\n";
                     }
-                    std::cout << vec.back() << "]\n";
+                    else {
+                        for (int i = 0; i < vec.size() - 1; ++i) {
+                            std::cout << vec[i] << ", ";
+                        }
+                        std::cout << vec.back() << "]\n";
+                    }
                 }
             }
             ++count;
@@ -356,6 +383,27 @@ private:
     // Рекурсивный resize для базовых типов
     template<int I = 0>
     std::enable_if_t<I >= n_basic_types> resize_basic(size_t new_size) { }
+
+    // Скопировать для одного базового типа значения
+    template <typename T>
+    static void copy_one_basic(const vec_of_vec<T>& src, size_t from,
+                                     vec_of_vec<T>& dst, size_t to) {
+        if (!src.empty() && src.size() == dst.size()) {
+            for (size_t k = 0; k < src.size(); ++k) {
+                dst[k][to] = src[k][from];
+            }
+        }
+    }
+
+    // Скопировать для всех базовых типов (рекурсивно)
+    template <int I = 0>
+    static void copy_basics(const vec_of_vec_types& src, size_t from,
+                                  vec_of_vec_types& dst, size_t to) {
+        copy_one_basic(std::get<I>(src), from, std::get<I>(dst), to);
+        if constexpr (I < n_basic_types - 1) {
+            copy_basics<I + 1>(src, from, dst, to);
+        }
+    }
 };
 
 // Название базового типа

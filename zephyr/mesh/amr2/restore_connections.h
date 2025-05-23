@@ -34,7 +34,7 @@ namespace zephyr::mesh::amr2 {
 /// Грани через процессы остаются без изменений. Линковка граней между процессами
 /// происходит на последнем этапе алгоритма адапатции.
 template<int dim>
-void restore_connections_one(index_t ic, SoaCell& locals, SoaCell& aliens, int rank, const Statistics &count) {
+void restore_connections_one(index_t ic, AmrCells& locals, AmrCells& aliens, int rank, const Statistics &count) {
     // Ячейка неактуальна, пропускаем
     if (locals.is_undefined(ic)) { return; }
 
@@ -77,7 +77,7 @@ void restore_connections_one(index_t ic, SoaCell& locals, SoaCell& aliens, int r
         }
 
         // Индекс старого соседа
-        auto [neibs, old_jc] = faces.get_neib(iface, locals, aliens);
+        auto [neibs, old_jc] = faces.adjacent.get_neib(iface, locals, aliens);
 
         // Актуальный сосед через грань
         if (neibs.is_actual(old_jc)) {
@@ -213,7 +213,7 @@ inline void set_undefined_next(index_t ic, std::vector<index_t> &next) {
 /// @brief Восстанавливает связи (без MPI)
 /// @details см. restore_connections_one
 template<int dim>
-void restore_connections(SoaCell &locals, SoaCell& aliens, int rank, const Statistics &count) {
+void restore_connections(AmrCells &locals, AmrCells& aliens, int rank, const Statistics &count) {
     threads::parallel_for(
             index_t{0}, index_t{count.n_cells_large},
             restore_connections_one<dim>,

@@ -4,14 +4,11 @@
 #include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/geom/generator/cuboid.h>
 
-#include "zephyr/math/cfd/gradient.h"
-#include "zephyr/phys/tests/ivp.h"
-
 using zephyr::utils::threads;
 using namespace zephyr::io;
 using zephyr::mesh::SoaMesh;
 using zephyr::mesh::SoaStorage;
-using zephyr::mesh::SoaCell;
+using zephyr::mesh::AmrCells;
 using zephyr::geom::generator::Rectangle;
 using zephyr::geom::generator::Cuboid;
 
@@ -24,21 +21,18 @@ int main() {
     //Cuboid gen(0.0, 1.0, 0.0, 0.6, 0.0, 0.9);
     Rectangle gen(-0.5, 1.0, -0.3, 0.7);
     gen.set_sizes(100, 100);
-    gen.set_boundaries({.left=Boundary::PERIODIC,.right=Boundary::ZOE,
+    gen.set_boundaries({.left=Boundary::ZOE,.right=Boundary::ZOE,
                         .bottom=Boundary::ZOE,.top=Boundary::WALL});
 
     SoaMesh mesh(gen);
-    mesh.add_data<double>("value");
+    mesh.add<double>("value");
 
-    int res = mesh.check_base();
-    if (res < 0) {
-        std::cout << "Bad mesh check: " << res << "\n";
+    if (mesh.check_base() < 0) {
+        std::cout << "Bad mesh.\n";
     }
     VtuFile vtu("mesh.vtu");
     vtu.variables = {"faces2D", "rank", "level", "index", "flag", "b_idx", "z_idx"};
     vtu.save(mesh);
-
-
 
     return 0;
 }

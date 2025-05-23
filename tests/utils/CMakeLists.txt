@@ -1,3 +1,4 @@
+list(APPEND TESTS a)
 #list(APPEND TESTS balancing_mpi)
 #list(APPEND TESTS distributed-amr)
 #list(APPEND TESTS distributed-conv)

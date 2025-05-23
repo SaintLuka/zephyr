@@ -49,7 +49,7 @@ inline index_t count_cells(AmrStorage &cells, const Filter &filter) {
     return count;
 }
 
-inline index_t count_cells(SoaCell &locals, const Filter &filter) {
+inline index_t count_cells(AmrCells &locals, const Filter &filter) {
     return locals.size();
 }
 
@@ -634,7 +634,7 @@ void write_mesh_header(
 }
 
 void write_mesh_header(
-        std::ofstream &file, SoaCell &cells, index_t n_cells,
+        std::ofstream &file, AmrCells &cells, index_t n_cells,
         const Variables &variables, bool hex_only, bool polyhedral,
         const Filter &filter
 ) {
@@ -949,7 +949,7 @@ void write_mesh_primitives(
 }
 
 void write_mesh_primitives(
-        std::ofstream &file, mesh::SoaCell &cells, index_t n_cells,
+        std::ofstream &file, mesh::AmrCells &cells, index_t n_cells,
         const Variables &variables, bool hex_only, bool polyhedral,
         const Filter &filter
 ) {
@@ -1189,7 +1189,7 @@ void write_cells_data(
 }
 
 void write_cells_data(
-        std::ofstream &file, SoaCell &cells, index_t n_cells,
+        std::ofstream &file, AmrCells &cells, index_t n_cells,
         const Variables &variables, const Filter &filter
 ) {
     std::vector<char> temp;
@@ -1345,7 +1345,7 @@ void VtuFile::save(AmrStorage &cells) {
     save(filename, cells, variables, hex_only, polyhedral, filter);
 }
 
-void VtuFile::save(mesh::SoaCell &cells) {
+void VtuFile::save(mesh::AmrCells &cells) {
     save(filename, cells, variables, hex_only, polyhedral, filter);
 }
 
@@ -1381,9 +1381,9 @@ void VtuFile::save(
 }
 
 void VtuFile::save(
-    const std::string &filename,
-    mesh::SoaCell &locals, const Variables &variables,
-    bool hex_only, bool polyhedral, const Filter &filter
+        const std::string &filename,
+        mesh::AmrCells &locals, const Variables &variables,
+        bool hex_only, bool polyhedral, const Filter &filter
 ) {
     index_t n_cells = locals.size();
 
