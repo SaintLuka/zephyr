@@ -1,11 +1,13 @@
 #pragma once
 
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/euler/soa_mesh.h>
 
 namespace zephyr::geom {
 
-using zephyr::mesh::EuCell;
-using zephyr::mesh::EuMesh;
+using zephyr::mesh::QCell;
+using zephyr::mesh::SoaMesh;
+using zephyr::mesh::AmrCells;
+using zephyr::mesh::Storable;
 using zephyr::geom::Vector3d;
 using zephyr::mesh::AmrStorage;
 using zephyr::mesh::VarExtra;
@@ -22,36 +24,41 @@ using zephyr::mesh::Byte;
 class InterfaceRecovery {
 public:
 
-    InterfaceRecovery(int volume_offset, int normal_offset, int origin_offset)
-        : a{volume_offset}, n{normal_offset}, p{origin_offset} { }
+    InterfaceRecovery() = default;
+
+    InterfaceRecovery(
+            Storable<double> volume,
+            Storable<Vector3d> normal,
+            Storable<Vector3d> origin)
+        : a{volume}, n{normal}, p{origin} { }
 
     /// @brief Обновить подсеточную реконструкцию
-    void update(EuMesh& mesh, int smoothing) const;
+    void update(SoaMesh& mesh, int smoothing) const;
 
     /// @brief Преобразовать реконструкцию в сетку
-    AmrStorage body(EuMesh& mesh) const;
+    SoaMesh body(SoaMesh& mesh) const;
 
 private:
 
     /// @brief Оценка нормали по производным объемной доли
-    void compute_normal(EuCell& cell) const;
+    void compute_normal(QCell& cell) const;
 
-    void compute_normals(EuMesh& mesh) const;
+    void compute_normals(SoaMesh& mesh) const;
 
     /// @brief Найти сечение ячейки по существующим нормалям
-    void find_section(EuCell& cell) const;
+    void find_section(QCell& cell) const;
 
-    void find_sections(EuMesh& mesh) const;
+    void find_sections(SoaMesh& mesh) const;
 
     /// @brief Поправить нормали с учетом соседей
-    void adjust_normal(EuCell& cell) const;
+    void adjust_normal(QCell& cell) const;
 
-    void adjust_normals(EuMesh& mesh) const;
+    void adjust_normals(SoaMesh& mesh) const;
 
 private:
-    VarExtra<double> a;    ///< Тип извлечения объемной доли
-    VarExtra<Vector3d> n;  ///< Тип для извлечения нормали
-    VarExtra<Vector3d> p;  ///< Тип для извлечения точки сечения
+    Storable<double> a;    ///< Тип извлечения объемной доли
+    Storable<Vector3d> n;  ///< Тип для извлечения нормали
+    Storable<Vector3d> p;  ///< Тип для извлечения точки сечения
 };
 
 } // namespace zephyr::geom

@@ -27,6 +27,7 @@ inline void change_adjacent_one1(index_t ic, AmrCells& locals) {
         // Граничные указывают на ячейку
         if (locals.faces.is_boundary(iface)) {
             locals.faces.adjacent.index[iface] = locals.next[ic];
+            locals.faces.adjacent.basic[iface] = locals.next[ic];
             continue;
         }
 
@@ -38,6 +39,7 @@ inline void change_adjacent_one1(index_t ic, AmrCells& locals) {
                        "change_adjacent_partial() error: adjacent.index out of range");
 
         locals.faces.adjacent.index[iface] = locals.next[locals.faces.adjacent.index[iface]];
+        locals.faces.adjacent.basic[iface] = locals.next[ic];
     }
 }
 
@@ -351,6 +353,9 @@ void remove_undefined(AmrCells &cells, const Statistics &count) {
 #endif
 }
 
+/* ============================================================================
+                                    MPI VERSION
+ ==============================================================================
 template<int dim>
 void remove_undefined(AmrCells& cells, const Statistics &count, EuMesh& mesh) {
     static Stopwatch create_swap_timer;
@@ -392,5 +397,6 @@ void remove_undefined(AmrCells& cells, const Statistics &count, EuMesh& mesh) {
     ++counter;
 #endif
 }
+ */
 
 } // namespace zephyr::mesh::amr2

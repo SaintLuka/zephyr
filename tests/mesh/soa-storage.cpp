@@ -3,9 +3,10 @@
 #include <zephyr/geom/vector.h>
 #include <zephyr/mesh/euler/soa_mesh.h>
 
-using zephyr::geom::Vector3d;
 using namespace zephyr::mesh;
 
+using zephyr::geom::Vector3d;
+using zephyr::utils::SoaStorage;
 
 // Имитация вектора состояния
 struct PState {

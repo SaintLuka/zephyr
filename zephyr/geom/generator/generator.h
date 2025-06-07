@@ -4,6 +4,7 @@
 #include <memory>
 
 namespace zephyr::utils { class Json; }
+namespace zephyr::mesh { class AmrCells; }
 
 namespace zephyr::geom {
 
@@ -22,6 +23,9 @@ public:
     /// @brief Базовый конструктор только с именем типа сетки
     explicit Generator(const std::string &name);
 
+    /// @brief Виртуальный деструктор (для наследования)
+    virtual ~Generator() = default;
+
     /// @brief Создать умный указатель по файлу конфигурации
     static Generator::Ptr create(const Json& config);
 
@@ -37,6 +41,9 @@ public:
 
     /// @brief Создать сетку общего вида
     virtual Grid make() = 0;
+
+    /// @brief Инициализация SoA-хранилища сетки
+    virtual void initialize(mesh::AmrCells& cells) { throw std::runtime_error("not implemented"); }
 
 protected:
     /// @brief Проверить размеры сетки перед созданием

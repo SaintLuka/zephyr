@@ -3,7 +3,7 @@
 #list(APPEND PROBLEMS smf_test_1D)
 #list(APPEND PROBLEMS smf_test_2D)
 #list(APPEND PROBLEMS smf_test_3D)
-list(APPEND PROBLEMS smf_test_3D_soa)
+#list(APPEND PROBLEMS smf_test_3D_soa)
 #list(APPEND PROBLEMS smf_test_axial)
 
 # Assume all files in direcory are tests

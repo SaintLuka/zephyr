@@ -7,6 +7,14 @@ void AmrAdjacent::resize(index_t n_faces) {
     rank.resize(n_faces, -1);
     index.resize(n_faces, -1);
     alien.resize(n_faces, -1);
+    basic.resize(n_faces, -1);
+}
+
+void AmrAdjacent::reserve(index_t n_faces) {
+    rank.reserve(n_faces);
+    index.reserve(n_faces);
+    alien.reserve(n_faces);
+    basic.reserve(n_faces);
 }
 
 void AmrFaces::resize(index_t n_faces) {
@@ -17,6 +25,16 @@ void AmrFaces::resize(index_t n_faces) {
     area.resize(n_faces);
     area_alt.resize(n_faces);
     vertices.resize(n_faces);
+}
+
+void AmrFaces::reserve(index_t n_faces) {
+    boundary.reserve(n_faces);
+    adjacent.reserve(n_faces);
+    normal.reserve(n_faces);
+    center.reserve(n_faces);
+    area.reserve(n_faces);
+    area_alt.reserve(n_faces);
+    vertices.reserve(n_faces);
 }
 
 void AmrFaces::insert(index_t iface, CellType ctype, int count) {

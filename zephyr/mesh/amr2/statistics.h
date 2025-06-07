@@ -81,8 +81,8 @@ struct Statistics {
         scrutiny_check(n_coarse % CpC(locals.dim) == 0, "Refiner::apply() error #2")
         scrutiny_check(n_retain + n_refine + n_coarse == n_cells, "Refiner::apply() error #1");
 
-        n_parents =  n_coarse / CpC(locals.dim);
-        n_children = n_refine * CpC(locals.dim);
+        n_parents =  n_coarse / CpC(locals.dim());
+        n_children = n_refine * CpC(locals.dim());
 
         n_cells_large = n_cells + n_parents + n_children;
         n_cells_short = n_retain + n_children + n_parents;

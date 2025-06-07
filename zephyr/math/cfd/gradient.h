@@ -9,7 +9,8 @@
 
 namespace zephyr::math::gradient {
 
-using zephyr::mesh::Cell;
+using zephyr::mesh::EuCell;
+using zephyr::mesh::QCell;
 using zephyr::mesh::SoaMesh;
 using zephyr::mesh::Boundary;
 
@@ -17,7 +18,11 @@ using namespace geom;
 
 /// @brief Получить вектор состояния типа T из ячейки
 template <class T>
-using GetState = std::function<T(Cell &)>;
+using GetState = std::function<T(EuCell &)>;
+
+/// @brief Получить вектор состояния типа T из ячейки
+template <class T>
+using GetState2 = std::function<T(QCell &)>;
 
 /// @brief Получить вектор состояния типа T через грань
 /// с граничным условием
@@ -59,7 +64,7 @@ struct Grad {
 
 /// @brief Расчет градиента методом Гаусса
 template<class State>
-Grad<State> gauss(Cell &cell,
+Grad<State> gauss(EuCell &cell,
                   const GetState<State> &get_state,
                   const GetBoundary<State> &boundary_value) {
     using Array = ei_arr<State>;
@@ -108,7 +113,7 @@ Grad<State> gauss(Cell &cell,
 
 /// @brief Метод наименьших квадратов (классическая версия)
 template<class State>
-Grad<State> LSM_orig(Cell &cell,
+Grad<State> LSM_orig(EuCell &cell,
                 const GetState<State> &get_state,
                 const GetBoundary<State> &boundary_value) {
     using Array = ei_vec<State>;
@@ -165,7 +170,7 @@ Grad<State> LSM_orig(Cell &cell,
 
 /// @brief Метод наименьших квадратов (улучшенная AMR версия)
 template<class State>
-Grad<State> LSM(Cell &cell,
+Grad<State> LSM(EuCell &cell,
                      const GetState<State> &get_state,
                      const GetBoundary<State> &boundary_value) {
     using Array = ei_vec<State>;
@@ -227,14 +232,15 @@ Grad<State> LSM(Cell &cell,
 
 /// @brief Метод наименьших квадратов (SoA версия)
 template<class State>
-Grad<State> LSM(mesh::QCell& cell, const State* states,
+Grad<State> LSM(QCell &cell,
+                const GetState2<State> &get_state,
                 const GetBoundary<State> &boundary_value) {
     using Array = ei_vec<State>;
 
     // Делает матрицу A безразмерной
     double w0 = cell.dim() < 3 ? 1.0 : 1.0 / cell.linear_size();
 
-    State zc = states[cell.index()];
+    State zc = get_state(cell);
     Vector3d cell_c = cell.center();
 
     Array Fx = Array::Zero();
@@ -242,15 +248,15 @@ Grad<State> LSM(mesh::QCell& cell, const State* states,
     Array Fz = Array::Zero();
     Matrix3d A = Matrix3d::Zero();
 
-    for (auto& face: cell.faces()) {
+    for (auto &face: cell.faces()) {
         auto &normal = face.normal();
 
         State zn;
         Vector3d dr;
         if (!face.is_boundary()) {
-            size_t jc = face.adj_index();
-            zn = states[jc];
-            dr = face.neib_center() - cell_c;
+            auto neib = face.neib();
+            zn = get_state(neib);
+            dr = neib.center() - cell_c;
         } else {
             zn = boundary_value(zc, normal, face.flag());
             dr = face.symm_point(cell_c) - cell_c;
@@ -288,7 +294,7 @@ Grad<State> LSM(mesh::QCell& cell, const State* states,
 
 /// @brief Ограничитель градиента (классическая версия)
 template<class State>
-Grad<State> limiting_orig(Cell &cell, const Limiter& limiter,
+Grad<State> limiting_orig(EuCell &cell, const Limiter& limiter,
                           const Grad<State> &grad,
                           const GetState<State> &get_state,
                           const GetBoundary<State> &boundary_value) {
@@ -350,7 +356,7 @@ Grad<State> limiting_orig(Cell &cell, const Limiter& limiter,
 
 /// @brief Ограничитель градиента (улучшенная AMR версия)
 template<class State>
-Grad<State> limiting(Cell &cell, const Limiter& limiter,
+Grad<State> limiting(EuCell &cell, const Limiter& limiter,
                           const Grad<State> &grad,
                           const GetState<State> &get_state,
                           const GetBoundary<State> &boundary_value) {
@@ -415,18 +421,18 @@ Grad<State> limiting(Cell &cell, const Limiter& limiter,
     return lim_grad;
 }
 
-/// @brief Метод наименьших квадратов (SoA версия)
+/// @brief Ограничитель градиента (улучшенная AMR версия)
 template<class State>
-Grad<State> limiting(mesh::QCell& cell, const Limiter& limiter,
+Grad<State> limiting(QCell &cell, const Limiter& limiter,
                      const Grad<State> &grad,
-                     const State* states,
+                     const GetState2<State> &get_state,
                      const GetBoundary<State> &boundary_value) {
     using Array = ei_arr<State>;
 
     // Делает матрицу A безразмерной
     double w0 = cell.dim() < 3 ? 1.0 : 1.0 / cell.linear_size();
 
-    State zc = states[cell.index()];
+    State zc = get_state(cell);
     Vector3d cell_c = cell.center();
 
     Array Fx = Array::Zero();
@@ -434,14 +440,15 @@ Grad<State> limiting(mesh::QCell& cell, const Limiter& limiter,
     Array Fz = Array::Zero();
 
     Matrix3d A = Matrix3d::Zero();
-    for (auto& face: cell.faces()) {
-        auto& normal = face.normal();
+    for (auto &face: cell.faces()) {
+        const Vector3d &normal = face.normal();
 
         State zn;
         Vector3d dr;
         if (!face.is_boundary()) {
-            zn = states[face.adj_index()];
-            dr = face.neib_center() - cell_c;
+            auto neib = face.neib();
+            zn = get_state(neib);
+            dr = neib.center() - cell_c;
         } else {
             zn = boundary_value(zc, normal, face.flag());
             dr = face.symm_point(cell_c) - cell_c;

@@ -7,6 +7,16 @@
 
 namespace zephyr::math {
 
+/// @brief Минимум из трёх величин
+inline double min(double x, double y, double z) {
+    return std::min(x, std::min(y, z));
+}
+
+/// @brief Максимум из трёх величин
+inline double max(double x, double y, double z) {
+    return std::max(x, std::max(y, z));
+}
+
 /// @brief Функция знака
 inline double sign(double x) {
     return x > 0.0 ? 1.0 : (x < 0.0 ? -1.0 : 0.0);

@@ -56,7 +56,7 @@ Vector3d Convection::velocity(const Vector3d& c) const {
 }
 
 double Convection::compute_dt(QCell &cell) const {
-    double h = cell.diameter();
+    double h = cell.incircle_diameter();
     return m_CFL * h / velocity(cell.center()).norm();
 }
 

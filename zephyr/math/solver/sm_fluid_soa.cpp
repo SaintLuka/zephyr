@@ -100,7 +100,7 @@ void SmFluidSoA::compute_dt(SoaMesh& mesh) {
     double dt = mesh.min(
         [this](mesh::QCell& cell) -> double {
             double c = m_eos->sound_speed_rP(cell(curr).density, cell(curr).pressure);
-            return cell.diameter() / (cell(curr).velocity.norm() + c);
+            return cell.incircle_diameter() / (cell(curr).velocity.norm() + c);
         }, std::numeric_limits<double>::infinity());
 
     dt = std::min(m_CFL * dt, m_max_dt);
@@ -108,6 +108,8 @@ void SmFluidSoA::compute_dt(SoaMesh& mesh) {
 }
 
 void SmFluidSoA::compute_grad(SoaMesh& mesh)  {
+    throw std::runtime_error("SMFLUID SOA GRAD");
+    /*
     mesh.for_each([this, &mesh](mesh::QCell& cell) {
         auto grad = gradient::LSM<smf::PState>(cell, mesh.m_locals.data(curr), boundary_value);
         grad = gradient::limiting<smf::PState>(cell, m_limiter, grad, mesh.m_locals.data(curr), boundary_value);
@@ -116,6 +118,7 @@ void SmFluidSoA::compute_grad(SoaMesh& mesh)  {
         cell(d_dy) = grad.y;
         cell(d_dz) = grad.z;
     });
+     */
 }
 
 void SmFluidSoA::fluxes(SoaMesh &mesh) {

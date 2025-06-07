@@ -2,9 +2,10 @@
 
 #include <vector>
 
-#include <zephyr/geom/boundary.h>
 #include <zephyr/geom/vector.h>
+#include <zephyr/geom/boundary.h>
 #include <zephyr/geom/cell_type.h>
+#include <zephyr/mesh/primitives/side.h>
 #include <zephyr/mesh/primitives/bface.h>
 
 namespace zephyr::mesh {
@@ -32,9 +33,14 @@ struct AmrAdjacent final {
     /// ячейка с данного процесса).
     std::vector<index_t> alien;
 
+    /// @brief Индекс базовой ячейки, которая содержит грань
+    std::vector<index_t> basic;
 
     /// @brief Расширить массивы по числу граней
     void resize(index_t n_faces);
+
+    /// @brief Расширить массивы по числу граней
+    void reserve(index_t n_faces);
 
     /// @brief Локальная ячейка?
     bool is_local(index_t iface) const { return alien[iface] < 0; }
@@ -74,8 +80,14 @@ struct AmrFaces final {
     std::vector<std::array<int, 4>> vertices;
 
 
+    /// @brief Число граней
+    index_t size() const { return boundary.size(); }
+
     /// @brief Масштабировать структуру под число граней
     void resize(index_t n_faces);
+
+    /// @brief Расширить под число граней
+    void reserve(index_t n_faces);
 
     /// @brief Добавить грани, соответствующие ячейке
     /// @details Есть реализация вставки для разных типов ячеек.
@@ -126,8 +138,9 @@ inline bool AmrFaces::is_undefined(index_t iface) const {
 inline void AmrFaces::set_undefined(index_t iface) {
     boundary[iface] = Boundary::UNDEFINED;
     adjacent.rank[iface]  = -1;
-    adjacent.alien[iface] = -1;
     adjacent.index[iface] = -1;
+    adjacent.alien[iface] = -1;
+    adjacent.basic[iface] = -1;
 }
 
 inline AmrFaces::Vector3d AmrFaces::area_n(index_t iface) const {

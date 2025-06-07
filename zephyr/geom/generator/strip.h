@@ -55,6 +55,9 @@ public:
     /// @brief Создать сетку общего вида
     Grid make() final;
 
+    /// @brief Инициализация SoA-хранилища сетки
+    void initialize(mesh::AmrCells& cells) final;
+
 
     // Далее не самые полезные get-функции
 

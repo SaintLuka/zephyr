@@ -14,7 +14,7 @@ inline double cross(const Vector3d& v1, const Vector3d& v2) {
 }
 
 // Производная по теореме Гаусса--Остроградского
-void InterfaceRecovery::compute_normal(EuCell &cell) const {
+void InterfaceRecovery::compute_normal(QCell &cell) const {
     double uc = cell(a);
 
     if (uc < 1.0e-12 || uc > 1.0 - 1.0e-12) {
@@ -37,13 +37,13 @@ void InterfaceRecovery::compute_normal(EuCell &cell) const {
     cell(n).normalize();
 }
 
-void InterfaceRecovery::compute_normals(EuMesh &mesh) const {
+void InterfaceRecovery::compute_normals(SoaMesh &mesh) const {
     for (auto cell: mesh) {
         compute_normal(cell);
     }
 }
 
-void InterfaceRecovery::find_section(EuCell &cell) const {
+void InterfaceRecovery::find_section(QCell &cell) const {
     if (cell(n).isZero()) {
         cell(p) = cell.center();
     } else {
@@ -52,13 +52,13 @@ void InterfaceRecovery::find_section(EuCell &cell) const {
     }
 }
 
-void InterfaceRecovery::find_sections(EuMesh &mesh) const {
+void InterfaceRecovery::find_sections(SoaMesh &mesh) const {
     for (auto cell: mesh) {
         find_section(cell);
     }
 }
 
-void InterfaceRecovery::adjust_normal(EuCell &cell) const {
+void InterfaceRecovery::adjust_normal(QCell &cell) const {
     if (cell(n).isZero()) {
         return;
     }
@@ -96,13 +96,13 @@ void InterfaceRecovery::adjust_normal(EuCell &cell) const {
     }
 }
 
-void InterfaceRecovery::adjust_normals(EuMesh &mesh) const {
+void InterfaceRecovery::adjust_normals(SoaMesh &mesh) const {
     for (auto cell: mesh) {
         adjust_normal(cell);
     }
 }
 
-void InterfaceRecovery::update(EuMesh &mesh, int smoothing) const {
+void InterfaceRecovery::update(SoaMesh &mesh, int smoothing) const {
     compute_normals(mesh);
     find_sections(mesh);
     for (int i = 0; i < smoothing; ++i) {
@@ -111,7 +111,7 @@ void InterfaceRecovery::update(EuMesh &mesh, int smoothing) const {
     }
 }
 
-AmrStorage InterfaceRecovery::body(EuMesh& mesh) const {
+SoaMesh InterfaceRecovery::body(SoaMesh& mesh) const {
     int count = 0;
     for (auto cell: mesh) {
         if (cell(a) < 1.0e-12) {
@@ -120,7 +120,11 @@ AmrStorage InterfaceRecovery::body(EuMesh& mesh) const {
         ++count;
     }
 
-    AmrStorage cells(count);
+    if (mesh.dim() != 2) {
+        throw std::runtime_error("Interface body 3D");
+    }
+
+    SoaMesh cells(mesh.dim(), mesh.axial());
 
     count = 0;
     for (auto cell: mesh) {
@@ -131,22 +135,22 @@ AmrStorage InterfaceRecovery::body(EuMesh& mesh) const {
         if (cell(a) < 1.0 - 1.0e-12) {
             if (cell(n).isZero()) {
                 double d = 0.5 * std::sqrt(cell(a) * cell.volume());
-                Quad quad = {
+                Polygon poly = {
                         cell(p) + Vector3d{-d, -d, 0.0},
                         cell(p) + Vector3d{+d, -d, 0.0},
-                        cell(p) + Vector3d{-d, +d, 0.0},
                         cell(p) + Vector3d{+d, +d, 0.0},
+                        cell(p) + Vector3d{-d, +d, 0.0},
                 };
-                cells[count] = mesh::AmrCell(quad);
+                cells.push_back(poly);
             }
             else {
                 auto poly = cell.polygon();
                 auto part = poly.clip(cell(p), cell(n));
-                cells[count] = mesh::AmrCell(part);
+                cells.push_back(part);
             }
         }
         else {
-            cells[count] = cell.geom();
+            cells.push_back(cell.polygon());
         }
         ++count;
     }

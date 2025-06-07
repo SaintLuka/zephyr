@@ -113,7 +113,7 @@ inline void apply(AmrCells &cells, const Distributor& op) {
     if (cells.empty())
         return;
 
-    if (cells.dim < 3) {
+    if (cells.dim() < 3) {
         amr2::apply_impl<2>(cells, op);
     }
     else {

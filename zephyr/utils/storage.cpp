@@ -13,6 +13,17 @@ void SoaStorage::resize(size_t new_size) {
     }
 }
 
+void SoaStorage::reserve(size_t new_size) {
+    m_size = new_size;
+    reserve_basic(new_size);
+
+    for (int i = 0; i < m_values2.size(); ++i) {
+        for (auto& vec: m_values2[i]) {
+            vec.reserve(new_size * custom_type_sizeof(i));
+        }
+    }
+}
+
 void SoaStorage::print() const {
     if (empty()) {
         std::cout << "SoaStorage is empty\n";

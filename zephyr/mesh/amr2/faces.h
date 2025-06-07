@@ -5,14 +5,11 @@
 #pragma once
 
 #include <zephyr/mesh/primitives/side.h>
-#include <zephyr/mesh/euler/soa_mesh.h>
+#include <zephyr/mesh/euler/amr_cells.h>
 #include <zephyr/mesh/amr2/common.h>
 
 
 namespace zephyr::mesh::amr2 {
-
-template <int dim>
-using SqMap = std::conditional_t<dim < 3, SqQuad, SqCube>;
 
 /// @brief Устанавливает на новых подгранях значение adjacent и
 /// boundary со старой грани
@@ -24,17 +21,20 @@ void split_face_prepare(index_t iface, AmrFaces& faces) {
     faces.adjacent.rank [iface + side[1]] = faces.adjacent.rank [iface + side];
     faces.adjacent.index[iface + side[1]] = faces.adjacent.index[iface + side];
     faces.adjacent.alien[iface + side[1]] = faces.adjacent.alien[iface + side];
+    faces.adjacent.basic[iface + side[1]] = faces.adjacent.basic[iface + side];
 
     if constexpr (dim > 2) {
         faces.boundary[iface + side[2]] = faces.boundary[iface + side];
         faces.adjacent.rank [iface + side[2]] = faces.adjacent.rank [iface + side];
         faces.adjacent.index[iface + side[2]] = faces.adjacent.index[iface + side];
         faces.adjacent.alien[iface + side[2]] = faces.adjacent.alien[iface + side];
+        faces.adjacent.basic[iface + side[2]] = faces.adjacent.basic[iface + side];
 
         faces.boundary[iface + side[3]] = faces.boundary[iface + side];
         faces.adjacent.rank [iface + side[3]] = faces.adjacent.rank [iface + side];
         faces.adjacent.index[iface + side[3]] = faces.adjacent.index[iface + side];
         faces.adjacent.alien[iface + side[3]] = faces.adjacent.alien[iface + side];
+        faces.adjacent.basic[iface + side[3]] = faces.adjacent.basic[iface + side];
     }
 }
 
@@ -180,7 +180,7 @@ inline void split_face<3>(index_t iface, AmrFaces& faces, const SqCube& vertices
 /// Устанавливает площади и нормали новых граней.
 template <int dim>
 void split_face(index_t ic, AmrCells& cells, int side) {
-    split_face<dim>(cells.face_begin[ic], cells.faces, cells.get_vertices<dim>(ic), side, cells.axial);
+    split_face<dim>(cells.face_begin[ic], cells.faces, cells.mapping<dim>(ic), side, cells.axial());
 }
 
 /// @brief Объединяет подграни в одну грань на стороне side
@@ -189,7 +189,7 @@ void merge_faces(index_t ic, AmrCells& cells) {
     constexpr Side<dim> side{int_side};
 
     const index_t iface  = cells.face_begin[ic];
-    const SqMap<dim> &vertices = cells.get_vertices<dim>(ic);
+    const SqMap<dim> &vertices = cells.mapping<dim>(ic);
 
     cells.faces.vertices[iface + side] = side.sf();
 
@@ -200,7 +200,7 @@ void merge_faces(index_t ic, AmrCells& cells) {
         cells.faces.set_undefined(iface + side[3]);
     }
 
-    setup_face_features<dim>(iface + side, cells.faces, vertices, cells.axial);
+    setup_face_features<dim>(iface + side, cells.faces, vertices, cells.axial());
 }
 
 /// @brief Объединяет подграни в одну грань на стороне side

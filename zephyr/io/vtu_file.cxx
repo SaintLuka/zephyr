@@ -130,10 +130,8 @@ struct Handler {
                 if (hex_only) {
                     return 9; // VTK_QUAD
                 } else {
-                    auto faces = cell.faces();
-
-                    if (faces.complex(Side2D::L) || faces.complex(Side2D::R) ||
-                        faces.complex(Side2D::B) || faces.complex(Side2D::T)) {
+                    if (cell.complex_face(Side2D::L) || cell.complex_face(Side2D::R) ||
+                        cell.complex_face(Side2D::B) || cell.complex_face(Side2D::T)) {
                         return 7; // VTK_POLYGON
                     } else {
                         return 9; // VTK_QUAD
@@ -151,9 +149,7 @@ struct Handler {
 
             if (cell.dim() < 3) {
                 // Двумерный полигон
-                throw std::runtime_error("vtu polygon not implemented");
-                /*
-                index_t n = cell.vertices.count();
+                index_t n = cell.node_count();
 
                 switch (n) {
                     case 3:
@@ -163,7 +159,6 @@ struct Handler {
                     default:
                         return 7; // VTK_POLYGON
                 }
-                 */
             } else {
                 // Многогранник общего вида
                 throw std::runtime_error("vtu polyhedral not implemented");
@@ -260,19 +255,17 @@ struct Handler {
                 if (hex_only) {
                     return 4;
                 } else {
-                    auto faces = cell.faces();
-
                     index_t n = 4;
-                    if (faces.complex(Side2D::LEFT)) {
+                    if (cell.complex_face(Side2D::LEFT)) {
                         n += 1;
                     }
-                    if (faces.complex(Side2D::RIGHT)) {
+                    if (cell.complex_face(Side2D::RIGHT)) {
                         n += 1;
                     }
-                    if (faces.complex(Side2D::BOTTOM)) {
+                    if (cell.complex_face(Side2D::BOTTOM)) {
                         n += 1;
                     }
-                    if (faces.complex(Side2D::TOP)) {
+                    if (cell.complex_face(Side2D::TOP)) {
                         n += 1;
                     }
                     return n;
@@ -284,8 +277,7 @@ struct Handler {
         }
         else {
             // В обратном случае это полигон или обычный трехмерный элемент
-            throw std::runtime_error("Btu Handler:: n_points Not implemented");
-            //return cell.vertices.count();
+            return cell.node_count();
         }
     }
 
@@ -385,7 +377,7 @@ struct Handler {
             // Адаптивная ячейка
             if (cell.dim() < 3) {
                 if (hex_only) {
-                    const SqQuad& vertices = cell.get_vertices<2>();
+                    const SqQuad& vertices = cell.mapping<2>();
                     // Сохраняем как простой четырехугольник (VTK_QUAD)
                     file.write((byte_ptr) vertices.vs<-1, -1>().data(), 3 * sizeof(double));
                     file.write((byte_ptr) vertices.vs<+1, -1>().data(), 3 * sizeof(double));
@@ -394,33 +386,31 @@ struct Handler {
                     return;
                 } else {
                     // Сохраняем как полигон
-                    auto faces = cell.faces();
-
-                    const SqQuad& vertices = cell.get_vertices<2>();
+                    const SqQuad& vertices = cell.mapping<2>();
 
                     file.write((byte_ptr) vertices.vs<-1, -1>().data(), 3 * sizeof(double));
-                    if (faces.complex(Side2D::BOTTOM)) {
+                    if (cell.complex_face(Side2D::BOTTOM)) {
                         file.write((byte_ptr) vertices.vs<0, -1>().data(), 3 * sizeof(double));
                     }
 
                     file.write((byte_ptr) vertices.vs<+1, -1>().data(), 3 * sizeof(double));
-                    if (faces.complex(Side2D::RIGHT)) {
+                    if (cell.complex_face(Side2D::RIGHT)) {
                         file.write((byte_ptr) vertices.vs<+1, 0>().data(), 3 * sizeof(double));
                     }
 
                     file.write((byte_ptr) vertices.vs<+1, +1>().data(), 3 * sizeof(double));
-                    if (faces.complex(Side2D::TOP)) {
+                    if (cell.complex_face(Side2D::TOP)) {
                         file.write((byte_ptr) vertices.vs<0, +1>().data(), 3 * sizeof(double));
                     }
 
                     file.write((byte_ptr) vertices.vs<-1, +1>().data(), 3 * sizeof(double));
-                    if (faces.complex(Side2D::LEFT)) {
+                    if (cell.complex_face(Side2D::LEFT)) {
                         file.write((byte_ptr) vertices.vs<-1, 0>().data(), 3 * sizeof(double));
                     }
                     return;
                 }
             } else {
-                const SqCube& vertices = cell.get_vertices<3>();
+                const SqCube& vertices = cell.mapping<3>();
 
                 // Сохраняем как простой шестигранник (VTK_HEXAHEDRON)
                 file.write((byte_ptr) vertices.vs<-1, -1, -1>().data(), 3 * sizeof(double));
@@ -440,9 +430,8 @@ struct Handler {
             // В данном случае подразумеваем, что вершины пронумерованы
             // в соответствии с соглашениями, принятыми в формате VTK
 
-            throw std::runtime_error("write_points: not implemented");
-            //index_t n_vertices = vertices.count();
-            //file.write((byte_ptr) vertices[0].data(), 3 * n_vertices * sizeof(double));
+            index_t n_vertices = cell.node_count();
+            file.write((byte_ptr) cell.vertices_data(), 3 * n_vertices * sizeof(double));
         }
     }
 

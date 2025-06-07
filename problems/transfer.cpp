@@ -1,12 +1,12 @@
 /// @file transfer.cpp
-/// @brief Решение задачи переноса с CRP решателем.
+/// @brief Решение задачи переноса со сложными решателями.
 
 #include <iostream>
 #include <iomanip>
 
+#include <zephyr/io/pvd_file.h>
 #include <zephyr/geom/vector.h>
 #include <zephyr/geom/generator/rectangle.h>
-#include <zephyr/io/pvd_file.h>
 #include <zephyr/math/solver/transfer.h>
 
 using namespace zephyr::geom;
@@ -21,9 +21,9 @@ class Solver;
 class Body {
 public:
     /// @brief Выставить на сетке начальные условия
-    virtual void initial(Solver& solver, EuMesh& mesh, bool exact) const = 0;
+    virtual void initial(Solver& solver, SoaMesh& mesh, bool exact) const = 0;
 
-    virtual double volume_inside(AmrStorage& body) const = 0;
+    virtual double volume_inside(SoaMesh& body) const = 0;
 
     std::function<bool(const Vector3d& v)> inside;
 
@@ -46,9 +46,9 @@ public:
     BodyLine();
 
     /// @brief Установить начальные данные
-    void initial(Solver& solver, EuMesh& mesh, bool exact) const final;
+    void initial(Solver& solver, SoaMesh& mesh, bool exact) const final;
 
-    double volume_inside(AmrStorage& body) const final;
+    double volume_inside(SoaMesh& body) const final;
 };
 
 /// @brief Начальные условия в виде квадрата
@@ -59,9 +59,9 @@ public:
     BodySquare();
 
     /// @brief Установить начальные данные
-    void initial(Solver& solver, EuMesh& mesh, bool exact) const final;
+    void initial(Solver& solver, SoaMesh& mesh, bool exact) const final;
 
-    double volume_inside(AmrStorage& body) const final;
+    double volume_inside(SoaMesh& body) const final;
 
 };
 
@@ -73,9 +73,9 @@ public:
     BodyDisk();
 
     /// @brief Установить начальные данные
-    void initial(Solver& solver, EuMesh& mesh, bool exact) const final;
+    void initial(Solver& solver, SoaMesh& mesh, bool exact) const final;
 
-    double volume_inside(AmrStorage& body) const final;
+    double volume_inside(SoaMesh& body) const final;
 
 };
 
@@ -94,72 +94,17 @@ public:
     Vector3d velocity(const Vector3d& p) const override;
 
     /// @brief Сетка с точным решением от времени
-    AmrStorage exact(Body& body, double curr_time) const;
+    SoaMesh exact(Body& body, double curr_time) const;
 };
 
-// Получим тип данных
-Solver::State U = Solver::datatype();
-
-// Переменные для сохранения
-double get_u(AmrStorage::Item& cell)  { return cell(U).u1; }
-
-double get_lvl(AmrStorage::Item& cell)  { return cell.level; }
-
-double grad_x(AmrStorage::Item& cell) { return cell(U).du_dx; }
-
-double grad_y(AmrStorage::Item& cell) { return cell(U).du_dy; }
-
-double normal_x(AmrStorage::Item& cell) { return cell(U).n.x(); }
-
-double normal_y(AmrStorage::Item& cell) { return cell(U).n.y(); }
-
-double point_x(AmrStorage::Item& cell) { return cell(U).p.x(); }
-
-double point_y(AmrStorage::Item& cell) { return cell(U).p.y(); }
-
-double get_over(AmrStorage::Item& cell) {
-    auto u = cell(U).u1;
-    return u < 0.0 ? u : (u <= 1.0 ? 0.0 / 0.0 : u - 1.0);
-}
-double get_fr(AmrStorage::Item& cell){
-    return  cell(U).flow_u[0];
-}
-double get_ft(AmrStorage::Item& cell){
-    return  cell(U).flow_u[1];
-}
-double get_fl(AmrStorage::Item& cell){
-    return  cell(U).flow_u[2];
-}
-double get_fb(AmrStorage::Item& cell){
-    return  cell(U).flow_u[3];
-}
-double get_u2(AmrStorage::Item& cell){
-    return  cell(U).u2;
-}
-double get_u3(AmrStorage::Item& cell){
-    return  (cell(U).flow_u[3] + cell(U).flow_u[2]  + cell(U).flow_u[1] + cell(U).flow_u[0] +  cell(U).u1)/5 ;
-}
-double get_close(AmrStorage::Item& cell) {
-    auto u = cell(U).u1;
-    return std::abs(u < 0.5 ? u : 1.0 - u);
-}
-double get_lambda_alpha(AmrStorage::Item& cell) {
-    return cell(U).lambda_alpha;
-}
-double get_lambda_beta(AmrStorage::Item& cell) {
-    return cell(U).lambda_beta;
-}
-double get_sp(AmrStorage::Item& cell){
-    if (cell(U).lambda_beta*cell(U).lambda_alpha >0) return 1; // 1 - usual point
-    return 0; // sonic point
-}
+static Solver::State data;
 
 // Объем тела
-double volume(EuMesh& cells) {
+double volume(SoaMesh& cells, Storable<double> u1) {
     double sum = 0.0;
     for (auto cell: cells) {
         if (cell.volume() >= 0)
-            sum += cell.volume() * cell(U).u1;
+            sum += cell.volume() * cell(u1);
     }
     return sum;
 }
@@ -169,29 +114,6 @@ int main() {
     PvdFile pvd("mesh", "output");
     PvdFile pvd_body("body", "output");
     PvdFile pvd_exact("exact", "output");
-    //PvdFile pvd_scheme("scheme", "output");
-
-    // Переменные для сохранения
-    pvd.variables += {"u",  get_u};
-    pvd.variables += {"u2",  get_u2};
-    pvd.variables += {"u3",  get_u3};
-    /*
-    pvd.variables += {"fr",  get_fr};
-    pvd.variables += {"ft",  get_ft};
-    pvd.variables += {"fl",  get_fl};
-    pvd.variables += {"fb",  get_fb};
-     */
-    pvd.variables += {"lvl", get_lvl};
-    pvd.variables += {"n.x", normal_x};
-    pvd.variables += {"n.y", normal_y};
-    //pvd.variables += {"du/dx", grad_x};
-    //pvd.variables += {"du/dy", grad_y};
-    pvd.variables += {"p.x", point_x};
-    pvd.variables += {"p.y", point_y};
-    pvd.variables += {"over", get_over};
-    pvd.variables += {"close", get_close};
-
-    pvd_body.variables = pvd.variables;
 
     // Использовать полигональную сетку
     bool voronoi = false;
@@ -206,20 +128,42 @@ int main() {
     // Создать решатель
     Solver solver;
     solver.set_CFL(0.13);
-    solver.set_mnt(true);
 
     // Расщепление по направлениям
-    bool splitting = true;
+    bool splitting = false;
 
     // Настройки метода
-    solver.set_method(Solver::Method::CRP_N1);
+    solver.set_method(Solver::Method::CRP_V3);
 
     // Настройки теста
-    BodySquare body;
+    BodyDisk body;
     solver.test = Solver::Test::Translation;
 
     // Создать сетку
-    EuMesh mesh(rect, U);
+    SoaMesh mesh(rect);
+
+    // Добавить типы
+    solver.add_types(mesh);
+
+    data = solver.data;
+
+
+    // Переменные для сохранения
+    pvd.variables = {"level"};
+    pvd.variables.append("u", data.u1);
+    pvd.variables.append("u2", data.u2);
+    //pvd.variables.append("n", data.n);
+    //pvd.variables.append("p", data.p);
+    //pvd.variables += {"du/dx", grad_x};
+    //pvd.variables += {"du/dy", grad_y};
+    pvd.variables += {"over", [data](QCell& cell) -> double {
+        double u = cell(data.u1);
+        return u < 0.0 ? u : (u <= 1.0 ? 0.0 / 0.0 : u - 1.0);
+    }};
+    pvd.variables += {"close", [data](QCell& cell) -> double {
+        double u = cell(data.u1);
+        return std::abs(u < 0.5 ? u : 1.0 - u);
+    }};
 
     // Настраиваем адаптацию
     mesh.set_max_level(0);
@@ -232,9 +176,9 @@ int main() {
         solver.set_flags(mesh);
         mesh.refine();
     }
+
     solver.update_interface(mesh);
-    solver.prepare(mesh);
-    double init_volume = volume(mesh);
+    double init_volume = volume(mesh, data.u1);
 
     int n_step = 0;
     double end_time = 1.0;
@@ -242,48 +186,44 @@ int main() {
     double write_freq = end_time / 100;
     double write_next = 0.0;
 
-    while (n_step < 10000) {
+    while (n_step < 1000) {
         if (curr_time >= write_next || curr_time >= end_time) {
             std::cout << "\tStep: " << std::setw(6) << n_step << ";"
                       << "\tTime: " << std::setw(8) << std::setprecision(3) << std::fixed
                       << curr_time << ";";
 
-            double curr_volume = volume(mesh);
+            double curr_volume = volume(mesh, data.u1);
             std::cout << "\tLoss: " << std::setw(12) << std::setprecision(3) << std::scientific
                       << (curr_volume - init_volume) / (init_volume) << "\n";
 
-            pvd.save(mesh.locals(), curr_time);
+            pvd.save(mesh, curr_time);
 
-            AmrStorage crop = solver.body(mesh);
+            SoaMesh crop = solver.body(mesh);
             pvd_body.save(crop, curr_time);
 
-            AmrStorage exact = solver.exact(body, curr_time);
+            SoaMesh exact = solver.exact(body, curr_time);
             pvd_exact.save(exact, curr_time);
-
-            //AmrStorage scheme = solver.scheme(mesh);
-            //pvd_scheme.save(scheme, curr_time);
 
             write_next += write_freq;
 
             if (curr_time >= end_time) {
-                double vi = body.volume_inside(crop);
+                //double vi = body.volume_inside(crop);
                 std::cout << std::setprecision(3) << std::fixed;
-                std::cout << "  Volume loss: " << 100 * (1.0 - vi / init_volume) << "%\n";
-                pvd_body.save(crop, curr_time + 1.0e-13);
+                //std::cout << "  Volume loss: " << 100 * (1.0 - vi / init_volume) << "%\n";
+                //pvd_body.save(crop, curr_time + 1.0e-13);
                 break;
             }
         }
 
         // Определить шаг
-        // double dt = solver.compute_dt(mesh); // для переменной скорости
-        double dt = solver.get_dt();            // для постоянной скорости
+        double dt = solver.compute_dt(mesh);
         if (curr_time + dt > end_time) {
             dt = end_time - curr_time;
         }
         solver.set_dt(dt);
 
         // Шаг интегрирования
-        if (splitting && solver.method() != Solver::Method::KABARE) {
+        if (splitting) {
             solver.update(mesh, Direction::X);
             solver.update(mesh, Direction::Y);
         }
@@ -316,30 +256,30 @@ BodyLine::BodyLine() {
     };
 }
 
-void BodyLine::initial(Solver& solver, EuMesh& mesh, bool exact) const {
+void BodyLine::initial(Solver& solver, SoaMesh& mesh, bool exact) const {
     for (auto cell: mesh) {
         if (!exact) {
-            cell(U).u1 = inside(cell.center());
+            cell(data.u1) = inside(cell.center());
         }
         else {
             double vol_frac = cell.approx_vol_fraction(inside);
             if (0.0 < vol_frac && vol_frac < 1.0) {
                 vol_frac = cell.volume_fraction(inside, 10000);
             }
-            cell(U).u1 = vol_frac;
+            cell(data.u1) = vol_frac;
         }
-        cell(U).u2 = 0.0;
+        cell(data.u2) = 0.0;
     }
 }
 
-double BodyLine::volume_inside(AmrStorage &body) const {
+double BodyLine::volume_inside(SoaMesh &body) const {
     double res = 0.0;
     for (auto& cell: body) {
         double a = cell.approx_vol_fraction(inside);
         if (0.0 < a && a < 1.0) {
             a = cell.volume_fraction(inside, 1000);
         }
-        res += a * cell.volume;
+        res += a * cell.volume();
     }
     return res;
 }
@@ -363,58 +303,31 @@ BodySquare::BodySquare() {
     };
 }
 
-void BodySquare::initial(Solver& solver, EuMesh& mesh, bool exact) const {
+void BodySquare::initial(Solver& solver, SoaMesh& mesh, bool exact) const {
     for (auto cell: mesh) {
         if (!exact) {
-            cell(U).u1 = inside(cell.center());
+            cell(data.u1) = inside(cell.center());
         }
         else {
             double vol_frac = cell.approx_vol_fraction(inside);
             if (0.0 < vol_frac && vol_frac < 1.0) {
                 vol_frac = cell.volume_fraction(inside, 10000);
             }
-            cell(U).u1 = vol_frac;
+            cell(data.u1) = vol_frac;
         }
-        cell(U).u2 = 0.0;
-    }
-
-    if (solver.method() != Solver::Method::KABARE) {
-        return;
-    }
-
-    for (int i = 0; i < mesh.nx(); ++i) {
-        for (int j = 0; j < mesh.ny(); ++j) {
-            auto cell = mesh(i, j);
-
-            for (int k = 0; k < 4; k++) {
-                cell(U).flow_u[k] = cell(U).u1;
-                cell(U).flow_u_tmp[k] = cell(U).flow_u[k];
-            }
-
-            if (solver.velocity(cell.vs<+1, 0>()).x() > 0)  cell(U).flow_u[0] = cell(U).flow_u_tmp[0] =  cell(U).u1/solver.velocity(cell.vs<+1, 0>()).x();
-            else if (solver.velocity(cell.vs<+1, 0>()).x() < 0)  cell(U).flow_u[0] = cell(U).flow_u_tmp[0] =  mesh(i+1,j).data(U).u1/solver.velocity(cell.vs<+1, 0>()).x();
-
-            if (solver.velocity(cell.vs<-1, 0>()).x() > 0)  cell(U).flow_u[2] = cell(U).flow_u_tmp[2] =  mesh(i-1,j).data(U).u1/solver.velocity(cell.vs<-1, 0>()).x();
-            else if (solver.velocity(cell.vs<+1, 0>()).x() < 0)  cell(U).flow_u[2] = cell(U).flow_u_tmp[2] =   cell(U).u1/solver.velocity(cell.vs<+1, 0>()).x();
-
-            if (solver.velocity(cell.vs<0, 1>()).y() > 0)  cell(U).flow_u[1] = cell(U).flow_u_tmp[1] =  cell(U).u1/solver.velocity(cell.vs<0, 1>()).y();
-            else if (solver.velocity(cell.vs<0, 1>()).y() < 0)  cell(U).flow_u[1] = cell(U).flow_u_tmp[1] =  mesh(i,j+1).data(U).u1/solver.velocity(cell.vs<0, 1>()).y();
-
-            if (solver.velocity(cell.vs<0, -1>()).y() > 0)  cell(U).flow_u[3] = cell(U).flow_u_tmp[3] =  mesh(i,j-1).data(U).u1/solver.velocity(cell.vs<0, -1>()).y();
-            else if (solver.velocity(cell.vs<0, 1>()).y() < 0)  cell(U).flow_u[3] = cell(U).flow_u_tmp[3] =  cell(U).u1/solver.velocity(cell.vs<0, 1>()).y();
-        }
+        cell(data.u2) = 0.0;
     }
 }
 
-double BodySquare::volume_inside(AmrStorage &body) const {
+double BodySquare::volume_inside(SoaMesh &body) const {
     double res = 0.0;
     for (auto& cell: body) {
         double vol = cell.approx_vol_fraction(inside);
         if (0.0 < vol && vol < 1.0) {
             vol = cell.volume_fraction(inside, 1000);
         }
-        cell(U).u1 = vol;
-        vol *= cell.volume;
+        cell(data.u1) = vol;
+        vol *= cell.volume();
         res += vol;
     }
     return res;
@@ -434,47 +347,20 @@ BodyDisk::BodyDisk() {
     }
 }
 
-void BodyDisk::initial(Solver& solver, EuMesh& mesh, bool exact) const {
+void BodyDisk::initial(Solver& solver, SoaMesh& mesh, bool exact) const {
     for (auto cell: mesh) {
         auto poly = cell.polygon();
-        cell(U).u1 = poly.disk_clip_area(C, R) / cell.volume();
-        cell(U).u2 = 0.0;
-    }
-
-    if (solver.method() != Solver::Method::KABARE) {
-        return;
-    }
-
-    for (int i = 0; i < mesh.nx(); ++i) {
-        for (int j = 0; j < mesh.ny(); ++j) {
-            auto cell = mesh(i, j);
-
-            for (int k = 0; k < 4; k++) {
-                cell(U).flow_u[k] = cell(U).u1;
-                cell(U).flow_u_tmp[k] = cell(U).flow_u[k];
-            }
-
-            if (solver.velocity(cell.vs<+1, 0>()).x() > 0)  cell(U).flow_u[0] = cell(U).flow_u_tmp[0] =  cell(U).u1;
-            else if (solver.velocity(cell.vs<+1, 0>()).x() < 0)  cell(U).flow_u[0] = cell(U).flow_u_tmp[0] =  mesh(i+1,j).data(U).u1;
-
-            if (solver.velocity(cell.vs<-1, 0>()).x() > 0)  cell(U).flow_u[2] = cell(U).flow_u_tmp[2] =  mesh(i-1,j).data(U).u1;
-            else if (solver.velocity(cell.vs<+1, 0>()).x() < 0)  cell(U).flow_u[2] = cell(U).flow_u_tmp[2] =   cell(U).u1;
-
-            if (solver.velocity(cell.vs<0, 1>()).y() > 0)  cell(U).flow_u[1] = cell(U).flow_u_tmp[1] =  cell(U).u1;
-            else if (solver.velocity(cell.vs<0, 1>()).y() < 0)  cell(U).flow_u[1] = cell(U).flow_u_tmp[1] =  mesh(i,j+1).data(U).u1;
-
-            if (solver.velocity(cell.vs<0, -1>()).y() > 0)  cell(U).flow_u[3] = cell(U).flow_u_tmp[3] =  mesh(i,j-1).data(U).u1;
-            else if (solver.velocity(cell.vs<0, 1>()).y() < 0)  cell(U).flow_u[3] = cell(U).flow_u_tmp[3] =  cell(U).u1;
-        }
+        cell(data.u1) = poly.disk_clip_area(C, R) / cell.volume();
+        cell(data.u2) = 0.0;
     }
 }
 
-double BodyDisk::volume_inside(AmrStorage &body) const {
+double BodyDisk::volume_inside(SoaMesh &body) const {
     double res = 0.0;
     for (auto& cell: body) {
         auto poly = cell.polygon();
         double vol = poly.disk_clip_area(C, R);
-        cell(U).u1 = vol / cell.volume;
+        cell(data.u1) = vol / cell.volume();
         res += vol;
     }
     return res;
@@ -495,7 +381,7 @@ Vector3d Solver::velocity(const Vector3d& p) const {
     }
 }
 
-AmrStorage Solver::exact(Body& body, double curr_time) const {
+SoaMesh Solver::exact(Body& body, double curr_time) const {
     using zephyr::geom::Quad;
     using zephyr::mesh::AmrCell;
 
@@ -528,16 +414,11 @@ AmrStorage Solver::exact(Body& body, double curr_time) const {
         body.C.z() = 0.0;
     }
 
-    AmrStorage cells(vs.size());
+    SoaMesh cells(2, false);
     for (size_t i = 0; i < vs.size(); ++i) {
         size_t j = (i + 1) % vs.size();
-        Quad quad = {
-                vs[i], vs[j], vs[i], vs[j]
-        };
-        AmrCell cell(quad);
-        cells[i] = cell;
+        Line line = {vs[i], vs[j]};
+        cells.push_back(line);
     }
-
     return cells;
-
 }

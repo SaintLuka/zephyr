@@ -22,7 +22,7 @@ SoaChildren select_children(AmrCells& locals, int ic) {
     auto sibs = get_siblings<dim>(locals, ic);
 
     // Дочерние ячейки, упорядоченные по локальному z-индексу
-    SoaChildren children(locals);
+    SoaChildren children(&locals);
     children.index[0] = ic;
     for (auto sib: sibs) {
         scrutiny_check(sib < locals.size(), "Vicinity: Sibling index out of range")
@@ -104,9 +104,9 @@ void make_parent(AmrCells& locals, AmrCells& aliens, int rank, SoaChildren& chil
     const auto children_by_side = get_children_by_side<dim>();
 
     if constexpr (dim == 2 && axial) {
-        locals.add_cell(ip, parent_vs<dim>(locals, children), axial);
+        locals.set_cell(ip, parent_vs<dim>(locals, children), axial);
     } else {
-        locals.add_cell(ip, parent_vs<dim>(locals, children));
+        locals.set_cell(ip, parent_vs<dim>(locals, children));
     }
 
     auto& adj = locals.faces.adjacent;
@@ -201,6 +201,7 @@ void make_parent(AmrCells& locals, AmrCells& aliens, int rank, SoaChildren& chil
             adj.rank[pface + side] = rank;
             adj.alien[pface + side] = some_neib_owner;
             adj.index[pface + side] = some_neib_local;
+            adj.basic[pface + side] = ip;
 
             // Обнуляем неактивные подграни
             for (int i = 1; i < FpF(dim); ++i) {
@@ -212,7 +213,7 @@ void make_parent(AmrCells& locals, AmrCells& aliens, int rank, SoaChildren& chil
         // Если мы здесь, то сторона side от родителя должна адаптироваться
         // Далее потребуется связать грани
 
-        split_face<dim>(pface, locals.faces, locals.get_vertices<dim>(ip), side, axial);
+        split_face<dim>(pface, locals.faces, locals.mapping<dim>(ip), side, axial);
 
         // Центры подграней родительской ячейки
         std::array<Vector3d, FpF(dim)> pfaces;
@@ -252,6 +253,7 @@ void make_parent(AmrCells& locals, AmrCells& aliens, int rank, SoaChildren& chil
                     adj.rank [pface + side[j]] = adj.rank[ch_face];
                     adj.index[pface + side[j]] = adj.index[ch_face];
                     adj.alien[pface + side[j]] = adj.alien[ch_face];
+                    adj.basic[pface + side[j]] = ip;
                     break;
                 }
             }
@@ -330,7 +332,7 @@ void coarse_cell(AmrCells& locals, AmrCells& aliens, index_t ich, int rank, cons
     auto children = select_children<dim>(locals, ich);
 
     index_t ip = locals.next[ich];
-    if (dim == 2 && locals.axial) {
+    if (dim == 2 && locals.axial()) {
         make_parent<dim, true>(locals, aliens, rank, children, ip);
     }
     else {

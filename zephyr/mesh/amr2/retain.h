@@ -22,7 +22,6 @@ template<int dim>
 void retain_cell(AmrCells &locals, AmrCells& aliens, index_t ic) {
     // Ячейка не требует разбиения, необходимо пройти по граням,
     // возможно, необходимо разбить грань или собрать
-    auto rank = locals.rank[ic];
     auto lvl_c = locals.level[ic];
     auto& adj = locals.faces.adjacent;
 
@@ -114,6 +113,7 @@ void retain_cell(AmrCells &locals, AmrCells& aliens, index_t ic) {
                     adj.rank [locals.face_begin[ic] + s] = adj.rank[iface];
                     adj.index[locals.face_begin[ic] + s] = adj.index[iface];
                     adj.alien[locals.face_begin[ic] + s] = adj.alien[iface];
+                    adj.basic[locals.face_begin[ic] + s] = ic;
                 }
                 merge_faces<dim>(ic, locals, Side<dim>(side));
             }

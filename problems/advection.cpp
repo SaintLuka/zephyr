@@ -24,13 +24,9 @@ Vector3d velocity(const Vector3d& c) {
     return { 1.0, 0.3 + 0.3*std::sin(4 * M_PI * c.x()), 0.0 };
 }
 
-// Данные для хранения на сетке
-static Storable<double> u1;
-static Storable<double> u2;
-
 int main() {
     // Геометрия области
-    Rectangle rect(0.0, 1.0, 0.0, 0.6);
+    Rectangle rect(0.0, 1.0, 0.0, 0.6, true);
     rect.set_nx(200);
     rect.set_boundaries({
         .left   = Boundary::PERIODIC, .right = Boundary::PERIODIC,
@@ -40,14 +36,14 @@ int main() {
     SoaMesh mesh(rect);
 
     // Данные для хранения на сетке
-    u1 = mesh.add<double>("u1");
-    u2 = mesh.add<double>("u2");
+    auto u1 = mesh.add<double>("u1");
+    auto u2 = mesh.add<double>("u2");
 
     // Файл для записи
     PvdFile pvd("mesh", "output");
 
     // Переменные для сохранения
-    pvd.variables += {"u",  [&u1](QCell cell) -> double { return cell(u1); }};
+    pvd.variables.append("u", u1);
     pvd.variables += {"vx", [](QCell cell) -> double { return velocity(cell.center()).x(); } };
     pvd.variables += {"vy", [](QCell cell) -> double { return velocity(cell.center()).y(); } };
 

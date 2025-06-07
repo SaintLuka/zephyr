@@ -95,7 +95,7 @@ inline void check_flags(AmrCells& locals, AmrCells& aliens, int max_level) {
         }
 
         if (locals.flag[ic] < 0) {
-            bool can = locals.dim < 3 ?
+            bool can = locals.dim() < 3 ?
                        can_coarse<2>(locals, ic) :
                        can_coarse<3>(locals, ic);
 

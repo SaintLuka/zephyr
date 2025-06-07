@@ -1,269 +1,735 @@
+#include <iostream>
+
+#include <zephyr/geom/geom.h>
+#include <zephyr/math/funcs.h>
 #include <zephyr/mesh/euler/amr_cells.h>
-#include <zephyr/mesh/euler/soa_mesh.h>
+
+using namespace zephyr::geom;
 
 namespace zephyr::mesh {
 
+AmrCells::AmrCells(int dim, bool adaptive, bool axial)
+        : m_size(0) {
 
+    // На единицу больше числа ячеек
+    face_begin = {0};
+    node_begin = {0};
 
-CellIt AmrCells::begin() { return {this, 0}; }
-
-CellIt AmrCells::end() { return {this, size()}; }
-
-QCell AmrCells::operator[](index_t cell_idx) {
-    return {this, cell_idx};
+    set_dimension(dim);
+    set_adaptive(adaptive);
+    set_axial(axial);
+    set_linear(true);
 }
 
+void AmrCells::set_dimension(int dim) {
+    if (!empty() && dim != m_dim) {
+        throw std::runtime_error("Can't change dimension. Mesh is not empty.");
+    }
 
-void AmrCells::initialize(const Strip& gen) {
-    bool x_period = gen.periodic_along_x();
+    if (dim == 2) {
+        m_dim = 2;
+    }
+    else if (dim == 3) {
+        m_dim = 3;
+        m_axial = false;
+        m_linear = true;
+    }
+    else {
+        throw std::runtime_error("Mesh dimension should be equal 2 or 3");
+    }
+}
 
-    double xmin = gen.x_min();
-    double ymin = gen.y_min();
-    double xmax = gen.x_max();
-    double ymax = gen.y_max();
+void AmrCells::set_adaptive(bool adaptive) {
+    if (!empty() && adaptive != m_adaptive) {
+        throw std::runtime_error("Can't change 'adaptive'. Mesh is not empty.");
+    }
 
-    index_t nx = gen.nx();
-    index_t ny = 1;
+    m_adaptive = adaptive;
+}
 
-    double hx = (xmax - xmin) / nx;
-    double hy = (ymax - ymin) / ny;
+void AmrCells::set_axial(bool axial) {
+    if (!empty() && axial != m_axial) {
+        throw std::runtime_error("Can't change symmetry. Mesh is not empty.");
+    }
 
-    auto get_vertex = [=](index_t i, index_t j) -> Vector3d {
-        return {
-                xmin + ((xmax - xmin) * i) / nx,
-                ymin + ((ymax - ymin) * j) / ny,
-                0.0
-        };
-    };
+    m_axial = axial;
+    if (axial) {
+        m_dim = 2;
+    }
+}
 
-    auto neib_index = [=](index_t i, Side2D side) -> index_t {
-        if (side == Side2D::LEFT) {
-            return i == 0 && !x_period ?  i : (i - 1 + nx) % nx;
+void AmrCells::set_linear(bool linear) {
+    m_linear = linear;
+}
+
+int AmrCells::face_count(index_t ic) const {
+    if (m_adaptive) {
+        int count = 0;
+        for (index_t iface: faces_range(ic)) {
+            if (faces.is_actual(iface)) {
+                ++count;
+            }
         }
-        else if (side == Side2D::RIGHT) {
-            return i == nx - 1 && !x_period ? i : (i + 1 + nx) % nx;
+        return count;
+    }
+    else {
+        return max_face_count(ic);
+    }
+}
+
+double AmrCells::incircle_diameter(index_t ic) const {
+    if (m_adaptive) {
+        if (m_dim == 2) {
+            const SqQuad &vertices = mapping<2>(ic);
+            return std::sqrt(std::min(
+                    (vertices.vs<+1, 0>() - vertices.vs<-1, 0>()).squaredNorm(),
+                    (vertices.vs<0, +1>() - vertices.vs<0, -1>()).squaredNorm()));
+        } else {
+            const SqCube &vertices = mapping<3>(ic);
+            return std::sqrt(math::min(
+                    (vertices.vs<+1, 0, 0>() - vertices.vs<-1, 0, 0>()).squaredNorm(),
+                    (vertices.vs<0, +1, 0>() - vertices.vs<0, -1, 0>()).squaredNorm(),
+                    (vertices.vs<0, 0, +1>() - vertices.vs<0, 0, -1>()).squaredNorm()));
+        }
+    } else {
+        assert(m_dim == 2);
+        int n = node_count(ic);
+        // Диаметр описаной окружности вокруг правильного многоугольника
+        // с площадью volume.
+        return 2.0 * std::sqrt(volume[ic] / (n * std::tan(M_PI / n)));
+    }
+}
+
+Polygon AmrCells::polygon(index_t ic) const {
+    if (m_dim > 2) {
+        throw std::runtime_error("AmrCell::polygon() error #1");
+    }
+
+    if (m_adaptive) {
+        Polygon poly;
+        poly.reserve(8);
+
+        const SqQuad& vertices = mapping<2>(ic);
+
+        poly += vertices.vs<-1, -1>();
+        if (!m_linear && complex_face(ic, Side2D::BOTTOM)) {
+            poly += vertices.vs<0, -1>();
+        }
+
+        poly += vertices.vs<+1, -1>();
+        if (!m_linear && complex_face(ic, Side2D::RIGHT)) {
+            poly += vertices.vs<+1, 0>();
+        }
+
+        poly += vertices.vs<+1, +1>();
+        if (!m_linear && complex_face(ic, Side2D::TOP)) {
+            poly += vertices.vs<0, +1>();
+        }
+
+        poly += vertices.vs<-1, +1>();
+        if (!m_linear && complex_face(ic, Side2D::LEFT)) {
+            poly += vertices.vs<-1, 0>();
+        }
+
+        return poly;
+    } else {
+        return Polygon(vertices_data(ic), node_count(ic));
+    }
+}
+
+double AmrCells::approx_vol_fraction(index_t ic, const std::function<double(const Vector3d &)> &inside) const {
+    if (m_dim < 3) {
+        if (m_adaptive) {
+            const SqQuad& vertices = mapping<2>(ic);
+
+            int sum = 0;
+            // Угловые точки, вес = 1
+            if (inside(vertices.vs<-1, -1>())) sum += 1;
+            if (inside(vertices.vs<-1, +1>())) sum += 1;
+            if (inside(vertices.vs<+1, +1>())) sum += 1;
+            if (inside(vertices.vs<+1, -1>())) sum += 1;
+
+            // Ребра, вес = 2
+            if (inside(vertices.vs<0, -1>())) sum += 2;
+            if (inside(vertices.vs<0, +1>())) sum += 2;
+            if (inside(vertices.vs<-1, 0>())) sum += 2;
+            if (inside(vertices.vs<+1, 0>())) sum += 2;
+
+            // Центр, вес = 3
+            if (inside(vertices.vs<0, 0>())) sum += 4;
+
+            if (sum == 0) {
+                return 0.0;
+            }
+            else if (sum == 16) {
+                return 1.0;
+            }
+            else {
+                return 0.0625 * sum; // sum / 16.0
+            }
         }
         else {
-            throw std::runtime_error("Strange side #153");
+            // Не адаптивная ячейка
+            int count = node_count(ic);
+
+            int sum = 0;
+            for (auto i: nodes_range(ic)) {
+                // Вершины многоугольника, вес 2
+                if (inside(verts[i])) {
+                    sum += 2;
+                }
+            }
+            // Центр многоугольника, вес равен числу вершин
+            if (inside(center[ic])) {
+                sum += count;
+            }
+            return sum < 1 ? 0.0 : sum / (3.0 * count);
         }
-    };
+    }
+    else {
+        // Трехмерная ячейка
+        if (m_adaptive) {
+            const SqCube& vertices = mapping<3>(ic);
 
-    m_size = nx * ny;
+            int sum = 0;
+            // Угловые точки, вес = 1
+            if (inside(vertices.vs<-1, -1, -1>())) sum += 1;
+            if (inside(vertices.vs<+1, -1, -1>())) sum += 1;
+            if (inside(vertices.vs<-1, +1, -1>())) sum += 1;
+            if (inside(vertices.vs<+1, +1, -1>())) sum += 1;
+            if (inside(vertices.vs<-1, -1, +1>())) sum += 1;
+            if (inside(vertices.vs<+1, -1, +1>())) sum += 1;
+            if (inside(vertices.vs<-1, +1, +1>())) sum += 1;
+            if (inside(vertices.vs<+1, +1, +1>())) sum += 1;
 
-    dim = 2;
-    adaptive = true;
+            // Ребра, вес = 2
+            if (inside(vertices.vs<-1, -1, 0>())) sum += 2;
+            if (inside(vertices.vs<+1, -1, 0>())) sum += 2;
+            if (inside(vertices.vs<-1, +1, 0>())) sum += 2;
+            if (inside(vertices.vs<+1, +1, 0>())) sum += 2;
+            if (inside(vertices.vs<-1, 0, -1>())) sum += 2;
+            if (inside(vertices.vs<+1, 0, -1>())) sum += 2;
+            if (inside(vertices.vs<-1, 0, +1>())) sum += 2;
+            if (inside(vertices.vs<+1, 0, +1>())) sum += 2;
+            if (inside(vertices.vs<0, -1, -1>())) sum += 2;
+            if (inside(vertices.vs<0, +1, -1>())) sum += 2;
+            if (inside(vertices.vs<0, -1, +1>())) sum += 2;
+            if (inside(vertices.vs<0, +1, +1>())) sum += 2;
 
-    linear = true;
-    axial = false;
+            // Грани, вес = 4
+            if (inside(vertices.vs<-1, 0, 0>())) sum += 4;
+            if (inside(vertices.vs<+1, 0, 0>())) sum += 4;
+            if (inside(vertices.vs<0, -1, 0>())) sum += 4;
+            if (inside(vertices.vs<0, +1, 0>())) sum += 4;
+            if (inside(vertices.vs<0, 0, -1>())) sum += 4;
+            if (inside(vertices.vs<0, 0, +1>())) sum += 4;
 
-    int n_faces = 8;
-    int n_nodes = 9;
+            // Центр, вес = 8
+            if (inside(vertices.vs<0, 0, 0>())) sum += 8;
 
-    resize(m_size);
-
-    for (index_t ic = 0; ic < m_size; ++ic) {
-        next[ic] = ic;
-        rank[ic] = 0;
-        index[ic] = ic;
-
-        flag[ic] = 0;
-        level[ic] = 0;
-        b_idx[ic] = ic;
-        z_idx[ic] = 0;
-
-        SqQuad quad(
-                get_vertex(ic, 0),
-                get_vertex(ic + 1, 0),
-                get_vertex(ic, 1),
-                get_vertex(ic + 1, 1));
-
-        center[ic] = quad.vs<0, 0>();
-        volume[ic] = hx * hy;
-        volume_alt[ic] = NAN;
-        face_begin[ic] = ic * n_faces;
-        node_begin[ic] = ic * n_nodes;
-        face_begin[ic + 1] = face_begin[ic] + n_faces;
-        node_begin[ic + 1] = face_begin[ic] + n_nodes;
-
-        // INIT FACES
-        for (index_t iface: faces_range(ic)) {
-            faces.set_undefined(iface);
-            faces.area_alt[iface] = NAN;
+            if (sum == 0) {
+                return 0.0;
+            }
+            else if (sum == 64) {
+                return 1.0;
+            }
+            else {
+                return 0.015625 * sum; // sum / 64.0
+            }
         }
+        else {
+            throw std::runtime_error("Approx volume fraction error #1");
+        };
+    }
+}
 
-        index_t iface = ic * n_faces;
-
-        faces.boundary[iface + Side2D::L] = ic > 0 ? Boundary::ORDINARY : gen.bounds().left;
-        faces.boundary[iface + Side2D::R] = ic < nx - 1 ? Boundary::ORDINARY : gen.bounds().right;
-
-        for (auto side: {Side2D::LEFT, Side2D::RIGHT}) {
-            faces.adjacent.rank[iface + side] = 0;
-            faces.adjacent.index[iface + side] = neib_index(ic, side);
-            faces.adjacent.alien[iface + side] = -1;
-            faces.vertices[iface + side].fill(-1);
+double AmrCells::volume_fraction(index_t ic, const std::function<double(const Vector3d &)> &inside, int n_points) const {
+    if (m_dim < 3) {
+        if (m_adaptive) {
+            if (m_linear) {
+                return mapping<2>(ic).reduce().volume_fraction(inside, n_points);
+            }
+            else {
+                return mapping<2>(ic).volume_fraction(inside, n_points);
+            }
         }
+        else {
+            // Полигон
+            int count = node_count(ic);
+            int N = n_points / count + 1;
 
-        faces.normal[iface + Side2D::L] = -Vector3d::UnitX();
-        faces.normal[iface + Side2D::R] =  Vector3d::UnitX();
-        faces.normal[iface + Side2D::B] = -Vector3d::UnitY();
-        faces.normal[iface + Side2D::T] =  Vector3d::UnitY();
+            double res = 0.0;
+            for (int i = 0; i < count; ++i) {
+                int j = (i + 1) % count;
 
-        faces.center[iface + Side2D::L] = quad.vs<-1, 0>();
-        faces.center[iface + Side2D::R] = quad.vs<+1, 0>();
-        faces.center[iface + Side2D::B] = quad.vs<0, -1>();
-        faces.center[iface + Side2D::T] = quad.vs<0, +1>();
+                index_t I = node_begin[ic] + i;
+                index_t J = node_begin[ic] + j;
 
-        faces.area[iface + Side2D::L] = hy;
-        faces.area[iface + Side2D::R] = hy;
-        faces.area[iface + Side2D::B] = hx;
-        faces.area[iface + Side2D::T] = hx;
+                Triangle tri(center[ic], verts[I], verts[J]);
+                res += tri.volume_fraction(inside, N) * tri.area();
+            }
 
-        faces.vertices[iface + Side2D::L] = Side2D::L.sf();
-        faces.vertices[iface + Side2D::R] = Side2D::R.sf();
-        faces.vertices[iface + Side2D::B] = Side2D::B.sf();
-        faces.vertices[iface + Side2D::T] = Side2D::T.sf();
+            return res / volume[ic];
+        }
+    }
+    else {
+        // Трехмерная ячейка
+        throw std::runtime_error("AmrCell::volume_fraction #1");
+    }
+}
 
-        for (index_t jn = 0; jn < n_nodes; ++jn) {
-            verts[ic * n_nodes + jn] = quad[jn];
+bool AmrCells::const_function(index_t ic, const std::function<double(const Vector3d&)>& func) const {
+    double value = func(center[ic]);
+    if (m_dim < 3) {
+        if (m_adaptive) {
+            const SqQuad& vertices = mapping<2>(ic);
+
+            // Угловые точки
+            if (func(vertices.vs<-1, -1>()) != value) { return false; }
+            if (func(vertices.vs<-1, +1>()) != value) { return false; }
+            if (func(vertices.vs<+1, +1>()) != value) { return false; }
+            if (func(vertices.vs<+1, -1>()) != value) { return false; }
+
+            // Ребра
+            if (func(vertices.vs<0, -1>()) != value) { return false; }
+            if (func(vertices.vs<0, +1>()) != value) { return false; }
+            if (func(vertices.vs<-1, 0>()) != value) { return false; }
+            if (func(vertices.vs<+1, 0>()) != value) { return false; }
+
+            // Центр
+            return func(vertices.vs<0, 0>()) == value;
+        }
+        else {
+            // Не адаптивная ячейка
+            for (int i: nodes_range(ic)) {
+                if (func(verts[i]) != value) {
+                    return false;
+                }
+            }
+            return true;
+        }
+    }
+    else {
+        // Трехмерная ячейка
+        throw std::runtime_error("AmrCell::const_function #1");
+    }
+}
+
+double AmrCells::integrate_low(index_t ic, const std::function<double(const Vector3d&)>& func, int n_points) const {
+    if (m_dim < 3) {
+        if (m_adaptive) {
+            if (m_linear) {
+                return mapping<2>(ic).reduce().integrate_low(func, n_points);
+            }
+            else {
+                return mapping<2>(ic).integrate_low(func, n_points);
+            }
+        }
+        else {
+            // Полигон
+            int count = node_count(ic);
+            int N = n_points / count + 1;
+
+            double sum = 0.0;
+            for (int i = 0; i < count; ++i) {
+                int j = (i + 1) % count;
+
+                index_t I = node_begin[ic] + i;
+                index_t J = node_begin[ic] + j;
+
+                Triangle tri(center[ic], verts[I], verts[J]);
+                sum += tri.integrate_low(func, N) * tri.area();
+            }
+
+            return sum;
+        }
+    }
+    else {
+        // Трехмерная ячейка
+        throw std::runtime_error("AmrCell::volume_fraction #1");
+    }
+}
+
+void AmrCells::move_item(index_t ic) {
+    int jc = next[ic];
+
+    rank[jc] = rank[ic];
+    next[jc] = jc;
+    index[jc] = jc;
+
+    flag[jc] = flag[ic];
+    level[jc] = level[ic];
+    b_idx[jc] = b_idx[ic];
+    z_idx[jc] = z_idx[ic];
+
+    center[jc] = center[ic];
+    volume[jc] = volume[ic];
+
+    volume_alt[jc] = volume_alt[ic];
+
+    for (index_t i = 0; i < face_begin[ic + 1] - face_begin[ic]; ++i) {
+        index_t iface = face_begin[ic] + i;
+        index_t jface = face_begin[jc] + i;
+
+        faces.boundary[jface] = faces.boundary[iface];
+        faces.normal  [jface] = faces.normal  [iface];
+        faces.center  [jface] = faces.center  [iface];
+        faces.area    [jface] = faces.area    [iface];
+        faces.area_alt[jface] = faces.area_alt[iface];
+        faces.vertices[jface] = faces.vertices[iface];
+
+        faces.adjacent.rank [jface] = faces.adjacent.rank[iface];
+        faces.adjacent.index[jface] = faces.adjacent.index[iface];
+        faces.adjacent.alien[jface] = faces.adjacent.alien[iface];
+        faces.adjacent.basic[jface] = jc;
+    }
+
+    for (index_t i = 0; i < node_begin[ic + 1] - node_begin[ic]; ++i) {
+        index_t jv = node_begin[jc] + i;
+        index_t iv = node_begin[ic] + i;
+        verts[jv] = verts[iv];
+    }
+
+    set_undefined(ic);
+}
+
+void AmrCells::copy_data(index_t from, index_t to) {
+    copy_data(from, this, to);
+}
+
+void AmrCells::copy_data(index_t from, AmrCells* dst, index_t to) {
+    data.copy_data(from, &dst->data, to);
+}
+
+void AmrCells::resize(index_t n_cells) {
+    if (!m_adaptive) {
+        throw std::runtime_error("Resize of unstructured mesh");
+    }
+
+    resize_cells(n_cells);
+
+    int n_faces = m_dim == 2 ? 8 : 24;
+    int n_nodes = m_dim == 3 ? 9 : 27;
+
+    // Поля граней и вершин пока так
+    faces.resize(n_cells * n_faces);
+    verts.resize(n_cells * n_nodes);
+
+    // Поля данных только для ячеек
+    data.resize(n_cells);
+}
+
+void AmrCells::resize_cells(index_t n_cells) {
+    m_size = n_cells;
+
+    // Поля ячеек по числу ячеек, логично
+    next.resize(n_cells, -1);
+    rank.resize(n_cells, -1);
+    index.resize(n_cells, -1);
+
+    center.resize(n_cells);
+    volume.resize(n_cells);
+    volume_alt.resize(n_cells);
+
+    // +1 для заключительной
+    face_begin.resize(n_cells + 1);
+    node_begin.resize(n_cells + 1);
+
+    flag.resize(n_cells);
+    b_idx.resize(n_cells);
+    z_idx.resize(n_cells);
+    level.resize(n_cells);
+
+    // Поля данных только для ячеек
+    data.resize(n_cells);
+}
+
+void AmrCells::reserve(index_t n_cells, index_t n_faces, index_t n_nodes) {
+    // Поля ячеек по числу ячеек, логично
+    next.reserve(n_cells);
+    rank.reserve(n_cells);
+    index.reserve(n_cells);
+
+    center.reserve(n_cells);
+    volume.reserve(n_cells);
+    volume_alt.reserve(n_cells);
+
+    // +1 для заключительной
+    face_begin.reserve(n_cells + 1);
+    node_begin.reserve(n_cells + 1);
+
+    flag.reserve(n_cells);
+    b_idx.reserve(n_cells);
+    z_idx.reserve(n_cells);
+    level.reserve(n_cells);
+
+    // Поля граней и вершин пока так
+    faces.reserve(n_cells * n_faces);
+    verts.reserve(n_cells * n_nodes);
+
+    // Поля данных только для ячеек
+    data.reserve(n_cells);
+}
+
+void AmrCells::set_cell(index_t ic, const Quad& quad) {
+    assert(m_dim == 2);
+    assert(m_adaptive);
+    assert(m_linear);
+    assert(!m_axial);
+
+    rank[ic] = -1;
+    index[ic] = -1;
+
+    flag[ic] = 0;
+    b_idx[ic] = -1;
+    z_idx[ic] = -1;
+    level[ic] = -1;
+
+    volume[ic] = quad.area();
+    center[ic] = quad.centroid(volume[ic]);
+
+    face_begin[ic] = 8 * ic;
+    face_begin[ic + 1] = 8 * (ic + 1);
+    faces.insert(face_begin[ic], CellType::AMR2D);
+
+    node_begin[ic] = 9 * ic;
+    node_begin[ic + 1] = 9 * (ic + 1);
+    mapping<2>(ic) = SqQuad(quad);
+
+    for (index_t iface = face_begin[ic]; iface < face_begin[ic] + Side2D::count(); ++iface) {
+        Line vs = {
+                verts[node_begin[ic] + faces.vertices[iface][0]],
+                verts[node_begin[ic] + faces.vertices[iface][1]]
+        };
+
+        faces.area[iface]     = vs.length();
+        faces.center[iface]   = vs.center();
+        faces.normal[iface]   = vs.normal(center[ic]);
+        faces.boundary[iface] = Boundary::ORDINARY;
+    }
+}
+
+void AmrCells::set_cell(index_t ic, const Quad& quad, bool axial) {
+    assert(m_dim == 2);
+    assert(m_adaptive);
+    assert(m_linear);
+    assert(m_axial == axial);
+
+    rank[ic] = -1;
+    index[ic] = -1;
+
+    flag[ic] = 0;
+    b_idx[ic] = -1;
+    z_idx[ic] = -1;
+    level[ic] = -1;
+
+    volume[ic] = quad.area();
+    center[ic] = quad.centroid(volume[ic]);
+
+    volume[ic]     = quad.area();
+    volume_alt[ic] = quad.volume_as();
+    center[ic]     = quad.centroid_as(volume_alt[ic]);
+
+    volume[ic] = quad.area();
+    if (!axial) {
+        center[ic]     = quad.centroid(volume[ic]);
+    }
+    else {
+        volume_alt[ic] = quad.volume_as();
+        center[ic]     = quad.centroid_as(volume_alt[ic]);
+    }
+
+    face_begin[ic] = 8 * ic;
+    face_begin[ic + 1] = 8 * (ic + 1);
+    faces.insert(face_begin[ic], CellType::AMR2D);
+
+    node_begin[ic] = 9 * ic;
+    node_begin[ic + 1] = 9 * (ic + 1);
+    mapping<2>(ic) = SqQuad(quad);
+
+    for (auto i: nodes_range(ic)) {
+        if (verts[i].z() != 0.0) {
+            throw std::runtime_error("AmrCells add axial cell, vertex.z != 0.0");
+        }
+    }
+
+    for (index_t iface = face_begin[ic]; iface < face_begin[ic] + Side2D::count(); ++iface) {
+        Line vs = {
+                verts[node_begin[ic] + faces.vertices[iface][0]],
+                verts[node_begin[ic] + faces.vertices[iface][1]]
+        };
+
+        faces.area[iface]     = vs.length();
+        faces.center[iface]   = vs.centroid(axial);
+        faces.normal[iface]   = vs.normal(center[ic]);
+        faces.boundary[iface] = Boundary::ORDINARY;
+
+        if (axial) {
+            faces.area_alt[iface] = vs.area_as();
         }
     }
 }
 
-void AmrCells::initialize(const Rectangle& gen) {
-    bool x_period = gen.periodic_along_x();
-    bool y_period = gen.periodic_along_y();
+void AmrCells::set_cell(index_t ic, const SqQuad& quad) {
+    set_cell(ic, quad.reduce());
+    //std::cerr << "Nonlinear AmrCells is not supported\n";
+}
 
-    double xmin = gen.x_min();
-    double ymin = gen.y_min();
-    double xmax = gen.x_max();
-    double ymax = gen.y_max();
+void AmrCells::set_cell(index_t ic, const SqQuad& quad, bool axial) {
+    set_cell(ic, quad.reduce(), axial);
+    //std::cerr << "Nonlinear AmrCells is not supported\n";
+}
 
-    index_t nx = gen.nx();
-    index_t ny = gen.ny();
+void AmrCells::set_cell(index_t ic, const Cube& cube) {
+    assert(m_dim == 3);
+    assert(m_adaptive);
+    assert(m_linear);
+    assert(!m_axial);
 
-    double hx = (xmax - xmin) / nx;
-    double hy = (ymax - ymin) / ny;
+    rank[ic] = -1;
+    index[ic] = -1;
 
-    auto get_index = [=](index_t i, index_t j) -> index_t {
-        return i * ny + j;
-    };
+    flag[ic] = 0;
+    b_idx[ic] = -1;
+    z_idx[ic] = -1;
+    level[ic] = -1;
 
-    auto get_index_pair = [=](index_t n) -> std::array<index_t, 2> {
-        return {n / ny, n % ny};
-    };
+    volume[ic] = cube.volume();
+    center[ic] = cube.centroid(volume[ic]);
 
-    auto get_vertex = [=](index_t i, index_t j) -> Vector3d {
-        return {
-                xmin + ((xmax - xmin) * i) / nx,
-                ymin + ((ymax - ymin) * j) / ny,
-                0.0
+    face_begin[ic] = 24 * ic ;
+    face_begin[ic + 1] = 24 * (ic + 1);
+    faces.insert(face_begin[ic], CellType::AMR3D);
+
+    node_begin[ic] = 27 * ic;
+    node_begin[ic + 1] = 27 * (ic + 1);
+    mapping<3>(ic) = SqCube(cube);
+
+    for (index_t iface = face_begin[ic]; iface < face_begin[ic] + Side3D::count(); ++iface) {
+        Quad vs = {
+                verts[node_begin[ic] + faces.vertices[iface][0]],
+                verts[node_begin[ic] + faces.vertices[iface][1]],
+                verts[node_begin[ic] + faces.vertices[iface][2]],
+                verts[node_begin[ic] + faces.vertices[iface][3]]
         };
-    };
 
-    auto neib_index = [=](index_t i, index_t j, Side2D side) -> index_t {
-        if (side == Side2D::LEFT) {
-            return i == 0 && !x_period ?  get_index(i, j) : get_index((i - 1 + nx) % nx, j);
-        }
-        else if (side == Side2D::RIGHT) {
-            return i == nx - 1 && !x_period ? get_index(i, j) : get_index((i + 1 + nx) % nx, j);
-        }
-        else if (side == Side2D::BOTTOM) {
-            return j == 0 && !y_period ? get_index(i, j) : get_index(i, (j - 1 + ny) % ny);
-        }
-        else if (side == Side2D::TOP) {
-            return j == ny - 1 && !y_period ? get_index(i, j): get_index(i, (j + 1 + ny) % ny);
-        }
-        else {
-            throw std::runtime_error("Strange side #142");
-        }
-    };
+        faces.area[iface]     = vs.area();
+        faces.center[iface]   = vs.center();
+        faces.normal[iface]   = vs.normal(center[iface]);
+        faces.boundary[iface] = Boundary::ORDINARY;
+    }
+}
 
-    m_size = nx * ny;
+void AmrCells::set_cell(index_t ic, const SqCube& cube) {
+    set_cell(ic, cube.reduce());
+    //std::cerr << "Nonlinear AmrCells is not supported\n";
+}
 
-    dim = 2;
-    adaptive = true;
-    linear = true;
-    axial = false;
+void AmrCells::push_back(const geom::Line &line) {
+    throw std::runtime_error("NO WAY ACPBWER");
+}
 
-    resize(m_size);
+void AmrCells::push_back(const Polygon& poly) {
+    assert(m_dim == 2);
+    assert(!m_adaptive);
+    assert(m_linear);
+    assert(!m_axial);
 
-    int n_faces = 8;
-    int n_nodes = 9;
+    index_t ic = size();
 
-    for (index_t ic = 0; ic < m_size; ++ic) {
-        auto[i, j] = get_index_pair(ic);
+    resize_cells(ic + 1);
 
-        next[ic] = ic;
-        rank[ic] = 0;
-        index[ic] = ic;
+    rank[ic] = 0;
+    index[ic] = ic;
 
-        flag[ic] = 0;
-        level[ic] = 0;
-        b_idx[ic] = ic;
-        z_idx[ic] = 0;
+    flag[ic] = 0;
+    b_idx[ic] = -1;
+    z_idx[ic] = -1;
+    level[ic] = -1;
 
-        SqQuad quad(
-                get_vertex(i, j),
-                get_vertex(i + 1, j),
-                get_vertex(i, j + 1),
-                get_vertex(i + 1, j + 1));
+    volume[ic] = poly.area();
+    center[ic] = poly.centroid(volume[ic]);
 
-        center[ic] = quad.vs<0, 0>();
-        volume[ic] = hx * hy;
-        volume_alt[ic] = NAN;
-        face_begin[ic] = ic * n_faces;
-        node_begin[ic] = ic * n_nodes;
-        face_begin[ic + 1] = face_begin[ic] + n_faces;
-        node_begin[ic + 1] = face_begin[ic] + n_nodes;
+    if (m_axial) {
+        volume_alt[ic] = poly.volume_as();
+    }
 
-        // INIT FACES
-        for (index_t iface: faces_range(ic)) {
-            faces.set_undefined(iface);
-            faces.area_alt[iface] = NAN;
-        }
+    int n_nodes = poly.size();
+    int n_faces = poly.size();
 
-        index_t iface = ic * n_faces;
+    faces.resize(faces.size() + n_faces);
+    verts.resize(verts.size() + n_nodes);
 
-        faces.boundary[iface + Side2D::L] = i > 0 ? Boundary::ORDINARY : gen.bounds().left;
-        faces.boundary[iface + Side2D::R] = i < nx - 1 ? Boundary::ORDINARY : gen.bounds().right;
-        faces.boundary[iface + Side2D::B] = j > 0 ? Boundary::ORDINARY : gen.bounds().bottom;
-        faces.boundary[iface + Side2D::T] = j < ny - 1 ? Boundary::ORDINARY : gen.bounds().top;
+    face_begin[ic + 1] = face_begin[ic] + n_faces;
+    faces.insert(face_begin[ic], CellType::POLYGON, n_faces);
 
-        for (auto side: Side2D::items()) {
-            faces.adjacent.rank[iface + side] = 0;
-            faces.adjacent.index[iface + side] = neib_index(i, j, side);
-            faces.adjacent.alien[iface + side] = -1;
-            faces.vertices[iface + side].fill(-1);
-        }
+    node_begin[ic + 1] = node_begin[ic] + n_nodes;
+    for (int i = 0; i < n_nodes; ++i) {
+        verts[node_begin[ic] + i] = poly[i];
+    }
 
-        faces.normal[iface + Side2D::L] = -Vector3d::UnitX();
-        faces.normal[iface + Side2D::R] =  Vector3d::UnitX();
-        faces.normal[iface + Side2D::B] = -Vector3d::UnitY();
-        faces.normal[iface + Side2D::T] =  Vector3d::UnitY();
+    for (index_t iface = face_begin[ic]; iface < face_begin[ic] + n_faces; ++iface) {
+        Line vs = {
+                verts[node_begin[ic] + faces.vertices[iface][0]],
+                verts[node_begin[ic] + faces.vertices[iface][1]]
+        };
 
-        faces.center[iface + Side2D::L] = quad.vs<-1, 0>();
-        faces.center[iface + Side2D::R] = quad.vs<+1, 0>();
-        faces.center[iface + Side2D::B] = quad.vs<0, -1>();
-        faces.center[iface + Side2D::T] = quad.vs<0, +1>();
+        faces.area[iface]     = vs.length();
+        faces.center[iface]   = vs.centroid();
+        faces.normal[iface]   = vs.normal(center[ic]);
+        faces.boundary[iface] = Boundary::ORDINARY;
 
-        faces.area[iface + Side2D::L] = hy;
-        faces.area[iface + Side2D::R] = hy;
-        faces.area[iface + Side2D::B] = hx;
-        faces.area[iface + Side2D::T] = hx;
-
-        faces.vertices[iface + Side2D::L] = Side2D::L.sf();
-        faces.vertices[iface + Side2D::R] = Side2D::R.sf();
-        faces.vertices[iface + Side2D::B] = Side2D::B.sf();
-        faces.vertices[iface + Side2D::T] = Side2D::T.sf();
-
-        for (index_t jn = 0; jn < n_nodes; ++jn) {
-            verts[ic * n_nodes + jn] = quad[jn];
+        if (m_axial) {
+            faces.area_alt[iface] = vs.area_as();
         }
     }
 }
 
-void AmrCells::initialize(const Cuboid& gen) {
-    throw std::runtime_error("AMRCells Initialize cuboid");
+void AmrCells::push_back(const Polyhedron& poly) {
+    throw std::runtime_error("AmrCells::set_cell: Not implemented");
+    /*
+    : Element(0, 0), dim(3),
+      adaptive(false), linear(true),
+      vertices(poly), faces(CellType::POLYHEDRON),
+      b_idx(-1), z_idx(-1), level(0), flag(0)
+
+    volume = poly.volume();
+    center = poly.centroid(volume);
+
+    if (poly.n_faces() > BFaces::max_count) {
+        throw std::runtime_error("Polygon has > 24 faces");
+    }
+
+    for (int i = 0; i < poly.n_faces(); ++i) {
+        int n_verts = poly.face_indices(i).size();
+        if (n_verts < 4) {
+            faces[i].vertices = {poly.face_indices(i)[0],
+                                 poly.face_indices(i)[1],
+                                 poly.face_indices(i)[2],
+                                 -1
+            };
+        }
+        else if (n_verts < 5) {
+            faces[i].vertices = {poly.face_indices(i)[0],
+                                 poly.face_indices(i)[1],
+                                 poly.face_indices(i)[2],
+                                 poly.face_indices(i)[3]
+            };
+        }
+        else {
+            // Хардкор, полигональная грань
+            faces[i].set_polygonal();
+            for (int j = 0; j < n_verts; ++j) {
+                faces[i].set_poly_vertex(j, poly.face_indices(i)[j]);
+            }
+        }
+
+        faces[i].area     = poly.face_area(i);
+        faces[i].center   = poly.face_center(i);
+        faces[i].normal   = poly.face_normal(i);
+        faces[i].boundary = Boundary::ORDINARY;
+    }
+    */
 }
 
 } // namespace zephyr::mesh

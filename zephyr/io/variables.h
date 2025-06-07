@@ -92,6 +92,11 @@ public:
         m_list.emplace_back(name, n_components, func);
     }
 
+    template<class T>
+    void append(const char *name, int n_components, const WriteSoaCell<T> &func) {
+        m_list.emplace_back(name, n_components, func);
+    }
+
     /// @brief Аналогично функции append(const char*, ...)
     template<class T>
     void append(const std::string &name, int n_components, const WriteAmrItem<T> &func) {
@@ -105,6 +110,11 @@ public:
 
     template<class T>
     void append(const std::string &name, int n_components, const WriteNodeItem<T> &func) {
+        m_list.emplace_back(name, n_components, func);
+    }
+
+    template<class T>
+    void append(const std::string &name, int n_components, const WriteSoaCell<T> &func) {
         m_list.emplace_back(name, n_components, func);
     }
 
@@ -124,6 +134,11 @@ public:
         m_list.emplace_back(name, 1, func);
     }
 
+    template<class T>
+    void append(const char *name, const WriteSoaCell<T> &func) {
+        m_list.emplace_back(name, 1, func);
+    }
+
     /// @brief Аналогично функции append(const char*, ...)
     template<class T>
     void append(const std::string &name, const WriteAmrItem<T> &func) {
@@ -137,6 +152,10 @@ public:
 
     template<class T>
     void append(const std::string &name, const WriteNodeItem<T> &func) {
+        m_list.emplace_back(name, 1, func);
+    }
+    template<class T>
+    void append(const std::string &name, const WriteSoaCell<T> &func) {
         m_list.emplace_back(name, 1, func);
     }
 
@@ -202,6 +221,30 @@ public:
     /// значение переменной
     void operator+=(std::pair<std::string, std::function<double(NodeStorage::Item&)>> p) {
         append(p.first, p.second);
+    }
+
+    /// @brief Упрощенный синтаксис для добавления Storable полей
+    /// @param name Название переменной
+    /// @param func Некоторая функция, которая для произвольной ячейки выдает
+    /// значение переменной
+    template <typename T>
+    void append(std::string name, const mesh::Storable<T>& p) {
+        if (VtkType::get<T>().is_undefined()) {
+            if constexpr (std::is_same_v<T, geom::Vector3d>) {
+                append(name, 3, WriteSoaCell<double>(
+                        [p](mesh::QCell &cell, double *out) {
+                            out[0] = cell(p).x();
+                            out[1] = cell(p).y();
+                            out[2] = cell(p).z();
+                        }));
+            } else {
+                throw std::runtime_error("Can't add as VTK type");
+            }
+        }
+        append(name, 1, WriteSoaCell<T>(
+                [p](mesh::QCell &cell, T *out) {
+                    out[0] = cell(p);
+                }));
     }
 
     /// @brief Очистить список переменных

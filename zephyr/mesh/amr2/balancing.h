@@ -19,7 +19,7 @@ inline void balance_flags(AmrCells &cells, int max_level) {
     if (cells.empty()) return;
 
 #if FAST_BALANCING
-    if (cells.dim < 3) {
+    if (cells.dim() < 3) {
         amr2::balance_flags_fast<2>(cells, max_level);
     } else {
         amr2::balance_flags_fast<3>(cells, max_level);

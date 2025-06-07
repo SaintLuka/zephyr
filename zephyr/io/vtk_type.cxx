@@ -91,7 +91,7 @@ bool VtkType::operator!=(const VtkType& value) const {
 }
 
 bool VtkType::is_undefined() const {
-    return m_value == 0;
+    return m_value == VtkType::Undefined;
 }
 
 bool VtkType::is_signed() const {

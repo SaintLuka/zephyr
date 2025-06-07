@@ -46,7 +46,7 @@ void restore_connections_one(index_t ic, AmrCells& locals, AmrCells& aliens, int
             continue;
         }
 
-        bool local_cell = faces.adjacent.alien[iface] < 0;
+        bool local_cell = faces.adjacent.is_local(iface);
 
 #if SCRUTINY
         // Проверим индексы
@@ -116,7 +116,7 @@ void restore_connections_one(index_t ic, AmrCells& locals, AmrCells& aliens, int
         double dist = std::numeric_limits<double>::max();
 
         // Прикол, так можно?
-        auto shape = neibs.get_vertices<dim>(old_jc).reduce();
+        auto shape = neibs.mapping<dim>(old_jc).reduce();
         for (int j = 0; j < CpC(dim); ++j) {
             double loc_dist = (shape[j] - faces.center[iface]).squaredNorm();
             if (loc_dist < dist) {

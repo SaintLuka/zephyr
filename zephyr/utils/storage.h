@@ -18,7 +18,7 @@ namespace zephyr::utils {
 template<typename T>
 struct Storable {
 public:
-    int idx;  ///< Смещение в массиве структур
+    int idx = -1;  ///< Смещение в массиве структур
 
     /// @brief  Со смещением для векторных полей
     Storable<T> operator[](int shift) const { return {idx + shift}; }
@@ -46,6 +46,9 @@ public:
 
     /// @brief Изменить размер массивов данных (даже если данных нет)
     void resize(size_t new_size);
+
+    /// @brief Изменить размер массивов данных (даже если данных нет)
+    void reserve(size_t new_size);
 
     /// @brief Добавить новое СКАЛЯРНОЕ поле
     /// @param name Имя для поля данных, должно быть уникальным среди полей
@@ -81,7 +84,7 @@ public:
 
     /// @brief Извлечь поле по переменной Storable<T>
     template<typename T>
-    inline const T *data(Storable<T> type) const {
+    const T *data(Storable<T> type) const {
         assert_storable_type<T>();
         if constexpr (is_basic_type<T>()) {
             return basic_values<T>().at(type.idx).data();
@@ -92,7 +95,7 @@ public:
 
     /// @brief Извлечь поле по переменной Storable<T>
     template<typename T>
-    inline T *data(Storable<T> type) {
+    T *data(Storable<T> type) {
         assert_storable_type<T>();
         if constexpr (is_basic_type<T>()) {
             return basic_values<T>().at(type.idx).data();
@@ -103,11 +106,11 @@ public:
 
     /// @brief Извлечь поле по переменной Storable<T>
     template <typename T>
-    inline T* operator()(Storable<T> type) { return data(type); }
+    T* operator()(Storable<T> type) { return data(type); }
 
     /// @brief Извлечь поле по переменной Storable<T>
     template <typename T>
-    inline const T* operator()(Storable<T> type) const { return data(type); }
+    const T* operator()(Storable<T> type) const { return data(type); }
 
     /// @brief Скопировать все данные по индексу from
     /// в хранилище dst по индексу to.
@@ -383,6 +386,19 @@ public:
     // Рекурсивный resize для базовых типов
     template<int I = 0>
     std::enable_if_t<I >= n_basic_types> resize_basic(size_t new_size) { }
+
+    // Рекурсивный reserve для базовых типов
+    template<int I = 0>
+    std::enable_if_t<I < n_basic_types> reserve_basic(size_t new_size) {
+        for (auto &vec: std::get<I>(m_values1)) {
+            vec.reserve(new_size);
+        }
+        reserve_basic<I + 1>(new_size);
+    }
+
+    // Рекурсивный reserve для базовых типов
+    template<int I = 0>
+    std::enable_if_t<I >= n_basic_types> reserve_basic(size_t new_size) { }
 
     // Скопировать для одного базового типа значения
     template <typename T>

@@ -20,21 +20,21 @@ template <int dim>
 void create_children(index_t ic, AmrCells& cells, const SqMap<dim>& shape) {
     if constexpr (dim == 2) {
         auto quads = shape.children();
-        cells.add_cell(ic + 0, quads[0], cells.axial);
-        cells.add_cell(ic + 1, quads[1], cells.axial);
-        cells.add_cell(ic + 2, quads[2], cells.axial);
-        cells.add_cell(ic + 3, quads[3], cells.axial);
+        cells.set_cell(ic + 0, quads[0], cells.axial());
+        cells.set_cell(ic + 1, quads[1], cells.axial());
+        cells.set_cell(ic + 2, quads[2], cells.axial());
+        cells.set_cell(ic + 3, quads[3], cells.axial());
     }
     else {
         auto cubes = shape.children();
-        cells.add_cell(ic + 0, cubes[0]);
-        cells.add_cell(ic + 1, cubes[1]);
-        cells.add_cell(ic + 2, cubes[2]);
-        cells.add_cell(ic + 3, cubes[3]);
-        cells.add_cell(ic + 4, cubes[4]);
-        cells.add_cell(ic + 5, cubes[5]);
-        cells.add_cell(ic + 6, cubes[6]);
-        cells.add_cell(ic + 7, cubes[7]);
+        cells.set_cell(ic + 0, cubes[0]);
+        cells.set_cell(ic + 1, cubes[1]);
+        cells.set_cell(ic + 2, cubes[2]);
+        cells.set_cell(ic + 3, cubes[3]);
+        cells.set_cell(ic + 4, cubes[4]);
+        cells.set_cell(ic + 5, cubes[5]);
+        cells.set_cell(ic + 6, cubes[6]);
+        cells.set_cell(ic + 7, cubes[7]);
     }
 }
 
@@ -166,33 +166,33 @@ index_t make_children(AmrCells &cells, index_t ip) {
     const index_t child_beg = cells.next[ip];
 
     if constexpr (dim == 2) {
-        auto quads = cells.get_vertices<dim>(ip).children();
-        cells.add_cell(child_beg + 0, quads[0], cells.axial);
-        cells.add_cell(child_beg + 1, quads[1], cells.axial);
-        cells.add_cell(child_beg + 2, quads[2], cells.axial);
-        cells.add_cell(child_beg + 3, quads[3], cells.axial);
+        auto quads = cells.mapping<dim>(ip).children();
+        cells.set_cell(child_beg + 0, quads[0], cells.axial());
+        cells.set_cell(child_beg + 1, quads[1], cells.axial());
+        cells.set_cell(child_beg + 2, quads[2], cells.axial());
+        cells.set_cell(child_beg + 3, quads[3], cells.axial());
     }
     else {
-        auto cubes = cells.get_vertices<dim>(ip).children();
-        cells.add_cell(child_beg + 0, cubes[0]);
-        cells.add_cell(child_beg + 1, cubes[1]);
-        cells.add_cell(child_beg + 2, cubes[2]);
-        cells.add_cell(child_beg + 3, cubes[3]);
-        cells.add_cell(child_beg + 4, cubes[4]);
-        cells.add_cell(child_beg + 5, cubes[5]);
-        cells.add_cell(child_beg + 6, cubes[6]);
-        cells.add_cell(child_beg + 7, cubes[7]);
+        auto cubes = cells.mapping<dim>(ip).children();
+        cells.set_cell(child_beg + 0, cubes[0]);
+        cells.set_cell(child_beg + 1, cubes[1]);
+        cells.set_cell(child_beg + 2, cubes[2]);
+        cells.set_cell(child_beg + 3, cubes[3]);
+        cells.set_cell(child_beg + 4, cubes[4]);
+        cells.set_cell(child_beg + 5, cubes[5]);
+        cells.set_cell(child_beg + 6, cubes[6]);
+        cells.set_cell(child_beg + 7, cubes[7]);
     }
 
 #ifdef SCRUTINY
     // Бывают проблемы с выделением граней и вершин
     for (int i = 0; i < CpC(dim); ++i) {
-        if (cells.max_faces(child_beg + i) != FpC(dim) * FpF(dim)) {
+        if (cells.max_face_count(child_beg + i) != FpC(dim) * FpF(dim)) {
 
             throw std::runtime_error("bad max faces");
         }
         scrutiny_check(cells.max_faces(child_beg + i) == FpC(dim) * FpF(dim), "make_children error: bad faces")
-        scrutiny_check(cells.max_nodes(child_beg + i) == std::pow(3, dim), "make_children error: bad nodes")
+        scrutiny_check(cells.max_node_count(child_beg + i) == std::pow(3, dim), "make_children error: bad nodes")
     }
 #endif
 
@@ -218,6 +218,7 @@ index_t make_children(AmrCells &cells, index_t ip) {
             adj.rank[cells.face_begin[ich] + s]  = cells.rank[ip];
             adj.index[cells.face_begin[ich] + s] = cells.index[ip];
             adj.alien[cells.face_begin[ich] + s] = -1;
+            adj.basic[cells.face_begin[ich] + s] = ich;
         }
     }
 
@@ -239,6 +240,7 @@ index_t make_children(AmrCells &cells, index_t ip) {
                 adj.rank [ch_face] = adj.rank [p_face + side];
                 adj.index[ch_face] = adj.index[p_face + side];
                 adj.alien[ch_face] = adj.alien[p_face + side];
+                adj.basic[ch_face] = ich;
             }
         } else {
             // Ячейка имела сложную грань
@@ -255,6 +257,7 @@ index_t make_children(AmrCells &cells, index_t ip) {
                         adj.rank [ch_face] = adj.rank [p_face + s];
                         adj.index[ch_face] = adj.index[p_face + s];
                         adj.alien[ch_face] = adj.alien[p_face + s];
+                        adj.basic[ch_face] = ich;
                         break;
                     }
                 }
@@ -356,12 +359,12 @@ void refine_cell(AmrCells &locals, index_t ip, int rank, const Distributor& op) 
 
             if (nei_wanted_lvl > locals.level[ich]) {
                 split_face<dim>(locals.face_begin[ich], locals.faces,
-                        locals.get_vertices<dim>(ich), s, locals.axial);
+                        locals.mapping<dim>(ich), s, locals.axial());
             }
         }
     }
 
-    SoaChildren children(locals);
+    SoaChildren children(&locals);
     for (int i = 0; i < CpC(dim); ++i) {
         children.index[i] = child_beg + i;
     }
