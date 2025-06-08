@@ -1,19 +1,19 @@
 add_subdirectory(single-fluid)
 add_subdirectory(multi-fluid)
 
-list(APPEND PROBLEMS advection)
-list(APPEND PROBLEMS convection)
-list(APPEND PROBLEMS membrane)
-list(APPEND PROBLEMS shu_osher)
-list(APPEND PROBLEMS transfer)
+#list(APPEND PROBLEMS advection)
+#list(APPEND PROBLEMS convection)
+#list(APPEND PROBLEMS membrane)
+#list(APPEND PROBLEMS shu_osher)
+#list(APPEND PROBLEMS transfer)
 
-# Assume all files in direcory are tests
+# Assuming all files in the directory are tests
 if (ZEPHYR_PROBLEMS_ALL)
     file(GLOB PROBLEM_SOURCES *.cpp)
 
     set(PROBLEMS "")
     foreach(filename IN LISTS PROBLEM_SOURCES)
-        # short name without path and extentsion
+        # short name without path and extension
         get_filename_component(problem ${filename} NAME_WE)
         list(APPEND PROBLEMS ${problem})
     endforeach()

@@ -127,13 +127,13 @@ int main() {
 
     // Создать решатель
     Solver solver;
-    solver.set_CFL(0.13);
+    solver.set_CFL(0.5);
 
     // Расщепление по направлениям
-    bool splitting = false;
+    bool splitting = true;
 
     // Настройки метода
-    solver.set_method(Solver::Method::CRP_V3);
+    solver.set_method(Solver::Method::CRP_N1);
 
     // Настройки теста
     BodyDisk body;
@@ -146,7 +146,6 @@ int main() {
     solver.add_types(mesh);
 
     data = solver.data;
-
 
     // Переменные для сохранения
     pvd.variables = {"level"};

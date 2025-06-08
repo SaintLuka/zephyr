@@ -122,7 +122,7 @@ protected:
     /// условия Куранта (для одной ячейки)
     double compute_dt(QCell& cell);
 
-    void compute_slopes(SoaMesh& mesh);
+    void compute_slopes(SoaMesh& mesh) const;
 
     void update_CRP(SoaMesh& mesh, Direction dir);
 

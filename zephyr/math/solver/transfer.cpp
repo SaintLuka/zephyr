@@ -357,9 +357,15 @@ void Transfer::fluxes_MUSCL(QCell &cell, Direction dir) {
         auto fn = face.normal();
         double vn = velocity(face.center()).dot(fn);
 
+        bool interesting = (cell(data.u1) > 0.01 && cell(data.u1) < 0.99) || (neib(data.u1) > 0.01 && neib(data.u1) < 0.99);
+
         double a_sig = NAN;
         if (m_method == Method::MUSCL_MC || m_method == Method::MUSCL_MC_CRP)
         {
+            if (interesting) {
+                //std::cout << cell(data.u1) << " " <<  cell(data.du_dx) << " " << cell(data.du_dy) << "\n";
+                //std::cout << neib(data.u1) << " " <<  neib(data.du_dx) << " " << neib(data.du_dy) << "\n";
+            }
             auto fe = FaceExtra::Direct(
                     cell(data.u1), cell(data.du_dx), cell(data.du_dy), 0.0,
                     neib(data.u1), neib(data.du_dx), neib(data.du_dy), 0.0,
@@ -377,6 +383,12 @@ void Transfer::fluxes_MUSCL(QCell &cell, Direction dir) {
             a_sig = vn > 0.0 ? fe.m(cell(data.u1)) : fe.p(neib(data.u1));
         }
 
+        if (interesting) {
+            //std::cout << "asig: " << a_sig << "\n";
+            //a_sig = vn > 0.0 ? cell(data.u1) : neib(data.u1);
+            //std::cout << "asig: " <<a_sig << "\n\n";
+        }
+
         double Flux = a_sig * vn * m_dt * face.area();
 
         // CRP поправка
@@ -392,7 +404,7 @@ void Transfer::fluxes_MUSCL(QCell &cell, Direction dir) {
     cell(data.u2) = cell(data.u1) - fluxes / cell.volume();
 }
 
-void Transfer::compute_slopes(SoaMesh& mesh) {
+void Transfer::compute_slopes(SoaMesh& mesh) const {
     if (m_method == Method::MUSCLn ||
         m_method == Method::MUSCLn_CRP) {
         for (auto cell: mesh) {
@@ -447,7 +459,6 @@ void Transfer::compute_slopes(SoaMesh& mesh) {
     auto boundary_value = [](double u, const Vector3d& n, Boundary b) -> double {
         return u;
     };
-
 
     for (auto cell: mesh) {
         auto grad = gradient::LSM<double>(cell, get_state, boundary_value);
