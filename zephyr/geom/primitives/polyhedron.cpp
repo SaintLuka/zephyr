@@ -680,9 +680,94 @@ Polyhedron Polyhedron::clip(const Vector3d& p, const Vector3d& n) const {
 }
 
 double Polyhedron::clip_volume(const Vector3d& p, const Vector3d& n) const {
-    return NAN;
-}
+    std::vector<double> distances(n_verts());
+    for (int i = 0; i < n_verts(); ++i) {
+        distances[i] = n.dot(verts[i] - p);
+    }
 
+    bool all = true;
+    bool none = true;
+    for (double d : distances) {
+        if (d >= 0) all = false;
+        if (d <= 0) none = false;
+    }
+    if (all) return volume();
+    if (none) return 0.;
+
+    double out = 0.;
+    const double coeff = 1. / 3.;
+
+    for (int i = 0; i < n_faces(); ++i) {
+        const auto& face = faces[i];
+        int nv = face.size();
+
+        std::vector<Vector3d> clipped_face;
+        for (int j = 0; j < nv; ++j) {
+            int v1 = face[j];
+            int v2 = face[(j + 1) % nv];
+            double d1 = distances[v1];
+            double d2 = distances[v2];
+
+            if (d1 <= 0) {
+                clipped_face.push_back(verts[v1]);
+            }
+
+            if (d1 * d2 < 0) {
+                double t = d1 / (d1 - d2);
+                Vector3d new_verts = verts[v1] + t * (verts[v2] - verts[v1]);
+                clipped_face.push_back(new_verts);
+            }
+        }
+
+        if (clipped_face.size() >= 3) {
+            Vector3d face_center = Vector3d::Zero();
+            for (const auto& v : clipped_face) {
+                face_center += v;
+            }
+            face_center /= clipped_face.size();
+
+            Vector3d new_faces = Vector3d::Zero();
+            for (size_t j = 0; j < clipped_face.size(); ++j) {
+                size_t k = (j + 1) % clipped_face.size();
+                new_faces += clipped_face[j].cross(clipped_face[k]);
+            }
+            new_faces *= 0.5;
+
+            out += coeff * new_faces.dot(face_center - p);
+        }
+    }
+
+    std::vector<Vector3d> section;
+    for (int i = 0; i < n_verts(); ++i) {
+        int j = (i + 1) % n_verts();
+        double d1 = distances[i];
+        double d2 = distances[j];
+
+        if (d1 * d2 < 0) {
+            double t = d1 / (d1 - d2);
+            section.push_back(verts[i] + t * (verts[j] - verts[i]));
+        }
+    }
+
+    if (section.size() >= 3) {
+        Vector3d section_center = Vector3d::Zero();
+        for (const auto& v : section) {
+            section_center += v;
+        }
+        section_center /= section.size();
+
+        Vector3d section_area = Vector3d::Zero();
+        for (size_t i = 0; i < section.size(); ++i) {
+            size_t j = (i + 1) % section.size();
+            section_area += section[i].cross(section[j]);
+        }
+        section_area *= 0.5;
+
+        out += coeff * section_area.dot(section_center - p);
+    }
+
+    return out;
+}
 
 Vector3d Polyhedron::find_section(const Vector3d& n, double alpha) const {
     return {NAN, NAN, NAN};

@@ -4,7 +4,7 @@
 #list(APPEND TESTS game_of_life)
 #list(APPEND TESTS maps_integral)
 #list(APPEND TESTS polygon_clip)
-#list(APPEND TESTS polyhedra)
+list(APPEND TESTS polyhedra)
 #list(APPEND TESTS splines)
 #list(APPEND TESTS volume_fraction)
 
