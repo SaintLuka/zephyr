@@ -6,7 +6,6 @@
 #include <iomanip>
 
 #include <zephyr/geom/generator/strip.h>
-#include <zephyr/mesh/mesh.h>
 
 #include <zephyr/phys/tests/test_1D.h>
 
@@ -23,39 +22,53 @@ using namespace zephyr::math::smf;
 
 using zephyr::mesh::generator::Strip;
 using zephyr::math::RiemannSolver;
-using zephyr::mesh::EuMesh;
+using zephyr::mesh::SoaMesh;
+using zephyr::mesh::QCell;
+using zephyr::math::SmFluid;
+using zephyr::utils::threads;
 
-//#define ADAPTIVE
-
-// Для быстрого доступа по типу
-SmFluid::State U;
-
-/// Переменные для сохранения
-double get_rho(AmrStorage::Item& cell) { return cell(U).density; }
-double get_u(AmrStorage::Item& cell) { return cell(U).velocity.x(); }
-double get_p(AmrStorage::Item& cell) { return cell(U).pressure; }
-double get_e(AmrStorage::Item& cell) { return cell(U).energy; }
-
+#define ADAPTIVE
 
 int main() {
+    threads::on();
+
     // Тестовая задача
     //SodTest test;
-    ToroTest test(1);
-    //ShuOsherTest test;
+    //ToroTest test(1);
+    ShuOsherTest test;
     //ShockWave test(3.0, 0.1, 1.0);
-
-    // Начальные данные
-    auto init_cells = [&test](Mesh& mesh) {
-        for (auto cell: mesh) {
-            cell(U).density  = test.density (cell.center());
-            cell(U).velocity = test.velocity(cell.center());
-            cell(U).pressure = test.pressure(cell.center());
-            cell(U).energy   = test.energy  (cell.center());
-        }
-    };
 
     // Уравнение состояния
     Eos::Ptr eos = test.get_eos();
+
+    // Создаем одномерную сетку
+#ifdef ADAPTIVE
+    int nx = 100;
+    double h = 0.01 * (test.xmax() - test.xmin());
+
+    Rectangle gen(test.xmin(), test.xmax(), -h, +h);
+    gen.set_boundaries({.left   = Boundary::ZOE,  .right = Boundary::ZOE,
+                        .bottom = Boundary::WALL, .top   = Boundary::WALL});
+    gen.set_sizes(nx, 1);
+#else
+    Strip gen(test.xmin(), test.xmax());
+    gen.set_boundaries({.left = Boundary::ZOE, .right = Boundary::ZOE});
+    gen.set_size(500);
+#endif
+
+    // Создать сетку
+    SoaMesh mesh(gen);
+
+    // Создать решатель
+    SmFluid solver(eos);
+    solver.set_CFL(0.5);
+    solver.set_accuracy(2);
+    solver.set_limiter("MC");
+    solver.set_method(Fluxes::HLLC_M);
+
+    // Добавляем типы на сетку, выбираем основной слой
+    auto data = solver.add_types(mesh);
+    auto z = data.init;
 
     // Файл для записи
     PvdFile pvd("test1D", "output");
@@ -64,65 +77,48 @@ int main() {
 
     // Переменные для сохранения
     pvd.variables = {"level"};
-    pvd.variables += {"rho", get_rho};
-    pvd.variables += {"u", get_u};
-    pvd.variables += {"p", get_p};
-    pvd.variables += {"e", get_e};
+    pvd.variables += {"density",  [z](QCell& cell) -> double { return cell(z).density; }};
+    pvd.variables += {"vel.x",    [z](QCell& cell) -> double { return cell(z).velocity.x(); }};
+    pvd.variables += {"vel.y",    [z](QCell& cell) -> double { return cell(z).velocity.y(); }};
+    pvd.variables += {"pressure", [z](QCell& cell) -> double { return cell(z).pressure; }};
+    pvd.variables += {"energy",   [z](QCell& cell) -> double { return cell(z).energy; }};
 
-    pvd.variables += {"rho_exact",
-                      [&test, &curr_time](const AmrStorage::Item &cell) -> double {
-                          return test.density_t(cell.center, curr_time);
+    pvd.variables += {"exact.dens",
+                      [&test, &curr_time](const QCell &cell) -> double {
+                          return test.density_t(cell.center(), curr_time);
                       }};
-    pvd.variables += {"u_exact",
-                      [&test, &curr_time](const AmrStorage::Item &cell) -> double {
-                          return test.velocity_t(cell.center, curr_time).x();
+    pvd.variables += {"exact.velocity",
+                      [&test, &curr_time](const QCell &cell) -> double {
+                          return test.velocity_t(cell.center(), curr_time).x();
                       }};
-    pvd.variables += {"p_exact",
-                      [&test, &curr_time](const AmrStorage::Item &cell) -> double {
-                          return test.pressure_t(cell.center, curr_time);
+    pvd.variables += {"exact.pres",
+                      [&test, &curr_time](const QCell &cell) -> double {
+                          return test.pressure_t(cell.center(), curr_time);
                       }};
-    pvd.variables += {"e_exact",
-                      [&test, &curr_time](const AmrStorage::Item &cell) -> double {
-                          return test.energy_t(cell.center, curr_time);
+    pvd.variables += {"exact.energy",
+                      [&test, &curr_time](const QCell &cell) -> double {
+                          return test.energy_t(cell.center(), curr_time);
                       }};
-    pvd.variables += {"c",
-                      [&eos](AmrStorage::Item& cell) -> double {
-                          return eos->sound_speed_rP(cell(U).density, cell(U).pressure);
+    pvd.variables += {"sound_speed",
+                      [&eos, z](const QCell & cell) -> double {
+                          return eos->sound_speed_rP(cell(z).density, cell(z).pressure);
                       }};
-    pvd.variables += {"c_exact",
-                      [&eos, &test, &curr_time](const AmrStorage::Item &cell) -> double {
-                          double rho = test.density_t(cell.center, curr_time);
-                          double P = test.pressure_t(cell.center, curr_time);
+    pvd.variables += {"exact.sound",
+                      [&eos, &test, &curr_time](const QCell &cell) -> double {
+                          double rho = test.density_t(cell.center(), curr_time);
+                          double P = test.pressure_t(cell.center(), curr_time);
                           return eos->sound_speed_rP(rho, P);
                       }};
 
-    // Создаем одномерную сетку
-
-#ifdef ADAPTIVE
-    int nx = 100;
-    double h = (test.xmax() - test.xmin()) / nx;
-
-    // Костыль. Две ячейки в ширину, с одной ячейкой сейчас косяк
-    // с граничными условиями
-    Rectangle gen(test.xmin(), test.xmax(), -h, +h);
-    gen.set_boundaries({.left   = Boundary::ZOE,  .right = Boundary::ZOE,
-                        .bottom = Boundary::WALL, .top   = Boundary::WALL});
-    gen.set_nx(nx);
-#else
-    Strip gen(test.xmin(), test.xmax());
-    gen.set_boundaries({.left = Boundary::ZOE, .right = Boundary::ZOE});
-    gen.set_size(500);
-#endif
-
-    // Создать сетку
-    EuMesh mesh(gen, U);
-
-    // Создать решатель
-    SmFluid solver(eos);
-    solver.set_CFL(0.5);
-    solver.set_accuracy(2);
-    solver.set_limiter("MC");
-    solver.set_method(Fluxes::HLLC);
+    // Начальные данные
+    auto init_cells = [&test, z](SoaMesh& mesh) {
+        for (auto cell: mesh) {
+            cell(z).density  = test.density (cell.center());
+            cell(z).velocity = test.velocity(cell.center());
+            cell(z).pressure = test.pressure(cell.center());
+            cell(z).energy   = test.energy  (cell.center());
+        }
+    };
 
 #ifdef ADAPTIVE
     // Сеточная адаптация
@@ -166,7 +162,7 @@ int main() {
 
     // Сохранить данные как текст
     CsvFile csv("test1D.csv", 8, pvd.variables);
-    csv.save(mesh);
+    csv.save(mesh.locals());
 
     // Расчёт ошибок
     double r_err = 0.0, u_err = 0.0, p_err = 0.0, e_err = 0.0;
@@ -175,15 +171,15 @@ int main() {
         Vector3d r = cell.center();
         double V = cell.volume();
 
-        r_err += V * std::abs(cell(U).density      - test.density_t(r, curr_time));
-        u_err += V * std::abs(cell(U).velocity.x() - test.velocity_t(r, curr_time).x());
-        p_err += V * std::abs(cell(U).pressure     - test.pressure_t(r, curr_time));
-        e_err += V * std::abs(cell(U).energy       - test.energy_t(r, curr_time));
+        r_err += V * std::abs(cell(z).density      - test.density_t(r, curr_time));
+        u_err += V * std::abs(cell(z).velocity.x() - test.velocity_t(r, curr_time).x());
+        p_err += V * std::abs(cell(z).pressure     - test.pressure_t(r, curr_time));
+        e_err += V * std::abs(cell(z).energy       - test.energy_t(r, curr_time));
 
-        r_avg += V * std::abs(cell(U).density     );
-        u_avg += V * std::abs(cell(U).velocity.x());
-        p_avg += V * std::abs(cell(U).pressure    );
-        e_avg += V * std::abs(cell(U).energy      );
+        r_avg += V * std::abs(cell(z).density     );
+        u_avg += V * std::abs(cell(z).velocity.x());
+        p_avg += V * std::abs(cell(z).pressure    );
+        e_avg += V * std::abs(cell(z).energy      );
     }
     r_err /= r_avg;
     u_err /= u_avg;

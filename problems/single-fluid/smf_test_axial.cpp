@@ -1,15 +1,12 @@
-QCell /// @file smf_test_axial.cpp
+/// @file smf_test_axial.cpp
 /// @brief Сферический взрыв на двумерной адаптивной сетке с осевой симметрией.
 
 #include <iostream>
 #include <iomanip>
 
-#include <zephyr/mesh/mesh.h>
 #include <zephyr/geom/generator/rectangle.h>
-
-#include <zephyr/phys/tests/sedov_blast.h>
-
 #include <zephyr/math/solver/sm_fluid.h>
+#include <zephyr/phys/tests/test_3D.h>
 
 #include <zephyr/io/pvd_file.h>
 #include <zephyr/io/csv_file.h>
@@ -23,40 +20,28 @@ using namespace zephyr::phys;
 using namespace zephyr::math;
 using namespace zephyr::math::smf;
 
-using zephyr::mesh::EuMesh;
+using zephyr::mesh::generator::Rectangle;
+using zephyr::mesh::SoaMesh;
+using zephyr::mesh::QCell;
 using zephyr::math::SmFluid;
 using zephyr::utils::mpi;
 using zephyr::utils::threads;
 using zephyr::utils::Stopwatch;
-using zephyr::geom::generator::Rectangle;
-
-
-// Для быстрого доступа по типу
-SmFluid::State U;
-
-/// Переменные для сохранения
-double get_lvl(AmrStorage::Item& cell) { return cell.level; }
-double get_rho(AmrStorage::Item& cell) { return cell(U).density; }
-double get_u(AmrStorage::Item& cell) { return cell(U).velocity.x(); }
-double get_v(AmrStorage::Item& cell) { return cell(U).velocity.y(); }
-double get_p(AmrStorage::Item& cell) { return cell(U).pressure; }
-double get_e(AmrStorage::Item& cell) { return cell(U).energy; }
-double get_volume(const AmrStorage::Item &cell) { return cell.get_volume(); }
 
 // Критерий адаптации подобран под задачу.
 // Адаптация ячеек с плотностью выше 1.5.
-void set_flags(Mesh &mesh) {
+void set_flags(SoaMesh &mesh, Storable<PState> z) {
     if (!mesh.is_adaptive()) return;
 
-    mesh.for_each([](Cell& cell) {
+    mesh.for_each([z](QCell cell) {
         const double threshold = 1.5;
 
-        if (cell(U).density > threshold) {
+        if (cell(z).density > threshold) {
             cell.set_flag(1);
             return;
         }
         for (auto face: cell.faces()) {
-            if (face.neib(U).density > threshold) {
+            if (face.neib(z).density > threshold) {
                 cell.set_flag(1);
                 return;
             }
@@ -65,116 +50,89 @@ void set_flags(Mesh &mesh) {
     });
 }
 
-// Массив центров ячеек и граней
-NodeStorage centers(EuMesh& mesh) {
-    size_t count = 0;
-    for (auto& cell: mesh) {
-        ++count;
-        for (auto& face: cell.faces()) {
-            ++count;
-        }
-    }
-
-    NodeStorage nodes_plain(count, 0);
-
-    count = 0;
-    for (auto& cell: mesh) {
-        nodes_plain[count].coords = cell.center();
-        ++count;
-        for (auto& face: cell.faces()) {
-            nodes_plain[count].coords = face.center();
-            ++count;
-        }
-    }
-    return nodes_plain;
-}
-
 int main() {
-    mpi::handler init;
+    mpi::handler mpi_handler;
     threads::on();
 
     // Тестовая задача
     SedovBlast3D test({.gamma=1.4, .rho0=1.0, .E=1.0});
 
     // Уравнение состояния
-    IdealGas::Ptr eos = test.eos;
-
-    // Задание начальных данных
-    double t0 = test.time_by_radius(0.4);
-    test.finish = test.time_by_radius(0.9);
-
-    auto init_cells = [&](Mesh& mesh) {
-        mesh.for_each([&](Cell& cell) {
-            double r = cell.center().norm();
-            Vector3d n = cell.center() / r;
-            cell(U).density  = test.density (r, t0);
-            cell(U).velocity = test.velocity(r, t0) * n;
-            cell(U).pressure = std::max(test.pressure(r, t0), 1.0e-3);
-            cell(U).energy   = eos->energy_rP(cell(U).density, cell(U).pressure);
-        });
-    };
-
-    // Файл для записи
-    PvdFile pvd("Sedov", "output");
-    pvd.unique_nodes = false;
-
-    size_t n_step = 0;
-    double curr_time = t0;
-    double next_write = t0;
-
-    // Переменные для сохранения
-    pvd.variables = {"level"};
-    pvd.variables += {"rho", get_rho};
-    pvd.variables += {"u", get_u};
-    pvd.variables += {"v", get_v};
-    pvd.variables += {"p", get_p};
-    pvd.variables += {"e", get_e};
-    pvd.variables += {"volume_as", get_volume};
-
-    pvd.variables += {"rho_exact",
-                      [&test, &curr_time](const AmrStorage::Item &cell) -> double {
-                          return test.density(cell.center.norm(), curr_time);
-                      }};
-    pvd.variables += {"v_exact",
-                      [&test, &curr_time](const AmrStorage::Item &cell) -> double {
-                          return test.velocity(cell.center.norm(), curr_time);
-                      }};
-    pvd.variables += {"p_exact",
-                      [&test, &curr_time](const AmrStorage::Item &cell) -> double {
-                          return test.pressure(cell.center.norm(), curr_time);
-                      }};
-    pvd.variables += {"e_exact",
-                      [&test, &curr_time](const AmrStorage::Item &cell) -> double {
-                          return test.energy(cell.center.norm(), curr_time);
-                      }};
+    Eos::Ptr eos = test.get_eos();
 
     // Генератор сетки (с граничными условиями) дает тест,
     // число ячеек можно задать
-    Rectangle gen(0.0, 1.0, 0.0, 1.0);
+    Rectangle gen(test.xmin(), test.xmax(), test.ymin(), test.ymax());
     gen.set_boundaries({.left=Boundary::WALL, .right=Boundary::ZOE,
                         .bottom=Boundary::WALL, .top=Boundary::ZOE});
-    gen.set_nx(10);
+    gen.set_nx(40);
     gen.set_axial(true);
 
     // Создать сетку
-    EuMesh mesh(gen, U);
-    mesh.set_decomposition("XY");
+    SoaMesh mesh(gen);
 
     // Создать решатель
     SmFluid solver(eos);
     solver.set_axial(true);
     solver.set_accuracy(2);
     solver.set_CFL(0.5);
-    solver.set_limiter("MC");
-    solver.set_method(Fluxes::HLLC_M);
+    solver.set_limiter("minmod");
+    solver.set_method(Fluxes::HLL);
 
-    // Сеточная адаптация
-    mesh.set_max_level(4);
+    // Добавляем типы на сетку, выбираем основной слой
+    auto data = solver.add_types(mesh);
+    auto z = data.init;
+
+    // Настройка сетки
+    //mesh.set_decomposition("XY")
+    mesh.set_max_level(3);
     mesh.set_distributor(solver.distributor());
 
+    // Начальные данные
+    auto init_cells = [&](SoaMesh& mesh) {
+        mesh.for_each([&](QCell& cell) {
+            Vector3d r = cell.center();
+            cell(z).density  = test.density (r);
+            cell(z).velocity = test.velocity(r);
+            cell(z).pressure = std::max(test.pressure(r), 1.0e-3);
+            cell(z).energy   = eos->energy_rP(cell(z).density, cell(z).pressure);
+        });
+    };
+
+    // Файл для записи
+    PvdFile pvd("Sedov", "output");
+
+    size_t n_step = 0;
+    double curr_time = test.init_time;
+    double next_write = test.init_time;
+
+    // Переменные для сохранения
+    pvd.variables = {"level"};
+    pvd.variables += {"rho", [z](QCell& cell) -> double { return cell(z).density; }};
+    pvd.variables += {"vr",  [z](QCell& cell) -> double { return cell(z).velocity.norm(); }};
+    pvd.variables += {"p",   [z](QCell& cell) -> double { return cell(z).pressure; }};
+    pvd.variables += {"e",   [z](QCell& cell) -> double { return cell(z).energy; }};
+    pvd.variables += {"rho_exact",
+                      [&test, &curr_time](const QCell &cell) -> double {
+                          return test.density_t(cell.center(), curr_time);
+                      }};
+    pvd.variables += {"vr_exact",
+                      [&test, &curr_time](const QCell  &cell) -> double {
+                          return test.velocity_t(cell.center(), curr_time).norm();
+                      }};
+    pvd.variables += {"p_exact",
+                      [&test, &curr_time](const QCell &cell) -> double {
+                          return test.pressure_t(cell.center(), curr_time);
+                      }};
+    pvd.variables += {"e_exact",
+                      [&test, &curr_time](const QCell &cell) -> double {
+                          return test.energy_t(cell.center(), curr_time);
+                      }};
+
+    // Инициализация начальными данными
     for (int k = 0; k < mesh.max_level() + 3; ++k) {
         init_cells(mesh);
-        set_flags(mesh);
+        set_flags(mesh, z);
         mesh.refine();
     }
     init_cells(mesh);
@@ -193,7 +151,8 @@ int main() {
 
         // Обновляем слои
         solver.update(mesh);
-        set_flags(mesh);
+        set_flags(mesh, z);
+        solver.compute_grad(mesh);
         mesh.refine();
 
         curr_time += solver.dt();

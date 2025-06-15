@@ -77,7 +77,7 @@ int main() {
     threads::on();
 
     // Геометрия области
-#define GENTYPE 1
+#define GENTYPE 3
 
 #if GENTYPE == 1
     // Прямоугольник
@@ -90,7 +90,7 @@ int main() {
 #elif GENTYPE == 2
     // Прямоугольник из сот
     Rectangle gen(0.0, 1.0, 0.0, 0.6, true);
-    gen.set_nx(300);
+    gen.set_nx(500);
     gen.set_boundaries({
         .left   = Boundary::ZOE, .right = Boundary::ZOE,
         .bottom = Boundary::ZOE, .top   = Boundary::ZOE});
@@ -98,7 +98,7 @@ int main() {
 #elif GENTYPE == 3
     // Кубоид
     Cuboid gen(0.0, 1.0, 0.0, 0.8, -0.3, 0.3);
-    gen.set_nx(50);
+    gen.set_nx(20);
     gen.set_boundaries({
         .left   = Boundary::ZOE, .right = Boundary::ZOE,
         .bottom = Boundary::ZOE, .top   = Boundary::ZOE,
@@ -116,11 +116,19 @@ int main() {
     // Создать сетку
     SoaMesh mesh(gen);
 
+    if (mesh.check_base() < 0) {
+        int res = mesh.check_base();
+
+        std::cout << "Bad init mesh " << res << "\n";
+
+        return 0;
+    }
+
     // Добавить типы на сетку
     solver.add_types(mesh);
 
     // Настраиваем адаптацию
-    mesh.set_max_level(5);
+    mesh.set_max_level(mesh.dim() < 3 ? 5 : 4);
     mesh.set_distributor(solver.distributor());
 
     // Файл для записи
@@ -145,6 +153,13 @@ int main() {
         setup_initial_1(mesh, D, solver.u_curr);
         solver.set_flags(mesh);
         mesh.refine();
+
+        int res = mesh.check_refined();
+        if (res < 0) {
+            res = mesh.check_refined();
+            std::cout << "Bad init refinement\n";
+            return 0;
+        }
     }
 
     Stopwatch elapsed;

@@ -77,7 +77,12 @@ int SoaMesh::max_level() const {
 }
 
 void SoaMesh::set_max_level(int max_level) {
-    m_max_level = std::max(0, std::min(max_level, 15));
+    if (!m_locals.adaptive()) {
+        m_max_level = 0;
+    }
+    else {
+        m_max_level = std::max(0, std::min(max_level, 15));
+    }
 }
 
 void SoaMesh::set_distributor(const std::string& name) {
@@ -182,6 +187,12 @@ int SoaMesh::check_base() const {
         return -1;
     }
 
+    // Только для адаптивных сеток
+    if (!m_locals.adaptive()) {
+        std::cout << "\tOnly adaptive meshes\n";
+        return -1;
+    }
+
     int res = 0;
     for (index_t ic = 0; ic < m_locals.size(); ++ic) {
         if (m_locals.index[ic] < 0 || m_locals.index[ic] != ic) {
@@ -202,13 +213,32 @@ int SoaMesh::check_base() const {
                 return -1;
             }
         }
+
         if (m_locals.face_count(ic) > FpC(dim)) {
             std::cout << "\tCell has too much faces (" << m_locals.face_count(ic) << ")\n";
             m_locals.print_info(ic);
             return -1;
         }
 
-        // Число вершин ???
+        // Проверим число вершин
+        int n_nodes = m_locals.node_count(ic);
+        int n_max_nodes = m_locals.max_node_count(ic);
+        if ((dim == 2 && n_nodes == n_max_nodes && n_max_nodes != 9) ||
+            (dim == 3 && n_nodes == n_max_nodes && n_max_nodes != 27)) {
+            std::cout << "\tCell has wrong node count " << n_nodes << " " << n_max_nodes << "\n";
+            m_locals.print_info(ic);
+            return -1;
+        }
+
+        // Проверим число граней
+        int n_faces = m_locals.face_count(ic);
+        int n_max_faces = m_locals.max_face_count(ic);
+        if ((dim == 2 && (n_faces > n_max_faces || n_max_faces != 8)) ||
+            (dim == 3 && (n_faces > n_max_faces || n_max_faces != 24))) {
+            std::cout << "\tCell has wrong face count " << n_faces << " " << n_max_faces << "\n";
+            m_locals.print_info(ic);
+            return -1;
+        }
 
         // Правильное задание геометрии
         res = m_locals.check_geometry(ic);

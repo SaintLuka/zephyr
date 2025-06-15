@@ -38,6 +38,9 @@ public:
           m_aliens(dim, adaptive, axial) {
     }
 
+    /// @brief Создание сеточным генератором
+    SoaMesh(geom::Generator& gen);
+
 
     /// @brief Установить максимальный допустимый уровень адаптации (>= 0)
     void set_max_level(int max_level);
@@ -118,6 +121,10 @@ public:
     void push_back(const geom::Polyhedron& poly);
 
 
+    AmrCells& locals() { return m_locals; }
+
+    const AmrCells& locals() const { return m_locals; }
+
 
 
     /// @brief Получить ячейку по нескольким индексам подразумевая,
@@ -134,7 +141,6 @@ public:
 
 
 
-    SoaMesh(geom::Generator& gen);
 
     geom::Box bbox() const;
 

@@ -78,7 +78,7 @@ struct Statistics {
         n_refine = ps.n_refine;
 
         // Пересчитаем завимисые величины
-        scrutiny_check(n_coarse % CpC(locals.dim) == 0, "Refiner::apply() error #2")
+        scrutiny_check(n_coarse % CpC(locals.dim()) == 0, "Refiner::apply() error #2")
         scrutiny_check(n_retain + n_refine + n_coarse == n_cells, "Refiner::apply() error #1");
 
         n_parents =  n_coarse / CpC(locals.dim());

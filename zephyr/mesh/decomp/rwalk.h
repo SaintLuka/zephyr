@@ -23,6 +23,9 @@ public:
     }
 
     /// @brief Основная функция. Определение нового ранга ячейки.
+    int rank(QCell& elem) const final;
+    
+    /// @brief Основная функция. Определение нового ранга ячейки.
     int rank(AmrStorage::Item& elem) const final;
 
     /// @brief Балансировка нагрузки (ничего не балансирует,

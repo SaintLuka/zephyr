@@ -185,6 +185,10 @@ void Convection::update(SoaMesh &mesh) {
 }
 
 void Convection::set_flags(SoaMesh& mesh) {
+    if (!mesh.is_adaptive()) {
+        return;
+    }
+
     mesh.for_each([this](QCell cell) {
         double min_val = cell(u_curr);
         double max_val = cell(u_curr);

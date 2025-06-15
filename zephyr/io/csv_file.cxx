@@ -7,8 +7,10 @@
 
 #include <zephyr/io/csv_file.h>
 
+using zephyr::mesh::QCell;
+using zephyr::mesh::AmrCells;
 
-namespace zephyr { namespace io {
+namespace zephyr::io {
 
 using namespace zephyr::geom;
 
@@ -41,7 +43,7 @@ void write_name(const Variable& var, std::ofstream& file) {
     }
 }
 
-void write_variable(const Variable& var, AmrStorage::Item& cell, std::ofstream& file) {
+void write_variable(const Variable& var, QCell& cell, std::ofstream& file) {
     if (!var.is_scalar()) {
         throw std::runtime_error("CsvFile doesn't support vector variables");
     }
@@ -72,15 +74,15 @@ CsvFile::CsvFile(
     variables(variables), filter() {
 }
 
-void CsvFile::save(AmrStorage &cells) {
+void CsvFile::save(AmrCells &cells) {
     save(filename, cells, precision, variables, filter);
 }
 
 void CsvFile::save(
-    const std::string &filename, AmrStorage &cells, int precision,
+    const std::string &filename, AmrCells &cells, int precision,
     const Variables &variables, const Filter &filter
 ) {
-    size_t n_cells = count_cells(cells, filter);
+    size_t n_cells = cells.n_cells();
     if (n_cells < 1) {
         return;
     }
@@ -105,22 +107,19 @@ void CsvFile::save(
         file << "\n";
     }
 
-    for (auto& cell: cells) {
-        if (filter(cell)) {
-            file << cell.center.x() << ", " << cell.center.y() << ", ";
-            for(int i = 0; i < n_variables - 1; ++i) {
-                write_variable(variables[i], cell, file);
-                file << ", ";
-            }
-            if (n_variables > 0) {
-                write_variable(variables[n_variables - 1], cell, file);
-            }
-            file << "\n";
+    for (auto cell: cells) {
+        file << cell.center().x() << ", " << cell.center().y() << ", ";
+        for (int i = 0; i < n_variables - 1; ++i) {
+            write_variable(variables[i], cell, file);
+            file << ", ";
         }
+        if (n_variables > 0) {
+            write_variable(variables[n_variables - 1], cell, file);
+        }
+        file << "\n";
     }
 
     file.close();
 }
 
-} // io
-} // zephyr
+} // namespace zephyr::io

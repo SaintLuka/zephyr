@@ -545,8 +545,8 @@ void Rectangle::initialize_classic(AmrCells& cells)  {
         cells.volume_alt[ic] = NAN;
         cells.face_begin[ic] = ic * n_faces;
         cells.node_begin[ic] = ic * n_nodes;
-        cells.face_begin[ic + 1] = cells.face_begin[ic] + n_faces;
-        cells.node_begin[ic + 1] = cells.face_begin[ic] + n_nodes;
+        cells.face_begin[ic + 1] = (ic + 1) * n_faces;
+        cells.node_begin[ic + 1] = (ic + 1) * n_nodes;
 
         // INIT FACES
         for (auto iface: cells.faces_range(ic)) {
@@ -592,6 +592,14 @@ void Rectangle::initialize_classic(AmrCells& cells)  {
         for (index_t jn = 0; jn < n_nodes; ++jn) {
             cells.verts[ic * n_nodes + jn] = quad[jn];
         }
+
+        if (m_axial) {
+            cells.volume_alt[ic] = hx * hy * quad.vs<0, 0>().y();
+            cells.faces.area_alt[iface + Side2D::L] = hy * quad.vs<-1, 0>().y();
+            cells.faces.area_alt[iface + Side2D::R] = hy * quad.vs<+1, 0>().y();
+            cells.faces.area_alt[iface + Side2D::B] = hx * quad.vs< 0,-1>().y();
+            cells.faces.area_alt[iface + Side2D::T] = hx * quad.vs< 0,+1>().y();
+        }
     }
 }
 
@@ -600,7 +608,7 @@ void Rectangle::initialize_voronoi(AmrCells& cells) {
     m_size = grid.n_cells();
 
     cells.set_dimension(2);
-    cells.set_adaptive(true);
+    cells.set_adaptive(false);
     cells.set_linear(true);
     cells.set_axial(m_axial);
 

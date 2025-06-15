@@ -71,6 +71,10 @@ int ORB::rank(const Vector3d& v) const {
     return m_blocks.rank(v);
 }
 
+int ORB::rank(QCell& elem) const {
+    return m_blocks.rank(elem.center());
+}
+
 int ORB::rank(AmrStorage::Item& elem) const {
     return m_blocks.rank(elem.center);
 }

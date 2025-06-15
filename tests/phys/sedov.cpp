@@ -1,7 +1,7 @@
 #include <vector>
 
 #include <zephyr/utils/matplotlib.h>
-#include <zephyr/phys/tests/sedov_blast.h>
+#include <zephyr/phys/tests/sedov.h>
 
 namespace plt = zephyr::utils::matplotlib;
 

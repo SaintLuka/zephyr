@@ -5,7 +5,7 @@
 
 #include <zephyr/io/pvd_file.h>
 
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/euler/soa_mesh.h>
 #include <zephyr/mesh/decomp/ORB.h>
 #include <zephyr/mesh/decomp/VD3.h>
 #include <zephyr/mesh/decomp/rwalk.h>
@@ -24,16 +24,11 @@ using zephyr::mesh::decomp::ORB;
 using zephyr::mesh::decomp::VD3;
 using zephyr::mesh::decomp::RWalk;
 
-struct _U_ {
-    int rank;
-    double load;
+// Для хранения на сетке
+struct Data {
+    Storable<int> rank;
+    Storable<double> load;
 };
-
-_U_ U;
-
-double get_rank(const AmrStorage::Item &cell) { return cell(U).rank; }
-
-double get_load(const AmrStorage::Item &cell) { return cell(U).load; }
 
 // Абстрактная нагрузка
 double foo(const Vector3d& v) {
@@ -51,26 +46,19 @@ double foo(const Vector3d& v) {
            A3/s3 * std::exp(-(v - c3).squaredNorm() / (s3 * s3));
 }
 
-std::vector<double> calc_loads(Mesh& mesh, int size) {
+// Посчитать фиктивную нагрузку
+std::vector<double> calc_loads(SoaMesh& mesh, int size, Data data) {
     std::vector<double> ws(size, 1.0e-3);
     for (auto cell: mesh) {
-        if (cell(U).rank < 0 || cell(U).rank > size) {
+        if (cell(data.rank) < 0 || cell(data.rank) > size) {
             throw std::runtime_error("Wrong rank");
         }
-        ws[cell(U).rank] += cell(U).load;
+        ws[cell(data.rank)] += cell(data.load);
     }
     return ws;
 }
 
 int main() {
-    threads::off();
-
-    // Файл для записи
-    PvdFile pvd("mesh", "output");
-
-    pvd.variables += {"rank", get_rank};
-    pvd.variables += {"load", get_load};
-
     // Сеточный генератор
     //Cuboid gen(0.0, 1.0, 0.0, 0.6, 0.0, 0.9);
     Rectangle gen(0.0, 1.0, 0.0, 0.6);
@@ -80,11 +68,22 @@ int main() {
     Box domain = gen.bbox();
 
     // Создаем сетку
-    EuMesh mesh(gen, U);
+    SoaMesh mesh(gen);
+
+    // Добавить переменные на сетку
+    Data data;
+    data.rank = mesh.add<int>("rank");
+    data.load = mesh.add<double>("load");
+
+    // Файл для записи
+    PvdFile pvd("mesh", "output");
+
+    pvd.variables.append("rank", data.rank);
+    pvd.variables.append("load", data.load);
 
     // Заполняем данные о нагрузке ячеек
     for (auto cell: mesh) {
-        cell(U).load = foo(cell.center());
+        cell(data.load) = foo(cell.center());
     }
 
     // Различные варианты инициализации ORB декомпозиции
@@ -97,7 +96,7 @@ int main() {
     for (int step = 0; step < 1000; ++step) {
         // Вычисляем новый ранг ячеек
         for (auto &cell: mesh.locals()) {
-            cell(U).rank = decmp->rank(cell);
+            cell(data.rank) = decmp->rank(cell);
         }
 
         if (step % 10 == 0) {
@@ -106,7 +105,7 @@ int main() {
         }
 
         // Подсчитываем нагрузку каждого ранга
-        auto ws = calc_loads(mesh, decmp->size());
+        auto ws = calc_loads(mesh, decmp->size(), data);
 
         if (step % 10 == 0) {
             std::cout << "Imbalance: " << decmp->imbalance(ws) << "\n";

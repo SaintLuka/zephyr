@@ -148,6 +148,15 @@ void check_link(AmrCells& cells, index_t ip, index_t child_beg) {
         // Число братьев через грань равно размерности
         if (count_sibs != dim) {
             std::cout << "Count siblings: " << count_sibs << "\n";
+            std::cout << "PARENT:\n";
+            cells.print_info(ip);
+            std::cout << "CHILDREN:\n";
+            for (int i = 0; i < CpC(dim); ++i) {
+                cells.print_info(child_beg + i);
+            }
+
+            check_link<dim>(cells, ip, child_beg);
+
             throw std::runtime_error("neibs sibings count != dimension");
         }
     }
@@ -191,7 +200,7 @@ index_t make_children(AmrCells &cells, index_t ip) {
 
             throw std::runtime_error("bad max faces");
         }
-        scrutiny_check(cells.max_faces(child_beg + i) == FpC(dim) * FpF(dim), "make_children error: bad faces")
+        scrutiny_check(cells.max_face_count(child_beg + i) == FpC(dim) * FpF(dim), "make_children error: bad faces")
         scrutiny_check(cells.max_node_count(child_beg + i) == std::pow(3, dim), "make_children error: bad nodes")
     }
 #endif

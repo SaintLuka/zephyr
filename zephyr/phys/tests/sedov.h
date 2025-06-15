@@ -7,29 +7,15 @@ namespace zephyr::phys {
 
 using zephyr::geom::Vector3d;
 
-/// "Автомодельное" решение в сферических координатах.
+/// Автомодельное решение задачи о точечном взрыве в сферических координатах.
 /// Аналитическое решение из следующих источников:
 /// https://github.com/brantr/sedov_taylor
 /// https://en.wikipedia.org/wiki/Taylor%E2%80%93von_Neumann%E2%80%93Sedov_blast_wave
 /// Но многие обозначения изменены, узнается с трудом.
-class SedovBlast3D {
+class Sedov3D {
 public:
-    IdealGas::Ptr eos;  ///< Используемый УрС
-    double finish;      ///< Конечный момент времени (радиус = 1)
-
-    struct params {
-        double gamma = 1.4;
-        double rho0  = 1.0;
-        double E     = 1.0;
-    };
-
     /// @brief Конструктор
-    SedovBlast3D(const params& p);
-
-    std::string name() const { return "SedovBlast3D"; }
-
-    /// @brief Конечный момент времени
-    double max_time() const { return finish; }
+    Sedov3D(double gamma, double rho0=1.0, double E=1.0);
 
     /// @brief Радиус ударной волны
     double r_shock(double t) const;

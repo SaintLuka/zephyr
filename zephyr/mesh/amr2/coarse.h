@@ -132,7 +132,7 @@ void make_parent(AmrCells& locals, AmrCells& aliens, int rank, SoaChildren& chil
             throw std::runtime_error("Undefined boundary (coarse cell");
         }
         for (int i = 0; i < FpF(dim); ++i) {
-            index_t ich = children[children_by_side[side][i]];
+            index_t ich = children.index[children_by_side[side][i]];
             index_t iface = locals.face_begin[ich] + side;
 
             if (locals.faces.boundary[iface] != locals.faces.boundary[some_face]) {
@@ -171,7 +171,7 @@ void make_parent(AmrCells& locals, AmrCells& aliens, int rank, SoaChildren& chil
 
 #if SCRUTINY
         for (int i = 1; i < VpF(dim); ++i) {
-            index_t ich = children[children_by_side[side][i]];
+            index_t ich = children.index[children_by_side[side][i]];
             index_t iface = locals.face_begin[ich] + side;
 
             if (adj.rank[iface] == rank && adj.index[iface] >= locals.size()) {
@@ -303,7 +303,8 @@ void make_parent(AmrCells& locals, AmrCells& aliens, int rank, SoaChildren& chil
             }
 
             locals.visualize(ip, "parent.py");
-            for (auto& child: children) {
+            for (auto child: children.index) {
+                if (child < 0) continue;
                 locals.visualize(child, "child" + std::to_string(locals.z_idx[child]) + ".py");
             }
 

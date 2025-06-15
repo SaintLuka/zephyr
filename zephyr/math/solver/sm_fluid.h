@@ -1,14 +1,15 @@
 #pragma once
 
-#include <zephyr/mesh/mesh.h>
+#include <zephyr/mesh/euler/soa_mesh.h>
 #include <zephyr/phys/matter/eos/eos.h>
 #include <zephyr/math/cfd/fluxes.h>
 #include <zephyr/math/cfd/limiter.h>
 
 namespace zephyr::math {
 
-using zephyr::mesh::Cell;
-using zephyr::mesh::Mesh;
+using zephyr::mesh::SoaMesh;
+using zephyr::mesh::QCell;
+using zephyr::mesh::Storable;
 using zephyr::mesh::Distributor;
 using zephyr::geom::Vector3d;
 using zephyr::phys::Eos;
@@ -23,43 +24,24 @@ public:
 
     /// @brief Расширенный вектор состояния на котором решается задача
     struct State {
-        double density;     ///< Плотность
-        Vector3d velocity;  ///< Скорость
-        double pressure;    ///< Давление
-        double energy;      ///< Внутренняя энергия
-
-        PState half;        ///< Состояние на полушаге
-        PState next;        ///< Состояние на следующем шаге
+        Storable<PState> init;  ///< Состояние на основном слое
+        Storable<PState> half;  ///< Состояние на полушаге
+        Storable<PState> next;  ///< Состояние на следующем шаге
 
         /// @brief Градиент вектора состояния
-        PState d_dx, d_dy, d_dz;
-
-        /// @brief Собрать вектор состояния на предыдущем шаге
-        PState get_state() const {
-            return PState(density, velocity, pressure, energy);
-        }
-
-        /// @brief Установить вектор состояния на предыдущем шаге
-        void set_state(const PState &z) {
-            density  = z.density;
-            velocity = z.velocity;
-            pressure = z.pressure;
-            energy   = z.energy;
-        }
+        Storable<PState> d_dx, d_dy, d_dz;
     };
 
-    /// @brief Получить экземпляр расширенного вектора состояния
-    static State datatype();
-
-    /// @brief В поток вывода
-    friend std::ostream &operator<<(std::ostream &os, const State &state);
-
+    State data;
 
     /// @brief Конструктор класса
     explicit SmFluid(Eos::Ptr eos);
 
-    /// @brief Декструктор
+    /// @brief Деструктор
     ~SmFluid() = default;
+
+    /// @brief Добавить типы на сетку
+    State add_types(SoaMesh& mesh);
 
     /// @brief Установить число Куранта
     void set_CFL(double CFL);
@@ -86,10 +68,10 @@ public:
     void set_max_dt(double dt);
 
     /// @brief Выполнить шаг интегрирования по времени
-    void update(Mesh &mesh);
+    void update(SoaMesh &mesh);
 
     /// @brief Установить флаги адаптации
-    void set_flags(Mesh& mesh);
+    void set_flags(SoaMesh& mesh) const;
 
     /// @brief Распределитель данных при адаптации
     /// @param type Тип "const" или "slope" переноса при разбиении
@@ -98,25 +80,22 @@ public:
 
     /// @brief Посчитать шаг интегрирования по времени с учетом
     /// условия Куранта
-    void compute_dt(Mesh &mesh);
+    void compute_dt(SoaMesh &mesh);
 
     /// @brief Расчёт потоков
-    void fluxes(Mesh &mesh);
+    void fluxes(SoaMesh &mesh) const;
 
     /// @brief Обновление ячеек
-    void swap(Mesh &mesh);
+    void swap(SoaMesh &mesh) const;
 
     /// @brief Вычислить производные
-    void compute_grad(Mesh &mesh);
-
-    /// @brief Вычислить производные
-    void compute_grad(Mesh &mesh, const std::function<smf::PState(Cell &)> &get_state);
+    void compute_grad(SoaMesh &mesh) const;
 
     /// @brief Вычислить потоки на стадии предиктора
-    void fluxes_stage1(Mesh &mesh);
+    void fluxes_stage1(SoaMesh &mesh) const;
 
     /// @brief Вычислить потоки на стадии корректора
-    void fluxes_stage2(Mesh &mesh);
+    void fluxes_stage2(SoaMesh &mesh) const;
 
 protected:
     Eos::Ptr m_eos;          ///< Уравнение состояния
@@ -128,11 +107,5 @@ protected:
     double m_dt;             ///< Шаг интегрирования
     double m_max_dt=1.e300;  ///< Максимальный шаг интегрирования
 };
-
-std::ostream &operator<<(std::ostream &os, const SmFluid::State &state) {
-    os << "State1: " << state.get_state() << "\n";
-    os << "State2: " << state.half << "\n";
-    return os;
-}
 
 } // namespace zephyr::math

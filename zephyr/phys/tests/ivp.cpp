@@ -89,6 +89,20 @@ double IVP::density_mean(mesh::EuCell& cell, int n) const {
     return M / V;
 }
 
+double IVP::density_mean(mesh::QCell& cell, int n) const {
+    auto get_density = [this](const Vector3d &r) -> double {
+        return this->density(r);
+    };
+
+    if (n < 2 || cell.const_function(get_density)) {
+        return density(cell.center());
+    }
+
+    double V = cell.volume();
+    double M = cell.integrate_low(get_density, n);
+    return M / V;
+}
+
 Vector3d IVP::momentum_mean(mesh::EuCell& cell, int n) const {
     auto momentum_x = [this](const Vector3d &r) -> double {
         return this->density(r) * this->velocity(r).x();
@@ -119,7 +133,52 @@ Vector3d IVP::momentum_mean(mesh::EuCell& cell, int n) const {
     return P / V;
 }
 
+Vector3d IVP::momentum_mean(mesh::QCell& cell, int n) const {
+    auto momentum_x = [this](const Vector3d &r) -> double {
+        return this->density(r) * this->velocity(r).x();
+    };
+    auto momentum_y = [this](const Vector3d &r) -> double {
+        return this->density(r) * this->velocity(r).y();
+    };
+    auto momentum_z = [this](const Vector3d &r) -> double {
+        return this->density(r) * this->velocity(r).z();
+    };
+
+    if (n < 2 ||
+        cell.const_function(momentum_x) ||
+        cell.const_function(momentum_y) ||
+        cell.const_function(momentum_z)) {
+
+        return {momentum_x(cell.center()),
+                momentum_y(cell.center()),
+                momentum_z(cell.center())};
+        }
+
+    double V = cell.volume();
+    Vector3d P = {
+        cell.integrate_low(momentum_x, n),
+        cell.integrate_low(momentum_y, n),
+        cell.integrate_low(momentum_z, n)
+};
+    return P / V;
+}
+
 double IVP::energy_mean(mesh::EuCell& cell, int n) const {
+    auto get_energy = [this](const Vector3d &r) -> double {
+        Vector3d v = this->velocity(r);
+        return this->density(r) * (this->energy(r) + 0.5 * v.dot(v));
+    };
+
+    if (n < 2 || cell.const_function(get_energy)) {
+        return get_energy(cell.center());
+    }
+
+    double V = cell.volume();
+    double E = cell.integrate_low(get_energy, n);
+    return E / V;
+}
+
+double IVP::energy_mean(mesh::QCell& cell, int n) const {
     auto get_energy = [this](const Vector3d &r) -> double {
         Vector3d v = this->velocity(r);
         return this->density(r) * (this->energy(r) + 0.5 * v.dot(v));

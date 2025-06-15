@@ -15,6 +15,10 @@ VD3::VD3(const Box &domain, int size)
     m_diagram = VDiagram(domain, gs);
 }
 
+int VD3::rank(QCell &elem) const {
+    return m_diagram.rank(elem.center());
+}
+
 int VD3::rank(AmrStorage::Item &elem) const {
     return m_diagram.rank(elem.center);
 }

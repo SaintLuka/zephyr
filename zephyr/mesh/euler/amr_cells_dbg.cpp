@@ -47,6 +47,7 @@ void AmrCells::print_info(index_t ic) const {
         std::cout << "\t\t\t\tflag:       " << faces.boundary[iface] << "\n";
         std::cout << "\t\t\t\tarea:       " << faces.area[iface] << "\n";
         std::cout << "\t\t\t\tnormal:     " << faces.normal[iface].transpose() << "\n";
+        std::cout << "\t\t\t\tcenter:     " << faces.center[iface].transpose() << "\n";
         std::cout << "\t\t\t\tadj.rank:   " << faces.adjacent.rank[iface] << "\n";
         std::cout << "\t\t\t\tadj.index:  " << faces.adjacent.index[iface] << "\n";
         std::cout << "\t\t\t\tadj.alien:  " << faces.adjacent.alien[iface] << "\n";

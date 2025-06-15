@@ -206,7 +206,10 @@ public:
     inline index_t level() const;
 
     template <typename T>
-    inline T& operator()(utils::Storable<T> type);
+    T& operator()(utils::Storable<T> type);
+
+    template <typename T>
+    const T& operator()(utils::Storable<T> type) const;
 
     inline QFace face(int idx) const;
 
@@ -495,7 +498,12 @@ inline void QCell::set_flag(int flag) { m_cells->flag[m_index] = flag; }
 
 
 template <typename T>
-inline T& QCell::operator()(utils::Storable<T> type) {
+T& QCell::operator()(utils::Storable<T> type) {
+    return m_cells->data(type)[m_index];
+}
+
+template <typename T>
+const T& QCell::operator()(utils::Storable<T> type) const {
     return m_cells->data(type)[m_index];
 }
 

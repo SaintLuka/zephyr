@@ -1,17 +1,13 @@
-#include <iomanip>
-#include <iostream>
 #include <vector>
 
-#include <zephyr/phys/tests/sedov_blast.h>
+#include <zephyr/phys/tests/sedov.h>
 
 namespace zephyr::phys {
 
-SedovBlast3D::SedovBlast3D(const params& p) {
-    gamma = p.gamma;
-    rho0 = p.rho0;
-    E = p.E;
-
-    eos = IdealGas::create(gamma, 1.0);
+Sedov3D::Sedov3D(double _gamma, double _rho0, double _E) {
+    gamma = _gamma;
+    rho0  = _rho0;
+    E     = _E;
 
     // Константы
     double kek = (13 * gamma * gamma - 7 * gamma + 12);
@@ -72,8 +68,6 @@ SedovBlast3D::SedovBlast3D(const params& p) {
                     std::pow(xi, 2);
     }
 
-    std::cout << std::scientific << std::setprecision(15);
-
     double b_int = 0.0;
     for (int i = 1; i < n_nodes; ++i) {
         b_int += 0.5 * (subint[i] + subint[i - 1]) * (m_xi[i] - m_xi[i - 1]);
@@ -81,8 +75,6 @@ SedovBlast3D::SedovBlast3D(const params& p) {
 
     double K = 16.0 * M_PI / 25.0;
     beta = std::pow(K * b_int, -0.2);
-
-    finish = time_by_radius(1.0);
 }
 
 // Линейная интерполяция
@@ -97,51 +89,51 @@ double interpolation(const std::vector<double>& xs, const std::vector<double>& y
     return y1 + (y2 - y1) * (x - x1) / (x2 - x1);
 }
 
-double SedovBlast3D::V_xi(double xi) const {
+double Sedov3D::V_xi(double xi) const {
     return interpolation(m_xi, m_Vs, xi);
 }
 
-double SedovBlast3D::Z_xi(double xi) const {
+double Sedov3D::Z_xi(double xi) const {
     return interpolation(m_xi, m_Zs, xi);
 }
 
-double SedovBlast3D::G_xi(double xi) const {
+double Sedov3D::G_xi(double xi) const {
     return interpolation(m_xi, m_Gs, xi);
 }
 
-double SedovBlast3D::P_xi(double xi) const {
+double Sedov3D::P_xi(double xi) const {
     return interpolation(m_xi, m_Ps, xi);
 }
 
-double SedovBlast3D::r_shock(double t) const {
+double Sedov3D::r_shock(double t) const {
     return beta * std::pow(E * t * t / rho0, 0.2);
 }
 
-double SedovBlast3D::time_by_radius(double r) const {
+double Sedov3D::time_by_radius(double r) const {
     return std::sqrt(rho0 / E * std::pow(r / beta, 5));
 }
 
-double SedovBlast3D::c_squared(double r, double t) const {
+double Sedov3D::c_squared(double r, double t) const {
     double xi = r / r_shock(t);
     return xi <= 1.0 ? std::pow(0.4 * r / t, 2) * Z_xi(xi) : 0.0;
 }
 
-double SedovBlast3D::density(double r, double t) const {
+double Sedov3D::density(double r, double t) const {
     double xi = r / r_shock(t);
     return xi <= 1.0 ? rho0 * G_xi(xi) : rho0;
 }
 
-double SedovBlast3D::velocity(double r, double t) const {
+double Sedov3D::velocity(double r, double t) const {
     double xi = r / r_shock(t);
     return xi <= 1.0 ? (0.4 * r / t) * V_xi(xi) : 0.0;
 }
 
-double SedovBlast3D::pressure(double r, double t) const {
+double Sedov3D::pressure(double r, double t) const {
     double xi = r / r_shock(t);
     return xi <= 1.0 ? rho0 * std::pow(0.4 * r_shock(t) / t, 2) * P_xi(xi) / gamma : 0.0;
 }
 
-double SedovBlast3D::energy(double r, double t) const {
+double Sedov3D::energy(double r, double t) const {
     return c_squared(r, t) / (gamma * (gamma - 1.0));
 }
 

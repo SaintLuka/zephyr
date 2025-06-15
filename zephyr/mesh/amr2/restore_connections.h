@@ -135,7 +135,7 @@ void restore_connections_one(index_t ic, AmrCells& locals, AmrCells& aliens, int
             neibs.level[old_jc] == locals.level[ic] - 1 &&
             neibs.z_idx[old_jc] == locals.z_idx[ic] / CpC(dim)) {
 
-            auto [bros, bro_idx] = faces.get_neib(iface, locals, aliens);
+            auto [bros, bro_idx] = faces.adjacent.get_neib(iface, locals, aliens);
 
             if (locals.b_idx[ic] == bros.b_idx[bro_idx] && bros.z_idx[bro_idx] == locals.z_idx[ic]) {
                 std::cout << neibs.rank[old_jc] << " " << neibs.level[old_jc] << " " << neibs.b_idx[old_jc] << " " << neibs.z_idx[old_jc] << " ""\n";

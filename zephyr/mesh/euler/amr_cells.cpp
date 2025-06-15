@@ -409,7 +409,7 @@ void AmrCells::resize(index_t n_cells) {
     resize_cells(n_cells);
 
     int n_faces = m_dim == 2 ? 8 : 24;
-    int n_nodes = m_dim == 3 ? 9 : 27;
+    int n_nodes = m_dim == 2 ? 9 : 27;
 
     // Поля граней и вершин пока так
     faces.resize(n_cells * n_faces);
@@ -615,7 +615,7 @@ void AmrCells::set_cell(index_t ic, const Cube& cube) {
 
         faces.area[iface]     = vs.area();
         faces.center[iface]   = vs.center();
-        faces.normal[iface]   = vs.normal(center[iface]);
+        faces.normal[iface]   = vs.normal(center[ic]);
         faces.boundary[iface] = Boundary::ORDINARY;
     }
 }
