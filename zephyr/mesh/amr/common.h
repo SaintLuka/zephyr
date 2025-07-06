@@ -18,6 +18,7 @@
 #endif
 
 #include <array>
+#include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/mesh/primitives/decomposition.h>
 
 namespace zephyr::mesh::amr {
@@ -31,46 +32,36 @@ static const size_t check_frequency = 100;
 
 /// @brief Локальные индексы ячеек, прилегающих к стороне.
 template<int dim>
-inline constexpr std::array<std::array<int, VpF(dim)>, FpC(dim)> get_children_by_side();
-
-/// @brief Локальные индексы ячеек, прилегающих к стороне (2D).
-template<>
-inline constexpr std::array<std::array<int, 2>, 4> get_children_by_side<2>() {
-    return {
+constexpr std::array<std::array<int, VpF(dim)>, FpC(dim)> get_children_by_side() {
+    if constexpr (dim == 2) {
+        return {
             std::array<int, 2>({0, 2}),
             std::array<int, 2>({1, 3}),
             std::array<int, 2>({0, 1}),
             std::array<int, 2>({2, 3})
-    };
-}
-
-/// @brief Локальные индексы ячеек, прилегающих к стороне (3D).
-template<>
-inline constexpr std::array<std::array<int, 4>, 6> get_children_by_side<3>() {
-    return {
+        };
+    }
+    else {
+        return {
             std::array<int, 4>({0, 2, 4, 6}),
             std::array<int, 4>({1, 3, 5, 7}),
             std::array<int, 4>({0, 1, 4, 5}),
             std::array<int, 4>({2, 3, 6, 7}),
             std::array<int, 4>({0, 1, 2, 3}),
             std::array<int, 4>({4, 5, 6, 7})
-    };
+        };
+    }
 }
 
 /// @brief Индексы подграней на стороне в списке faces.
 template<int dim>
-inline std::array<int, FpF(dim)> subface_sides(int side);
-
-/// @brief  Индексы подграней на стороне в списке faces (2D).
-template<>
-inline std::array<int, 2> subface_sides<2>(int side) {
-    return {side, side + 6};
-}
-
-/// @brief Индексы подграней на стороне в списке faces (3D).
-template<>
-inline std::array<int, 4> subface_sides<3>(int side) {
-    return {side, side + 6, side + 12, side + 18};
+std::array<Side<dim>, FpF(dim)> subface_sides(int side) {
+    if constexpr (dim == 2) {
+        return {Side<dim>(side), Side<dim>(side)[1]};
+    }
+    else {
+        return {Side<dim>(side), Side<dim>(side)[1], Side<dim>(side)[2], Side<dim>(side)[3]};
+    }
 }
 
 } // namespace zephyr::mesh::amr

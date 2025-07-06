@@ -7,7 +7,7 @@
 #include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/geom/generator/cuboid.h>
 
-#include <zephyr/mesh/euler/soa_mesh.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
 
 #include <zephyr/math/solver/convection.h>
 
@@ -21,8 +21,8 @@ using zephyr::geom::Boundary;
 using zephyr::geom::Vector3d;
 using zephyr::mesh::generator::Rectangle;
 using zephyr::mesh::generator::Cuboid;
-using zephyr::mesh::QCell;
-using zephyr::mesh::SoaMesh;
+using zephyr::mesh::EuCell;
+using zephyr::mesh::EuMesh;
 using zephyr::mesh::Storable;
 using zephyr::io::PvdFile;
 using zephyr::utils::threads;
@@ -44,7 +44,7 @@ public:
 const double margin = 0.0198;
 
 // Начальное условие в виде круга
-void setup_initial_1(SoaMesh& mesh, double D, Storable<double> u) {
+void setup_initial_1(EuMesh& mesh, double D, Storable<double> u) {
     //double R = D / 2.0;
     //Vector3d vc = {R + margin, R + margin, 0.2};
     double R = 0.1;
@@ -55,7 +55,7 @@ void setup_initial_1(SoaMesh& mesh, double D, Storable<double> u) {
 }
 
 // Начальное условие в виде квадрата
-void setup_initial_2(SoaMesh& mesh, double D, Storable<double> u) {
+void setup_initial_2(EuMesh& mesh, double D, Storable<double> u) {
     double x_min = margin;
     double x_max = D + x_min;
     double y_min = margin;
@@ -114,7 +114,7 @@ int main() {
     solver.set_limiter("MC");
 
     // Создать сетку
-    SoaMesh mesh(gen);
+    EuMesh mesh(gen);
 
     if (mesh.check_base() < 0) {
         int res = mesh.check_base();
@@ -136,13 +136,13 @@ int main() {
 
     // Переменные для сохранения
     pvd.variables = {"level"};
-    pvd.variables += {"u", [&solver](QCell& cell) { return cell(solver.u_curr); } };
-    pvd.variables += {"u2", [&solver](QCell& cell) { return cell(solver.u_next); } };
-    pvd.variables += {"uh", [&solver](QCell& cell) { return cell(solver.u_half); } };
-    pvd.variables += {"dx", [&solver](QCell& cell) { return cell(solver.du_dx); } };
-    pvd.variables += {"dy", [&solver](QCell& cell) { return cell(solver.du_dy); } };
-    pvd.variables += {"vx", [&solver](QCell& cell) { return solver.velocity(cell.center()).x(); } };
-    pvd.variables += {"vy", [&solver](QCell& cell) { return solver.velocity(cell.center()).y(); } };
+    pvd.variables += {"u", [&solver](EuCell& cell) { return cell(solver.u_curr); } };
+    pvd.variables += {"u2", [&solver](EuCell& cell) { return cell(solver.u_next); } };
+    pvd.variables += {"uh", [&solver](EuCell& cell) { return cell(solver.u_half); } };
+    pvd.variables += {"dx", [&solver](EuCell& cell) { return cell(solver.du_dx); } };
+    pvd.variables += {"dy", [&solver](EuCell& cell) { return cell(solver.du_dy); } };
+    pvd.variables += {"vx", [&solver](EuCell& cell) { return solver.velocity(cell.center()).x(); } };
+    pvd.variables += {"vy", [&solver](EuCell& cell) { return solver.velocity(cell.center()).y(); } };
 
     // Заполняем начальные данные
     Box box = mesh.bbox();

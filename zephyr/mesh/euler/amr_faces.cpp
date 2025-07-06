@@ -1,7 +1,9 @@
+#include <zephyr/geom/cell_type.h>
 #include <zephyr/mesh/euler/amr_cells.h>
-#include <zephyr/mesh/euler/soa_mesh.h>
 
 namespace zephyr::mesh {
+
+using geom::CellType;
 
 void AmrAdjacent::resize(index_t n_faces) {
     rank.resize(n_faces, -1);
@@ -15,6 +17,13 @@ void AmrAdjacent::reserve(index_t n_faces) {
     index.reserve(n_faces);
     alien.reserve(n_faces);
     basic.reserve(n_faces);
+}
+
+void AmrAdjacent::shrink_to_fit() {
+    rank.shrink_to_fit();
+    index.shrink_to_fit();
+    alien.shrink_to_fit();
+    basic.shrink_to_fit();
 }
 
 void AmrFaces::resize(index_t n_faces) {
@@ -35,6 +44,16 @@ void AmrFaces::reserve(index_t n_faces) {
     area.reserve(n_faces);
     area_alt.reserve(n_faces);
     vertices.reserve(n_faces);
+}
+
+void AmrFaces::shrink_to_fit() {
+    boundary.shrink_to_fit();
+    adjacent.shrink_to_fit();
+    normal.shrink_to_fit();
+    center.shrink_to_fit();
+    area.shrink_to_fit();
+    area_alt.shrink_to_fit();
+    vertices.shrink_to_fit();
 }
 
 void AmrFaces::insert(index_t iface, CellType ctype, int count) {

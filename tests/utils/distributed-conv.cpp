@@ -1,4 +1,4 @@
-/// @file Динамическая ORB декомпозиция без адаптации.
+/// @brief Динамическая ORB декомпозиция без адаптации.
 /// Можно проверить динамическую балансировку на различных сетках,
 /// включая неструктурированные сетки из многоугольников.
 
@@ -16,6 +16,8 @@
 #include <zephyr/geom/generator/rectangle.h>
 
 using namespace zephyr::mesh;
+using namespace zephyr::geom;
+
 using zephyr::utils::mpi;
 using zephyr::io::PvdFile;
 using zephyr::geom::generator::Cuboid;
@@ -24,50 +26,59 @@ using zephyr::utils::Stopwatch;
 
 using zephyr::mesh::decomp::ORB;
 
-struct _U_ {
-    double load;
-    double u1, u2;
-};
-
-_U_ U;
-
 // Векторное поле скорости
 Vector3d velocity(const Vector3d& c) {
-    return { 1.0, 0.3 + 0.3*std::sin(4 * M_PI * c.x()), 0.0 };
+    return { 1.0, 0.5 + 0.3*std::sin(4 * M_PI * c.x()), 0.0 };
 }
 
-// Переменные для сохранения
-double get_u(AmrStorage::Item& cell)  { return cell(U).u1; }
-
-double get_load(const AmrStorage::Item &cell) { return cell(U).load; }
+// Абстрактная нагрузка
+double foo(const Vector3d& v) {
+    Vector3d c1 = {0.2, 0.4, 0.0};
+    Vector3d c2 = {0.6, 0.1, 0.0};
+    Vector3d c3 = {0.8, 0.4, 0.0};
+    double A1 = 200.0;
+    double A2 = 100.0;
+    double A3 = 50.0;
+    double s1 = 0.15;
+    double s2 = 0.2;
+    double s3 = 0.1;
+    return A1/s1 * std::exp(-(v - c1).squaredNorm() / (s1 * s1)) +
+           A2/s2 * std::exp(-(v - c2).squaredNorm() / (s2 * s2)) +
+           A3/s3 * std::exp(-(v - c3).squaredNorm() / (s3 * s3));
+}
 
 // Просуммировать фиктивную нагрузку
-double calc_loads(Mesh& mesh) {
-    double load = 0;
+double calc_loads(EuMesh& mesh, Storable<double> load) {
+    double full = 0;
     for (auto cell: mesh) {
-        load += cell(U).load;
+        full += cell(load);
     }
-    return load;
+    return full;
 }
 
 int main() {
     mpi::handler init;
 
-    // Файл для записи
-    PvdFile pvd("mesh", "output");
-
-    pvd.variables = {"rank"};
-    pvd.variables += {"u",  get_u};
-    pvd.variables += {"load", get_load};
-
     // Сеточный генератор
     //Cuboid gen(0.0, 1.0, 0.0, 0.6, 0.0, 0.9);
     //gen.set_nx(50);
     Rectangle gen(0.0, 1.0, 0.0, 1.0, true);
-    gen.set_nx(250);
+    gen.set_nx(200);
 
     // Создаем сетку
-    EuMesh mesh(gen, U);
+    EuMesh mesh(gen);
+
+    auto u1 = mesh.add<double>("u1");
+    auto u2 = mesh.add<double>("u2");
+    auto load = mesh.add<double>("load");
+
+    // Файл для записи
+    PvdFile pvd("mesh", "output");
+
+    pvd.variables = {"rank", "index", "faces2D"};
+    pvd.variables.append("u", u1);
+    pvd.variables.append("load", load);
+
 
     // Bounding Box для сетки
     Box domain = gen.bbox();
@@ -75,10 +86,13 @@ int main() {
     // Заполняем данные о нагрузке ячеек
     Vector3d vc = domain.vmin + 0.2 * domain.size();
     double D = 0.1 * domain.diameter();
+    Vector3d vc2 = domain.vmin + 0.7 * domain.size();
+    double D2 = 0.15 * domain.diameter();
     for (auto cell: mesh) {
-        cell(U).u1 = (cell.center() - vc).norm() < D ? 1.0 : 0.0;
-        cell(U).u2 = 0.0;
-        cell(U).load = cell(U).u1;
+        cell(u1) = (cell.center() - vc).norm() < D ? 1.0 : 0.0;
+        //cell(u1) += (cell.center() - vc2).norm() < D2 ? 0.8 : 0.0;
+        cell(u2) = 0.0;
+        cell(load) = cell(u1);
     }
 
     // Различные варианты инициализации ORB декомпозиции
@@ -86,7 +100,10 @@ int main() {
     //ORB orb(domain, "YX", 13);
     //ORB orb(domain, "YX", 13, 3);
 
-    mesh.set_decomposition(orb);
+    mesh.set_decomposition(orb, false);
+
+    mesh.redistribute(u1);
+    pvd.save(mesh, -0.1);
 
     // Число Куранта
     double CFL = 0.5;
@@ -94,18 +111,24 @@ int main() {
     int n_step = 0;
 
     Stopwatch elapsed(true);
-    for (int step = 0; step < 500; ++step) {
+    for (int step = 0; step < 200; ++step) {
+        // Подсчитываем нагрузку каждого ранга
+        if (step % 1 == 0) {
+            mpi::cout << "Step:      " << step << "\n";
+            pvd.save(mesh, step);
+        }
+
         // Балансировка декомпозиции
         {
-            double load = calc_loads(mesh);
-            mesh.balancing(load);
-            mesh.redistribute();
+            double full = calc_loads(mesh, load);
+            mesh.balancing(full);
+            mesh.redistribute(u1);
         }
 
         // Подсчитываем нагрузку каждого ранга
-        if (step % 10 == 0) {
+        if (step % 1 == 0) {
             mpi::cout << "Step:      " << step << "\n";
-            pvd.save(mesh, step);
+            pvd.save(mesh, step + 0.1);
         }
 
         double dt = std::numeric_limits<double>::max();
@@ -115,29 +138,32 @@ int main() {
         }
         dt = mpi::min(CFL * dt);
 
+        // Отправить/получить основной слой
+        mesh.sync(u1);
+
         // Расчет по схеме upwind
         for (auto& cell: mesh) {
-            auto& zc = cell(U);
+            double zc = cell(u1);
 
             double fluxes = 0.0;
             for (auto& face: cell.faces()) {
-                const auto& zn = face.neib(U);
+                double zn = face.neib(u1);
 
                 double af = velocity(face.center()).dot(face.normal());
                 double a_p = std::max(af, 0.0);
                 double a_m = std::min(af, 0.0);
 
-                fluxes += (a_p * zc.u1 + a_m * zn.u1) * face.area();
+                fluxes += (a_p * zc + a_m * zn) * face.area();
             }
 
-            zc.u2 = zc.u1 - dt * fluxes / cell.volume();
+            cell(u2) = cell(u1) - dt * fluxes / cell.volume();
         }
 
         // Обновляем слои
         for (auto& cell: mesh) {
-            cell(U).u1 = cell(U).u2;
-            cell(U).u2 = 0.0;
-            cell(U).load = cell(U).u1;
+            cell(u1) = cell(u2);
+            cell(u2) = 0.0;
+            cell(load) = cell(u1);
         }
 
         n_step += 1;

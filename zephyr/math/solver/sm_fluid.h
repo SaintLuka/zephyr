@@ -1,14 +1,14 @@
 #pragma once
 
-#include <zephyr/mesh/euler/soa_mesh.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/phys/matter/eos/eos.h>
 #include <zephyr/math/cfd/fluxes.h>
 #include <zephyr/math/cfd/limiter.h>
 
 namespace zephyr::math {
 
-using zephyr::mesh::SoaMesh;
-using zephyr::mesh::QCell;
+using zephyr::mesh::EuMesh;
+using zephyr::mesh::EuCell;
 using zephyr::mesh::Storable;
 using zephyr::mesh::Distributor;
 using zephyr::geom::Vector3d;
@@ -41,7 +41,7 @@ public:
     ~SmFluid() = default;
 
     /// @brief Добавить типы на сетку
-    State add_types(SoaMesh& mesh);
+    State add_types(EuMesh& mesh);
 
     /// @brief Установить число Куранта
     void set_CFL(double CFL);
@@ -68,10 +68,10 @@ public:
     void set_max_dt(double dt);
 
     /// @brief Выполнить шаг интегрирования по времени
-    void update(SoaMesh &mesh);
+    void update(EuMesh &mesh);
 
     /// @brief Установить флаги адаптации
-    void set_flags(SoaMesh& mesh) const;
+    void set_flags(EuMesh& mesh) const;
 
     /// @brief Распределитель данных при адаптации
     /// @param type Тип "const" или "slope" переноса при разбиении
@@ -80,22 +80,22 @@ public:
 
     /// @brief Посчитать шаг интегрирования по времени с учетом
     /// условия Куранта
-    void compute_dt(SoaMesh &mesh);
+    void compute_dt(EuMesh &mesh);
 
     /// @brief Расчёт потоков
-    void fluxes(SoaMesh &mesh) const;
+    void fluxes(EuMesh &mesh) const;
 
     /// @brief Обновление ячеек
-    void swap(SoaMesh &mesh) const;
+    void swap(EuMesh &mesh) const;
 
     /// @brief Вычислить производные
-    void compute_grad(SoaMesh &mesh) const;
+    void compute_grad(EuMesh &mesh) const;
 
     /// @brief Вычислить потоки на стадии предиктора
-    void fluxes_stage1(SoaMesh &mesh) const;
+    void fluxes_stage1(EuMesh &mesh) const;
 
     /// @brief Вычислить потоки на стадии корректора
-    void fluxes_stage2(SoaMesh &mesh) const;
+    void fluxes_stage2(EuMesh &mesh) const;
 
 protected:
     Eos::Ptr m_eos;          ///< Уравнение состояния

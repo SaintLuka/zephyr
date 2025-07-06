@@ -3,7 +3,7 @@
 #include <zephyr/math/cfd/face_extra.h>
 
 using namespace zephyr::geom;
-using zephyr::mesh::SoaChildren;
+using zephyr::mesh::Children;
 
 namespace zephyr::math {
 
@@ -14,7 +14,7 @@ Convection::Convection() {
     m_limiter = "minmod";
 }
 
-void Convection::add_types(SoaMesh& mesh) {
+void Convection::add_types(EuMesh& mesh) {
     u_curr = mesh.add<double>("u1");
     du_dx = mesh.add<double>("ux");
     du_dy = mesh.add<double>("uy");
@@ -55,12 +55,12 @@ Vector3d Convection::velocity(const Vector3d& c) const {
     return Vector3d::UnitX();
 }
 
-double Convection::compute_dt(QCell &cell) const {
+double Convection::compute_dt(EuCell &cell) const {
     double h = cell.incircle_diameter();
     return m_CFL * h / velocity(cell.center()).norm();
 }
 
-void Convection::compute_grad(QCell &cell, int stage) const {
+void Convection::compute_grad(EuCell &cell, int stage) const {
     double uc = stage < 1 ? cell(u_curr) : cell(u_half);
 
     Vector3d grad = Vector3d::Zero();
@@ -75,7 +75,7 @@ void Convection::compute_grad(QCell &cell, int stage) const {
     cell(du_dz) = grad.z();
 }
 
-void Convection::fluxes(QCell &cell, int stage) {
+void Convection::fluxes(EuCell &cell, int stage) {
     double uc = stage < 1 ? cell(u_curr) : cell(u_half);
     double uc_dx = cell(du_dx);
     double uc_dy = cell(du_dy);
@@ -137,10 +137,10 @@ void Convection::fluxes(QCell &cell, int stage) {
     }
 }
 
-void Convection::update(SoaMesh &mesh) {
+void Convection::update(EuMesh &mesh) {
     // Определяем dt
     m_dt = mesh.min(
-            [this](QCell cell) -> double {
+            [this](EuCell cell) -> double {
                 return compute_dt(cell);
             }, 1.0e300);
 
@@ -148,7 +148,7 @@ void Convection::update(SoaMesh &mesh) {
         // Схема первого порядка, простой снос значений
         // на промежуточный слой
         mesh.for_each(
-                [this](QCell cell) {
+                [this](EuCell cell) {
                     cell(u_half) = cell(u_curr);
                 });
     } else {
@@ -157,26 +157,26 @@ void Convection::update(SoaMesh &mesh) {
 
         // Считаем производные
         mesh.for_each(
-                [this](QCell cell) {
+                [this](EuCell cell) {
                     compute_grad(cell, 0);
                 });
 
         // Шаг предиктора
         mesh.for_each(
-                [this](QCell cell) {
+                [this](EuCell cell) {
                     fluxes(cell, 0);
                 });
 
         // Считаем производные
         mesh.for_each(
-                [this](QCell cell) {
+                [this](EuCell cell) {
                     compute_grad(cell, 1);
                 });
     }
 
     // Шаг корректора
     mesh.for_each(
-            [this](QCell cell) {
+            [this](EuCell cell) {
                 fluxes(cell, 1);
             });
 
@@ -184,12 +184,12 @@ void Convection::update(SoaMesh &mesh) {
     mesh.swap(u_curr, u_next);
 }
 
-void Convection::set_flags(SoaMesh& mesh) {
-    if (!mesh.is_adaptive()) {
+void Convection::set_flags(EuMesh& mesh) {
+    if (!mesh.adaptive()) {
         return;
     }
 
-    mesh.for_each([this](QCell cell) {
+    mesh.for_each([this](EuCell cell) {
         double min_val = cell(u_curr);
         double max_val = cell(u_curr);
 
@@ -210,11 +210,9 @@ void Convection::set_flags(SoaMesh& mesh) {
 }
 
 Distributor Convection::distributor() const {
-    using mesh::Children;
-
     Distributor distr;
 
-    distr.split_soa = [&](QCell &parent, SoaChildren &children) {
+    distr.split = [&](EuCell &parent, Children &children) {
         for (auto child: children) {
             Vector3d dr = parent.center() - child.center();
             child(u_curr) = parent(u_curr) +
@@ -224,7 +222,7 @@ Distributor Convection::distributor() const {
         }
     };
 
-    distr.merge_soa = [&](SoaChildren &children, QCell &parent) {
+    distr.merge = [&](Children &children, EuCell &parent) {
         double sum = 0.0;
         for (auto child: children) {
             sum += child(u_curr) * child.volume();

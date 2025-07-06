@@ -18,12 +18,8 @@ RWalk::RWalk(const Box &domain, int size)
     }
 }
 
-int RWalk::rank(QCell &elem) const {
+int RWalk::rank(EuCell &elem) const {
     return m_diagram.rank(elem.center()) % m_size;
-}
-
-int RWalk::rank(AmrStorage::Item &elem) const {
-    return m_diagram.rank(elem.center) % m_size;
 }
 
 void RWalk::balancing(const std::vector<double> &w) {

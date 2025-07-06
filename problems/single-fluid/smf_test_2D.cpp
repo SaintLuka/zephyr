@@ -23,8 +23,8 @@ using namespace zephyr::math;
 using namespace zephyr::math::smf;
 
 using zephyr::mesh::generator::Rectangle;
-using zephyr::mesh::SoaMesh;
-using zephyr::mesh::QCell;
+using zephyr::mesh::EuMesh;
+using zephyr::mesh::EuCell;
 using zephyr::math::SmFluid;
 using zephyr::utils::mpi;
 using zephyr::utils::threads;
@@ -53,7 +53,7 @@ int main() {
     gen.set_nx(mpi::single() ? 100 : 500);
 
     // Создать сетку
-    SoaMesh mesh(gen);
+    EuMesh mesh(gen);
 
     // Создать и настроить решатель
     SmFluid solver(eos);
@@ -76,8 +76,8 @@ int main() {
     const int n = simple_init ? 0 : 20;
 
     // Задание начальных данных
-    auto init_cells = [&test, z, eos](SoaMesh& mesh) {
-        mesh.for_each([&](QCell& cell) {
+    auto init_cells = [&test, z, eos](EuMesh& mesh) {
+        mesh.for_each([&](EuCell& cell) {
             QState q(test.density_mean(cell, n),
                      test.momentum_mean(cell, n),
                      test.energy_mean(cell, n));
@@ -91,19 +91,19 @@ int main() {
 
     // Переменные для сохранения
     pvd.variables = {"level"};
-    pvd.variables += {"density",  [z](QCell& cell) -> double { return cell(z).density; }};
-    pvd.variables += {"vel.x",    [z](QCell& cell) -> double { return cell(z).velocity.x(); }};
-    pvd.variables += {"vel.y",    [z](QCell& cell) -> double { return cell(z).velocity.y(); }};
-    pvd.variables += {"pressure", [z](QCell& cell) -> double { return cell(z).pressure; }};
-    pvd.variables += {"energy",   [z](QCell& cell) -> double { return cell(z).energy; }};
+    pvd.variables += {"density",  [z](EuCell& cell) -> double { return cell(z).density; }};
+    pvd.variables += {"vel.x",    [z](EuCell& cell) -> double { return cell(z).velocity.x(); }};
+    pvd.variables += {"vel.y",    [z](EuCell& cell) -> double { return cell(z).velocity.y(); }};
+    pvd.variables += {"pressure", [z](EuCell& cell) -> double { return cell(z).pressure; }};
+    pvd.variables += {"energy",   [z](EuCell& cell) -> double { return cell(z).energy; }};
 
     double curr_time = 0.0;
     pvd.variables += {"exact.dens",
-                      [&test, &curr_time](const QCell &cell) -> double {
+                      [&test, &curr_time](const EuCell &cell) -> double {
                           return test.density_t(cell.center(), curr_time);
                       }};
     pvd.variables += {"exact.pres",
-                      [&test, &curr_time](const QCell &cell) -> double {
+                      [&test, &curr_time](const EuCell &cell) -> double {
                           return test.pressure_t(cell.center(), curr_time);
                       }};
 

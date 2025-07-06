@@ -2,6 +2,18 @@
 
 namespace zephyr::utils {
 
+SoaStorage SoaStorage::same() const {
+    SoaStorage new_s;
+    new_s.m_names1 = m_names1;
+    new_s.m_names2 = m_names2;
+    resize_basic_values(new_s);
+
+    for (int i = 0; i < m_values2.size(); ++i) {
+        new_s.m_values2[i].resize(m_values2[i].size());
+    }
+    return new_s;
+}
+
 void SoaStorage::resize(size_t new_size) {
     m_size = new_size;
     resize_basic(new_size);
@@ -14,12 +26,21 @@ void SoaStorage::resize(size_t new_size) {
 }
 
 void SoaStorage::reserve(size_t new_size) {
-    m_size = new_size;
     reserve_basic(new_size);
 
     for (int i = 0; i < m_values2.size(); ++i) {
         for (auto& vec: m_values2[i]) {
             vec.reserve(new_size * custom_type_sizeof(i));
+        }
+    }
+}
+
+void SoaStorage::shrink_to_fit() {
+    shrink_basic();
+
+    for (auto& row: m_values2) {
+        for (auto& vec: row) {
+            vec.shrink_to_fit();
         }
     }
 }
@@ -55,7 +76,7 @@ void SoaStorage::copy_data(size_t from, size_t to) {
     copy_data(from, this, to);
 }
 
-void SoaStorage::copy_data(size_t from, SoaStorage* dst, size_t to) {
+void SoaStorage::copy_data(size_t from, SoaStorage* dst, size_t to) const {
     copy_basics(m_values1, from, dst->m_values1, to);
 
     for (size_t i = 0; i < n_custom_types; ++i) {

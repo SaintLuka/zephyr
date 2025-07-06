@@ -1,16 +1,13 @@
 #pragma once
 
-#include <vector>
-
-#include <zephyr/geom/vector.h>
 #include <zephyr/mesh/euler/amr_cells.h>
 
 namespace zephyr::mesh {
 
-class QCell;
+class EuCell;
 
 /// @brief Классная грань
-class QFace final {
+class EuFace final {
     using Vector3d = geom::Vector3d;
     using Boundary = geom::Boundary;
 
@@ -23,7 +20,7 @@ class QFace final {
 
 public:
     /// @brief Основной конструктор
-    QFace(AmrCells* cells, index_t face_idx, AmrCells* aliens = nullptr)
+    EuFace(AmrCells* cells, index_t face_idx, AmrCells* aliens = nullptr)
         : m_cells(cells), m_face_idx(face_idx), m_aliens(aliens) { }
 
     /// @brief Флаг граничных условий
@@ -73,7 +70,7 @@ public:
 
     /// @brief Ячейка по внешней нормали, на границе сетки возвращается
     /// сама ячейка
-    QCell neib() const;
+    EuCell neib() const;
 
     template <typename T>
     inline const T& neib(utils::Storable<T> type) const;
@@ -90,7 +87,7 @@ public:
 
 /// @brief Обертка для типа geom::BFace, реализует интерфейс грани,
 /// необходимый для работы. Также содержит несколько новых функций.
-class QFaceIt {
+class EuFaceIt {
 private:
     AmrCells* m_cells;     //< Указатель на сетку (обычно locals)
     index_t   m_face_idx;  //< Индекс первой грани
@@ -105,14 +102,14 @@ private:
 public:
     /// @brief Изолированная грань на стороне side,
     /// не позволяет обходить грани
-    QFaceIt(AmrCells* cells, index_t face_idx, index_t face_end, AmrCells* aliens, Direction dir = Direction::ANY)
+    EuFaceIt(AmrCells* cells, index_t face_idx, index_t face_end, AmrCells* aliens, Direction dir = Direction::ANY)
             : m_cells(cells), m_face_idx(face_idx), m_aliens(aliens), m_face_end(face_end), m_dir(dir) {
         while (m_face_idx < m_face_end && to_skip(m_dir)) {
             m_face_idx += 1;
         }
     }
 
-    QFaceIt &operator++() {
+    EuFaceIt &operator++() {
         do {
             // Доработать, не забыть (забыл)
             m_face_idx += 1;
@@ -127,28 +124,28 @@ public:
         return m_cells->faces.to_skip(m_face_idx, dir);
     }
 
-    bool operator!=(const QFaceIt &face) const {
+    bool operator!=(const EuFaceIt &face) const {
         return m_face_idx != face.m_face_idx;
     }
 
     template <int dim>
-    QFace operator[](Side<dim> s) const {
-        return QFace(m_cells, m_face_idx + s);
+    EuFace operator[](Side<dim> s) const {
+        return EuFace(m_cells, m_face_idx + s);
     }
 
     // Лайфхак, начало структур совпадает
-    QFace &operator*() { return *reinterpret_cast<QFace*>(this); }
+    EuFace &operator*() { return *reinterpret_cast<EuFace*>(this); }
 
     // Лайфхак, начало структур совпадает
-    const QFace &operator*() const { return *reinterpret_cast<const QFace*>(this); }
+    const EuFace &operator*() const { return *reinterpret_cast<const EuFace*>(this); }
 };
 
 /// @brief Интерфейс для итераций по граням ячейки
-class QFaces {
-    QFaceIt m_begin;
-    QFaceIt m_end;
+class EuFaces {
+    EuFaceIt m_begin;
+    EuFaceIt m_end;
 public:
-    QFaces(
+    EuFaces(
         AmrCells* cells,
         index_t cell_idx,
         AmrCells* aliens = nullptr,
@@ -163,13 +160,13 @@ public:
             cells->face_begin[cell_idx + 1],
             aliens, dir) { }
 
-    QFaceIt begin() const { return m_begin; }
+    EuFaceIt begin() const { return m_begin; }
 
-    QFaceIt end() const { return m_end; }
+    EuFaceIt end() const { return m_end; }
 };
 
 /// @brief Классная ячейка
-class QCell final {
+class EuCell final {
 public:
     AmrCells* m_cells;  //< Указатель на сетку (обычно locals)
     index_t   m_index;  //< Индекс ячейки
@@ -179,7 +176,7 @@ public:
     AmrCells* m_aliens = nullptr;
 
 public:
-    QCell(AmrCells* cells, index_t index, AmrCells* aliens = nullptr)
+    EuCell(AmrCells* cells, index_t index, AmrCells* aliens = nullptr)
         : m_cells(cells), m_index(index), m_aliens(aliens) { }
 
     /// @brief Размерность ячейки
@@ -211,11 +208,11 @@ public:
     template <typename T>
     const T& operator()(utils::Storable<T> type) const;
 
-    inline QFace face(int idx) const;
+    inline EuFace face(int idx) const;
 
-    inline QFace face(Side2D s) const;
+    inline EuFace face(Side2D s) const;
 
-    inline QFace face(Side3D s) const;
+    inline EuFace face(Side3D s) const;
 
     template <int dim>
     bool complex_face(Side<dim> s) const {
@@ -244,9 +241,11 @@ public:
     template <int dim>
     SqMap<dim> mapping() const { return m_cells->mapping<dim>(m_index); }
 
-    QFaces faces(Direction dir = Direction::ANY) const;
+    int max_face_count() const;
 
-    void copy_data_to(QCell& dst) const;
+    EuFaces faces(Direction dir = Direction::ANY) const;
+
+    void copy_data_to(EuCell& dst) const;
 
     geom::Polygon polygon() const;
 
@@ -267,8 +266,8 @@ public:
     }
 };
 
-/// @brief Итератор по ячейкам из SoaMesh или AmrCells
-class CellIt final {
+/// @brief Итератор по ячейкам из EuMesh или AmrCells
+class EuCellIt final {
 private:
     AmrCells* m_cells;  //< Указатель на сетку
     index_t   m_index;  //< Индекс ячейки
@@ -280,66 +279,66 @@ private:
 public:
     using iterator_category = std::random_access_iterator_tag;
     using difference_type = index_t;
-    using value_type = QCell;
-    using pointer    = QCell*;
-    using reference  = QCell&;
+    using value_type = EuCell;
+    using pointer    = EuCell*;
+    using reference  = EuCell&;
 
     // Конструктор
-    CellIt(AmrCells* cells, index_t index, AmrCells* aliens = nullptr)
+    EuCellIt(AmrCells* cells, index_t index, AmrCells* aliens = nullptr)
         : m_cells(cells), m_index(index), m_aliens(aliens) { }
 
     /// @brief Разыменование итератора (для цикла for), лайфхак
-    QCell& operator*() { return *reinterpret_cast<QCell*>(this); }
+    EuCell& operator*() { return *reinterpret_cast<EuCell*>(this); }
 
     /// @brief Инкремент
-    CellIt &operator++() { ++m_index; return *this; }
+    EuCellIt &operator++() { ++m_index; return *this; }
 
     /// @brief Декремент
-    CellIt &operator--() { --m_index; return *this; }
+    EuCellIt &operator--() { --m_index; return *this; }
 
     /// @brief Итератор через step
-    CellIt &operator+=(index_t step) { m_index += step; return *this; }
+    EuCellIt &operator+=(index_t step) { m_index += step; return *this; }
 
     /// @brief Итератор через step
-    CellIt operator+(index_t step) const {
-        return CellIt(m_cells, m_index + step);
+    EuCellIt operator+(index_t step) const {
+        return EuCellIt(m_cells, m_index + step);
     }
 
     /// @brief Оператор доступа как для указателя (требует random access iterator)
-    QCell operator[](index_t offset) const {
-        return QCell(m_cells, m_index + offset, m_aliens);
+    EuCell operator[](index_t offset) const {
+        return EuCell(m_cells, m_index + offset, m_aliens);
     }
 
     /// @brief Расстояние между двумя ячейками
-    index_t operator-(const CellIt& cell) const { return m_index - cell.m_index; }
+    index_t operator-(const EuCellIt& cell) const { return m_index - cell.m_index; }
 
     /// @brief Оператор сравнения
-    bool operator<(const CellIt& cell) const { return m_index < cell.m_index; }
+    bool operator<(const EuCellIt& cell) const { return m_index < cell.m_index; }
 
     /// @brief Оператор сравнения
-    bool operator!=(const CellIt& cell) const { return m_index != cell.m_index; }
+    bool operator!=(const EuCellIt& cell) const { return m_index != cell.m_index; }
 
     /// @brief Оператор сравнения
-    bool operator==(const CellIt& cell) const { return m_index == cell.m_index; }
+    bool operator==(const EuCellIt& cell) const { return m_index == cell.m_index; }
 };
 
 /// @brief Для итераций по AmrCells, aliens = nullptr,
 /// поэтому проход по соседям не возможен
-inline CellIt begin(AmrCells& cells) {
-    return CellIt(&cells, 0);
+inline EuCellIt begin(AmrCells& cells) {
+    return EuCellIt(&cells, 0);
 }
 
 /// @brief Для итераций по AmrCells, aliens = nullptr,
 /// поэтому проход по соседям не возможен
-inline CellIt end(AmrCells& cells) {
-    return CellIt(&cells, cells.size());
+inline EuCellIt end(AmrCells& cells) {
+    return EuCellIt(&cells, cells.size());
 }
 
 /// @brief Простой интерфейс для обхода дочерних ячеек.
 /// Предполагается, что дочерние ячейки располагаются в локальном хранилище.
 /// Во время операций split (refine) и merge (coarse) сетка может находиться
 /// в не совместном состоянии, поэтому переход по соседям запрещен.
-class SoaChildren {
+class Children {
 public:
 
     /// @brief Индексы дочерних ячеек
@@ -347,7 +346,7 @@ public:
 
 
     /// @brief Обязательная инициализация локального хранилища
-    explicit SoaChildren(AmrCells* locals) : m_locals(locals) { }
+    explicit Children(AmrCells* locals) : m_locals(locals) { }
 
     /// @brief Размерность определяется по числу дочерних ячеек
     int dim() const { return index[4] < 0 ? 2 : 3; }
@@ -356,14 +355,14 @@ public:
     int count() const { return index[4] < 0 ? 4 : 8; }
 
     /// @brief Получить дочернюю ячейку
-    QCell operator[](int idx) const { return QCell(m_locals, index[idx]); };
+    EuCell operator[](int idx) const { return EuCell(m_locals, index[idx]); };
 
     /// @brief Простенький итератор по дочерним ячейкам
     struct iterator {
-        iterator(SoaChildren& children, int idx)
+        iterator(Children& children, int idx)
                 : m_children(children), m_idx(idx) { }
 
-        QCell operator*() const { return m_children[m_idx]; }
+        EuCell operator*() const { return m_children[m_idx]; }
 
         void operator++() { ++m_idx; }
 
@@ -371,7 +370,7 @@ public:
 
     private:
         int m_idx;
-        SoaChildren& m_children;
+        Children& m_children;
     };
 
     iterator begin() { return iterator(*this, 0); }
@@ -386,167 +385,167 @@ protected:
 
 
 // ============================================================================
-//                         inline функции Face
+//                         inline функции EuFace
 // ============================================================================
 
-inline geom::Boundary QFace::flag() const {
+inline geom::Boundary EuFace::flag() const {
     return m_cells->faces.boundary[m_face_idx];
 }
 
-inline bool QFace::is_boundary() const {
+inline bool EuFace::is_boundary() const {
     return m_cells->faces.is_boundary(m_face_idx);
 }
 
-inline bool QFace::is_actual() const {
+inline bool EuFace::is_actual() const {
     return m_cells->faces.is_actual(m_face_idx);
 }
 
-inline bool QFace::is_undefined() const {
+inline bool EuFace::is_undefined() const {
     return m_cells->faces.is_undefined(m_face_idx);
 }
 
-inline void QFace::set_undefined() {
+inline void EuFace::set_undefined() {
     m_cells->faces.set_undefined(m_face_idx);
 }
 
-inline const geom::Vector3d &QFace::normal() const {
+inline const geom::Vector3d &EuFace::normal() const {
     return m_cells->faces.normal[m_face_idx];
 }
 
-inline const geom::Vector3d &QFace::center() const {
+inline const geom::Vector3d &EuFace::center() const {
     return m_cells->faces.center[m_face_idx];
 }
 
-inline double QFace::area() const {
+inline double EuFace::area() const {
     return m_cells->faces.area[m_face_idx];
 }
 
-inline double QFace::area(bool axial) const {
+inline double EuFace::area(bool axial) const {
     return m_cells->faces.get_area(m_face_idx, axial);
 }
 
-inline geom::Vector3d QFace::symm_point(const Vector3d &p) const {
+inline geom::Vector3d EuFace::symm_point(const Vector3d &p) const {
     return m_cells->faces.symm_point(m_face_idx, p);
 }
 
-inline geom::Vector3d QFace::vs(int idx) const {
+inline geom::Vector3d EuFace::vs(int idx) const {
     index_t cell_idx = m_cells->faces.adjacent.basic[m_face_idx];
     return m_cells->verts[m_cells->node_begin[cell_idx] +
                           m_cells->faces.vertices[m_face_idx][idx]];
 }
 
-inline index_t QFace::adj_index() const {
+inline index_t EuFace::adj_index() const {
     return m_cells->faces.adjacent.index[m_face_idx];
 }
 
-inline index_t QFace::adj_alien() const {
+inline index_t EuFace::adj_alien() const {
     return m_cells->faces.adjacent.alien[m_face_idx];
 }
 
-inline QCell QFace::neib() const {
+inline EuCell EuFace::neib() const {
     if (m_cells->faces.adjacent.is_local(m_face_idx)) {
-        return QCell(m_cells, adj_index(), m_aliens);
+        return EuCell(m_cells, adj_index(), m_aliens);
     }
-    return QCell(m_aliens, adj_alien(), m_aliens);
+    return EuCell(m_aliens, adj_alien(), m_aliens);
 }
 
 template <typename T>
-const T& QFace::neib(utils::Storable<T> type) const {
+const T& EuFace::neib(utils::Storable<T> type) const {
     if (m_cells->faces.adjacent.is_local(m_face_idx)) {
         return m_cells->data(type)[adj_index()];
     }
     return m_aliens->data(type)[adj_alien()];
 }
 
-inline int QFace::neib_rank() const {
+inline int EuFace::neib_rank() const {
     return m_cells->faces.adjacent.rank[m_face_idx];
 }
 
-inline geom::Vector3d QFace::neib_center() const {
+inline geom::Vector3d EuFace::neib_center() const {
     if (m_cells->faces.adjacent.is_local(m_face_idx)) {
         return m_cells->center[adj_index()];
     }
     return m_aliens->center[adj_alien()];
 }
 
-
-
-
 // ============================================================================
-//                         inline функции Cell
+//                         inline функции EuCell
 // ============================================================================
 
-inline int QCell::dim() const { return m_cells->dim(); }
+inline int EuCell::dim() const { return m_cells->dim(); }
 
-inline bool QCell::adaptive() const { return m_cells->adaptive(); }
+inline bool EuCell::adaptive() const { return m_cells->adaptive(); }
 
-inline int QCell::rank() const { return m_cells->rank[m_index]; }
+inline int EuCell::rank() const { return m_cells->rank[m_index]; }
 
-inline int QCell::flag() const { return m_cells->flag[m_index]; }
+inline int EuCell::flag() const { return m_cells->flag[m_index]; }
 
-inline int QCell::level() const { return m_cells->level[m_index]; }
+inline int EuCell::level() const { return m_cells->level[m_index]; }
 
-inline index_t QCell::b_idx() const { return m_cells->b_idx[m_index]; }
+inline index_t EuCell::b_idx() const { return m_cells->b_idx[m_index]; }
 
-inline index_t QCell::z_idx() const { return m_cells->z_idx[m_index]; }
+inline index_t EuCell::z_idx() const { return m_cells->z_idx[m_index]; }
 
-inline index_t QCell::index() const { return m_cells->index[m_index]; }
+inline index_t EuCell::index() const { return m_cells->index[m_index]; }
 
-inline index_t QCell::next() const { return m_cells->next[m_index]; }
+inline index_t EuCell::next() const { return m_cells->next[m_index]; }
 
-inline void QCell::set_flag(int flag) { m_cells->flag[m_index] = flag; }
+inline void EuCell::set_flag(int flag) { m_cells->flag[m_index] = flag; }
 
 
 template <typename T>
-T& QCell::operator()(utils::Storable<T> type) {
+T& EuCell::operator()(utils::Storable<T> type) {
     return m_cells->data(type)[m_index];
 }
 
 template <typename T>
-const T& QCell::operator()(utils::Storable<T> type) const {
+const T& EuCell::operator()(utils::Storable<T> type) const {
     return m_cells->data(type)[m_index];
 }
 
-inline const geom::Vector3d& QCell::center() const {
+inline const geom::Vector3d& EuCell::center() const {
     return m_cells->center[m_index];
 }
 
-inline double QCell::volume() const {
+inline double EuCell::volume() const {
     return m_cells->volume[m_index];
 }
 
-inline double QCell::volume(bool axial) const {
+inline double EuCell::volume(bool axial) const {
     return m_cells->get_volume(m_index, axial);
 }
 
-inline double QCell::linear_size() const {
+inline double EuCell::linear_size() const {
     return m_cells->linear_size(m_index);
 }
 
-inline QFace QCell::face(int idx) const {
-    return QFace(m_cells, m_cells->face_begin[m_index] + idx, m_aliens);
+inline EuFace EuCell::face(int idx) const {
+    return EuFace(m_cells, m_cells->face_begin[m_index] + idx, m_aliens);
 }
 
-inline QFace QCell::face(Side2D s) const {
-    return QFace(m_cells, m_cells->face_begin[m_index] + s, m_aliens);
+inline EuFace EuCell::face(Side2D s) const {
+    return EuFace(m_cells, m_cells->face_begin[m_index] + s, m_aliens);
 }
 
-inline QFace QCell::face(Side3D s) const {
-    return QFace(m_cells, m_cells->face_begin[m_index] + s, m_aliens);
+inline EuFace EuCell::face(Side3D s) const {
+    return EuFace(m_cells, m_cells->face_begin[m_index] + s, m_aliens);
 }
 
 
-inline void QCell::copy_data_to(QCell &dst) const {
+inline void EuCell::copy_data_to(EuCell &dst) const {
     m_cells->copy_data(m_index, dst.m_cells, dst.m_index);
 }
 
-inline double QCell::incircle_diameter() const {
+inline double EuCell::incircle_diameter() const {
     return m_cells->incircle_diameter(m_index);
 }
 
-inline QFaces QCell::faces(Direction dir) const {
-    return QFaces(m_cells, m_index, m_aliens, dir);
+inline int EuCell::max_face_count() const {
+    return m_cells->max_face_count(m_index);
 }
 
-
+inline EuFaces EuCell::faces(Direction dir) const {
+    return EuFaces(m_cells, m_index, m_aliens, dir);
 }
+
+} // namespace zephyr::mesh

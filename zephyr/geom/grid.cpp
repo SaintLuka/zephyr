@@ -4,14 +4,8 @@
 #include <zephyr/geom/grid.h>
 
 #include <zephyr/mesh/primitives/side.h>
-#include <zephyr/mesh/primitives/mov_node.h>
-#include <zephyr/mesh/primitives/amr_cell.h>
-#include <zephyr/mesh/primitives/mov_cell.h>
 
 using zephyr::mesh::Side3D;
-using zephyr::mesh::AmrCell;
-using zephyr::mesh::MovNode;
-using zephyr::mesh::MovCell;
 
 namespace zephyr::geom {
 
@@ -106,23 +100,6 @@ std::vector<int> GNode::shared_cells(const std::vector<GNode::Ptr> &vs) {
 
 void GNode::add_neib_cell(int idx) {
     m_neibs.insert(idx);
-}
-
-MovNode GNode::bnode() const {
-    MovNode mov_node(0, index);
-    if (m_bounds.empty()) {
-        mov_node.boundary = *m_bounds.begin();
-    }
-    mov_node.coords = this->v;
-
-    int counter = 0;
-    for (int idx: m_neibs) {
-        mov_node.neibs[counter].rank = 0;
-        mov_node.neibs[counter].index = idx;
-        mov_node.neibs[counter].alien = -1;
-        ++counter;
-    }
-    return mov_node;
 }
 
 GCell::GCell()
@@ -415,6 +392,7 @@ void Grid::setup_adjacency() {
     }
 }
 
+/*
 AmrCell Grid::amr_cell(int idx) const {
     auto gcell = cell(idx);
 
@@ -556,51 +534,7 @@ AmrCell Grid::amr_cell(int idx) const {
         throw std::runtime_error("Can't create AmrCell");
     }
 }
-
-MovCell Grid::mov_cell(int idx) const {
-    auto gcell = cell(idx);
-
-    assert(gcell.index == idx);
-
-    if (gcell.type() == CellType::QUAD ||
-        gcell.type() == CellType::POLYGON) {
-
-        int n_nodes = gcell.n_nodes();
-
-        std::vector<GNode::Ptr> nodes(n_nodes, nullptr);
-
-        geom::Polygon poly(n_nodes);
-        for (int i = 0; i < n_nodes; ++i) {
-            nodes[i] = m_nodes[gcell.node(i).index];
-            poly.set(i, nodes[i]->v);
-        }
-
-        MovCell cell(poly);
-        for (int i = 0; i < n_nodes; ++i) {
-            cell.nodes[i] = nodes[i]->index;
-        }
-
-        cell.rank  = mpi::rank();
-        cell.index = idx;
-        cell.next  = 0;
-
-        for (int i = 0; i < n_nodes; ++i) {
-            GNode::Ref v1 = nodes[cell.faces[i].vertices[0]];
-            GNode::Ref v2 = nodes[cell.faces[i].vertices[1]];
-
-            cell.faces[i].boundary = gcell.boundary({v1, v2});
-            cell.faces[i].adjacent.rank = 0;
-            cell.faces[i].adjacent.alien = -1;
-            cell.faces[i].adjacent.index = gcell.adjacent({v1, v2});
-        }
-
-        return cell;
-    }
-    else {
-        throw std::runtime_error("Can't create MovCell");
-    }
-}
-
+*/
 void Grid::assume_structured(int nx, int ny, int nz) {
     if (nx <= 0 && ny <= 0 && nz <= 0) {
         throw std::runtime_error("Grid::assume structured nx | ny | nz <= 0");

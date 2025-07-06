@@ -5,9 +5,7 @@
 namespace zephyr::utils {
 
 /// @brief Простой класс для представления диапазона чисел.
-/// По умолчанию используется для целочисленного типа int, можно использовать
-/// для генерации чисел из size_t. Вообще говоря, класс нужен, чтобы кидать
-/// на вход функции threads::for_each().
+/// По умолчанию используется для целочисленного типа size_t.
 /// Пример, вывести числа от 0 до 9 (включительно):
 /// @code
 /// for (auto i: range(10)) {
@@ -35,7 +33,7 @@ public:
     public:
         /// @brief Категория random_access
         using iterator_category = std::random_access_iterator_tag;
-        using difference_type   = std::ptrdiff_t;
+        using difference_type   = std::make_signed_t<T>;
         using value_type = T;
         using pointer    = T*;
         using reference  = T;
@@ -71,7 +69,7 @@ public:
         }
 
         /// @brief Расстояние между итераторами
-        inline int operator-(const iterator &other) const {
+        inline difference_type operator-(const iterator &other) const {
             return int(m_val - other.m_val);
         }
 

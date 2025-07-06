@@ -4,7 +4,7 @@
 
 #include <iomanip>
 
-#include <zephyr/mesh/euler/soa_mesh.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/geom/primitives/polygon.h>
 #include <zephyr/io/pvd_file.h>
@@ -60,11 +60,11 @@ struct Star {
     }
 };
 
-void set_index(QCell& cell, Star& star) {
+void set_index(EuCell& cell, Star& star) {
     cell(bit) = star.inside(cell.center());
 }
 
-void set_flag(QCell& cell) {
+void set_flag(EuCell& cell) {
     cell.set_flag(cell(bit) > 0 ? 1 : -1);
 }
 
@@ -73,12 +73,12 @@ int main() {
 
     PvdFile pvd("mesh", "output");
     pvd.variables = {"rank", "index", "next", "level", "flag", "faces2D"};
-    pvd.variables += {"wanted", [](QCell& cell) -> double { return cell(bit); }};
+    pvd.variables += {"wanted", [](EuCell& cell) -> double { return cell(bit); }};
 
     Rectangle rect(-2.0, 2.0, -1.0, 1.0);
     rect.set_nx(50);
 
-    SoaMesh mesh(rect);
+    EuMesh mesh(rect);
     bit = mesh.add<int>("bit");
 
     mesh.set_max_level(5);

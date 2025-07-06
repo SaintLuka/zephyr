@@ -5,38 +5,27 @@
 #include <variant>
 #include <functional>
 
-#include <zephyr/mesh/euler/amr_storage.h>
-#include <zephyr/mesh/lagrange/mov_storage.h>
-#include <zephyr/mesh/euler/soa_mesh.h>
-
+#include <zephyr/geom/vector.h>
 #include <zephyr/io/vtk_type.h>
 
-namespace zephyr::io {
+// Forward declaration
+namespace zephyr::mesh  { class EuCell; }
+namespace zephyr::utils { template<typename T> struct Storable; }
 
-using zephyr::mesh::AmrStorage;
-using zephyr::mesh::CellStorage;
-using zephyr::mesh::NodeStorage;
+
+namespace zephyr::io {
 
 /// @brief Тип функции для записи переменных, позволяет инициализировать
 /// функцию записи переменных через лямбда функцию. Далее пример использования.
 /// позволяет сократить размер выходного файла.
 /// @code
 /// WriteFunction<float> ev_energy =
-///     [](AmrStorage::Item cell, float* out) {
+///     [](EuCell& cell, float* out) {
 ///         out[0] = static_cast<float>(cell.energy / 1.6e-19);
 ///     };
 /// @endcode
 template <typename T>
-using WriteAmrItem = std::function<void(AmrStorage::Item&, T*)>;
-
-template <typename T>
-using WriteCellItem = std::function<void(CellStorage::Item&, T*)>;
-
-template <typename T>
-using WriteNodeItem = std::function<void(NodeStorage::Item&, T*)>;
-
-template <typename T>
-using WriteSoaCell = std::function<void(mesh::QCell&, T*)>;
+using WriteSoaCell = std::function<void(mesh::EuCell&, T*)>;
 
 /// @brief Класс для записи переменных в VTU файл, каждой переменной для
 /// записи должен соответствовать экземпляр Variable.
@@ -74,70 +63,19 @@ public:
     template<class T>
     Variable(const char *name,
              int n_components,
-             const WriteAmrItem<T> &func) {
-
-        m_name = name;
-        m_type = VtkType::get<T>();
-        m_n_components = n_components;
-        m_amr_func = [func](AmrStorage::Item &cell, void *out) {
-            func(cell, (T *) out);
-        };
-    }
-
-    template<class T>
-    Variable(const char *name,
-             int n_components,
              const WriteSoaCell<T> &func) {
 
         m_name = name;
         m_type = VtkType::get<T>();
         m_n_components = n_components;
-        m_soa_func = [func](mesh::QCell &cell, void *out) {
-            func(cell, (T *) out);
-        };
-    }
-
-    template<class T>
-    Variable(const char *name,
-             int n_components,
-             const WriteCellItem<T> &func) {
-
-        m_name = name;
-        m_type = VtkType::get<T>();
-        m_n_components = n_components;
-        m_cell_func = [func](CellStorage::Item &cell, void *out) {
-            func(cell, (T *) out);
-        };
-    }
-
-    template<class T>
-    Variable(const char *name,
-             int n_components,
-             const WriteNodeItem<T> &func) {
-
-        m_name = name;
-        m_type = VtkType::get<T>();
-        m_n_components = n_components;
-        m_node_func = [func](NodeStorage::Item &cell, void *out) {
+        m_write = [func](mesh::EuCell &cell, void *out) {
             func(cell, (T *) out);
         };
     }
 
     /// Тип vtk_type выводится из T.
     template<class T>
-    Variable(const std::string &name, int n_components, const WriteAmrItem<T> &func)
-            : Variable(name.c_str(), n_components, func) {}
-
-    template<class T>
     Variable(const std::string &name, int n_components, const WriteSoaCell<T> &func)
-            : Variable(name.c_str(), n_components, func) {}
-
-    template<class T>
-    Variable(const std::string &name, int n_components, const WriteCellItem<T> &func)
-            : Variable(name.c_str(), n_components, func) {}
-
-    template<class T>
-    Variable(const std::string &name, int n_components, const WriteNodeItem<T> &func)
             : Variable(name.c_str(), n_components, func) {}
 
     /// @brief Имя переменной
@@ -145,15 +83,6 @@ public:
 
     /// @brief Переменная эйлеровой ячейки
     bool is_eu_cell() const;
-
-    /// @brief Переменная эйлеровой ячейки
-    bool is_soa_cell() const;
-
-    /// @brief Переменная лагранжевой ячейки
-    bool is_lag_cell() const;
-
-    /// @brief Переменная вершины
-    bool is_node() const;
 
     /// @brief Тип переменной
     VtkType type() const;
@@ -168,16 +97,7 @@ public:
     size_t size() const;
 
     /// @brief Основная функция класса. Запись переменной из ячейки в поток.
-    void write(AmrStorage::Item &cell, void *out) const;
-
-    /// @brief Основная функция класса. Запись переменной из ячейки в поток.
-    void write(mesh::QCell &cell, void *out) const;
-
-    /// @brief Основная функция класса. Запись переменной из ячейки в поток.
-    void write(CellStorage::Item &cell, void *out) const;
-
-    /// @brief Основная функция класса. Запись переменной из ячейки в поток.
-    void write(NodeStorage::Item &cell, void *out) const;
+    void write(mesh::EuCell &cell, void *out) const;
 
 private:
     std::string m_name;
@@ -186,11 +106,7 @@ private:
 
     // Три функции записи для разных типов элементов,
     // в каждом экземпляре актуальна только одна.
-
-    WriteAmrItem<void> m_amr_func = nullptr;
-    WriteSoaCell<void> m_soa_func = nullptr;
-    WriteCellItem<void> m_cell_func = nullptr;
-    WriteNodeItem<void> m_node_func = nullptr;
+    WriteSoaCell<void> m_write = nullptr;
 };
 
 } // namespace zephyr::io

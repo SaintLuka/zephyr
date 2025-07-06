@@ -5,7 +5,6 @@
 #include <zephyr/utils/mpi.h>
 #include <zephyr/geom/geom.h>
 #include <zephyr/mesh/euler/amr_cells.h>
-#include <zephyr/mesh/primitives/bfaces.h>
 
 using zephyr::utils::mpi;
 using namespace zephyr::geom;
@@ -334,6 +333,9 @@ int AmrCells::check_base_vertices_order(index_t ic) const {
 
         bool bad = false;
 
+        throw std::runtime_error("Can't check 3D cell");
+
+        /*
         // Индекс пересечения трех граней
         auto cross_face = [](const BFaces& faces, Side3D side1, Side3D side2, Side3D side3) -> int {
             auto& face1 = faces[side1];
@@ -361,6 +363,7 @@ int AmrCells::check_base_vertices_order(index_t ic) const {
             }
             return 100;
         };
+         */
 
         for (int i: {-1, 0}) {
             for (int j: {-1, 0}) {

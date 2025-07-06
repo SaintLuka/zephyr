@@ -7,7 +7,7 @@
 
 #include <zephyr/geom/generator/rectangle.h>
 
-#include <zephyr/mesh/euler/soa_mesh.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
 
 #include <zephyr/io/pvd_file.h>
 
@@ -23,8 +23,8 @@ using zephyr::geom::Box;
 using zephyr::geom::Boundary;
 using zephyr::geom::Vector3d;
 using zephyr::mesh::generator::Rectangle;
-using zephyr::mesh::SoaMesh;
-using zephyr::mesh::QCell;
+using zephyr::mesh::EuMesh;
+using zephyr::mesh::EuCell;
 using zephyr::io::PvdFile;
 using zephyr::utils::Stopwatch;
 using zephyr::utils::threads;
@@ -51,7 +51,7 @@ int main() {
                                 .bottom = Boundary::WALL, .top   = Boundary::WALL});
 
     // Создать сетку
-    SoaMesh mesh(rect);
+    EuMesh mesh(rect);
 
     // Переменные для хранения на сетке
     auto [rho1, p1, e1] = mesh.append<double>("rho1", "p1", "e1");
@@ -62,12 +62,12 @@ int main() {
     PvdFile pvd("mesh", "output");
 
     // Переменные для сохранения
-    pvd.variables += {"rho", [rho1](QCell& cell) -> double { return cell(rho1); }};
-    pvd.variables += {"velocity.x", [v1](QCell& cell) -> double { return cell(v1).x(); }};
-    pvd.variables += {"velocity.y", [v1](QCell& cell) -> double { return cell(v1).y(); }};
-    pvd.variables += {"|velocity|", [v1](QCell& cell) -> double { return cell(v1).norm(); }};
-    pvd.variables += {"pressure",   [p1](QCell& cell) -> double { return cell(p1); }};
-    pvd.variables += {"SPL", [p1](QCell& cell) -> double {
+    pvd.variables += {"rho", [rho1](EuCell& cell) -> double { return cell(rho1); }};
+    pvd.variables += {"velocity.x", [v1](EuCell& cell) -> double { return cell(v1).x(); }};
+    pvd.variables += {"velocity.y", [v1](EuCell& cell) -> double { return cell(v1).y(); }};
+    pvd.variables += {"|velocity|", [v1](EuCell& cell) -> double { return cell(v1).norm(); }};
+    pvd.variables += {"pressure",   [p1](EuCell& cell) -> double { return cell(p1); }};
+    pvd.variables += {"SPL", [p1](EuCell& cell) -> double {
         // Уровень звукового давления в дБ
         return 20.0 * std::log(1.0 + std::abs(cell(p1) - 1.0_bar) / 20.0e-6_Pa) / std::log(10.0);
     }};
@@ -110,7 +110,7 @@ int main() {
 
         // Определяем dt
         sw_dt.resume();
-        double dt = mesh.min([&](QCell cell) -> double {
+        double dt = mesh.min([&](EuCell cell) -> double {
             double dt = 1.0e300;
 
             // скорость звука
@@ -133,7 +133,7 @@ int main() {
 
         // Расчет по схеме CIR
         sw_flux.resume();
-        mesh.for_each([&](QCell cell) {
+        mesh.for_each([&](EuCell cell) {
             // Примитивный вектор в ячейке
             PState zc(cell(rho1), cell(v1), cell(p1), cell(e1));
 

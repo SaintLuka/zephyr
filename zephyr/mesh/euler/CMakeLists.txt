@@ -2,29 +2,24 @@ set(ZEPHYR_MESH_EULER_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/amr_cells.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/amr_cells_dbg.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/amr_faces.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/soa_prim.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/distributor.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/eu_face.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/eu_cell.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/eu_prim.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/eu_mesh.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/eu_mesh_check.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/eu_mesh_refine.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/eu_mesh_decomp.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/soa_mesh.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/migration.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/router.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/tourism.cpp
     PARENT_SCOPE)
 
 install(FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/amr_cells.h
     ${CMAKE_CURRENT_SOURCE_DIR}/amr_faces.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/soa_prim.h
-    amr_storage.h
-    distributor.h
-    eu_face.h
-    eu_cell.h
-    eu_mesh.h
-    soa_mesh.h
-    migration.h
-    tourism.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/amr_storage.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/distributor.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/eu_prim.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/eu_mesh.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/migration.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/router.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/tourism.h
     DESTINATION
     include/${PROJECT_NAME}/mesh/euler)

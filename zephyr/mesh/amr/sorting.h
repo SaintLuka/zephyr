@@ -6,12 +6,15 @@
 
 #include <zephyr/mesh/amr/common.h>
 
-namespace zephyr { namespace mesh { namespace amr {
+namespace zephyr::mesh::amr {
 
 /// @brief Функция сортировки ячеек с сохранением связности
 /// @details Не самый быстрый алгоритм, нужен для проверки гипотез
 /// по поводу производительности других алгоритмов
-void sorting(AmrStorage& cells) {
+void sorting(AmrCells& cells) {
+    throw std::runtime_error("NOt implemented sorting");
+
+    /*
     size_t n_cells = cells.size();
 
     std::vector<size_t> map1(n_cells);
@@ -52,7 +55,7 @@ void sorting(AmrStorage& cells) {
         size_t jc = map[ic];
         if (ic != jc) {
             throw std::runtime_error("ZAZAZAZA");
-            /*
+
             _item_ item_i = cells[ic][item];
             _item_ item_j = cells[jc][item];
 
@@ -65,14 +68,12 @@ void sorting(AmrStorage& cells) {
             //std::swap(map[ic], map[jc]);
             map[ic] = map[jc];
             map[jc] = jc;
-             */
         }
         else {
             ++ic;
         }
     }
+    */
 }
 
-} // namespace amr
-} // namespace mesh
 } // namespace zephyr

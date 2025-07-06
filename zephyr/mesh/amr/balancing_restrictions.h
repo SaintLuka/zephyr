@@ -10,26 +10,27 @@
 
 namespace zephyr::mesh::amr {
 
-/// @brief Функция накладывает базовые ограничения на флаг адаптации ячейки:
-/// 1. Ячейка нижнего уровня не огрубляется;
-/// 2. Ячейка верхнего -- не разбивается;
-/// 3. Ячейка может иметь флаг -1 (огрубление), только если все сиблинги
-/// находятся на том же процессе, имеют такой же уровень адаптации как и
-/// ячейка, а также флаг адаптации -1.
-/// @param item Целевой элемент хранилища (из locals)
-/// @param locals Локальное хранилище ячеек
-/// @param max_level Максимальный уровень адаптации
+// Функция накладывает базовые ограничения на флаг адаптации ячейки:
+//   1. Ячейка нижнего уровня не огрубляется;
+//   2. Ячейка верхнего -- не разбивается;
+//   3. Ячейка может иметь флаг -1 (огрубление), только если все сиблинги
+//      находятся на том же процессе, имеют такой же уровень адаптации,
+//      как и ячейка, а также флаг адаптации -1.
+// Параметры
+//   iс        -- Целевой элемент хранилища (из locals)
+//   locals    -- Локальное хранилище ячеек
+//   max_level -- Максимальный уровень адаптации
 template<int dim>
-void base_restriction(AmrStorage::Item& cell, AmrStorage &locals, int max_level) {
-    scrutiny_check(cell.index < locals.size(), "base_restrictions: ic >= cells.size()")
+void base_restriction(index_t ic, AmrCells &locals, int max_level) {
+    scrutiny_check(ic < locals.size(), "base_restrictions: ic >= cells.size()")
 
-    int flag = cell.flag;
+    int flag = locals.flag[ic];
     // Приводим к одному из трех значений { -1, 0, 1 }
     if (flag != 0) {
         flag = flag > 0 ? 1 : -1;
     }
 
-    int lvl = cell.level;
+    int lvl = locals.level[ic];
 
     if (lvl + flag < 0) {
         flag = 0;
@@ -40,33 +41,30 @@ void base_restriction(AmrStorage::Item& cell, AmrStorage &locals, int max_level)
     }
 
     if (flag < 0) {
-        if (!can_coarse<dim>(cell, locals)) {
+        if (!can_coarse<dim>(locals, ic)) {
             flag = 0;
         }
     }
 
-    cell.flag = flag;
+    locals.flag[ic] = flag;
 }
 
 /// @brief Выполняет функцию base_restriction для всех ячеек хранилища
-/// @param locals Хранилище ячеек
 /// @param max_level Максимальный уровень адаптации
 template <int dim>
-void base_restrictions(AmrStorage &locals, int max_level) {
-    threads::for_each(
-            locals.begin(), locals.end(),
+void base_restrictions(AmrCells &locals, int max_level) {
+    threads::parallel_for(index_t{0}, index_t{locals.size()},
             base_restriction<dim>, std::ref(locals), max_level);
 }
 
-/// @brief Проверка соблюдения баланса флагов смежных ячеек.
-/// Уровни смежных ячеек после адаптации не должны отличаться не более,
-/// чем на один уровень.
+/// @brief Проверка соблюдения баланса флагов смежных ячеек и сиблингов.
+/// Все сиблинги, которые хотят огрубиться, должны находиться вместе и желать
+/// огрубиться тоже вместе. Уровни смежных ячеек после адаптации не должны
+/// отличаться более, чем на один уровень.
 /// Функция вызывается только при включенной тщательной проверке.
-void check_flags(AmrStorage& locals, AmrStorage& aliens, int max_level) {
-    for(auto it = locals.begin(); it < locals.end(); ++it) {
-        auto& cell = *it;
-
-        int cell_wanted_lvl = cell.level + cell.flag;
+inline void check_flags(AmrCells& locals, AmrCells& aliens, int max_level) {
+    for (index_t ic = 0; ic < locals.size(); ++ic) {
+        int cell_wanted_lvl = locals.level[ic] + locals.flag[ic];
 
         if (cell_wanted_lvl < 0 || cell_wanted_lvl > max_level) {
             std::string message = "Wanted level (" + std::to_string(cell_wanted_lvl) + ") "
@@ -75,31 +73,31 @@ void check_flags(AmrStorage& locals, AmrStorage& aliens, int max_level) {
             throw std::runtime_error(message);
         }
 
-        for (auto &face: cell.faces) {
-            if (face.is_undefined() || face.is_boundary()) {
+        for (auto iface: locals.faces_range(ic)) {
+            if (locals.faces.is_undefined(iface) ||
+                locals.faces.is_boundary(iface)) {
                 continue;
             }
 
-            auto &adj = face.adjacent;
+            // Индекс соседа и хранилище соседа
+            auto [neibs, jc] = locals.faces.adjacent.get_neib(iface, locals, aliens);
 
-            auto& neib = adj.rank == cell.rank ? locals[adj.index] : aliens[adj.alien];
-
-            int neib_wanted_lvl = neib.level + neib.flag;
+            int neib_wanted_lvl = neibs.level[jc] + neibs.flag[jc];
             if (std::abs(cell_wanted_lvl - neib_wanted_lvl) > 1) {
                 std::string message = "Adaptation flag balance is broken.";
                 std::cerr << message << "\n";
                 std::cout << "cell:\n";
-                cell.print_info();
+                locals.print_info(ic);
                 std::cout << "neib:\n";
-                neib.print_info();
+                neibs.print_info(jc);
                 throw std::runtime_error(message);
             }
         }
 
-        if (cell.flag < 0) {
-            bool can = cell.dim < 3 ?
-                       can_coarse<2>(locals, it - locals.begin()) :
-                       can_coarse<3>(locals, it - locals.begin());
+        if (locals.flag[ic] < 0) {
+            bool can = locals.dim() < 3 ?
+                       can_coarse<2>(locals, ic) :
+                       can_coarse<3>(locals, ic);
 
             if (!can) {
                 std::string message = "Not all siblings want to coarse.";
@@ -108,6 +106,11 @@ void check_flags(AmrStorage& locals, AmrStorage& aliens, int max_level) {
             }
         }
     }
+}
+
+inline void check_flags(AmrCells& cells, int max_level) {
+    AmrCells aliens;
+    check_flags(cells, aliens, max_level);
 }
 
 } // namespace zephyr

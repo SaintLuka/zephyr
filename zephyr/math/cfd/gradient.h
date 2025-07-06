@@ -2,29 +2,22 @@
 
 #include <functional>
 #include <zephyr/geom/vector.h>
-#include <zephyr/mesh/cell.h>
-#include <zephyr/mesh/mesh.h>
 #include <zephyr/utils/storage.h>
 #include <zephyr/math/cfd/limiter.h>
-#include <zephyr/mesh/euler/soa_mesh.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
 
 namespace zephyr::math::gradient {
 
 using zephyr::mesh::EuCell;
-using zephyr::mesh::QCell;
 using zephyr::mesh::Storable;
-using zephyr::mesh::SoaMesh;
-using zephyr::mesh::Boundary;
+using zephyr::mesh::EuMesh;
+using zephyr::geom::Boundary;
 
 using namespace geom;
 
 /// @brief Получить вектор состояния типа T из ячейки
 template <class T>
 using GetState = std::function<T(EuCell &)>;
-
-/// @brief Получить вектор состояния типа T из ячейки
-template <class T>
-using GetState2 = std::function<T(QCell &)>;
 
 /// @brief Получить вектор состояния типа T через грань
 /// с граничным условием
@@ -51,17 +44,17 @@ struct Grad {
     }
 
     // Приведение компонент к Eigen массивам
-    inline Array &x_arr() { return (Array &) x; }
+    Array &x_arr() { return (Array &) x; }
 
-    inline Array &y_arr() { return (Array &) y; }
+    Array &y_arr() { return (Array &) y; }
 
-    inline Array &z_arr() { return (Array &) z; }
+    Array &z_arr() { return (Array &) z; }
 
-    inline const Array &x_arr() const { return (Array &) x; }
+    const Array &x_arr() const { return (Array &) x; }
 
-    inline const Array &y_arr() const { return (Array &) y; }
+    const Array &y_arr() const { return (Array &) y; }
 
-    inline const Array &z_arr() const { return (Array &) z; }
+    const Array &z_arr() const { return (Array &) z; }
 };
 
 /// @brief Расчет градиента методом Гаусса
@@ -173,69 +166,7 @@ Grad<State> LSM_orig(EuCell &cell,
 /// @brief Метод наименьших квадратов (улучшенная AMR версия)
 template<class State>
 Grad<State> LSM(EuCell &cell,
-                     const GetState<State> &get_state,
-                     const GetBoundary<State> &boundary_value) {
-    using Array = ei_vec<State>;
-
-    // Делает матрицу A безразмерной
-    double w0 = cell.dim() < 3 ? 1.0 : 1.0 / cell.linear_size();
-
-    State zc = get_state(cell);
-    Vector3d cell_c = cell.center();
-
-    Array Fx = Array::Zero();
-    Array Fy = Array::Zero();
-    Array Fz = Array::Zero();
-    Matrix3d A = Matrix3d::Zero();
-
-    for (auto &face: cell.faces()) {
-        auto &normal = face.normal();
-
-        State zn;
-        Vector3d dr;
-        if (!face.is_boundary()) {
-            auto neib = face.neib();
-            zn = get_state(neib);
-            dr = neib.center() - cell_c;
-        } else {
-            zn = boundary_value(zc, normal, face.flag());
-            dr = face.symm_point(cell_c) - cell_c;
-        }
-
-        Vector3d drn = dr.dot(normal) * normal;
-
-        double w = w0 * face.area() / std::pow(drn.norm(), 3);
-
-        A += w * drn * dr.transpose();
-
-        Array dF = (Array &) zn - (Array &) zc;
-
-        Fx += w * dF * drn.x();
-        Fy += w * dF * drn.y();
-        Fz += w * dF * drn.z();
-    }
-
-    // Матрица A безразмерная, коэффициенты порядка единиц
-    if (std::abs(A(2, 2)) < 1e-8) {
-        A(2, 2) = 1.0; // Случай 2D
-        if (std::abs(A(1, 1)) < 1e-8) {
-            A(1, 1) = 1.0; // Случай 1D
-        }
-    }
-
-    Matrix3d B = A.inverse();
-
-    Grad<State> grad;
-    grad.x_arr() = B(0, 0) * Fx + B(0, 1) * Fy + B(0, 2) * Fz;
-    grad.y_arr() = B(1, 0) * Fx + B(1, 1) * Fy + B(1, 2) * Fz;
-    grad.z_arr() = B(2, 0) * Fx + B(2, 1) * Fy + B(2, 2) * Fz;
-    return grad;
-}
-
-/// @brief Метод наименьших квадратов (SoA версия)
-template<class State>
-Grad<State> LSM(QCell &cell,
-                const GetState2<State> &get_state,
+                const GetState<State> &get_state,
                 const GetBoundary<State> &boundary_value) {
     using Array = ei_vec<State>;
 
@@ -295,7 +226,7 @@ Grad<State> LSM(QCell &cell,
 }
 
 template<class State>
-Grad<State> LSM(QCell &cell, Storable<State> state,
+Grad<State> LSM(EuCell &cell, Storable<State> state,
                 const GetBoundary<State> &boundary_value) {
     using Array = ei_vec<State>;
 
@@ -418,75 +349,8 @@ Grad<State> limiting_orig(EuCell &cell, const Limiter& limiter,
 /// @brief Ограничитель градиента (улучшенная AMR версия)
 template<class State>
 Grad<State> limiting(EuCell &cell, const Limiter& limiter,
-                          const Grad<State> &grad,
-                          const GetState<State> &get_state,
-                          const GetBoundary<State> &boundary_value) {
-    using Array = ei_arr<State>;
-
-    // Делает матрицу A безразмерной
-    double w0 = cell.dim() < 3 ? 1.0 : 1.0 / cell.linear_size();
-
-    State zc = get_state(cell);
-    Vector3d cell_c = cell.center();
-
-    Array Fx = Array::Zero();
-    Array Fy = Array::Zero();
-    Array Fz = Array::Zero();
-
-    Matrix3d A = Matrix3d::Zero();
-    for (auto &face: cell.faces()) {
-        const Vector3d &normal = face.normal();
-
-        State zn;
-        Vector3d dr;
-        if (!face.is_boundary()) {
-            auto neib = face.neib();
-            zn = get_state(neib);
-            dr = neib.center() - cell_c;
-        } else {
-            zn = boundary_value(zc, normal, face.flag());
-            dr = face.symm_point(cell_c) - cell_c;
-        }
-
-        Vector3d drn = dr.dot(normal) * normal;
-
-        double w = w0 * face.area() / std::pow(drn.norm() , 3);
-
-        A += w * drn * dr.transpose();
-
-        Array dF_p = (Array &) zn - (Array &) zc;
-        Array du_n = grad.x_arr() * dr.x() + grad.y_arr() * dr.y() + grad.z_arr() * dr.z();
-        Array dF_m = 2.0 * du_n - dF_p;
-
-        Array dF_lim = limiter(dF_m, dF_p) * dF_p;
-
-        Fx += w * dF_lim * drn.x();
-        Fy += w * dF_lim * drn.y();
-        Fz += w * dF_lim * drn.z();
-    }
-
-    // Матрица A безразмерная, коэффициенты порядка единиц
-    if (std::abs(A(2, 2)) < 1e-8) {
-        A(2, 2) = 1.0; // Случай 2D
-        if (std::abs(A(1, 1)) < 1e-8) {
-            A(1, 1) = 1.0; // Случай 1D
-        }
-    }
-
-    Matrix3d B = A.inverse();
-
-    Grad<State> lim_grad;
-    lim_grad.x_arr() = B(0, 0) * Fx + B(0, 1) * Fy + B(0, 2) * Fz;
-    lim_grad.y_arr() = B(1, 0) * Fx + B(1, 1) * Fy + B(1, 2) * Fz;
-    lim_grad.z_arr() = B(2, 0) * Fx + B(2, 1) * Fy + B(2, 2) * Fz;
-    return lim_grad;
-}
-
-/// @brief Ограничитель градиента (улучшенная AMR версия)
-template<class State>
-Grad<State> limiting(QCell &cell, const Limiter& limiter,
                      const Grad<State> &grad,
-                     const GetState2<State> &get_state,
+                     const GetState<State> &get_state,
                      const GetBoundary<State> &boundary_value) {
     using Array = ei_arr<State>;
 
@@ -551,7 +415,7 @@ Grad<State> limiting(QCell &cell, const Limiter& limiter,
 
 /// @brief Ограничитель градиента (улучшенная AMR версия)
 template<class State>
-Grad<State> limiting(QCell &cell, const Limiter& limiter,
+Grad<State> limiting(EuCell &cell, const Limiter& limiter,
                      const Grad<State> &grad, Storable<State> state,
                      const GetBoundary<State> &boundary_value) {
     using Array = ei_arr<State>;

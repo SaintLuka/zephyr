@@ -3,8 +3,7 @@
 #include <zephyr/geom/vector.h>
 #include <zephyr/geom/generator/rectangle.h>
 
-#include <zephyr/mesh/euler/eu_cell.h>
-#include <zephyr/mesh/euler/soa_prim.h>
+#include <zephyr/mesh/euler/eu_prim.h>
 
 #include <zephyr/phys/literals.h>
 #include <zephyr/phys/fractions.h>
@@ -100,15 +99,12 @@ public:
 
     /// @brief Плотность вещества ячейки
     double density_mean(mesh::EuCell& cell, int n) const;
-    double density_mean(mesh::QCell& cell, int n) const;
 
     /// @brief Плотность момента импульса ячейки
     Vector3d momentum_mean(mesh::EuCell& cell, int n) const;
-    Vector3d momentum_mean(mesh::QCell& cell, int n) const;
 
     /// @brief Удельная полная энергия ячейки
     double energy_mean(mesh::EuCell& cell, int n) const;
-    double energy_mean(mesh::QCell& cell, int n) const;
 
     /// @brief Массовые доли компонент смеси
     Fractions mass_fractions(mesh::EuCell& cell, int n) const;

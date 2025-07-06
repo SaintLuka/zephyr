@@ -21,9 +21,9 @@ class Solver;
 class Body {
 public:
     /// @brief Выставить на сетке начальные условия
-    virtual void initial(Solver& solver, SoaMesh& mesh, bool exact) const = 0;
+    virtual void initial(Solver& solver, EuMesh& mesh, bool exact) const = 0;
 
-    virtual double volume_inside(SoaMesh& body) const = 0;
+    virtual double volume_inside(EuMesh& body) const = 0;
 
     std::function<bool(const Vector3d& v)> inside;
 
@@ -46,9 +46,9 @@ public:
     BodyLine();
 
     /// @brief Установить начальные данные
-    void initial(Solver& solver, SoaMesh& mesh, bool exact) const final;
+    void initial(Solver& solver, EuMesh& mesh, bool exact) const final;
 
-    double volume_inside(SoaMesh& body) const final;
+    double volume_inside(EuMesh& body) const final;
 };
 
 /// @brief Начальные условия в виде квадрата
@@ -59,9 +59,9 @@ public:
     BodySquare();
 
     /// @brief Установить начальные данные
-    void initial(Solver& solver, SoaMesh& mesh, bool exact) const final;
+    void initial(Solver& solver, EuMesh& mesh, bool exact) const final;
 
-    double volume_inside(SoaMesh& body) const final;
+    double volume_inside(EuMesh& body) const final;
 
 };
 
@@ -73,9 +73,9 @@ public:
     BodyDisk();
 
     /// @brief Установить начальные данные
-    void initial(Solver& solver, SoaMesh& mesh, bool exact) const final;
+    void initial(Solver& solver, EuMesh& mesh, bool exact) const final;
 
-    double volume_inside(SoaMesh& body) const final;
+    double volume_inside(EuMesh& body) const final;
 
 };
 
@@ -94,13 +94,13 @@ public:
     Vector3d velocity(const Vector3d& p) const override;
 
     /// @brief Сетка с точным решением от времени
-    SoaMesh exact(Body& body, double curr_time) const;
+    EuMesh exact(Body& body, double curr_time) const;
 };
 
 static Solver::State data;
 
 // Объем тела
-double volume(SoaMesh& cells, Storable<double> u1) {
+double volume(EuMesh& cells, Storable<double> u1) {
     double sum = 0.0;
     for (auto cell: cells) {
         if (cell.volume() >= 0)
@@ -140,7 +140,7 @@ int main() {
     solver.test = Solver::Test::Translation;
 
     // Создать сетку
-    SoaMesh mesh(rect);
+    EuMesh mesh(rect);
 
     // Добавить типы
     solver.add_types(mesh);
@@ -155,11 +155,11 @@ int main() {
     //pvd.variables.append("p", data.p);
     //pvd.variables += {"du/dx", grad_x};
     //pvd.variables += {"du/dy", grad_y};
-    pvd.variables += {"over", [data](QCell& cell) -> double {
+    pvd.variables += {"over", [data](EuCell& cell) -> double {
         double u = cell(data.u1);
         return u < 0.0 ? u : (u <= 1.0 ? 0.0 / 0.0 : u - 1.0);
     }};
-    pvd.variables += {"close", [data](QCell& cell) -> double {
+    pvd.variables += {"close", [data](EuCell& cell) -> double {
         double u = cell(data.u1);
         return std::abs(u < 0.5 ? u : 1.0 - u);
     }};
@@ -169,7 +169,7 @@ int main() {
     mesh.set_distributor(solver.distributor());
 
     // Адаптация под начальные данные
-    int n_init_loops = mesh.is_adaptive() ? mesh.max_level() + 2 : 0;
+    int n_init_loops = mesh.adaptive() ? mesh.max_level() + 2 : 0;
     for (int k = n_init_loops; k >= 0; --k) {
         body.initial(solver, mesh, k < 1);
         solver.set_flags(mesh);
@@ -197,10 +197,10 @@ int main() {
 
             pvd.save(mesh, curr_time);
 
-            SoaMesh crop = solver.body(mesh);
+            EuMesh crop = solver.body(mesh);
             pvd_body.save(crop, curr_time);
 
-            SoaMesh exact = solver.exact(body, curr_time);
+            EuMesh exact = solver.exact(body, curr_time);
             pvd_exact.save(exact, curr_time);
 
             write_next += write_freq;
@@ -255,7 +255,7 @@ BodyLine::BodyLine() {
     };
 }
 
-void BodyLine::initial(Solver& solver, SoaMesh& mesh, bool exact) const {
+void BodyLine::initial(Solver& solver, EuMesh& mesh, bool exact) const {
     for (auto cell: mesh) {
         if (!exact) {
             cell(data.u1) = inside(cell.center());
@@ -271,7 +271,7 @@ void BodyLine::initial(Solver& solver, SoaMesh& mesh, bool exact) const {
     }
 }
 
-double BodyLine::volume_inside(SoaMesh &body) const {
+double BodyLine::volume_inside(EuMesh &body) const {
     double res = 0.0;
     for (auto& cell: body) {
         double a = cell.approx_vol_fraction(inside);
@@ -302,7 +302,7 @@ BodySquare::BodySquare() {
     };
 }
 
-void BodySquare::initial(Solver& solver, SoaMesh& mesh, bool exact) const {
+void BodySquare::initial(Solver& solver, EuMesh& mesh, bool exact) const {
     for (auto cell: mesh) {
         if (!exact) {
             cell(data.u1) = inside(cell.center());
@@ -318,7 +318,7 @@ void BodySquare::initial(Solver& solver, SoaMesh& mesh, bool exact) const {
     }
 }
 
-double BodySquare::volume_inside(SoaMesh &body) const {
+double BodySquare::volume_inside(EuMesh &body) const {
     double res = 0.0;
     for (auto& cell: body) {
         double vol = cell.approx_vol_fraction(inside);
@@ -346,7 +346,7 @@ BodyDisk::BodyDisk() {
     }
 }
 
-void BodyDisk::initial(Solver& solver, SoaMesh& mesh, bool exact) const {
+void BodyDisk::initial(Solver& solver, EuMesh& mesh, bool exact) const {
     for (auto cell: mesh) {
         auto poly = cell.polygon();
         cell(data.u1) = poly.disk_clip_area(C, R) / cell.volume();
@@ -354,7 +354,7 @@ void BodyDisk::initial(Solver& solver, SoaMesh& mesh, bool exact) const {
     }
 }
 
-double BodyDisk::volume_inside(SoaMesh &body) const {
+double BodyDisk::volume_inside(EuMesh &body) const {
     double res = 0.0;
     for (auto& cell: body) {
         auto poly = cell.polygon();
@@ -380,7 +380,7 @@ Vector3d Solver::velocity(const Vector3d& p) const {
     }
 }
 
-SoaMesh Solver::exact(Body& body, double curr_time) const {
+EuMesh Solver::exact(Body& body, double curr_time) const {
     using zephyr::geom::Quad;
     using zephyr::mesh::AmrCell;
 
@@ -413,7 +413,7 @@ SoaMesh Solver::exact(Body& body, double curr_time) const {
         body.C.z() = 0.0;
     }
 
-    SoaMesh cells(2, false);
+    EuMesh cells(2, false);
     for (size_t i = 0; i < vs.size(); ++i) {
         size_t j = (i + 1) % vs.size();
         Line line = {vs[i], vs[j]};

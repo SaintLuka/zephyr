@@ -4,7 +4,6 @@
 
 namespace zephyr::io {
 
-
 /// @brief Список переменных для записи в VTU файл
 /// Данный класс содержит массив дескрипторов полей для записи, подробнее
 /// о дескрипторах см. в классе FieldDescriptor.
@@ -77,20 +76,6 @@ public:
     ///         out[1] = static_cast<float>(cell.mass * cell.velocity.y);
     ///     }));
     /// @endcode
-    template<class T>
-    void append(const char *name, int n_components, const WriteAmrItem<T> &func) {
-        m_list.emplace_back(name, n_components, func);
-    }
-
-    template<class T>
-    void append(const char *name, int n_components, const WriteCellItem<T> &func) {
-        m_list.emplace_back(name, n_components, func);
-    }
-
-    template<class T>
-    void append(const char *name, int n_components, const WriteNodeItem<T> &func) {
-        m_list.emplace_back(name, n_components, func);
-    }
 
     template<class T>
     void append(const char *name, int n_components, const WriteSoaCell<T> &func) {
@@ -99,41 +84,11 @@ public:
 
     /// @brief Аналогично функции append(const char*, ...)
     template<class T>
-    void append(const std::string &name, int n_components, const WriteAmrItem<T> &func) {
-        m_list.emplace_back(name, n_components, func);
-    }
-
-    template<class T>
-    void append(const std::string &name, int n_components, const WriteCellItem<T> &func) {
-        m_list.emplace_back(name, n_components, func);
-    }
-
-    template<class T>
-    void append(const std::string &name, int n_components, const WriteNodeItem<T> &func) {
-        m_list.emplace_back(name, n_components, func);
-    }
-
-    template<class T>
     void append(const std::string &name, int n_components, const WriteSoaCell<T> &func) {
         m_list.emplace_back(name, n_components, func);
     }
 
     /// @brief Аналогично функции append(const char*, ... )
-    template<class T>
-    void append(const char *name, const WriteAmrItem<T> &func) {
-        m_list.emplace_back(name, 1, func);
-    }
-
-    template<class T>
-    void append(const char *name, const WriteCellItem<T> &func) {
-        m_list.emplace_back(name, 1, func);
-    }
-
-    template<class T>
-    void append(const char *name, const WriteNodeItem<T> &func) {
-        m_list.emplace_back(name, 1, func);
-    }
-
     template<class T>
     void append(const char *name, const WriteSoaCell<T> &func) {
         m_list.emplace_back(name, 1, func);
@@ -141,52 +96,14 @@ public:
 
     /// @brief Аналогично функции append(const char*, ...)
     template<class T>
-    void append(const std::string &name, const WriteAmrItem<T> &func) {
-        m_list.emplace_back(name, 1, func);
-    }
-
-    template<class T>
-    void append(const std::string &name, const WriteCellItem<T> &func) {
-        m_list.emplace_back(name, 1, func);
-    }
-
-    template<class T>
-    void append(const std::string &name, const WriteNodeItem<T> &func) {
-        m_list.emplace_back(name, 1, func);
-    }
-    template<class T>
     void append(const std::string &name, const WriteSoaCell<T> &func) {
         m_list.emplace_back(name, 1, func);
     }
 
     /// @brief Упрощенный вариант для добавления double полей
-    void append(const std::string& name, std::function<double(AmrStorage::Item&)> f) {
-        m_list.emplace_back(name, 1, WriteAmrItem<double>(
-                [f](AmrStorage::Item& cell, double *out) {
-                    out[0] = f(cell);
-                }));
-    }
-
-    /// @brief Упрощенный вариант для добавления double полей
-    void append(const std::string& name, std::function<double(mesh::QCell&)> f) {
+    void append(const std::string& name, std::function<double(mesh::EuCell&)> f) {
         m_list.emplace_back(name, 1, WriteSoaCell<double>(
-                [f](mesh::QCell& cell, double *out) {
-                    out[0] = f(cell);
-                }));
-    }
-
-    /// @brief Упрощенный вариант для добавления double полей
-    void append(const std::string& name, std::function<double(CellStorage::Item&)> f) {
-        m_list.emplace_back(name, 1, WriteCellItem<double>(
-                [f](CellStorage::Item& cell, double *out) {
-                    out[0] = f(cell);
-                }));
-    }
-
-    /// @brief Упрощенный вариант для добавления double полей
-    void append(const std::string& name, std::function<double(NodeStorage::Item&)> f) {
-        m_list.emplace_back(name, 1, WriteNodeItem<double>(
-                [f](NodeStorage::Item& cell, double *out) {
+                [f](mesh::EuCell& cell, double *out) {
                     out[0] = f(cell);
                 }));
     }
@@ -195,31 +112,7 @@ public:
     /// @param name Название переменной
     /// @param func Некоторая функция, которая для произвольной ячейки выдает
     /// значение переменной
-    void operator+=(std::pair<std::string, std::function<double(AmrStorage::Item&)>> p) {
-        append(p.first, p.second);
-    }
-
-    /// @brief Упрощенный синтаксис для добавления полей типа double
-    /// @param name Название переменной
-    /// @param func Некоторая функция, которая для произвольной ячейки выдает
-    /// значение переменной
-    void operator+=(std::pair<std::string, std::function<double(mesh::QCell&)>> p) {
-        append(p.first, p.second);
-    }
-
-    /// @brief Упрощенный синтаксис для добавления полей типа double
-    /// @param name Название переменной
-    /// @param func Некоторая функция, которая для произвольной ячейки выдает
-    /// значение переменной
-    void operator+=(std::pair<std::string, std::function<double(CellStorage::Item&)>> p) {
-        append(p.first, p.second);
-    }
-
-    /// @brief Упрощенный синтаксис для добавления полей типа double
-    /// @param name Название переменной
-    /// @param func Некоторая функция, которая для произвольной ячейки выдает
-    /// значение переменной
-    void operator+=(std::pair<std::string, std::function<double(NodeStorage::Item&)>> p) {
+    void operator+=(std::pair<std::string, std::function<double(mesh::EuCell&)>> p) {
         append(p.first, p.second);
     }
 
@@ -228,11 +121,11 @@ public:
     /// @param func Некоторая функция, которая для произвольной ячейки выдает
     /// значение переменной
     template <typename T>
-    void append(std::string name, const mesh::Storable<T>& p) {
+    void append(std::string name, const utils::Storable<T>& p) {
         if (VtkType::get<T>().is_undefined()) {
             if constexpr (std::is_same_v<T, geom::Vector3d>) {
                 append(name, 3, WriteSoaCell<double>(
-                        [p](mesh::QCell &cell, double *out) {
+                        [p](mesh::EuCell &cell, double *out) {
                             out[0] = cell(p).x();
                             out[1] = cell(p).y();
                             out[2] = cell(p).z();
@@ -242,7 +135,7 @@ public:
             }
         }
         append(name, 1, WriteSoaCell<T>(
-                [p](mesh::QCell &cell, T *out) {
+                [p](mesh::EuCell &cell, T *out) {
                     out[0] = cell(p);
                 }));
     }

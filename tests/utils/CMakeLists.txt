@@ -1,7 +1,7 @@
 list(APPEND TESTS a)
 #list(APPEND TESTS balancing_mpi)
 #list(APPEND TESTS distributed-amr)
-#list(APPEND TESTS distributed-conv)
+list(APPEND TESTS distributed-conv)
 #list(APPEND TESTS distributed-conv-amr)
 #list(APPEND TESTS json-config)
 #list(APPEND TESTS mpitest)

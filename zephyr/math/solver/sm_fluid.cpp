@@ -22,7 +22,7 @@ SmFluid::SmFluid(Eos::Ptr eos) : m_eos(eos) {
     m_max_dt = std::numeric_limits<double>::max();
 }
 
-SmFluid::State SmFluid::add_types(SoaMesh& mesh) {
+SmFluid::State SmFluid::add_types(EuMesh& mesh) {
     /*
     data.density  = mesh.add<double>("density");
     data.velocity = mesh.add<Vector3d>("velocity");
@@ -84,7 +84,7 @@ PState boundary_value(const PState &zc, const Vector3d &normal, Boundary flag) {
     return zn;
 }
 
-void SmFluid::update(SoaMesh &mesh) {
+void SmFluid::update(EuMesh &mesh) {
     // Определяем dt
     compute_dt(mesh);
 
@@ -107,8 +107,8 @@ void SmFluid::update(SoaMesh &mesh) {
     swap(mesh);
 }
 
-void SmFluid::compute_dt(SoaMesh &mesh) {
-    double dt = mesh.min([this](QCell cell) -> double {
+void SmFluid::compute_dt(EuMesh &mesh) {
+    double dt = mesh.min([this](EuCell cell) -> double {
         //double c = m_eos->sound_speed_rP(cell(data.density), cell(data.pressure));
         //return cell.incircle_diameter() / (cell(data.velocity).norm() + c);
         double c = m_eos->sound_speed_rP(cell(data.init).density, cell(data.init).pressure);
@@ -119,8 +119,8 @@ void SmFluid::compute_dt(SoaMesh &mesh) {
     m_dt = mpi::min(dt);
 }
 
-void SmFluid::compute_grad(SoaMesh &mesh) const {
-    mesh.for_each([this](QCell &cell) {
+void SmFluid::compute_grad(EuMesh &mesh) const {
+    mesh.for_each([this](EuCell &cell) {
         auto grad = gradient::LSM<PState>(cell, data.init, boundary_value);
         grad = gradient::limiting<PState>(cell, m_limiter, grad, data.init, boundary_value);
 
@@ -130,8 +130,8 @@ void SmFluid::compute_grad(SoaMesh &mesh) const {
     });
 }
 
-void SmFluid::fluxes(SoaMesh &mesh) const {
-    mesh.for_each([this](QCell &cell) {
+void SmFluid::fluxes(EuMesh &mesh) const {
+    mesh.for_each([this](EuCell &cell) {
         // Примитивный вектор в ячейке
         PState z_c = cell(data.init);
 
@@ -179,8 +179,8 @@ void SmFluid::fluxes(SoaMesh &mesh) const {
     });
 }
 
-void SmFluid::fluxes_stage1(SoaMesh &mesh) const {
-    mesh.for_each([this](QCell &cell) {
+void SmFluid::fluxes_stage1(EuMesh &mesh) const {
+    mesh.for_each([this](EuCell &cell) {
         // Центр ячейки
         Vector3d cell_c = cell.center();
 
@@ -250,8 +250,8 @@ void SmFluid::fluxes_stage1(SoaMesh &mesh) const {
     });
 }
 
-void SmFluid::fluxes_stage2(SoaMesh &mesh) const {
-    mesh.for_each([this](QCell &cell) {
+void SmFluid::fluxes_stage2(EuMesh &mesh) const {
+    mesh.for_each([this](EuCell &cell) {
         // Центр ячейки
         Vector3d cell_c = cell.center();
 
@@ -343,8 +343,8 @@ void SmFluid::fluxes_stage2(SoaMesh &mesh) const {
     });
 }
 
-void SmFluid::swap(SoaMesh &mesh) const {
-    mesh.for_each([this](QCell &cell) {
+void SmFluid::swap(EuMesh &mesh) const {
+    mesh.for_each([this](EuCell &cell) {
         cell(data.init) = cell(data.next);
     });
 }
@@ -354,12 +354,12 @@ Distributor SmFluid::distributor(const std::string& type) const {
         throw std::runtime_error("SmFluid error: unknown distributor type '" + type + "'");
     }
     
-    using mesh::SoaChildren;
+    using mesh::Children;
     
     Distributor distr;
 
     // Консервативное суммирование
-    distr.merge_soa = [this](SoaChildren &children, QCell &parent) {
+    distr.merge = [this](Children &children, EuCell &parent) {
         QState q_p;
         for (auto child: children) {
             QState q_ch(child(data.init));
@@ -371,7 +371,7 @@ Distributor SmFluid::distributor(const std::string& type) const {
     };
 
     // Снос копированием
-    auto split_const = [this](QCell &parent, SoaChildren &children) {
+    auto split_const = [this](EuCell &parent, Children &children) {
         PState z_p = parent(data.init);
         for (auto child: children) {
             child(data.init) = z_p;
@@ -379,7 +379,7 @@ Distributor SmFluid::distributor(const std::string& type) const {
     };
     
     // Снос по градиентам
-    auto split_slope = [this](QCell &parent, SoaChildren &children) {
+    auto split_slope = [this](EuCell &parent, Children &children) {
         PState& z_p  = parent(data.init);
         PState& d_dx = parent(data.d_dx);
         PState& d_dy = parent(data.d_dy);
@@ -435,18 +435,18 @@ Distributor SmFluid::distributor(const std::string& type) const {
     
     if (type == "const") {
         // Снос копированием
-        distr.split_soa = split_const;
+        distr.split = split_const;
     }
     else {
         // Снос по градиентам
-        distr.split_soa = split_slope;
+        distr.split = split_slope;
     }
 
     return distr;
 }
 
-void SmFluid::set_flags(SoaMesh &mesh) const {
-    if (!mesh.is_adaptive()) {
+void SmFluid::set_flags(EuMesh &mesh) const {
+    if (!mesh.adaptive()) {
         return;
     }
 

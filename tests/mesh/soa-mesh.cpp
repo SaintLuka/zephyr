@@ -1,12 +1,12 @@
 #include <zephyr/utils/threads.h>
-#include <zephyr/mesh/euler/soa_mesh.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/io/vtu_file.h>
 #include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/geom/generator/cuboid.h>
 
 using zephyr::utils::threads;
 using namespace zephyr::io;
-using zephyr::mesh::SoaMesh;
+using zephyr::mesh::EuMesh;
 using zephyr::mesh::SoaStorage;
 using zephyr::mesh::AmrCells;
 using zephyr::geom::generator::Rectangle;
@@ -24,7 +24,7 @@ int main() {
     gen.set_boundaries({.left=Boundary::ZOE,.right=Boundary::ZOE,
                         .bottom=Boundary::ZOE,.top=Boundary::WALL});
 
-    SoaMesh mesh(gen);
+    EuMesh mesh(gen);
     mesh.add<double>("value");
 
     if (mesh.check_base() < 0) {

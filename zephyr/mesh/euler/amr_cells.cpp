@@ -21,6 +21,12 @@ AmrCells::AmrCells(int dim, bool adaptive, bool axial)
     set_linear(true);
 }
 
+AmrCells AmrCells::same() const {
+    AmrCells cells(m_dim, m_adaptive, m_axial);
+    cells.data = data.same();
+    return cells;
+}
+
 void AmrCells::set_dimension(int dim) {
     if (!empty() && dim != m_dim) {
         throw std::runtime_error("Can't change dimension. Mesh is not empty.");
@@ -397,26 +403,81 @@ void AmrCells::copy_data(index_t from, index_t to) {
     copy_data(from, this, to);
 }
 
-void AmrCells::copy_data(index_t from, AmrCells* dst, index_t to) {
+void AmrCells::copy_data(index_t from, AmrCells* dst, index_t to) const {
     data.copy_data(from, &dst->data, to);
 }
 
-void AmrCells::resize(index_t n_cells) {
+void AmrCells::copy_geom(index_t ic, AmrCells& cells,
+        index_t jc, index_t face_beg, index_t node_beg) const {
+
+    cells.rank [jc] = rank [ic];
+    cells.next [jc] = next [ic];
+    cells.index[jc] = index[ic];
+
+    cells.flag [jc] = flag [ic];
+    cells.level[jc] = level[ic];
+    cells.b_idx[jc] = b_idx[ic];
+    cells.z_idx[jc] = z_idx[ic];
+
+    cells.center[jc] = center[ic];
+    cells.volume[jc] = volume[ic];
+
+    cells.volume_alt[jc] = volume_alt[ic];
+
+    cells.face_begin[jc] = face_beg;
+    cells.face_begin[jc + 1] = face_beg + max_face_count(ic);
+
+    for (index_t i = 0; i < max_face_count(ic); ++i) {
+        index_t iface = face_begin[ic] + i;
+        index_t jface = cells.face_begin[jc] + i;
+
+        cells.faces.boundary[jface] = faces.boundary[iface];
+        cells.faces.normal  [jface] = faces.normal  [iface];
+        cells.faces.center  [jface] = faces.center  [iface];
+        cells.faces.area    [jface] = faces.area    [iface];
+        cells.faces.area_alt[jface] = faces.area_alt[iface];
+        cells.faces.vertices[jface] = faces.vertices[iface];
+
+        cells.faces.adjacent.rank [jface] = faces.adjacent.rank [iface];
+        cells.faces.adjacent.index[jface] = faces.adjacent.index[iface];
+        cells.faces.adjacent.alien[jface] = faces.adjacent.alien[iface];
+        cells.faces.adjacent.basic[jface] = jc;
+    }
+
+    cells.node_begin[jc] = node_beg;
+    cells.node_begin[jc + 1] = node_beg + max_node_count(ic);
+
+    for (index_t i = 0; i < max_node_count(ic); ++i) {
+        index_t iv = node_begin[ic] + i;
+        index_t jv = cells.node_begin[jc] + i;
+        cells.verts[jv] = verts[iv];
+    }
+}
+
+void AmrCells::clear() {
+    resize(0, 0, 0);
+}
+
+void AmrCells::resize_amr(index_t n_cells) {
     if (!m_adaptive) {
         throw std::runtime_error("Resize of unstructured mesh");
     }
 
-    resize_cells(n_cells);
+    index_t n_faces = n_cells * (m_dim == 2 ? 8 : 24);
+    index_t n_nodes = n_cells * (m_dim == 2 ? 9 : 27);
+    
+    resize(n_cells, n_faces, n_nodes);
+}
 
-    int n_faces = m_dim == 2 ? 8 : 24;
-    int n_nodes = m_dim == 2 ? 9 : 27;
+void AmrCells::reserve_amr(index_t n_cells) {
+    if (!m_adaptive) {
+        throw std::runtime_error("Resize of unstructured mesh");
+    }
 
-    // Поля граней и вершин пока так
-    faces.resize(n_cells * n_faces);
-    verts.resize(n_cells * n_nodes);
+    index_t n_faces = n_cells * (m_dim == 2 ? 8 : 24);
+    index_t n_nodes = n_cells * (m_dim == 2 ? 9 : 27);
 
-    // Поля данных только для ячеек
-    data.resize(n_cells);
+    reserve(n_cells, n_faces, n_nodes);
 }
 
 void AmrCells::resize_cells(index_t n_cells) {
@@ -444,7 +505,7 @@ void AmrCells::resize_cells(index_t n_cells) {
     data.resize(n_cells);
 }
 
-void AmrCells::reserve(index_t n_cells, index_t n_faces, index_t n_nodes) {
+void AmrCells::reserve_cells(index_t n_cells) {
     // Поля ячеек по числу ячеек, логично
     next.reserve(n_cells);
     rank.reserve(n_cells);
@@ -463,12 +524,49 @@ void AmrCells::reserve(index_t n_cells, index_t n_faces, index_t n_nodes) {
     z_idx.reserve(n_cells);
     level.reserve(n_cells);
 
-    // Поля граней и вершин пока так
-    faces.reserve(n_cells * n_faces);
-    verts.reserve(n_cells * n_nodes);
-
     // Поля данных только для ячеек
     data.reserve(n_cells);
+}
+
+void AmrCells::shrink_to_fit_cells() {
+    // Поля ячеек по числу ячеек, логично
+    next.shrink_to_fit();
+    rank.shrink_to_fit();
+    index.shrink_to_fit();
+
+    center.shrink_to_fit();
+    volume.shrink_to_fit();
+    volume_alt.shrink_to_fit();
+
+    // +1 для заключительной
+    face_begin.shrink_to_fit();
+    node_begin.shrink_to_fit();
+
+    flag.shrink_to_fit();
+    b_idx.shrink_to_fit();
+    z_idx.shrink_to_fit();
+    level.shrink_to_fit();
+
+    // Поля данных только для ячеек
+    data.shrink_to_fit();
+}
+
+void AmrCells::resize(index_t n_cells, index_t n_faces, index_t n_nodes) {
+    resize_cells(n_cells);
+    faces.resize(n_faces);
+    verts.resize(n_nodes);
+}
+
+void AmrCells::reserve(index_t n_cells, index_t n_faces, index_t n_nodes) {
+    reserve_cells(n_cells);
+    faces.reserve(n_faces);
+    verts.reserve(n_nodes);
+}
+
+void AmrCells::shrink_to_fit() {
+    shrink_to_fit_cells();
+    faces.shrink_to_fit();
+    verts.shrink_to_fit();
 }
 
 void AmrCells::set_cell(index_t ic, const Quad& quad) {

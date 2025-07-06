@@ -228,7 +228,7 @@ void Strip::initialize(AmrCells& cells) {
     cells.set_linear(true);
     cells.set_axial(false);
 
-    cells.resize(m_nx);
+    cells.resize_amr(m_nx);
 
     int n_faces = 8;
     int n_nodes = 9;

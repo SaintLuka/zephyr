@@ -1,14 +1,8 @@
 #include <cstring>
 
-#include <zephyr/mesh/primitives/mov_node.h>
-#include <zephyr/mesh/primitives/mov_cell.h>
-#include <zephyr/mesh/primitives/amr_cell.h>
-
 #include <zephyr/io/variables.h>
 
-
 namespace zephyr::io {
-
 
 Variables::Variables(const char* name) {
     append(name);
@@ -51,14 +45,14 @@ void Variables::append(const char* name) {
         m_list.emplace_back("face.boundary");
     }
     else if (!std::strcmp(name, "faces2D")) {
-        // Для SoaMesh
+        // Для EuMesh
         m_list.emplace_back("face2D.rank");
         m_list.emplace_back("face2D.index");
         m_list.emplace_back("face2D.alien");
         m_list.emplace_back("face2D.boundary");
     }
     else if (!std::strcmp(name, "faces3D")) {
-        // Для SoaMesh
+        // Для EuMesh
         m_list.emplace_back("face3D.rank");
         m_list.emplace_back("face3D.index");
         m_list.emplace_back("face3D.alien");

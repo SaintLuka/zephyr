@@ -20,8 +20,11 @@ struct Storable {
 public:
     int idx = -1;  ///< Смещение в массиве структур
 
-    /// @brief  Со смещением для векторных полей
+    /// @brief Со смещением для векторных полей
     Storable<T> operator[](int shift) const { return {idx + shift}; }
+
+    /// @brief MPI-тэг, используется в пересылках
+    int tag() const;
 };
 
 /// @class SoaStorage storage.h
@@ -38,6 +41,9 @@ public:
     /// @brief Пустое хранилище заданного размера
     explicit SoaStorage(size_t size = 0) : m_size(size) { }
 
+    /// @brief Создать пустое хранилище с таким же размером данных
+    SoaStorage same() const;
+
     /// @brief Размер массивов данных равен нулю? (даже если данных нет)
     inline bool empty() const { return m_size == 0; }
 
@@ -49,6 +55,9 @@ public:
 
     /// @brief Изменить размер массивов данных (даже если данных нет)
     void reserve(size_t new_size);
+
+    /// @brief Изменить размеры буфферов под размеры данных
+    void shrink_to_fit();
 
     /// @brief Добавить новое СКАЛЯРНОЕ поле
     /// @param name Имя для поля данных, должно быть уникальным среди полей
@@ -118,7 +127,7 @@ public:
 
     /// @brief Скопировать все данные по индексу from
     /// в хранилище dst по индексу to.
-    void copy_data(size_t from, SoaStorage* dst, size_t to);
+    void copy_data(size_t from, SoaStorage* dst, size_t to) const;
 
     /// @brief Поменять два массива данных местами
     template <typename T>
@@ -400,6 +409,19 @@ public:
     template<int I = 0>
     std::enable_if_t<I >= n_basic_types> reserve_basic(size_t new_size) { }
 
+    // Рекурсивный shrink_to_fit для базовых типов
+    template<int I = 0>
+    std::enable_if_t<I < n_basic_types> shrink_basic() {
+        for (auto &vec: std::get<I>(m_values1)) {
+            vec.shrink_to_fit();
+        }
+        shrink_basic<I + 1>();
+    }
+
+    // Рекурсивный reserve для базовых типов
+    template<int I = 0>
+    std::enable_if_t<I >= n_basic_types> shrink_basic() { }
+
     // Скопировать для одного базового типа значения
     template <typename T>
     static void copy_one_basic(const vec_of_vec<T>& src, size_t from,
@@ -418,6 +440,15 @@ public:
         copy_one_basic(std::get<I>(src), from, std::get<I>(dst), to);
         if constexpr (I < n_basic_types - 1) {
             copy_basics<I + 1>(src, from, dst, to);
+        }
+    }
+
+    // Выполняет resize для полей данных, нужно для копии сигнатуры SoaStorage
+    template <int I = 0>
+    void resize_basic_values(SoaStorage& new_storage) const {
+        std::get<I>(new_storage.m_values1).resize(std::get<I>(m_values1).size());
+        if constexpr (I < n_basic_types - 1) {
+            resize_basic_values<I + 1>(new_storage);
         }
     }
 };
@@ -507,6 +538,18 @@ Storable<T> SoaStorage::add(const std::string &name, int count) {
     }
 
     return {c};
+}
+
+template <typename T>
+int Storable<T>::tag() const {
+    if constexpr (SoaStorage::is_basic_type<T>()) {
+        // 1024 * type_index + idx
+        return (SoaStorage::basic_type_index<T>() << 10) + idx;
+    }
+    else {
+        // 1024 * 1024 * type_index + idx
+        return (SoaStorage::custom_type_index<T>() << 20) + idx;
+    }
 }
 
 } // namespace zephyr::utils

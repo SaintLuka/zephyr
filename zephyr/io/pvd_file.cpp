@@ -2,16 +2,14 @@
 #include <fstream>
 #include <filesystem>
 
-#include <zephyr/mesh/primitives/mov_node.h>
-#include <zephyr/mesh/primitives/mov_cell.h>
-#include <zephyr/mesh/primitives/amr_cell.h>
-#include <zephyr/mesh/lagrange/la_mesh.h>
-
 #include <zephyr/utils/mpi.h>
 #include <zephyr/utils/json.h>
 
 #include <zephyr/io/pvd_file.h>
 #include <zephyr/io/vtu_file.h>
+
+#include <zephyr/mesh/euler/eu_prim.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
 
 namespace zephyr::io {
 
@@ -28,7 +26,6 @@ inline bool is_big_endian() {
 
 PvdFile::PvdFile()
     : variables(),
-      filter(),
       hex_only(true),
       unique_nodes(false),
       m_open(false),
@@ -157,42 +154,11 @@ void PvdFile::open(const std::string& filename, const std::string& _directory, b
 }
 
 void PvdFile::save(mesh::EuMesh& mesh, double timestep) {
-    if (unique_nodes) {
-        mesh.collect_nodes();
-    }
-    if (mesh.has_nodes()) {
-        save(mesh.locals(), mesh.nodes(), timestep);
-    }
-    else {
-        save(mesh.locals(), timestep);
-    }
-}
-
-void PvdFile::save(mesh::SoaMesh& mesh, double timestep) {
     save(mesh.m_locals, timestep);
 }
 
-void PvdFile::save(AmrStorage& elements, double timestep) {
-    VtuFile::save(get_filename(), elements, variables, hex_only, polyhedral, filter);
-    update_pvd(timestep);
-}
-
 void PvdFile::save(mesh::AmrCells& elements, double timestep) {
-    VtuFile::save(get_filename(), elements, variables, hex_only, polyhedral, filter);
-    update_pvd(timestep);
-}
-
-void PvdFile::save(AmrStorage& elements, const std::vector<geom::Vector3d>& nodes, double timestep) {
-    VtuFile::save(get_filename(), elements, nodes, variables, hex_only, polyhedral);
-    update_pvd(timestep);
-}
-
-void PvdFile::save(zephyr::mesh::LaMesh& mesh, double timestep) {
-    save(mesh.locals(), mesh.nodes(), timestep);
-}
-
-void PvdFile::save(CellStorage& cells, NodeStorage& nodes, double timestep) {
-    VtuFile::save(get_filename(), cells, nodes, variables, filter);
+    VtuFile::save(get_filename(), elements, variables, hex_only, polyhedral);
     update_pvd(timestep);
 }
 

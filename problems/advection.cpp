@@ -6,7 +6,7 @@
 #include <iomanip>
 
 #include <zephyr/geom/generator/rectangle.h>
-#include <zephyr/mesh/euler/soa_mesh.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/io/pvd_file.h>
 
 using zephyr::geom::Vector3d;
@@ -14,8 +14,8 @@ using zephyr::geom::Box;
 using zephyr::geom::Boundary;
 using zephyr::geom::generator::Rectangle;
 using zephyr::mesh::Storable;
-using zephyr::mesh::SoaMesh;
-using zephyr::mesh::QCell;
+using zephyr::mesh::EuMesh;
+using zephyr::mesh::EuCell;
 using zephyr::mesh::AmrStorage;
 using zephyr::io::PvdFile;
 
@@ -33,7 +33,7 @@ int main() {
         .bottom = Boundary::PERIODIC, .top   = Boundary::PERIODIC});
 
     // Создать сетку
-    SoaMesh mesh(rect);
+    EuMesh mesh(rect);
 
     // Данные для хранения на сетке
     auto u1 = mesh.add<double>("u1");
@@ -44,8 +44,8 @@ int main() {
 
     // Переменные для сохранения
     pvd.variables.append("u", u1);
-    pvd.variables += {"vx", [](QCell cell) -> double { return velocity(cell.center()).x(); } };
-    pvd.variables += {"vy", [](QCell cell) -> double { return velocity(cell.center()).y(); } };
+    pvd.variables += {"vx", [](EuCell cell) -> double { return velocity(cell.center()).x(); } };
+    pvd.variables += {"vy", [](EuCell cell) -> double { return velocity(cell.center()).y(); } };
 
     // Заполняем начальные данные
     Box box = mesh.bbox();

@@ -1,35 +1,17 @@
 #include <fstream>
 #include <iomanip>
 
-#include <zephyr/mesh/primitives/mov_node.h>
-#include <zephyr/mesh/primitives/mov_cell.h>
-#include <zephyr/mesh/primitives/amr_cell.h>
-
 #include <zephyr/io/csv_file.h>
+#include <zephyr/mesh/euler/eu_prim.h>
 
-using zephyr::mesh::QCell;
+using zephyr::mesh::EuCell;
 using zephyr::mesh::AmrCells;
 
 namespace zephyr::io {
 
-using namespace zephyr::geom;
-
 /// ===========================================================================
 ///             Реализация записи в виде набора статических функций
 /// ===========================================================================
-
-inline size_t count_cells(AmrStorage &cells, const Filter &filter) {
-    if (filter.is_trivial()) {
-        return cells.size();
-    }
-    size_t count = 0;
-    for (auto& cell: cells) {
-        if (filter(cell)) {
-            ++count;
-        }
-    }
-    return count;
-}
 
 void write_name(const Variable& var, std::ofstream& file) {
     if (var.is_scalar()) {
@@ -43,7 +25,7 @@ void write_name(const Variable& var, std::ofstream& file) {
     }
 }
 
-void write_variable(const Variable& var, QCell& cell, std::ofstream& file) {
+void write_variable(const Variable& var, EuCell& cell, std::ofstream& file) {
     if (!var.is_scalar()) {
         throw std::runtime_error("CsvFile doesn't support vector variables");
     }
@@ -70,17 +52,18 @@ void write_variable(const Variable& var, QCell& cell, std::ofstream& file) {
 CsvFile::CsvFile(
         const std::string &filename, int precision,
         const Variables &variables) :
-    filename(filename), precision(precision),
-    variables(variables), filter() {
+    filename(filename),
+    precision(precision),
+    variables(variables) {
 }
 
 void CsvFile::save(AmrCells &cells) {
-    save(filename, cells, precision, variables, filter);
+    save(filename, cells, precision, variables);
 }
 
 void CsvFile::save(
-    const std::string &filename, AmrCells &cells, int precision,
-    const Variables &variables, const Filter &filter
+    const std::string &filename, AmrCells &cells,
+    int precision, const Variables &variables
 ) {
     size_t n_cells = cells.n_cells();
     if (n_cells < 1) {

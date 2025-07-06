@@ -1,17 +1,16 @@
 #pragma once
 
-#include <zephyr/mesh/euler/soa_mesh.h>
+
+#include <zephyr/mesh/euler/eu_prim.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
 
 namespace zephyr::geom {
 
-using zephyr::mesh::QCell;
-using zephyr::mesh::SoaMesh;
+using zephyr::mesh::EuCell;
+using zephyr::mesh::EuMesh;
 using zephyr::mesh::AmrCells;
 using zephyr::mesh::Storable;
 using zephyr::geom::Vector3d;
-using zephyr::mesh::AmrStorage;
-using zephyr::mesh::VarExtra;
-using zephyr::mesh::Byte;
 
 
 /// @brief Восстановление интерфейса для многоматериальных задач.
@@ -33,27 +32,27 @@ public:
         : a{volume}, n{normal}, p{origin} { }
 
     /// @brief Обновить подсеточную реконструкцию
-    void update(SoaMesh& mesh, int smoothing) const;
+    void update(EuMesh& mesh, int smoothing) const;
 
     /// @brief Преобразовать реконструкцию в сетку
-    SoaMesh body(SoaMesh& mesh) const;
+    EuMesh body(EuMesh& mesh) const;
 
 private:
 
     /// @brief Оценка нормали по производным объемной доли
-    void compute_normal(QCell& cell) const;
+    void compute_normal(EuCell& cell) const;
 
-    void compute_normals(SoaMesh& mesh) const;
+    void compute_normals(EuMesh& mesh) const;
 
     /// @brief Найти сечение ячейки по существующим нормалям
-    void find_section(QCell& cell) const;
+    void find_section(EuCell& cell) const;
 
-    void find_sections(SoaMesh& mesh) const;
+    void find_sections(EuMesh& mesh) const;
 
     /// @brief Поправить нормали с учетом соседей
-    void adjust_normal(QCell& cell) const;
+    void adjust_normal(EuCell& cell) const;
 
-    void adjust_normals(SoaMesh& mesh) const;
+    void adjust_normals(EuMesh& mesh) const;
 
 private:
     Storable<double> a;    ///< Тип извлечения объемной доли

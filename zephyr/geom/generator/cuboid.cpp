@@ -443,7 +443,7 @@ void Cuboid::initialize(mesh::AmrCells& cells)  {
     cells.set_linear(true);
     cells.set_axial(false);
 
-    cells.resize(m_size);
+    cells.resize_amr(m_size);
 
     int n_faces = 24;
     int n_nodes = 27;

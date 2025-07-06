@@ -6,7 +6,7 @@
 
 #include <zephyr/geom/generator/strip.h>
 
-#include <zephyr/mesh/euler/soa_mesh.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
 
 #include <zephyr/io/pvd_file.h>
 
@@ -19,8 +19,8 @@ using zephyr::geom::Box;
 using zephyr::geom::Boundary;
 using zephyr::geom::Vector3d;
 using zephyr::mesh::generator::Strip;
-using zephyr::mesh::SoaMesh;
-using zephyr::mesh::QCell;
+using zephyr::mesh::EuMesh;
+using zephyr::mesh::EuCell;
 using zephyr::io::PvdFile;
 
 using namespace zephyr::phys;
@@ -41,7 +41,7 @@ int main() {
     gen.set_boundaries({.left = Boundary::ZOE, .right = Boundary::ZOE});
 
     // Создать сетку
-    SoaMesh mesh(gen);
+    EuMesh mesh(gen);
 
     // Переменные для хранения на сетке
     auto [rho1, p1, e1] = mesh.append<double>("rho1", "p1", "e1");
@@ -52,10 +52,10 @@ int main() {
     PvdFile pvd("mesh", "output");
 
     // Переменные для сохранения
-    pvd.variables += {"rho",    [rho1](QCell& cell) -> double { return cell(rho1); }};
-    pvd.variables += {"velocity", [v1](QCell& cell) -> double { return cell(v1).x(); }};
-    pvd.variables += {"pressure", [p1](QCell& cell) -> double { return cell(p1); }};
-    pvd.variables += {"energy",   [e1](QCell& cell) -> double { return cell(e1); }};
+    pvd.variables += {"rho",    [rho1](EuCell& cell) -> double { return cell(rho1); }};
+    pvd.variables += {"velocity", [v1](EuCell& cell) -> double { return cell(v1).x(); }};
+    pvd.variables += {"pressure", [p1](EuCell& cell) -> double { return cell(p1); }};
+    pvd.variables += {"energy",   [e1](EuCell& cell) -> double { return cell(e1); }};
 
     // Заполняем начальные данные
     for (auto cell: mesh) {

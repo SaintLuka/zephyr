@@ -15,7 +15,6 @@ public:
     /// сохранения сетки могут настраиваться пользователем класса.
 
     Variables     variables; ///< Список переменных на запись
-    ComplexFilter filter;    ///< Функтор, возвращает true для нужных ячеек
     bool hex_only = true;    ///< Записывать как четырехугольники/шестигранники
 
     /// @brief Интерпретировать трёхмерные ячейки как многогранники общего вида.
@@ -69,35 +68,9 @@ public:
     /// @brief Записать хранилище (или часть, при распределенном счете) в один
     /// файл VTU (или набор VTU), затем обновить PVD файл.
     /// Используется функция VtuFile::write
-    void save(mesh::SoaMesh& mesh, double timestep);
-
-    /// @brief Записать хранилище (или часть, при распределенном счете) в один
-    /// файл VTU (или набор VTU), затем обновить PVD файл.
-    /// Используется функция VtuFile::write
-    void save(AmrStorage& elements, double timestep);
-
-    /// @brief Записать хранилище (или часть, при распределенном счете) в один
-    /// файл VTU (или набор VTU), затем обновить PVD файл.
-    /// Используется функция VtuFile::write
     void save(mesh::AmrCells& elements, double timestep);
 
-    /// @brief Записать хранилище (или часть, при распределенном счете) в один
-    /// файл VTU (или набор VTU), затем обновить PVD файл.
-    /// Используется функция VtuFile::write
-    void save(AmrStorage& elements, const std::vector<geom::Vector3d>& nodes, double timestep);
-
-    /// @brief Записать хранилище (или часть, при распределенном счете) в один
-    /// файл VTU (или набор VTU), затем обновить PVD файл.
-    /// Используется функция VtuFile::write
-    void save(mesh::LaMesh& mesh, double timestep);
-
-    /// @brief Записать хранилище (или часть, при распределенном счете) в один
-    /// файл VTU (или набор VTU), затем обновить PVD файл.
-    /// Используется функция VtuFile::write
-    void save(CellStorage& cells, NodeStorage& nodes, double timestep);
-
 private:
-
     std::string get_filename() const;
 
     void update_pvd(double timestep);

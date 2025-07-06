@@ -1,10 +1,8 @@
 #pragma once
 
-#include <vector>
-
-#include <zephyr/geom/vector.h>
 #include <zephyr/utils/range.h>
 #include <zephyr/utils/storage.h>
+#include <zephyr/mesh/primitives/side.h>
 #include <zephyr/mesh/euler/amr_faces.h>
 
 // Forward Declaration для классов из geom
@@ -94,6 +92,10 @@ public:
     explicit AmrCells(int dim, bool adaptive = false, bool axial = false);
 
 
+    /// @brief Создать пустое хранилище с таким же набором типов
+    AmrCells same() const;
+
+
     /// @brief Размерность сетки
     int dim() const { return m_dim; }
 
@@ -130,6 +132,12 @@ public:
 
     /// @brief Число ячеек (синоним)
     index_t n_cells() const { return m_size; }
+
+    /// @brief Полное число граней
+    index_t n_faces() const { return faces.size(); }
+
+    /// @brief Полное число вершин
+    index_t n_nodes() const { return verts.size(); }
 
 
     /// @{ @name Топологические свойства ячеек
@@ -278,21 +286,37 @@ public:
 
     /// @brief Скопировать все данные целиком с индекса from,
     /// в хранилище dst на индекс to
-    void copy_data(index_t from, AmrCells* dst, index_t to);
+    void copy_data(index_t from, AmrCells* dst, index_t to) const;
+
+    /// @brief Скопировать ячейку с позиции ic в хранилище cells на индекс jc,
+    /// грани на позицию iface, вершины на позицию inode.
+    void copy_geom(index_t ic, AmrCells& cells,
+                   index_t jc, index_t face_beg, index_t node_beg) const;
 
 
     // Размеры хранилища
 
-    /// @brief Только для AMR ячеек с установленной размерностью
-    void resize(index_t n_cells);
+    /// @brief Очистить хранилище
+    void clear();
 
-    /// @brief Увеличить только массивы данных ячеек
-    void resize_cells(index_t n_cells);
+    /// @brief Только для AMR ячеек с установленной размерностью
+    void resize_amr(index_t n_cells);
+
+    /// @brief Только для AMR ячеек с установленной размерностью
+    void reserve_amr(index_t n_cells);
+
+    /// @brief Увеличить массивы под ячейки, грани и вершины
+    /// @param n_faces Полное число граней!
+    /// @param n_nodes Полное число вершин!
+    void resize(index_t n_cells, index_t n_faces, index_t n_nodes);
 
     /// @brief Зарезервировать под неструктурированные ячейки
     /// @param n_faces Максимальное число граней на ячейку
     /// @param n_nodes Максимальное число вершин на ячейку
     void reserve(index_t n_cells, index_t n_faces, index_t n_nodes);
+
+    /// @brief Сжать массивы до актуальных размеров
+    void shrink_to_fit();
 
 
 
@@ -364,6 +388,17 @@ public:
     int check_connectivity(index_t ic, AmrCells& aliens) const;
 
     /// @}
+
+
+protected:
+    /// @brief Увеличить только массивы данных ячеек
+    void resize_cells(index_t n_cells);
+
+    /// @brief Увеличить буфферы только для массивов данных ячеек
+    void reserve_cells(index_t n_cells);
+
+    /// @brief Увеличить буфферы только для массивов данных ячеек
+    void shrink_to_fit_cells();
 };
 
 } // namespace zephyr::mesh

@@ -62,9 +62,10 @@ set(BUILD_SHARED_LIBS YES)
 
 # Тип компиляции (SHARED/STATIC) пропущен, полагаемся на переменную BUILD_SHARED_LIBS
 add_library(zephyr ${ZEPHYR_SOURCES}
-        zephyr/mesh/euler/soa_mesh.h
+    zephyr/mesh/euler/eu_mesh.h
         zephyr/utils/storage.h
-        zephyr/utils/storage.cpp)
+        zephyr/utils/storage.cpp
+        zephyr/mesh/euler/router.h)
 if (ZEPHYR_TBB)
     target_link_libraries(zephyr PUBLIC TBB::tbb)
 elseif (ZEPHYR_OPENMP)

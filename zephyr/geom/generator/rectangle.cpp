@@ -4,10 +4,13 @@
 #include <zephyr/geom/box.h>
 #include <zephyr/geom/grid.h>
 #include <zephyr/geom/generator/rectangle.h>
-#include <zephyr/utils/json.h>
+
+#include <zephyr/geom/primitives/quad.h>
+#include <zephyr/geom/primitives/polygon.h>
 
 #include <zephyr/mesh/euler/amr_cells.h>
-#include <zephyr/mesh/primitives/amr_cell.h>
+
+#include <zephyr/utils/json.h>
 
 namespace zephyr::geom::generator {
 
@@ -517,7 +520,7 @@ void Rectangle::initialize_classic(AmrCells& cells)  {
     cells.set_linear(true);
     cells.set_axial(m_axial);
 
-    cells.resize(m_size);
+    cells.resize_amr(m_size);
 
     int n_faces = 8;
     int n_nodes = 9;
@@ -613,21 +616,35 @@ void Rectangle::initialize_voronoi(AmrCells& cells) {
     cells.set_axial(m_axial);
 
     // Зарезервировать ячейки, добавляем push_back'ом
-    cells.reserve(m_size, 6, 6);
+    cells.reserve(m_size, 6 * m_size, 6 * m_size);
 
     for (index_t ic = 0; ic < m_size; ++ic) {
-        AmrCell cell = grid.amr_cell(ic);
-        Polygon poly = cell.polygon();
+        GCell cell = grid.cell(ic);
+
+        int n_nodes = cell.n_nodes();
+
+        // Уникальные узлы
+        std::vector<GNode::Ptr> nodes(n_nodes, nullptr);
+
+        Polygon poly(n_nodes);
+        for (int i = 0; i < n_nodes; ++i) {
+            nodes[i] = grid.node(cell.node(i).index);
+            poly.set(i, nodes[i]->v);
+        }
 
         cells.push_back(poly);
 
         // Смежность
         for (int i = 0; i < poly.size(); ++i) {
             index_t iface = cells.face_begin[ic] + i;
-            cells.faces.boundary[iface] = cell.faces[i].boundary;
-            cells.faces.adjacent.rank[iface] = cell.faces[i].adjacent.rank;
-            cells.faces.adjacent.index[iface] = cell.faces[i].adjacent.index;
-            cells.faces.adjacent.alien[iface] = cell.faces[i].adjacent.alien;
+
+            GNode::Ref v1 = nodes[i];
+            GNode::Ref v2 = nodes[(i + 1) % n_nodes];
+
+            cells.faces.boundary[iface] = cell.boundary({v1, v2});
+            cells.faces.adjacent.rank[iface]  = 0;
+            cells.faces.adjacent.index[iface] = cell.adjacent({v1, v2});
+            cells.faces.adjacent.alien[iface] = -1;
             cells.faces.adjacent.basic[iface] = ic;
         }
     }

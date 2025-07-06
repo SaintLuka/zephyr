@@ -4,7 +4,7 @@
 
 #include <iomanip>
 
-#include <zephyr/mesh/euler/soa_mesh.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/geom/generator/cuboid.h>
 #include <zephyr/io/pvd_file.h>
@@ -18,7 +18,7 @@ using generator::Cuboid;
 using zephyr::io::PvdFile;
 using zephyr::utils::Stopwatch;
 
-void set_flag(QCell& cell) {
+void set_flag(EuCell& cell) {
     const double p_coarse = 0.80;
     const double p_retain = 0.18;
 
@@ -47,7 +47,7 @@ int main() {
     Cuboid cube(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
     cube.set_nx(10);
 
-    SoaMesh mesh(rect);
+    EuMesh mesh(rect);
 
     mesh.set_max_level(4);
 

@@ -1,5 +1,4 @@
 #include <zephyr/math/solver/transfer.h>
-#include <zephyr/mesh/primitives/bface.h>
 #include <zephyr/geom/primitives/polygon.h>
 #include <zephyr/geom/intersection.h>
 #include <zephyr/geom/sections.h>
@@ -50,7 +49,7 @@ Transfer::Transfer() {
     m_limiter = "MC";
 }
 
-void Transfer::add_types(SoaMesh& mesh) {
+void Transfer::add_types(EuMesh& mesh) {
     data.u1 = mesh.add<double>("u1");
     data.u2 = mesh.add<double>("u2");
     data.n = mesh.add<Vector3d>("n");
@@ -89,7 +88,7 @@ Vector3d Transfer::velocity(const Vector3d &c) const {
     return Vector3d::UnitX();
 }
 
-double Transfer::compute_dt(QCell &cell) {
+double Transfer::compute_dt(EuCell &cell) {
     double max_area = 0.0;
     for (auto &face: cell.faces()) {
         max_area = std::max(max_area, face.area());
@@ -98,7 +97,7 @@ double Transfer::compute_dt(QCell &cell) {
     return dx / velocity(cell.center()).norm();
 }
 
-double Transfer::compute_dt(SoaMesh &mesh) {
+double Transfer::compute_dt(EuMesh &mesh) {
     double tau = std::numeric_limits<double>::max();
 
     for (auto &cell: mesh) {
@@ -140,7 +139,7 @@ double face_fraction_n1(
     return between(a_sig, a1, a2);
 }
 
-double face_fraction_n2(QCell& cell, QCell& neib, QFace& face, double vn, const Transfer::State& data) {
+double face_fraction_n2(EuCell& cell, EuCell& neib, EuFace& face, double vn, const Transfer::State& data) {
     // Отрезок - грань
     obj::segment seg{
             .v1 = face.vs(0),
@@ -194,7 +193,7 @@ double best_face_fraction(double a1, double a2, double S, double vn, double dt, 
     return between(Flux / (dt * vn * S), a_min, a_max);
 }
 
-double flux_CRP(QCell& cell, QCell& neib, QFace& face, double vn, double dt, double Flux, const Transfer::State& data) {
+double flux_CRP(EuCell& cell, EuCell& neib, EuFace& face, double vn, double dt, double Flux, const Transfer::State& data) {
     double a1 = cell(data.u1);
     double a2 = neib(data.u1);
 
@@ -208,7 +207,7 @@ double flux_CRP(QCell& cell, QCell& neib, QFace& face, double vn, double dt, dou
     return flux_2D(a1, a2, S, vol1, vol2, a_sig, vn, dt);
 }
 
-void Transfer::fluxes_CRP(QCell &cell, Direction dir) {
+void Transfer::fluxes_CRP(EuCell &cell, Direction dir) {
     double a1 = cell(data.u1);
     Vector3d n1 = cell(data.n);
 
@@ -257,7 +256,7 @@ void Transfer::fluxes_CRP(QCell &cell, Direction dir) {
 // V1, V2 -- скорость в узлах грани
 // fn -- нормаль к грани
 // Предполагаем (V1 + V2).dot(fn) > 0.0
-double flux_VOF(QCell &cell, QFace &face,
+double flux_VOF(EuCell &cell, EuFace &face,
         const Vector3d& V1, const Vector3d& V2,
         double dt, const Vector3d& fn, const Transfer::State& data) {
 
@@ -297,7 +296,7 @@ double flux_VOF(QCell &cell, QFace &face,
     }
 }
 
-void Transfer::fluxes_VOF(QCell &cell, Direction dir) {
+void Transfer::fluxes_VOF(EuCell &cell, Direction dir) {
     double fluxes = 0.0;
     for (auto &face: cell.faces(dir)) {
         if (face.is_boundary()) {
@@ -345,7 +344,7 @@ void Transfer::fluxes_VOF(QCell &cell, Direction dir) {
     cell(data.u2) = cell(data.u1) - fluxes / cell.volume();
 }
 
-void Transfer::fluxes_MUSCL(QCell &cell, Direction dir) {
+void Transfer::fluxes_MUSCL(EuCell &cell, Direction dir) {
     double fluxes = 0.0;
     for (auto &face: cell.faces(dir)) {
         if (face.is_boundary()) {
@@ -404,7 +403,7 @@ void Transfer::fluxes_MUSCL(QCell &cell, Direction dir) {
     cell(data.u2) = cell(data.u1) - fluxes / cell.volume();
 }
 
-void Transfer::compute_slopes(SoaMesh& mesh) const {
+void Transfer::compute_slopes(EuMesh& mesh) const {
     if (m_method == Method::MUSCLn ||
         m_method == Method::MUSCLn_CRP) {
         for (auto cell: mesh) {
@@ -453,7 +452,7 @@ void Transfer::compute_slopes(SoaMesh& mesh) const {
     }
 
     auto u1 = data.u1;
-    auto get_state = [u1](QCell& cell) -> double {
+    auto get_state = [u1](EuCell& cell) -> double {
         return cell(u1);
     };
     auto boundary_value = [](double u, const Vector3d& n, Boundary b) -> double {
@@ -475,7 +474,7 @@ void Transfer::compute_slopes(SoaMesh& mesh) const {
     }
 }
 
-void Transfer::update(SoaMesh &mesh, Direction dir) {
+void Transfer::update(EuMesh &mesh, Direction dir) {
     if (CRP_type(m_method)) {
         update_CRP(mesh, dir);
     }
@@ -493,7 +492,7 @@ void Transfer::update(SoaMesh &mesh, Direction dir) {
     }
 }
 
-void Transfer::update_CRP(SoaMesh& mesh, Direction dir) {
+void Transfer::update_CRP(EuMesh& mesh, Direction dir) {
     // Считаем потоки
     for (auto cell: mesh) {
         fluxes_CRP(cell, dir);
@@ -509,7 +508,7 @@ void Transfer::update_CRP(SoaMesh& mesh, Direction dir) {
     update_interface(mesh, 0);
 }
 
-void Transfer::update_VOF(SoaMesh& mesh, Direction dir) {
+void Transfer::update_VOF(EuMesh& mesh, Direction dir) {
     // Считаем потоки
     for (auto cell: mesh) {
         fluxes_VOF(cell, dir);
@@ -524,7 +523,7 @@ void Transfer::update_VOF(SoaMesh& mesh, Direction dir) {
     update_interface(mesh);
 }
 
-void Transfer::update_MUSCL(SoaMesh& mesh, Direction dir) {
+void Transfer::update_MUSCL(EuMesh& mesh, Direction dir) {
     compute_slopes(mesh);
 
     // Считаем потоки
@@ -541,7 +540,7 @@ void Transfer::update_MUSCL(SoaMesh& mesh, Direction dir) {
     update_interface(mesh);
 }
 
-void Transfer::update_WENO(SoaMesh& mesh, Direction dir) {
+void Transfer::update_WENO(EuMesh& mesh, Direction dir) {
     // Считаем потоки
     for (int i = 0; i < mesh.nx(); ++i) {
         for (int j = 0; j < mesh.ny(); ++j) {
@@ -668,11 +667,11 @@ void Transfer::update_WENO(SoaMesh& mesh, Direction dir) {
     update_interface(mesh);
 }
 
-void Transfer::update_interface(SoaMesh& mesh, int smoothing) {
+void Transfer::update_interface(EuMesh& mesh, int smoothing) {
     interface.update(mesh, smoothing);
 }
 
-void Transfer::set_flags(SoaMesh& mesh) {
+void Transfer::set_flags(EuMesh& mesh) {
     for (auto cell: mesh) {
         double min_val = cell(data.u1);
         double max_val = cell(data.u1);
@@ -699,14 +698,14 @@ Distributor Transfer::distributor() const {
 
     auto u1 = data.u1;
 
-    distr.split_soa = [u1](QCell& parent, SoaChildren &children) {
+    distr.split = [u1](EuCell& parent, Children &children) {
         for (auto child: children) {
             Vector3d dr = parent.center() - child.center();
             child(u1) = parent(u1);
         }
     };
 
-    distr.merge_soa = [u1](SoaChildren &children, QCell& parent) {
+    distr.merge = [u1](Children &children, EuCell& parent) {
         double sum = 0.0;
         for (auto child: children) {
             sum += child(u1) * child.volume();
@@ -717,7 +716,7 @@ Distributor Transfer::distributor() const {
     return distr;
 }
 
-SoaMesh Transfer::body(SoaMesh& mesh) {
+EuMesh Transfer::body(EuMesh& mesh) {
     return interface.body(mesh);
 }
 

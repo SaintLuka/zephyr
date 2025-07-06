@@ -1,13 +1,22 @@
 
 
-#include <zephyr/mesh/euler/amr_faces.h>
+#include <zephyr/utils/range.h>
 
 
+struct Foo {
+    double kek;
+};
+
+using zephyr::utils::range;
 
 int main() {
 
-    zephyr::mesh::AmrFaces af;
-    af.resize(10);
+    range<size_t> kek(30);
+
+
+
+
+
 
     return 0;
 };

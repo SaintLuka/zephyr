@@ -1,13 +1,13 @@
 #pragma once
 
-#include <zephyr/mesh/euler/soa_mesh.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/math/cfd/limiter.h>
 
 namespace zephyr::math {
 
 using zephyr::geom::Vector3d;
-using zephyr::mesh::QCell;
-using zephyr::mesh::SoaMesh;
+using zephyr::mesh::EuCell;
+using zephyr::mesh::EuMesh;
 using zephyr::mesh::Storable;
 using zephyr::mesh::Distributor;
 
@@ -27,7 +27,7 @@ public:
     virtual ~Convection() = default;
 
     /// @brief Добавить типы для хранения на сетку
-    void add_types(SoaMesh& mesh);
+    void add_types(EuMesh& mesh);
 
     /// @brief Число Куранта
     double CFL() const;
@@ -56,28 +56,28 @@ public:
     virtual Vector3d velocity(const Vector3d& c) const;
 
     /// @brief Один шаг интегрирования по времени
-    void update(SoaMesh& mesh);
+    void update(EuMesh& mesh);
 
     /// @brief Установить флаги адаптации
-    void set_flags(SoaMesh& mesh);
+    void set_flags(EuMesh& mesh);
 
     /// @brief Распределитель данных при адаптации
     Distributor distributor() const;
 
     /// @brief Посчитать шаг интегрирования по времени с учетом
     /// условия Куранта
-    double compute_dt(QCell& cell) const;
+    double compute_dt(EuCell& cell) const;
 
     /// @brief Посчитать градиент хранимой функции
     /// @param stage При stage = 0 производные считаются для предыдущего
     /// временного слоя, при stage = 1 производные считаются для
     /// промежуточного временного слоя.
-    void compute_grad(QCell& cell, int stage) const;
+    void compute_grad(EuCell& cell, int stage) const;
 
     /// @brief Просуммировать потоки.
     /// @param stage При stage = 0 выполняется шаг предиктора, при stage = 1
     /// выполняется шаг коррекции.
-    void fluxes(QCell& cell, int stage);
+    void fluxes(EuCell& cell, int stage);
 
 protected:
     int m_accuracy;     ///< Точность схемы (1/2/3)

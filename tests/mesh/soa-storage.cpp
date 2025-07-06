@@ -1,7 +1,7 @@
 #include <iostream>
 
 #include <zephyr/geom/vector.h>
-#include <zephyr/mesh/euler/soa_mesh.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
 
 using namespace zephyr::mesh;
 

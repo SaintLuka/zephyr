@@ -1,78 +1,404 @@
-#include <zephyr/geom/box.h>
-#include <zephyr/geom/grid.h>
-#include <zephyr/mesh/primitives/amr_cell.h>
-#include <zephyr/mesh/primitives/bfaces.h>
-#include <zephyr/mesh/euler/eu_cell.h>
-#include <zephyr/mesh/euler/eu_mesh.h>
-#include <zephyr/utils/json.h>
+#include <fstream>
 
-using zephyr::utils::Json;
+#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/euler/eu_prim.h>
+
+#include <zephyr/geom/generator/rectangle.h>
+#include <zephyr/geom/generator/cuboid.h>
+#include <zephyr/geom/primitives/polygon.h>
+
+#include <zephyr/mesh/amr/apply.h>
+#include <zephyr/mesh/amr/balancing.h>
+
+using namespace zephyr::geom;
+using generator::Rectangle;
+using generator::Cuboid;
 
 namespace zephyr::mesh {
 
-EuMesh::EuMesh(const Json& config, size_t datasize)
-    : m_locals(0, true, datasize), m_aliens(0, true, datasize) {
-
+EuMesh::EuMesh(Generator& gen) {
     if (mpi::master()) {
-        // Задать генератор
-        auto gen = Generator::create(config);
-
-        initialize(gen->make());
+        gen.initialize(m_locals);
     }
 
-    if_mpi( m_tourism.init_types(m_locals) );
+#ifdef ZEPHYR_MPI
+    int dim   = m_locals.dim();
+    int adapt = m_locals.adaptive();
+    int axial = m_locals.axial();
 
+    // Соберем базовые характеристики сетки с master-процесса
+    mpi::broadcast(0, dim);
+    mpi::broadcast(0, adapt);
+    mpi::broadcast(0, axial);
+
+    if (!mpi::master()) {
+        m_locals.set_dimension(dim);
+        m_locals.set_adaptive(adapt);
+        m_locals.set_axial(axial);
+    }
+
+    m_tourists.init_types(m_locals);
+    m_migrants.init_types(m_locals);
+#endif
+
+    structured = false;
+    m_nx = 1;
+    m_ny = 1;
+    m_nz = 1;
+
+#ifndef ZEPHYR_MPI
+    // Структурированность не работает для распределенных расчетов
+    if (dynamic_cast<Rectangle*>(&gen) != nullptr) {
+        Rectangle* rect = dynamic_cast<Rectangle*>(&gen);
+        if (rect->structured()) {
+            structured = true;
+            m_nx = rect->nx();
+            m_ny = rect->ny();
+            m_nz = 1;
+        }
+    }
+    else if (dynamic_cast<Cuboid*>(&gen) != nullptr) {
+        Cuboid* cuboid = dynamic_cast<Cuboid*>(&gen);
+        structured = true;
+        m_nx = cuboid->nx();
+        m_ny = cuboid->ny();
+        m_nz = cuboid->nz();
+    }
+#endif
+}
+
+void EuMesh::init_amr() {
+    // Эта функция нифига не используется же?
     m_max_level = 0;
-    if (config["max_level"]) {
-        m_max_level = std::max(0, config["max_level"].as<int>());
-        if (m_max_level > 15) {
-            std::cerr << "Max level set up to " << m_max_level << ", decreased to 15\n";
-            m_max_level = 15;
-        }
+
+    if (m_locals.empty()) {
+        return;
     }
-    if (config["adaptive"]) {
-        // Есть ключевое слово adaptive, выставлено на false
-        if (!config["adaptive"].as<bool>()) {
-            m_max_level = 0;
+
+    int rank = mpi::rank();
+    int size = mpi::size();
+
+    auto cells_nums = mpi::all_gather(m_locals.size());
+    std::vector<int> offset(size, 0);
+    for (int r = 0; r < size - 1; ++r) {
+        offset[r + 1] = offset[r] + cells_nums[r];
+    }
+
+    for (int ic = 0; ic < m_locals.size(); ++ic) {
+        m_locals.b_idx[ic] = offset[rank] + ic;
+        m_locals.z_idx[ic] = 0;
+        m_locals.level[ic] = 0;
+        m_locals.flag[ic] = 0;
+    }
+}
+
+bool EuMesh::adaptive() const {
+    return m_max_level > 0;
+}
+
+int EuMesh::max_level() const {
+    return m_max_level;
+}
+
+void EuMesh::set_max_level(int max_level) {
+    if (!m_locals.adaptive()) {
+        m_max_level = 0;
+    }
+    else {
+        m_max_level = std::max(0, std::min(max_level, 15));
+    }
+}
+
+void EuMesh::set_distributor(const std::string& name) {
+    if (name == "empty") {
+        distributor = Distributor::empty();
+    } else {
+        distributor = Distributor::simple();
+    }
+}
+
+void EuMesh::set_distributor(Distributor distr) {
+    distributor = std::move(distr);
+}
+
+void EuMesh::balance_flags() {
+#if SCRUTINY
+    static bool first_time = true;
+    if (first_time) {
+        if (check_base() < 0) {
+            throw std::runtime_error("Check base failed");
+        }
+        first_time = false;
+    }
+#endif
+    if (mpi::single()) {
+        amr::balance_flags(m_locals, m_max_level);
+    }
+#ifdef ZEPHYR_MPI
+    else {
+        amr::balance_flags(m_locals, m_aliens, m_max_level, *this);
+    }
+#endif
+}
+
+void EuMesh::apply_flags() {
+    if (mpi::single()) {
+        amr::apply(m_locals, distributor);
+    }
+#ifdef ZEPHYR_MPI
+    else {
+        amr::apply(m_locals, m_aliens, distributor, *this);
+    }
+#endif
+
+#if SCRUTINY
+    if (check_refined() < 0) {
+        //throw std::runtime_error("Check refined failed");
+    }
+#endif
+}
+
+void EuMesh::refine() {
+    if (!adaptive()) { return; }
+
+    static Stopwatch balance;
+    static Stopwatch apply;
+    static Stopwatch full;
+
+    // Для однопроцессорной версии при пустой сетке сразу выход
+    if (mpi::single() && m_locals.empty()) {
+        throw std::runtime_error("EuMesh::refine() error: Empty mesh");
+    }
+
+    full.resume();
+
+    balance.resume();
+    balance_flags();
+    balance.stop();
+
+    apply.resume();
+    apply_flags();
+    apply.stop();
+
+    full.stop();
+
+#if CHECK_PERFORMANCE
+    static size_t counter = 0;
+    if (counter % amr::check_frequency == 0) {
+        std::cout << "  Balance steps elapsed: " << std::setw(10) << balance.milliseconds() << " ms\n";
+        std::cout << "  Apply steps elapsed:   " << std::setw(10) << apply.milliseconds() << " ms\n";
+        std::cout << "Refine steps elapsed:    " << std::setw(10) << full.milliseconds() << " ms\n";
+    }
+    ++counter;
+#endif
+}
+
+
+int EuMesh::check_base() const {
+    if (m_locals.empty()) {
+        if (mpi::single()) {
+            std::cout << "\tEmpty storage\n";
+            return -1;
+        } else {
+            return 0;
         }
     }
 
-    // Если есть декомпозиция, то использовать
+    auto dim = m_locals.dim();
+
+    if (dim != 2 && dim != 3) {
+        std::cout << "\tDimension is not 2 or 3\n";
+        return -1;
+    }
+
+    // Только для адаптивных сеток
+    if (!m_locals.adaptive()) {
+        std::cout << "\tOnly adaptive meshes\n";
+        return -1;
+    }
+
+    int res = 0;
+    for (index_t ic = 0; ic < m_locals.size(); ++ic) {
+        if (m_locals.index[ic] < 0 || m_locals.index[ic] != ic) {
+            std::cout << "\tWrong cell index\n";
+            return -1;
+        }
+
+        if (m_locals.rank[ic] < 0 || m_locals.rank[ic] != mpi::rank()) {
+            std::cout << "\tWrong cell rank\n";
+            return -1;
+        }
+
+        // Число граней
+        for (int i = 0; i < FpC(dim); ++i) {
+            if (m_locals.faces.is_undefined(m_locals.face_begin[ic] + i)) {
+                std::cout << "\tCell has no one of main faces\n";
+                m_locals.print_info(ic);
+                return -1;
+            }
+        }
+
+        if (m_locals.face_count(ic) > FpC(dim)) {
+            std::cout << "\tCell has too much faces (" << m_locals.face_count(ic) << ")\n";
+            m_locals.print_info(ic);
+            return -1;
+        }
+
+        // Проверим число вершин
+        int n_nodes = m_locals.node_count(ic);
+        int n_max_nodes = m_locals.max_node_count(ic);
+        if ((dim == 2 && n_nodes == n_max_nodes && n_max_nodes != 9) ||
+            (dim == 3 && n_nodes == n_max_nodes && n_max_nodes != 27)) {
+            std::cout << "\tCell has wrong node count " << n_nodes << " " << n_max_nodes << "\n";
+            m_locals.print_info(ic);
+            return -1;
+        }
+
+        // Проверим число граней
+        int n_faces = m_locals.face_count(ic);
+        int n_max_faces = m_locals.max_face_count(ic);
+        if ((dim == 2 && (n_faces > n_max_faces || n_max_faces != 8)) ||
+            (dim == 3 && (n_faces > n_max_faces || n_max_faces != 24))) {
+            std::cout << "\tCell has wrong face count " << n_faces << " " << n_max_faces << "\n";
+            m_locals.print_info(ic);
+            return -1;
+        }
+
+        // Правильное задание геометрии
+        res = m_locals.check_geometry(ic);
+        if (res < 0) return res;
+
+        // Грани правильно ориентированы
+        res = m_locals.check_base_face_orientation(ic);
+        if (res < 0) return res;
+
+        // Порядок основных вершин
+        res = m_locals.check_base_vertices_order(ic);
+        if (res < 0) return res;
+
+        // Проверка смежности
+        res = m_locals.check_connectivity(ic);
+        if (res < 0) return res;
+    }
+
+    return 0;
+}
+
+int EuMesh::check_refined() const {
+    if (m_locals.empty()) {
+        if (mpi::single()) {
+            std::cout << "\tEmpty storage\n";
+            return -1;
+        } else {
+            return 0;
+        }
+    }
+
+    auto dim = m_locals.dim();
+
+    if (dim != 2 && dim != 3) {
+        std::cout << "\tDimension is not 2 or 3\n";
+        return -1;
+    }
+
+    int res = 0;
+    for (index_t ic = 0; ic < m_locals.size(); ++ic) {
+        if (m_locals.is_undefined(ic)) {
+            std::cout << "\tUndefined cell\n";
+            return -1;
+        }
+
+        if (m_locals.index[ic] < 0 || m_locals.index[ic] != ic) {
+            std::cout << "\tWrong cell index\n";
+            return -1;
+        }
+
+        if (m_locals.rank[ic] < 0 || m_locals.rank[ic] != mpi::rank()) {
+            std::cout << "\tWrong cell rank\n";
+            return -1;
+        }
+
+        // Число граней
+        for (int i = 0; i < FpC(dim); ++i) {
+            if (m_locals.faces.is_undefined(m_locals.face_begin[ic] + i)) {
+                std::cout << "\tCell has no one of main faces\n";
+                m_locals.print_info(ic);
+                return -1;
+            }
+        }
+
+        // Вершины дублируются
+        for (int i = m_locals.node_begin[ic]; i < m_locals.node_begin[ic + 1]; ++i) {
+            for (int j = i + 1; j < m_locals.node_begin[ic + 1]; ++j) {
+                double dist = (m_locals.verts[i] - m_locals.verts[j]).norm();
+                if (dist < 1.0e-5 * m_locals.linear_size(ic)) {
+                    std::cout << "\tIdentical vertices\n";
+                    m_locals.print_info(ic);
+                    return -1;
+                }
+            }
+        }
+
+        // Правильное задание геометрии
+        res = m_locals.check_geometry(ic);
+        if (res < 0) return res;
+
+        // Грани правльно ориентированы
+        res = m_locals.check_base_face_orientation(ic);
+        if (res < 0) return res;
+
+        // Порядок основных вершин
+        res = m_locals.check_base_vertices_order(ic);
+        if (res < 0) return res;
+
+        // Проверка сложных граней
+        res = m_locals.check_complex_faces(ic);
+        if (res < 0) return res;
+
+        // Проверка смежности
+        res = m_locals.check_connectivity(ic);
+        if (res < 0) return res;
+    }
+
+    return 0;
+}
+
+Box EuMesh::bbox() const {
+    Box box1 = Box::Empty(3);
+    for (auto& v: m_locals.verts) {
+        box1.capture(v);
+    }
+
+    Box box2(box1);
+
+#ifdef ZEPHYR_MPI
     if (!mpi::single()) {
-        geom::Box domain = bbox();
-
-        if (config["decomp"]) {
-            // Там все свойства декомпозиции автоматически ставятся
-            m_decomp = Decomposition::create(domain, config["decomp"]);
-
-            //set_decomposition("XY");
-            set_decomposition(m_decomp, true);
-        }
-        else {
-            // Определяем размерность сетки
-            int dim = m_locals.empty() ? 0 : m_locals[0].dim;
-            dim = mpi::max(dim);
-
-            assert((dim == 2 || dim == 3) && "Strange dimension, Mesh::Mesh()");
-
-            // По умолчанию что-то такое
-            set_decomposition(dim < 3 ? "XY" : "XYZ");
-        }
+        // Покомпонентный минимум/максимум
+        MPI_Allreduce(box1.vmin.data(), box2.vmin.data(), 3, MPI_DOUBLE, MPI_MIN, mpi::comm());
+        MPI_Allreduce(box1.vmax.data(), box2.vmax.data(), 3, MPI_DOUBLE, MPI_MAX, mpi::comm());
     }
+#endif
+
+    return box2;
 }
 
-void EuMesh::initialize(const Grid& grid) {
-    m_locals.resize(grid.n_cells());
-
-    for (int i = 0; i < grid.n_cells(); ++i) {
-        m_locals[i] = grid.amr_cell(i);
-    }
-
-    structured = grid.is_structured();
-    m_nx = grid.nx();
-    m_ny = grid.ny();
-    m_nz = grid.nz();
+void EuMesh::push_back(const geom::Line& line) {
+    geom::Polygon poly = {line[0], line[1], line[1], line[0]};
+    m_locals.push_back(poly);
 }
+
+void EuMesh::push_back(const geom::Polygon& poly) {
+    m_locals.push_back(poly);
+}
+
+void EuMesh::push_back(const geom::Polyhedron& poly) {
+    throw std::runtime_error("Polyhedrpushback");
+}
+
+EuCellIt EuMesh::begin() { return {&m_locals, 0, &m_aliens}; }
+
+EuCellIt EuMesh::end() { return {&m_locals, m_locals.size(), &m_aliens}; }
+
 
 EuCell EuMesh::operator()(int i, int j) {
     i = (i + m_nx) % m_nx;
@@ -85,401 +411,6 @@ EuCell EuMesh::operator()(int i, int j, int k) {
     j = (j + m_ny) % m_ny;
     k = (k + m_nz) % m_nz;
     return operator[](m_nz * (m_ny * i + j) + k);
-}
-
-geom::Box EuMesh::bbox() {
-    geom::Box box1 = Box::Empty(3);
-    for (auto& cell: *this) {
-        for (auto& face: cell.faces()) {
-            for (int i = 0; i < face.size(); ++i) {
-                box1.capture(face.vs(i));
-            }
-        }
-    }
-
-    geom::Box box2(box1);
-#ifdef ZEPHYR_MPI
-    if (!mpi::single()) {
-        // Покомпонентный минимум/максимум
-        MPI_Allreduce(box1.vmin.data(), box2.vmin.data(), 3, MPI_DOUBLE, MPI_MIN, mpi::comm());
-        MPI_Allreduce(box1.vmax.data(), box2.vmax.data(), 3, MPI_DOUBLE, MPI_MAX, mpi::comm());
-    }
-#endif
-    return box2;
-}
-
-namespace {
-void swap_elements(AmrStorage& s, int i, int j, Byte* temp) {
-    Byte* ptr1 = s[i].ptr();
-    Byte* ptr2 = s[j].ptr();
-
-    std::memcpy(temp, ptr1, s.itemsize());
-    std::memcpy(ptr1, ptr2, s.itemsize());
-    std::memcpy(ptr2, temp, s.itemsize());
-}
-}
-
-void EuMesh::random_sorting() {
-    if (!mpi::single()) {
-        throw std::runtime_error("block_sorting only for single process");
-    }
-
-    std::vector<int> next(m_locals.size());
-    for (size_t i = 0; i < m_locals.size(); ++i) {
-        next[i] = i;
-    }
-
-
-    std::mt19937 gen(13);
-
-    std::shuffle(next.begin(), next.end(), gen);
-
-    for (size_t i = 0; i < m_locals.size(); ++i) {
-        m_locals[i].next = next[i];
-    }
-
-
-    for (auto& cell: m_locals) {
-        for (auto& face: cell.faces) {
-            if (!face.is_undefined() && !face.is_boundary() && face.adjacent.index < m_locals.size()) {
-                face.adjacent.index = m_locals[face.adjacent.index].next;
-            }
-        }
-    }
-
-    std::vector<Byte> temp(m_locals.itemsize());
-    for (int i = 0; i < m_locals.size(); ++i) {
-        // Пока текущий элемент не на своём месте
-        while (m_locals[i].next != i) {
-            // Меняем местами текущий элемент и тот, который должен быть на его месте
-            int j = m_locals[i].next;
-            swap_elements(m_locals, i, j, temp.data());
-        }
-    }
-
-    for (int i = 0; i < m_locals.size(); ++i) {
-        m_locals[i].index = m_locals[i].next = i;
-    }
-}
-
-void EuMesh::block_sorting(int nx, int ny, int nz) {
-    if (!mpi::single()) {
-        throw std::runtime_error("block_sorting only for single process");
-    }
-
-    Box box = bbox();
-    if (box.is_2D()) {
-        nz = 1;
-    }
-
-    auto get_n = [nx, ny, nz](int i, int j, int k) -> int {
-        i = (i + nx) % nx;
-        j = (j + ny) % ny;
-        k = (k + nz) % nz;
-        return nz * (ny * i + j) + k;
-    };
-
-    std::vector<int> blocks(nx * ny * nz, 0);
-    for (auto& cell: m_locals) {
-        int i = nx == 1 ? 0 : int(std::floor(nx * (cell.center.x() - box.vmin.x()) / box.size().x()));
-        int j = ny == 1 ? 0 : int(std::floor(ny * (cell.center.y() - box.vmin.y()) / box.size().y()));
-        int k = nz == 1 ? 0 : int(std::floor(nz * (cell.center.z() - box.vmin.z()) / box.size().z()));
-
-        int n = get_n(i, j, k);
-        cell.rank = n;
-        cell.next = blocks[n];
-        blocks[n] += 1;
-    }
-
-    std::vector<int> offsets(nx * ny * nz + 1, 0);
-    for (int i = 0; i < nx * ny * nz; ++i) {
-        offsets[i + 1] = offsets[i] + blocks[i];
-    }
-
-    for (auto& cell: m_locals) {
-        cell.next += offsets[cell.rank];
-        cell.rank = mpi::rank();
-    }
-
-    for (auto& cell: m_locals) {
-        for (auto& face: cell.faces) {
-            if (!face.is_undefined() && !face.is_boundary() && face.adjacent.index < m_locals.size()) {
-                face.adjacent.index = m_locals[face.adjacent.index].next;
-            }
-        }
-    }
-
-    std::vector<Byte> temp(m_locals.itemsize());
-    for (int i = 0; i < m_locals.size(); ++i) {
-        // Пока текущий элемент не на своём месте
-        while (m_locals[i].next != i) {
-            // Меняем местами текущий элемент и тот, который должен быть на его месте
-            int j = m_locals[i].next;
-            swap_elements(m_locals, i, j, temp.data());
-        }
-    }
-
-    for (int i = 0; i < m_locals.size(); ++i) {
-        m_locals[i].index = m_locals[i].next = i;
-    }
-}
-
-bool EuMesh::has_nodes() const {
-    return !m_nodes.empty();
-}
-
-void EuMesh::break_nodes() {
-    m_nodes.clear();
-}
-
-inline int nodes_estimation(int n_cells, int dim) {
-    assert(dim == 2 || dim == 3);
-    if (dim < 3) {
-        int nx = int(std::ceil(std::sqrt(n_cells))) + 2;
-        return nx * nx;
-    } else {
-        int nx = int(std::ceil(std::cbrt(n_cells))) + 2;
-        return nx * nx * nx;
-    }
-}
-
-// Владелец узла (любая ячейка, которая содержит узел)
-// Основной владелец: ячейка с минимальным индексом.
-struct NodeOwner {
-    int ic;  // Индекс ячейки
-    int iv;  // Индекс вершины в ячейке
-
-    // Можно создать без указания iv, типа просто индекс ячейки
-    // используется для поиска в множестве std::set<NodeOwner>;
-    NodeOwner(int _ic, int _iv)
-            : ic(_ic), iv(_iv) {}
-
-    // Считаем различие только по индексу ячейки
-    inline bool operator<(const NodeOwner& other) const {
-        return ic < other.ic;
-    }
-
-    static const int base = 64;
-
-    // Смешаный индекс вершины (владелец + индекс внутри)
-    inline int node_index() const {
-        return base * ic + iv;
-    }
-
-    // Восстановление из смешаного индекса
-    inline static NodeOwner from_index(int idx) {
-        return NodeOwner(idx / base, idx % base);
-    }
-};
-
-// Простая структура, хранит множество ячеек, которые владеют
-// некоторым узлом
-struct NodeOwners {
-
-    // Добавить владельца
-    inline void insert(int ic, int iv) {
-        owners.insert(NodeOwner(ic, iv));
-    }
-
-    // Имеется владелец с индексом ic?
-    inline bool contain(int ic) {
-        return owners.count(NodeOwner(ic, -1)) > 0;
-    }
-
-    inline NodeOwner main() const {
-        return *std::min_element(owners.begin(), owners.end());
-    }
-
-    inline auto begin() {
-        return owners.begin();
-    }
-
-    inline auto end() {
-        return owners.end();
-    }
-
-    std::set<NodeOwner> owners;
-};
-
-NodeOwners find_owners(AmrStorage& cells, AmrCell& base_cell, int base_iv) {
-    NodeOwners owners;
-
-    // Интересующая нас вершина
-    Vector3d base_v = base_cell.vertices[base_iv];
-    double eps = 1.0e-10 * base_cell.linear_size();
-
-    // Моделирует стек с ячейками в работе
-    std::vector<NodeOwner> in_work;
-
-    in_work.emplace_back(base_cell.index, base_iv);
-
-    while (!in_work.empty()) {
-        // Извлекли из стека последнюю ячейку
-        auto[ic_c, iv_c] = in_work.back();
-        in_work.pop_back();
-
-        owners.insert(ic_c, iv_c);
-
-        AmrCell &cell = cells[ic_c];
-
-        // Проходим по граням, ищем грани, которые содержат искомую вершину
-        // и при этом указывают на ячейки, которых нет в множестве done
-        for (const BFace &face: cell.faces) {
-            if (face.is_undefined() ||
-                face.is_boundary()) {
-                continue;
-            }
-
-            // Грань содержит целевую вершину
-            if (face.contain(iv_c)) {
-                // Сосед через грань
-                AmrCell &neib = cells[face.adjacent.index];
-                int ic_n = neib.index;
-
-                // Сосед уже есть в массиве
-                if (owners.contain(ic_n)) {
-                    continue;
-                }
-
-                // Ищем интересующую вершину среди вершин соседа
-                int iv_n = neib.vertices.find(base_v, eps);
-
-                assert(iv_n >= 0 && "EuMesh::collect_nodes: Impossible error #1");
-
-                // Соседняя ячейка нам подходит, помещаем в стек
-                in_work.emplace_back(ic_n, iv_n);
-            }
-        }
-    }
-
-    return owners;
-}
-
-// Для узлов ячейки, которые помечены индексом -13 выставляет их основного
-// владельца. Кроме этого возвращает количество узлов, для которых ячейка
-// является основным владельцем.
-int count_owned(AmrStorage::Item& cell, AmrStorage& cells) {
-    int owned = 0;
-    for (int iv = 0; iv < BNodes::max_count; ++iv) {
-        // Интересуют актуальные (помеченые) узлы,
-        // которые ещё не получили свой номер.
-        if (cell.nodes[iv] != -13) {
-            continue;
-        }
-
-        // Ищем все ячейки, которые содержат узел
-        auto owners = find_owners(cells, cell, iv);
-
-        // Основной владелец узла
-        NodeOwner owner = owners.main();
-
-        // Устанавливаем смешаный индекс (кодирует основного
-        // владельца) для каждого узла
-        cell.nodes[iv] = owner.node_index();
-
-        if (owner.ic == cell.index) {
-            ++owned;
-        }
-    }
-    return owned;
-};
-
-void setup_nodes(AmrStorage& cells, std::vector<Vector3d>& nodes) {
-    if (cells.empty()) {
-        return;
-    }
-
-    // Стираем существующий массив узлов
-    nodes.clear();
-
-    // Помечаем актуальные узлы (которые есть на каких-либо гранях),
-    // индексом -13.
-    threads::for_each(cells.begin(), cells.end(),
-            [](AmrStorage::Item& cell) {
-                cell.mark_actual_nodes(-13);
-            });
-
-    // TODO: Заменить set, vector на быстрые версии на стеке
-
-    // TODO: Есть только наметки, как это сделать параллельно
-
-    if (true || threads::disabled()) {
-        /// Последовательная версия работает за один проход по ячейкам
-        nodes.reserve(nodes_estimation(cells.size(), cells[0].dim));
-
-        int counter = 0;
-        for (auto &cell: cells) {
-            for (int iv = 0; iv < BNodes::max_count; ++iv) {
-                // Интересуют актуальные (помеченые) узлы,
-                // которые ещё не получили свой номер.
-                if (cell.nodes[iv] != -13) {
-                    continue;
-                }
-
-                // Ищем все ячейки, которые содержат узел
-                auto owners = find_owners(cells, cell, iv);
-
-                // Отмечаем индекс узла у каждого владельца
-                for (auto &owner: owners) {
-                    cells[owner.ic].nodes[owner.iv] = counter;
-                }
-
-                // Добавляем узел в массив
-                nodes.push_back(cell.vertices[iv]);
-                ++counter;
-            }
-        }
-    }
-    else {
-        // Параллельная версия отличается от последовательной и
-        // содержит две стадии.
-
-        std::vector<int> n_owned = threads::partial_sum(
-                cells.begin(), cells.end(), 0,
-                count_owned, std::ref(cells));
-
-        // Смещение индексации в каждом треде
-        std::vector<int> offset;
-        offset.reserve(n_owned.size());
-        offset.push_back(0);
-        for (size_t i = 1; i < n_owned.size(); ++i) {
-            offset[i] = offset[i - 1] + n_owned[i];
-        }
-
-        int counter = 0;
-        for (auto &cell: cells) {
-
-            // Идем по всем вершинам с выставленным номером
-            for (int iv = 0; iv < BNodes::max_count; ++iv) {
-                if (cell.nodes[iv] < 0) {
-                    continue;
-                }
-
-                NodeOwner owner = NodeOwner::from_index(cell.nodes[iv]);
-
-                if (owner.ic == cell.index) {
-                    // Вершина принадлежит ячейке
-                    nodes.push_back(cell.vertices[iv]);
-
-                    cell.nodes[iv] = counter;
-                    ++counter;
-                }
-                else {
-                    assert(owner.ic < cell.index && "setup unique, error #1534");
-                    cell.nodes[iv] = cells[owner.ic].nodes[owner.iv];
-                }
-
-
-            }
-        }
-    }
-}
-
-void EuMesh::collect_nodes() {
-    if (has_nodes()) {
-        return;
-    }
-    setup_nodes(m_locals, m_nodes);
 }
 
 } // namespace zephyr::mesh

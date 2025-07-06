@@ -5,13 +5,9 @@
 #include <zephyr/geom/vector.h>
 #include <zephyr/geom/boundary.h>
 #include <zephyr/geom/cell_type.h>
-#include <zephyr/mesh/primitives/side.h>
-#include <zephyr/mesh/primitives/bface.h>
+#include <zephyr/mesh/index.h>
 
 namespace zephyr::mesh {
-
-/// @brief Индексация примитивов (граней, ячеек и узлов)
-using index_t = int;
 
 /// @brief Индексы смежности граней
 /// @details Короткое объяснение. Если сосед через грань
@@ -42,17 +38,20 @@ struct AmrAdjacent final {
     /// @brief Расширить массивы по числу граней
     void reserve(index_t n_faces);
 
-    /// @brief Локальная ячейка?
+    /// @brief Сжать массивы до актуальных размеров
+    void shrink_to_fit();
+
+    /// @brief Локальная соседняя ячейка?
     bool is_local(index_t iface) const { return alien[iface] < 0; }
 
-    /// @brief Удаленный сосед?
+    /// @brief Удаленная соседняя сосед?
     bool is_alien(index_t iface) const { return alien[iface] >= 0; }
 
     /// @brief Получить хранилище ячеек, в котором находится сосед, а также
     /// индекс соседа в данном хранилище
-    template<class Cells>
-    std::tuple<const Cells &, index_t> get_neib(index_t iface,
-            const Cells &locals, const Cells &aliens) const {
+    template<class SomeArray>
+    std::tuple<const SomeArray &, index_t> get_neib(index_t iface,
+            const SomeArray &locals, const SomeArray &aliens) const {
         if (alien[iface] < 0) {
             return {locals, index[iface]};
         } else {
@@ -61,12 +60,20 @@ struct AmrAdjacent final {
     }
 };
 
+/// @brief Перечисление используется для выбора граней
+/// с определенным направлением нормалей
+enum class Direction : int {
+    ANY = 0,  // Любое направление нормали
+    X   = 1,
+    Y   = 2,
+    Z   = 3
+};
+
 /// @brief Грани AMR-сетки, развернутые в SoA.
 struct AmrFaces final {
     // aliases inside class
     using Boundary = zephyr::geom::Boundary;
     using Vector3d = zephyr::geom::Vector3d;
-    using CellType = zephyr::geom::CellType;
 
     AmrAdjacent adjacent; ///< Индексы смежных ячеек
 
@@ -83,15 +90,18 @@ struct AmrFaces final {
     /// @brief Число граней
     index_t size() const { return boundary.size(); }
 
-    /// @brief Масштабировать структуру под число граней
+    /// @brief Изменить размер под число граней
     void resize(index_t n_faces);
 
-    /// @brief Расширить под число граней
+    /// @brief Расширить буффер под число граней
     void reserve(index_t n_faces);
+
+    /// @brief Сжать до актуальных размеров
+    void shrink_to_fit();
 
     /// @brief Добавить грани, соответствующие ячейке
     /// @details Есть реализация вставки для разных типов ячеек.
-    void insert(index_t iface, CellType ctype, int count = -1);
+    void insert(index_t iface, geom::CellType ctype, int count = -1);
 
     /// @brief Является ли грань граничной?
     bool is_boundary(index_t iface) const;

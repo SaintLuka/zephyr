@@ -21,8 +21,8 @@ using namespace zephyr::math;
 using namespace zephyr::math::smf;
 
 using zephyr::mesh::generator::Rectangle;
-using zephyr::mesh::SoaMesh;
-using zephyr::mesh::QCell;
+using zephyr::mesh::EuMesh;
+using zephyr::mesh::EuCell;
 using zephyr::math::SmFluid;
 using zephyr::utils::mpi;
 using zephyr::utils::threads;
@@ -30,10 +30,10 @@ using zephyr::utils::Stopwatch;
 
 // Критерий адаптации подобран под задачу.
 // Адаптация ячеек с плотностью выше 1.5.
-void set_flags(SoaMesh &mesh, Storable<PState> z) {
-    if (!mesh.is_adaptive()) return;
+void set_flags(EuMesh &mesh, Storable<PState> z) {
+    if (!mesh.adaptive()) return;
 
-    mesh.for_each([z](QCell cell) {
+    mesh.for_each([z](EuCell cell) {
         const double threshold = 1.5;
 
         if (cell(z).density > threshold) {
@@ -69,7 +69,7 @@ int main() {
     gen.set_axial(true);
 
     // Создать сетку
-    SoaMesh mesh(gen);
+    EuMesh mesh(gen);
 
     // Создать решатель
     SmFluid solver(eos);
@@ -89,8 +89,8 @@ int main() {
     mesh.set_distributor(solver.distributor());
 
     // Начальные данные
-    auto init_cells = [&](SoaMesh& mesh) {
-        mesh.for_each([&](QCell& cell) {
+    auto init_cells = [&](EuMesh& mesh) {
+        mesh.for_each([&](EuCell& cell) {
             Vector3d r = cell.center();
             cell(z).density  = test.density (r);
             cell(z).velocity = test.velocity(r);
@@ -108,24 +108,24 @@ int main() {
 
     // Переменные для сохранения
     pvd.variables = {"level"};
-    pvd.variables += {"rho", [z](QCell& cell) -> double { return cell(z).density; }};
-    pvd.variables += {"vr",  [z](QCell& cell) -> double { return cell(z).velocity.norm(); }};
-    pvd.variables += {"p",   [z](QCell& cell) -> double { return cell(z).pressure; }};
-    pvd.variables += {"e",   [z](QCell& cell) -> double { return cell(z).energy; }};
+    pvd.variables += {"rho", [z](EuCell& cell) -> double { return cell(z).density; }};
+    pvd.variables += {"vr",  [z](EuCell& cell) -> double { return cell(z).velocity.norm(); }};
+    pvd.variables += {"p",   [z](EuCell& cell) -> double { return cell(z).pressure; }};
+    pvd.variables += {"e",   [z](EuCell& cell) -> double { return cell(z).energy; }};
     pvd.variables += {"rho_exact",
-                      [&test, &curr_time](const QCell &cell) -> double {
+                      [&test, &curr_time](const EuCell &cell) -> double {
                           return test.density_t(cell.center(), curr_time);
                       }};
     pvd.variables += {"vr_exact",
-                      [&test, &curr_time](const QCell  &cell) -> double {
+                      [&test, &curr_time](const EuCell  &cell) -> double {
                           return test.velocity_t(cell.center(), curr_time).norm();
                       }};
     pvd.variables += {"p_exact",
-                      [&test, &curr_time](const QCell &cell) -> double {
+                      [&test, &curr_time](const EuCell &cell) -> double {
                           return test.pressure_t(cell.center(), curr_time);
                       }};
     pvd.variables += {"e_exact",
-                      [&test, &curr_time](const QCell &cell) -> double {
+                      [&test, &curr_time](const EuCell &cell) -> double {
                           return test.energy_t(cell.center(), curr_time);
                       }};
 

@@ -22,25 +22,25 @@ namespace zephyr::mesh::amr {
 /// Фактически структура осуществляет соритровку ячеек по уровням (блочная сортировка,
 /// работает за линейное время).
 struct CellsByLevelPartial {
-    AmrStorage &cells;   ///< Ссылка на хранилище
-    size_t from, to;  ///< Диапазон ячеек в хранилище
+    AmrCells &cells;   ///< Ссылка на хранилище
+    index_t from, to;  ///< Диапазон ячеек в хранилище
 
-    std::vector<size_t> n_coarse; ///< Число ячеек каждого уровня, которые хотят огрубиться
-    std::vector<size_t> n_retain; ///< Число ячеек каждого уровня, которые хотят сохраниться
+    std::vector<index_t> n_coarse; ///< Число ячеек каждого уровня, которые хотят огрубиться
+    std::vector<index_t> n_retain; ///< Число ячеек каждого уровня, которые хотят сохраниться
 
     /// @brief Списки ячеек по уровням, которые хотят огрубиться
-    std::vector<std::vector<size_t>> coarse;
+    std::vector<std::vector<index_t>> coarse;
 
     /// @brief Списки ячеек по уровням, которые хотят сохраниться
-    std::vector<std::vector<size_t>> retain;
+    std::vector<std::vector<index_t>> retain;
 
     /// @brief Создание экземпляра класса
-    static CellsByLevelPartial create(AmrStorage& cells, int max_level, size_t from, size_t to) {
+    static CellsByLevelPartial create(AmrCells& cells, int max_level, index_t from, index_t to) {
         return CellsByLevelPartial(cells, max_level, from, to);
     }
 
     /// @brief Конструктор класса
-    explicit CellsByLevelPartial(AmrStorage& cells, int max_level, size_t from, size_t to)
+    explicit CellsByLevelPartial(AmrCells& cells, int max_level, index_t from, index_t to)
     : cells(cells), from(from), to(to) {
         set_count(max_level);
         sort_by_levels(max_level);
@@ -50,9 +50,9 @@ struct CellsByLevelPartial {
     void set_count(int max_level) {
         n_coarse.resize(max_level);
         n_retain.resize(max_level);
-        for (size_t ic = from; ic < to; ++ic) {
-            auto lvl = cells[ic].level;
-            auto flag = cells[ic].flag;
+        for (index_t ic = from; ic < to; ++ic) {
+            auto lvl = cells.level[ic];
+            auto flag = cells.flag[ic];
 
             if (lvl < max_level && flag < 1) {
                 if (flag < 0) {
@@ -73,9 +73,9 @@ struct CellsByLevelPartial {
             retain[lvl].reserve(n_retain[lvl]);
         }
 
-        for (size_t ic = from; ic < to; ++ic) {
-            auto lvl = cells[ic].level;
-            auto flag = cells[ic].flag;
+        for (index_t ic = from; ic < to; ++ic) {
+            auto lvl = cells.level[ic];
+            auto flag = cells.flag[ic];
             if (lvl < max_level && flag < 1) {
                 if (flag < 0) {
                     coarse[lvl].push_back(ic);
@@ -92,21 +92,21 @@ struct CellsByLevelPartial {
 /// только характеризует ячейки со всего хранилища. В многопоточном режиме строится
 /// на основе множества структур CellsByLevelPartial.
 struct CellsByLevel {
-    AmrStorage &cells;   ///< Ссылка на хранилище
+    AmrCells &cells;   ///< Ссылка на хранилище
 
-    std::vector<size_t> n_coarse; ///< Число ячеек каждого уровня, которые хотят огрубиться
-    std::vector<size_t> n_retain; ///< Число ячеек каждого уровня, которые хотят сохраниться
+    std::vector<index_t> n_coarse; ///< Число ячеек каждого уровня, которые хотят огрубиться
+    std::vector<index_t> n_retain; ///< Число ячеек каждого уровня, которые хотят сохраниться
 
     /// @brief Списки ячеек по уровням, которые хотят огрубиться
-    std::vector<std::vector<size_t>> coarse;
+    std::vector<std::vector<index_t>> coarse;
 
     /// @brief Списки ячеек по уровням, которые хотят сохраниться
-    std::vector<std::vector<size_t>> retain;
+    std::vector<std::vector<index_t>> retain;
 
     /// @brief Однопоточный конструктор класса
     /// @details Вызывается конструктор CellsByLevelPartial для всего диапазона
     /// ячеек хранилища, затем данные перемещаются
-    CellsByLevel(AmrStorage &cells, int max_level)
+    CellsByLevel(AmrCells &cells, int max_level)
             : cells(cells) {
         serial_constructor(max_level);
     }
@@ -124,8 +124,8 @@ struct CellsByLevel {
         auto num_tasks = threads.size();
         std::vector<std::future<CellsByLevelPartial>> parts(num_tasks);
 
-        std::size_t bin = cells.size() / num_tasks + 1;
-        std::size_t pos = 0;
+        std::index_t bin = cells.size() / num_tasks + 1;
+        std::index_t pos = 0;
         for (auto &count: parts) {
             count = threads.enqueue(&CellsByLevelPartial::create,
                                     std::ref(cells), max_level,
@@ -165,24 +165,21 @@ private:
 
 /// @brief Обновляет флаг ячейки под индексом index, которая имеет флаг 0.
 /// Повышает флаг адаптации, если один из соседей хочет уровень на два выше
-inline void retain_update_flag(int index, AmrStorage &cells) {
-    scrutiny_check(index < cells.size(), "round_1: index >= cells.size()")
-    scrutiny_check(cells[index].flag == 0, "retain_update_flag: cell.flag != 0")
+inline void retain_update_flag(int ic, AmrCells &cells) {
+    scrutiny_check(ic < cells.size(), "round_1: cell_idx >= cells.size()")
+    scrutiny_check(cells.flag[ic] == 0, "retain_update_flag: cell.flag != 0")
 
-    auto& cell = cells[index];
-
-    for (const auto &face: cell.faces) {
-        if (face.is_undefined() or face.is_boundary()) {
+    for (auto iface: cells.faces_range(ic)) {
+        if (cells.faces.is_undefined(iface) || cells.faces.is_boundary(iface)) {
             continue;
         }
 
-        int neib_idx = face.adjacent.index;
-        scrutiny_check(neib_idx < cells.size(), "retain_update_flag: neib_idx >= cells.size()")
+        int jc = cells.faces.adjacent.index[iface];
+        scrutiny_check(jc < cells.size(), "retain_update_flag: neib_idx >= cells.n_cells()")
 
-        const auto& neib = cells[neib_idx];
-        int neib_wanted = neib.level + neib.flag;
-        if (neib_wanted > cell.level + 1) {
-            cell.flag = 1;
+        int neib_wanted = cells.level[jc] + cells.flag[jc];
+        if (neib_wanted > cells.level[ic] + 1) {
+            cells.flag[ic] = 1;
             return;
         }
     }
@@ -192,31 +189,29 @@ inline void retain_update_flag(int index, AmrStorage &cells) {
 /// Ставит флаг адаптации 0, если сосед хочет уровень на 1 выше,
 /// ставит флаг адаптации 1, если сосед хочет уровень на 2 выше,
 /// флаги сиблингов не рассматриваются.
-inline void coarse_update_flag(int index, AmrStorage &cells) {
-    scrutiny_check(index < cells.size(), "round_2/3: index >= cells.size()")
+inline void coarse_update_flag(int ic, AmrCells &cells) {
+    scrutiny_check(ic < cells.size(), "round_2/3: cell_idx >= cells.size()")
 
-    auto& cell = cells[index];
-    if (cell.flag >= 0) {
+    if (cells.flag[ic] >= 0) {
         return;
     }
 
-    for (const auto &face: cell.faces) {
-        if (face.is_undefined() || face.is_boundary()) {
+    for (auto iface: cells.faces_range(ic)) {
+        if (cells.faces.is_undefined(iface) || cells.faces.is_boundary(iface)) {
             continue;
         }
 
-        auto neib_idx = face.adjacent.index;
-        scrutiny_check(neib_idx < cells.size(), "coarse_update_flag: neib_idx >= cells.size()")
+        index_t jc = cells.faces.adjacent.index[iface];
+        scrutiny_check(jc < cells.size(), "coarse_update_flag: neib_idx >= cells.n_cells()")
 
-        const auto& neib = cells[neib_idx];
-        int neib_wanted = neib.level + neib.flag;
+        int neib_wanted = cells.level[jc] + cells.flag[jc];
 
-        if (neib_wanted > cell.level) {
-            if (neib_wanted > cell.level + 1) {
-                cell.flag = 1;
+        if (neib_wanted > cells.level[ic]) {
+            if (neib_wanted > cells.level[ic] + 1) {
+                cells.flag[ic] = 1;
                 return;
             } else {
-                cell.flag = 0;
+                cells.flag[ic] = 0;
             }
         }
     }
@@ -225,21 +220,19 @@ inline void coarse_update_flag(int index, AmrStorage &cells) {
 /// @brief Обновляет флаг ячейки, которая имеет флаг -1.
 /// Ставит флаг адаптации 0, если один из сиблингов не хочет огрубляться.
 template <int dim>
-inline void coarse_update_flag_by_sibs(int index, AmrStorage &cells) {
-    scrutiny_check(index < cells.size(), "round_4: index >= cells.size()")
+inline void coarse_update_flag_by_sibs(int ic, AmrCells &cells) {
+    scrutiny_check(ic < cells.size(), "round_4: cell_idx >= cells.size()")
 
-    auto& cell = cells[index];
-
-    if (cell.flag >= 0) {
+    if (cells.flag[ic] >= 0) {
         return;
     }
 
-    auto sibs = get_siblings<dim>(cells, index);
+    auto sibs = get_siblings<dim>(cells, ic);
     for (auto is: sibs) {
         scrutiny_check(is < cells.size(), "round_4: Sibling index out of range")
 
-        if (cells[is].flag >= 0) {
-            cell.flag = 0;
+        if (cells.flag[is] >= 0) {
+            cells.flag[ic] = 0;
             break;
         }
     }
@@ -250,7 +243,7 @@ inline void coarse_update_flag_by_sibs(int index, AmrStorage &cells) {
 /// уровень ячеек больше не меняется
 /// @param indices Индексы ячеек с флагом = 0 в хранилище
 /// @param cells Ссылка на хранилище
-void round_1(const std::vector<size_t> &indices, AmrStorage &cells) {
+void round_1(const std::vector<index_t> &indices, AmrCells &cells) {
     threads::for_each(
             indices.begin(), indices.end(),
             retain_update_flag, std::ref(cells));
@@ -263,7 +256,7 @@ void round_1(const std::vector<size_t> &indices, AmrStorage &cells) {
 /// флаги на данном обходе (сохранили флаг -1).
 /// @param indices Индексы ячеек с флагом = -1 в хранилище
 /// @param cells Ссылка на хранилище
-void round_2(const std::vector<size_t> &indices, AmrStorage &cells) {
+void round_2(const std::vector<index_t> &indices, AmrCells &cells) {
     threads::for_each(
             indices.begin(), indices.end(),
             coarse_update_flag, std::ref(cells));
@@ -275,7 +268,7 @@ void round_2(const std::vector<size_t> &indices, AmrStorage &cells) {
 /// обхода флаги ячеек ещё могут измениться (@see round_4).
 /// @param indices Индексы ячеек с исходным флагом = -1 в хранилище
 /// @param cells Ссылка на хранилище
-void round_3(const std::vector<size_t> &indices, AmrStorage &cells) {
+void round_3(const std::vector<index_t> &indices, AmrCells &cells) {
     threads::for_each(
             indices.begin(), indices.end(),
             coarse_update_flag, std::ref(cells));
@@ -289,7 +282,7 @@ void round_3(const std::vector<size_t> &indices, AmrStorage &cells) {
 /// @param indices Индексы ячеек с исходным флагом = -1 в хранилище
 /// @param cells Ссылка на хранилище
 template <int dim>
-void round_4(const std::vector<size_t> &indices, AmrStorage &cells) {
+void round_4(const std::vector<index_t> &indices, AmrCells &cells) {
     threads::for_each(
             indices.begin(), indices.end(),
             coarse_update_flag_by_sibs<dim>, std::ref(cells));
@@ -315,7 +308,7 @@ void round_4(const std::vector<size_t> &indices, AmrStorage &cells) {
 /// 4. На заключительном обходе координируются сиблинги, которые хотят
 /// огрубиться (@see round_4), флаги могут повыситься до 0.
 template <int dim>
-void balance_flags_fast(AmrStorage& cells, int max_level) {
+void balance_flags_fast(AmrCells& cells, int max_level) {
     static Stopwatch restriction_timer;
     static Stopwatch sorting_timer;
     static Stopwatch round_timer_1;
@@ -358,7 +351,7 @@ void balance_flags_fast(AmrStorage& cells, int max_level) {
     n_total_coarse += std::accumulate(sorted.n_coarse.begin(), sorted.n_coarse.end(), 0);
     n_total_retain += std::accumulate(sorted.n_retain.begin(), sorted.n_retain.end(), 0);
 
-    static size_t counter = 0;
+    static index_t counter = 0;
     if (counter % amr::check_frequency == 0) {
         std::cout << "    Restriction elapsed: " << std::setw(10) << restriction_timer.milliseconds() << " ms\n";
         std::cout << "    Sorting elapsed:     " << std::setw(10) << sorting_timer.milliseconds() << " ms\n";

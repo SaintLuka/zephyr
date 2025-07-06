@@ -3,8 +3,7 @@
 #include <memory>
 
 #include <zephyr/geom/box.h>
-#include <zephyr/mesh/euler/soa_prim.h>
-#include <zephyr/mesh/euler/amr_storage.h>
+#include <zephyr/mesh/euler/eu_prim.h>
 
 namespace zephyr::utils { class Json; }
 
@@ -38,10 +37,7 @@ public:
 	int size() const { return m_size; }
 
     /// @brief Основная функция. Определение нового ранга ячейки.
-    virtual int rank(QCell& elem) const = 0;
-
-	/// @brief Основная функция. Определение нового ранга ячейки.
-	virtual int rank(AmrStorage::Item& elem) const = 0;
+    virtual int rank(EuCell& elem) const = 0;
 
 	/// @brief Дисбаланс нагрузки
     static double imbalance(const std::vector<double>& ws);
