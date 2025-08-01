@@ -1,14 +1,12 @@
 #include <zephyr/math/solver/transfer.h>
-#include <zephyr/geom/primitives/polygon.h>
 #include <zephyr/geom/intersection.h>
 #include <zephyr/geom/sections.h>
+#include <zephyr/geom/geom.h>
 
 #include <zephyr/math/funcs.h>
 #include <zephyr/math/calc/weno.h>
 #include <zephyr/math/cfd/face_extra.h>
 #include <zephyr/math/cfd/gradient.h>
-
-#include <zephyr/geom/sections.h>
 
 namespace zephyr::math {
 

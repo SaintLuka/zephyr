@@ -1,20 +1,18 @@
 #pragma once
 
-#include <array>
 #include <vector>
 #include <functional>
 
 #include <zephyr/geom/box.h>
 #include <zephyr/geom/vector.h>
 #include <zephyr/geom/cell_type.h>
-#include <zephyr/geom/primitives/line.h>
 
 namespace zephyr::geom {
 
-/// @addtogroup Geom-Primitives
+/// @addtogroup geom-primitives
 /// @{
 
-/// @brief Представление многогранника
+/// @brief Многогранник общего вида.
 class Polyhedron {
 public:
     /// @brief Пустой многогранник (заглушка)
@@ -49,14 +47,10 @@ public:
     int n_faces() const { return faces.size(); }
 
     /// @brief Вершина по индексу
-    const Vector3d& vertex(int idx) const {
-        return verts[idx];
-    }
+    const Vector3d& vertex(int idx) const { return verts[idx]; }
 
     /// @brief Индексы вершин грани
-    const std::vector<int>& face_indices(int idx) const {
-        return faces[idx];
-    }
+    const std::vector<int>& face_indices(int idx) const { return faces[idx]; }
 
     /// @brief Ограничивающий прямоугольник
     Box bbox() const;
@@ -102,7 +96,8 @@ public:
     /// @param inside Характеристическая функция, возвращает true, если точка p
     /// находится внутри области, иначе -- false.
     /// @param N Число пробных точек
-    double clip_volume(const std::function<bool(const Vector3d& p)>& inside, int N = 10000) const;
+    double clip_volume(const std::function<bool(const Vector3d& p)>& inside,
+                       int N = 10000) const;
 
     /// @brief Отсечь от полигона часть с помощью плоскости с внешней нормалью n,
     /// проходящей через точку p
@@ -114,7 +109,7 @@ public:
     /// Равносильно вызову polyhedron.clip(p, n).volume(), но быстрее.
     double clip_volume(const Vector3d& p, const Vector3d& n) const;
 
-    /// @brief Находит отсечение от многогранника с заданой объемной долей
+    /// @brief Находит отсечение от многогранника с заданной объемной долей
     /// @param n Внешняя нормаль плоскости
     /// @param alpha Объемная доля
     /// @return Точка плоскости
@@ -136,7 +131,7 @@ public:
     /// @brief Единичный куб с центром в начале координат
     static Polyhedron Cube() { return Polyhedron::Cuboid(1.0, 1.0, 1.0); }
 
-    /// @brief Прямугольный параллелепипед со сторонами [a, b, c] и центром
+    /// @brief Прямоугольный параллелепипед со сторонами [a, b, c] и центром
     /// в начале координат
     static Polyhedron Cuboid(double a, double b, double c);
 
@@ -146,7 +141,7 @@ public:
     /// @brief Треугольная призма, вписана в единичную сферу
     static Polyhedron Wedge();
 
-    /// @brief Правильный тэтраэдр, вписан в единичную сферу
+    /// @brief Правильный тетраэдр, вписан в единичную сферу
     static Polyhedron Tetrahedron();
 
     /// @brief Правильный октаэдр, вписан в единичную сферу

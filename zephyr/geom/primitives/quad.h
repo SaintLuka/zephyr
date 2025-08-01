@@ -8,13 +8,12 @@
 
 namespace zephyr::geom {
 
-/// @addtogroup Geom-Primitives
+/// @addtogroup geom-primitives
 /// @{
 
-/// @brief Представление четырехугольника. Содержит несколько полезных
-/// функций, а также отвечает за линейное отображение квадрата
-/// (x, y) in [-1, 1]^2 на заданый четырехугольник.
-struct Quad {
+/// @brief Четырёхугольник.
+/// Полилинейное отображение квадрата [-1, 1]^2 на произвольный четырехугольник.
+class Quad {
 protected:
     /// @brief Вершины в Z-порядке (таблица 2 x 2)
     std::array<Vector3d, 4> verts;
@@ -28,19 +27,15 @@ public:
 
     /// @brief Прямой доступ к данным по индексу
     /// @param idx in [0..3]
-    inline Vector3d &operator[](int idx) {
-        return verts[idx];
-    }
+    Vector3d &operator[](int idx) { return verts[idx]; }
 
     /// @brief Прямой доступ к данным по индексу
     /// @param idx in [0..3]
-    inline const Vector3d &operator[](int idx) const {
-        return verts[idx];
-    }
+    const Vector3d &operator[](int idx) const {  return verts[idx]; }
 
     /// @brief Отображает индексы {-1, +1}^2 в [0..3]
     template <int i, int j>
-    inline static constexpr int iss() {
+    static constexpr int iss() {
         static_assert(i * i == 1 && j * j == 1,
                       "Available indices: {-1, +1}");
         return j + 1 + (i + 1) / 2;
@@ -50,7 +45,7 @@ public:
     /// @tparam i in {-1, +1}
     /// @tparam j in {-1, +1}
     template <int i, int j>
-    inline Vector3d &vs() {
+    Vector3d &vs() {
         return verts[iss<i, j>()];
     }
 
@@ -58,7 +53,7 @@ public:
     /// @tparam i in {-1, +1}
     /// @tparam j in {-1, +1}
     template <int i, int j>
-    inline const Vector3d &vs() const {
+    const Vector3d &vs() const {
         return verts[iss<i, j>()];
     }
 
@@ -143,8 +138,9 @@ public:
     double integrate_extra(const std::function<double(const Vector3d&)>& func, int n) const;
 };
 
-/// @brief Квадратичное отображение на четырехугольник
-struct SqQuad {
+/// @brief Криволинейный четырёхугольник.
+/// Поликвадратичное отображение квадрата [-1, 1]^2 на криволинейный четырехугольник.
+class SqQuad {
 protected:
     /// @brief Вершины (таблица 3 x 3)
     std::array<Vector3d, 9> verts;
@@ -173,37 +169,37 @@ public:
 
     /// @brief Прямой доступ к данным по индексу
     /// @param idx in [0..8]
-    inline Vector3d &operator[](int idx) {
+    Vector3d &operator[](int idx) {
         return verts[idx];
     }
 
     /// @brief Прямой доступ к данным по индексу
     /// @param idx in [0..8]
-    inline const Vector3d &operator[](int idx) const {
+    const Vector3d &operator[](int idx) const {
         return verts[idx];
     }
 
     /// @brief Отображает индексы {-1, 0, +1}^2 в [0..8]
-    template<int i, int j>
-    inline static constexpr int iss() {
+    template <int i, int j>
+    static constexpr int iss() {
         static_assert(i * i <= 1 && j * j <= 1,
                       "Available indices: {-1, 0, 1}");
         return 3 * j + i + 4;
     }
 
     /// @brief Оператор доступа по индексам отображения
-    /// @param i in {-1, 0, +1}
-    /// @param j in {-1, 0, +1}
+    /// @tparam i in {-1, 0, +1}
+    /// @tparam j in {-1, 0, +1}
     template <int i, int j>
-    inline Vector3d &vs() {
+    Vector3d &vs() {
         return verts[iss<i, j>()];
     }
 
     /// @brief Оператор доступа по индексам отображения
-    /// @param i in {-1, 0, +1}
-    /// @param j in {-1, 0, +1}
+    /// @tparam i in {-1, 0, +1}
+    /// @tparam j in {-1, 0, +1}
     template <int i, int j>
-    inline const Vector3d &vs() const {
+    const Vector3d &vs() const {
         return verts[iss<i, j>()];
     }
 

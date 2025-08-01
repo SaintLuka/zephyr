@@ -1,20 +1,18 @@
 #pragma once
 
-#include <array>
 #include <vector>
 #include <functional>
 
 #include <zephyr/geom/box.h>
 #include <zephyr/geom/vector.h>
-#include <zephyr/geom/primitives/line.h>
 
 namespace zephyr::geom {
 
-/// @addtogroup Geom-Primitives
+/// @addtogroup geom-primitives
 /// @{
 
-/// @brief Представление многоугольника в плоскости OXY.
-/// Для треугольника лучше использовать класс geom::Triangle
+/// @brief Многоугольник в плоскости Oxy.
+/// Для треугольника лучше использовать класс Triangle.
 /// @warning По умолчанию вершины полигона не сортируются, если порядок
 /// вершин в конструкторе неизвестен, то лучше вызвать функцию Polygon::sort()
 class Polygon {
@@ -22,12 +20,12 @@ public:
     /// @brief Пустой полигон (заглушка)
     Polygon();
 
-    /// @brief Полигон с заданым числом вершин
+    /// @brief Полигон с заданным числом вершин
     /// Все вершины устанавливаются равными нулю
     explicit Polygon(int size);
 
     /// @brief Создание полигона на основе имеющегося массива вершин
-    /// заданого размера. Вершины копируются в буффер полигона
+    /// заданного размера. Вершины копируются в буфер полигона
     /// @param sort Необходимо сортировать?
     Polygon(const Vector3d* buff, int size, bool sort = false);
 
@@ -53,19 +51,13 @@ public:
     Polygon(Polygon&& ) = default;
 
     /// @brief Число вершин в буфере
-    inline int size() const {
-        return vs.size();
-    };
+    int size() const { return vs.size(); }
 
-    /// @brief Пустой полигон?
-    inline bool empty() const {
-        return vs.empty();
-    }
+    /// @brief Полигон заглушка?
+    bool empty() const { return vs.empty(); }
 
     /// @brief Оператор доступа по индексу
-    inline const Vector3d& operator[](int idx) const {
-        return vs[idx];
-    }
+    const Vector3d& operator[](int idx) const { return vs[idx]; }
 
     /// @brief Установить новое положение вершины полигона
     /// @details Центр полигона пересчитывается
@@ -124,7 +116,7 @@ public:
     /// проходящей через точку p
     double clip_area(const Vector3d& p, const Vector3d& n) const;
 
-    /// @return Две точки прямой (p1, p2). Точка p1 находится в центре
+    /// @brief Две точки прямой (p1, p2). Точка p1 находится в центре
     /// сечения, точка p2 на многоугольнике, таким образом, что при обходе
     /// в направлении p1 -> p2 область остается слева.
     struct section {
@@ -135,7 +127,7 @@ public:
         operator const Vector3d&() const { return p1; }
     };
 
-    /// @brief Находит отсечение от полигона с заданой объемной долей
+    /// @brief Находит отсечение от полигона с заданной объемной долей
     /// @param n Внешняя нормаль прямой
     /// @param alpha Объемная доля
     section find_section(const Vector3d& n, double alpha) const;
@@ -151,7 +143,7 @@ public:
     Vector3d disk_clip_normal(const Vector3d& c, double R) const;
 
     /// @brief Посчитать объемную долю, которая отсекается от ячейки некоторым
-    /// телом, точки которого определяются характеристической функцией inside
+    /// телом, точки которого определяются характеристической функцией inside.
     /// @param inside Характеристическая функция: true, если точка находится
     /// внутри тела, иначе false
     /// @param n_points Число тестовых точек, погрешность ~ 1/N.

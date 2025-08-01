@@ -128,7 +128,34 @@ endif()
 
 add_subdirectory(python)
 
+# Включить опцию ZEPHYR_DOXYGEN, затем вызвать make docs
 if (ZEPHYR_DOXYGEN)
-    find_package(Doxygen REQUIRED dot)
-    doxygen_add_docs(docs ${PROJECT_SOURCE_DIR}/zephyr)
+    # Поиск Doxygen и Graphviz
+    find_package(Doxygen REQUIRED)
+    find_program(DOXYGEN_DOT_EXECUTABLE dot REQUIRED)
+
+    if(NOT DOXYGEN_FOUND)
+        message(WARNING "Doxygen not found! Documentation will not be generated.")
+    else()
+        # Настройка Doxygen
+        set(DOXYGEN_INPUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+        set(DOXYGEN_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/docs")
+        set(DOXYGEN_HTML_OUTPUT "${DOXYGEN_OUTPUT_DIR}/html")
+        set(DOXYGEN_CONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/Doxyfile")
+
+        # Конфигурация Doxyfile
+        configure_file(
+                "${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in"
+                "${DOXYGEN_CONFIG_FILE}"
+                @ONLY
+        )
+
+        # Добавление цели для генерации документации
+        add_custom_target(docs
+                COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_CONFIG_FILE}
+                WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+                COMMENT "Generating documentation with Doxygen"
+                VERBATIM
+        )
+    endif()
 endif()

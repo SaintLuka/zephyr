@@ -1,20 +1,19 @@
 #pragma once
 
-#include <zephyr/geom/vector.h>
-
 #include <random>
+
+#include <zephyr/geom/vector.h>
 
 namespace zephyr::geom {
 
 class Random2D;
 class QuasiRandom2D;
 
-/// @class Box box.h
 /// @brief Ограничивающий кубоид (bounding box).
 /// @details Очень полезная структура для хранения ограничивающего
 /// прямоугольника или кубоида (bounding box). Содержит пару полезных функций.
 /// Ящик считается двумерным прямоугольником, если vmin.z() == vmax.z(),
-/// условие справедливо в том числе для бесконечных и пустых ящиков.
+/// условие справедливо, в том числе для бесконечных и пустых ящиков.
 /// В обратном случае vmin.z() != vmax.z() ящик считается трёхмерном.
 struct Box final {
     Vector3d vmin = {NAN, NAN, NAN};
