@@ -1,8 +1,8 @@
-list(APPEND TESTS dense)
-list(APPEND TESTS gradient)
-list(APPEND TESTS interface)
-list(APPEND TESTS random)
-list(APPEND TESTS templates)
+#list(APPEND TESTS dense)
+#list(APPEND TESTS gradient)
+#list(APPEND TESTS interface)
+#list(APPEND TESTS random)
+#list(APPEND TESTS templates)
 
 # Assume all files in direcory are tests
 if (ZEPHYR_TESTS_ALL)

@@ -195,6 +195,11 @@ public:
         return faces.is_actual(face_begin[ic] + side[1]);
     }
 
+    /// @brief Название грани для AMR-ячейки
+    std::string face_name(index_t ic, index_t iface) const {
+        return side_to_string(iface - face_begin[ic], m_dim);
+    }
+
     /// @}
 
 
@@ -291,7 +296,10 @@ public:
     /// @brief Скопировать ячейку с позиции ic в хранилище cells на индекс jc,
     /// грани на позицию iface, вершины на позицию inode.
     void copy_geom(index_t ic, AmrCells& cells,
-                   index_t jc, index_t face_beg, index_t node_beg) const;
+            index_t jc, index_t face_beg, index_t node_beg) const;
+
+    void copy_geom_basic(index_t ic, AmrCells& cells,
+            index_t jc, index_t face_beg, index_t node_beg) const;
 
 
     // Размеры хранилища
@@ -385,7 +393,7 @@ public:
     int check_connectivity(index_t ic) const;
 
     /// @brief Проверка связности ячеек в MPI версии
-    int check_connectivity(index_t ic, AmrCells& aliens) const;
+    int check_connectivity(index_t ic, const AmrCells& aliens) const;
 
     /// @}
 

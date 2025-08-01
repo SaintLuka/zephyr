@@ -20,12 +20,8 @@ inline std::ostream &operator<<(std::ostream &os, const std::vector<index_t> &ar
     return os;
 }
 
-void Migration::init_types(const AmrCells& locals) {
-    migrants = locals.same();
-}
-
 void Migration::clear() {
-    migrants.resize(0, 0, 0);
+    migrants.clear();
 }
 
 void Migration::shrink_to_fit() {
@@ -63,20 +59,20 @@ void Migration::fill_router(AmrCells& locals) {
     mpi::for_each([&]() {
         std::cout << "Rank " << mpi::rank() << "\n";
         std::cout << "Cell Router\n";
-        cell_route.print();
+        m_cell_route.print();
         std::cout << "Face Router\n";
-        face_route.print();
+        m_face_route.print();
         std::cout << "Node Router\n";
-        node_route.print();
+        m_node_route.print();
     });
      */
 }
 
-void Migration::reindexing(Tourism& tourists, AmrCells& locals, AmrCells& aliens) {
+void Migration::reindexing(Tourism& tourism, AmrCells& locals, AmrCells& aliens) {
     // Отправим новые ранги ячеек
-    tourists.prepare<MpiTag::RANK>(locals);
-    auto send_rnk_1 = tourists.isend<MpiTag::RANK>();
-    auto recv_rnk_1 = tourists.irecv<MpiTag::RANK>(aliens);
+    tourism.prepare<MpiTag::RANK>(locals);
+    auto send_rnk_1 = tourism.isend<MpiTag::RANK>();
+    auto recv_rnk_1 = tourism.irecv<MpiTag::RANK>(aliens);
 
     // Переиндексируем локальные ячейки
 
@@ -97,16 +93,16 @@ void Migration::reindexing(Tourism& tourists, AmrCells& locals, AmrCells& aliens
         locals.index[ic] = cell_index[locals.rank[ic]]++;
     }
 
-    // Отправим новые индексы ячеек на alien слой
-    tourists.prepare<MpiTag::INDEX>(locals);
-    auto send_idx_1 = tourists.isend<MpiTag::INDEX>();
-    auto recv_idx_1 = tourists.irecv<MpiTag::INDEX>(aliens);
+    tourism.prepare<MpiTag::INDEX>(locals);
+    auto send_idx_1 = tourism.isend<MpiTag::INDEX>();
+    auto recv_idx_1 = tourism.irecv<MpiTag::INDEX>(aliens);
 
     // Дождемся получения новых rank и index ячеек
     send_rnk_1.wait();
-    send_idx_1.wait();
     recv_rnk_1.wait();
+    send_idx_1.wait();
     recv_idx_1.wait();
+
 
     // Переиндексируем грани
     auto& faces = locals.faces;

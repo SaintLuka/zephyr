@@ -441,7 +441,7 @@ void AmrCells::copy_geom(index_t ic, AmrCells& cells,
         cells.faces.adjacent.rank [jface] = faces.adjacent.rank [iface];
         cells.faces.adjacent.index[jface] = faces.adjacent.index[iface];
         cells.faces.adjacent.alien[jface] = faces.adjacent.alien[iface];
-        cells.faces.adjacent.basic[jface] = jc;
+        cells.faces.adjacent.basic[jface] = index[ic];
     }
 
     cells.node_begin[jc] = node_beg;
@@ -451,6 +451,35 @@ void AmrCells::copy_geom(index_t ic, AmrCells& cells,
         index_t iv = node_begin[ic] + i;
         index_t jv = cells.node_begin[jc] + i;
         cells.verts[jv] = verts[iv];
+    }
+}
+
+void AmrCells::copy_geom_basic(index_t ic, AmrCells& cells,
+        index_t jc, index_t face_beg, index_t node_beg) const {
+
+    cells.rank [jc] = rank [ic];
+    cells.index[jc] = index[ic];
+
+    cells.face_begin[jc] = face_beg;
+    cells.face_begin[jc + 1] = face_beg + max_face_count(ic);
+
+    for (index_t i = 0; i < max_face_count(ic); ++i) {
+        index_t iface = face_begin[ic] + i;
+        index_t jface = cells.face_begin[jc] + i;
+
+        cells.faces.boundary[jface] = faces.boundary[iface];
+
+        cells.faces.adjacent.rank [jface] = faces.adjacent.rank [iface];
+        cells.faces.adjacent.index[jface] = faces.adjacent.index[iface];
+        cells.faces.adjacent.alien[jface] = faces.adjacent.alien[iface];
+    }
+
+    cells.node_begin[jc] = node_beg;
+    cells.node_begin[jc + 1] = node_beg + max_node_count(ic);
+
+    for (index_t i = 0; i < max_node_count(ic); ++i) {
+        index_t iv = node_begin[ic] + i;
+        index_t jv = cells.node_begin[jc] + i;
     }
 }
 

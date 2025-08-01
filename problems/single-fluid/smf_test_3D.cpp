@@ -21,7 +21,7 @@ using namespace zephyr::phys;
 using namespace zephyr::math;
 using namespace zephyr::math::smf;
 
-using zephyr::mesh::generator::Cuboid;
+using zephyr::geom::generator::Cuboid;
 using zephyr::mesh::EuMesh;
 using zephyr::mesh::EuCell;
 using zephyr::math::SmFluid;
@@ -63,10 +63,13 @@ int main(int argc, char** argv) {
     Eos::Ptr eos = test.get_eos();
 
     // Генератор сетки
-    Cuboid gen = Cuboid(test.xmin(), test.xmax(),
-                        test.ymin(), test.ymax(),
-                        test.zmin(), test.zmax());
-    gen.set_nx(10);
+    //Cuboid gen = Cuboid(test.xmin(), test.xmax(),
+    //                    test.ymin(), test.ymax(),
+    //                    test.zmin(), test.zmax());
+    Cuboid gen = Cuboid(-test.xmax(), test.xmax(),
+                        -test.ymax(), test.ymax(),
+                        -test.zmax(), test.zmax());
+    gen.set_nx(20);
     gen.set_boundaries(test.boundaries());
 
     // Создать сетку
@@ -74,17 +77,17 @@ int main(int argc, char** argv) {
 
     // Создать решатель
     SmFluid solver(eos);
-    solver.set_accuracy(1);
+    solver.set_accuracy(2);
     solver.set_CFL(0.5);
     solver.set_limiter("minmod");
-    solver.set_method(Fluxes::HLL);
+    solver.set_method(Fluxes::HLLC);
 
     // Добавляем типы на сетку, выбираем основной слой
     auto data = solver.add_types(mesh);
     auto z = data.init;
 
     // Настройка сетки
-    //mesh.set_decomposition("XYZ");
+    mesh.set_decomposition("XYZ");
     //mesh.block_sorting(4, 4, 8);
     mesh.set_max_level(4);
     mesh.set_distributor(solver.distributor());
@@ -142,16 +145,20 @@ int main(int argc, char** argv) {
     Stopwatch sw_flags;
     Stopwatch sw_grad;
     Stopwatch sw_refine;
+    Stopwatch sw_write;
+
+    test.finish = 0.2;
 
     Stopwatch elapsed(true);
     while (curr_time < test.max_time()) {
+        sw_write.resume();
+        mpi::cout << "\tStep: " << std::setw(6) << n_step << ";"
+                  << "\tTime: " << std::setw(10) << std::setprecision(5) << curr_time << "\n";
         if (curr_time >= next_write) {
-            mpi::cout << "\tStep: " << std::setw(6) << n_step << ";"
-                      << "\tTime: " << std::setw(10) << std::setprecision(5) << curr_time << "\n";
-
             pvd.save(mesh, curr_time);
-            next_write += test.max_time() / 200;
+            next_write += test.max_time() / 5;
         }
+        sw_write.stop();
 
         // Точное завершение в end_time
         solver.set_max_dt(test.max_time() - curr_time);
@@ -162,6 +169,7 @@ int main(int argc, char** argv) {
         sw_update.stop();
 
         sw_flags.resume();
+        mesh.sync(z);
         set_flags(mesh, z);
         sw_flags.stop();
 
@@ -178,11 +186,13 @@ int main(int argc, char** argv) {
         n_step += 1;
     }
     elapsed.stop();
-    pvd.save(mesh, 1.0);
+    pvd.save(mesh, curr_time);
 
     mpi::cout << "\nElapsed time:   " << elapsed.extended_time()
               << " ( " << elapsed.milliseconds() << " ms)\n";
 
+    mpi::cout << "  Write time:   " << sw_write.extended_time()
+              << " ( " << sw_write.milliseconds() << " ms)\n";
     mpi::cout << "  Update time:  " << sw_update.extended_time()
               << " ( " << sw_update.milliseconds() << " ms)\n";
     mpi::cout << "  Flags  time:  " << sw_flags.extended_time()

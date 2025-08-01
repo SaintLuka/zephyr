@@ -12,20 +12,210 @@
 
 #include <zephyr/geom/vector.h>
 
+
 namespace zephyr::utils {
+
+// Появляется в C++20
+template <class T>
+struct remove_cvref { using type = std::remove_cv_t<std::remove_reference_t<T>>; };
+
+template <class T>
+using remove_cvref_t = typename remove_cvref<T>::type;
+
+
+/// @brief Добавлю различные полезные типы и функции
+namespace soa {
+
+/// @brief Двойной массив
+template<typename T>
+using vec_of_vec = std::vector<std::vector<T>>;
+
+
+/// @brief Список типов (почти кортеж, но ничего не хранит)
+template<typename... Ts>
+struct type_list {
+
+    /// @brief Число типов в списке
+    static constexpr int size() { return sizeof...(Ts); }
+
+    /// @brief Проверить наличие типа в списке
+    template<typename T>
+    static constexpr bool contain() {
+        return (std::is_same_v<T, Ts> || ...);
+    }
+
+    /// @brief Индекс типа в списке параметров, или -1, если не найден
+    template<typename T>
+    static constexpr int index_of() {
+        int idx = 0;
+        bool found = ((std::is_same_v<T, Ts> ? (++idx, true) : (++idx, false)) || ...);
+        return found ? (idx - 1) : -1;
+    }
+
+    /// @brief Получить тип из списка по индексу
+    template<int I>
+    using type = std::tuple_element_t<I, std::tuple<Ts...>>;
+
+    /// @brief Кортеж, который для каждого параметра хранит двойной вектор
+    using tuple_of_vec = std::tuple<vec_of_vec<Ts>...>;
+};
+
+
+template<typename List1, typename List2>
+struct type_list_cat;
+
+template<typename... Ts1, typename... Ts2>
+struct type_list_cat<type_list<Ts1...>, type_list<Ts2...>> {
+    using type = type_list<Ts1..., Ts2...>;
+};
+
+/// @brief Конкатенация двух списков типов
+template<typename List1, typename List2>
+using type_list_cat_t = typename type_list_cat<List1, List2>::type;
+
+
+// ========================================================================
+//          Описание базовых и пользовательских типов + функции
+// ========================================================================
+
+/// @brief Базовые типы, доступные для хранения в SoaStorage
+using basic_types = type_list<
+        short, unsigned short, int, unsigned int,
+        long, unsigned long, long long, unsigned long long,
+        float, double, long double, geom::Vector3d>;
+
+/// @brief Допустимое число пользовательских типов разного размера. Допускаются
+/// пользовательские типы, кратные 4 байтам: 4, 8, 12, 16 байт и так далее.
+/// Использование типов длиннее 64 байт считается сомнительным.
+static constexpr int n_custom_types = 20;
+
+/// @brief Допустимое выравнивание пользовательского типа (кратно 4 байтам)
+static constexpr int type_alignment = 4;
+
+/// @brief Максимальный размер пользовательского типа в байтах (включительно)
+static constexpr int custom_type_max_sizeof = type_alignment * n_custom_types;
+
+// Пользовательские типы будем сохранять в массивах:
+//    std::array<std::byte, 4>,
+//    std::array<std::byte, 8>,
+//    ...
+//    std::array<std::byte, 4 * n_custom_types>
+template<size_t N, typename = std::make_index_sequence<N>>
+struct generate_custom_types;
+
+template<size_t N, size_t... Is>
+struct generate_custom_types<N, std::index_sequence<Is...>> {
+    using type = type_list<std::array<std::byte, 4 * (Is + 1)>...>;
+};
+
+/// @brief Пользовательские типы (после редукции), доступные для хранения
+/// в SoaStorage. Набор типов:
+//    std::array<std::byte, 4>,
+//    std::array<std::byte, 8>,
+//    ...
+//    std::array<std::byte, 4 * n_custom_types>
+using custom_types = generate_custom_types<n_custom_types>::type;
+
+/// @brief Является ли тип базовым? (присутствует в кортеже basic_types)
+template<typename T>
+static constexpr bool is_basic_type() { return basic_types::contain<T>(); }
+
+/// @brief Является ли тип пользовательским?
+template<typename T>
+static constexpr bool is_custom_type() {
+    // Не базовый тип
+    if constexpr (is_basic_type<T>()) {
+        return false;
+    }
+    // Размер кратен 4 байтам
+    if constexpr (sizeof(T) % type_alignment != 0) {
+        return false;
+    }
+    // Меньше определенного размера
+    return sizeof(T) <= custom_type_max_sizeof;
+}
+
+/// @brief Редуцировать тип до такого, который можно хранить в SoaStorage
+/// Получается void, если редукция невозможна
+template<typename T>
+using reduce_t = std::conditional_t<
+        is_basic_type<T>(), T,
+        std::conditional_t<
+                is_custom_type<T>(),
+                std::array<std::byte, sizeof(T)>,
+                void>>;
+
+/// @brief Тип может храниться в SoaStorage?
+template<typename T>
+static constexpr bool is_storable_type() {
+    return !std::is_same_v<reduce_t<T>, void> && (is_basic_type<T>() || is_custom_type<T>());
+}
+
+/// @brief Статическая проверка, что тип можно хранить в SoaStorage
+template<typename T>
+static constexpr void assert_storable_type() {
+    static_assert(is_storable_type<T>(), "Using of not storable type");
+}
+
+// Полный список допустимых типов
+using storable_types = type_list_cat_t<basic_types, custom_types>;
+
+// Кортеж векторов для всех допустимых типов
+using tuple_of_values = storable_types::tuple_of_vec;
+
+// Объявление типов
+using names_t = std::vector<std::string>;
+
+// Массив имен для всех допустимых типов
+using array_of_names = std::array<names_t, storable_types::size()>;
+
+/// @brief Индекс типа в списке
+template<typename T>
+static constexpr int type_index() {
+    assert_storable_type<T>();
+    return storable_types::index_of<reduce_t<T>>();
+}
+
+} // namespace soa
+
 
 /// @brief Простая структура для доступа к полям SoaStorage
 template<typename T>
 struct Storable {
 public:
+    using type = T;
+
     int idx = -1;  ///< Смещение в массиве структур
 
     /// @brief Со смещением для векторных полей
     Storable<T> operator[](int shift) const { return {idx + shift}; }
 
     /// @brief MPI-тэг, используется в пересылках
-    int tag() const;
+    int tag() const { return (soa::type_index<T>() << 10) + idx; }
+
+    // Проверка хранимых типов
+    static_assert(soa::is_storable_type<T>(), "Storable<T>: using of not storable type T");
 };
+
+
+template <typename >
+struct is_storable : std::false_type { };
+
+template <typename T>
+struct is_storable<Storable<T>> : std::true_type { };
+
+/// @brief Все типы в parameter pack являются Storable<T>
+template <typename... Args>
+constexpr bool is_all_storable() {
+    return (is_storable<std::decay_t<Args>>::value && ...);
+}
+
+/// @brief Статическая проверка, что все типы являются Storable<T>
+template<typename... Args>
+static constexpr void assert_all_storable() {
+    static_assert(is_all_storable<Args...>(), "All types must be storable");
+}
+
 
 /// @class SoaStorage storage.h
 /// @brief Класс для хранения разнородных данных в форме SoA (Structure of Arrays),
@@ -45,10 +235,10 @@ public:
     SoaStorage same() const;
 
     /// @brief Размер массивов данных равен нулю? (даже если данных нет)
-    inline bool empty() const { return m_size == 0; }
+    bool empty() const { return m_size == 0; }
 
     /// @brief Получить размер массивов данных (даже если данных нет)
-    inline size_t size() const { return m_size; }
+    size_t size() const { return m_size; }
 
     /// @brief Изменить размер массивов данных (даже если данных нет)
     void resize(size_t new_size);
@@ -59,31 +249,42 @@ public:
     /// @brief Изменить размеры буфферов под размеры данных
     void shrink_to_fit();
 
-    /// @brief Добавить новое СКАЛЯРНОЕ поле
-    /// @param name Имя для поля данных, должно быть уникальным среди полей
-    /// данного типа, поля типа double и int могут иметь одинаковое имя, но
-    /// зачем так делать?
-    template<typename T>
-    Storable<T> add(const std::string &name);
+    /// @brief Добавить одно или несколько СКАЛЯРНЫХ полей
+    /// @param names Имена должна быть уникальными
+    /// @details Принимает произвольное число аргументов (> 0) типов, которые
+    /// можно конвертировать в std::string, для всех выполняет add_one
+    /// @return Единственный Storable<T> при единственном аргументе, кортеж из
+    /// Storable<T> при нескольких аргументах (для structure binding).
+    template<typename T, typename... Names, typename = std::enable_if_t<
+            (sizeof...(Names) > 0) && (std::is_convertible_v<Names, std::string> && ...)>>
+    auto add(Names&&... names) {
+        soa::assert_storable_type<T>();
+        if constexpr (sizeof...(Names) == 1) {
+            return add_one<T>(std::forward<Names>(names)...);
+        } else {
+            // Короче жесть, тут сложно было добиться соблюдения порядка
+            // с круглыми скобками std::tuple() или std::make_tuple() не работают.
+            return std::tuple{add_one<T>(std::string(std::forward<Names>(names)))...};
+        }
+    }
 
     /// @brief Добавить новое ВЕКТОРНОЕ поле
-    /// @param name Имя для поля данных, должно быть уникальным среди полей
-    /// данного типа, поля типа double и int могут иметь одинаковое имя, но
-    /// зачем так делать?
+    /// @param name Имя поля данных должно быть уникальным
     template<typename T>
     Storable<T> add(const std::string &name, int count);
 
     /// @brief Содержит поле с именем name типа T?
     template<typename T>
     bool contain(const std::string &name) const {
-        const auto &row = names<T>();
+        const auto &row = get_names<T>();
         return std::find(row.cbegin(), row.cend(), name) != row.cend();
     }
 
     /// @brief Вытащить поле с именем name для типа T
     template<typename T>
     Storable<T> storable(const std::string &name) const {
-        const auto &row = names<T>();
+        soa::assert_storable_type<T>();
+        const auto &row = get_names<T>();
         auto it = std::find(row.cbegin(), row.cend(), name);
         if (it != row.cend()) {
             return {int(std::distance(row.cbegin(), it))};
@@ -93,33 +294,57 @@ public:
 
     /// @brief Извлечь поле по переменной Storable<T>
     template<typename T>
-    const T *data(Storable<T> type) const {
-        assert_storable_type<T>();
-        if constexpr (is_basic_type<T>()) {
-            return basic_values<T>().at(type.idx).data();
+    T *data(Storable<T> type) {
+        soa::assert_storable_type<T>();
+        if constexpr (soa::is_basic_type<T>()) {
+            return get_values<T>()[type.idx].data();
         } else {
-            return reinterpret_cast<const T *>(m_values2[custom_type_index<T>()].at(type.idx).data());
+            return reinterpret_cast<T *>(get_values<T>()[type.idx].data()->data());
         }
     }
 
     /// @brief Извлечь поле по переменной Storable<T>
     template<typename T>
-    T *data(Storable<T> type) {
-        assert_storable_type<T>();
-        if constexpr (is_basic_type<T>()) {
-            return basic_values<T>().at(type.idx).data();
+    const T *data(Storable<T> type) const {
+        soa::assert_storable_type<T>();
+        if constexpr (soa::is_basic_type<T>()) {
+            return get_values<T>()[type.idx].data();
         } else {
-            return reinterpret_cast<T *>(m_values2[custom_type_index<T>()].at(type.idx).data());
+            return reinterpret_cast<const T *>(get_values<T>()[type.idx].data()->data());
         }
     }
 
-    /// @brief Извлечь поле по переменной Storable<T>
-    template <typename T>
-    T* operator()(Storable<T> type) { return data(type); }
+    /// @brief Кортеж указателей на данные (может быть пустым)
+    template<typename... Args>
+    auto data_tuple(const std::tuple<Args...>& vars) {
+        assert_all_storable<Args...>();
+        return std::apply([this](const auto&... args) {
+            return std::tuple{data(args)...};
+        }, vars);
+    }
+
+    /// @brief Кортеж указателей на данные (может быть пустым)
+    template<typename... Args>
+    auto data_tuple_1(Args&&... vars) {
+        assert_all_storable<Args...>();
+        return std::tuple{data(std::forward<Args>(vars))...};
+    }
 
     /// @brief Извлечь поле по переменной Storable<T>
-    template <typename T>
-    const T* operator()(Storable<T> type) const { return data(type); }
+    template<typename T>
+    auto operator()(Storable<T> var) { return data(var); }
+
+    /// @brief Извлечь поле по переменной Storable<T>
+    template<typename T>
+    auto operator()(Storable<T> var) const { return data(var); }
+
+    /// @brief Извлечь поле по переменной Storable<T>
+    template<typename T>
+    auto operator[](Storable<T> var) { return data(var); }
+
+    /// @brief Извлечь поле по переменной Storable<T>
+    template<typename T>
+    auto operator[](Storable<T> var) const { return data(var); }
 
     /// @brief Скопировать все данные по индексу from
     /// в хранилище dst по индексу to.
@@ -132,424 +357,162 @@ public:
     /// @brief Поменять два массива данных местами
     template <typename T>
     void swap(const Storable<T>& type1, const Storable<T>& type2) {
-        if constexpr (is_basic_type<T>()) {
-            std::swap(basic_values<T>()[type1.idx], basic_values<T>()[type2.idx]);
-        }
-        else {
-            std::swap(custom_values<T>()[type1.idx], custom_values<T>()[type2.idx]);
-        }
+        std::swap(get_values<T>()[type1.idx], get_values<T>()[type2.idx]);
     }
 
     /// @brief Вывести в консоль массивы данных, массивы пользовательских
     /// типов не выводятся, только имена и размеры типов данных
     void print() const;
 
+    /// @brief Для списка переменных типа Storable<T1>, Storable<T2>, ...
+    /// находятся места в существующем хранилище, возможно, с заменой уже
+    /// существующих данных. Возвращается кортеж с теми же типами
+    /// Storable<T1>, Storable<T2>, ... которые указывают на нужные
+    /// массивы данных в хранлище.
+    /// @param vars Переменные типа Storable<T1>, Storable<T2>, ...
+    /// @return Кортеж переменных типа <Storable<T1>, Storable<T2>, ...>, который
+    /// соответствует входным аргументам.
+    template <typename... Args>
+    std::tuple<remove_cvref_t<Args>...> add_replace(Args&&... vars);
+
 public:
-    // ========================================================================
-    //          Описание базовых и пользовательских типов + функции
-    // ========================================================================
-
-    // Кортеж с базовыми типами, доступными для хранения в SoaStorage
-    using basic_types_t = std::tuple<
-            short, unsigned short, int, unsigned int,
-            long, unsigned long, long long, unsigned long long,
-            float, double, long double, geom::Vector3d>;
-
-    // Число типов в basic_types_t
-    static constexpr int n_basic_types = std::tuple_size<basic_types_t>::value;
-
-    // Индекс типа в кортеже basic_types_t или -1, если тип не найден
-    template <typename T>
-    static constexpr int basic_type_index() {
-        int index = -1;
-        [&index] <size_t... Is>(std::index_sequence<Is...>) {
-                ((std::is_same_v<T, std::tuple_element_t<Is, basic_types_t>> ? (index = Is) : 0), ...);
-        }
-        (std::make_index_sequence<n_basic_types>());
-        return index;
-    }
-
-    // Название базового типа
-    template <typename T>
-    static std::string basic_type_name();
-
-    // Название базового типа по индексу в кортеже
-    template<int I>
-    static std::string basic_type_name();
-
-    // Является ли тип базовым? (присутствует в кортеже basic_types_t)
-    template <typename T>
-    static constexpr bool is_basic_type() { return basic_type_index<T>() >= 0; }
-
-    // Допустимое число пользовательских типов разного размера. Допускаются
-    // пользовательские типы, кратные 4 байтам: 4, 8, 12, 16 байт и так далее.
-    // Использование типов длиннее 64 байт считается сомнительным.
-    static constexpr int n_custom_types = 20;
-
-    // Допустимое выравнивание пользовательского типа (кратно 4 байтам)
-    static constexpr int type_alignment = 4;
-
-    // Максимальный размер пользовательского типа в байтах (включительно)
-    static constexpr int custom_type_max_sizeof = type_alignment * n_custom_types;
-
-    // Индекс пользовательского типа данных, возвращает -1, если тип нельзя
-    // поместить в SoaStorage по некоторым причинам (выравнивание / размер).
-    template <typename T>
-    static constexpr int custom_type_index() {
-        if constexpr (is_basic_type<T>()) {
-            return -1;
-        }
-        if constexpr (sizeof(T) % type_alignment != 0) {
-            return -1;
-        }
-        if constexpr (sizeof(T) > custom_type_max_sizeof) {
-            return -1;
-        }
-        return sizeof(T) / type_alignment - 1;
-    }
-
-    // Размер пользовательского типа по индексу
-    static constexpr int custom_type_sizeof(int idx) {
-        assert(0 <= idx && idx < custom_type_max_sizeof &&
-                "Индекс пользовательского типа out_of_range");
-        return type_alignment * (idx + 1);
-    }
-
-    // Является допустимым пользовательским типом?
-    template <typename T>
-    static constexpr bool is_custom_type() { return custom_type_index<T>() >= 0; }
-
-    // Является базовым типом
-    template <typename T>
-    static constexpr void assert_basic_type() {
-        static_assert(is_basic_type<T>(), "В данном контексте допускается только базовый тип");
-    }
-
-    // Является пользовательским типом
-    template <typename T>
-    static constexpr void assert_custom_type() {
-        static_assert(!is_basic_type<T>() && is_custom_type<T>(),
-                      "В данном контексте допускается только пользовательский тип");
-    }
-
-    // Тип можно ли сохранить в SoaStorage
-    template <typename T>
-    static constexpr void assert_storable_type() {
-        if constexpr (!is_basic_type<T>()) {
-            static_assert(sizeof(T) % type_alignment == 0, "Пользовательский тип должен быть кратен 4 байтам");
-            static_assert(sizeof(T) <= custom_type_max_sizeof, "Слишком большой пользовательский тип");
-        }
-    }
-
-    // ========================================================================
-    //                         Некоторые типы данных
-    // ========================================================================
-
-    // Объявление типов
-    using names_t = std::vector<std::string>;
-
-    // Двойной массив
-    template<typename T>
-    using vec_of_vec = std::vector<std::vector<T>>;
-
-    template<typename... Ts>
-    static auto to_vec_of_vec_tuple(const std::tuple<Ts...> &)
-    -> std::tuple<vec_of_vec<Ts>...> { return {}; }
-
-    using vec_of_vec_types = decltype(to_vec_of_vec_tuple(basic_types_t{}));
 
     // ========================================================================
     //                        Приватные поля класса
     // ========================================================================
 
-    // Длина используемых массивов
+    /// @brief Длина всех используемых массивов данных
     size_t m_size = 0;
 
-    // Имена для массивов базовых типов
-    std::array<names_t, n_basic_types> m_names1 = {};
-    
-    // Массивы массивов в кортеже для базовых типов
-    vec_of_vec_types m_values1 = {};
-    
-    // Имена для массивов пользовательских типов
-    std::array<names_t, n_custom_types> m_names2 = {};
+    /// @brief Имена полей данных
+    soa::array_of_names  m_names  = {};
 
-    // Массивы массивов для пользовательских типов
-    std::array<vec_of_vec<std::byte>, n_custom_types> m_values2 = {};
+    /// @brief Массивы данных
+    soa::tuple_of_values m_values = {};
 
     // ========================================================================
     //                       Приватные методы класса
     // ========================================================================
 
-    // Приватный доступ к именам по типу
-    template<typename T>
-    inline std::vector<std::string> &names() {
-        assert_storable_type<T>();
-
-        if constexpr (is_basic_type<T>()) {
-            return m_names1[basic_type_index<T>()];
-        } else {
-            return m_names2[custom_type_index<T>()];
-        }
+    /// @brief Имена переменных для заданного типа
+    template <typename T>
+    soa::names_t &get_names() {
+        soa::assert_storable_type<T>();
+        return m_names[soa::type_index<T>()];
     }
 
-    // Приватный доступ к именам по типу
-    template<typename T>
-    inline const names_t &names() const {
-        assert_storable_type<T>();
-
-        if constexpr (is_basic_type<T>()) {
-            return m_names1[basic_type_index<T>()];
-        } else {
-            return m_names2[custom_type_index<T>()];
-        }
+    /// @brief Имена переменных для заданного типа
+    template <typename T>
+    const soa::names_t &get_names() const {
+        soa::assert_storable_type<T>();
+        return m_names[soa::type_index<T>()];
     }
 
     // Приватный доступ к данным по типу (для базовых типов)
     template<typename T>
-    inline vec_of_vec<T> &basic_values() {
-        assert_basic_type<T>();
-        return std::get<vec_of_vec<T>>(m_values1);
+    soa::vec_of_vec<soa::reduce_t<T>> &get_values() {
+        soa::assert_storable_type<T>();
+        return std::get<soa::type_index<T>()>(m_values);
     }
 
     // Приватный доступ к данным по типу (для базовых типов)
     template<typename T>
-    inline const vec_of_vec<T> &basic_values() const {
-        assert_basic_type<T>();
-        return std::get<vec_of_vec<T>>(m_values1);
+    const soa::vec_of_vec<soa::reduce_t<T>> &get_values() const {
+        soa::assert_storable_type<T>();
+        return std::get<soa::type_index<T>()>(m_values);
     }
-
-    // Приватный доступ к данным по типу (для пользовательских типов)
-    template<typename T>
-    inline vec_of_vec<std::byte> &custom_values() {
-        assert_custom_type<T>();
-        return m_values2[custom_type_index<T>()];
-    }
-
-    // Приватный доступ к данным по типу (для пользовательских типов)
-    template<typename T>
-    inline const vec_of_vec<std::byte> &custom_values() const {
-        assert_custom_type<T>();
-        return m_values2[custom_type_index<T>()];
-    }
-
 
     // Количество уже добавленных полей типа T
     template<typename T>
     int type_count() const {
-        if constexpr (is_basic_type<T>()) {
-            return std::get<vec_of_vec<T>>(m_values1).size();
-        } else {
-            return m_values2[custom_type_index<T>()].size();
-        }
+        soa::assert_storable_type<T>();
+        return get_values<T>().size();
     }
 
-    // Рекурсивная печать базовых типов, возвращает количество напечатаных полей
-    template<int I = 0>
-    std::enable_if_t<I < n_basic_types, int> print_basic() const {
-        int count = 0;
-        if (!std::get<I>(m_values1).empty()) {
-            int K = std::get<I>(m_values1).size();
-            std::cout << "  " << basic_type_name<I>() << " arrays:\n";
-            for (int k = 0; k < K; ++k) {
-                auto &vec = std::get<I>(m_values1).at(k);
-                auto &name = m_names1[I].at(k);
+    /// @brief Добавить новое СКАЛЯРНОЕ поле
+    /// @param name Имя поля данных должно быть уникальным
+    template<typename T>
+    Storable<T> add_one(const std::string &name);
 
-                std::cout << "    '" << name << "': [";
-                if (vec.empty()) {
-                    std::cout << "]\n";
-                }
-                else {
-                    if constexpr (I == basic_type_index<geom::Vector3d>()) {
-                        for (int i = 0; i < vec.size() - 1; ++i) {
-                            std::cout << "{" << vec[i].transpose() << "}, ";
-                        }
-                        std::cout << "{" << vec.back().transpose() << "}]\n";
-                    }
-                    else {
-                        for (int i = 0; i < vec.size() - 1; ++i) {
-                            std::cout << vec[i] << ", ";
-                        }
-                        std::cout << vec.back() << "]\n";
-                    }
-                }
-            }
-            ++count;
-        }
-        return print_basic<I + 1>() + count;
-    }
-
-    // Рекурсивная печать базовых типов, возвращает количество напечатаных полей
-    template<int I = 0>
-    std::enable_if_t<I >= n_basic_types, int> print_basic() const { return 0;}
-
-    // Рекурсивный resize для базовых типов
-    template<int I = 0>
-    std::enable_if_t<I < n_basic_types> resize_basic(size_t new_size) {
-        for (auto &vec: std::get<I>(m_values1)) {
-            vec.resize(new_size);
-        }
-        resize_basic<I + 1>(new_size);
-    }
-
-    // Рекурсивный resize для базовых типов
-    template<int I = 0>
-    std::enable_if_t<I >= n_basic_types> resize_basic(size_t new_size) { }
-
-    // Рекурсивный reserve для базовых типов
-    template<int I = 0>
-    std::enable_if_t<I < n_basic_types> reserve_basic(size_t new_size) {
-        for (auto &vec: std::get<I>(m_values1)) {
-            vec.reserve(new_size);
-        }
-        reserve_basic<I + 1>(new_size);
-    }
-
-    // Рекурсивный reserve для базовых типов
-    template<int I = 0>
-    std::enable_if_t<I >= n_basic_types> reserve_basic(size_t new_size) { }
-
-    // Рекурсивный shrink_to_fit для базовых типов
-    template<int I = 0>
-    std::enable_if_t<I < n_basic_types> shrink_basic() {
-        for (auto &vec: std::get<I>(m_values1)) {
-            vec.shrink_to_fit();
-        }
-        shrink_basic<I + 1>();
-    }
-
-    // Рекурсивный reserve для базовых типов
-    template<int I = 0>
-    std::enable_if_t<I >= n_basic_types> shrink_basic() { }
-
-    // Скопировать для одного базового типа значения
-    template <typename T>
-    static void copy_one_basic(const vec_of_vec<T>& src, size_t from,
-                                     vec_of_vec<T>& dst, size_t to) {
-        if (!src.empty() && src.size() == dst.size()) {
-            for (size_t k = 0; k < src.size(); ++k) {
-                dst[k][to] = src[k][from];
-            }
-        }
-    }
-
-    // Скопировать для всех базовых типов (рекурсивно)
-    template <int I = 0>
-    static void copy_basics(const vec_of_vec_types& src, size_t from,
-                                  vec_of_vec_types& dst, size_t to) {
-        copy_one_basic(std::get<I>(src), from, std::get<I>(dst), to);
-        if constexpr (I < n_basic_types - 1) {
-            copy_basics<I + 1>(src, from, dst, to);
-        }
-    }
-
-    // Выполняет resize для полей данных, нужно для копии сигнатуры SoaStorage
-    template <int I = 0>
-    void resize_basic_values(SoaStorage& new_storage) const {
-        std::get<I>(new_storage.m_values1).resize(std::get<I>(m_values1).size());
-        if constexpr (I < n_basic_types - 1) {
-            resize_basic_values<I + 1>(new_storage);
-        }
-    }
+    /// @brief Добавить поле данных типа T после индекса idx.
+    /// Если после idx уже существует поле данных, то используется оно само,
+    /// фактически происходит замена.  Если поля данных нет, то оно
+    /// добавляется в конец. Полю данных назначается имя "DEF_{idx}"
+    template<typename T>
+    Storable<T> paste_one(int idx);
 };
 
-// Название базового типа
-template <typename T>
-std::string SoaStorage::basic_type_name() {
-    if constexpr (std::is_same_v<T, short>) {
-        return "short";
-    } else if constexpr (std::is_same_v<T, unsigned short>) {
-        return "unsigned short";
-    } else if constexpr (std::is_same_v<T, int>) {
-        return "int";
-    } else if constexpr (std::is_same_v<T, unsigned int>) {
-        return "unsigned int";
-    } else if constexpr (std::is_same_v<T, long>) {
-        return "long";
-    } else if constexpr (std::is_same_v<T, unsigned long>) {
-        return "unsigned long";
-    } else if constexpr (std::is_same_v<T, long long>) {
-        return "long long";
-    } else if constexpr (std::is_same_v<T, unsigned long long>) {
-        return "unsigned long long";
-    } else if constexpr (std::is_same_v<T, float>) {
-        return "float";
-    } else if constexpr (std::is_same_v<T, double>) {
-        return "double";
-    } else if constexpr (std::is_same_v<T, long double>) {
-        return "long double";
-    } else if constexpr (std::is_same_v<T, geom::Vector3d>) {
-        return "Vector3d";
-    } else {
-        return "Unknown basic type";
-    }
-}
-
-// Название хранимого типа по индексу в кортеже
-template<int I>
-std::string SoaStorage::basic_type_name() {
-    return basic_type_name<std::tuple_element_t<I, basic_types_t>>();
-}
-
 template<typename T>
-Storable<T> SoaStorage::add(const std::string &name) {
-    assert_storable_type<T>();
-
-    int c = type_count<T>();
-    if constexpr (is_basic_type<T>()) {
-        basic_values<T>().push_back(std::vector<T>(m_size));
-    } else {
-        // Пользовательские типы разворачиваются в массив байтов
-        custom_values<T>().push_back(std::vector<std::byte>(m_size * sizeof(T)));
-    }
-
+Storable<T> SoaStorage::add_one(const std::string &name) {
+    soa::assert_storable_type<T>();
     // Проверка на наличие массива данных с таким именем
     if (contain<T>(name)) {
         throw std::runtime_error("SoaStorage::add() error: SoaStorage contains name '" + name + "' already");
     }
-    names<T>().push_back(name);
+
+    int c = type_count<T>();
+    get_names<T>().push_back(name);
+    get_values<T>().push_back(std::vector<soa::reduce_t<T>>(m_size));
 
     return {c};
 }
 
 template<typename T>
 Storable<T> SoaStorage::add(const std::string &name, int count) {
-    assert_storable_type<T>();
-
-    int c = type_count<T>();
-    if constexpr (is_basic_type<T>()) {
-        // Добавить count раз
-        for (int i = 0; i < count; ++i) {
-            basic_values<T>().push_back(std::vector<T>(m_size));
-        }
-    } else {
-        // Пользовательские типы разворачиваются в массив байтов
-        for (int i = 0; i < count; ++i) {
-            custom_values<T>().push_back(std::vector<std::byte>(m_size * sizeof(T)));
-        }
-    }
-
+    soa::assert_storable_type<T>();
     // Проверка на наличие массива данных с таким именем
     if (contain<T>(name)) {
         throw std::runtime_error("SoaStorage::add() error: SoaStorage contains name '" + name + "' already");
     }
+
+    int c = type_count<T>();
+
+    // Добавить count раз
     for (int i = 0; i < count; ++i) {
-        names<T>().push_back(name);
+        get_names<T>().push_back(name);
+        get_values<T>().push_back(std::vector<soa::reduce_t<T>>(m_size));
     }
 
     return {c};
 }
 
-template <typename T>
-int Storable<T>::tag() const {
-    if constexpr (SoaStorage::is_basic_type<T>()) {
-        // 1024 * type_index + idx
-        return (SoaStorage::basic_type_index<T>() << 10) + idx;
+template<typename T>
+Storable<T> SoaStorage::paste_one(int idx) {
+    soa::assert_storable_type<T>();
+
+    int c = type_count<T>();
+    if (idx < c) {
+        get_names<T>()[idx] = "DEF_" + std::to_string(idx);
+        return {idx};
     }
     else {
-        // 1024 * 1024 * type_index + idx
-        return (SoaStorage::custom_type_index<T>() << 20) + idx;
+        get_names<T>().push_back("DEF_" + std::to_string(idx));
+        get_values<T>().push_back(std::vector<soa::reduce_t<T>>(m_size));
+        return {c};
     }
+}
+
+template <typename... Args>
+std::tuple<remove_cvref_t<Args>...> SoaStorage::add_replace(Args&&... vars) {
+    // Проверяет, что все типы
+    assert_all_storable<Args...>();
+
+    // Результирующий кортеж с типами Storable<T1>, Storable<T2>, ...
+    auto result = std::tuple{std::forward<Args>(vars)...};
+
+    // Обнуляем число полей, при добавлении поля выполняется count++
+    std::array<int, soa::storable_types::size()> count = {};
+
+    // Для каждого Storable<T> в vars выполняется paste_one
+    // Было бы неплохо немного упростить запись, но пока так.
+    [&]<size_t... Is> (std::index_sequence<Is...>) {
+        ((std::get<Is>(result) =
+                paste_one<typename std::tuple_element_t<Is, decltype(result)>::type>(
+                        count[soa::type_index<typename std::tuple_element_t<Is, decltype(result)>::type>()]++)
+                        ), ... );
+    }(std::index_sequence_for<Args...>());
+
+    return result;
 }
 
 } // namespace zephyr::utils

@@ -12,7 +12,7 @@
 using namespace zephyr;
 using namespace mesh;
 
-using generator::Rectangle;
+using geom::generator::Rectangle;
 using zephyr::io::PvdFile;
 using zephyr::utils::Stopwatch;
 
@@ -22,7 +22,7 @@ static Storable<int> bit;
 
 // Периодическая функция времени, с периодом = 1
 int calc_idx(EuCell& cell, double t) {
-    Vector3d c = cell.center();
+    geom::Vector3d c = cell.center();
 
     double r = c.norm();
     double phi = std::atan2(c.y(), c.x()) - 2 * M_PI * t;

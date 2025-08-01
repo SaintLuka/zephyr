@@ -1,8 +1,6 @@
 /// @brief Динамическая ORB декомпозиция сетки совместно с адаптацией.
 /// На сетке решается уравнение переноса для проверки связности сетки.
 
-// TODO: Удалить лишние mesh.sync()
-
 #include <iostream>
 #include <iomanip>
 
@@ -18,6 +16,8 @@
 #include <zephyr/geom/generator/rectangle.h>
 
 using namespace zephyr::mesh;
+using namespace zephyr::geom;
+
 using zephyr::utils::mpi;
 using zephyr::utils::Stopwatch;
 using zephyr::io::PvdFile;
@@ -26,42 +26,33 @@ using zephyr::geom::generator::Rectangle;
 
 using zephyr::mesh::decomp::ORB;
 
-struct _U_ {
-    double u1, u2;
-};
-
-_U_ U;
 
 // Векторное поле скорости
 Vector3d velocity(const Vector3d& c) {
     return { 1.0, 0.3 + 0.3*std::sin(4 * M_PI * c.x()), 0.3 };
 }
 
-// Переменные для сохранения
-double get_u(AmrStorage::Item& cell)  {
-    return cell(U).u1;
-}
-
 // Шар в левом нижнем углу области
-void set_initials(EuMesh& mesh, Box domain) {
+void set_initials(EuMesh& mesh, const Box& domain,
+        Storable<double> u1, Storable<double> u2) {
     Vector3d vc = domain.vmin + 0.2 * domain.size();
     double D = 0.1 * domain.diameter();
-    for (auto& cell: mesh) {
-        cell(U).u1 = (cell.center() - vc).norm() < D ? 1.0 : 0.0;
-        cell(U).u2 = 0.0;
+    for (auto cell: mesh) {
+        cell(u1) = (cell.center() - vc).norm() < D ? 1.0 : 0.0;
+        cell(u2) = 0.0;
     }
 }
 
 // Адаптация больших перепадов концентрации
-void set_flags(EuMesh& mesh) {
+void set_flags(EuMesh& mesh, Storable<double> var) {
     for (auto cell: mesh) {
         cell.set_flag(-1);
 
-        double u1 = cell(U).u1;
+        double uc = cell(var);
         for (auto face: cell.faces()) {
-            double u2 = face.neib(U).u1;
+            double un = face.neib(var);
 
-            if (std::abs(u1 - u2) > 0.01) {
+            if (std::abs(uc - un) > 0.01) {
                 cell.set_flag(1);
                 break;
             }
@@ -69,16 +60,15 @@ void set_flags(EuMesh& mesh) {
     }
 }
 
-// Если поставить обычный распределитель, то возникают
-// странные дефекты, я уж думал ошибка адаптации.
-Distributor conv_distributor() {
+// Распределитель данных при адаптации
+Distributor get_distributor(Storable<double> var) {
     Distributor distr = Distributor::simple();
-    distr.merge = [](Children &children, AmrStorage::Item &parent) {
+    distr.merge = [var](Children &children, EuCell &parent) {
         double sum = 0.0;
-        for (auto &child: children) {
-            sum += child(U).u1 * child.volume;
+        for (auto child: children) {
+            sum += child(var) * child.volume();
         }
-        parent(U).u1 = sum / parent.volume;
+        parent(var) = sum / parent.volume();
     };
     return distr;
 }
@@ -86,40 +76,40 @@ Distributor conv_distributor() {
 int main() {
     mpi::handler init;
 
-    threads::off();
-
-    // Файл для записи
-    PvdFile pvd("mesh", "output");
-
-    pvd.variables = {"rank", "level"};
-    pvd.variables += {"u",  get_u};
-
     // Сеточный генератор
     //Cuboid gen(0.0, 1.0, 0.0, 0.6, 0.0, 0.9);
     Rectangle gen(0.0, 1.0, 0.0, 1.0);
     gen.set_nx(123);
 
-    // Bounding Box для сетки
-    Box domain = gen.bbox();
-
     // Создаем сетку
-    EuMesh mesh(gen, U);
+    EuMesh mesh(gen);
+
+    // Добавить данные на сетку
+    auto [u1, u2] = mesh.add<double>("u1", "u2");
 
     mesh.set_max_level(3);
-    mesh.set_distributor(conv_distributor());
+    mesh.set_distributor(get_distributor(u1));
 
     // Добавляем декомпозицию
     mesh.set_decomposition("XY");
 
+    // Bounding Box для сетки
+    Box domain = gen.bbox();
+
     // Начальные данные
     for (int i = 0; i < mesh.max_level(); ++i) {
-        set_initials(mesh, domain);
-        mesh.sync();
-        set_flags(mesh);
+        set_initials(mesh, domain, u1, u2);
+        mesh.sync(u1);
+        set_flags(mesh, u1);
         mesh.refine();
     }
-    set_initials(mesh, domain);
-    mesh.sync();
+    set_initials(mesh, domain, u1, u2);
+
+    // Файл для записи
+    PvdFile pvd("mesh", "output");
+
+    pvd.variables = {"rank", "level"};
+    pvd.variables.append("u", u1);
 
     // Число Куранта
     double CFL = 0.5;
@@ -133,8 +123,7 @@ int main() {
         // Балансировка декомпозиции
         if (n_step % 10 == 0) {
             mesh.balancing(mesh.n_cells());
-            mesh.redistribute();
-            mesh.sync();
+            mesh.redistribute(u1);
         }
 
         if (curr_time >= next_write) {
@@ -152,35 +141,35 @@ int main() {
         }
         dt = mpi::min(CFL * dt);
 
-        // Расчет потоков по схеме upwind
-        for (auto& cell: mesh) {
-            auto& zc = cell(U);
+        // Отправить/получить основной слой
+        mesh.sync(u1);
 
+        // Расчет потоков по схеме upwind
+        for (auto cell: mesh) {
             double fluxes = 0.0;
             for (auto& face: cell.faces()) {
-                const auto& zn = face.neib(U);
+                auto neib = face.neib();
 
                 double af = velocity(face.center()).dot(face.normal());
                 double a_p = std::max(af, 0.0);
                 double a_m = std::min(af, 0.0);
 
-                fluxes += (a_p * zc.u1 + a_m * zn.u1) * face.area();
+                fluxes += (a_p * cell(u1) + a_m * neib(u1)) * face.area();
             }
 
-            zc.u2 = zc.u1 - dt * fluxes / cell.volume();
+            cell(u2) = cell(u1) - dt * fluxes / cell.volume();
         }
 
         // Обновляем слои
         for (auto& cell: mesh) {
-            cell(U).u1 = cell(U).u2;
-            cell(U).u2 = 0.0;
+            cell(u1) = cell(u2);
+            cell(u2) = 0.0;
         }
 
-        mesh.sync();
-        set_flags(mesh);
-        mesh.sync();
+        // Отправить/получить основной слой
+        mesh.sync(u1);
+        set_flags(mesh, u1);
         mesh.refine();
-        mesh.sync();
 
         n_step += 1;
         curr_time += dt;

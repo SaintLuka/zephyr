@@ -33,6 +33,16 @@ namespace zephyr::mesh::amr {
 /// реальных соседей, полученных после адаптации.
 /// Грани через процессы остаются без изменений. Линковка граней между процессами
 /// происходит на последнем этапе алгоритма адапатции.
+///
+/// Нифига нифига, я теперь восстанавливаю правильный index для alien ячеек.
+/// Именно index! при этом индекс .alien неизвестен.
+/// Правильная пара (rank, index) позволяет затем сделать build_border.
+/// \tparam dim
+/// \param ic
+/// \param locals
+/// \param aliens
+/// \param rank
+/// \param count
 template<int dim>
 void restore_connections_one(index_t ic, AmrCells& locals, AmrCells& aliens, int rank, const Statistics &count) {
     // Ячейка неактуальна, пропускаем
@@ -60,11 +70,15 @@ void restore_connections_one(index_t ic, AmrCells& locals, AmrCells& aliens, int
             }
         }
         else {
-            if (faces.adjacent.alien[iface] < 0) {
+            if (faces.adjacent.alien[iface] < 0 ||
+                faces.adjacent.alien[iface] >= aliens.size()) {
                 throw std::runtime_error("Restore connections: out of range #2");
             }
             if (faces.adjacent.rank[iface] == rank) {
-                locals.print_info(ic);
+                if (mpi::master()) {
+                    std::cout << "Rank " << mpi::rank() << " == " << rank << "; side: " << locals.face_name(ic, iface) << "\n";
+                    locals.print_info(ic);
+                }
                 throw std::runtime_error("Restore connections: bad adjacent rank #2");
             }
         }

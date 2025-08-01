@@ -4,6 +4,7 @@
 #include <iomanip>
 #include <algorithm>
 #include <numeric>
+#include <future>
 
 #include <zephyr/utils/mpi.h>
 #include <zephyr/mesh/index.h>
@@ -11,7 +12,7 @@
 namespace zephyr::mesh {
 
 /// @brief MPI-тэги для корректных пересылок
-enum MpiTag {
+enum MpiTag : int {
     NONE = 0,
 
     // Данные ячеек
@@ -44,10 +45,14 @@ enum MpiTag {
     VERTICES
 };
 
+inline std::string to_string(MpiTag tag) {
+    return std::to_string(static_cast<int>(tag));
+}
+
 #ifdef ZEPHYR_MPI
 
 /// @brief Массив MPI-запросов isend/irecv
-class  Requests {
+class Requests {
 public:
     /// @brief Массив "нулевых" запросов
     explicit Requests(int size)
@@ -63,11 +68,9 @@ private:
     std::vector<MPI_Request> m_requests;
 };
 
-
 /// @brief Управляет обменными операциями
 class Router {
 public:
-
     /// @brief По умолчанию, size = mpi::size()
     /// Массивы инициализируются нулями
     Router();
@@ -154,10 +157,10 @@ protected:
 
     int m_size;  ///< Число процессов (== mpi::size())
 
-    std::vector<index_t> m_send_count;    ///< Число элементов на отправку
-    std::vector<index_t> m_recv_count;    ///< Число элементов на получение
-    std::vector<index_t> m_send_offset;   ///< Смещения в массиве на отправку
-    std::vector<index_t> m_recv_offset;   ///< Смещения в массиве на получение
+    std::vector<index_t> m_send_count;   ///< Число элементов на отправку
+    std::vector<index_t> m_recv_count;   ///< Число элементов на получение
+    std::vector<index_t> m_send_offset;  ///< Смещения в массиве на отправку
+    std::vector<index_t> m_recv_offset;  ///< Смещения в массиве на получение
 
     /// @brief Полная матрица пересылок (опционально)
     std::vector<index_t> m_send_recv;

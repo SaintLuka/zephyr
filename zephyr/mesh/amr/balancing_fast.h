@@ -353,14 +353,14 @@ void balance_flags_fast(AmrCells& cells, int max_level) {
 
     static index_t counter = 0;
     if (counter % amr::check_frequency == 0) {
-        std::cout << "    Restriction elapsed: " << std::setw(10) << restriction_timer.milliseconds() << " ms\n";
-        std::cout << "    Sorting elapsed:     " << std::setw(10) << sorting_timer.milliseconds() << " ms\n";
-        std::cout << "    Round 1 elapsed:     " << std::setw(10) << round_timer_1.milliseconds() << " ms  ";
-        std::cout << "    (avg retain: " << std::setw(10) << n_total_retain / n_step << ")\n";
-        std::cout << "    Round 2 elapsed:     " << std::setw(10) << round_timer_2.milliseconds() << " ms  ";
-        std::cout << "    (avg coarse: " << std::setw(10) << n_total_coarse / n_step << ")\n";
-        std::cout << "    Round 3 elapsed:     " << std::setw(10) << round_timer_3.milliseconds() << " ms\n";
-        std::cout << "    Round 4 elapsed:     " << std::setw(10) << round_timer_4.milliseconds() << " ms\n";
+        mpi::cout << "    Base restrictions: " << std::setw(8) << restriction_timer.milliseconds() << " ms\n";
+        mpi::cout << "    Sort by level:     " << std::setw(8) << sorting_timer.milliseconds() << " ms\n";
+        mpi::cout << "    Round 1 elapsed:   " << std::setw(8) << round_timer_1.milliseconds() << " ms  ";
+        mpi::cout << "    (avg retain: " << std::setw(10) << n_total_retain / n_step << ")\n";
+        mpi::cout << "    Round 2 elapsed:   " << std::setw(8) << round_timer_2.milliseconds() << " ms  ";
+        mpi::cout << "    (avg coarse: " << std::setw(10) << n_total_coarse / n_step << ")\n";
+        mpi::cout << "    Round 3 elapsed:   " << std::setw(8) << round_timer_3.milliseconds() << " ms\n";
+        mpi::cout << "    Round 4 elapsed:   " << std::setw(8) << round_timer_4.milliseconds() << " ms\n";
     }
     ++counter;
 #endif

@@ -194,10 +194,11 @@ public:
         MPI_Datatype vec3 = MPI_DATATYPE_NULL;  ///< Для Vector3d
         MPI_Datatype int4 = MPI_DATATYPE_NULL;  ///< Для std::array<int, 4>
 
-        /// @brief Типы кратные int
-        std::vector<MPI_Datatype> int_multiples;
 
-        static const int n_int_multiples = 30;
+        static const int byte4_count = 30;
+
+        /// @brief Типы кратные 4 байтам
+        std::array<MPI_Datatype, byte4_count> byte4_types;
 
         /// @brief Инициализация MPI-типов
         void init();
@@ -210,13 +211,13 @@ public:
     static DefaultTypes default_types;
 
     /// @brief Примитивные MPI-типы по шаблону
-    /// По умолчанию используются типы contiguous, кратные int
+    /// По умолчанию используются типы contiguous, кратные 4 байтам
     template<class T>
     static MPI_Datatype type() {
-        static_assert(sizeof(T) % sizeof(int) == 0, "Defaults only for int multiples");
-        static_assert(sizeof(T) / sizeof(int) < DefaultTypes::n_int_multiples);
+        static_assert(sizeof(T) % 4 == 0, "Defaults only for int multiples");
+        static_assert(sizeof(T) / 4 < DefaultTypes::byte4_count);
 
-        return default_types.int_multiples[sizeof(T) / sizeof(int)];
+        return default_types.byte4_types[sizeof(T) / 4];
     }
 };
 

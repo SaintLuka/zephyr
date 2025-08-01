@@ -18,7 +18,7 @@
 using zephyr::geom::Box;
 using zephyr::geom::Boundary;
 using zephyr::geom::Vector3d;
-using zephyr::mesh::generator::Strip;
+using zephyr::geom::generator::Strip;
 using zephyr::mesh::EuMesh;
 using zephyr::mesh::EuCell;
 using zephyr::io::PvdFile;
@@ -44,9 +44,9 @@ int main() {
     EuMesh mesh(gen);
 
     // Переменные для хранения на сетке
-    auto [rho1, p1, e1] = mesh.append<double>("rho1", "p1", "e1");
-    auto [rho2, p2, e2] = mesh.append<double>("rho2", "p2", "e2");
-    auto [v1, v2]       = mesh.append<Vector3d>("v1", "v2");
+    auto [rho1, p1, e1] = mesh.add<double>("rho1", "p1", "e1");
+    auto [rho2, p2, e2] = mesh.add<double>("rho2", "p2", "e2");
+    auto [v1, v2]       = mesh.add<Vector3d>("v1", "v2");
 
     // Файл для записи
     PvdFile pvd("mesh", "output");

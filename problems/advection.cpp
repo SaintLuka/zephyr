@@ -16,7 +16,6 @@ using zephyr::geom::generator::Rectangle;
 using zephyr::mesh::Storable;
 using zephyr::mesh::EuMesh;
 using zephyr::mesh::EuCell;
-using zephyr::mesh::AmrStorage;
 using zephyr::io::PvdFile;
 
 // Векторное поле скорости
@@ -35,7 +34,7 @@ int main() {
     // Создать сетку
     EuMesh mesh(rect);
 
-    // Данные для хранения на сетке
+    // Переменные для хранения на сетке
     auto u1 = mesh.add<double>("u1");
     auto u2 = mesh.add<double>("u2");
 

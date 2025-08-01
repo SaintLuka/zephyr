@@ -13,15 +13,30 @@ namespace zephyr::mesh {
 
 class Migration {
 public:
-
-    Migration() = default;
-
-    void init_types(const AmrCells& locals);
-
+    /// @brief Очистить буфферы
     void clear();
 
+    /// @brief Привести буфферы к актуальным размерам
     void shrink_to_fit();
 
+    /// @brief Основная функция перераспределения ячеек
+    /// @param tourists Актуальные слои для пересылок
+    /// @param locals Локальные ячейки
+    /// @param aliens Слой удаленных ячеек
+    /// @param vars Список переменных типа Storable<T>, которые переносятся
+    /// при перераспределении ячеек.
+    /// @details Входной параметр tourists требуется для связывании соседних
+    /// ячеек при построении глобальной индексации примитивов.
+    /// На данный момент не занимается построением обменного слоя, после
+    /// миграции следует вызвать build_aliens().
+    template <typename... Args>
+    void migrate(
+            Tourism & tourists,
+            AmrCells& locals,
+            AmrCells& aliens,
+            Args&&... vars);
+
+protected:
     /// @brief Составить матрицу пересылок перед миграцей.
     /// Проверяет новые ранги ячеек и подсчитывает число пересылок ячеек,
     /// граней и вершин. Заполняет cell_route, face_route, node_route.
@@ -30,18 +45,18 @@ public:
 
     // Новая индексация ячеек (какая будет после миграции), пересылка
     // и получение новых index и rank в alien-слой.
-    void reindexing(Tourism& tourists,
-            AmrCells& locals,
-            AmrCells& aliens);
+    void reindexing(Tourism& tourism,
+                    AmrCells& locals,
+                    AmrCells& aliens);
 
     // Копировать геометрию и поля данных в хранилище migrants
-    template <typename T>
-    void fill_migrants(AmrCells& locals, Storable<T> var);
+    // Все аргументы Vars должны иметь тип Storable<T>
+    template <typename... Vars>
+    void fill_migrants(AmrCells& locals,
+            const std::tuple<Vars...>& loc_vars,
+            const std::tuple<Vars...>& mig_vars);
 
-    template <typename T>
-    void migrate(Tourism& tourists, AmrCells& locals, AmrCells& aliens, Storable<T> var);
-
-
+    /// @brief Вспомогательный буффер
     AmrCells migrants;
 
     Router cell_route;
@@ -49,9 +64,16 @@ public:
     Router node_route;
 };
 
+template <typename Src, typename Dst, size_t... Is>
+void data_assign_impl(Src& src, Dst& dst, index_t from, index_t to, std::index_sequence<Is...>) {
+    ((std::get<Is>(dst)[to] = std::get<Is>(src)[from]), ...);
+}
 
-template <typename T> inline
-void Migration::fill_migrants(AmrCells& locals, Storable<T> var) {
+template <typename... Vars>
+void Migration::fill_migrants(AmrCells& locals,
+        const std::tuple<Vars...>& loc_vars,
+        const std::tuple<Vars...>& mig_vars
+        ) {
     // Для сортировки в migrants по ранку за О(n).
     // cell_offsets[i] показывает с какого индекса в migrants ставить i-ранковую ячейку.
 
@@ -63,25 +85,35 @@ void Migration::fill_migrants(AmrCells& locals, Storable<T> var) {
 
     // Сортировка migrants по rank, получается нормальный AmrCells
     // стартовые индексы (?)
-    auto cell_offsets = cell_route.send_offset();
-    auto face_offsets = face_route.send_offset();
-    auto node_offsets = node_route.send_offset();
+    auto cell_index = cell_route.send_offset();
+    auto face_index = face_route.send_offset();
+    auto node_index = node_route.send_offset();
 
-    // Указатели на буферы данных
-    T*       data_dst = migrants.data(var);
-    const T* data_src = locals  .data(var);
-
+    // Кортеж указателей на буферы данных
+    auto data_src = locals  .data.data_tuple(loc_vars);
+    auto data_dst = migrants.data.data_tuple(mig_vars);
 
     for (index_t ic = 0; ic < migrants.size(); ++ic) {
         int r = locals.rank[ic];
-        locals.copy_geom(ic, migrants, cell_offsets[r], face_offsets[r], node_offsets[r]);
+
+        index_t jc = cell_index[r];
+
+        locals.copy_geom(ic, migrants, jc, face_index[r], node_index[r]);
+        /*
+        for (int iface: migrants.faces_range(jc)) {
+            if (migrants.faces.is_undefined(iface)) {
+                continue;
+            }
+        }
+         */
 
         // Копирование данных
-        data_dst[cell_offsets[r]] = data_src[ic];
+        //data_dst[jc] = data_src[ic];
+        data_assign_impl(data_src, data_dst, ic, jc, std::index_sequence_for<Vars...>{});
 
-        cell_offsets[r] += 1;
-        face_offsets[r] += locals.max_face_count(ic);
-        node_offsets[r] += locals.max_node_count(ic);
+        cell_index[r] += 1;
+        face_index[r] += locals.max_face_count(ic);
+        node_index[r] += locals.max_node_count(ic);
     }
 
     /*
@@ -102,49 +134,37 @@ void Migration::fill_migrants(AmrCells& locals, Storable<T> var) {
     //pvd.save(migrants, 0.0);
 }
 
-template <typename T>
-void Migration::migrate(Tourism& tourists, AmrCells& locals, AmrCells& aliens, Storable<T> var) {
-    /*
-    mpi::for_each([]() {
-        std::cout << "START MIGRATION " << mpi::rank() << "\n";
-    });
-     */
+template <typename... Args>
+void Migration::migrate(Tourism& tourists, AmrCells& locals, AmrCells& aliens, Args&&... vars) {
+    // Все дополнительные переменные имеют тип Storable<T>
+    utils::assert_all_storable<Args...>();
+
+    // Кортежи переменных std::tuple{Storable<T1>, Storable<T2>, ...}
+    // loc_vars - переменные в locals
+    // mig_vars - переменные в migrants
+    auto loc_vars = std::tuple{std::forward<Args>(vars)...};
+    auto mig_vars = migrants.data.add_replace(std::forward<Args>(vars)...);
 
     // Составим полные матрицы пересылок (совпадают на всех процессах).
-    // То есть заполним cell_route, face_route и node_route.
+    // То есть заполним m_cell_route, m_face_route и m_node_route.
     fill_router(locals);
 
     // Переиндексировать ячейки, отправить новые индексы и ранги в alien-ячейки
     reindexing(tourists, locals, aliens);
 
     // Перенести ячейки из locals в migrants в нужном порядке
-    fill_migrants(locals, var);
+    fill_migrants(locals, loc_vars, mig_vars);
 
     // Меняем размеры locals
-    locals.resize(
-            cell_route.recv_buffer_size(),
-            face_route.recv_buffer_size(),
-            node_route.recv_buffer_size());
-
-    /*
-    mpi::for_each([&]() {
-        std::cout << "Rank " << mpi::rank() << ";\n";
-        std::cout << "  cell recv: " << cell_route.recv_count() << "\n";
-        std::cout << "  face recv: " << face_route.recv_count() << "\n";
-        std::cout << "  node recv: " << node_route.recv_count() << "\n";
-        std::cout << "  locals: " <<
-                  locals.n_cells() << ", " <<
-                  locals.n_faces() << ", " <<
-                  locals.n_nodes() << "\n";
-    });
-     */
+    locals.resize(cell_route.recv_buffer_size(),
+                  face_route.recv_buffer_size(),
+                  node_route.recv_buffer_size());
 
     // ========================== Пересылка ячеек =============================
 
-
     // Указатели на буферы данных
-    const T* data_src = migrants.data(var);
-          T* data_dst = locals  .data(var);
+    auto data_src = migrants.data.data_tuple(mig_vars);
+    auto data_dst = locals  .data.data_tuple(loc_vars);
 
     // Оптимизируем использование памяти, используем повторно массивы.
     // Запишем в face_begin и node_begin количество элементов на ячейку
@@ -168,7 +188,11 @@ void Migration::migrate(Tourism& tourists, AmrCells& locals, AmrCells& aliens, S
     auto send_volume_a = cell_route.isend(migrants.volume_alt, MpiTag::VOLUME_ALT);
     auto send_face_beg = cell_route.isend(migrants.face_begin, MpiTag::FACE_BEG);
     auto send_node_beg = cell_route.isend(migrants.node_begin, MpiTag::NODE_BEG);
-    auto send_data     = cell_route.isend(data_src, MpiTag(var.tag()));
+
+    // Отправить данные ячеек
+    auto send_data     = [&]<size_t... Is>(std::index_sequence<Is...> ) {
+        return std::tuple{ cell_route.isend(std::get<Is>(data_src), MpiTag(12345 + Is))...  };
+    }(std::index_sequence_for<Args...>());
 
     // Отправить данные граней
     auto send_adj_rank  = face_route.isend(migrants.faces.adjacent.rank,  MpiTag::ADJ_RANK);
@@ -198,7 +222,11 @@ void Migration::migrate(Tourism& tourists, AmrCells& locals, AmrCells& aliens, S
     auto recv_center   = cell_route.irecv(locals.center, MpiTag::CENTER);
     auto recv_volume   = cell_route.irecv(locals.volume, MpiTag::VOLUME);
     auto recv_volume_a = cell_route.irecv(locals.volume_alt, MpiTag::VOLUME_ALT);
-    auto recv_data     = cell_route.irecv(data_dst, MpiTag(var.tag()));
+
+    // Получить данные ячеек
+    auto recv_data     = [&]<size_t... Is>(std::index_sequence<Is...> ) {
+        return std::tuple{ cell_route.irecv(std::get<Is>(data_dst), MpiTag(12345 + Is))...  };
+    }(std::index_sequence_for<Args...>());
 
     // При получении используем сдвиг на единицу, чтобы записать нулевой первый элемент
     auto recv_face_beg = cell_route.irecv(locals.face_begin.data() + 1, MpiTag::FACE_BEG);
@@ -234,7 +262,11 @@ void Migration::migrate(Tourism& tourists, AmrCells& locals, AmrCells& aliens, S
     send_volume_a.wait();
     send_face_beg.wait();
     send_node_beg.wait();
-    send_data.wait();
+
+    // Завершить отправку данных ячеек
+    [&]<size_t... Is>(std::index_sequence<Is...> ) {
+        ( std::get<Is>(send_data).wait(), ... );
+    }(std::index_sequence_for<Args...>());
 
     // Завершить отправку данных граней
     send_adj_rank.wait();
@@ -266,7 +298,11 @@ void Migration::migrate(Tourism& tourists, AmrCells& locals, AmrCells& aliens, S
     recv_volume_a.wait();
     recv_face_beg.wait();
     recv_node_beg.wait();
-    recv_data.wait();
+
+    // Завершить получение данных ячеек
+    [&]<size_t... Is>(std::index_sequence<Is...> ) {
+        ( std::get<Is>(recv_data).wait(), ... );
+    }(std::index_sequence_for<Args...>());
 
     // Завершить получение данных граней
     recv_adj_rank.wait();
@@ -299,7 +335,6 @@ void Migration::migrate(Tourism& tourists, AmrCells& locals, AmrCells& aliens, S
         std::cout << "  nb: " << locals.node_begin << "\n";
     });
     */
-
     /*
     static int counter = 0;
     static PvdFile pvd("migrants");

@@ -208,6 +208,12 @@ public:
     template <typename T>
     const T& operator()(utils::Storable<T> type) const;
 
+    template <typename T>
+    T& operator[](utils::Storable<T> type);
+
+    template <typename T>
+    const T& operator[](utils::Storable<T> type) const;
+
     inline EuFace face(int idx) const;
 
     inline EuFace face(Side2D s) const;

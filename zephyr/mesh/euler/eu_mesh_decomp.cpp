@@ -48,14 +48,16 @@ void EuMesh::set_decomposition(Decomposition::Ref decmp, bool update) {
     if (update) {
         // вызываю, чтобы инициализировать m_tourists
     	build_aliens();
-    	std::cout << "Has no first redistribute\n";
-        //redistribute();
+        redistribute();
 
         // Вероятно, первый (и единственный) redistribute, почистим память
     	m_locals.shrink_to_fit();
     	m_aliens.shrink_to_fit();
+
     	m_tourists.shrink_to_fit();
+
     	m_migrants.clear();
+    	m_migrants.shrink_to_fit();
     }
 #endif
 }
@@ -101,14 +103,20 @@ void EuMesh::build_aliens() {
 #ifdef ZEPHYR_MPI
     if (mpi::single()) return;
 
+    /*
     mpi::barrier();
     mpi::for_each([]() {
         std::cout << "BUILD ALIENS " << mpi::rank() << "\n";
     });
+     */
+
     m_tourists.build_aliens(m_locals, m_aliens);
+
+    /*
     mpi::for_each([]() {
         std::cout << "END BUILD ALIENS " << mpi::rank() << "\n";
     });
+     */
 #endif
 }
 

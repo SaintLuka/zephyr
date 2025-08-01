@@ -16,9 +16,9 @@ Convection::Convection() {
 
 void Convection::add_types(EuMesh& mesh) {
     u_curr = mesh.add<double>("u1");
-    du_dx = mesh.add<double>("ux");
-    du_dy = mesh.add<double>("uy");
-    du_dz = mesh.add<double>("uz");
+    du_dx  = mesh.add<double>("ux");
+    du_dy  = mesh.add<double>("uy");
+    du_dz  = mesh.add<double>("uz");
     u_half = mesh.add<double>("uh");
     u_next = mesh.add<double>("u2");
 }

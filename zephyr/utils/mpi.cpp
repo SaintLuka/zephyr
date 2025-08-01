@@ -66,11 +66,10 @@ void mpi::DefaultTypes::init() {
     MPI_Type_contiguous(4, MPI_INT, &int4);
     MPI_Type_commit(&int4);
 
-    int_multiples.resize(n_int_multiples);
-    int_multiples[0] = MPI_DATATYPE_NULL;
-    for (int i = 1; i < n_int_multiples; ++i) {
-        MPI_Type_contiguous(i, MPI_INT, int_multiples.data() + i);
-        MPI_Type_commit(int_multiples.data() + i);
+    byte4_types[0] = MPI_DATATYPE_NULL;
+    for (int i = 1; i < byte4_count; ++i) {
+        MPI_Type_contiguous(4 * i, MPI_BYTE, &byte4_types[i]);
+        MPI_Type_commit(&byte4_types[i]);
     }
 }
 
@@ -78,10 +77,9 @@ void mpi::DefaultTypes::free() {
     MPI_Type_free(&vec3);
     MPI_Type_free(&int4);
 
-    for (int i = 1; i < n_int_multiples; ++i) {
-        MPI_Type_free(int_multiples.data() + i);
+    for (int i = 1; i < byte4_count; ++i) {
+        MPI_Type_free(&byte4_types[i]);
     }
-    int_multiples.clear();
 }
 
 void mpi_free_type(MPI_Datatype& type) {

@@ -8,7 +8,6 @@
 #include <zephyr/mesh/amr/common.h>
 #include <zephyr/mesh/amr/siblings.h>
 #include <zephyr/mesh/amr/balancing_restrictions.h>
-#include <zephyr/io/vtu_file.h>
 
 namespace zephyr::mesh::amr {
 
@@ -255,15 +254,15 @@ bool flag_balancing_step(AmrCells& locals, const VicinityList<dim>& vicinity_lis
 /// обобщается на многопроцессорную систему.
 template<int dim>
 void balance_flags_slow(AmrCells& locals, int max_level) {
-    static Stopwatch base_restrictions_timer;
+    static Stopwatch restriction_timer;
     static Stopwatch setup_vicinity_timer;
     static Stopwatch flag_balancing_timer;
 
     static AmrCells aliens;
 
-    base_restrictions_timer.resume();
+    restriction_timer.resume();
     base_restrictions<dim>(locals, max_level);
-    base_restrictions_timer.stop();
+    restriction_timer.stop();
 
     // Делаем статическим, чтобы не выделять каждый раз память (гениально)
     static VicinityList<dim> vicinity_list;
@@ -283,9 +282,9 @@ void balance_flags_slow(AmrCells& locals, int max_level) {
 #if CHECK_PERFORMANCE
     static size_t counter = 0;
     if (counter % amr::check_frequency == 0) {
-        std::cout << "    Restrictions elapsed:   " << std::setw(10) << base_restrictions_timer.milliseconds() << " ms\n";
-        std::cout << "    Setup vicinity elapsed: " << std::setw(10) << setup_vicinity_timer.milliseconds() << " ms\n";
-        std::cout << "    Flag balancing elapsed: " << std::setw(10) << flag_balancing_timer.milliseconds() << " ms\n";
+        mpi::cout << "    Base restrictions: " << std::setw(8) << restriction_timer.milliseconds() << " ms\n";
+        mpi::cout << "    Setup vicinity:    " << std::setw(8) << setup_vicinity_timer.milliseconds() << " ms\n";
+        mpi::cout << "    Flag balancing:    " << std::setw(8) << flag_balancing_timer.milliseconds() << " ms\n";
     }
     ++counter;
 #endif
@@ -296,8 +295,7 @@ void balance_flags_slow(AmrCells& locals, int max_level) {
 /// @brief Простая версия функции балансировки флагов.
 /// @details Смотреть однопоточную версию.
 template<int dim>
-void balance_flags_slow(AmrCells &locals, AmrCells &aliens,
-        int max_level, EuMesh& mesh) {
+void balance_flags_slow(Tourism& tourism, AmrCells &locals, AmrCells &aliens, int max_level) {
     using zephyr::utils::Stopwatch;
     static Stopwatch restrictions_timer;
     static Stopwatch setup_vicinity_timer;
@@ -317,7 +315,9 @@ void balance_flags_slow(AmrCells &locals, AmrCells &aliens,
     flag_balancing_timer.resume();
     int changed = 1;
     while (changed) {
-        // mesh.sync(); ???????
+        // Синхронизация флагов адаптации в alien-ячейках
+        tourism.sync<MpiTag::FLAG>(locals, aliens);
+
         vicinity_list.update();
 
         changed = flag_balancing_step(locals, vicinity_list);
@@ -328,9 +328,9 @@ void balance_flags_slow(AmrCells &locals, AmrCells &aliens,
 #if CHECK_PERFORMANCE
     static size_t counter = 0;
     if (counter % amr::check_frequency == 0) {
-        std::cout << "    Restrictions elapsed:   " << std::setw(10) << base_restrictions_timer.milliseconds() << " ms\n";
-        std::cout << "    Setup vicinity elapsed: " << std::setw(10) << setup_vicinity_timer.milliseconds() << " ms\n";
-        std::cout << "    Flag balancing elapsed: " << std::setw(10) << flag_balancing_timer.milliseconds() << " ms\n";
+        mpi::cout << "    Base restrictions: " << std::setw(8) << restrictions_timer.milliseconds() << " ms\n";
+        mpi::cout << "    Setup vicinity:    " << std::setw(8) << setup_vicinity_timer.milliseconds() << " ms\n";
+        mpi::cout << "    Flag balancing:    " << std::setw(8) << flag_balancing_timer.milliseconds() << " ms\n";
     }
     ++counter;
 #endif
@@ -338,21 +338,13 @@ void balance_flags_slow(AmrCells &locals, AmrCells &aliens,
 
 /// @brief Специализация для процессов без ячеек
 template<>
-void balance_flags_slow<0>(AmrCells &locals, AmrCells &aliens,
-                           int max_level, EuMesh& mesh) {
-
-    // ???
-    throw std::runtime_error("IMPLEMENT");
-    /*
-    bool changed = true;
+void balance_flags_slow<0>(Tourism& tourism, AmrCells &locals, AmrCells &aliens, int max_level) {
+    int changed = 1;
     while (changed) {
-        decomposition.send();
-        decomposition.recv();
-        changed = network.max(0);
+        tourism.sync<MpiTag::FLAG>(locals, aliens);
+        changed = mpi::max(0);
     }
-     */
 }
-
 #endif
 
 } // namespace zephyr::mesh::amr

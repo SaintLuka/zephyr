@@ -16,7 +16,6 @@
 #include <zephyr/mesh/amr/restore_connections.h>
 #include <zephyr/mesh/amr/remove_undefined.h>
 #include <zephyr/mesh/amr/sorting.h>
-#include <zephyr/mesh/amr/link_aliens.h>
 
 namespace zephyr::mesh {
 // Сейчас нужно для MPI, там функция обменов
@@ -51,7 +50,7 @@ void apply_impl(AmrCells &locals, const Distributor& op) {
     static Stopwatch positions_timer;
     static Stopwatch geometry_timer;
     static Stopwatch connections_timer;
-    static Stopwatch clean_timer;
+    static Stopwatch remove_timer;
     static Stopwatch sort_timer;
 
     static AmrCells aliens;
@@ -81,9 +80,9 @@ void apply_impl(AmrCells &locals, const Distributor& op) {
     connections_timer.stop();
 
     /// Этап 5. Удаление неопределенных ячеек
-    clean_timer.resume();
+    remove_timer.resume();
     remove_undefined<dim>(locals, count);
-    clean_timer.stop();
+    remove_timer.stop();
 
     for (index_t ic = 0; ic < locals.size(); ++ic) {
         locals.index[ic] = ic;
@@ -97,12 +96,11 @@ void apply_impl(AmrCells &locals, const Distributor& op) {
 #if CHECK_PERFORMANCE
     static size_t counter = 0;
     if (counter % amr::check_frequency == 0) {
-        std::cout << "    Statistics elapsed:  " << std::setw(10) << count_timer.milliseconds() << " ms\n";
-        std::cout << "    Positions elapsed:   " << std::setw(10) << positions_timer.milliseconds() << " ms\n";
-        std::cout << "    Geometry elapsed:    " << std::setw(10) << geometry_timer.milliseconds() << " ms\n";
-        std::cout << "    Connections elapsed: " << std::setw(10) << connections_timer.milliseconds() << " ms\n";
-        std::cout << "    Clean elapsed:       " << std::setw(10) << clean_timer.milliseconds() << " ms\n";
-        std::cout << "    Sorting elapsed:     " << std::setw(10) << sort_timer.milliseconds() << " ms\n";
+        mpi::cout << "    Statistics:       " << std::setw(9) << count_timer.milliseconds() << " ms\n";
+        mpi::cout << "    Positions:        " << std::setw(9) << positions_timer.milliseconds() << " ms\n";
+        mpi::cout << "    Geometry:         " << std::setw(9) << geometry_timer.milliseconds() << " ms\n";
+        mpi::cout << "    Connections:      " << std::setw(9) << connections_timer.milliseconds() << " ms\n";
+        mpi::cout << "    Remove undefined: " << std::setw(9) << remove_timer.milliseconds() << " ms\n";
     }
     ++counter;
 #endif
@@ -128,7 +126,7 @@ inline void apply(AmrCells &cells, const Distributor& op) {
 /// @details Алгоритм практически совпадает с однопроцессорной версией,
 /// поскольку не допускается огрубление ячеек, у которых сиблинги находятся
 /// на различных процессах. Детали алгоритма:
-/// Этап 1. Сбор данных о количестве ячеек для огрубления, разбиения и т. д.
+/// Этап 1. Сбор данных о количестве ячеек для огрубления, разбиения и т.д.
 /// Этап 2. Определение позиций для создания новых ячеек (все ячейки будут
 /// созданы за границами исходного хранилища)
 /// Этап 3. Создание геометрии ячеек, ячейки создаются на выделенных для них
@@ -141,40 +139,24 @@ inline void apply(AmrCells &cells, const Distributor& op) {
 /// Этап 5. На начале этапа все ячейки правильно связаны, но внутри
 /// хранилища часть старых ячеек (не листовых) являются неопределенными.
 /// Алгоритм осуществляет удаление данных ячеек.
-/// Этап 6. ???
-///
-/// \param mesh Сейчас используется, поскольку нужна операция обменов,
-/// потом желательно выкинуть
 template<int dim>
-void apply_impl(
-        AmrCells &locals, AmrCells &aliens,
-        const Distributor& op,
-        EuMesh& mesh)
-{
-    throw std::runtime_error("MPI amr::apply not implemented #0");
-    /*
+void apply_impl(Tourism& tourism, AmrCells &locals, AmrCells &aliens, const Distributor& op) {
     using zephyr::utils::Stopwatch;
 
     static Stopwatch count_timer;
     static Stopwatch positions_timer;
     static Stopwatch geometry_timer;
     static Stopwatch connections_timer;
-    static Stopwatch clean_timer;
-    static Stopwatch sort_timer;
-    static Stopwatch link_timer;
+    static Stopwatch remove_timer;
+    static Stopwatch exchange_timer;
+    static Stopwatch alien1_timer;
+    static Stopwatch alien2_timer;
 
     int rank = mpi::rank();
-
-    // Я не знаю флаги, надо получить.
-    mesh.sync();
 
     /// Этап 1. Сбор статистики
     count_timer.resume();
     Statistics count(locals);
-    //mpi::for_each([&]() {
-    //    std::cout << "rank " << mpi::rank() << "\n";
-    //    count.print();
-    //});
     count_timer.stop();
 
     /// Этап 2. Распределяем места для новых ячеек
@@ -182,87 +164,88 @@ void apply_impl(
     setup_positions<dim>(locals, count);
     positions_timer.stop();
 
-    // Отправить MPI locals.next (!!!!)
-    mesh.sync();
+    // Отправить / получить aliens.next.
+    exchange_timer.resume();
+    tourism.prepare<MpiTag::NEXT>(locals);
+    auto send_next = tourism.isend<MpiTag::NEXT>();
+    auto recv_next = tourism.irecv<MpiTag::NEXT>(aliens);
+    exchange_timer.stop();
 
     /// Этап 3. Восстановление геометрии
     geometry_timer.resume();
     setup_geometry<dim>(locals, aliens, rank, count, op);
     geometry_timer.stop();
 
-    // Получить по MPI aliens.index, aliens.next
-    // Если index < 0, то ячейка считается неактуальной, то есть
-    // она переместилась, так мы отличаем тех, кто остался от тех, кто удалится.
-    // Ну и флаги нужны, конечно. Но они и так есть, вроде как.
-    mesh.sync();
+    // Отправить / получить aliens.index. Если index < 0, то ячейка считается
+    // неактуальной, то есть она переместилась, так мы понимаем, кто удалится.
+    exchange_timer.resume();
+    tourism.prepare<MpiTag::INDEX>(locals);
+    auto send_idx = tourism.isend<MpiTag::INDEX>();
+    auto recv_idx = tourism.irecv<MpiTag::INDEX>(aliens);
+
+    // Дождаться (aliens.index, aliens.next).
+    send_next.wait();
+    recv_next.wait();
+    send_idx.wait();
+    recv_idx.wait();
+    exchange_timer.stop();
 
     /// Этап 4. Восстановление соседства
     connections_timer.resume();
     restore_connections<dim>(locals, aliens, rank, count);
     connections_timer.stop();
 
+    // Частичное восстановление border/aliens. Возможно, поскольку
+    // в restore_connections верно проставлены (rank, index).
+    // Восстановление нужно, чтобы в дальнейшем получить alien.next.
+    alien1_timer.resume();
+    tourism.build_aliens_basic(locals, aliens);
+    alien1_timer.stop();
+
     /// Этап 5. Удаление неопределенных ячеек
     /// Сделать внутри MPI запрос чтобы узнать, куда переместились ячейки !
-    clean_timer.resume();
-    remove_undefined<dim>(locals, aliens, count, mesh);
-    clean_timer.stop();
+    remove_timer.resume();
+    remove_undefined<dim>(tourism, locals, aliens, count);
+    remove_timer.stop();
 
-    mesh.build_aliens();
-    mesh.sync();
-
-    /// Этап 6. Пересылка и линковка alien ячеек
-    //link_timer.resume();
-    //link_aliens<dim>(decomposition if_multithreading(, threads));
-    //link_timer.stop();
+    // Здесь точно нужна, в отличае от предыдущей
+    alien2_timer.resume();
+    tourism.build_aliens(locals, aliens);
+    alien2_timer.stop();
 
 #if CHECK_PERFORMANCE
     static size_t counter = 0;
     if (counter % amr::check_frequency == 0) {
-        std::cout << "    Statistics elapsed: " << count_timer.times().wall() << "\n";
-        std::cout << "    Positions elapsed: " << positions_timer.times().wall() << "\n";
-        std::cout << "    Geometry elapsed: " << geometry_timer.times().wall() << "\n";
-        std::cout << "    Connections elapsed: " << connections_timer.times().wall() << "\n";
-        std::cout << "    Clean elapsed: " << clean_timer.times().wall() << "\n";
-        std::cout << "    Sorting elapsed: " << sort_timer.times().wall() << "\n";
+        mpi::cout << "    Statistics:     " << std::setw(11) << count_timer.milliseconds() << " ms\n";
+        mpi::cout << "    Positions:      " << std::setw(11) << positions_timer.milliseconds() << " ms\n";
+        mpi::cout << "    Geometry:       " << std::setw(11) << geometry_timer.milliseconds() << " ms\n";
+        mpi::cout << "    Send/Recv:      " << std::setw(11) << exchange_timer.milliseconds() << " ms\n";
+        mpi::cout << "    Connections:    " << std::setw(11) << connections_timer.milliseconds() << " ms\n";
+        mpi::cout << "    Build aliens 1: " << std::setw(11) << alien1_timer.milliseconds() << " ms\n";
+        mpi::cout << "    Build aliens 2: " << std::setw(11) << alien2_timer.milliseconds() << " ms\n";
+        mpi::cout << "    Remove undef:   " << std::setw(11) << remove_timer.milliseconds() << " ms\n";
     }
     ++counter;
 #endif
-     */
 }
 
 /// @brief Специализация для пустых хранилищ
 template<>
-void apply_impl<0>(
-        AmrCells &locals, AmrCells &aliens,
-        const Distributor& op,
-        EuMesh& mesh)
-{
+void apply_impl<0>(Tourism& tourism, AmrCells &locals, AmrCells &aliens, const Distributor& op) {
     throw std::runtime_error("MPI amr::apply not implemented #1");
-    // TODO LINK ALIENS, WHAT??
-    //link_aliens<0>(decomposition);
 }
 
 /// @brief Автоматический выбор размерности
-void apply(
-        AmrCells &locals, AmrCells &aliens,
-        const Distributor& op,
-        EuMesh& mesh)
-{
-    throw std::runtime_error("MPI amr::apply not implemented #2");
-    /*
+void apply(Tourism& tourism, AmrCells &locals, AmrCells &aliens, const Distributor& op) {
     if (locals.empty()) {
-        amr::apply_impl<0>(locals, aliens, op, mesh);
-    }
-    else {
-        auto dim = locals[0].dim;
-
-        if (dim < 3) {
-            amr::apply_impl<2>(locals, aliens, op, mesh);
+        amr::apply_impl<0>(tourism, locals, aliens, op);
+    } else {
+        if (locals.dim() < 3) {
+            amr::apply_impl<2>(tourism, locals, aliens, op);
         } else {
-            amr::apply_impl<3>(locals, aliens, op, mesh);
+            amr::apply_impl<3>(tourism, locals, aliens, op);
         }
     }
-     */
 }
 #endif
 

@@ -20,8 +20,6 @@ namespace zephyr::mesh::amr {
 /// у объединенной грани будет такой, какой был у старой грани.
 template<int dim>
 void retain_cell(AmrCells &locals, AmrCells& aliens, index_t ic) {
-    int rank = 0;
-
     // Ячейка не требует разбиения, необходимо пройти по граням,
     // возможно, необходимо разбить грань или собрать
     auto lvl_c = locals.level[ic];
@@ -37,6 +35,7 @@ void retain_cell(AmrCells &locals, AmrCells& aliens, index_t ic) {
             continue;
         }
 #if SCRUTINY
+        int rank = mpi::rank();
         if (adj.rank[iface] == rank && adj.index[iface] >= locals.size()) {
             std::cout << "AmrCell has no local neighbor through the " <<
                       side_to_string(side, dim) << " side\n";

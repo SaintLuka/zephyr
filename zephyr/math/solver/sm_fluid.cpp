@@ -89,17 +89,18 @@ void SmFluid::update(EuMesh &mesh) {
     compute_dt(mesh);
 
     if (m_acc == 1) {
-        //mesh.sync();
+        mesh.sync(data.init);
         fluxes(mesh);
     }
     else {
-        //mesh.sync();
+        mesh.sync(data.init);
 
         compute_grad(mesh);
 
+        mesh.sync(data.d_dx, data.d_dy, data.d_dz);
         fluxes_stage1(mesh);
 
-        //mesh.sync();
+        mesh.sync(data.half);
         fluxes_stage2(mesh);
     }
 

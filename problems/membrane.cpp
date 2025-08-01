@@ -22,7 +22,7 @@
 using zephyr::geom::Box;
 using zephyr::geom::Boundary;
 using zephyr::geom::Vector3d;
-using zephyr::mesh::generator::Rectangle;
+using zephyr::geom::generator::Rectangle;
 using zephyr::mesh::EuMesh;
 using zephyr::mesh::EuCell;
 using zephyr::io::PvdFile;
@@ -47,16 +47,16 @@ int main() {
     Rectangle rect(0.0, 4.0, -2.0, 4.0, true);
     rect.set_nx(200);
     rect.set_boundaries({
-                                .left   = Boundary::WALL, .right = Boundary::WALL,
-                                .bottom = Boundary::WALL, .top   = Boundary::WALL});
+        .left   = Boundary::WALL, .right = Boundary::WALL,
+        .bottom = Boundary::WALL, .top   = Boundary::WALL});
 
     // Создать сетку
     EuMesh mesh(rect);
 
     // Переменные для хранения на сетке
-    auto [rho1, p1, e1] = mesh.append<double>("rho1", "p1", "e1");
-    auto [rho2, p2, e2] = mesh.append<double>("rho2", "p2", "e2");
-    auto [v1, v2]       = mesh.append<Vector3d>("v1", "v2");
+    auto [rho1, p1, e1] = mesh.add<double>("rho1", "p1", "e1");
+    auto [rho2, p2, e2] = mesh.add<double>("rho2", "p2", "e2");
+    auto [v1, v2]       = mesh.add<Vector3d>("v1", "v2");
 
     // Файл для записи
     PvdFile pvd("mesh", "output");

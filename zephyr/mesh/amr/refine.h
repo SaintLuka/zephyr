@@ -290,7 +290,7 @@ index_t make_children(AmrCells &cells, index_t ip) {
 /// @details Дочерние ячейки правильно ссылаются друг на друга, на гранях
 /// adjacent указан на старые ячейки.
 template<int dim>
-void refine_cell(AmrCells &locals, index_t ip, int rank, const Distributor& op) {
+void refine_cell(AmrCells &locals, AmrCells& aliens, index_t ip, const Distributor& op) {
     auto child_beg = make_children<dim>(locals, ip);
 
     auto& adj = locals.faces.adjacent;
@@ -310,28 +310,30 @@ void refine_cell(AmrCells &locals, index_t ip, int rank, const Distributor& op) 
                 continue;
             }
 
-            int nei_wanted_lvl = 0;
+#if SCRUTINY
+            int rank = mpi::rank();
             if (adj.rank[iface] == rank) {
                 // Локальная ячейка
-#if SCRUTINY
-                if (adj.index[iface] < 0 || adj.index[iface] >= locals.size()) {
+                if (adj.alien[iface] >= 0 || adj.index[iface] < 0 || adj.index[iface] >= locals.size()) {
                     throw std::runtime_error("adjacent.index out of range (refine_cell)");
                 }
-#endif
-                index_t neib_idx = adj.index[iface];
-                nei_wanted_lvl = locals.level[neib_idx] + locals.flag[neib_idx];
             }
             else {
                 // Удаленная ячейка
-#if SCRUTINY
-                if (adj.alien[iface] < 0 || adj.index[iface] >= locals.size()) {
+                if (adj.alien[iface] < 0 || adj.alien[iface] >= aliens.size()) {
                     throw std::runtime_error("adjacent.alien out of range (refine_cell)");
                 }
-#endif
-                index_t neib_idx = adj.index[iface];
-                nei_wanted_lvl = locals.level[neib_idx] + locals.flag[neib_idx];
             }
+#endif
 
+            // Ссылка на соседнюю ячейку
+            auto [neibs, jc] = adj.get_neib(iface, locals, aliens);
+
+            // Желаемый уровень соседней ячейки
+            int nei_wanted_lvl = neibs.level[jc] + neibs.flag[jc];
+
+            // Если сосед хочет адаптировать выше уровня текущей дочерней,
+            // то дополнительно разбиваем грань дочерней ячейки
             if (nei_wanted_lvl > locals.level[ich]) {
                 split_face<dim>(locals.face_begin[ich], locals.faces,
                         locals.mapping<dim>(ich), s, locals.axial());

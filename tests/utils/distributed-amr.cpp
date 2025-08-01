@@ -1,8 +1,6 @@
 /// @file Тяжелый тест на динамическую декомпозицию и адаптацию.
 /// Процессы хаотично перемещаются, ячейки хаотично адаптируются.
 
-// TODO: Удалить лишние mesh.sync()
-
 #include <iostream>
 #include <iomanip>
 
@@ -18,25 +16,15 @@
 #include <zephyr/geom/generator/rectangle.h>
 
 using namespace zephyr::mesh;
+using namespace zephyr::geom;
+
 using zephyr::utils::mpi;
-using zephyr::utils::Stopwatch;
 using zephyr::io::PvdFile;
 using zephyr::geom::generator::Cuboid;
 using zephyr::geom::generator::Rectangle;
+using zephyr::utils::Stopwatch;
 
 using zephyr::mesh::decomp::RWalk;
-
-// Решаем два волновых уравнения по простой схеме
-struct _U_ {
-    double u;      ///< Некоторая гладкая функция
-    double wflag;  ///< Равномерно распределенная величина [0, 1]
-};
-
-_U_ U;
-
-// Переменные для сохранения
-double get_u(AmrStorage::Item& cell)     { return cell(U).u; }
-double get_wflag(AmrStorage::Item& cell) { return cell(U).wflag; }
 
 // Некоторая странная функция (случайный тригонометрический ряд
 // для генерации случайных возмущений)
@@ -92,16 +80,17 @@ struct Membrane {
     }
 };
 
-// Поле cell.u задается из Membrane, функция
-// Поле cell.wflag задается по процентилям от cell.u
-void setup_values(EuMesh& mesh, double t = 0.0) {
+// Поле cell(u) задается из Membrane, функция
+// Поле cell(wflag) задается по процентилям от cell(u)
+void setup_values(EuMesh& mesh, double t,
+        Storable<double> val, Storable<double> wflag) {
     static Membrane func_u(1);
 
     double u_min = +1.0e300;
     double u_max = -1.0e300;
     for (auto &cell: mesh) {
         double u = func_u(cell.center(), t);
-        cell(U).u = u;
+        cell(val) = u;
         u_min = std::min(u, u_min);
         u_max = std::max(u, u_max);
     }
@@ -111,7 +100,7 @@ void setup_values(EuMesh& mesh, double t = 0.0) {
 
     // Нормируем от 0.0 до 1.0
     for (auto &cell: mesh) {
-        cell(U).u = (cell(U).u - u_min) / (u_max - u_min);
+        cell(val) = (cell(val) - u_min) / (u_max - u_min);
     }
 
     double count = 100.0;
@@ -120,7 +109,7 @@ void setup_values(EuMesh& mesh, double t = 0.0) {
     std::vector<double> vols_u(count);
     for (auto &cell: mesh) {
         // Индекс от 0 до count
-        double idx_u = std::floor(cell(U).u * count);
+        double idx_u = std::floor(cell(val) * count);
 
         double V = cell.volume();
         vols_u[idx_u] += V;
@@ -137,17 +126,17 @@ void setup_values(EuMesh& mesh, double t = 0.0) {
     }
 
     for (auto &cell: mesh) {
-        int idx_u = int(std::floor(cell(U).u * count));
-        cell(U).wflag = vols_u[idx_u];
+        int idx_u = int(std::floor(cell(val) * count));
+        cell(wflag) = vols_u[idx_u];
     }
 }
 
 // Флаги выставляются по процентилям в wflag
-void set_flags(EuMesh& mesh) {
+void set_flags(EuMesh& mesh, Storable<double> wflag) {
     for (auto cell: mesh) {
-        if (cell(U).wflag < 0.5) {
+        if (cell(wflag) < 0.5) {
             cell.set_flag(-1);
-        } else if (cell(U).wflag < 0.9) {
+        } else if (cell(wflag) < 0.9) {
             cell.set_flag(0);
         } else {
             cell.set_flag(1);
@@ -158,24 +147,27 @@ void set_flags(EuMesh& mesh) {
 int main() {
     mpi::handler init;
 
-    // Файл для записи
-    PvdFile pvd("mesh", "output");
-
-    pvd.variables = {"rank", "level"};
-    pvd.variables += {"u", get_u};
-    pvd.variables += {"wflag", get_wflag};
-
     // Сеточный генератор
     //Cuboid gen(0.0, 1.0, 0.0, 0.6, 0.0, 0.9);
     Rectangle gen(0.0, 1.0, 0.0, 1.0);
     gen.set_nx(50);
 
+    // Создаем сетку
+    EuMesh mesh(gen);
+    mesh.set_max_level(3);
+
+    // Добавить переменные на сетку
+    auto [u, wflag] = mesh.add<double>("u", "wflag");
+
+    // Файл для записи
+    PvdFile pvd("mesh", "output");
+
+    pvd.variables = {"rank", "index", "faces2D"};
+    pvd.variables.append("u", u);
+    pvd.variables.append("wflag", wflag);
+
     // Bounding Box для сетки
     Box domain = gen.bbox();
-
-    // Создаем сетку
-    EuMesh mesh(gen, U);
-    mesh.set_max_level(4);
 
     // Сложная случайная декомпозиция
     auto decmp = RWalk::create(domain, mpi::size());
@@ -183,35 +175,44 @@ int main() {
     // Добавляем декомпозицию
     mesh.set_decomposition(decmp);
 
+    //if (mesh.check_base() < 0) {
+    //    std::cout << "Bad init mesh\n";
+    //    return 0;
+    //}
+
     // Начальные данные
     for (int i = 0; i < mesh.max_level(); ++i) {
-        setup_values(mesh);
-        mesh.sync();
-        set_flags(mesh);
+        setup_values(mesh, 0.0, u, wflag);
+        set_flags(mesh, wflag);
         mesh.refine();
+
+        //if (mesh.check_refined() < 0) {
+        //    std::cout << "Bad init refinement\n";
+        //    return 0;
+        //}
     }
-    setup_values(mesh);
-    mesh.sync();
+    setup_values(mesh, 0.0, u, wflag);
+    mesh.sync(u, wflag);
 
     Stopwatch elapsed(true);
     for (int n_step = 0; n_step <= 1000; ++n_step) {
         // redistribute на каждом шаге
-        mesh.balancing(mesh.n_cells());
+        mesh.balancing(mesh.locals().size());
         mesh.redistribute();
-        mesh.sync();
 
-        setup_values(mesh, 0.01 * n_step);
+        setup_values(mesh, 0.01 * n_step, u, wflag);
 
         if (n_step % 10 == 0) {
             mpi::cout << "\tШаг: " << std::setw(6) << n_step << "\n";
             pvd.save(mesh, n_step);
         }
 
-        mesh.sync();
-        set_flags(mesh);
-        mesh.sync();
+        set_flags(mesh, wflag);
         mesh.refine();
-        mesh.sync();
+
+        //if (mesh.check_refined() < 0) {
+        //    throw std::runtime_error("Bad refined mesh");
+        //}
     }
     elapsed.stop();
 

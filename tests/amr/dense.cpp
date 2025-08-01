@@ -12,6 +12,7 @@
 
 using namespace zephyr;
 using namespace mesh;
+using namespace geom;
 
 using generator::Rectangle;
 using zephyr::io::PvdFile;

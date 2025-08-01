@@ -2,7 +2,7 @@ add_subdirectory(single-fluid)
 add_subdirectory(multi-fluid)
 
 #list(APPEND PROBLEMS advection)
-list(APPEND PROBLEMS convection)
+#list(APPEND PROBLEMS convection)
 #list(APPEND PROBLEMS membrane)
 #list(APPEND PROBLEMS shu_osher)
 #list(APPEND PROBLEMS transfer)

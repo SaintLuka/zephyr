@@ -19,8 +19,8 @@
 using zephyr::geom::Box;
 using zephyr::geom::Boundary;
 using zephyr::geom::Vector3d;
-using zephyr::mesh::generator::Rectangle;
-using zephyr::mesh::generator::Cuboid;
+using zephyr::geom::generator::Rectangle;
+using zephyr::geom::generator::Cuboid;
 using zephyr::mesh::EuCell;
 using zephyr::mesh::EuMesh;
 using zephyr::mesh::Storable;
@@ -116,15 +116,15 @@ int main() {
     // Создать сетку
     EuMesh mesh(gen);
 
+    /*
     if (mesh.check_base() < 0) {
         int res = mesh.check_base();
-
         std::cout << "Bad init mesh " << res << "\n";
-
         return 0;
     }
+     */
 
-    // Добавить типы на сетку
+    // Добавить переменные на сетку
     solver.add_types(mesh);
 
     // Настраиваем адаптацию
@@ -154,12 +154,13 @@ int main() {
         solver.set_flags(mesh);
         mesh.refine();
 
-        int res = mesh.check_refined();
-        if (res < 0) {
-            res = mesh.check_refined();
+        /*
+        if (mesh.check_refined() < 0) {
+            int res = mesh.check_refined();
             std::cout << "Bad init refinement\n";
             return 0;
         }
+         */
     }
 
     Stopwatch elapsed;

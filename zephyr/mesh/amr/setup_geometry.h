@@ -26,7 +26,7 @@ void setup_geometry_one(index_t ic, AmrCells &locals, AmrCells& aliens,
     }
 
     if (locals.flag[ic] > 0) {
-        refine_cell<dim>(locals, ic, rank, op);
+        refine_cell<dim>(locals, aliens, ic, op);
         return;
     }
 
@@ -37,24 +37,22 @@ void setup_geometry_one(index_t ic, AmrCells &locals, AmrCells& aliens,
 /// соответствующие методы адаптации (без MPI)
 template<int dim>
 void setup_geometry(AmrCells &locals, AmrCells& aliens, const Statistics &count, const Distributor& op) {
-    threads::parallel_for(index_t{0}, index_t{count.n_cells},
-        setup_geometry_one<dim>,
-        std::ref(locals), std::ref(aliens), 0, std::ref(op));
+    threads::parallel_for(
+            index_t{0}, index_t{count.n_cells},
+            setup_geometry_one<dim>,
+            std::ref(locals), std::ref(aliens), 0, std::ref(op));
 }
 
 #ifdef ZEPHYR_MPI
-/*
 /// @brief Осуществляет проход по диапазону ячеек и вызывает для них
 /// соответствующие методы адаптации (с MPI и без тредов)
 template<int dim>
-void setup_geometry(AmrStorage &locals, AmrStorage &aliens, int rank,
-                    const Statistics &count, const Distributor& op) {
-    threads::for_each<10>(
-            locals.begin(), locals.begin() + count.n_cells,
-            setup_geometry_one<dim>, std::ref(locals),
-            std::ref(aliens), rank, std::ref(op));
+void setup_geometry(AmrCells &locals, AmrCells& aliens, int rank, const Statistics &count, const Distributor& op) {
+    threads::parallel_for(
+            index_t{0}, index_t{count.n_cells},
+            setup_geometry_one<dim>,
+            std::ref(locals), std::ref(aliens), rank, std::ref(op));
 }
-*/
 #endif
 
 } // namespace zephyr::mesh::amr

@@ -13,8 +13,8 @@
 using namespace zephyr;
 using namespace mesh;
 
-using generator::Rectangle;
-using generator::Cuboid;
+using geom::generator::Rectangle;
+using geom::generator::Cuboid;
 using zephyr::io::PvdFile;
 using zephyr::utils::Stopwatch;
 

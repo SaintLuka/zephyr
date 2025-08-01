@@ -31,22 +31,6 @@ Vector3d velocity(const Vector3d& c) {
     return { 1.0, 0.5 + 0.3*std::sin(4 * M_PI * c.x()), 0.0 };
 }
 
-// Абстрактная нагрузка
-double foo(const Vector3d& v) {
-    Vector3d c1 = {0.2, 0.4, 0.0};
-    Vector3d c2 = {0.6, 0.1, 0.0};
-    Vector3d c3 = {0.8, 0.4, 0.0};
-    double A1 = 200.0;
-    double A2 = 100.0;
-    double A3 = 50.0;
-    double s1 = 0.15;
-    double s2 = 0.2;
-    double s3 = 0.1;
-    return A1/s1 * std::exp(-(v - c1).squaredNorm() / (s1 * s1)) +
-           A2/s2 * std::exp(-(v - c2).squaredNorm() / (s2 * s2)) +
-           A3/s3 * std::exp(-(v - c3).squaredNorm() / (s3 * s3));
-}
-
 // Просуммировать фиктивную нагрузку
 double calc_loads(EuMesh& mesh, Storable<double> load) {
     double full = 0;
@@ -63,61 +47,46 @@ int main() {
     //Cuboid gen(0.0, 1.0, 0.0, 0.6, 0.0, 0.9);
     //gen.set_nx(50);
     Rectangle gen(0.0, 1.0, 0.0, 1.0, true);
-    gen.set_nx(200);
+    gen.set_nx(400);
 
     // Создаем сетку
     EuMesh mesh(gen);
 
-    auto u1 = mesh.add<double>("u1");
-    auto u2 = mesh.add<double>("u2");
-    auto load = mesh.add<double>("load");
-
-    // Файл для записи
-    PvdFile pvd("mesh", "output");
-
-    pvd.variables = {"rank", "index", "faces2D"};
-    pvd.variables.append("u", u1);
-    pvd.variables.append("load", load);
-
+    // Добавить переменные на сетку
+    auto [u1, u2, load] = mesh.add<double>("u1", "u2", "load");
 
     // Bounding Box для сетки
     Box domain = gen.bbox();
 
-    // Заполняем данные о нагрузке ячеек
-    Vector3d vc = domain.vmin + 0.2 * domain.size();
-    double D = 0.1 * domain.diameter();
-    Vector3d vc2 = domain.vmin + 0.7 * domain.size();
-    double D2 = 0.15 * domain.diameter();
-    for (auto cell: mesh) {
-        cell(u1) = (cell.center() - vc).norm() < D ? 1.0 : 0.0;
-        //cell(u1) += (cell.center() - vc2).norm() < D2 ? 0.8 : 0.0;
-        cell(u2) = 0.0;
-        cell(load) = cell(u1);
-    }
-
-    // Различные варианты инициализации ORB декомпозиции
+    // Варианты инициализации ORB декомпозиции
     ORB orb(domain, "XY", mpi::size());
     //ORB orb(domain, "YX", 13);
     //ORB orb(domain, "YX", 13, 3);
 
-    mesh.set_decomposition(orb, false);
+    // Установить декомпозицию (+ делает redistribute)
+    mesh.set_decomposition(orb);
 
-    mesh.redistribute(u1);
-    pvd.save(mesh, -0.1);
+    // Заполняем начальные данные и нагрузку
+    Vector3d vc = domain.vmin + 0.2 * domain.size();
+    double D = 0.1 * domain.diameter();
+    for (auto cell: mesh) {
+        cell(u1) = (cell.center() - vc).norm() < D ? 1.0 : 0.0;
+        cell(u2) = 0.0;
+        cell(load) = cell(u1);
+    }
+
+    // Файл для записи
+    PvdFile pvd("mesh", "output");
+
+    pvd.variables = {"rank", "index"};
+    pvd.variables.append("u", u1);
+    pvd.variables.append("load", load);
 
     // Число Куранта
     double CFL = 0.5;
 
-    int n_step = 0;
-
     Stopwatch elapsed(true);
     for (int step = 0; step < 200; ++step) {
-        // Подсчитываем нагрузку каждого ранга
-        if (step % 1 == 0) {
-            mpi::cout << "Step:      " << step << "\n";
-            pvd.save(mesh, step);
-        }
-
         // Балансировка декомпозиции
         {
             double full = calc_loads(mesh, load);
@@ -126,9 +95,9 @@ int main() {
         }
 
         // Подсчитываем нагрузку каждого ранга
-        if (step % 1 == 0) {
+        if (step % 10 == 0) {
             mpi::cout << "Step:      " << step << "\n";
-            pvd.save(mesh, step + 0.1);
+            pvd.save(mesh, step);
         }
 
         double dt = std::numeric_limits<double>::max();
@@ -165,8 +134,6 @@ int main() {
             cell(u2) = 0.0;
             cell(load) = cell(u1);
         }
-
-        n_step += 1;
     }
     elapsed.stop();
 

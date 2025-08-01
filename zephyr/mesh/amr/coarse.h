@@ -110,16 +110,16 @@ void make_parent(AmrCells& locals, AmrCells& aliens, int rank, Children& childre
 
     auto& adj = locals.faces.adjacent;
 
-    locals.rank[ip]  = locals.rank[children.index[0]];
+    locals.rank [ip] = locals.rank[children.index[0]];
+    locals.next [ip] = locals.next[children.index[0]];
     locals.index[ip] = locals.next[children.index[0]];
-    locals.next[ip]  = locals.next[children.index[0]];
 
+    locals.flag [ip] = 0;
     locals.b_idx[ip] = locals.b_idx[children.index[0]];
-    locals.flag[ip]  = 0;
     locals.level[ip] = locals.level[children.index[0]] - 1;
     locals.z_idx[ip] = locals.z_idx[children.index[0]] / CpC(dim);
 
-    /// Линкуем грани
+    // Линкуем грани
     for (Side<dim> side: Side<dim>::items()) {
         index_t pface = locals.face_begin[ip];
 
@@ -127,7 +127,7 @@ void make_parent(AmrCells& locals, AmrCells& aliens, int rank, Children& childre
         index_t some_face = locals.face_begin[some_ch] + side;
 
 #if SCRUTINY
-        if (locals.faces.boundary[some_face] == Boundary::UNDEFINED) {
+        if (locals.faces.is_undefined(some_face)) {
             throw std::runtime_error("Undefined boundary (coarse cell");
         }
         for (int i = 0; i < FpF(dim); ++i) {
@@ -147,17 +147,17 @@ void make_parent(AmrCells& locals, AmrCells& aliens, int rank, Children& childre
             continue;
         }
 
-        auto some_neib_rank  = adj.rank[some_face];
-        auto some_neib_owner = adj.alien[some_face];
-        auto some_neib_local = adj.index[some_face];
+        auto some_neib_rank  = adj.rank [some_face];
+        auto some_neib_alien = adj.alien[some_face];
+        auto some_neib_index = adj.index[some_face];
 #if SCRUTINY
-        if (some_neib_rank == rank && some_neib_owner >= locals.size()) {
+        if (some_neib_rank == rank && (some_neib_alien >= 0 || some_neib_index >= locals.size())) {
             std::cout << "Child has no local neighbor through the " <<
                       side_to_string(side, dim) << " side #1\n";
             locals.print_info(some_ch);
             throw std::runtime_error("Child has no local neighbor (coarse_cell) #1");
         }
-        if (some_neib_rank != rank && some_neib_local >= locals.size()) {
+        if (some_neib_rank != rank && (some_neib_alien < 0 || some_neib_alien >= aliens.size())) {
             std::cout << "Child has no remote neighbor through the " <<
                       side_to_string(side, dim) << " side #1\n";
             locals.print_info(some_ch);
@@ -173,22 +173,23 @@ void make_parent(AmrCells& locals, AmrCells& aliens, int rank, Children& childre
             index_t ich = children.index[children_by_side[side][i]];
             index_t iface = locals.face_begin[ich] + side;
 
-            if (adj.rank[iface] == rank && adj.index[iface] >= locals.size()) {
+            if (adj.rank[iface] == rank && (adj.alien[iface] >= 0 ||
+                    adj.index[iface] < 0 || adj.index[iface] >= locals.size())) {
                 std::cout << "Child has no local neighbor through the " <<
                           side_to_string(side, dim) << " side #2\n";
                 locals.print_info(ich);
                 throw std::runtime_error("Child has no local neighbor (coarse_cell) #2");
             }
-            if (adj.rank[iface] != rank && adj.index[iface] >= locals.size()) {
+            if (adj.rank[iface] != rank && (adj.alien[iface] < 0 || adj.alien[iface] >= aliens.size())) {
                 std::cout << "Child has no remote neighbor through the " <<
                           side_to_string(side, dim) << " side #2\n";
                 locals.print_info(ich);
                 throw std::runtime_error("Child has no remote neighbor (coarse_cell) #2");
             }
 
-            index_t neib = adj.index[iface];
+            auto [neibs2, neib2] = adj.get_neib(iface, locals, aliens);
 
-            auto neib_wanted_lvl = locals.level[neib] + locals.flag[neib];
+            auto neib_wanted_lvl = neibs2.level[neib2] + neibs2.flag[neib2];
             if (neib_wanted_lvl != some_neib_wanted_lvl) {
                 throw std::runtime_error("Different wanted level (coarsing cell neighbor)");
             }
@@ -197,9 +198,9 @@ void make_parent(AmrCells& locals, AmrCells& aliens, int rank, Children& childre
 
         // Простой случай: грань родительской ячейки должна быть простой
         if (some_neib_wanted_lvl <= locals.level[ip]) {
-            adj.rank[pface + side] = rank;
-            adj.alien[pface + side] = some_neib_owner;
-            adj.index[pface + side] = some_neib_local;
+            adj.rank [pface + side] = some_neib_rank;
+            adj.alien[pface + side] = some_neib_alien;
+            adj.index[pface + side] = some_neib_index;
             adj.basic[pface + side] = ip;
 
             // Обнуляем неактивные подграни

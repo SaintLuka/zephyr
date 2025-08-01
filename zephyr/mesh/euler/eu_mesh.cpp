@@ -13,6 +13,7 @@
 using namespace zephyr::geom;
 using generator::Rectangle;
 using generator::Cuboid;
+using zephyr::utils::Stopwatch;
 
 namespace zephyr::mesh {
 
@@ -38,8 +39,10 @@ EuMesh::EuMesh(Generator& gen) {
     }
 
     m_tourists.init_types(m_locals);
-    m_migrants.init_types(m_locals);
 #endif
+
+    // установить dim/adapt/axial
+    m_aliens = m_locals.same();
 
     structured = false;
     m_nx = 1;
@@ -136,25 +139,52 @@ void EuMesh::balance_flags() {
     }
 #ifdef ZEPHYR_MPI
     else {
-        amr::balance_flags(m_locals, m_aliens, m_max_level, *this);
+        amr::balance_flags(m_tourists, m_locals, m_aliens, m_max_level);
     }
 #endif
 }
 
 void EuMesh::apply_flags() {
+#if SCRUTINY
+    static size_t counter = 0;
+
+    zephyr::io::Variables vars = {"rank", "index", "next", "level", "flag", "faces2D"};
+
+    static PvdFile locals_before("bef_locals", "output");
+    locals_before.variables = vars;
+    //locals_before.save(m_locals, counter);
+    static PvdFile aliens_before("bef_aliens", "output");
+    aliens_before.variables = vars;
+    //aliens_before.save(m_aliens, counter);
+    mpi::barrier();
+#endif
+
     if (mpi::single()) {
         amr::apply(m_locals, distributor);
     }
 #ifdef ZEPHYR_MPI
     else {
-        amr::apply(m_locals, m_aliens, distributor, *this);
+        amr::apply(m_tourists, m_locals, m_aliens, distributor);
     }
 #endif
 
 #if SCRUTINY
-    if (check_refined() < 0) {
-        //throw std::runtime_error("Check refined failed");
-    }
+    static PvdFile locals_after("aft_locals", "output");
+    locals_after.variables = vars;
+    //locals_after.save(m_locals, counter);
+    static PvdFile aliens_after("aft_aliens", "output");
+    aliens_after.variables = vars;
+    //aliens_after.save(m_aliens, counter);
+    mpi::barrier();
+
+    ++counter;
+
+    mpi::for_each([&]() {
+        if (check_refined() < 0) {
+            std::cout << "Check refined for rank " << mpi::rank() << "\n";
+            throw std::runtime_error("Check refined failed");
+        }
+    });
 #endif
 }
 
@@ -185,9 +215,9 @@ void EuMesh::refine() {
 #if CHECK_PERFORMANCE
     static size_t counter = 0;
     if (counter % amr::check_frequency == 0) {
-        std::cout << "  Balance steps elapsed: " << std::setw(10) << balance.milliseconds() << " ms\n";
-        std::cout << "  Apply steps elapsed:   " << std::setw(10) << apply.milliseconds() << " ms\n";
-        std::cout << "Refine steps elapsed:    " << std::setw(10) << full.milliseconds() << " ms\n";
+        mpi::cout << "  Balance flags: " << std::setw(14) << balance.milliseconds() << " ms\n";
+        mpi::cout << "  Apply flags:   " << std::setw(14) << apply.milliseconds() << " ms\n";
+        mpi::cout << "Refine elapsed:  " << std::setw(14) << full.milliseconds() << " ms\n";
     }
     ++counter;
 #endif
@@ -277,7 +307,7 @@ int EuMesh::check_base() const {
         if (res < 0) return res;
 
         // Проверка смежности
-        res = m_locals.check_connectivity(ic);
+        res = m_locals.check_connectivity(ic, m_aliens);
         if (res < 0) return res;
     }
 
@@ -356,7 +386,7 @@ int EuMesh::check_refined() const {
         if (res < 0) return res;
 
         // Проверка смежности
-        res = m_locals.check_connectivity(ic);
+        res = m_locals.check_connectivity(ic, m_aliens);
         if (res < 0) return res;
     }
 

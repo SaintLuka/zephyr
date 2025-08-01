@@ -56,6 +56,12 @@ public:
     /// @brief Адаптивная сетка?
     bool adaptive() const;
 
+    /// @brief Нет locals ячеек?
+    bool empty() const { return n_cells() == 0; }
+
+    /// @brief Число locals ячеек
+    index_t n_cells() const { return m_locals.size(); }
+
     /// @brief Установить распределитель данных при адаптации,
     /// допустимые значения: "empty", "simple".
     void set_distributor(const std::string& name);
@@ -87,36 +93,39 @@ public:
         return {&m_locals, cell_idx, &m_aliens};
     }
 
-
+    /// @brief Добавить массив данных в хранилище
+    /// @param name Имя массива данных
     template <typename T>
-    Storable<T> add(const std::string& name) {
+    Storable<T> add_one(const std::string& name) {
         auto res1 = m_locals.data.add<T>(name);
         auto res2 = m_aliens.data.add<T>(name);
         if (res1.idx != res2.idx) {
             throw std::runtime_error("EuMesh error: bad add<T> #1");
         }
 #ifdef ZEPHYR_MPI
-        auto res3 = m_tourists.m_border.data.add<T>(name);
+        auto res3 = m_tourists.add<T>(name);
         if (res1.idx != res3.idx) {
             throw std::runtime_error("EuMesh error: bad add<T> #2");
-        }
-        auto res4 = m_migrants.migrants.data.add<T>(name);
-        if (res1.idx != res4.idx) {
-            throw std::runtime_error("EuMesh error: bad add<T> #3");
         }
 #endif
         return res1;
     }
 
-    template <typename T, typename U>
-    Storable<T> add(const char*& name) {
-        return add<T>(std::string(name));
-    }
-
-    // Основная функция, которая принимает произвольное количество строк и возвращает кортеж double
-    template <typename T, typename... Args>
-    auto append(Args... args) {
-        return std::make_tuple(std::invoke(&EuMesh::add<T>, *this, args)...);
+    /// @brief Добавить несколько массивов данных в хранилище
+    /// @param names Имена массивов данных
+    /// @return Если передан один аргумент, то возвращает единственный Storable<T>,
+    /// при наличии нескольких аргументов возвращает кортеж Storable<T>.
+    template<typename T, typename... Names, typename = std::enable_if_t<
+            (sizeof...(Names) > 0) && (std::is_convertible_v<Names, std::string> && ...)>>
+    auto add(Names&&... names) {
+        utils::soa::assert_storable_type<T>();
+        if constexpr (sizeof...(Names) == 1) {
+            return add_one<T>(std::string(std::forward<Names>(names))...);
+        } else {
+            // Короче жесть, тут сложно было добиться соблюдения порядка
+            // с круглыми скобками std::tuple() или std::make_tuple() не работают.
+            return std::tuple{add_one<T>(std::string(std::forward<Names>(names)))...};
+        }
     }
 
     template <typename T>
@@ -124,8 +133,7 @@ public:
         m_locals.data.swap<T>(val1, val2);
         m_aliens.data.swap<T>(val1, val2);
 #ifdef ZEPHYR_MPI
-        m_tourists.m_border.data.swap<T>(val1, val2);
-        m_migrants.migrants.data.swap<T>(val1, val2);
+        m_tourists.swap<T>(val1, val2);
 #endif
     }
 
@@ -140,21 +148,13 @@ public:
 
     const AmrCells& locals() const { return m_locals; }
 
+    AmrCells& aliens() { return m_aliens; }
+
+    const AmrCells& aliens() const { return m_aliens; }
+
 
     /// @brief Выставяет новые ранги ячейкам
     void setup_ranks();
-
-    /// @brief Перераспределить ячейки между процессами, в соответствии
-    /// со значениями, которые выдает m_decomp
-    template <typename T>
-    void migrate(Storable<T> var) {
-#ifdef ZEPHYR_MPI
-        if (mpi::single()) return;
-
-        setup_ranks();
-        m_migrants.migrate(m_tourists, m_locals, m_aliens, var);
-#endif
-    }
 
     /// @brief Собрать обменные слои (aliens и сопутствующие члены),
     /// принимаются актуальные данные с border слоя.
@@ -197,30 +197,27 @@ public:
     /// До вызова redistribute распределенная сетка должна быть согласована
     /// и после вызова остается согласованной (массивы locals и aliens
     /// корректно связаны).
-    template <typename T>
-    void redistribute(Storable<T> var) {
+    template <typename... Args>
+    void redistribute(Args&&... vars) {
 #ifdef ZEPHYR_MPI
         if (mpi::single()) return;
 
-        migrate(var);
+        setup_ranks();
+        m_migrants.migrate(
+                m_tourists, m_locals, m_aliens,
+                std::forward<Args>(vars)...);
         build_aliens();
 #endif
     }
 
     /// @brief Обмен данными между процессами, в массивы aliens записываются
     /// данные с других процессов. Последовательное выволнение send и recv
-    template <typename T>
-    void sync(Storable<T> var) {
+    template <typename... Args, typename = std::enable_if_t<(sizeof...(Args) > 0)> >
+    void sync(Args&&... vars) {
 #ifdef ZEPHYR_MPI
         if (mpi::single()) return;
 
-        mpi::for_each([]() {
-            std::cout << "START SYNC " << mpi::rank() << "\n";
-        });
-        m_tourists.sync(m_locals, m_aliens, var);
-        mpi::for_each([]() {
-            std::cout << "SUCCESS SYNC " << mpi::rank() << "\n";
-        });
+        m_tourists.sync(m_locals, m_aliens, std::forward<Args>(vars)...);
 #endif
     }
 

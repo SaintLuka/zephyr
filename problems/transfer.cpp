@@ -7,13 +7,14 @@
 #include <zephyr/io/pvd_file.h>
 #include <zephyr/geom/vector.h>
 #include <zephyr/geom/generator/rectangle.h>
+#include <zephyr/geom/primitives/polygon.h>
 #include <zephyr/math/solver/transfer.h>
 
 using namespace zephyr::geom;
 using namespace zephyr::mesh;
 
 using zephyr::io::PvdFile;
-using zephyr::mesh::generator::Rectangle;
+using zephyr::geom::generator::Rectangle;
 
 class Solver;
 
@@ -382,7 +383,6 @@ Vector3d Solver::velocity(const Vector3d& p) const {
 
 EuMesh Solver::exact(Body& body, double curr_time) const {
     using zephyr::geom::Quad;
-    using zephyr::mesh::AmrCell;
 
     // Точная граница в начальный момент времени
     std::vector<Vector3d> vs = body.vs;

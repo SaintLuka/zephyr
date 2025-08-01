@@ -14,7 +14,7 @@ namespace zephyr::mesh {
 inline int VpF(int dim) { return dim == 2 ? 2 : 4; }
 
 void AmrCells::print_info(index_t ic) const {
-    std::cout << "\t\tIndex:  " << ic << "\n";
+    std::cout << "\t\tarr.ic: " << ic << "\n";
     std::cout << "\t\tcenter: " << center[ic].transpose() << "\n";
     std::cout << "\t\trank:   " << rank[ic] << "\n";
     std::cout << "\t\tindex:  " << index[ic] << "\n";
@@ -465,7 +465,7 @@ int AmrCells::check_connectivity(index_t ic) const {
     return check_connectivity(ic, aliens);
 }
 
-int AmrCells::check_connectivity(index_t ic, AmrCells& aliens) const {
+int AmrCells::check_connectivity(index_t ic, const AmrCells& aliens) const {
     if (ic >= m_size) {
         throw std::runtime_error("Данная проверка только для локальных ячеек!");
     }
@@ -497,11 +497,11 @@ int AmrCells::check_connectivity(index_t ic, AmrCells& aliens) const {
         // Массив смежности
         auto& adj = faces.adjacent;
 
-        std::string face_name = side_to_string(iface - face_begin[ic], dim());
+        std::string f_name = face_name(ic, iface);
 
         // Должна указывать на ячейку
         if (faces.adjacent.basic[iface] != ic) {
-            std::cout << "\tFace " << face_name << " should point to origin cell\n";
+            std::cout << "\tFace " << f_name << " should point to origin cell\n";
             print_info(ic);
             return -1;
         }
@@ -551,15 +551,15 @@ int AmrCells::check_connectivity(index_t ic, AmrCells& aliens) const {
         else {
             // Удаленная ячейка
             if (adj.alien[iface] < 0 || adj.alien[iface] >= aliens.size()) {
-                std::cout << "\tadjacent.alien out of range for remote cell\n";
+                std::cout << "\t" + f_name + ": adjacent.alien out of range for remote cell\n";
+                std::cout << "\t\taliens.size: " << aliens.size() << "\n";
                 print_info(ic);
                 return -1;
             }
         }
 
         // Сосед может быть из aliens
-        index_t jc = adj.alien[iface] < 0 ? adj.index[iface] : adj.alien[iface];
-        const AmrCells& cells = adj.alien[iface] < 0 ? *this : aliens;
+        auto [neibs, jc] = adj.get_neib(iface, *this, aliens);
 
         Vector3d fc = faces.center[iface];
 
@@ -567,17 +567,17 @@ int AmrCells::check_connectivity(index_t ic, AmrCells& aliens) const {
         // и ссылаться на текущую ячейку
         int counter = 0;
 
-        for (index_t jface: cells.faces_range(jc)) {
-            if (cells.faces.is_undefined(jface)) {
+        for (index_t jface: neibs.faces_range(jc)) {
+            if (neibs.faces.is_undefined(jface)) {
                 continue;
             }
 
             // простая граничная грань
-            if (cells.faces.is_boundary(jface)) {
+            if (neibs.faces.is_boundary(jface)) {
                 continue;
             }
 
-            Vector3d nfc = cells.faces.center[jface];
+            Vector3d nfc = neibs.faces.center[jface];
             if ((fc - nfc).norm() > 1.0e-6 * linear_size(ic)) {
                 continue;
             }
@@ -586,56 +586,56 @@ int AmrCells::check_connectivity(index_t ic, AmrCells& aliens) const {
             ++counter;
 
             // нормали противоположны
-            if (std::abs(faces.normal[iface].dot(cells.faces.normal[jface]) + 1.0) > 1.0e-6) {
+            if (std::abs(faces.normal[iface].dot(neibs.faces.normal[jface]) + 1.0) > 1.0e-6) {
                 std::cout << "\tOpposite faces have not opposite normals\n";
                 std::cout << "\tCurrent cell:\n";
                 print_info(ic);
                 std::cout << "\tNeighbor:\n";
-                cells.print_info(jc);
+                neibs.print_info(jc);
                 return -1;
             }
             // площади совпадают
-            if (std::abs(faces.area[iface] - cells.faces.area[jface]) > 1.0e-6 * linear_size(ic)) {
+            if (std::abs(faces.area[iface] - neibs.faces.area[jface]) > 1.0e-6 * linear_size(ic)) {
                 std::cout << "\tOpposite faces have different area\n";
                 std::cout << "\tCurrent cell:\n";
                 print_info(ic);
                 std::cout << "\tNeighbor:\n";
-                cells.print_info(jc);
+                neibs.print_info(jc);
                 return -1;
             }
             // Указывает на исходную ячейку
-            if (cells.faces.adjacent.index[jface] != ic || cells.faces.adjacent.alien[jface] >= 0) {
-                std::cout << "\tWrong connection (index != ic)\n";
+            if (neibs.faces.adjacent.index[jface] != ic) {
+                std::cout << "\tWrong connection (index != ic). " << f_name << " face\n";
                 std::cout << "\tCurrent cell:\n";
                 print_info(ic);
                 std::cout << "\tNeighbor:\n";
-                cells.print_info(jc);
+                neibs.print_info(jc);
                 return -1;
             }
             // Ранг смежной (исходная) больше нуля
-            if (cells.faces.adjacent.rank[jface] < 0) {
+            if (neibs.faces.adjacent.rank[jface] < 0) {
                 std::cout << "\tWrong adjacent (rank < 0)\n";
                 std::cout << "\tCurrent cell:\n";
                 print_info(ic);
                 std::cout << "\tNeighbor:\n";
-                cells.print_info(jc);
+                neibs.print_info(jc);
                 return -1;
             }
             // Ранг смежной (исходная) равен рангу процесса
-            if (cells.faces.adjacent.rank[jface] != mpi::rank()) {
+            if (neibs.faces.adjacent.rank[jface] != mpi::rank()) {
                 std::cout << "\tWrong adjacent (rank)\n";
                 std::cout << "\tCurrent cell:\n";
                 print_info(ic);
                 std::cout << "\tNeighbor:\n";
-                cells.print_info(jc);
+                neibs.print_info(jc);
                 return -1;
             }
         }
         if (counter < 1) {
-            std::cout << "\tHas no neighbor across ordinary " << side_to_string(iface - face_begin[ic], m_dim) << "\n";
+            std::cout << "\tHas no neighbor across ordinary " << f_name << "\n";
             print_info(ic);
             std::cout << "\tNeighbor:\n";
-            cells.print_info(jc);
+            neibs.print_info(jc);
             return -1;
         }
         if (counter > 1) {
