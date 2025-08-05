@@ -117,11 +117,11 @@ void Rectangle::set_nx(int nx) {
     }
     if (!m_voronoi) {
         m_nx = nx;
-        m_ny = int(std::round(m_nx * (m_ymax - m_ymin) / (m_xmax - m_xmin)));
+        m_ny = std::max(int(std::round(m_nx * (m_ymax - m_ymin) / (m_xmax - m_xmin))), 1);
     }
     else {
-        m_nx = int(std::round(nx * std::pow(3.0, 0.25)) / std::sqrt(2.0));
-        m_ny = int(std::round(m_nx * (m_ymax - m_ymin) / (m_xmax - m_xmin) / std::sqrt(3.0)));
+        m_nx = std::max(int(std::round(nx * std::pow(3.0, 0.25)) / std::sqrt(2.0)), 1);
+        m_ny = std::max(int(std::round(m_nx * (m_ymax - m_ymin) / (m_xmax - m_xmin) / std::sqrt(3.0))), 1);
     }
     compute_size();
 }
@@ -132,11 +132,11 @@ void Rectangle::set_ny(int ny) {
     }
     if (!m_voronoi) {
         m_ny = ny;
-        m_nx = int(std::round(ny * (m_xmax - m_xmin) / (m_ymax - m_ymin)));
+        m_nx = std::max(int(std::round(ny * (m_xmax - m_xmin) / (m_ymax - m_ymin))), 1);
     }
     else {
-        m_ny = int(std::round(ny / std::pow(3.0, 0.25)) / std::sqrt(2.0));
-        m_nx = int(std::round(m_ny * (m_xmax - m_xmin) / (m_ymax - m_ymin) * std::sqrt(3.0)));
+        m_ny = std::max(int(std::round(ny / std::pow(3.0, 0.25)) / std::sqrt(2.0)), 1);
+        m_nx = std::max(int(std::round(m_ny * (m_xmax - m_xmin) / (m_ymax - m_ymin) * std::sqrt(3.0))), 1);
     }
     compute_size();
 }
@@ -150,8 +150,8 @@ void Rectangle::set_sizes(int nx, int ny) {
         m_ny = ny;
     }
     else {
-        m_nx = int(std::round(nx * std::pow(3.0, 0.25)) / std::sqrt(2.0));
-        m_ny = int(std::round(ny / std::pow(3.0, 0.25)) / std::sqrt(2.0));
+        m_nx = std::max(int(std::round(nx * std::pow(3.0, 0.25)) / std::sqrt(2.0)), 1);
+        m_ny = std::max(int(std::round(ny / std::pow(3.0, 0.25)) / std::sqrt(2.0)), 1);
     }
     compute_size();
 
@@ -176,15 +176,15 @@ void Rectangle::set_size(int N) {
 
     if (!m_voronoi) {
         double d = std::sqrt((m_xmax - m_xmin) * (m_ymax - m_ymin) / N);
-        m_nx = int(std::round((m_xmax - m_xmin) / d));
-        m_ny = int(std::round((m_ymax - m_ymin) / d));
+        m_nx = std::max(int(std::round((m_xmax - m_xmin) / d)), 1);
+        m_ny = std::max(int(std::round((m_ymax - m_ymin) / d)), 1);
     }
     else {
         double a = std::sqrt(2 * (m_xmax - m_xmin) * (m_ymax - m_ymin) / (std::sqrt(3.0) * N));
         double h = std::sqrt(3.0) * a;
 
-        m_nx = int(std::round((m_xmax - m_xmin) / a));
-        m_ny = int(std::round((m_ymax - m_ymin) / h));
+        m_nx = std::max(int(std::round((m_xmax - m_xmin) / a)), 1);
+        m_ny = std::max(int(std::round((m_ymax - m_ymin) / h)), 1);
     }
     compute_size();
 }

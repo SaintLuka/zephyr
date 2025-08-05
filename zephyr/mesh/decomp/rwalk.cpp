@@ -1,3 +1,5 @@
+#include <random>
+
 #include <zephyr/geom/vector.h>
 #include <zephyr/mesh/decomp/rwalk.h>
 

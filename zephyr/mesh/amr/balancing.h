@@ -1,16 +1,13 @@
-/// @file Файл содержит реализацию простой функции балансировки флагов адаптации.
-/// Данный файл не устанавливается при установке zephyr, все изложенные описания
-/// алгоритмов и комментарии к функциям предназначены исключительно для
-/// разработчиков. Хотя вряд ли кто-то когда-нибудь попробует в этом разобраться.
-
+// Функция balancing верхнего уровня, выполняет балансировку флагов адаптации.
+//
+// Не устанавливается при установке zephyr, детали алгоритмов и комментарии
+// к функциям предназначены для разработчиков.
 #pragma once
 
 #include <zephyr/mesh/amr/common.h>
 #include <zephyr/mesh/amr/siblings.h>
 #include <zephyr/mesh/amr/balancing_slow.h>
 #include <zephyr/mesh/amr/balancing_fast.h>
-
-#include <zephyr/io/vtu_file.h>
 
 namespace zephyr::mesh::amr {
 
@@ -38,8 +35,9 @@ inline void balance_flags(AmrCells &cells, int max_level) {
 }
 
 #ifdef ZEPHYR_MPI
-/// @brief Функция балансировки флагов верхнего уровня блээээт
-void balance_flags(Tourism& tourism, AmrCells &locals, AmrCells& aliens, int max_level) {
+
+/// @brief Функция балансировки флагов верхнего уровня
+inline void balance_flags(Tourism& tourism, AmrCells &locals, AmrCells& aliens, int max_level) {
     if (locals.empty()) {
         amr::balance_flags_slow<0>(tourism, locals, aliens, max_level);
     }
@@ -55,6 +53,7 @@ void balance_flags(Tourism& tourism, AmrCells &locals, AmrCells& aliens, int max
     amr::check_flags(locals, aliens, max_level);
 #endif
 }
+
 #endif
 
 } // namespace zephyr::mesh::amr

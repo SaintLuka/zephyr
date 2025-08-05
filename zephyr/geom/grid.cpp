@@ -3,7 +3,7 @@
 #include <zephyr/utils/mpi.h>
 #include <zephyr/geom/grid.h>
 
-#include <zephyr/mesh/primitives/side.h>
+#include <zephyr/mesh/side.h>
 
 using zephyr::mesh::Side3D;
 

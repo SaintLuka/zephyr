@@ -81,7 +81,7 @@ Variable::Variable(const char* name)
         m_write = [n_faces](EuCell& cell, void *arg) {
             auto out = (int8_t *) arg;
             for (int i = 0; i < n_faces; ++i) {
-                out[i] = cell.face(i).neib_rank();
+                out[i] = cell.face(i).adj_rank();
             }
         };
     }

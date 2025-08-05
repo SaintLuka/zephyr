@@ -12,8 +12,6 @@
 
 namespace zephyr::mesh {
 
-using zephyr::utils::Storable;
-
 /// @brief Поддерживает согласованные обменные слои
 class Tourism final {
 public:
@@ -133,7 +131,7 @@ void Tourism::prepare(const AmrCells& locals, Storable<T> var) {
 template <typename... Args>
 void Tourism::sync(const AmrCells& locals, AmrCells& aliens, Args&&... vars) {
     static_assert(sizeof...(Args) > 0, "Tourism::sync, zero arguments");
-    utils::assert_all_storable<Args...>();
+    soa::assert_storable<Args...>();
     
     // Отправить и дождаться одну переменную
     auto sync_one = [&](auto&& var) {

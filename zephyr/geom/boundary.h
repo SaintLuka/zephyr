@@ -34,7 +34,7 @@ inline std::string to_string(Boundary type) {
     }
 }
 
-/// @brief Вывод типа гран условия в поток
+/// @brief Вывод типа граничного условия в консоль
 inline std::ostream &operator<<(std::ostream &os, Boundary boundary) {
     os << to_string(boundary);
     return os;

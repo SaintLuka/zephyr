@@ -100,7 +100,7 @@ double AmrCells::incircle_diameter(index_t ic) const {
     } else {
         assert(m_dim == 2);
         int n = node_count(ic);
-        // Диаметр описаной окружности вокруг правильного многоугольника
+        // Диаметр вписаной окружности внутрь правильного многоугольника
         // с площадью volume.
         return 2.0 * std::sqrt(volume[ic] / (n * std::tan(M_PI / n)));
     }
@@ -143,7 +143,7 @@ Polygon AmrCells::polygon(index_t ic) const {
     }
 }
 
-double AmrCells::approx_vol_fraction(index_t ic, const std::function<double(const Vector3d &)> &inside) const {
+double AmrCells::approx_vol_fraction(index_t ic, const InFunction &inside) const {
     if (m_dim < 3) {
         if (m_adaptive) {
             const SqQuad& vertices = mapping<2>(ic);
@@ -249,7 +249,7 @@ double AmrCells::approx_vol_fraction(index_t ic, const std::function<double(cons
     }
 }
 
-double AmrCells::volume_fraction(index_t ic, const std::function<double(const Vector3d &)> &inside, int n_points) const {
+double AmrCells::volume_fraction(index_t ic, const InFunction &inside, int n_points) const {
     if (m_dim < 3) {
         if (m_adaptive) {
             if (m_linear) {
@@ -284,7 +284,7 @@ double AmrCells::volume_fraction(index_t ic, const std::function<double(const Ve
     }
 }
 
-bool AmrCells::const_function(index_t ic, const std::function<double(const Vector3d&)>& func) const {
+bool AmrCells::const_function(index_t ic, const SpFunction& func) const {
     double value = func(center[ic]);
     if (m_dim < 3) {
         if (m_adaptive) {
@@ -321,7 +321,7 @@ bool AmrCells::const_function(index_t ic, const std::function<double(const Vecto
     }
 }
 
-double AmrCells::integrate_low(index_t ic, const std::function<double(const Vector3d&)>& func, int n_points) const {
+double AmrCells::integrate_low(index_t ic, const SpFunction& func, int n_points) const {
     if (m_dim < 3) {
         if (m_adaptive) {
             if (m_linear) {

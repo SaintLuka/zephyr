@@ -5,11 +5,24 @@
 
 namespace zephyr::mesh {
 
+/// @brief Число вершин простой грани.
+constexpr int VpF(int dim) { return dim < 3 ? 2 : 4; }
+
+/// @brief Количество подграней.
+constexpr int FpF(int dim) { return dim < 3 ? 2 : 4; }
+
+/// @brief Число граней у простой ячейки.
+constexpr int FpC(int dim) { return dim < 3 ? 4 : 6; }
+
+/// @brief Количество дочерних ячеек.
+constexpr int CpC(int dim) { return dim < 3 ? 4 : 8; }
+
+
 /// @brief Структура позволяет хранить индексы граней AMR-ячейки.
-/// В большинстве контекстов работает как простой enum Side : int,
-/// то есть позволяет получить Side2D::LEFT, Side3D::BACK, ...
+/// В большинстве контекстов работает как простой `enum Side : int`,
+/// то есть позволяет получить `Side2D::LEFT`, `Side3D::BACK`, ...
 /// Также позволяет получить индексы подграней, к примеру,
-/// для трехмерной ячейки Side3D::BACK[0], Side3D::BACK[1], ...
+/// для трехмерной ячейки `Side3D::BACK[0]`, `Side3D::BACK[1]`, ...
 /// @tparam dim Размерность ячейки
 template <int dim>
 struct Side {
@@ -28,7 +41,7 @@ struct Side {
     static constexpr Side L = LEFT;
     static constexpr Side R = RIGHT;
     static constexpr Side B = BOTTOM;
-    static constexpr Side T = TOP;;
+    static constexpr Side T = TOP;
     static const Side X;
     static const Side F;
 
@@ -45,7 +58,16 @@ struct Side {
     static constexpr int count() { return 2 * dim; }
 
     /// @brief Число подграней сложной грани
-    static constexpr int subfaces() { return dim == 2 ? 2 : 4; }
+    static constexpr int n_subfaces() { return dim == 2 ? 2 : 4; }
+
+    /// @brief Индексы подграней на стороне в списке faces.
+    std::array<Side, n_subfaces()> subfaces() const {
+        if constexpr (dim == 2) {
+            return {Side{val}, Side{val}[1]};
+        } else {
+            return {Side{val}, Side{val}[1], Side{val}[2], Side{val}[3]};
+        }
+    }
 
     /// @brief Получить подгрань сложной грани
     constexpr Side operator[](int idx) const {

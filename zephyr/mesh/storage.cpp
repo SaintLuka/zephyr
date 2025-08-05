@@ -1,8 +1,8 @@
-#include <cstring>
+#include <iostream>
 
-#include <zephyr/utils/storage.h>
+#include <zephyr/mesh/storage.h>
 
-namespace zephyr::utils {
+namespace zephyr::mesh {
 
 // Название базового типа
 template <typename T>
@@ -36,7 +36,7 @@ std::string basic_type_name() {
     }
 }
 
-// Выполняет resize для полей данных, нужно для копии сигнатуры SoaStorage
+// Выполняет resize для полей данных, нужно для копии сигнатуры Storage
 template <int I = 0, typename... Ts>
 void resize_by_example(const std::tuple<Ts...>& old_values,
                        std::tuple<Ts...>& new_values) {
@@ -46,8 +46,8 @@ void resize_by_example(const std::tuple<Ts...>& old_values,
     }
 }
 
-SoaStorage SoaStorage::same() const {
-    SoaStorage new_s;
+Storage Storage::same() const {
+    Storage new_s;
     new_s.m_names = m_names;
     resize_by_example(m_values, new_s.m_values);
     return new_s;
@@ -63,7 +63,7 @@ void resize_base(std::tuple<Ts...>& values, size_t new_size) {
     }
 }
 
-void SoaStorage::resize(size_t new_size) {
+void Storage::resize(size_t new_size) {
     m_size = new_size;
     resize_base(m_values, new_size);
 }
@@ -78,7 +78,7 @@ void reserve_base(std::tuple<Ts...>& values, size_t new_size) {
     }
 }
 
-void SoaStorage::reserve(size_t new_size) {
+void Storage::reserve(size_t new_size) {
     reserve_base(m_values, new_size);
 }
 
@@ -92,7 +92,7 @@ void shrink_base(std::tuple<Ts...>& values) {
     }
 }
 
-void SoaStorage::shrink_to_fit() {
+void Storage::shrink_to_fit() {
     shrink_base(m_values);
 }
 
@@ -135,7 +135,7 @@ int print_base(const std::array<soa::names_t, sizeof...(Ts)>& names, const std::
                 }
             }
             else {
-                std::cout << "  " << sizeof(soa::storable_types::type<I>) << " byte type arrays:\n    ";
+                std::cout << "  " << sizeof(soa::storable_types::get_type<I>) << " byte type arrays:\n    ";
                 for (int j = 0; j < names[I].size() - 1; ++j) {
                     std::cout << "'" << names[I][j] << "', ";
                 }
@@ -149,12 +149,12 @@ int print_base(const std::array<soa::names_t, sizeof...(Ts)>& names, const std::
     return 0;
 }
 
-void SoaStorage::print() const {
+void Storage::print() const {
     if (empty()) {
-        std::cout << "SoaStorage is empty\n";
+        std::cout << "Storage is empty\n";
     }
     else {
-        std::cout << "SoaStorage contains " << size() << " elements\n";
+        std::cout << "Storage contains " << size() << " elements\n";
     }
     //int count = 0;
     int count = print_base(m_names, m_values);
@@ -166,7 +166,7 @@ void SoaStorage::print() const {
 }
 
 
-void SoaStorage::copy_data(size_t from, size_t to) {
+void Storage::copy_data(size_t from, size_t to) {
     copy_data(from, this, to);
 }
 
@@ -191,8 +191,8 @@ static void copy_values(const std::tuple<Ts...>& src, size_t from,
     }
 }
 
-void SoaStorage::copy_data(size_t from, SoaStorage* dst, size_t to) const {
+void Storage::copy_data(size_t from, Storage* dst, size_t to) const {
     copy_values(m_values, from, dst->m_values, to);
 }
 
-} // namespace zephyr::utils
+} // namespace zephyr::mesh

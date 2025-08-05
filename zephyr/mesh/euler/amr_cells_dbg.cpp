@@ -11,8 +11,6 @@ using namespace zephyr::geom;
 
 namespace zephyr::mesh {
 
-inline int VpF(int dim) { return dim == 2 ? 2 : 4; }
-
 void AmrCells::print_info(index_t ic) const {
     std::cout << "\t\tarr.ic: " << ic << "\n";
     std::cout << "\t\tcenter: " << center[ic].transpose() << "\n";

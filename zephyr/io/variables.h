@@ -121,7 +121,7 @@ public:
     /// @param func Некоторая функция, которая для произвольной ячейки выдает
     /// значение переменной
     template <typename T>
-    void append(std::string name, const utils::Storable<T>& p) {
+    void append(std::string name, const mesh::Storable<T>& p) {
         if (VtkType::get<T>().is_undefined()) {
             if constexpr (std::is_same_v<T, geom::Vector3d>) {
                 append(name, 3, WriteSoaCell<double>(

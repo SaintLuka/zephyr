@@ -1,7 +1,7 @@
 #include <fstream>
 
 #include <zephyr/io/vtu_file.h>
-#include <zephyr/mesh/primitives/side.h>
+#include <zephyr/mesh/side.h>
 #include <zephyr/geom/primitives/quad.h>
 #include <zephyr/geom/primitives/cube.h>
 
@@ -458,7 +458,7 @@ void VtuFile::save(EuMesh &mesh) {
     //    save(mesh.locals(), mesh.nodes());
     //}
     //else {
-        save(mesh.m_locals);
+        save(mesh.locals());
     //}
 }
 

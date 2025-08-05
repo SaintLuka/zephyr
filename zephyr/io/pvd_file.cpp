@@ -154,7 +154,7 @@ void PvdFile::open(const std::string& filename, const std::string& _directory, b
 }
 
 void PvdFile::save(mesh::EuMesh& mesh, double timestep) {
-    save(mesh.m_locals, timestep);
+    save(mesh.locals(), timestep);
 }
 
 void PvdFile::save(mesh::AmrCells& elements, double timestep) {

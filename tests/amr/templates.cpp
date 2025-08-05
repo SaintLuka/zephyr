@@ -1,4 +1,4 @@
-/// @file Проверка производных на AMR-шаблонах
+// @brief Проверка производных на AMR-шаблонах
 #ifdef ZEPHYR_EIGEN
 #include <iomanip>
 

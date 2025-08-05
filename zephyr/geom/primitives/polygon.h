@@ -178,7 +178,8 @@ protected:
     Vector3d m_center;         ///< Центр полигона
 };
 
-std::ostream& operator<<(std::ostream& os, const Polygon& poly);
+/// @brief Вывод многоугольника в консоль
+static std::ostream& operator<<(std::ostream& os, const Polygon& poly);
 
 /// @}
 

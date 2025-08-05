@@ -1,6 +1,3 @@
-/// @file Основной код был позаимствован отсюда:
-/// https://github.com/progschj/ThreadPool
-
 #pragma once
 
 #include <vector>
@@ -15,6 +12,8 @@
 
 namespace zephyr::utils {
 
+/// @brief Пул-тредов, за основу взят код
+/// https://github.com/progschj/ThreadPool
 class ThreadPool {
 public:
     explicit ThreadPool(size_t);

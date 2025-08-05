@@ -6,7 +6,7 @@
 using namespace zephyr::mesh;
 
 using zephyr::geom::Vector3d;
-using zephyr::utils::SoaStorage;
+using zephyr::mesh::Storage;
 
 // Имитация вектора состояния
 struct PState {
@@ -16,7 +16,7 @@ struct PState {
     Storable<double>   e;    // Энергия
 
     // Изменяет хранилище s, добавляет в него новые поля
-    void add_types(SoaStorage &s, const std::string &prefix) {
+    void add_types(Storage &s, const std::string &prefix) {
         rho = s.add<double>  (prefix + ".rho");
         v   = s.add<Vector3d>(prefix + ".v");
         P   = s.add<double>  (prefix + ".P");
@@ -30,11 +30,11 @@ struct State {
     PState half;  // Состояние на полушаге
     PState next;  // Состояние на следующем шаге
 
-    /// @brief Градиент вектора состояния
+    // @brief Градиент вектора состояния
     PState d_dx, d_dy, d_dz;
 
     // Изменяет хранилище s, добавляет в него новые поля
-    void add_types(SoaStorage &s) {
+    void add_types(Storage &s) {
         curr.add_types(s, "curr");
         half.add_types(s, "half");
         next.add_types(s, "next");
@@ -48,7 +48,7 @@ inline std::string yes_no(bool val) { return val ? "yes" : "no"; }
 
 
 int main() {
-    SoaStorage s;
+    Storage s;
 
     // Напечатать пустое хранилище без полей
     s.print();
@@ -75,7 +75,7 @@ int main() {
     {
         // Другой вариант, создать сразу хранилище на 100 элементов,
         // но без полей
-        SoaStorage s2(100);
+        Storage s2(100);
         s2.print();
     }
 

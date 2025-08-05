@@ -179,7 +179,8 @@ protected:
     std::vector<Vector3d> faces_s;        ///< Нормаль с площадью
 };
 
-std::ostream& operator<<(std::ostream& os, const Polyhedron& poly);
+/// @brief Вывод многогранника в консоль
+static std::ostream& operator<<(std::ostream& os, const Polyhedron& poly);
 
 /// @}
 

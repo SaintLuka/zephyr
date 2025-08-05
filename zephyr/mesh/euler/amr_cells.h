@@ -1,11 +1,12 @@
 #pragma once
 
 #include <zephyr/utils/range.h>
-#include <zephyr/utils/storage.h>
-#include <zephyr/mesh/primitives/side.h>
+
+#include <zephyr/mesh/side.h>
+#include <zephyr/mesh/storage.h>
 #include <zephyr/mesh/euler/amr_faces.h>
 
-// Forward Declaration для классов из geom
+// forward declaration для классов из geom
 namespace zephyr::geom {
 class Quad;
 class SqQuad;
@@ -22,22 +23,32 @@ namespace zephyr::mesh {
 template <int dim>
 using SqMap = std::conditional_t<dim < 3, geom::SqQuad, geom::SqCube>;
 
-/// @brief Аналог AmrCell развернутый в структуру массивов,
-/// теоретически, все функции тоже можно просто скопировать.
-/// Три типа сеток.
-/// 1. Двумерная AMR сетка, по 8 граней, по 9 вершин на ячейку.
-/// 2. Трехмерная AMR сетка, по 24 грани, по 27 вершин на ячейку.
-/// 3. Неструктурированная/произвольная сетка. Произвольное число
-/// граней и вершин на ячейку, но вершины не уникальны.
-/// Нет неактуальных вершин.
-/// Неактуальные грани допускаются для AMR ячеек.
+
+/// @brief Набор ячеек в форме Structure of Arrays (набор массивов).
 ///
-/// Почему всё public, обоснование
+/// Поддерживается три типа сеткок:
+///   1. Двумерная AMR сетка, по 8 граней, по 9 вершин на ячейку.
+///   2. Трехмерная AMR сетка, по 24 грани, по 27 вершин на ячейку.
+///   3. Неструктурированная/произвольная сетка. Произвольное число граней
+///      и вершин на ячейку, но вершины не уникальны.
+///
+/// Сетка не поддерживает уникальные вершины и грани. Таким образом, одна
+/// внутренняя грань сетки хранится в двух экземплярах. Члены класса (за
+/// исключением базовых) помечены как public. Доступ к ним открыт, как
+/// если бы это была обычная структура. Сеточные данные обрабатываются
+/// специальными методами.
 class AmrCells final {
     // aliases inside class
     using Vector3d = geom::Vector3d;
-    using SoaStorage = utils::SoaStorage;
     using AmrVerts = std::vector<Vector3d>;
+
+    /// @brief Характеристическая функция (функция-индикатор)
+    using InFunction = std::function<bool(const Vector3d &)>;
+
+    /// @brief Пространственная функция
+    using SpFunction = std::function<double(const Vector3d &)>;
+
+    /// @{ @name Глобальные характеристики ячеек
 
     index_t m_size  = 0;      ///< Число ячеек
 
@@ -46,43 +57,47 @@ class AmrCells final {
     bool m_linear   = true;   ///< Линейная ячейка?
     bool m_axial    = false;  ///< Осевая симметрия?
 
-public:
+    /// @}
 
-    // Главные индексы ячейки
+public:
+    /// @{ @name Основные индексы ячейки
 
     std::vector<int>     rank;   ///< Ранг процесса владельца (< 0 -- ошибка, не используется)
     std::vector<index_t> next;   ///< Новый индекс в хранилище (в алгоритмах с перестановками)
     std::vector<index_t> index;  ///< Глобальный индекс элемента в локальном Storage
-                                 /// ( < 0 для неопределенных элементов, элементов на удаление)
-
-    // Величины, связанные с адаптацией
+                                 /// (< 0 для неопределенных элементов, элементов на удаление)
+    /// @}
+    /// @{ @name Характеристики адаптивных ячеек
 
     std::vector<int> flag;       ///< Желаемый флаг адаптации
     std::vector<int> level;      ///< Уровень адаптации (0 для базовой)
     std::vector<index_t> b_idx;  ///< Индекс среди базовых ячеек
     std::vector<index_t> z_idx;  ///< Индекс ячейки на z-кривой
 
-    // Геометрия ячеек
+    /// @}
+    /// @{ @name Геометрия ячеек
 
     std::vector<Vector3d> center;      ///< Барицентр ячейки
     std::vector<double>   volume;      ///< Объем трехмерной / площадь двумерной ячейки
     std::vector<double>   volume_alt;  ///< Объем двумерной осесимметричной ячейки
 
-    // Грани и вершины ячеек
+    /// @}
+    /// @{ @name Грани и вершины ячеек
 
     std::vector<index_t> face_begin;   ///< Индекс первой грани ячейки
     std::vector<index_t> node_begin;   ///< Индекс первой вершины ячейки
 
-    AmrFaces   faces;  ///< Массив граней ячеек
-    AmrVerts   verts;  ///< Массив вершин ячеек
+    AmrFaces faces;  ///< Массив граней ячеек
+    AmrVerts verts;  ///< Массив вершин ячеек
 
-    SoaStorage data;   ///< SoA с данными ячеек
+    /// @}
 
+    Storage  data;   ///< Данные ячеек
 
+public:
+    /// @{ @name Конструкторы
 
-    // Конструкторы
-
-    /// @brief Никак не уйти, иногда нужны
+    /// @brief Конструктор по умолчанию.
     AmrCells() = default;
 
     /// @brief Базовый конструктор
@@ -91,10 +106,12 @@ public:
     /// @param axial Сетка с осевой симметрией?
     explicit AmrCells(int dim, bool adaptive = false, bool axial = false);
 
-
-    /// @brief Создать пустое хранилище с таким же набором типов
+    /// @brief Создать пустой набор ячеек с таким же набором типов
     AmrCells same() const;
 
+    /// @}
+
+    /// @{ @name Общие характеристики ячеек
 
     /// @brief Размерность сетки
     int dim() const { return m_dim; }
@@ -120,9 +137,9 @@ public:
     /// @brief Использовать линейные отображения
     void set_linear(bool linear);
 
+    /// @}
 
-
-    // Базовые свойства всего хранилища
+    /// @{ @name Размеры хранилища
 
     /// @brief Пустое хранилище?
     bool empty() const { return m_size == 0; }
@@ -139,6 +156,31 @@ public:
     /// @brief Полное число вершин
     index_t n_nodes() const { return verts.size(); }
 
+    /// @brief Очистить хранилище
+    void clear();
+
+    /// @brief Только для AMR ячеек с установленной размерностью
+    void resize_amr(index_t n_cells);
+
+    /// @brief Только для AMR ячеек с установленной размерностью
+    void reserve_amr(index_t n_cells);
+
+    /// @brief Увеличить массивы под ячейки, грани и вершины
+    /// @param n_cells Полное число ячеек
+    /// @param n_faces Полное число граней
+    /// @param n_nodes Полное число вершин
+    void resize(index_t n_cells, index_t n_faces, index_t n_nodes);
+
+    /// @brief Зарезервировать под неструктурированные ячейки
+    /// @param n_cells Полное число ячеек
+    /// @param n_faces Полное число граней
+    /// @param n_nodes Полное число вершин
+    void reserve(index_t n_cells, index_t n_faces, index_t n_nodes);
+
+    /// @brief Сжать массивы до актуальных размеров
+    void shrink_to_fit();
+
+    /// @}
 
     /// @{ @name Топологические свойства ячеек
 
@@ -167,7 +209,7 @@ public:
     }
 
     /// @brief Число вершин, оно же максимальное, хранение неактуальных вершин
-    /// сейчас не допускается.
+    /// не допускается.
     int node_count(index_t ic) const {
         return node_begin[ic + 1] - node_begin[ic];
     }
@@ -195,13 +237,12 @@ public:
         return faces.is_actual(face_begin[ic] + side[1]);
     }
 
-    /// @brief Название грани для AMR-ячейки
+    /// @brief Название грани AMR-ячейки
     std::string face_name(index_t ic, index_t iface) const {
         return side_to_string(iface - face_begin[ic], m_dim);
     }
 
     /// @}
-
 
     /// @{ @name Геометрические свойства ячеек
 
@@ -249,6 +290,7 @@ public:
     /// @brief Создать полигон из ячейки (для 3D ячеек -- UB)
     geom::Polygon polygon(index_t ic) const;
 
+    /// @}
 
     /// @{ @name Сечения и интегрирование по ячейке
 
@@ -259,30 +301,29 @@ public:
     /// на узлах ячейки, позволяет быстро выяснить, содержит ли ячейка
     /// границу двух областей. Если ячейка внутри тела, то возвращает строго
     /// единицу 1.0, если снаружи -- строго ноль 0.0.
-    double approx_vol_fraction(index_t ic, const std::function<double(const Vector3d &)> &inside) const;
+    double approx_vol_fraction(index_t ic, const InFunction& inside) const;
 
     /// @brief Объемная доля, которая отсекается от ячейки некоторым телом.
     /// @param inside Характеристическая функция области, возвращает true для
     /// точек, которые располагаются внутри области.
     /// @param n_points Число тестовых точек, для которых проверяется функция
     /// inside, погрешность определения объемной доли ~ 1/N.
-    double volume_fraction(index_t ic, const std::function<double(const Vector3d &)> &inside, int n_points) const;
+    double volume_fraction(index_t ic, const InFunction& inside, int n_points) const;
 
     /// @brief Функция func является константой на ячейке?
     /// @details Проверяется значение функции в узлах и в центре ячейки,
     /// если все значения совпадают, то считается, что функция принимает
     /// постоянное значение в пределах ячейки.
-    bool const_function(index_t ic, const std::function<double(const Vector3d&)>& func) const;
+    bool const_function(index_t ic, const SpFunction& func) const;
 
     /// @brief Интеграл скалярной функции по ячейке
     /// @param n_points Разбиение по сторонам
     /// @details Сумма по барицентрам 2-го порядка (low accuracy order)
-    double integrate_low(index_t ic, const std::function<double(const Vector3d&)>& func, int n_points) const;
+    double integrate_low(index_t ic, const SpFunction& func, int n_points) const;
 
     /// @}
 
-
-    // Работа с данными
+    /// @{ @name Работа с данными
 
     void move_item(index_t ic);
 
@@ -301,32 +342,7 @@ public:
     void copy_geom_basic(index_t ic, AmrCells& cells,
             index_t jc, index_t face_beg, index_t node_beg) const;
 
-
-    // Размеры хранилища
-
-    /// @brief Очистить хранилище
-    void clear();
-
-    /// @brief Только для AMR ячеек с установленной размерностью
-    void resize_amr(index_t n_cells);
-
-    /// @brief Только для AMR ячеек с установленной размерностью
-    void reserve_amr(index_t n_cells);
-
-    /// @brief Увеличить массивы под ячейки, грани и вершины
-    /// @param n_faces Полное число граней!
-    /// @param n_nodes Полное число вершин!
-    void resize(index_t n_cells, index_t n_faces, index_t n_nodes);
-
-    /// @brief Зарезервировать под неструктурированные ячейки
-    /// @param n_faces Максимальное число граней на ячейку
-    /// @param n_nodes Максимальное число вершин на ячейку
-    void reserve(index_t n_cells, index_t n_faces, index_t n_nodes);
-
-    /// @brief Сжать массивы до актуальных размеров
-    void shrink_to_fit();
-
-
+    /// @}
 
     /// @{ @name Конструирование и добавление ячеек
 
@@ -397,15 +413,14 @@ public:
 
     /// @}
 
-
 protected:
     /// @brief Увеличить только массивы данных ячеек
     void resize_cells(index_t n_cells);
 
-    /// @brief Увеличить буфферы только для массивов данных ячеек
+    /// @brief Увеличить буферы только для массивов данных ячеек
     void reserve_cells(index_t n_cells);
 
-    /// @brief Увеличить буфферы только для массивов данных ячеек
+    /// @brief Увеличить буферы только для массивов данных ячеек
     void shrink_to_fit_cells();
 };
 

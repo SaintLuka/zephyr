@@ -1,8 +1,5 @@
-/// @file Файл содержит реализацию единственной функции retain_cell, которая
-/// используется для адаптации ячейки, которая не хочет адаптироваться (да, именно так).
-/// Данный файл не устанавливается при установке zephyr, все изложенные описания
-/// алгоритмов и комментарии к функциям предназначены исключительно для разработчиков.
-
+// Не устанавливается при установке zephyr, детали алгоритмов и комментарии
+// к функциям предназначены для разработчиков.
 #pragma once
 
 #include <zephyr/mesh/amr/common.h>
@@ -25,8 +22,8 @@ void retain_cell(AmrCells &locals, AmrCells& aliens, index_t ic) {
     auto lvl_c = locals.level[ic];
     auto& adj = locals.faces.adjacent;
 
-    for (int side = 0; side < FpC(dim); ++side) {
-        auto sides = subface_sides<dim>(side);
+    for (auto side: Side<dim>::items()) {
+        auto sides = side.subfaces();
 
         index_t iface = locals.face_begin[ic] + side;
 

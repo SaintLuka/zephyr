@@ -352,7 +352,7 @@ void SmFluid::swap(EuMesh &mesh) const {
 
 Distributor SmFluid::distributor(const std::string& type) const {
     if (type != "const" && type != "slope") {
-        throw std::runtime_error("SmFluid error: unknown distributor type '" + type + "'");
+        throw std::runtime_error("SmFluid error: unknown m_distributor type '" + type + "'");
     }
     
     using mesh::Children;

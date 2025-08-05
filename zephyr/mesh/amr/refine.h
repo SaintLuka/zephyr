@@ -1,41 +1,12 @@
-/// @brief Файл содержит реализацию функций для разбиения ячейки.
-/// Данный файл не устанавливается при установке zephyr, все изложенные описания
-/// алгоритмов и комментарии к функциям предназначены исключительно для разработчиков.
-
+// Не устанавливается при установке zephyr, детали алгоритмов и комментарии
+// к функциям предназначены для разработчиков.
 #pragma once
-
-#include <zephyr/geom/primitives/cube.h>
 
 #include <zephyr/mesh/amr/common.h>
 #include <zephyr/mesh/amr/faces.h>
 #include <zephyr/mesh/amr/coarse.h>
 
 namespace zephyr::mesh::amr {
-
-/// @brief Создать геометрию дочерних ячеек по родительской ячейке
-/// @param ic Позиция для размещения дочерних
-/// @param shape Родительская ячейка (SqQuad или SqCube)
-template <int dim>
-void create_children(index_t ic, AmrCells& cells, const SqMap<dim>& shape) {
-    if constexpr (dim == 2) {
-        auto quads = shape.children();
-        cells.set_cell(ic + 0, quads[0], cells.axial());
-        cells.set_cell(ic + 1, quads[1], cells.axial());
-        cells.set_cell(ic + 2, quads[2], cells.axial());
-        cells.set_cell(ic + 3, quads[3], cells.axial());
-    }
-    else {
-        auto cubes = shape.children();
-        cells.set_cell(ic + 0, cubes[0]);
-        cells.set_cell(ic + 1, cubes[1]);
-        cells.set_cell(ic + 2, cubes[2]);
-        cells.set_cell(ic + 3, cubes[3]);
-        cells.set_cell(ic + 4, cubes[4]);
-        cells.set_cell(ic + 5, cubes[5]);
-        cells.set_cell(ic + 6, cubes[6]);
-        cells.set_cell(ic + 7, cubes[7]);
-    }
-}
 
 /// @brief Связать грани соседних дочерних ячеек
 /// @param ic Индекс первой ячейки
@@ -258,7 +229,7 @@ index_t make_children(AmrCells &cells, index_t ip) {
 
                 auto child_fc = cells.faces.center[ch_face];
 
-                for (auto s: subface_sides<dim>(side)) {
+                for (auto s: side.subfaces()) {
                     auto cell_fc = cells.faces.center[p_face + s];
 
                     if ((child_fc - cell_fc).norm() < 1.0e-5 * cells.linear_size(ip)) {

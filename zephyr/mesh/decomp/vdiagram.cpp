@@ -6,11 +6,9 @@
 
 #include <zephyr/mesh/decomp/vdiagram.h>
 #include <zephyr/geom/primitives/polygon.h>
-
+#include <zephyr/math/random.h>
 
 namespace zephyr::mesh::decomp {
-
-using zephyr::geom::Polygon;
 
 VDiagram::VDiagram(const Box& domain, int size)
     : m_domain(domain), m_actual(false) {
@@ -552,7 +550,7 @@ void VDiagram::balancing() {
 
     std::vector<double> ws(size());
     for (int iGen = 0; iGen < size(); ++iGen) {
-        Polygon poly(m_lines[iGen], true);
+        geom::Polygon poly(m_lines[iGen], true);
         ws[iGen] = poly.area();
     }
     balancing(ws);

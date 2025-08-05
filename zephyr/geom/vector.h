@@ -12,6 +12,7 @@
 #include <zephyr/geom/eigen/interface.h>
 #endif
 
+/// @brief Геометрические примитивы, поиск площадей, объемов, сечений.
 namespace zephyr::geom {
 
 #ifdef ZEPHYR_EIGEN
@@ -62,11 +63,6 @@ template<class T>
 using ei_vec = Eigen::Matrix<double, sizeof(T) / sizeof(double), 1>;
 
 
-/// @brief Установить значения компоненты равными NAN
-inline void setNaN(Vector3d& vec) {
-    vec.x() = vec.y() = vec.z() = NAN;
-}
-
 /// @brief Аналог linspace из numpy.
 /// Создает равномерный массив из N чисел на отрезке [t1, t2],
 /// концы включаются
@@ -85,8 +81,8 @@ inline std::tuple<std::vector<std::vector<double>>,
         const std::vector<double>& x,
         const std::vector<double>& y) {
 
-    std::vector<std::vector<double>> X(x.size(), std::vector<double>(y.size()));
-    std::vector<std::vector<double>> Y(x.size(), std::vector<double>(y.size()));
+    std::vector X(x.size(), std::vector<double>(y.size()));
+    std::vector Y(x.size(), std::vector<double>(y.size()));
 
     for (size_t i = 0; i < x.size(); ++i) {
         for (size_t j = 0; j < y.size(); ++j) {

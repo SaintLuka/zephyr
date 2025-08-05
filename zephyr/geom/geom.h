@@ -3,7 +3,7 @@
 #pragma once
 
 /// @defgroup geom-primitives Геометрические примитивы
-/// @brief Треугольник, полигон, многогранник. Отображения: линия, четырехугольник, шестигранник.
+/// @brief Треугольник, многоугольник, многогранник. Отображения: линия, четырехугольник, шестигранник.
 
 #include <zephyr/geom/vector.h>
 #include <zephyr/geom/primitives/line.h>
@@ -12,3 +12,8 @@
 #include <zephyr/geom/primitives/triangle.h>
 #include <zephyr/geom/primitives/polygon.h>
 #include <zephyr/geom/primitives/polyhedron.h>
+
+/// @brief Основное пространство имен.
+namespace zephyr {
+
+}

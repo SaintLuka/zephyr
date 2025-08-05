@@ -1,5 +1,4 @@
 #include <zephyr/mesh/euler/distributor.h>
-
 #include <zephyr/mesh/euler/eu_prim.h>
 
 namespace zephyr::mesh {

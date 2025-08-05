@@ -1,4 +1,4 @@
-/// @brief Тестирование WENO реконструкции
+// @brief Тестирование WENO реконструкции
 
 #include <zephyr/geom/generator/strip.h>
 #include <zephyr/geom/generator/rectangle.h>

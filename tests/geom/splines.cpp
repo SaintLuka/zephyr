@@ -1,5 +1,5 @@
-/// @brief В geom/curves определено несколько классов параметрических кривых
-/// и сплайнов, протестируем их здесь.
+// @brief В geom/curves определено несколько классов параметрических кривых
+// и сплайнов, протестируем их здесь.
 #include <zephyr/geom/curves/linear_spline.h>
 #include <zephyr/geom/curves/cubic_spline.h>
 #include <zephyr/geom/curves/lagrange.h>

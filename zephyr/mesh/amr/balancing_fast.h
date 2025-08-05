@@ -1,12 +1,6 @@
-/// @file Файл содержит реализацию быстрой функции балансировки флагов адаптации.
-/// Данный файл не устанавливается при установке zephyr, все изложенные описания
-/// алгоритмов и комментарии к функциям предназначены исключительно для разработчиков.
-/// Хотя вряд ли кто-то когда-нибудь попробует в этом разобраться.
-
+// Не устанавливается при установке zephyr, детали алгоритмов и комментарии
+// к функциям предназначены для разработчиков.
 #pragma once
-
-#include <numeric>
-#include <iomanip>
 
 #include <zephyr/mesh/amr/common.h>
 #include <zephyr/mesh/amr/siblings.h>
@@ -165,7 +159,7 @@ private:
 
 /// @brief Обновляет флаг ячейки под индексом index, которая имеет флаг 0.
 /// Повышает флаг адаптации, если один из соседей хочет уровень на два выше
-inline void retain_update_flag(int ic, AmrCells &cells) {
+inline void retain_update_flag(index_t ic, AmrCells &cells) {
     scrutiny_check(ic < cells.size(), "round_1: cell_idx >= cells.size()")
     scrutiny_check(cells.flag[ic] == 0, "retain_update_flag: cell.flag != 0")
 
@@ -189,7 +183,7 @@ inline void retain_update_flag(int ic, AmrCells &cells) {
 /// Ставит флаг адаптации 0, если сосед хочет уровень на 1 выше,
 /// ставит флаг адаптации 1, если сосед хочет уровень на 2 выше,
 /// флаги сиблингов не рассматриваются.
-inline void coarse_update_flag(int ic, AmrCells &cells) {
+inline void coarse_update_flag(index_t ic, AmrCells &cells) {
     scrutiny_check(ic < cells.size(), "round_2/3: cell_idx >= cells.size()")
 
     if (cells.flag[ic] >= 0) {
@@ -220,7 +214,7 @@ inline void coarse_update_flag(int ic, AmrCells &cells) {
 /// @brief Обновляет флаг ячейки, которая имеет флаг -1.
 /// Ставит флаг адаптации 0, если один из сиблингов не хочет огрубляться.
 template <int dim>
-inline void coarse_update_flag_by_sibs(int ic, AmrCells &cells) {
+inline void coarse_update_flag_by_sibs(index_t ic, AmrCells &cells) {
     scrutiny_check(ic < cells.size(), "round_4: cell_idx >= cells.size()")
 
     if (cells.flag[ic] >= 0) {

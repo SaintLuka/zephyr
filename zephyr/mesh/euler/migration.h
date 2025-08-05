@@ -13,10 +13,10 @@ namespace zephyr::mesh {
 
 class Migration {
 public:
-    /// @brief Очистить буфферы
+    /// @brief Очистить буферы
     void clear();
 
-    /// @brief Привести буфферы к актуальным размерам
+    /// @brief Привести буферы к актуальным размерам
     void shrink_to_fit();
 
     /// @brief Основная функция перераспределения ячеек
@@ -56,7 +56,7 @@ protected:
             const std::tuple<Vars...>& loc_vars,
             const std::tuple<Vars...>& mig_vars);
 
-    /// @brief Вспомогательный буффер
+    /// @brief Вспомогательный буфер
     AmrCells migrants;
 
     Router cell_route;
@@ -137,7 +137,7 @@ void Migration::fill_migrants(AmrCells& locals,
 template <typename... Args>
 void Migration::migrate(Tourism& tourists, AmrCells& locals, AmrCells& aliens, Args&&... vars) {
     // Все дополнительные переменные имеют тип Storable<T>
-    utils::assert_all_storable<Args...>();
+    soa::assert_storable<Args...>();
 
     // Кортежи переменных std::tuple{Storable<T1>, Storable<T2>, ...}
     // loc_vars - переменные в locals

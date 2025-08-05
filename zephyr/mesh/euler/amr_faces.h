@@ -15,8 +15,8 @@ namespace zephyr::mesh {
 ///    rank  :    == this.rank    |    != this.rank
 ///    index :    < locals.size   |    < decomposition(rank).locals.size
 ///    alien :    < 0             |    < aliens.size
-struct AmrAdjacent final {
-
+class AmrAdjacent final {
+public:
     /// @brief Ранг процесса, на котором находится смежная ячейка
     /// при распределенном расчете.
     std::vector<int> rank;
@@ -49,7 +49,7 @@ struct AmrAdjacent final {
 
     /// @brief Получить хранилище ячеек, в котором находится сосед, а также
     /// индекс соседа в данном хранилище
-    template<class SomeArray>
+    template <class SomeArray>
     std::tuple<const SomeArray &, index_t> get_neib(index_t iface,
             const SomeArray &locals, const SomeArray &aliens) const {
         if (alien[iface] < 0) {
@@ -58,10 +58,16 @@ struct AmrAdjacent final {
             return {aliens, alien[iface]};
         }
     }
+
+    /// @brief Получить значение из массива, в котором находится сосед
+    template <typename T>
+    const T& get_value(index_t iface, const std::vector<T> &locals,
+            const std::vector<T> &aliens) const {
+        return alien[iface] < 0 ? locals[index[iface]] : aliens[alien[iface]];
+    }
 };
 
-/// @brief Перечисление используется для выбора граней
-/// с определенным направлением нормалей
+/// @brief Направление внешней нормали к грани
 enum class Direction : int {
     ANY = 0,  // Любое направление нормали
     X   = 1,
@@ -69,13 +75,14 @@ enum class Direction : int {
     Z   = 3
 };
 
-/// @brief Грани AMR-сетки, развернутые в SoA.
-struct AmrFaces final {
+/// @brief Набор граней в форме Structure of Arrays (набор массивов).
+class AmrFaces final {
     // aliases inside class
-    using Boundary = zephyr::geom::Boundary;
-    using Vector3d = zephyr::geom::Vector3d;
+    using Boundary = geom::Boundary;
+    using Vector3d = geom::Vector3d;
 
-    AmrAdjacent adjacent; ///< Индексы смежных ячеек
+public:
+    AmrAdjacent adjacent;            ///< Индексы смежных ячеек
 
     std::vector<Boundary> boundary;  ///< Тип граничного условия
     std::vector<Vector3d> normal;    ///< Внешняя нормаль к грани
@@ -93,7 +100,7 @@ struct AmrFaces final {
     /// @brief Изменить размер под число граней
     void resize(index_t n_faces);
 
-    /// @brief Расширить буффер под число граней
+    /// @brief Расширить буфер под число граней
     void reserve(index_t n_faces);
 
     /// @brief Сжать до актуальных размеров

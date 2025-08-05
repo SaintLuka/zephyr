@@ -1,4 +1,4 @@
-/// @brief Тестирование многогранников, сечения, объемы и прочее
+// @brief Тестирование многогранников, сечения, объемы и прочее
 
 #include <zephyr/geom/primitives/polyhedron.h>
 #include <zephyr/io/pvd_file.h>

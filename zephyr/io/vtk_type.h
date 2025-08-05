@@ -5,8 +5,7 @@
 
 namespace zephyr::io {
 
-/// @brief Простенький класс для хранения типа скаляра при сохранении VTU.
-/// Работает как класс перечисления.
+/// @brief Тип скаляра при сохранении в VTU, работает как enum class.
 class VtkType {
 public:
     enum ValueType : int {
@@ -92,7 +91,7 @@ private:
     ValueType m_value;
 };
 
-/// @brief Оператор для вывода типа в поток
+/// @brief Оператор для вывода типа в консоль
 std::ostream& operator<<(std::ostream& os, const VtkType& vtk_type);
 
 } // namespace zephyr::io

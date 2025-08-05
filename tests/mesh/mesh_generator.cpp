@@ -68,11 +68,11 @@ struct Test {
         BlockStruct1, BlockStruct2, BlockStruct3
     };
 
-    std::string name;  ///< Название теста
-    std::string file;  ///< Имя выходного файла
-    std::string desc;  ///< Описание теста
+    std::string name;  //< Название теста
+    std::string file;  //< Имя выходного файла
+    std::string desc;  //< Описание теста
     
-    Generator::Ptr generator;  ///< Сеточный генератор
+    Generator::Ptr generator;  //< Сеточный генератор
     
     Test(TestType test);
 

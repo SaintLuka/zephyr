@@ -3,7 +3,7 @@
 #list(APPEND TESTS mesh_generator)
 #list(APPEND TESTS movable_mesh)
 #list(APPEND TESTS soa-mesh)
-#list(APPEND TESTS soa-storage)
+list(APPEND TESTS soa-storage)
 #list(APPEND TESTS voronoi)
 
 # Assume all files in direcory are tests

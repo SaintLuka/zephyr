@@ -1,5 +1,5 @@
 #include <zephyr/mesh/decomp/VD3.h>
-
+#include <zephyr/math/random.h>
 
 namespace zephyr::mesh::decomp {
 

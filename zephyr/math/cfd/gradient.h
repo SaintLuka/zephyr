@@ -2,7 +2,7 @@
 
 #include <functional>
 #include <zephyr/geom/vector.h>
-#include <zephyr/utils/storage.h>
+#include <zephyr/mesh/storage.h>
 #include <zephyr/math/cfd/limiter.h>
 #include <zephyr/mesh/euler/eu_mesh.h>
 

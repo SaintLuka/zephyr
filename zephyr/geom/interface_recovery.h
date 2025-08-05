@@ -1,23 +1,21 @@
 #pragma once
 
-
 #include <zephyr/mesh/euler/eu_prim.h>
 #include <zephyr/mesh/euler/eu_mesh.h>
 
 namespace zephyr::geom {
 
-using zephyr::mesh::EuCell;
-using zephyr::mesh::EuMesh;
-using zephyr::mesh::AmrCells;
-using zephyr::mesh::Storable;
-using zephyr::geom::Vector3d;
-
+using mesh::EuCell;
+using mesh::EuMesh;
+using mesh::AmrCells;
+using mesh::Storable;
+using geom::Vector3d;
 
 /// @brief Восстановление интерфейса для многоматериальных задач.
 /// Работает на сетках с произвольными данными, единственное условие: 
 /// в данных должны быть поля для хранения трех величин
 /// 1. Объемная доля
-/// 2. Номаль интерфейса в ячейке
+/// 2. Нормаль интерфейса в ячейке
 /// 3. Точка плоскости внутри ячейке.
 /// Последние две величины определяются с использованием данного класса.
 class InterfaceRecovery {

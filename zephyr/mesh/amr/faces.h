@@ -1,14 +1,8 @@
-/// @brief Файл содержит операции разбиения и огрубления для граней ячейки.
-/// Данный файл не устанавливается при установке zephyr, все изложенные описания
-/// алгоритмов и комментарии к функциям предназначены исключительно для разработчиков.
-
+// Не устанавливается при установке zephyr, детали алгоритмов и комментарии
+// к функциям предназначены для разработчиков.
 #pragma once
 
-#include <zephyr/geom/primitives/line.h>
-#include <zephyr/mesh/primitives/side.h>
-#include <zephyr/mesh/euler/amr_cells.h>
 #include <zephyr/mesh/amr/common.h>
-
 
 namespace zephyr::mesh::amr {
 

@@ -1,8 +1,8 @@
-/// @file Файл содержит набор определений и реализацию некоторых простых функций,
-/// используемых в алгоритмах адаптации.
-/// Данный файл не устанавливается при установке zephyr, все изложенные описания
-/// алгоритмов и комментарии к функциям предназначены исключительно для разработчиков.
-
+// Базовые настройки адаптации. Сразу делаем include и using для всех классов,
+// которые используются внутри namespace amr.
+//
+// Не устанавливается при установке zephyr, детали алгоритмов и комментарии
+// к функциям предназначены для разработчиков.
 #pragma once
 
 #define SCRUTINY 0          ///< Тщательная проверка вычислений
@@ -17,22 +17,58 @@
 #define scrutiny_check(...)
 #endif
 
+#include <set>
 #include <array>
-#include <zephyr/mesh/euler/eu_mesh.h>
-#include <zephyr/mesh/primitives/decomposition.h>
+#include <iomanip>
+#include <numeric>
+
+#include <zephyr/configuration.h>
+
+#include <zephyr/mesh/side.h>
+#include <zephyr/mesh/euler/eu_prim.h>
+#include <zephyr/geom/primitives/line.h>
+#include <zephyr/geom/primitives/quad.h>
+#include <zephyr/geom/primitives/cube.h>
+
+#include <zephyr/utils/threads.h>
+
+#ifdef ZEPHYR_MPI
+#include <zephyr/utils/mpi.h>
+#include <zephyr/mesh/euler/tourism.h>
+#endif
+
+#ifdef CHECK_PERFORMANCE
+#include <zephyr/utils/stopwatch.h>
+#endif
 
 namespace zephyr::mesh::amr {
 
-using namespace zephyr::geom;
+using utils::threads;
+using mesh::AmrCells;
+using mesh::Children;
+using geom::Vector3d;
+using geom::Line;
+using geom::Quad;
+using geom::SqQuad;
+using geom::Cube;
+using geom::SqCube;
+using geom::Boundary;
+
+#ifdef ZEPHYR_MPI
+using utils::mpi;
+using mesh::Tourism;
+#endif
 
 #ifdef CHECK_PERFORMANCE
+using utils::Stopwatch;
+
 /// @brief Частота вывода сообщений о производительности
 static const size_t check_frequency = 100;
 #endif
 
 /// @brief Локальные индексы ячеек, прилегающих к стороне.
 template<int dim>
-constexpr std::array<std::array<int, VpF(dim)>, FpC(dim)> get_children_by_side() {
+constexpr std::array<std::array<int, FpF(dim)>, FpC(dim)> get_children_by_side() {
     if constexpr (dim == 2) {
         return {
             std::array<int, 2>({0, 2}),
@@ -50,17 +86,6 @@ constexpr std::array<std::array<int, VpF(dim)>, FpC(dim)> get_children_by_side()
             std::array<int, 4>({0, 1, 2, 3}),
             std::array<int, 4>({4, 5, 6, 7})
         };
-    }
-}
-
-/// @brief Индексы подграней на стороне в списке faces.
-template<int dim>
-std::array<Side<dim>, FpF(dim)> subface_sides(int side) {
-    if constexpr (dim == 2) {
-        return {Side<dim>(side), Side<dim>(side)[1]};
-    }
-    else {
-        return {Side<dim>(side), Side<dim>(side)[1], Side<dim>(side)[2], Side<dim>(side)[3]};
     }
 }
 

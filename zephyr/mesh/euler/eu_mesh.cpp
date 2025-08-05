@@ -45,7 +45,7 @@ EuMesh::EuMesh(Generator& gen) {
     m_aliens = m_locals.same();
 
     structured = false;
-    m_nx = 1;
+    m_nx = n_cells();
     m_ny = 1;
     m_nz = 1;
 
@@ -70,6 +70,10 @@ EuMesh::EuMesh(Generator& gen) {
 #endif
 }
 
+EuMesh::EuMesh(int dim, bool adaptive, bool axial)
+    : m_locals(dim, adaptive, axial) {
+}
+
 void EuMesh::init_amr() {
     // Эта функция нифига не используется же?
     m_max_level = 0;
@@ -91,7 +95,7 @@ void EuMesh::init_amr() {
         m_locals.b_idx[ic] = offset[rank] + ic;
         m_locals.z_idx[ic] = 0;
         m_locals.level[ic] = 0;
-        m_locals.flag[ic] = 0;
+        m_locals.flag [ic] = 0;
     }
 }
 
@@ -106,22 +110,21 @@ int EuMesh::max_level() const {
 void EuMesh::set_max_level(int max_level) {
     if (!m_locals.adaptive()) {
         m_max_level = 0;
-    }
-    else {
+    } else {
         m_max_level = std::max(0, std::min(max_level, 15));
     }
 }
 
 void EuMesh::set_distributor(const std::string& name) {
     if (name == "empty") {
-        distributor = Distributor::empty();
+        m_distributor = Distributor::empty();
     } else {
-        distributor = Distributor::simple();
+        m_distributor = Distributor::simple();
     }
 }
 
 void EuMesh::set_distributor(Distributor distr) {
-    distributor = std::move(distr);
+    m_distributor = std::move(distr);
 }
 
 void EuMesh::balance_flags() {
@@ -160,11 +163,11 @@ void EuMesh::apply_flags() {
 #endif
 
     if (mpi::single()) {
-        amr::apply(m_locals, distributor);
+        amr::apply(m_locals, m_distributor);
     }
 #ifdef ZEPHYR_MPI
     else {
-        amr::apply(m_tourists, m_locals, m_aliens, distributor);
+        amr::apply(m_tourists, m_locals, m_aliens, m_distributor);
     }
 #endif
 
@@ -222,7 +225,6 @@ void EuMesh::refine() {
     ++counter;
 #endif
 }
-
 
 int EuMesh::check_base() const {
     if (m_locals.empty()) {
@@ -425,10 +427,17 @@ void EuMesh::push_back(const geom::Polyhedron& poly) {
     throw std::runtime_error("Polyhedrpushback");
 }
 
-EuCellIt EuMesh::begin() { return {&m_locals, 0, &m_aliens}; }
+EuCell_Iter EuMesh::begin() {
+    return {&m_locals, 0, &m_aliens};
+}
 
-EuCellIt EuMesh::end() { return {&m_locals, m_locals.size(), &m_aliens}; }
+EuCell_Iter EuMesh::end() {
+    return {&m_locals, m_locals.size(), &m_aliens};
+}
 
+EuCell EuMesh::operator[](index_t idx) {
+    return {&m_locals, idx, &m_aliens};
+}
 
 EuCell EuMesh::operator()(int i, int j) {
     i = (i + m_nx) % m_nx;

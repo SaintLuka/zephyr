@@ -9,9 +9,11 @@
 #include <zephyr/io/vtk_type.h>
 
 // Forward declaration
-namespace zephyr::mesh  { class EuCell; }
-namespace zephyr::utils { template<typename T> struct Storable; }
-
+namespace zephyr::mesh {
+template<typename T>
+struct Storable;
+class EuCell;
+}
 
 namespace zephyr::io {
 
