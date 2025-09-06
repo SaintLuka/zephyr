@@ -1,5 +1,5 @@
 #list(APPEND TESTS crp_interface)
-#list(APPEND TESTS cuboid_clip)
+list(APPEND TESTS cuboid_clip)
 #list(APPEND TESTS curves)
 #list(APPEND TESTS mapping)
 #list(APPEND TESTS poly_integrate)

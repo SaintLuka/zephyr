@@ -1,3 +1,5 @@
+#include <iostream>
+
 #include <zephyr/math/funcs.h>
 #include <zephyr/geom/sections.h>
 
@@ -5,7 +7,7 @@ namespace zephyr::geom {
 
 using namespace zephyr::math;
 
-double volume_fraction(const Vector3d &n, double p, double a, double b) {
+double quad_volume_fraction(const Vector3d &n, double p, double a, double b) {
     auto[xi, eta] = minmax(a * abs(n.x()), b * abs(n.y()));
 
     if (std::abs(p) <= 0.5 * (eta - xi)) {
@@ -17,7 +19,7 @@ double volume_fraction(const Vector3d &n, double p, double a, double b) {
     }
 }
 
-double find_section(const Vector3d &n, double alpha, double a, double b) {
+double quad_find_section(const Vector3d &n, double alpha, double a, double b) {
     auto[xi, eta] = minmax(a * abs(n.x()), b * abs(n.y()));
 
     if (alpha <= 0.5 * xi / eta) {
@@ -121,7 +123,7 @@ double average_flux(double alpha, double cos, double CFL) {
     auto[xi1, eta1] = minmax(std::abs(cos), std::sqrt(1.0 - cos * cos));
     auto[xi2, eta2] = minmax(CFL * std::abs(cos), std::sqrt(1.0 - cos * cos));
 
-    // Фактически find_section
+    // Фактически quad_find_section
     double P1;
     if (std::abs(2 * alpha - 1) <= 1.0 - xi1 / eta1) {
         P1 = (alpha - 0.5) * eta1;
@@ -132,7 +134,7 @@ double average_flux(double alpha, double cos, double CFL) {
 
     double P2 = P1 + 0.5 * (CFL - 1.0) * cos;
 
-    // Фактически volume_fraction
+    // Фактически quad_volume_fraction
     if (std::abs(P2) <= 0.5 * (eta2 - xi2)) {
         return 0.5 + P2 / eta2;
     } else if (std::abs(P2) < 0.5 * (eta2 + xi2)) {
@@ -140,6 +142,64 @@ double average_flux(double alpha, double cos, double CFL) {
     } else {
         return heav(P2);
     }
+}
+
+double cube_volume_fraction(const Vector3d& n, double Pz, double a, double b, double c) {
+    std::vector sizes={std::abs(a * n.x()), std::abs(b * n.y()), std::abs(c * n.z())};
+    std::sort(sizes.begin(), sizes.end());
+
+    double xi = sizes[0];
+    double eta = sizes[1];
+    double chi = sizes[2];
+
+    std::cout << "  n: " << n.transpose() << "\n";
+    std::cout << "  xi : " << xi << "\n";
+    std::cout << "  eta: " << eta << "\n";
+    std::cout << "  chi: " << chi << "\n";
+
+    double p = Pz + 0.5 * (xi + eta + chi);
+
+    bool inv = p > 0.5 * (xi + eta + chi);
+
+    if (inv) {
+        std::cout << "  Inverse case\n";
+        p = xi + eta + chi - p;
+    }
+
+    double vol = NAN;
+    if (p < xi) {
+        std::cout << "  case 1\n";
+        vol = std::pow(p, 3) / (6.0 * xi * eta * chi);
+    }
+    else if (p < eta) {
+        std::cout << "  case 2\n";
+        vol = (3.0 * p * (p - xi) + xi * xi) / (6.0 * eta * chi);
+    }
+    else if (p < std::min(xi + eta, chi)) {
+        std::cout << "  case 3\n";
+
+        vol = (std::pow(p, 3) - std::pow(p - xi, 3) - std::pow(p - eta, 3)) / (6.0 * xi * eta * chi);
+    }
+    else {
+        if (xi + eta < chi) {
+            std::cout << "  case 4.1\n";
+            vol = (2.0 * p - xi - eta) / (2.0 * chi);
+        } else {
+            std::cout << "  case 4.2\n";
+
+            vol = (std::pow(p, 3) - std::pow(p - xi, 3) - std::pow(p - eta, 3) - std::pow(p - chi, 3)) / (6.0 * xi * eta * chi);
+        }
+    }
+
+    if (inv) {
+        vol = 1.0 - vol;
+    }
+
+    return vol;
+}
+
+double cube_find_section(const Vector3d& n, double alpha, double a, double b, double c) {
+    return NAN;
 }
 
 } // namespace zephyr::geom
