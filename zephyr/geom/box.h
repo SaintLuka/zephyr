@@ -15,7 +15,7 @@ namespace zephyr::geom {
 /// Ящик считается двумерным прямоугольником, если vmin.z() == vmax.z(),
 /// условие справедливо, в том числе для бесконечных и пустых ящиков.
 /// В обратном случае vmin.z() != vmax.z() ящик считается трёхмерном.
-struct Box final {
+struct Box {
     Vector3d vmin = {NAN, NAN, NAN};
     Vector3d vmax = {NAN, NAN, NAN};
 
@@ -62,7 +62,7 @@ struct Box final {
     /// @brief Точка находится внутри ящика?
     bool inside(const Vector3d& p) const;
 
-    /// @brief Ограничить координаты точки до границ ящика
+    /// @brief Поместить точку в ящик
     Vector3d shove_in(const Vector3d& p) const;
 
     /// @brief Расширить ящик, чтобы захватить точку

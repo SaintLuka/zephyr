@@ -5,16 +5,15 @@
 #include <iomanip>
 
 #include <zephyr/io/pvd_file.h>
-#include <zephyr/geom/vector.h>
+#include <zephyr/geom/geom.h>
 #include <zephyr/geom/generator/rectangle.h>
-#include <zephyr/geom/primitives/polygon.h>
 #include <zephyr/math/solver/transfer.h>
 
 using namespace zephyr::geom;
 using namespace zephyr::mesh;
 
 using zephyr::io::PvdFile;
-using zephyr::geom::generator::Rectangle;
+using generator::Rectangle;
 
 class Solver;
 

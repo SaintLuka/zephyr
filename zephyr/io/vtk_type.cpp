@@ -79,7 +79,7 @@ const char* VtkType::const_char_conversion() const {
 }
 
 std::string VtkType::string_conversion() const {
-    return std::string(const_char_conversion());
+    return const_char_conversion();
 }
 
 bool VtkType::operator==(const VtkType& value) const {
@@ -156,7 +156,7 @@ VtkType VtkType::get_floating(size_t size) {
 }
 
 std::ostream& operator<<(std::ostream& os, const VtkType& vtk_type) {
-    os << (const char*)vtk_type;
+    os << static_cast<const char *>(vtk_type);
     return os;
 }
 

@@ -226,7 +226,7 @@ bool update_flag(index_t ic, AmrCells& locals, const VicinityList<dim>& vicinity
 template <int dim>
 bool flag_balancing_step(AmrCells& locals, const VicinityList<dim>& vicinity_list) {
     // Функция max в данном контексте заменяет логическое "И"
-    utils::range<index_t> range(0, locals.size());
+    range<index_t> range(0, locals.size());
     return threads::max(
             range.begin(), range.end(),
             update_flag<dim>, std::ref(locals), std::ref(vicinity_list)

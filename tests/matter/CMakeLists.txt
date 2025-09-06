@@ -1,8 +1,8 @@
 #list(APPEND TESTS consistency)
-#list(APPEND TESTS matter-ex)
+#list(APPEND TESTS matter)
 #list(APPEND TESTS mixture)
 #list(APPEND TESTS mixture2)
-#list(APPEND TESTS mixutre3)
+#list(APPEND TESTS mixture3)
 
 # Assume all files in direcory are tests
 if (ZEPHYR_TESTS_ALL)

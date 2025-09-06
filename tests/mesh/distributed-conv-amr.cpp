@@ -1,5 +1,5 @@
-// @brief Динамическая ORB декомпозиция сетки совместно с адаптацией.
-// На сетке решается уравнение переноса для проверки связности сетки.
+// Динамическая ORB декомпозиция сетки совместно с адаптацией. На сетке решается
+// уравнение переноса для проверки связности сетки.
 
 #include <iostream>
 #include <iomanip>
@@ -63,7 +63,7 @@ void set_flags(EuMesh& mesh, Storable<double> var) {
 // Распределитель данных при адаптации
 Distributor get_distributor(Storable<double> var) {
     Distributor distr = Distributor::simple();
-    distr.merge = [var](Children &children, EuCell &parent) {
+    distr.merge = [var](const Children &children, EuCell &parent) {
         double sum = 0.0;
         for (auto child: children) {
             sum += child(var) * child.volume();

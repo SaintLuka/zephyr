@@ -1,27 +1,26 @@
-// @brief Проверка производных на AMR-шаблонах
-#ifdef ZEPHYR_EIGEN
+// Проверка производных на AMR-шаблонах
+
 #include <iomanip>
 
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/geom/vector.h>
 #include <zephyr/geom/generator/rectangle.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/io/pvd_file.h>
-#include <zephyr/io/variables.h>
 
 #include <zephyr/utils/matplotlib.h>
 
-#include <Eigen/Dense>
-
-using namespace zephyr;
-using namespace mesh;
+using namespace zephyr::geom;
+using namespace zephyr::mesh;
 
 using generator::Rectangle;
 using zephyr::io::PvdFile;
 
 namespace plt = zephyr::utils::matplotlib;
 
+
 struct _U_ {
     // Метка целевой ячейки
-    bool target;
+    int target;
 
     // Значение функции
     double u;
@@ -49,26 +48,26 @@ struct _U_ {
 _U_ U;
 
 // Переменные для сохранения
-double get_interesting(AmrStorage::Item& cell)  { return double(cell(U).target); }
-double get_u(AmrStorage::Item& cell) { return cell(U).u; }
-double get_ux(AmrStorage::Item& cell) { return cell(U).grad.x(); }
-double get_uy(AmrStorage::Item& cell) { return cell(U).grad.y(); }
-double get_du_dx_o(AmrStorage::Item& cell) { return cell(U).grad_o.x(); }
-double get_du_dy_o(AmrStorage::Item& cell) { return cell(U).grad_o.y(); }
-double get_err_x_o(AmrStorage::Item& cell) { return cell(U).err_o.x(); }
-double get_err_y_o(AmrStorage::Item& cell) { return cell(U).err_o.y(); }
-double get_du_dx_n(AmrStorage::Item& cell) { return cell(U).grad_n.x(); }
-double get_du_dy_n(AmrStorage::Item& cell) { return cell(U).grad_n.y(); }
-double get_err_x_n(AmrStorage::Item& cell) { return cell(U).err_n.x(); }
-double get_err_y_n(AmrStorage::Item& cell) { return cell(U).err_n.y(); }
-double get_du_dx_g(AmrStorage::Item& cell) { return cell(U).grad_g.x(); }
-double get_du_dy_g(AmrStorage::Item& cell) { return cell(U).grad_g.y(); }
-double get_err_x_g(AmrStorage::Item& cell) { return cell(U).err_g.x(); }
-double get_err_y_g(AmrStorage::Item& cell) { return cell(U).err_g.y(); }
+double get_interesting(EuCell& cell)  { return double(cell(U).target); }
+double get_u(EuCell& cell) { return cell(U).u; }
+double get_ux(EuCell& cell) { return cell(U).grad.x(); }
+double get_uy(EuCell& cell) { return cell(U).grad.y(); }
+double get_du_dx_o(EuCell& cell) { return cell(U).grad_o.x(); }
+double get_du_dy_o(EuCell& cell) { return cell(U).grad_o.y(); }
+double get_err_x_o(EuCell& cell) { return cell(U).err_o.x(); }
+double get_err_y_o(EuCell& cell) { return cell(U).err_o.y(); }
+double get_du_dx_n(EuCell& cell) { return cell(U).grad_n.x(); }
+double get_du_dy_n(EuCell& cell) { return cell(U).grad_n.y(); }
+double get_err_x_n(EuCell& cell) { return cell(U).err_n.x(); }
+double get_err_y_n(EuCell& cell) { return cell(U).err_n.y(); }
+double get_du_dx_g(EuCell& cell) { return cell(U).grad_g.x(); }
+double get_du_dy_g(EuCell& cell) { return cell(U).grad_g.y(); }
+double get_err_x_g(EuCell& cell) { return cell(U).err_g.x(); }
+double get_err_y_g(EuCell& cell) { return cell(U).err_g.y(); }
 
 
 // Расчет градиента методом Гаусса
-void gauss(Cell &cell) {
+void gauss(EuCell &cell) {
     if (!cell(U).target) {
         cell(U).grad_g = Vector2d::Zero();
         cell(U).err_g  = Vector2d::Zero();
@@ -133,7 +132,7 @@ void LSM_old(EuCell &cell) {
 }
 
 // Расчет градиента новым МНК
-void LSM_new(Cell &cell) {
+void LSM_new(EuCell &cell) {
     if (!cell(U).target) {
         cell(U).grad_n = Vector2d::Zero();
         cell(U).err_n  = Vector2d::Zero();
@@ -176,7 +175,8 @@ EuMesh get_template(int num, double H) {
         Rectangle rect(-1.5 * H, 1.5 * H, -1.5 * H, 1.5 * H);
         rect.set_nx(3);
 
-        EuMesh mesh(rect, U);
+        EuMesh mesh(rect);
+        mesh.add<_U_>("U");
         mesh.set_max_level(1);
 
         if (num == 0) {
@@ -235,7 +235,7 @@ EuMesh get_template(int num, double H) {
         mesh.refine();
         for (auto cell: mesh) {
             if (cell.center().norm() < 0.1 * H) {
-                cell(U).target = true;
+                cell(U).target = 1;
             }
         }
 
@@ -245,7 +245,8 @@ EuMesh get_template(int num, double H) {
                        -1.5 * H, 2.5 * H);
         rect.set_nx(2);
 
-        EuMesh mesh(rect, U);
+        EuMesh mesh(rect);
+        mesh.add<_U_>("U");
         mesh.set_max_level(2);
 
         if (num == 6) {
@@ -295,7 +296,7 @@ EuMesh get_template(int num, double H) {
         mesh.refine();
         for (auto cell: mesh) {
             if (cell.center().norm() < 0.1 * H) {
-                cell(U).target = true;
+                cell(U).target = 1;
             }
         }
 
@@ -407,7 +408,6 @@ void set_data(EuMesh& mesh,
     mesh.for_each(LSM_new);
 }
 
-
 int main() {
     PvdFile pvd("mesh", "output");
     pvd.variables += {"target", get_interesting};
@@ -504,6 +504,3 @@ int main() {
 
     return 0;
 }
-#else
-int main() { return 0; }
-#endif

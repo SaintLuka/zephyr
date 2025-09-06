@@ -9,7 +9,7 @@ namespace zephyr::mesh::amr {
 // Сторона, по которой необходимо пройти, чтобы от одного сиблинга перейти
 // к следующему. Детали можно найти в файле _ascii.h
 template <int dim>
-inline constexpr std::array<Side3D, CpC(dim)> side_to_next_sibling() {
+constexpr std::array<Side3D, CpC(dim)> side_to_next_sibling() {
     if constexpr (dim == 2) {
         return {Side3D::RIGHT, Side3D::TOP, Side3D::BOTTOM, Side3D::LEFT};
     }
@@ -84,7 +84,7 @@ bool can_coarse(AmrCells& cells, int ic) {
 /// @brief Возвращает массив с индексами сиблингов, число сиблингов на единицу
 /// меньше числа детей (индекс ic не добавляется в массив).
 /// Предполагается, что для ячейки ic функция can_coarse возвращает true,
-/// в обратном случае поведение функции неоопределено.
+/// в обратном случае поведение функции не определено.
 /// @param cells Хранилище ячеек
 /// @param ic Целевая ячейка (от которой запрос)
 template<int dim>

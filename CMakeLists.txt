@@ -20,18 +20,19 @@ option(ZEPHYR_PROBLEMS_ALL "Build ALL problems" OFF)
 option(ZEPHYR_PYTHON       "Use python libs"    ON)
 option(ZEPHYR_TESTS        "Build tests"        ON)
 option(ZEPHYR_TESTS_ALL    "Build ALL tests"    OFF)
+option(ZEPHYR_ASSERTS      "Enable asserts"     OFF)
 
-set(THREADS_TYPE "STD" CACHE STRING "Choose thread style: STD, OpenMP (not yet), TBB")
-set_property(CACHE THREADS_TYPE PROPERTY STRINGS STD TBB OpenMP)
+set(THREADS_TYPE "STD" CACHE STRING "Choose thread style: STD, TBB")
+set_property(CACHE THREADS_TYPE PROPERTY STRINGS STD TBB)
 if (${THREADS_TYPE} STREQUAL TBB)
     message(STATUS "Use TBB")
     set(ZEPHYR_TBB ON)
-elseif (${THREADS_TYPE} STREQUAL OpenMP)
-    message(STATUS "Use OpenMP")
-    set(ZEPHYR_OPENMP ON)
 else ()
     message(STATUS "Use standard threads")
-    set(ZEPHYR_STD_THREADS ON)
+    set(ZEPHYR_TBB OFF)
+endif ()
+if (CMAKE_BUILD_TYPE STREQUAL Debug)
+    set(ZEPHYR_ASSERTS ON)
 endif ()
 
 configure_file(
@@ -41,8 +42,6 @@ configure_file(
 
 if (ZEPHYR_TBB)
     find_package(TBB REQUIRED)
-elseif (ZEPHYR_OPENMP)
-    find_package(OpenMP)
 else ()
     find_package(Threads REQUIRED)
 endif ()
@@ -61,17 +60,9 @@ add_subdirectory(zephyr)
 set(BUILD_SHARED_LIBS YES)
 
 # Тип компиляции (SHARED/STATIC) пропущен, полагаемся на переменную BUILD_SHARED_LIBS
-add_library(zephyr ${ZEPHYR_SOURCES}
-    zephyr/mesh/euler/eu_mesh.h
-        zephyr/mesh/storage.h
-        zephyr/mesh/storage.cpp
-        zephyr/mesh/euler/router.h
-        zephyr/math/random.h
-        zephyr/math/random.cpp)
+add_library(zephyr ${ZEPHYR_SOURCES})
 if (ZEPHYR_TBB)
     target_link_libraries(zephyr PUBLIC TBB::tbb)
-elseif (ZEPHYR_OPENMP)
-    target_link_libraries(zephyr PUBLIC OpenMP::OpenMP_CXX)
 else ()
     target_link_libraries(zephyr PUBLIC ${CMAKE_THREAD_LIBS_INIT})
 endif ()

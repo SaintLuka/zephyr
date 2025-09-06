@@ -64,16 +64,19 @@ protected:
     Router node_route;
 };
 
-template <typename Src, typename Dst, size_t... Is>
-void data_assign_impl(Src& src, Dst& dst, index_t from, index_t to, std::index_sequence<Is...>) {
-    ((std::get<Is>(dst)[to] = std::get<Is>(src)[from]), ...);
-}
-
 template <typename... Vars>
 void Migration::fill_migrants(AmrCells& locals,
         const std::tuple<Vars...>& loc_vars,
         const std::tuple<Vars...>& mig_vars
         ) {
+    using utils::Buffer;
+
+    // Все переменные имеют тип Storable<T>
+    soa::assert_storable<Vars...>();
+
+    // Число переменных для пересылки
+    constexpr int n_vars = sizeof...(Vars);
+
     // Для сортировки в migrants по ранку за О(n).
     // cell_offsets[i] показывает с какого индекса в migrants ставить i-ранковую ячейку.
 
@@ -90,8 +93,8 @@ void Migration::fill_migrants(AmrCells& locals,
     auto node_index = node_route.send_offset();
 
     // Кортеж указателей на буферы данных
-    auto data_src = locals  .data.data_tuple(loc_vars);
-    auto data_dst = migrants.data.data_tuple(mig_vars);
+    std::array<Buffer*, n_vars> data_src = locals  .data[loc_vars];
+    std::array<Buffer*, n_vars> data_dst = migrants.data[mig_vars];
 
     for (index_t ic = 0; ic < migrants.size(); ++ic) {
         int r = locals.rank[ic];
@@ -99,17 +102,12 @@ void Migration::fill_migrants(AmrCells& locals,
         index_t jc = cell_index[r];
 
         locals.copy_geom(ic, migrants, jc, face_index[r], node_index[r]);
-        /*
-        for (int iface: migrants.faces_range(jc)) {
-            if (migrants.faces.is_undefined(iface)) {
-                continue;
-            }
-        }
-         */
 
         // Копирование данных
         //data_dst[jc] = data_src[ic];
-        data_assign_impl(data_src, data_dst, ic, jc, std::index_sequence_for<Vars...>{});
+        for (int v = 0; v < n_vars; ++v) {
+            data_src[v]->copy_data(ic, *data_dst[v], jc);
+        }
 
         cell_index[r] += 1;
         face_index[r] += locals.max_face_count(ic);
@@ -134,16 +132,21 @@ void Migration::fill_migrants(AmrCells& locals,
     //pvd.save(migrants, 0.0);
 }
 
-template <typename... Args>
-void Migration::migrate(Tourism& tourists, AmrCells& locals, AmrCells& aliens, Args&&... vars) {
+template <typename... Vars>
+void Migration::migrate(Tourism& tourists, AmrCells& locals, AmrCells& aliens, Vars&&... vars) {
+    using utils::Buffer;
+
     // Все дополнительные переменные имеют тип Storable<T>
-    soa::assert_storable<Args...>();
+    soa::assert_storable<Vars...>();
+
+    // Число переменных для пересылки
+    constexpr int n_vars = sizeof...(Vars);
 
     // Кортежи переменных std::tuple{Storable<T1>, Storable<T2>, ...}
     // loc_vars - переменные в locals
     // mig_vars - переменные в migrants
-    auto loc_vars = std::tuple{std::forward<Args>(vars)...};
-    auto mig_vars = migrants.data.add_replace(std::forward<Args>(vars)...);
+    auto loc_vars = std::tuple{std::forward<Vars>(vars)...};
+    auto mig_vars = migrants.data.add_replace(locals.data, loc_vars);
 
     // Составим полные матрицы пересылок (совпадают на всех процессах).
     // То есть заполним m_cell_route, m_face_route и m_node_route.
@@ -163,8 +166,8 @@ void Migration::migrate(Tourism& tourists, AmrCells& locals, AmrCells& aliens, A
     // ========================== Пересылка ячеек =============================
 
     // Указатели на буферы данных
-    auto data_src = migrants.data.data_tuple(mig_vars);
-    auto data_dst = locals  .data.data_tuple(loc_vars);
+    std::array<Buffer*, n_vars> data_src = migrants.data[mig_vars];
+    std::array<Buffer*, n_vars> data_dst = locals  .data[loc_vars];
 
     // Оптимизируем использование памяти, используем повторно массивы.
     // Запишем в face_begin и node_begin количество элементов на ячейку
@@ -190,9 +193,10 @@ void Migration::migrate(Tourism& tourists, AmrCells& locals, AmrCells& aliens, A
     auto send_node_beg = cell_route.isend(migrants.node_begin, MpiTag::NODE_BEG);
 
     // Отправить данные ячеек
-    auto send_data     = [&]<size_t... Is>(std::index_sequence<Is...> ) {
-        return std::tuple{ cell_route.isend(std::get<Is>(data_src), MpiTag(12345 + Is))...  };
-    }(std::index_sequence_for<Args...>());
+    std::array<Requests, n_vars> send_data;
+    for (int v = 0; v < n_vars; ++v) {
+        send_data[v] = cell_route.isend(*data_src[v], static_cast<MpiTag>(12345 + v));
+    }
 
     // Отправить данные граней
     auto send_adj_rank  = face_route.isend(migrants.faces.adjacent.rank,  MpiTag::ADJ_RANK);
@@ -224,9 +228,10 @@ void Migration::migrate(Tourism& tourists, AmrCells& locals, AmrCells& aliens, A
     auto recv_volume_a = cell_route.irecv(locals.volume_alt, MpiTag::VOLUME_ALT);
 
     // Получить данные ячеек
-    auto recv_data     = [&]<size_t... Is>(std::index_sequence<Is...> ) {
-        return std::tuple{ cell_route.irecv(std::get<Is>(data_dst), MpiTag(12345 + Is))...  };
-    }(std::index_sequence_for<Args...>());
+    std::array<Requests, n_vars> recv_data;
+    for (int v = 0; v < n_vars; ++v) {
+        cell_route.irecv(*data_dst[v], static_cast<MpiTag>(12345 + v));
+    };
 
     // При получении используем сдвиг на единицу, чтобы записать нулевой первый элемент
     auto recv_face_beg = cell_route.irecv(locals.face_begin.data() + 1, MpiTag::FACE_BEG);
@@ -264,9 +269,7 @@ void Migration::migrate(Tourism& tourists, AmrCells& locals, AmrCells& aliens, A
     send_node_beg.wait();
 
     // Завершить отправку данных ячеек
-    [&]<size_t... Is>(std::index_sequence<Is...> ) {
-        ( std::get<Is>(send_data).wait(), ... );
-    }(std::index_sequence_for<Args...>());
+    for (auto& req: send_data) { req.wait(); }
 
     // Завершить отправку данных граней
     send_adj_rank.wait();
@@ -300,9 +303,7 @@ void Migration::migrate(Tourism& tourists, AmrCells& locals, AmrCells& aliens, A
     recv_node_beg.wait();
 
     // Завершить получение данных ячеек
-    [&]<size_t... Is>(std::index_sequence<Is...> ) {
-        ( std::get<Is>(recv_data).wait(), ... );
-    }(std::index_sequence_for<Args...>());
+    for (auto& req: recv_data) { req.wait(); }
 
     // Завершить получение данных граней
     recv_adj_rank.wait();

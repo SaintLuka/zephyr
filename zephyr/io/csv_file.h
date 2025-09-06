@@ -3,15 +3,13 @@
 #include <zephyr/mesh/euler/amr_cells.h>
 #include <zephyr/io/variables.h>
 
-
 namespace zephyr::mesh {
 class AmrCells;
 }
 
 namespace zephyr::io {
 
-/// @class CsvFile для записи хранилища в файл .csv для неструктурированных
-/// сеток.
+/// @brief Запись данных в CSV-файл.
 class CsvFile {
 public:
 
@@ -31,7 +29,7 @@ public:
 
     /// @brief Базовая функция записи в файл. До вызова функции должен быть
     /// создан экземпляр класса и настроены опции записи.
-    void save(mesh::AmrCells &cells);
+    void save(mesh::AmrCells &cells) const;
 
     /// @brief Статическая функция записи в файл. Полный аналог функции-члена
     /// класса write, но вызывается без экземпляра класса, все параметры записи

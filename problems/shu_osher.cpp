@@ -1,4 +1,4 @@
-/// @file shu_oscher.cpp
+/// @file shu_osher.cpp
 /// @brief Решатель газодинамики в одном файле на примере теста Шу-Ошера
 
 #include <iostream>

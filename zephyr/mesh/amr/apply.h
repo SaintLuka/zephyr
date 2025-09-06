@@ -11,12 +11,12 @@
 #include <zephyr/mesh/amr/setup_geometry.h>
 #include <zephyr/mesh/amr/restore_connections.h>
 #include <zephyr/mesh/amr/remove_undefined.h>
-#include <zephyr/mesh/amr/sorting.h>
+#include <zephyr/mesh/euler/tourism.h>
 
 namespace zephyr::mesh::amr {
 
-/// @brief Функция выполняет непостредственную адаптацию ячеек в хранилище в
-/// соответствии с флагами адапатции. Предполагается, что флаги адаптации
+/// @brief Функция выполняет непосредственную адаптацию ячеек в хранилище в
+/// соответствии с флагами адаптации. Предполагается, что флаги адаптации
 /// сбалансированы.
 /// @param locals Ссылка на хранилище ячеек
 /// @param op Осуществляет распределение данных
@@ -109,8 +109,8 @@ inline void apply(AmrCells &cells, const Distributor& op) {
 }
 
 #ifdef ZEPHYR_MPI
-/// @brief Многопроцессорная версия функции, выполняет непостредственную
-/// адаптацию ячеек в хранилище в соответствии с флагами адапатции.
+/// @brief Многопроцессорная версия функции, выполняет непосредственную
+/// адаптацию ячеек в хранилище в соответствии с флагами адаптации.
 /// Предполагается, что флаги адаптации сбалансированы.
 /// @details Алгоритм практически совпадает с однопроцессорной версией,
 /// поскольку не допускается огрубление ячеек, у которых сиблинги находятся
@@ -124,13 +124,13 @@ inline void apply(AmrCells &cells, const Distributor& op) {
 /// новые, ссылаются на старые индексы, а новые индексы указаны в amrData.next.
 /// На данном этапе происходит выставление face.adjacent, которые указывают
 /// на новые ячейки. Для граней между процессами ничего не происходит, на данном
-/// этапе ссылки указвают на старые ячейки (до адаптации)
+/// этапе ссылки указывают на старые ячейки (до адаптации)
 /// Этап 5. На начале этапа все ячейки правильно связаны, но внутри
 /// хранилища часть старых ячеек (не листовых) являются неопределенными.
 /// Алгоритм осуществляет удаление данных ячеек.
 template<int dim>
 void apply_impl(Tourism& tourism, AmrCells &locals, AmrCells &aliens, const Distributor& op) {
-    using zephyr::utils::Stopwatch;
+    using utils::Stopwatch;
 
     static Stopwatch count_timer;
     static Stopwatch positions_timer;
@@ -205,14 +205,14 @@ void apply_impl(Tourism& tourism, AmrCells &locals, AmrCells &aliens, const Dist
 #if CHECK_PERFORMANCE
     static size_t counter = 0;
     if (counter % amr::check_frequency == 0) {
-        mpi::cout << "    Statistics:     " << std::setw(11) << count_timer.milliseconds() << " ms\n";
-        mpi::cout << "    Positions:      " << std::setw(11) << positions_timer.milliseconds() << " ms\n";
-        mpi::cout << "    Geometry:       " << std::setw(11) << geometry_timer.milliseconds() << " ms\n";
-        mpi::cout << "    Send/Recv:      " << std::setw(11) << exchange_timer.milliseconds() << " ms\n";
-        mpi::cout << "    Connections:    " << std::setw(11) << connections_timer.milliseconds() << " ms\n";
-        mpi::cout << "    Build aliens 1: " << std::setw(11) << alien1_timer.milliseconds() << " ms\n";
-        mpi::cout << "    Build aliens 2: " << std::setw(11) << alien2_timer.milliseconds() << " ms\n";
-        mpi::cout << "    Remove undef:   " << std::setw(11) << remove_timer.milliseconds() << " ms\n";
+        mpi::cout << "    Statistics:     " << std::setw(11) << count_timer.milliseconds_mpi() << " ms\n";
+        mpi::cout << "    Positions:      " << std::setw(11) << positions_timer.milliseconds_mpi() << " ms\n";
+        mpi::cout << "    Geometry:       " << std::setw(11) << geometry_timer.milliseconds_mpi() << " ms\n";
+        mpi::cout << "    Send/Recv:      " << std::setw(11) << exchange_timer.milliseconds_mpi() << " ms\n";
+        mpi::cout << "    Connections:    " << std::setw(11) << connections_timer.milliseconds_mpi() << " ms\n";
+        mpi::cout << "    Build aliens 1: " << std::setw(11) << alien1_timer.milliseconds_mpi() << " ms\n";
+        mpi::cout << "    Build aliens 2: " << std::setw(11) << alien2_timer.milliseconds_mpi() << " ms\n";
+        mpi::cout << "    Remove undef:   " << std::setw(11) << remove_timer.milliseconds_mpi() << " ms\n";
     }
     ++counter;
 #endif
@@ -220,12 +220,12 @@ void apply_impl(Tourism& tourism, AmrCells &locals, AmrCells &aliens, const Dist
 
 /// @brief Специализация для пустых хранилищ
 template<>
-void apply_impl<0>(Tourism& tourism, AmrCells &locals, AmrCells &aliens, const Distributor& op) {
-    throw std::runtime_error("MPI amr::apply not implemented #1");
+inline void apply_impl<0>(Tourism& tourism, AmrCells &locals, AmrCells &aliens, const Distributor& op) {
+    throw std::runtime_error("MPI amr::apply<0> not implemented #1");
 }
 
 /// @brief Автоматический выбор размерности
-void apply(Tourism& tourism, AmrCells &locals, AmrCells &aliens, const Distributor& op) {
+inline void apply(Tourism& tourism, AmrCells &locals, AmrCells &aliens, const Distributor& op) {
     if (locals.empty()) {
         amr::apply_impl<0>(tourism, locals, aliens, op);
     } else {

@@ -12,10 +12,10 @@ class Children;
 /// @ingroup euler-mesh
 struct Distributor {
     /// @brief Тип функции, распределяющей данные между дочерними ячейками
-    using split_function = std::function<void(EuCell&, Children&)>;
+    using split_function = std::function<void(const EuCell&, Children&)>;
 
     /// @brief Тип функции, объединяющей данные дочерних ячеек
-    using merge_function = std::function<void(Children&, EuCell&)>;
+    using merge_function = std::function<void(const Children&, EuCell&)>;
 
     split_function split;  ///< Распределение данным между дочерними
     merge_function merge;  ///< Объединение данных дочерних ячеек
@@ -30,7 +30,7 @@ struct Distributor {
     /// @brief Создает Distributor, который определяет функции split и merge
     /// простейшим способом. Для функции split используется простой перенос
     /// данных в дочерние ячейки. Для функции merge используется перенос данных
-    /// в родительсую ячейку из первой дочерней.
+    /// в родительскую ячейку из первой дочерней.
     static Distributor simple();
 };
 

@@ -191,11 +191,12 @@ public:
 
     /// @brief Типы по умолчанию, инициализации
     struct DefaultTypes {
-        MPI_Datatype vec3 = MPI_DATATYPE_NULL;  ///< Для Vector3d
-        MPI_Datatype int4 = MPI_DATATYPE_NULL;  ///< Для std::array<int, 4>
+        MPI_Datatype vec3 = MPI_DATATYPE_NULL;    ///< Для Vector3d
+        MPI_Datatype int4 = MPI_DATATYPE_NULL;    ///< Для std::array<int, 4>
+        MPI_Datatype short8 = MPI_DATATYPE_NULL;  ///< Для std::array<short, 8>
 
 
-        static const int byte4_count = 30;
+        static const int byte4_count = 50;
 
         /// @brief Типы кратные 4 байтам
         std::array<MPI_Datatype, byte4_count> byte4_types;
@@ -233,9 +234,14 @@ template <> inline MPI_Datatype mpi::type<unsigned char>() { return MPI_BYTE; }
 // Разные приколы
 template <> inline MPI_Datatype mpi::type<geom::Vector3d>() {
     return mpi::default_types.vec3;
-}template <> inline MPI_Datatype mpi::type<std::array<int, 4>>() {
+}
+template <> inline MPI_Datatype mpi::type<std::array<int, 4>>() {
     return mpi::default_types.int4;
 }
+template <> inline MPI_Datatype mpi::type<std::array<short, 8>>() {
+    return mpi::default_types.short8;
+}
+
 // Специализация mpi::type<> для пересылки Boundary
 template<> inline
 MPI_Datatype mpi::type<geom::Boundary>() {

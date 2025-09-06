@@ -1,4 +1,5 @@
 #include <fstream>
+#include <iomanip>
 
 #include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/mesh/euler/eu_prim.h>
@@ -10,32 +11,37 @@
 #include <zephyr/mesh/amr/apply.h>
 #include <zephyr/mesh/amr/balancing.h>
 
-using namespace zephyr::geom;
+#include <zephyr/utils/json.h>
+
+namespace zephyr::mesh {
+
+using namespace geom;
+using namespace utils;
 using generator::Rectangle;
 using generator::Cuboid;
 using zephyr::utils::Stopwatch;
 
-namespace zephyr::mesh {
-
-EuMesh::EuMesh(Generator& gen) {
+void EuMesh::build(Generator& gen) {
     if (mpi::master()) {
         gen.initialize(m_locals);
     }
 
 #ifdef ZEPHYR_MPI
-    int dim   = m_locals.dim();
-    int adapt = m_locals.adaptive();
-    int axial = m_locals.axial();
+    if (!mpi::single()) {
+        int dim = m_locals.dim();
+        int adapt = m_locals.adaptive();
+        int axial = m_locals.axial();
 
-    // Соберем базовые характеристики сетки с master-процесса
-    mpi::broadcast(0, dim);
-    mpi::broadcast(0, adapt);
-    mpi::broadcast(0, axial);
+        // Соберем базовые характеристики сетки с master-процесса
+        mpi::broadcast(0, dim);
+        mpi::broadcast(0, adapt);
+        mpi::broadcast(0, axial);
 
-    if (!mpi::master()) {
-        m_locals.set_dimension(dim);
-        m_locals.set_adaptive(adapt);
-        m_locals.set_axial(axial);
+        if (!mpi::master()) {
+            m_locals.set_dimension(dim);
+            m_locals.set_adaptive(adapt);
+            m_locals.set_axial(axial);
+        }
     }
 
     m_tourists.init_types(m_locals);
@@ -44,34 +50,81 @@ EuMesh::EuMesh(Generator& gen) {
     // установить dim/adapt/axial
     m_aliens = m_locals.same();
 
-    structured = false;
+    m_structured = false;
     m_nx = n_cells();
     m_ny = 1;
     m_nz = 1;
 
-#ifndef ZEPHYR_MPI
-    // Структурированность не работает для распределенных расчетов
-    if (dynamic_cast<Rectangle*>(&gen) != nullptr) {
-        Rectangle* rect = dynamic_cast<Rectangle*>(&gen);
-        if (rect->structured()) {
-            structured = true;
-            m_nx = rect->nx();
-            m_ny = rect->ny();
-            m_nz = 1;
+    if (mpi::single()) {
+        // Структурированность не работает для распределенных расчетов
+        if (gen.can_cast<Rectangle>()) {
+            Rectangle& rect = gen.cast<Rectangle>();
+            if (rect.structured()) {
+                m_structured = true;
+                m_nx = rect.nx();
+                m_ny = rect.ny();
+                m_nz = 1;
+            }
+        } else if (gen.can_cast<Cuboid>()) {
+            Cuboid& cuboid = gen.cast<Cuboid>();
+            m_structured = true;
+            m_nx = cuboid.nx();
+            m_ny = cuboid.ny();
+            m_nz = cuboid.nz();
         }
     }
-    else if (dynamic_cast<Cuboid*>(&gen) != nullptr) {
-        Cuboid* cuboid = dynamic_cast<Cuboid*>(&gen);
-        structured = true;
-        m_nx = cuboid->nx();
-        m_ny = cuboid->ny();
-        m_nz = cuboid->nz();
-    }
-#endif
+}
+
+EuMesh::EuMesh(Generator& gen) {
+    build(gen);
 }
 
 EuMesh::EuMesh(int dim, bool adaptive, bool axial)
     : m_locals(dim, adaptive, axial) {
+}
+
+EuMesh::EuMesh(const Json& config) {
+    // Создать сетку на master-процессе
+    auto gen = Generator::create(config);
+    build(*gen);
+
+    m_max_level = 0;
+    if (config["max_level"]) {
+        m_max_level = std::max(0, config["max_level"].as<int>());
+        if (m_max_level > 15) {
+            std::cerr << "Max level set up to " << m_max_level << ", decreased to 15\n";
+            m_max_level = 15;
+        }
+    }
+    if (config["adaptive"]) {
+        // Есть ключевое слово adaptive, выставлено на false
+        if (!config["adaptive"].as<bool>()) {
+            m_max_level = 0;
+        }
+    }
+
+    // Если есть декомпозиция, то использовать
+    if (!mpi::single()) {
+        Box domain = bbox();
+
+        if (config["decomp"]) {
+            // Там все свойства декомпозиции автоматически ставятся
+            m_decomp = Decomposition::create(domain, config["decomp"]);
+
+            //set_decomposition("XY");
+            set_decomposition(m_decomp, true);
+        }
+        else {
+            // Определяем размерность сетки
+            int dim = m_locals.empty() ? 0 : m_locals.dim();
+            dim = mpi::max(dim);
+
+            assert((dim == 2 || dim == 3) && "Strange dimension, EuMesh constructed by json");
+
+            // По умолчанию что-то такое
+            set_decomposition(dim < 3 ? "XY" : "XYZ");
+        }
+    }
 }
 
 void EuMesh::init_amr() {
@@ -218,12 +271,193 @@ void EuMesh::refine() {
 #if CHECK_PERFORMANCE
     static size_t counter = 0;
     if (counter % amr::check_frequency == 0) {
-        mpi::cout << "  Balance flags: " << std::setw(14) << balance.milliseconds() << " ms\n";
-        mpi::cout << "  Apply flags:   " << std::setw(14) << apply.milliseconds() << " ms\n";
-        mpi::cout << "Refine elapsed:  " << std::setw(14) << full.milliseconds() << " ms\n";
+        mpi::cout << "  Balance flags: " << std::setw(14) << balance.milliseconds_mpi() << " ms\n";
+        mpi::cout << "  Apply flags:   " << std::setw(14) << apply.milliseconds_mpi() << " ms\n";
+        mpi::cout << "Refine elapsed:  " << std::setw(14) << full.milliseconds_mpi() << " ms\n";
     }
     ++counter;
 #endif
+}
+
+void EuMesh::refine_full(int level) {
+    if (level < 0 || level > m_max_level) {
+        level = m_max_level;
+    }
+    if (level == 0) {
+        return;
+    }
+
+    for (int i = 0; i < level; ++i) {
+        for_each([level](EuCell &cell) {
+            cell.set_flag(cell.level() < level ? 1 : 0);
+        });
+        refine();
+    }
+}
+
+void EuMesh::check_reference(bool fix) {
+    Box box = bbox();
+    double xmin = box.vmin.x();
+    double xmax = box.vmax.x();
+    double ymin = box.vmin.y();
+    double ymax = box.vmax.y();
+
+    if (m_locals.empty()) return;
+
+    int level = m_locals.level[0];
+
+    int nx = m_nx * std::pow(2, level);
+    int ny = m_ny * std::pow(2, level);
+
+    double hx = (xmax - xmin) / nx;
+    double hy = (ymax - ymin) / ny;
+    double volume = hx * hy;
+
+
+    std::cout << std::setprecision(14);
+
+    std::cout << "BBox: " << box << "\n";
+
+    std::cout << "Structured: " << nx << " x " << ny << " cells\n";
+
+    auto get_center = [=](int i, int j) -> Vector3d {
+        return {xmin + (i + 0.5) * hx, ymin + (j + 0.5) * hy, 0.0};
+    };
+    auto lface_center = [=](int i, int j) -> Vector3d {
+        return {xmin + (i + 0.0) * hx, ymin + (j + 0.5) * hy, 0.0};
+    };
+    auto rface_center = [=](int i, int j) -> Vector3d {
+        return {xmin + (i + 1.0) * hx, ymin + (j + 0.5) * hy, 0.0};
+    };
+    auto bface_center = [=](int i, int j) -> Vector3d {
+        return {xmin + (i + 0.5) * hx, ymin + (j + 0.0) * hy, 0.0};
+    };
+    auto tface_center = [=](int i, int j) -> Vector3d {
+        return {xmin + (i + 0.5) * hx, ymin + (j + 1.0) * hy, 0.0};
+    };
+    auto get_vertex = [=](double i, double j) -> Vector3d {
+        return {xmin + i * hx, ymin + j * hy, 0.0};
+    };
+
+    double cell_volume_error = 0.0;
+    double cell_center_error = 0.0;
+    double face_area_error = 0.0;
+    double face_normal_error = 0.0;
+    double face_center_error = 0.0;
+    double vertices_error = 0.0;
+
+    for (auto& cell: m_locals) {
+        int i = std::round((cell.x() - 0.5 * hx - xmin) / hx);
+        int j = std::round((cell.y() - 0.5 * hy - ymin) / hy);
+
+        // Погрешности данных ячейки
+        cell_volume_error = std::max(cell_volume_error, std::abs(cell.volume() - volume));
+        cell_center_error = std::max(cell_center_error, (cell.center() - get_center(i, j)).norm());
+
+        // Погрешности для граней
+        face_area_error = std::max(
+                {
+                        face_area_error,
+                        std::abs(cell.face(Side2D::L).area() - hy),
+                        std::abs(cell.face(Side2D::R).area() - hy),
+                        std::abs(cell.face(Side2D::B).area() - hx),
+                        std::abs(cell.face(Side2D::T).area() - hx),
+                });
+
+        face_normal_error = std::max(
+                {
+                        face_normal_error,
+                        (cell.face(Side2D::L).normal() + Vector3d::UnitX()).norm(),
+                        (cell.face(Side2D::R).normal() - Vector3d::UnitX()).norm(),
+                        (cell.face(Side2D::B).normal() + Vector3d::UnitY()).norm(),
+                        (cell.face(Side2D::T).normal() - Vector3d::UnitY()).norm()
+                });
+
+        face_center_error = std::max(
+                {
+                        face_center_error,
+                        (cell.face(Side2D::L).center() - lface_center(i, j)).norm(),
+                        (cell.face(Side2D::R).center() - rface_center(i, j)).norm(),
+                        (cell.face(Side2D::B).center() - bface_center(i, j)).norm(),
+                        (cell.face(Side2D::T).center() - tface_center(i, j)).norm()
+                });
+
+        // Погрешности для вершин
+        SqQuad quad = cell.mapping<2>();
+        vertices_error = std::max(
+                {
+                        vertices_error,
+                        (quad.vs<-1, -1>() - get_vertex(i + 0.0, j + 0.0)).norm(),
+                        (quad.vs< 0, -1>() - get_vertex(i + 0.5, j + 0.0)).norm(),
+                        (quad.vs<+1, -1>() - get_vertex(i + 1.0, j + 0.0)).norm(),
+                        (quad.vs<-1,  0>() - get_vertex(i + 0.0, j + 0.5)).norm(),
+                        (quad.vs< 0,  0>() - get_vertex(i + 0.5, j + 0.5)).norm(),
+                        (quad.vs<+1,  0>() - get_vertex(i + 1.0, j + 0.5)).norm(),
+                        (quad.vs<-1, +1>() - get_vertex(i + 0.0, j + 1.0)).norm(),
+                        (quad.vs< 0, +1>() - get_vertex(i + 0.5, j + 1.0)).norm(),
+                        (quad.vs<+1, +1>() - get_vertex(i + 1.0, j + 1.0)).norm(),
+
+                });
+    }
+
+    // Линейный размер
+    double H = std::max(hx, hy);
+
+    cell_volume_error /= volume;
+    cell_center_error /= H;
+
+    face_area_error   /= H;
+    face_center_error /= H;
+    vertices_error    /= H;
+
+    std::cout << "Errors\n";
+    std::cout << "  Cell volume:  " << cell_volume_error << "\n";
+    std::cout << "  Cell center:  " << cell_volume_error << "\n";
+    std::cout << "  Face areas:   " << face_area_error << "\n";
+    std::cout << "  Face centers: " << face_center_error << "\n";
+    std::cout << "  Face normals: " << face_normal_error << "\n";
+    std::cout << "  Vertices:     " << vertices_error << "\n";
+
+    // Исправить сетку, если необходимо
+    if (fix) {
+        for (auto& cell: m_locals) {
+            index_t ic = cell.index();
+            
+            int i = std::round((cell.x() - 0.5 * hx - xmin) / hx);
+            int j = std::round((cell.y() - 0.5 * hy - ymin) / hy);
+
+            m_locals.volume[ic] = volume;
+            m_locals.center[ic] = get_center(i, j);
+
+            index_t iface = m_locals.face_begin[ic];
+
+            m_locals.faces.area[iface + Side2D::L] = hy;
+            m_locals.faces.area[iface + Side2D::R] = hy;
+            m_locals.faces.area[iface + Side2D::B] = hx;
+            m_locals.faces.area[iface + Side2D::T] = hx;
+
+            m_locals.faces.normal[iface + Side2D::L] = -Vector3d::UnitX();
+            m_locals.faces.normal[iface + Side2D::R] =  Vector3d::UnitX();
+            m_locals.faces.normal[iface + Side2D::B] = -Vector3d::UnitY();
+            m_locals.faces.normal[iface + Side2D::T] =  Vector3d::UnitY();
+
+            m_locals.faces.center[iface + Side2D::L] = lface_center(i, j);
+            m_locals.faces.center[iface + Side2D::R] = rface_center(i, j);
+            m_locals.faces.center[iface + Side2D::B] = bface_center(i, j);
+            m_locals.faces.center[iface + Side2D::T] = tface_center(i, j);
+
+            SqQuad& quad = m_locals.mapping<2>(ic);
+            quad.vs<-1, -1>() = get_vertex(i + 0.0, j + 0.0);
+            quad.vs< 0, -1>() = get_vertex(i + 0.5, j + 0.0);
+            quad.vs<+1, -1>() = get_vertex(i + 1.0, j + 0.0);
+            quad.vs<-1,  0>() = get_vertex(i + 0.0, j + 0.5);
+            quad.vs< 0,  0>() = get_vertex(i + 0.5, j + 0.5);
+            quad.vs<+1,  0>() = get_vertex(i + 1.0, j + 0.5);
+            quad.vs<-1, +1>() = get_vertex(i + 0.0, j + 1.0);
+            quad.vs< 0, +1>() = get_vertex(i + 0.5, j + 1.0);
+            quad.vs<+1, +1>() = get_vertex(i + 1.0, j + 1.0);
+        }
+    }
 }
 
 int EuMesh::check_base() const {
@@ -424,7 +658,22 @@ void EuMesh::push_back(const geom::Polygon& poly) {
 }
 
 void EuMesh::push_back(const geom::Polyhedron& poly) {
-    throw std::runtime_error("Polyhedrpushback");
+    m_locals.push_back(poly);
+}
+
+void EuMesh::add_marker(const geom::Vector3d& pos, double size) {
+    if (dim() < 3) {
+        double c1 = 0.5 * size;
+        double c2 = 0.5 * size * std::sqrt(3.0);
+        Vector3d a = {0.0, -size, 1.0};
+        Vector3d b = {+c2, c1, 1.0};
+        Vector3d c = {-c2, c1, 1.0};
+        Polygon poly = {pos + a, pos + b, pos + c};
+        push_back(poly);
+    }
+    else {
+        throw std::runtime_error("3D markers not supported");
+    }
 }
 
 EuCell_Iter EuMesh::begin() {

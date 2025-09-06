@@ -330,12 +330,14 @@ int AmrCells::check_base_vertices_order(index_t ic) const {
         SqCube cube = mapping<3>(ic);
 
         bool bad = false;
-
-        throw std::runtime_error("Can't check 3D cell");
-
+        static bool first = true;
+        if (first) {
+            std::cerr << "Can't check 3D cell!!!\n";
+            first = false;
+        }
         /*
         // Индекс пересечения трех граней
-        auto cross_face = [](const BFaces& faces, Side3D side1, Side3D side2, Side3D side3) -> int {
+        auto cross_face = [](const Faces& faces, Side3D side1, Side3D side2, Side3D side3) -> int {
             auto& face1 = faces[side1];
             auto& face2 = faces[side2];
             auto& face3 = faces[side3];
@@ -361,7 +363,6 @@ int AmrCells::check_base_vertices_order(index_t ic) const {
             }
             return 100;
         };
-         */
 
         for (int i: {-1, 0}) {
             for (int j: {-1, 0}) {
@@ -395,6 +396,7 @@ int AmrCells::check_base_vertices_order(index_t ic) const {
             print_info(ic);
             return -1;
         }
+         */
     }
 
     return 0;

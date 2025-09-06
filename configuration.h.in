@@ -5,11 +5,19 @@
 #cmakedefine ZEPHYR_PYTHON
 
 #cmakedefine ZEPHYR_TBB
-#cmakedefine ZEPHYR_OPENMP
-#cmakedefine ZEPHYR_STD_THREADS
+#cmakedefine ZEPHYR_ASSERTS
 
 #ifdef ZEPHYR_MPI
     #define if_mpi(...) __VA_ARGS__
 #else
     #define if_mpi(...)
+#endif
+
+#ifdef ZEPHYR_ASSERTS
+    /// @brief Кидает исключение, если условие не выполняется
+    #define z_assert(condition, message) if ((condition)) { \
+        std::cerr << message << "\n"; throw std::runtime_error(message); }
+#else
+    /// @brief Если debug отключен, ничего не происходит
+    #define z_assert(...)
 #endif

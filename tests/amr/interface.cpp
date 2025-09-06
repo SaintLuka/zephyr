@@ -1,20 +1,22 @@
-// @brief Тестирование AMR на задачах с интерфейсами, под интерфейсами
-// понимаются узкие области адаптации с шириной в одну ячейку, которые
-// имеют меру размерности меньше, чем мера самой области.
+// Тестирование AMR на задачах с интерфейсами, под интерфейсами понимаются
+// узкие области адаптации с шириной в одну ячейку, которые имеют меру
+// размерности меньше, чем мера самой области.
 
 #include <iomanip>
 
-#include <zephyr/mesh/euler/eu_mesh.h>
-#include <zephyr/geom/generator/rectangle.h>
-#include <zephyr/io/pvd_file.h>
 #include <zephyr/utils/stopwatch.h>
+#include <zephyr/utils/threads.h>
+#include <zephyr/geom/generator/rectangle.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/io/pvd_file.h>
 
-using namespace zephyr;
-using namespace mesh;
+using namespace zephyr::mesh;
+using namespace zephyr::geom;
+using namespace zephyr::utils;
 
-using geom::generator::Rectangle;
+using generator::Rectangle;
 using zephyr::io::PvdFile;
-using zephyr::utils::Stopwatch;
+
 
 // Поля для хранения на сетке
 static Storable<int> idx;
@@ -22,7 +24,7 @@ static Storable<int> bit;
 
 // Периодическая функция времени, с периодом = 1
 int calc_idx(EuCell& cell, double t) {
-    geom::Vector3d c = cell.center();
+    Vector3d c = cell.center();
 
     double r = c.norm();
     double phi = std::atan2(c.y(), c.x()) - 2 * M_PI * t;
@@ -43,6 +45,7 @@ int calc_idx(EuCell& cell, double t) {
     return a1 + a2;
 }
 
+// Отметить ячейки на границах областей
 int calc_bit(EuCell& cell) {
     int idx_c = cell(idx);
     for (auto& face: cell.faces()) {
@@ -58,6 +61,7 @@ int calc_bit(EuCell& cell) {
     return 0;
 }
 
+// Выставить функцию-индикатор подобласти
 void set_index(EuCell& cell, double t) {
     cell(idx) = calc_idx(cell, t);
 }
@@ -67,30 +71,8 @@ void set_flag(EuCell& cell) {
     cell.set_flag(cell(bit) > 0 ? 1 : -1);
 }
 
-int solution_step(EuMesh& mesh, double t = 0.0) {
-    for (auto& cell: mesh) {
-        set_flag(cell);
-    }
-
-    mesh.refine();
-
-    for (auto cell: mesh) {
-        cell(idx) = calc_idx(cell, t);
-    }
-    for (auto cell: mesh) {
-        cell(bit) = calc_bit(cell);
-    }
-
-    return mesh.check_refined();
-}
-
 int main() {
     threads::on();
-
-    PvdFile pvd("mesh", "output");
-    pvd.variables = {"rank", "index", "next", "level", "flag", "faces2D"};
-    pvd.variables += {"idx", [](EuCell& cell) -> double { return cell(idx); }};
-    pvd.variables += {"bit", [](EuCell& cell) -> double { return cell(bit); }};
 
     Rectangle rect(-1.0, 1.0, -1.0, 1.0);
     rect.set_nx(30);
@@ -101,6 +83,11 @@ int main() {
 
     mesh.set_max_level(4);
     mesh.set_distributor("simple");
+
+    PvdFile pvd("mesh", "output");
+    pvd.variables = {"rank", "index", "next", "level", "flag", "faces2D"};
+    pvd.variables += {"idx", [](EuCell& cell) -> double { return cell(idx); }};
+    pvd.variables += {"bit", [](EuCell& cell) -> double { return cell(bit); }};
 
     if (mesh.check_base() < 0) {
         std::cout << "Bad init mesh\n";

@@ -57,19 +57,20 @@ struct Statistics {
     /// @brief Конструктор, однопоточный сбор статистики
     /// @details В многопоточном режиме данные получаются после объединения 
     /// статистики с разных потоков
-    explicit Statistics(AmrCells &locals) {
+    explicit Statistics(const AmrCells &locals) {
         n_cells = locals.size();
 
         scrutiny_check(n_cells >= 0, "Empty AmrStorage statistics");
 
         PartStatistics ps = threads::sum(
-                locals.flag.cbegin(), locals.flag.cend(), {}, cell_statistics);
+            locals.flag.cbegin(), locals.flag.cend(),
+            PartStatistics{}, cell_statistics);
 
         n_coarse = ps.n_coarse;
         n_retain = ps.n_retain;
         n_refine = ps.n_refine;
 
-        // Пересчитаем завимисые величины
+        // Пересчитаем зависимые величины
         scrutiny_check(n_coarse % CpC(locals.dim()) == 0, "Refiner::apply() error #2")
         scrutiny_check(n_retain + n_refine + n_coarse == n_cells, "Refiner::apply() error #1");
 
@@ -82,7 +83,7 @@ struct Statistics {
 
     /// @brief Выводит статистику
     void print() const {
-        mpi::for_each([this]() {
+        mpi::for_each([this] {
             if (!mpi::single()) {
                 std::cout << "rank " << mpi::rank() << "\n";
             }

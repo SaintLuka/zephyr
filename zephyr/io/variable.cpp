@@ -15,7 +15,7 @@ Variable::Variable(const char* name)
         m_n_components = 1;
 
         m_write = [](EuCell& cell, void *arg) {
-            auto out = (int32_t *) arg;
+            auto out = static_cast<int32_t *>(arg);
             out[0] = cell.rank();
         };
     }
@@ -24,7 +24,7 @@ Variable::Variable(const char* name)
         m_n_components = 1;
 
         m_write = [](EuCell& cell, void *arg) {
-            auto out = (int32_t *) arg;
+            auto out = static_cast<int32_t *>(arg);
             out[0] = cell.index();
         };
     }
@@ -33,8 +33,8 @@ Variable::Variable(const char* name)
         m_n_components = 1;
 
         m_write = [](EuCell& cell, void *arg) {
-            auto out = (int8_t *) arg;
-            out[0] = cell.level();
+            auto out = static_cast<int8_t *>(arg);
+            out[0] = static_cast<int8_t>(cell.level());
         };
     }
     else if (!std::strcmp(name, "next")) {
@@ -42,7 +42,7 @@ Variable::Variable(const char* name)
         m_n_components = 1;
 
         m_write = [](EuCell& cell, void *arg) {
-            auto out = (int32_t *) arg;
+            auto out = static_cast<int32_t *>(arg);
             out[0] = cell.next();
         };
     }
@@ -51,8 +51,8 @@ Variable::Variable(const char* name)
         m_n_components = 1;
 
         m_write = [](EuCell& cell, void *arg) {
-            auto out = (int8_t *) arg;
-            out[0] = cell.flag();
+            auto out = static_cast<int8_t *>(arg);
+            out[0] = static_cast<int8_t>(cell.flag());
         };
     }
     else if (!std::strcmp(name, "b_idx")) {
@@ -60,7 +60,7 @@ Variable::Variable(const char* name)
         m_n_components = 1;
 
         m_write = [](EuCell& cell, void *arg) {
-            auto out = (int32_t *) arg;
+            auto out = static_cast<int32_t *>(arg);
             out[0] = cell.b_idx();
         };
     }
@@ -69,7 +69,7 @@ Variable::Variable(const char* name)
         m_n_components = 1;
 
         m_write = [](EuCell& cell, void *arg) {
-            auto out = (int32_t *) arg;
+            auto out = static_cast<int32_t *>(arg);
             out[0] = cell.z_idx();
         };
     }
@@ -79,9 +79,9 @@ Variable::Variable(const char* name)
         m_n_components = n_faces;
 
         m_write = [n_faces](EuCell& cell, void *arg) {
-            auto out = (int8_t *) arg;
+            auto out = static_cast<int8_t *>(arg);
             for (int i = 0; i < n_faces; ++i) {
-                out[i] = cell.face(i).adj_rank();
+                out[i] = static_cast<int8_t>(cell.face(i).adj_rank());
             }
         };
     }
@@ -91,7 +91,7 @@ Variable::Variable(const char* name)
         m_n_components = n_faces;
 
         m_write = [n_faces](EuCell& cell, void *arg) {
-            auto out = (int32_t *) arg;
+            auto out = static_cast<int32_t *>(arg);
             for (int i = 0; i < n_faces; ++i) {
                 out[i] = cell.face(i).adj_index();
             }
@@ -103,7 +103,7 @@ Variable::Variable(const char* name)
         m_n_components = n_faces;
 
         m_write = [n_faces](EuCell& cell, void *arg) {
-            auto out = (int32_t *) arg;
+            auto out = static_cast<int32_t *>(arg);
             for (int i = 0; i < n_faces; ++i) {
                 out[i] = cell.face(i).adj_alien();
             }
@@ -115,9 +115,9 @@ Variable::Variable(const char* name)
         m_n_components = n_faces;
 
         m_write = [n_faces](EuCell& cell, void *arg) {
-            auto out = (int8_t *) arg;
+            auto out = static_cast<int8_t *>(arg);
             for (int i = 0; i < n_faces; ++i) {
-                out[i] = (int8_t) cell.face(i).flag();
+                out[i] = static_cast<int8_t>(cell.face(i).flag());
             }
         };
     }
@@ -126,10 +126,10 @@ Variable::Variable(const char* name)
         m_n_components = 3;
 
         m_write = [](EuCell& cell, void *arg) {
-            auto out = (float *) arg;
-            out[0] = float(cell.center().x());
-            out[1] = float(cell.center().y());
-            out[2] = float(cell.center().z());
+            auto out = static_cast<float *>(arg);
+            out[0] = static_cast<float>(cell.center().x());
+            out[1] = static_cast<float>(cell.center().y());
+            out[2] = static_cast<float>(cell.center().z());
         };
     }
     else {
@@ -142,33 +142,9 @@ Variable::Variable(const std::string& name)
 
 }
 
-void Variable::write(EuCell& elem, void* out) const {
+void Variable::write(EuCell& cell, void* out) const {
     assert(m_write != nullptr);
-    m_write(elem, out);
-}
-
-std::string Variable::name() const {
-    return m_name;
-}
-
-bool Variable::is_eu_cell() const {
-    return m_write != nullptr;
-}
-
-VtkType Variable::type() const {
-    return m_type;
-}
-
-int Variable::n_components() const {
-    return m_n_components;
-}
-
-bool Variable::is_scalar() const {
-    return m_n_components < 2;
-}
-
-size_t Variable::size() const {
-    return m_n_components * m_type.size();
+    m_write(cell, out);
 }
 
 } // namespace zephyr::io

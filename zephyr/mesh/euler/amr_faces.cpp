@@ -84,12 +84,14 @@ void AmrFaces::insert(index_t iface, CellType ctype, int count) {
 
         case CellType::POLYGON:
             if (count < 0) {
-                std::string message = "BFaces::BFaces error(): set argument 'count' with CellType::POLYGON";
+                std::string message = "AmrFaces::insert error(): set argument 'count' with CellType::POLYGON";
                 std::cerr << message << "\n";
                 throw std::runtime_error(message);
             }
             for (int i = 0; i < count; ++i) {
-                vertices[iface + i] = {i, (i + 1) % count, -1, -1};
+                vertices[iface + i].fill(-1);
+                vertices[iface + i][0] = i;
+                vertices[iface + i][1] = (i + 1) % count;
             }
             n_faces = count;
             break;

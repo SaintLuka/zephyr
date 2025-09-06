@@ -4,10 +4,10 @@
 
 namespace zephyr::phys {
 
-Sedov3D::Sedov3D(double _gamma, double _rho0, double _E) {
-    gamma = _gamma;
-    rho0  = _rho0;
-    E     = _E;
+Sedov3D::Sedov3D(const params& p) {
+    gamma = p.gamma;
+    rho0  = p.rho0;
+    E     = p.E;
 
     // Константы
     double kek = (13 * gamma * gamma - 7 * gamma + 12);

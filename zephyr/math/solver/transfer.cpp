@@ -696,14 +696,13 @@ Distributor Transfer::distributor() const {
 
     auto u1 = data.u1;
 
-    distr.split = [u1](EuCell& parent, Children &children) {
+    distr.split = [u1](const EuCell& parent, Children &children) {
         for (auto child: children) {
-            Vector3d dr = parent.center() - child.center();
             child(u1) = parent(u1);
         }
     };
 
-    distr.merge = [u1](Children &children, EuCell& parent) {
+    distr.merge = [u1](const Children &children, EuCell& parent) {
         double sum = 0.0;
         for (auto child: children) {
             sum += child(u1) * child.volume();

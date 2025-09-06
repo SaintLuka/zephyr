@@ -37,7 +37,7 @@ public:
 	int size() const { return m_size; }
 
     /// @brief Основная функция. Определение нового ранга ячейки.
-    virtual int rank(EuCell& elem) const = 0;
+    virtual int rank(const EuCell& elem) const = 0;
 
 	/// @brief Дисбаланс нагрузки
     static double imbalance(const std::vector<double>& ws);

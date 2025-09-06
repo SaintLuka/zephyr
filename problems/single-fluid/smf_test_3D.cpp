@@ -1,7 +1,5 @@
 /// @file smf_test_3D.cpp
 /// @brief Сферический взрыв на трехмерной декартовой сетке.
-
-
 #include <iostream>
 #include <iomanip>
 

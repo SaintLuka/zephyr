@@ -1,4 +1,5 @@
 #include <fstream>
+#include <filesystem>
 
 #include <zephyr/io/vtu_file.h>
 #include <zephyr/mesh/side.h>
@@ -13,6 +14,8 @@ namespace zephyr::io {
 using namespace zephyr::geom;
 using namespace zephyr::mesh;
 
+namespace fs = std::filesystem;
+
 /// ===========================================================================
 ///             Реализация записи в виде набора статических функций
 /// ===========================================================================
@@ -26,41 +29,45 @@ inline bool is_big_endian() {
     return bint.c[0] == 1;
 }
 
+inline std::string byteorder() {
+    return is_big_endian() ? "BigEndian" : "LittleEndian";
+}
+
 namespace {
-// Тип для задания размерва массивов в бинарном файле,
-// я не уверен, что его можно менять
+// Тип для задания размера массивов в бинарном файле, я не уверен, что его можно менять
 using datasize_t = std::uint32_t;
 using offset_t   = std::uint32_t;  // Тип смещения массивов в байтах
 using index_t    = std::uint32_t;  // Тип нумерации примитивов (ячеек, вершин и т.д.)
-using type_t     = std::uint8_t;   // VTK тип примитива/ячейки)
+using type_t     = std::uint8_t;   // VTK тип примитива/ячейки
 
 using byte_ptr = char*;
 }
 
+// Обработчик ячейки
 struct Handler {
     bool hex_only, polyhedral;
 
-    Handler(bool hex_only = false, bool polyhedral = false)
+    explicit Handler(bool hex_only = false, bool polyhedral = false)
         : hex_only(hex_only), polyhedral(polyhedral) {
     }
 
-    /// @brief VTK тип ячейки
-    type_t type(EuCell& cell) {
+    // VTK тип ячейки
+    type_t type(const EuCell& cell) const {
         if (cell.adaptive()) {
             // Адаптивная ячейка
             if (cell.dim() < 3) {
                 if (hex_only) {
-                    return 9; // VTK_QUAD
+                    return 9;  // VTK_QUAD
                 } else {
                     if (cell.complex_face(Side2D::L) || cell.complex_face(Side2D::R) ||
                         cell.complex_face(Side2D::B) || cell.complex_face(Side2D::T)) {
-                        return 7; // VTK_POLYGON
+                        return 7;  // VTK_POLYGON
                     } else {
-                        return 9; // VTK_QUAD
+                        return 9;  // VTK_QUAD
                     }
                 }
             } else {
-                return 12; // VTK_HEXAHEDRON
+                return 12;  // VTK_HEXAHEDRON
 
                 // В будущем использовать TRIQUADRIC HEXAHEDRON
                 // return 29; // VTK_TRIQUADRIC_HEXAHEDRON
@@ -71,43 +78,30 @@ struct Handler {
 
             if (cell.dim() < 3) {
                 // Двумерный полигон
-                index_t n = cell.node_count();
-
-                switch (n) {
-                    case 3:
-                        return 5; // VTK_TRIANGLE
-                    case 4:
-                        return 9; // VTK_QUAD
-                    default:
-                        return 7; // VTK_POLYGON
+                switch (cell.node_count()) {
+                    case 3:  return 5;  // VTK_TRIANGLE
+                    case 4:  return 9;  // VTK_QUAD
+                    default: return 7;  // VTK_POLYGON
                 }
             } else {
                 // Многогранник общего вида
-                throw std::runtime_error("vtu polyhedral not implemented");
                 if (polyhedral) {
-                    return 42;     // VTK_POLYHEDRON
+                    return 42;  // VTK_POLYHEDRON
                 }
 
-                /*
                 // Один из доступных примитивов
-                index_t n = cell.vertices.count();
-                switch (n) {
-                    case 4:
-                        return 10; // VTK_TETRA
-                    case 5:
-                        return 14; // VTK_PYRAMID
-                    case 6:
-                        return 13; // VTK_WEDGE
-                    default:
-                        return 12; // VTK_HEXAHEDRON
+                switch (cell.node_count()) {
+                    case 4:  return 10;  // VTK_TETRA
+                    case 5:  return 14;  // VTK_PYRAMID
+                    case 6:  return 13;  // VTK_WEDGE
+                    default: return 12;  // VTK_HEXAHEDRON
                 }
-                */
             }
         }
     }
 
-    /// @brief Количество вершин элемента
-    index_t n_points(EuCell& cell) {
+    // Количество вершин элемента
+    index_t n_points(const EuCell& cell) const {
         if (cell.adaptive()) {
             // Адаптивная ячейка
             if (cell.dim() < 3) {
@@ -115,18 +109,10 @@ struct Handler {
                     return 4;
                 } else {
                     index_t n = 4;
-                    if (cell.complex_face(Side2D::LEFT)) {
-                        n += 1;
-                    }
-                    if (cell.complex_face(Side2D::RIGHT)) {
-                        n += 1;
-                    }
-                    if (cell.complex_face(Side2D::BOTTOM)) {
-                        n += 1;
-                    }
-                    if (cell.complex_face(Side2D::TOP)) {
-                        n += 1;
-                    }
+                    if (cell.complex_face(Side2D::LEFT))   { n += 1; }
+                    if (cell.complex_face(Side2D::RIGHT))  { n += 1; }
+                    if (cell.complex_face(Side2D::BOTTOM)) { n += 1; }
+                    if (cell.complex_face(Side2D::TOP))    { n += 1; }
                     return n;
                 }
             } else {
@@ -140,27 +126,22 @@ struct Handler {
         }
     }
 
-    /// @brief Число граней ячейки + число вершин на каждой грани
-    index_t n_fverts(EuCell& cell) {
+    // Число граней ячейки + число вершин на каждой грани
+    index_t n_fverts(const EuCell& cell) const {
         if (!polyhedral) { return 0; }
 
-        throw std::runtime_error("n_fverts Not implemented");
-
-        /*
         index_t res = 0;
         for (auto& face: cell.faces()) {
             if (face.is_undefined()) continue;
 
-            // Допускаются грани с числом вершин до 9
-            res += face.poly_size() + 1;
+            // Допускаются грани с числом вершин до 8
+            res += face.n_vertices() + 1;
         }
         return res;
-         */
     }
 
-    /// @brief Записать в файл координаты вершин элемента
-    void write_points(std::ofstream &file, EuCell& cell) {
-
+    // Записать в файл координаты вершин элемента
+    void write_points(std::ofstream &file, const EuCell& cell) const {
         if (cell.adaptive()) {
             // Адаптивная ячейка
             if (cell.dim() < 3) {
@@ -223,8 +204,8 @@ struct Handler {
         }
     }
 
-    /// @brief Записать порядок вершин элемента
-    void write_connectivity(std::ofstream &file, EuCell& cell, index_t &counter) {
+    // Записать порядок вершин элемента
+    void write_connectivity(std::ofstream &file, const EuCell& cell, index_t &counter) const {
         index_t n = n_points(cell);
         for (index_t i = 0; i < n; ++i) {
             index_t val = counter++;
@@ -237,9 +218,9 @@ void write_mesh_header(
         std::ofstream &file, AmrCells &cells,
         const Variables &variables, bool hex_only, bool polyhedral
 ) {
-    Handler handler(hex_only, polyhedral);
+    const Handler handler(hex_only, polyhedral);
 
-    index_t n_cells = cells.n_cells();
+    const index_t n_cells = cells.n_cells();
 
     // Количество вершин
     index_t n_points = 0;
@@ -249,9 +230,7 @@ void write_mesh_header(
         n_fverts += handler.n_fverts(cell);
     }
 
-    std::string byteord = is_big_endian() ? "BigEndian" : "LittleEndian";
-
-    file << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" byte_order=\"" + byteord + "\">\n";
+    file << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" byte_order=\"" + byteorder() + "\">\n";
     file << "  <UnstructuredGrid>" << '\n';
     file << "    <Piece NumberOfPoints=\"" << n_points << "\" NumberOfCells=\"" << n_cells << "\">\n";
 
@@ -287,10 +266,6 @@ void write_mesh_header(
     file << "      <CellData>\n";
 
     for (auto &field: variables.list()) {
-        if (!field.is_eu_cell()) {
-            continue;
-        }
-
         file << "        <DataArray type=\"" << field.type() << "\" Name=\"" << field.name();
         if (!field.is_scalar()) {
             file << "\" NumberOfComponents=\"" << field.n_components();
@@ -307,11 +282,11 @@ void write_mesh_header(
 
 void write_mesh_primitives(
         std::ofstream &file, AmrCells &cells,
-        const Variables &variables, bool hex_only, bool polyhedral
+        bool hex_only, bool polyhedral
 ) {
-    Handler handler(hex_only, polyhedral);
+    const Handler handler(hex_only, polyhedral);
 
-    index_t n_cells = cells.n_cells();
+    const index_t n_cells = cells.n_cells();
 
     // Количество вершин
     index_t n_points = 0;
@@ -364,28 +339,23 @@ void write_mesh_primitives(
 
     // Данные многогранников
     if (polyhedral) {
-        throw std::runtime_error("polyhedral not implemented");
-
-        /*
         // Faces
         data_size = (n_cells + n_fverts) * sizeof(index_t);
         file.write((byte_ptr) &data_size, sizeof(datasize_t));
 
         counter = 0;
         for (auto &cell: cells) {
-            if (!filter(cell)) { continue; }
-
-            index_t nf = cell.faces.count();
+            index_t nf = cell.face_count();
             file.write((byte_ptr) &nf, sizeof(index_t));
 
             // Массив для описания грани
-            std::array<index_t, 10> some_face;
-            for (auto &face: cell.faces) {
+            std::array<index_t, AmrFaces::max_vertices + 1> some_face;
+            for (auto &face: cell.faces()) {
                 if (face.is_undefined()) { continue; }
 
-                some_face[0] = face.poly_size();
+                some_face[0] = face.n_vertices();
                 for (int j = 0; j < some_face[0]; ++j) {
-                    some_face[j + 1] = face.get_poly_vertex(j);
+                    some_face[j + 1] = face.vertex_index(j);
                 }
                 file.write((byte_ptr) some_face.data(), (some_face[0] + 1) * sizeof(index_t));
             }
@@ -398,12 +368,9 @@ void write_mesh_primitives(
 
         p_index = 0;
         for (auto& cell: cells) {
-            if (filter(cell)) {
-                p_index += (1 + handler.n_fverts(cell));
-                file.write((byte_ptr) &p_index, sizeof(index_t));
-            }
+            p_index += (1 + handler.n_fverts(cell));
+            file.write((byte_ptr) &p_index, sizeof(index_t));
         }
-        */
     }
 }
 
@@ -413,13 +380,9 @@ void write_cells_data(
 ) {
     std::vector<char> temp;
 
-    index_t n_cells = cells.n_cells();
+    const index_t n_cells = cells.n_cells();
 
     for (auto &field: variables.list()) {
-        if (!field.is_eu_cell()) {
-            continue;
-        }
-
         index_t field_size = field.size();
         datasize_t data_size = n_cells * field_size;
 
@@ -444,12 +407,12 @@ void write_cells_data(
 VtuFile::VtuFile(
         const std::string &filename,
         const Variables &variables,
-        bool hex_only, bool polyhedral) :
+        bool hex_only, bool polyhedral, bool unique_nodes) :
     filename(filename), variables(variables),
     hex_only(hex_only), polyhedral(polyhedral) {
 }
 
-void VtuFile::save(EuMesh &mesh) {
+void VtuFile::save(EuMesh &mesh) const {
     if (unique_nodes) {
         throw std::runtime_error("VtuFile save unique nodes: Not implemented");
         //mesh.collect_nodes();
@@ -462,14 +425,22 @@ void VtuFile::save(EuMesh &mesh) {
     //}
 }
 
-void VtuFile::save(AmrCells &cells) {
-    save(filename, cells, variables, hex_only, polyhedral);
+void VtuFile::save(AmrCells &cells) const {
+    save(filename, cells, variables, hex_only, polyhedral, unique_nodes);
 }
 
 void VtuFile::save(
         const std::string &filename, AmrCells &locals,
-        const Variables &variables, bool hex_only, bool polyhedral
+        const Variables &variables, bool hex_only, bool polyhedral, bool unique_nodes
 ) {
+    // Создать директории, если указано сложное имя filename
+    fs::path file_path(filename);
+    fs::path dir_path = file_path.parent_path();
+
+    if (!dir_path.empty()) {
+        fs::create_directories(dir_path);
+    }
+
     std::ofstream file(filename, std::ios::out | std::ios::binary);
     if (!file.is_open()) {
         std::cerr << "Warning: Cannot open file '" << filename << "'\n";
@@ -477,7 +448,7 @@ void VtuFile::save(
     }
 
     write_mesh_header(file, locals, variables, hex_only, polyhedral);
-    write_mesh_primitives(file, locals, variables, hex_only, polyhedral);
+    write_mesh_primitives(file, locals, hex_only, polyhedral);
     write_cells_data(file, locals, variables);
 
     file.close();

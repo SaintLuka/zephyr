@@ -3,6 +3,7 @@
 #include <zephyr/math/sle/tridiagonal.h>
 #include <zephyr/math/calc/derivatives.h>
 #include <zephyr/geom/curves/cubic_spline.h>
+#include <zephyr/utils/numpy.h>
 
 namespace zephyr::geom::curves {
 
@@ -368,7 +369,7 @@ void PCubicSpline::build(
     // Параметризация
     switch (param) {
         case Parametrization::Uniform:
-            m_ts = linspace(0.0, 1.0, m_xs.size());
+            m_ts = np::linspace(0.0, 1.0, m_xs.size());
             break;
         case Parametrization::Chord:
             m_ts = chord_parametrization(m_xs, m_ys, m_zs);

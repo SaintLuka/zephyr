@@ -1,6 +1,5 @@
-// @brief Проверка совместности для уравнений состояния
+// Проверка совместности для уравнений состояния
 
-#include <stdexcept>
 #include <iostream>
 #include <iomanip>
 #include <cmath>

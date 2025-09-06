@@ -22,22 +22,14 @@ SmFluid::SmFluid(Eos::Ptr eos) : m_eos(eos) {
     m_max_dt = std::numeric_limits<double>::max();
 }
 
-SmFluid::State SmFluid::add_types(EuMesh& mesh) {
-    /*
-    data.density  = mesh.add<double>("density");
-    data.velocity = mesh.add<Vector3d>("velocity");
-    data.pressure = mesh.add<double>("pressure");
-    data.energy   = mesh.add<double>("energy");
-    */
-
-    data.init = mesh.add<PState>("init");
-    data.half = mesh.add<PState>("half");
-    data.next = mesh.add<PState>("next");
-    data.d_dx = mesh.add<PState>("d_dx");
-    data.d_dy = mesh.add<PState>("d_dy");
-    data.d_dz = mesh.add<PState>("d_dz");
-
-    return data;
+SmFluid::Parts SmFluid::add_types(EuMesh& mesh) {
+    part.init = mesh.add<PState>("init");
+    part.d_dx = mesh.add<PState>("d_dx");
+    part.d_dy = mesh.add<PState>("d_dy");
+    part.d_dz = mesh.add<PState>("d_dz");
+    part.half = mesh.add<PState>("half");
+    part.next = mesh.add<PState>("next");
+    return part;
 }
 
 void SmFluid::set_CFL(double CFL) {
@@ -89,18 +81,17 @@ void SmFluid::update(EuMesh &mesh) {
     compute_dt(mesh);
 
     if (m_acc == 1) {
-        mesh.sync(data.init);
+        mesh.sync(part.init);
         fluxes(mesh);
     }
     else {
-        mesh.sync(data.init);
-
+        mesh.sync(part.init);
         compute_grad(mesh);
 
-        mesh.sync(data.d_dx, data.d_dy, data.d_dz);
+        mesh.sync(part.d_dx, part.d_dy, part.d_dz);
         fluxes_stage1(mesh);
 
-        mesh.sync(data.half);
+        mesh.sync(part.half);
         fluxes_stage2(mesh);
     }
 
@@ -110,11 +101,11 @@ void SmFluid::update(EuMesh &mesh) {
 
 void SmFluid::compute_dt(EuMesh &mesh) {
     double dt = mesh.min([this](EuCell cell) -> double {
-        //double c = m_eos->sound_speed_rP(cell(data.density), cell(data.pressure));
-        //return cell.incircle_diameter() / (cell(data.velocity).norm() + c);
-        double c = m_eos->sound_speed_rP(cell(data.init).density, cell(data.init).pressure);
-        return cell.incircle_diameter() / (cell(data.init).velocity.norm() + c);
-    }, 1.0e300);
+        //double c = m_eos->sound_speed_rP(cell(part.density), cell(part.pressure));
+        //return cell.incircle_diameter() / (cell(part.velocity).norm() + c);
+        double c = m_eos->sound_speed_rP(cell[part.init].density, cell[part.init].pressure);
+        return cell.incircle_diameter() / (cell[part.init].velocity.norm() + c);
+    });
 
     dt = std::min(m_CFL * dt, m_max_dt);
     m_dt = mpi::min(dt);
@@ -122,19 +113,19 @@ void SmFluid::compute_dt(EuMesh &mesh) {
 
 void SmFluid::compute_grad(EuMesh &mesh) const {
     mesh.for_each([this](EuCell &cell) {
-        auto grad = gradient::LSM<PState>(cell, data.init, boundary_value);
-        grad = gradient::limiting<PState>(cell, m_limiter, grad, data.init, boundary_value);
+        auto grad = gradient::LSM<PState>(cell, part.init, boundary_value);
+        grad = gradient::limiting<PState>(cell, m_limiter, grad, part.init, boundary_value);
 
-        cell(data.d_dx) = grad.x;
-        cell(data.d_dy) = grad.y;
-        cell(data.d_dz) = grad.z;
+        cell(part.d_dx) = grad.x;
+        cell(part.d_dy) = grad.y;
+        cell(part.d_dz) = grad.z;
     });
 }
 
 void SmFluid::fluxes(EuMesh &mesh) const {
     mesh.for_each([this](EuCell &cell) {
         // Примитивный вектор в ячейке
-        PState z_c = cell(data.init);
+        PState z_c = cell[part.init];
 
         // Консервативный вектор в ячейке
         QState q_c(z_c);
@@ -148,7 +139,7 @@ void SmFluid::fluxes(EuMesh &mesh) const {
             // Примитивный вектор соседа
             PState z_n;
             if (!face.is_boundary()) {
-                z_n = face.neib(data.init);
+                z_n = face.neib(part.init);
             } else {
                 z_n = boundary_value(z_c, normal, face.flag());
             }
@@ -176,7 +167,7 @@ void SmFluid::fluxes(EuMesh &mesh) const {
         }
 
         // Новое значение примитивных переменных
-        cell(data.next) = PState(q_c, *m_eos);
+        cell(part.next) = PState(q_c, *m_eos);
     });
 }
 
@@ -186,7 +177,7 @@ void SmFluid::fluxes_stage1(EuMesh &mesh) const {
         Vector3d cell_c = cell.center();
 
         // Примитивный вектор в ячейке
-        PState z_c = cell(data.init);
+        PState z_c = cell[part.init];
 
         // Консервативный вектор в ячейке
         QState q_c(z_c);
@@ -206,7 +197,7 @@ void SmFluid::fluxes_stage1(EuMesh &mesh) const {
             Vector3d neib_c;
             if (!face.is_boundary()) {
                 neib_c = neib.center();
-                z_n = neib(data.init);
+                z_n = neib[part.init];
             }
             else {
                 neib_c = face.symm_point(cell_c);
@@ -214,8 +205,8 @@ void SmFluid::fluxes_stage1(EuMesh &mesh) const {
             }
 
             auto face_extra = FaceExtra::Direct(
-                    z_c, cell(data.d_dx), cell(data.d_dy), cell(data.d_dz),
-                    z_n, neib(data.d_dx), neib(data.d_dy), neib(data.d_dz),
+                    z_c, cell(part.d_dx), cell(part.d_dy), cell(part.d_dz),
+                    z_n, neib(part.d_dx), neib(part.d_dy), neib(part.d_dz),
                     cell_c, neib_c, face_c);
 
             // Интерполяция на грань со стороны ячейки
@@ -247,7 +238,7 @@ void SmFluid::fluxes_stage1(EuMesh &mesh) const {
         }
 
         // Значение примитивных переменных на полушаге
-        cell(data.half) = PState(q_c, *m_eos);
+        cell(part.half) = PState(q_c, *m_eos);
     });
 }
 
@@ -257,10 +248,10 @@ void SmFluid::fluxes_stage2(EuMesh &mesh) const {
         Vector3d cell_c = cell.center();
 
         // Примитивный вектор на полуслое
-        PState z_c = cell(data.init);
+        PState z_c = cell[part.init];
 
         // Примитивный вектор на полуслое
-        PState z_ch = cell(data.half);
+        PState z_ch = cell(part.half);
 
         // Консервативный вектор в ячейке на прошлом шаге
         QState q_c(z_c);
@@ -280,8 +271,8 @@ void SmFluid::fluxes_stage2(EuMesh &mesh) const {
             Vector3d neib_c;
             if (!face.is_boundary()) {
                 neib_c = neib.center();
-                z_n  = neib(data.init);
-                z_nh = neib(data.half);
+                z_n  = neib[part.init];
+                z_nh = neib(part.half);
             }
             else {
                 neib_c = face.symm_point(cell_c);
@@ -291,8 +282,8 @@ void SmFluid::fluxes_stage2(EuMesh &mesh) const {
 
             // Параметры интерполяции с предыдущего (!) слоя
             auto face_extra = FaceExtra::Direct(
-                    z_c, cell(data.d_dx), cell(data.d_dy), cell(data.d_dz),
-                    z_n, neib(data.d_dx), neib(data.d_dy), neib(data.d_dz),
+                    z_c, cell(part.d_dx), cell(part.d_dy), cell(part.d_dz),
+                    z_n, neib(part.d_dx), neib(part.d_dy), neib(part.d_dz),
                     cell_c, neib_c, face_c);
 
             // Интерполяция на грань со стороны ячейки
@@ -340,13 +331,13 @@ void SmFluid::fluxes_stage2(EuMesh &mesh) const {
         }
 
         // Значение примитивных переменных на новом слое
-        cell(data.next) = PState(q_c, *m_eos);
+        cell(part.next) = PState(q_c, *m_eos);
     });
 }
 
 void SmFluid::swap(EuMesh &mesh) const {
     mesh.for_each([this](EuCell &cell) {
-        cell(data.init) = cell(data.next);
+        cell[part.init] = cell(part.next);
     });
 }
 
@@ -360,31 +351,31 @@ Distributor SmFluid::distributor(const std::string& type) const {
     Distributor distr;
 
     // Консервативное суммирование
-    distr.merge = [this](Children &children, EuCell &parent) {
+    distr.merge = [this](const Children &children, EuCell &parent) {
         QState q_p;
         for (auto child: children) {
-            QState q_ch(child(data.init));
+            QState q_ch(child[part.init]);
             q_p.arr() += q_ch.arr() * child.volume();
         }
         q_p.arr() /= parent.volume();
         PState z_p(q_p, *m_eos);
-        parent(data.init) = z_p;
+        parent[part.init] = z_p;
     };
 
     // Снос копированием
-    auto split_const = [this](EuCell &parent, Children &children) {
-        PState z_p = parent(data.init);
+    auto split_const = [this](const EuCell &parent, Children &children) {
+        PState z_p = parent[part.init];
         for (auto child: children) {
-            child(data.init) = z_p;
+            child[part.init] = z_p;
         }
     };
     
     // Снос по градиентам
-    auto split_slope = [this](EuCell &parent, Children &children) {
-        PState& z_p  = parent(data.init);
-        PState& d_dx = parent(data.d_dx);
-        PState& d_dy = parent(data.d_dy);
-        PState& d_dz = parent(data.d_dz);
+    auto split_slope = [this](const EuCell &parent, Children &children) {
+        const PState& z_p  = parent[part.init];
+        const PState& d_dx = parent(part.d_dx);
+        const PState& d_dy = parent(part.d_dy);
+        const PState& d_dz = parent(part.d_dz);
 
         auto P = m_eos->pressure_re(z_p.density, z_p.energy, {.deriv = true});
 
@@ -398,7 +389,7 @@ Distributor SmFluid::distributor(const std::string& type) const {
         for (auto child: children) {
             Vector3d dr = child.center() - parent.center();
 
-            PState z_ch = parent(data.init);
+            PState z_ch = parent[part.init];
 
             z_ch.density = z_p.density +
                            d_dx.density * dr.x() +
@@ -422,14 +413,14 @@ Distributor SmFluid::distributor(const std::string& type) const {
                 break;
             }
 
-            child(data.init) = z_ch;
+            child[part.init] = z_ch;
         }
 
         // Не удалось сделать интерполяцию в одну из дочерних ячеек,
         // выполняем простой перенос
         if (bad_grad) {
             for (auto child: children) {
-                child(data.init) = z_p;
+                child[part.init] = z_p;
             }
         }
     };
@@ -461,8 +452,8 @@ void SmFluid::set_flags(EuMesh &mesh) const {
         //cell.set_flag(1); continue;
         cell.set_flag(-1);
 
-        double dens = cell(data.init).density;
-        double pres = cell(data.init).pressure;
+        double dens = cell[part.init].density;
+        double pres = cell[part.init].pressure;
 
         double dens_split = xi_dens * std::abs(dens);
         double pres_split = xi_pres * std::abs(pres);
@@ -472,8 +463,8 @@ void SmFluid::set_flags(EuMesh &mesh) const {
                 continue;
             }
 
-            double dens_n = face.neib(data.init).density;
-            double pres_n = face.neib(data.init).pressure;
+            double dens_n = face.neib(part.init).density;
+            double pres_n = face.neib(part.init).pressure;
 
             // Большой перепад плотностей или давлений
             if (std::abs(dens_n - dens) > dens_split ||

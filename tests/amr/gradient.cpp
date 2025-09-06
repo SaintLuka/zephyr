@@ -1,20 +1,21 @@
-// @brief Тестирование AMR на задаче с медленно (по времени) и
-// плавно (по координате) изменяющимися уровнями адаптации.
+// Тестирование AMR на задаче с медленно (по времени) и плавно (по координате)
+// изменяющимися уровнями адаптации.
 
 #include <iomanip>
 
-#include <zephyr/mesh/euler/eu_mesh.h>
-#include <zephyr/geom/generator/rectangle.h>
-#include <zephyr/io/pvd_file.h>
 #include <zephyr/utils/stopwatch.h>
+#include <zephyr/utils/threads.h>
+#include <zephyr/geom/generator/rectangle.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/io/pvd_file.h>
 
-using namespace zephyr;
-using namespace mesh;
-using namespace geom;
+using namespace zephyr::mesh;
+using namespace zephyr::geom;
+using namespace zephyr::utils;
 
 using generator::Rectangle;
 using zephyr::io::PvdFile;
-using zephyr::utils::Stopwatch;
+
 
 // Поле для хранения на сетке
 static Storable<int> wanted;
@@ -62,10 +63,6 @@ void set_flag(EuCell& cell) {
 int main() {
     threads::on();
 
-    PvdFile pvd("mesh", "output");
-    pvd.variables = {"rank", "index", "next", "level", "flag", "faces2D"};
-    pvd.variables += {"wanted", [](EuCell& cell) -> double { return cell(wanted); }};
-
     Rectangle rect(-1.0, 1.0, -1.0, 1.0);
     rect.set_nx(20);
 
@@ -74,6 +71,10 @@ int main() {
 
     mesh.set_max_level(5);
     mesh.set_distributor("simple");
+
+    PvdFile pvd("mesh", "output");
+    pvd.variables = {"rank", "index", "next", "level", "flag", "faces2D"};
+    pvd.variables += {"wanted", [](EuCell& cell) -> double { return cell(wanted); }};
 
     if (mesh.check_base() < 0) {
         std::cout << "Bad init mesh\n";

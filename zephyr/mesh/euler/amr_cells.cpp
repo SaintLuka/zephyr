@@ -100,7 +100,7 @@ double AmrCells::incircle_diameter(index_t ic) const {
     } else {
         assert(m_dim == 2);
         int n = node_count(ic);
-        // Диаметр вписаной окружности внутрь правильного многоугольника
+        // Диаметр вписанной окружности внутрь правильного многоугольника
         // с площадью volume.
         return 2.0 * std::sqrt(volume[ic] / (n * std::tan(M_PI / n)));
     }
@@ -139,7 +139,7 @@ Polygon AmrCells::polygon(index_t ic) const {
 
         return poly;
     } else {
-        return Polygon(vertices_data(ic), node_count(ic));
+        return {vertices_data(ic), node_count(ic)};
     }
 }
 
@@ -307,7 +307,7 @@ bool AmrCells::const_function(index_t ic, const SpFunction& func) const {
         }
         else {
             // Не адаптивная ячейка
-            for (int i: nodes_range(ic)) {
+            for (auto i: nodes_range(ic)) {
                 if (func(verts[i]) != value) {
                     return false;
                 }
@@ -476,11 +476,6 @@ void AmrCells::copy_geom_basic(index_t ic, AmrCells& cells,
 
     cells.node_begin[jc] = node_beg;
     cells.node_begin[jc + 1] = node_beg + max_node_count(ic);
-
-    for (index_t i = 0; i < max_node_count(ic); ++i) {
-        index_t iv = node_begin[ic] + i;
-        index_t jv = cells.node_begin[jc] + i;
-    }
 }
 
 void AmrCells::clear() {
@@ -749,7 +744,6 @@ void AmrCells::set_cell(index_t ic, const Cube& cube) {
 
 void AmrCells::set_cell(index_t ic, const SqCube& cube) {
     set_cell(ic, cube.reduce());
-    //std::cerr << "Nonlinear AmrCells is not supported\n";
 }
 
 void AmrCells::push_back(const geom::Line &line) {
@@ -760,7 +754,6 @@ void AmrCells::push_back(const Polygon& poly) {
     assert(m_dim == 2);
     assert(!m_adaptive);
     assert(m_linear);
-    assert(!m_axial);
 
     index_t ic = size();
 
@@ -813,50 +806,77 @@ void AmrCells::push_back(const Polygon& poly) {
 }
 
 void AmrCells::push_back(const Polyhedron& poly) {
-    throw std::runtime_error("AmrCells::set_cell: Not implemented");
-    /*
-    : Element(0, 0), dim(3),
-      adaptive(false), linear(true),
-      vertices(poly), faces(CellType::POLYHEDRON),
-      b_idx(-1), z_idx(-1), level(0), flag(0)
+    if (poly.need_simplify(AmrFaces::max_vertices)) {
+        Polyhedron simple_poly = poly;
+        simple_poly.simplify_faces(AmrFaces::max_vertices);
+        push_back_impl(simple_poly);
+    }
+    else {
+        push_back_impl(poly);
+    }
+}
 
-    volume = poly.volume();
-    center = poly.centroid(volume);
+void AmrCells::push_back_impl(const Polyhedron& poly) {
+    assert(m_dim == 3);
+    assert(!m_adaptive);
+    assert(m_linear);
+    assert(!m_axial);
 
-    if (poly.n_faces() > BFaces::max_count) {
-        throw std::runtime_error("Polygon has > 24 faces");
+    index_t ic = size();
+
+    resize_cells(ic + 1);
+
+    rank[ic] = 0;
+    index[ic] = ic;
+
+    flag[ic] = 0;
+    b_idx[ic] = -1;
+    z_idx[ic] = -1;
+    level[ic] = -1;
+
+    volume[ic] = poly.volume();
+    center[ic] = poly.centroid(volume[ic]);
+
+    volume_alt[ic] = NAN;
+
+    // Зададим вершины многогранника
+    int n_nodes = poly.n_verts();
+    verts.resize(verts.size() + n_nodes);
+
+    node_begin[ic + 1] = node_begin[ic] + n_nodes;
+    for (int i = 0; i < n_nodes; ++i) {
+        verts[node_begin[ic] + i] = poly.vertex(i);
     }
 
+    // Определим грани многогранника
+    int n_faces = poly.n_faces();
+    faces.resize(faces.size() + n_faces);
+
+    face_begin[ic + 1] = face_begin[ic] + n_faces;
     for (int i = 0; i < poly.n_faces(); ++i) {
+        index_t iface = face_begin[ic] + i;
+
+        faces.area[iface] = poly.face_area(i);
+        faces.center[iface] = poly.face_center(i);
+        faces.normal[iface] = poly.face_normal(i);
+        faces.boundary[iface] = Boundary::ORDINARY;
+
+        faces.area_alt[iface] = NAN;
+
+        // Выставить вершины грани
         int n_verts = poly.face_indices(i).size();
-        if (n_verts < 4) {
-            faces[i].vertices = {poly.face_indices(i)[0],
-                                 poly.face_indices(i)[1],
-                                 poly.face_indices(i)[2],
-                                 -1
-            };
-        }
-        else if (n_verts < 5) {
-            faces[i].vertices = {poly.face_indices(i)[0],
-                                 poly.face_indices(i)[1],
-                                 poly.face_indices(i)[2],
-                                 poly.face_indices(i)[3]
-            };
-        }
-        else {
-            // Хардкор, полигональная грань
-            faces[i].set_polygonal();
-            for (int j = 0; j < n_verts; ++j) {
-                faces[i].set_poly_vertex(j, poly.face_indices(i)[j]);
-            }
+        if (n_verts > AmrFaces::max_vertices) {
+            std::string message = "Can't add polyhedron with " +
+                    std::to_string(n_verts) + " vertices per face.";
+            std::cerr << message << "\n";
+            throw std::runtime_error(message);
         }
 
-        faces[i].area     = poly.face_area(i);
-        faces[i].center   = poly.face_center(i);
-        faces[i].normal   = poly.face_normal(i);
-        faces[i].boundary = Boundary::ORDINARY;
+        faces.vertices[iface].fill(-1);
+        for (int j = 0; j < n_verts; ++j) {
+            faces.vertices[iface][j] = poly.face_indices(i)[j];
+        }
     }
-    */
 }
 
 } // namespace zephyr::mesh

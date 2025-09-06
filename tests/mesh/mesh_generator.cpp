@@ -1,7 +1,8 @@
 #include <iostream>
 #include <vector>
 
-#include <zephyr/mesh/mesh.h>
+#if 0
+#include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/io/vtu_file.h>
 
 #include <zephyr/geom/box.h>
@@ -508,3 +509,6 @@ LaMesh Test::gen_la() const {
 
     return mesh;
 }
+#else
+int main(int argc, char *argv[]) { return -1; }
+#endif

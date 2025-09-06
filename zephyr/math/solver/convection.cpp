@@ -142,7 +142,7 @@ void Convection::update(EuMesh &mesh) {
     m_dt = mesh.min(
             [this](EuCell cell) -> double {
                 return compute_dt(cell);
-            }, 1.0e300);
+            });
 
     if (m_accuracy < 2) {
         // Схема первого порядка, простой снос значений
@@ -157,26 +157,26 @@ void Convection::update(EuMesh &mesh) {
 
         // Считаем производные
         mesh.for_each(
-                [this](EuCell cell) {
+                [this](EuCell& cell) {
                     compute_grad(cell, 0);
                 });
 
         // Шаг предиктора
         mesh.for_each(
-                [this](EuCell cell) {
+                [this](EuCell& cell) {
                     fluxes(cell, 0);
                 });
 
         // Считаем производные
         mesh.for_each(
-                [this](EuCell cell) {
+                [this](EuCell& cell) {
                     compute_grad(cell, 1);
                 });
     }
 
     // Шаг корректора
     mesh.for_each(
-            [this](EuCell cell) {
+            [this](EuCell& cell) {
                 fluxes(cell, 1);
             });
 
@@ -212,7 +212,7 @@ void Convection::set_flags(EuMesh& mesh) {
 Distributor Convection::distributor() const {
     Distributor distr;
 
-    distr.split = [&](EuCell &parent, Children &children) {
+    distr.split = [&](const EuCell &parent, Children &children) {
         for (auto child: children) {
             Vector3d dr = parent.center() - child.center();
             child(u_curr) = parent(u_curr) +
@@ -222,7 +222,7 @@ Distributor Convection::distributor() const {
         }
     };
 
-    distr.merge = [&](Children &children, EuCell &parent) {
+    distr.merge = [&](const Children &children, EuCell &parent) {
         double sum = 0.0;
         for (auto child: children) {
             sum += child(u_curr) * child.volume();

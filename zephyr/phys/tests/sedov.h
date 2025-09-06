@@ -14,8 +14,14 @@ using zephyr::geom::Vector3d;
 /// Но многие обозначения изменены, узнается с трудом.
 class Sedov3D {
 public:
+    struct params {
+        double gamma = 1.4;
+        double rho0  = 1.0;
+        double E     = 1.0;
+    };
+    
     /// @brief Конструктор
-    Sedov3D(double gamma, double rho0=1.0, double E=1.0);
+    Sedov3D(const params& p);
 
     /// @brief Радиус ударной волны
     double r_shock(double t) const;

@@ -23,7 +23,7 @@ class SmFluid {
 public:
 
     /// @brief Расширенный вектор состояния на котором решается задача
-    struct State {
+    struct Parts {
         Storable<PState> init;  ///< Состояние на основном слое
         Storable<PState> half;  ///< Состояние на полушаге
         Storable<PState> next;  ///< Состояние на следующем шаге
@@ -32,7 +32,7 @@ public:
         Storable<PState> d_dx, d_dy, d_dz;
     };
 
-    State data;
+    Parts part;
 
     /// @brief Конструктор класса
     explicit SmFluid(Eos::Ptr eos);
@@ -41,7 +41,7 @@ public:
     ~SmFluid() = default;
 
     /// @brief Добавить типы на сетку
-    State add_types(EuMesh& mesh);
+    Parts add_types(EuMesh& mesh);
 
     /// @brief Установить число Куранта
     void set_CFL(double CFL);

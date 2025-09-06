@@ -73,7 +73,7 @@ public:
     /// На практике точка v обычно является положением центра ячейки
     int rank(const Vector3d& v) const;
     
-    int rank(EuCell& elem) const override;
+    int rank(const EuCell& elem) const override;
 
 
     // set функции

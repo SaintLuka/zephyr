@@ -12,8 +12,3 @@
 #include <zephyr/geom/primitives/triangle.h>
 #include <zephyr/geom/primitives/polygon.h>
 #include <zephyr/geom/primitives/polyhedron.h>
-
-/// @brief Основное пространство имен.
-namespace zephyr {
-
-}

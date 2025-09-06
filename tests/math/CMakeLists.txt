@@ -1,4 +1,3 @@
-#list(APPEND TESTS asigma)
 #list(APPEND TESTS weno)
 #list(APPEND TESTS derivatives)
 
@@ -16,7 +15,6 @@ endif()
 
 # Can't compile targets without python
 if (NOT ZEPHYR_PYTHON)
-    list(REMOVE_ITEM TESTS asigma)
     list(REMOVE_ITEM TESTS weno)
 endif()
 

@@ -1,57 +1,36 @@
-// @brief Создание сетки с осевой симметрией. Наличие осевой симметрии можно
-// увидеть по расположению центров ячеек и граней, а также объемам/длинам граней.
+// Создание сетки с осевой симметрией. Наличие осевой симметрии можно увидеть
+// по расположению центров ячеек и граней, а также объемам/длинам граней.
 
-#include <filesystem>
-
-#include <zephyr/mesh/euler/eu_mesh.h>
-#include <zephyr/mesh/lagrange/la_node.h>
 #include <zephyr/geom/generator/sector.h>
 #include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/io/vtu_file.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
 
 using zephyr::geom::Vector3d;
+using zephyr::mesh::EuCell;
 using zephyr::mesh::EuMesh;
-using zephyr::mesh::AmrStorage;
-using zephyr::mesh::NodeStorage;
 using zephyr::geom::generator::Sector;
 using zephyr::geom::generator::Rectangle;
 
 using zephyr::io::VtuFile;
 using zephyr::io::Variables;
 
-namespace fs = std::filesystem;
-
-struct _U_ {
-    double value;
-};
-
-_U_ U;
-
-double get_volume(AmrStorage::Item& cell) { return cell.volume; }
-double get_vol_as(AmrStorage::Item& cell) { return cell.volume_alt; }
+double get_volume(EuCell& cell) { return cell.volume(); }
+double get_vol_as(EuCell& cell) { return cell.volume(true); }
 
 // Массив центров ячеек и граней
-NodeStorage centers(EuMesh& mesh) {
-    size_t count = 0;
+EuMesh centers(EuMesh& mesh) {
+    EuMesh markers(2, false);
+
+    // Добавляем точки в виде маркеров
     for (auto& cell: mesh) {
-        ++count;
+        double size = 0.1 * cell.linear_size();
+        markers.add_marker(cell.center(), size);
         for (auto& face: cell.faces()) {
-            ++count;
+            markers.add_marker(face.center(), 0.1 * face.area());
         }
     }
-
-    NodeStorage nodes_plain(count, 0);
-
-    count = 0;
-    for (auto& cell: mesh) {
-        nodes_plain[count].coords = cell.center();
-        ++count;
-        for (auto& face: cell.faces()) {
-            nodes_plain[count].coords = face.center();
-            ++count;
-        }
-    }
-    return nodes_plain;
+    return markers;
 }
 
 double calc_volume(EuMesh& mesh, bool axial) {
@@ -83,10 +62,10 @@ int main() {
 #endif
 
     gen.set_axial(false);
-    EuMesh mesh_plain(gen, U);
+    EuMesh mesh_plain(gen);
 
     gen.set_axial(true);
-    EuMesh mesh_axial(gen, U);
+    EuMesh mesh_axial(gen);
 
     std::cout << "Area   (plain): " << calc_volume(mesh_plain, false) << " / " << volume_plain << "\n";
     std::cout << "Volume (axial): " << calc_volume(mesh_axial, true ) << " / " << volume_axial << "\n";
@@ -94,13 +73,8 @@ int main() {
     Variables vars;
     vars += {"volume", get_volume};
     vars += {"vol_as", get_vol_as};
-
-    if (!fs::exists("out") || (fs::exists("out") && fs::is_directory("out"))) {
-        fs::create_directory("out");
-    }
-
-    NodeStorage centers_pl = centers(mesh_plain);
-    NodeStorage centers_ax = centers(mesh_axial);
+    EuMesh centers_pl = centers(mesh_plain);
+    EuMesh centers_ax = centers(mesh_axial);
 
     VtuFile::save("out/mesh_plain.vtu", mesh_plain, vars, true);
     VtuFile::save("out/mesh_axial.vtu", mesh_axial, vars, true);

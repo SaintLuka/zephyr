@@ -2,7 +2,8 @@
 
 #include <algorithm>
 
-namespace zephyr::utils {
+/// @brief Основное пространство имен.
+namespace zephyr {
 
 /// @brief Простой класс для представления диапазона чисел.
 /// @tparam T Целочисленный тип (int, unsigned int, size_t...),

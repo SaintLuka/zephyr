@@ -20,16 +20,18 @@ using namespace zephyr::phys;
 using namespace zephyr::math;
 using namespace zephyr::math::smf;
 
-using zephyr::mesh::generator::Strip;
+using zephyr::geom::generator::Strip;
 using zephyr::math::RiemannSolver;
 using zephyr::mesh::EuMesh;
 using zephyr::mesh::EuCell;
 using zephyr::math::SmFluid;
 using zephyr::utils::threads;
+using zephyr::utils::mpi;
 
 #define ADAPTIVE
 
 int main() {
+    mpi::handler init;
     threads::on();
 
     // Тестовая задача

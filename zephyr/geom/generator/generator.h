@@ -8,14 +8,14 @@ namespace zephyr::mesh { class AmrCells; }
 
 namespace zephyr::geom {
 
-class Box;  ///< Ограничивающий объем
+struct Box;  ///< Ограничивающий объем
 class Grid; ///< Сетка общего вида, создается генератором
 
 /// @brief Базовый класс для сеточных генераторов. Содержит набор
 /// виртуальных функций для создания AmrStorage с сеткой.
 class Generator {
 protected:
-    using Json = zephyr::utils::Json;
+    using Json = utils::Json;
 public:
     using Ptr = std::shared_ptr<Generator>;
     using Ref = const std::shared_ptr<Generator>&;
@@ -28,6 +28,21 @@ public:
 
     /// @brief Создать умный указатель по файлу конфигурации
     static Generator::Ptr create(const Json& config);
+
+    /// @brief Проверить, что можно преобразовать к наследнику
+    template <class T>
+    typename std::enable_if<std::is_base_of<Generator, T>::value, bool>::type
+    can_cast() { return dynamic_cast<T*>(this) != nullptr; };
+
+    /// @brief Приведение к конкретному типу
+    /// @throw segfault при невозможности приведения
+    /// @code
+    ///     Generator::Ptr gen;
+    ///     Rectangle& rect = gen->cast<Rectangle>();
+    /// @endcode
+    template <class T>
+    std::enable_if_t<std::is_base_of_v<Generator, T>, T&>
+    cast() { return *(dynamic_cast<T*>(this)); };
 
     /// @brief Тип сеточного генератора
     const std::string &name() const;

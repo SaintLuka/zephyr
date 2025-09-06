@@ -4,7 +4,6 @@
 
 #include <zephyr/mesh/amr/common.h>
 #include <zephyr/mesh/amr/faces.h>
-#include <zephyr/mesh/amr/coarse.h>
 
 namespace zephyr::mesh::amr {
 

@@ -3,28 +3,33 @@
 #include <zephyr/geom/generator/strip.h>
 #include <zephyr/geom/generator/rectangle.h>
 
-#include <zephyr/mesh/mesh.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
 
 #include <zephyr/math/calc/weno.h>
 
+#include <zephyr/utils/numpy.h>
 #include <zephyr/utils/matplotlib.h>
 
+using namespace zephyr;
 using namespace zephyr::geom;
+using namespace zephyr::mesh;
+
 using generator::Strip;
 using generator::Rectangle;
-
-using namespace zephyr::mesh;
 
 using zephyr::math::WENO5;
 
 namespace plt = zephyr::utils::matplotlib;
 
-struct _D1_ {
+struct _U_ {
     double u;
     double du_dx;
 
-    _D1_() = default;
+    _U_() = default;
 };
+
+static _U_ U;
+
 
 class TestFunc {
 public:
@@ -45,12 +50,12 @@ public:
 };
 
 void test_1D(TestFunc test) {
-    _D1_ U{};
 
     Strip gen(0.0, 1.0, Strip::Type::UNIFORM);
     gen.set_nx(54);
 
-    EuMesh cells(gen, U);
+    EuMesh cells(gen);
+    cells.add<_U_>("U");
 
     // Установить начальные данные (средние величины в ячейках)
     for (int i = 0; i < cells.nx(); ++i) {
@@ -67,7 +72,6 @@ void test_1D(TestFunc test) {
         auto neib_l = cell.face(Side3D::L).neib();
         cell(U).du_dx = (neib_r(U).u - neib_l(U).u) / (neib_r.center().x() - neib_l.center().x());
     }
-
 
     // Строим все полученные реконструкции
 
@@ -86,7 +90,7 @@ void test_1D(TestFunc test) {
 
         // Для внутренней реконструкции
         int M = 20;
-        auto xs = linspace(x1, x2, M);
+        auto xs = np::linspace(x1, x2, M);
 
         // Границы ячеек
         plt::plot({x1, x1}, {-0.1, 1.1}, {{"linestyle", "solid"}, {"color", "lightgray"}, {"linewidth", "0.5"}});
@@ -130,9 +134,9 @@ void test_1D(TestFunc test) {
 
 int main() {
     //TestFunc test = TestFunc::Smooth();
-    //TestFunc test = TestFunc::Parabola();
+    TestFunc test = TestFunc::Parabola();
     //TestFunc test = TestFunc::Step();
-    TestFunc test = TestFunc::Hardcore();
+    //TestFunc test = TestFunc::Hardcore();
 
     test_1D(test);
 

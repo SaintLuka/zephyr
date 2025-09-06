@@ -8,8 +8,8 @@ set(ZEPHYR_MESH_SRC
         PARENT_SCOPE)
 
 install(FILES
-        index.h
-        side.h
-        storage.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/index.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/side.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/storage.h
         DESTINATION
         include/${PROJECT_NAME}/mesh)

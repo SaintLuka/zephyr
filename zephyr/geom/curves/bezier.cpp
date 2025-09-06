@@ -1,4 +1,5 @@
 #include <zephyr/geom/curves/bezier.h>
+#include <zephyr/utils/numpy.h>
 
 namespace zephyr::geom::curves {
 
@@ -67,7 +68,7 @@ const std::vector<double>& Bezier::ys() const { return m_ys; }
 const std::vector<double>& Bezier::zs() const { return m_zs; }
 
 std::vector<Vector3d> Bezier::vs() const {
-    return zip(m_xs, m_ys, m_zs);
+    return np::zip(m_xs, m_ys, m_zs);
 }
 
 std::vector<double> Bezier::xs(int N) const {

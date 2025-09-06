@@ -1,13 +1,16 @@
+#include <numeric>
+#include <iomanip>
+
 #include <zephyr/mesh/euler/router.h>
 
 namespace zephyr::mesh {
 
-using zephyr::utils::mpi;
+using utils::mpi;
 
 inline std::vector<index_t> accumulate(const std::vector<index_t> &arr) {
     std::vector<index_t> res(arr.size());
     res[0] = 0;
-    for (size_t i = 0; i < arr.size(); ++i) {
+    for (size_t i = 1; i < arr.size(); ++i) {
         res[i] = res[i - 1] + arr[i - 1];
     }
     return res;
@@ -133,6 +136,28 @@ void Router::print_complete() const {
         std::cout << "\n";
     }
     std::cout << "\n";
+}
+
+Requests Router::isend(const utils::Buffer& src, MpiTag tag) {
+    Requests send_req(m_size);
+    for (int r = 0; r < m_size; ++r) {
+        if (m_send_count[r] > 0) {
+            MPI_Isend(src.get_ptr(m_send_offset[r]), m_send_count[r],
+                      src.dtype(), r, int(tag), utils::mpi::comm(), &send_req[r]);
+        }
+    }
+    return send_req;
+}
+
+Requests Router::irecv(utils::Buffer& dst, MpiTag tag) {
+    Requests recv_req(m_size);
+    for (int r = 0; r < m_size; ++r) {
+        if (m_recv_count[r] > 0) {
+            MPI_Irecv(dst.get_ptr(m_recv_offset[r]), m_recv_count[r],
+                      dst.dtype(), r, int(tag), utils::mpi::comm(), &recv_req[r]);
+        }
+    }
+    return recv_req;
 }
 
 #endif // ZEPHYR_MPI

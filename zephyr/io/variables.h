@@ -1,6 +1,7 @@
 #pragma once
 
 #include <zephyr/io/variable.h>
+#include <zephyr/geom/vector.h>
 
 namespace zephyr::io {
 
@@ -13,26 +14,26 @@ public:
     /// @brief Пустой список переменных
     Variables() = default;
 
-    /// @brief Создать список по одному имени VariablesList = "uid"
+    /// @brief Создать список по одному имени Variables = "level"
     explicit Variables(const char *name);
 
-    /// @brief Создать список по одному имени VariablesList = "uid"
+    /// @brief Создать список по одному имени Variables = "level"
     explicit Variables(const std::string &name);
 
     /// @brief Создать список по набору имен переменных
-    /// Пример. VariablesList list = {"base_id", "coords", "level"}
+    /// Пример. Variables list = {"center", "level"}
     Variables(std::initializer_list<const char *> names);
 
     /// @brief Создать список по набору имен переменных
-    /// Пример. VariablesList list = {"base_id", "coords", "level"}
+    /// Пример. Variables list = {"center", "level"}
     Variables(std::initializer_list<std::string> names);
 
     /// @brief Создать список по набору имен переменных
-    /// Пример. VariablesList list = {"base_id", "coords", "level"}
+    /// Пример. Variables list = {"center", "level"}
     Variables(const std::vector<const char *> &names);
 
     /// @brief Создать список по набору имен переменных
-    /// Пример. VariablesList list = {"base_id", "coords", "level"}
+    /// Пример. Variables list = {"center", "level"}
     Variables(const std::vector<std::string> &names);
 
     /// @brief Добавляет в список набор переменных по именам
@@ -53,78 +54,80 @@ public:
 
     /// @details Добавить в список переменную по имени.
     /// Данным образом в список можно добавить только некоторые предопределенные
-    /// переменные. К примеру, list.append("base_id"); list.append("level").
+    /// переменные. К примеру, list.append("center"); list.append("level").
     void append(const char *name);
 
     /// @brief Аналогично функции append(const char* )
     void append(const std::string &name);
 
-    /// @brief Добавть в список переменную с полным описанием
+    /// @brief Добавить в список переменную с полным описанием
     /// @param name Имя переменной
     /// @param n_components Размер вектора для хранения переменной
     /// @param func Функция записи переменной по заданному указателю
     /// @tparam T Тип шаблона важен для правильной дедукции VtkType
-    /// Следующий код позволяет добавить векторную переменную "momentum",
-    /// которая позволяет записывать две компоненты импульса в формате
-    /// Float32. В целом, использование чисел с одинарной точностью
-    /// позволяет сократить размер выходного файла.
+    ///
+    /// Следующий код добавляет векторную переменную "momentum", которая
+    /// позволяет записывать две компоненты импульса в формате Float32.
     /// @code
-    /// VariableList list;
-    /// list.append("momentum", 2,
-    ///     WriteFunction<float>([](AmrStorage::Item& cell, float* out) {
+    /// Variables vars;
+    /// vars.append("momentum", 2,
+    ///     WriteFunction<float>([](EuCell& cell, float* out) {
     ///         out[0] = static_cast<float>(cell.mass * cell.velocity.x);
     ///         out[1] = static_cast<float>(cell.mass * cell.velocity.y);
     ///     }));
     /// @endcode
-
     template<class T>
-    void append(const char *name, int n_components, const WriteSoaCell<T> &func) {
+    void append(const char *name, int n_components, const WriteCell<T> &func) {
         m_list.emplace_back(name, n_components, func);
     }
 
     /// @brief Аналогично функции append(const char*, ...)
     template<class T>
-    void append(const std::string &name, int n_components, const WriteSoaCell<T> &func) {
+    void append(const std::string &name, int n_components, const WriteCell<T> &func) {
         m_list.emplace_back(name, n_components, func);
     }
 
     /// @brief Аналогично функции append(const char*, ... )
     template<class T>
-    void append(const char *name, const WriteSoaCell<T> &func) {
+    void append(const char *name, const WriteCell<T> &func) {
         m_list.emplace_back(name, 1, func);
     }
 
     /// @brief Аналогично функции append(const char*, ...)
     template<class T>
-    void append(const std::string &name, const WriteSoaCell<T> &func) {
+    void append(const std::string &name, const WriteCell<T> &func) {
         m_list.emplace_back(name, 1, func);
     }
 
     /// @brief Упрощенный вариант для добавления double полей
     void append(const std::string& name, std::function<double(mesh::EuCell&)> f) {
-        m_list.emplace_back(name, 1, WriteSoaCell<double>(
+        m_list.emplace_back(name, 1, WriteCell<double>(
                 [f](mesh::EuCell& cell, double *out) {
                     out[0] = f(cell);
                 }));
     }
 
     /// @brief Упрощенный синтаксис для добавления полей типа double
-    /// @param name Название переменной
-    /// @param func Некоторая функция, которая для произвольной ячейки выдает
-    /// значение переменной
+    /// Variables vars;
+    /// vars += {"rho", [](EuCell& cell) -> double { ... } };
     void operator+=(std::pair<std::string, std::function<double(mesh::EuCell&)>> p) {
         append(p.first, p.second);
     }
 
-    /// @brief Упрощенный синтаксис для добавления Storable полей
-    /// @param name Название переменной
-    /// @param func Некоторая функция, которая для произвольной ячейки выдает
-    /// значение переменной
+    /// @brief Добавить существующий список к текущему
+    void operator+=(const Variables& other) {
+        for (const auto& var: other.m_list) { m_list.emplace_back(var); }
+    }
+
+    /// @brief Упрощенный синтаксис для добавления Storable полей типа double/Vector3d
+    /// Storable<T> rho;
+    /// Variables vars;
+    /// vars += {"rho", rho};
     template <typename T>
     void append(std::string name, const mesh::Storable<T>& p) {
         if (VtkType::get<T>().is_undefined()) {
             if constexpr (std::is_same_v<T, geom::Vector3d>) {
-                append(name, 3, WriteSoaCell<double>(
+                append(name, 3, WriteCell<double>(
                         [p](mesh::EuCell &cell, double *out) {
                             out[0] = cell(p).x();
                             out[1] = cell(p).y();
@@ -134,10 +137,12 @@ public:
                 throw std::runtime_error("Can't add as VTK type");
             }
         }
-        append(name, 1, WriteSoaCell<T>(
+        else {
+            append(name, 1, WriteCell<T>(
                 [p](mesh::EuCell &cell, T *out) {
                     out[0] = cell(p);
                 }));
+        }
     }
 
     /// @brief Очистить список переменных
@@ -153,7 +158,7 @@ public:
     const std::vector<Variable> &list() const;
 
 private:
-    std::vector<Variable> m_list;
+    std::vector<Variable> m_list;  ///< Список переменных
 };
 
 } // namespace zephyr::io

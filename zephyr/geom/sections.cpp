@@ -34,7 +34,7 @@ double find_section(const Vector3d &n, double alpha, double a, double b) {
 namespace {
 
 // Минимум и максимум, но не выходя за пределы [0, 1]
-inline std::tuple<double, double> minmax_unit(double a1, double a2) {
+std::tuple<double, double> minmax_unit(double a1, double a2) {
     if (a1 < a2) {
         return {std::max(0.0, a1), std::min(a2, 1.0)};
     } else {

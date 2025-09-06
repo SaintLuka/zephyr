@@ -1,5 +1,5 @@
-// @brief Балансировка сетки на одном процессе. Демонстрирует работу
-// алгоритмов балансировки нагрузки и подходит для их отладки.
+// Балансировка сетки на одном процессе. Демонстрирует работу алгоритмов
+// балансировки нагрузки и подходит для их отладки.
 
 #include <iostream>
 
@@ -17,6 +17,8 @@
 using namespace zephyr::mesh;
 using zephyr::utils::mpi;
 using zephyr::io::PvdFile;
+using zephyr::geom::Box;
+using zephyr::geom::Vector3d;
 using zephyr::geom::generator::Cuboid;
 using zephyr::geom::generator::Rectangle;
 

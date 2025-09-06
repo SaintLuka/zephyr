@@ -16,6 +16,11 @@ if (ZEPHYR_TESTS_ALL)
     endforeach()
 endif()
 
+# Can't compile targets without python
+if (NOT ZEPHYR_PYTHON)
+    list(REMOVE_ITEM TESTS templates)
+endif()
+
 if (TESTS)
     message(STATUS "Build AMR tests:\n   ${TESTS}")
 endif()

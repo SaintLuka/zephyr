@@ -86,10 +86,13 @@ public:
     /// @details На данный момент приближение -- просто ценр
     Vector3d centroid(double vol = 0.0) const;
 
-    /// @brief Привести к каноническому виду, 3 или 4 вершины на гранях
-    /// @details Новые вершины не добавляются и массив вершин не изменяется,
-    /// всего лишь новые индексы на гранях
-    void canonic();
+    /// @brief Возвращает 'true', если одна из граней имеет более
+    /// max_vertices вершин
+    bool need_simplify(int max_vertices) const;
+
+    /// @brief Разбить грани таким образом, чтобы каждая грань содержала
+    /// не более max_vertices вершин. При этом вершины не добавляются.
+    void simplify_faces(int max_vertices);
 
     /// @brief Объем внутри многогранника на пересечении с характеристической
     /// функцией inside. Вычисляется приближенно с точностью ~ 1 / N
@@ -160,14 +163,17 @@ protected:
     void build(const std::vector<Vector3d>& vertices,
                const std::vector<std::vector<int>>& face_indices);
 
-    /// @brief Заменить вершины у грани
-    void replace_face(int face_idx, int v1, int v2, int v3, int v4);
+
+    /// @brief Упрощает грань, возвращает массивы индексов, на которых можно
+    /// построить новые грани
+    std::vector<std::vector<int>> simplified_faces(
+            int face_idx, int max_vertices) const;
+
+    /// @brief Заменить вершины грани
+    void replace_face(int face_idx, const std::vector<int>& vs);
 
     /// @brief Добавить грань на существующих вершинах
-    void add_face(int v1, int v2, int v3);
-
-    /// @brief Добавить грань на существующих вершинах
-    void add_face(int v1, int v2, int v3, int v4);
+    void add_face(const std::vector<int>& vs);
 
     // Базовые поля
     std::vector<Vector3d> verts;          ///< Массив вершин

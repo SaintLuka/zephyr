@@ -122,7 +122,7 @@ private:
     Grid create_voronoi() const;
 
     /// @brief Создать классическую декартову сетку
-    void initialize_classic(mesh::AmrCells& cells);
+    void initialize_classic(mesh::AmrCells& cells) const;
 
     /// @brief Создать сетку из шестиугольников
     void initialize_voronoi(mesh::AmrCells& cells);

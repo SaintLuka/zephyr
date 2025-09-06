@@ -30,12 +30,16 @@ public:
         return m_border.data.add<T>(name);
     }
 
-    /// @brief Добавить тип данных на border-слой ячеек
+    /// @brief
     template<typename T>
     auto swap(Storable<T> var1, Storable<T> var2) {
         return m_border.data.swap<T>(var1, var2);
     }
 
+    /// @brief Индексы ячеек для отправки
+    const std::vector<index_t>& border_indices() const {
+        return m_border_indices;
+    }
 
     /// @brief Построить обменные слои, на гранях ячеек должны быть корректно
     /// заданы величины (adjacent.rank, adjacent.index)
@@ -98,14 +102,14 @@ private:
     template <typename T>
     void prepare(const AmrCells& locals, Storable<T> var);
 
-private:
+public:
     // Уникальные индексы border-ячеек по возрастанию
     std::vector<index_t> m_unique_border_indices;
 
     // Индексы ячеек, которые составляют хранилище m_border
     std::vector<index_t> m_border_indices;
 
-    // Хранилилще для ячеек на отправку. Ячейки, которые отправляются на один
+    // Хранилище для ячеек на отправку. Ячейки, которые отправляются на один
     // процесс, располагаются сплошным блоком. Ячейка может быть включена
     // в массив дважды, если отправляется нескольким процессам.
     AmrCells m_border;
@@ -120,11 +124,11 @@ private:
 
 template <typename T>
 void Tourism::prepare(const AmrCells& locals, Storable<T> var) {
-    auto src = locals  .data[var];
-    auto dst = m_border.data[var];
+    const utils::Buffer& src = locals  .data[var];
+          utils::Buffer& dst = m_border.data[var];
 
     for (size_t ic = 0; ic < m_border_indices.size(); ++ic) {
-        std::memcpy(dst + ic, src + m_border_indices[ic], sizeof(T));
+        src.copy_data(m_border_indices[ic], dst, ic);
     }
 }
 
@@ -136,11 +140,11 @@ void Tourism::sync(const AmrCells& locals, AmrCells& aliens, Args&&... vars) {
     // Отправить и дождаться одну переменную
     auto sync_one = [&](auto&& var) {
         prepare(locals, var);
-        const auto *src = m_border.data[var];
-        auto send_req = m_cell_route.isend(src, MpiTag(var.tag()));
+        const utils::Buffer& src = m_border.data[var];
+        auto send_req = m_cell_route.isend(src, static_cast<MpiTag>(var.tag()));
 
-        auto *dst = aliens.data[var];
-        auto recv_req = m_cell_route.irecv(dst, MpiTag(var.tag()));
+        utils::Buffer& dst = aliens.data[var];
+        auto recv_req = m_cell_route.irecv(dst, static_cast<MpiTag>(var.tag()));
 
         send_req.wait();
         recv_req.wait();

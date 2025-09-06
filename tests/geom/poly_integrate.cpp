@@ -1,3 +1,5 @@
+// Интегрирование по полигонам с различной точностью. Вычисление объемных долей.
+
 #include <iostream>
 #include <iomanip>
 
@@ -342,7 +344,7 @@ void test3() {
     volume_test(triangle, test_func, inside, I2);
 
     std::cout << "Объемная доля полуплоскости на скошеном квадратном элементе:\n";
-    volume_test(skewed, test_func, inside, I2);
+    volume_test(skewed, test_func, inside, I3);
 }
 
 int main() {

@@ -14,7 +14,6 @@ set(ZEPHYR_MESH_EULER_SRC
 install(FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/amr_cells.h
     ${CMAKE_CURRENT_SOURCE_DIR}/amr_faces.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/amr_storage.h
     ${CMAKE_CURRENT_SOURCE_DIR}/distributor.h
     ${CMAKE_CURRENT_SOURCE_DIR}/eu_prim.h
     ${CMAKE_CURRENT_SOURCE_DIR}/eu_mesh.h

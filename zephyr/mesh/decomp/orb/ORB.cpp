@@ -53,16 +53,16 @@ ORB::ORB(Box domain, const utils::Json& config)
 
         // Попытка разбить двумерную сетку по оси Z приводит к ошибке
         if (domain.is_2D()) {
-            type.erase(type.find('Z'), 1);
+            type.erase(std::remove(type.begin(), type.end(), 'Z'), type.end());
         }
     } else {
         type = domain.is_2D() ? "XY" : "XYZ";
     }
 
-    if (config["proc_nx"]) {
+    if (!config["proc_nx"]) {
         m_blocks = Blocks(domain, type, m_size);
     } else {
-        int nx = config["nx"].as<int>();
+        int nx = config["proc_nx"].as<int>();
         m_blocks = Blocks(domain, type, m_size, nx);
     }
 }
@@ -71,7 +71,7 @@ int ORB::rank(const Vector3d& v) const {
     return m_blocks.rank(v);
 }
 
-int ORB::rank(EuCell& elem) const {
+int ORB::rank(const EuCell& elem) const {
     return m_blocks.rank(elem.center());
 }
 

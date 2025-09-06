@@ -1,26 +1,28 @@
-// @brief В geom/curves определено несколько классов параметрических кривых
-// и сплайнов, протестируем их здесь.
-
-#include <zephyr/utils/matplotlib.h>
+// Протестируем параметрические кривые и сплайны, определенные в geom/curves.
 
 #include <zephyr/geom/curves/bezier.h>
 #include <zephyr/geom/curves/linear_spline.h>
 #include <zephyr/geom/curves/cubic_spline.h>
 #include <zephyr/geom/curves/lagrange.h>
+#include <zephyr/utils/numpy.h>
 
-
-namespace plt = zephyr::utils::matplotlib;
+#include <zephyr/utils/matplotlib.h>
 
 using namespace zephyr::geom;
 using namespace zephyr::geom::curves;
+namespace np = zephyr::np;
+
+namespace plt = zephyr::utils::matplotlib;
 
 
+// Уравнение спирали в полярных координатах r(phi)
 Vector3d spiral(double angle) {
     const double phi = 0.5 * (1.0 + std::sqrt(5.0));
     double r = std::pow(phi, 2.0 * angle / M_PI);
     return {r * std::cos(angle), r * std::sin(angle), 0.0};
 }
 
+// Параметрическое задание эпитрохоиды
 Vector3d epitr(double t) {
     double m = 0.2;
     double h = 0.3;
@@ -40,14 +42,14 @@ template <typename F>
 void test(F&& f, double t1, double t2, int M, bool bezier, bool chebyshev, bool periodic) {
     // High-res curve
     int N = 2000;
-    std::vector<double> phi_n = linspace(t1, t2, N);
+    std::vector<double> phi_n = np::linspace(t1, t2, N);
     std::vector<Vector3d> vs_n(N);
     for (int i = 0; i < N; ++i) {
         vs_n[i] = f(phi_n[i]);
     }
 
     // Basic nodes
-    std::vector<double> phi_m = linspace(t1, t2, M);
+    std::vector<double> phi_m = np::linspace(t1, t2, M);
     std::vector<Vector3d> vs_m(M);
     for (int i = 0; i < M; ++i) {
         vs_m[i] = f(phi_m[i]);
@@ -58,7 +60,7 @@ void test(F&& f, double t1, double t2, int M, bool bezier, bool chebyshev, bool 
     plt::grid(true);
     plt::set_aspect_equal();
 
-    plt::plot(get_x(vs_n), get_y(vs_n), {{"color",     "black"},
+    plt::plot(np::get_x(vs_n), np::get_y(vs_n), {{"color",     "black"},
                                          {"linestyle", "dashed"},
                                          {"label",     "Original"}});
 
@@ -84,7 +86,7 @@ void test(F&& f, double t1, double t2, int M, bool bezier, bool chebyshev, bool 
                    {"label", "Bezier curve"}});
     }
 
-    plt::plot(get_x(vs_m), get_y(vs_m), "k.");
+    plt::plot(np::get_x(vs_m), np::get_y(vs_m), "k.");
 
     plt::legend();
     plt::tight_layout();

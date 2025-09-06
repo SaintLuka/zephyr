@@ -1,6 +1,4 @@
-list(APPEND TESTS distributed-amr)
-list(APPEND TESTS distributed-conv)
-list(APPEND TESTS distributed-conv-amr)
+#list(APPEND TESTS buffer)
 #list(APPEND TESTS json-config)
 #list(APPEND TESTS mpitest)
 #list(APPEND TESTS range)

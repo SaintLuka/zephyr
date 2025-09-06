@@ -44,7 +44,7 @@ public:
     /// @brief Локальная соседняя ячейка?
     bool is_local(index_t iface) const { return alien[iface] < 0; }
 
-    /// @brief Удаленная соседняя сосед?
+    /// @brief Удаленная соседняя ячейка?
     bool is_alien(index_t iface) const { return alien[iface] >= 0; }
 
     /// @brief Получить хранилище ячеек, в котором находится сосед, а также
@@ -82,6 +82,9 @@ class AmrFaces final {
     using Vector3d = geom::Vector3d;
 
 public:
+    /// @brief Максимальное число вершин на одну грань
+    static constexpr int max_vertices = 8;
+
     AmrAdjacent adjacent;            ///< Индексы смежных ячеек
 
     std::vector<Boundary> boundary;  ///< Тип граничного условия
@@ -90,8 +93,8 @@ public:
     std::vector<double>   area;      ///< Площадь грани
     std::vector<double>   area_alt;  ///< "Альтернативная" площадь грани
 
-    /// @brief Список индексов вершин в массиве вершин ячейки
-    std::vector<std::array<int, 4>> vertices;
+    /// @brief Индексы вершин в массиве вершин ячейки
+    std::vector<std::array<short, max_vertices>> vertices;
 
 
     /// @brief Число граней
@@ -123,8 +126,8 @@ public:
     void set_undefined(index_t iface);
 
     /// @brief Пропустить грань?
-    /// @return 'true' если грань неопределена или
-    /// не совпадает с выбраным направлением
+    /// @return 'true' если грань не определена или не совпадает
+    /// с выбранным направлением
     bool to_skip(index_t iface, Direction dir) const;
 
     /// @brief Внешняя нормаль грани на площадь
@@ -132,6 +135,9 @@ public:
 
     /// @brief Площадь/длина обычной грани или грани осесимметричной ячейки
     double get_area(index_t iface, bool axial = false) const;
+
+    /// @brief Число вершин грани
+    int n_vertices(index_t iface) const;
 
     /// @brief Симметричная точка относительно грани
     Vector3d symm_point(index_t iface, const Vector3d& p) const;
@@ -166,6 +172,16 @@ inline AmrFaces::Vector3d AmrFaces::area_n(index_t iface) const {
 
 inline double AmrFaces::get_area(index_t iface, bool axial) const {
     return axial ? area_alt[iface] : area[iface];
+}
+
+inline int AmrFaces::n_vertices(index_t iface) const {
+    int count = 2;
+    for (; count < AmrFaces::max_vertices; ++count) {
+        if (vertices[iface][count] < 0) {
+            break;
+        }
+    }
+    return count;
 }
 
 inline AmrFaces::Vector3d AmrFaces::symm_point(index_t iface, const Vector3d& p) const {

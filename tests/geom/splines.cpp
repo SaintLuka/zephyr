@@ -4,13 +4,14 @@
 #include <zephyr/geom/curves/cubic_spline.h>
 #include <zephyr/geom/curves/lagrange.h>
 
+#include <zephyr/utils/numpy.h>
 #include <zephyr/utils/matplotlib.h>
 
-
-namespace plt = zephyr::utils::matplotlib;
-
+using namespace zephyr;
 using namespace zephyr::geom;
 using namespace zephyr::geom::curves;
+namespace plt = zephyr::utils::matplotlib;
+
 
 using Dictionary = std::map<std::string, std::string>;
 
@@ -28,8 +29,8 @@ void ordinary_interpolants() {
     auto func = [L](double x) -> double {
         return std::sin(2.0 * M_PI * x / L);
     };
-    std::vector<double> x_all = linspace(0.0, L, 1000);
-    std::vector<double> y_all(x_all.size());
+    auto x_all = np::linspace(0.0, L, 1000);
+    auto y_all = np::zeros_like(x_all);
     for (size_t i = 0; i < x_all.size(); ++i) {
         y_all[i] = func(x_all[i]);
     }

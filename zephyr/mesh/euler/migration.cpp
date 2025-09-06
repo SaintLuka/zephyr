@@ -1,13 +1,10 @@
 #include <zephyr/mesh/euler/migration.h>
-#include <zephyr/io/pvd_file.h>
 #include <zephyr/io/vtu_file.h>
-
 
 namespace zephyr::mesh {
 
-using utils::mpi;
-
 #ifdef ZEPHYR_MPI
+using utils::mpi;
 
 inline std::ostream &operator<<(std::ostream &os, const std::vector<index_t> &arr) {
     os << "[";

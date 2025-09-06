@@ -13,7 +13,7 @@
 
 namespace zephyr::io {
 
-using zephyr::utils::mpi;
+using utils::mpi;
 
 inline bool is_big_endian() {
     union {
@@ -22,6 +22,10 @@ inline bool is_big_endian() {
     } bint = {0x01020304};
 
     return bint.c[0] == 1;
+}
+
+inline std::string byteorder() {
+    return is_big_endian() ? "BigEndian" : "LittleEndian";
 }
 
 PvdFile::PvdFile()
@@ -35,10 +39,7 @@ PvdFile::PvdFile()
 
 const std::string default_dir = "output";
 
-PvdFile::PvdFile(const utils::Json& config)
-    : PvdFile() {
-
-    std::string filename;
+PvdFile::PvdFile(const utils::Json& config) : PvdFile() {
     std::string directory;
 
     if (config["directory"]) {
@@ -50,7 +51,7 @@ PvdFile::PvdFile(const utils::Json& config)
     if (!config["filename"]) {
         throw std::runtime_error("PvdFile(json) error: Add key 'filename'");
     }
-    filename = config["filename"].as<std::string>();
+    std::string filename = config["filename"].as<std::string>();
 
     if (config["hex_only"]) {
         hex_only = config["hex_only"].as<bool>();
@@ -110,7 +111,7 @@ void PvdFile::open(const std::string& filename, const std::string& _directory, b
     // Мастер проверяет наличие директории и создает при необходимости
     if (mpi::master()) {
         if (!fs::exists(directory) || !fs::is_directory(directory)) {
-            fs::create_directory(directory);
+            fs::create_directories(directory);
         }
     }
 
@@ -137,10 +138,8 @@ void PvdFile::open(const std::string& filename, const std::string& _directory, b
         return;
     }
 
-    std::string byteord = is_big_endian() ? "BigEndian" : "LittleEndian";
-
     ofs << "<?xml version=\"1.0\"?>\n";
-    ofs << "<VTKFile type=\"Collection\" version=\"0.1\" byte_order=\"" + byteord + "\">\n";
+    ofs << "<VTKFile type=\"Collection\" version=\"0.1\" byte_order=\"" + byteorder() + "\">\n";
     ofs << "    <Collection>" << std::endl;
 
     m_pos = ofs.tellp();

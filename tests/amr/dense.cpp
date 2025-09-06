@@ -1,22 +1,23 @@
-// @brief Тестирование AMR на задачах с движением больших областей с высоким
-// уровнем адаптации. Под большими областями понимаются области, которые имеют
-// ту же меру размерности, что и сама область.
+// Тестирование AMR на задачах с движением больших областей с высоким уровнем
+// адаптации. Под большими областями понимаются области, которые имеют ту же
+// меру размерности, что и сама область.
 
 #include <iomanip>
 
-#include <zephyr/mesh/euler/eu_mesh.h>
-#include <zephyr/geom/generator/rectangle.h>
-#include <zephyr/geom/primitives/polygon.h>
-#include <zephyr/io/pvd_file.h>
 #include <zephyr/utils/stopwatch.h>
+#include <zephyr/utils/threads.h>
+#include <zephyr/geom/primitives/polygon.h>
+#include <zephyr/geom/generator/rectangle.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/io/pvd_file.h>
 
-using namespace zephyr;
-using namespace mesh;
-using namespace geom;
+using namespace zephyr::mesh;
+using namespace zephyr::geom;
+using namespace zephyr::utils;
 
 using generator::Rectangle;
 using zephyr::io::PvdFile;
-using zephyr::utils::Stopwatch;
+
 
 // Поле для хранения на сетке
 static Storable<int> bit;
@@ -72,18 +73,18 @@ void set_flag(EuCell& cell) {
 int main() {
     threads::on();
 
-    PvdFile pvd("mesh", "output");
-    pvd.variables = {"rank", "index", "next", "level", "flag", "faces2D"};
-    pvd.variables += {"wanted", [](EuCell& cell) -> double { return cell(bit); }};
+    Rectangle gen(-2.0, 2.0, -1.0, 1.0);
+    gen.set_nx(50);
 
-    Rectangle rect(-2.0, 2.0, -1.0, 1.0);
-    rect.set_nx(50);
-
-    EuMesh mesh(rect);
+    EuMesh mesh(gen);
     bit = mesh.add<int>("bit");
 
     mesh.set_max_level(5);
     mesh.set_distributor("simple");
+
+    PvdFile pvd("mesh", "output");
+    pvd.variables = {"rank", "index", "next", "level", "flag", "faces2D"};
+    pvd.variables += {"wanted", [](EuCell& cell) -> double { return cell(bit); }};
 
     if (mesh.check_base() < 0) {
         std::cout << "Bad init mesh\n";

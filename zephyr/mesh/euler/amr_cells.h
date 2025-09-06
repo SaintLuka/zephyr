@@ -26,7 +26,7 @@ using SqMap = std::conditional_t<dim < 3, geom::SqQuad, geom::SqCube>;
 
 /// @brief Набор ячеек в форме Structure of Arrays (набор массивов).
 ///
-/// Поддерживается три типа сеткок:
+/// Поддерживается три типа сеток:
 ///   1. Двумерная AMR сетка, по 8 граней, по 9 вершин на ячейку.
 ///   2. Трехмерная AMR сетка, по 24 грани, по 27 вершин на ячейку.
 ///   3. Неструктурированная/произвольная сетка. Произвольное число граней
@@ -204,8 +204,8 @@ public:
     }
 
     /// @brief Полный диапазон граней ячейки (могут встречаться неактуальные)
-    utils::range<index_t> faces_range(index_t ic) const {
-        return utils::range(face_begin[ic], face_begin[ic + 1]);
+    range<index_t> faces_range(index_t ic) const {
+        return {face_begin[ic], face_begin[ic + 1]};
     }
 
     /// @brief Число вершин, оно же максимальное, хранение неактуальных вершин
@@ -221,8 +221,8 @@ public:
     }
 
     /// @brief Полный диапазон вершин ячейки
-    utils::range<index_t> nodes_range(index_t ic) const {
-        return utils::range(node_begin[ic], node_begin[ic + 1]);
+    range<index_t> nodes_range(index_t ic) const {
+        return {node_begin[ic], node_begin[ic + 1]};
     }
 
     /// @brief Простая грань на стороне?
@@ -256,9 +256,9 @@ public:
         return axial ? volume_alt[ic] : volume[ic];
     }
 
-    /// @brief Диаметр вписаной окружности.
+    /// @brief Диаметр вписанной окружности.
     /// @details Для AMR-ячейки представляет собой минимальное расстояние между
-    /// противоположными гранями. Для полигона --- диаметр вписаной окружности
+    /// противоположными гранями. Для полигона --- диаметр вписанной окружности
     /// для правильного многоугольника аналогичной площади.
     /// Величину удобно использовать совместно с условием Куранта.
     /// Для двумерных расчетов на прямоугольных сетках совпадает с минимальной
@@ -275,13 +275,13 @@ public:
         return verts.data() + node_begin[ic];
     }
 
-    /// @brief Ссылка на вешины в форме набора узлов квадратичного отображения
+    /// @brief Ссылка на вешены в форме набора узлов квадратичного отображения
     template <int dim>
     SqMap<dim>& mapping(index_t ic) {
         return *reinterpret_cast<SqMap<dim>*>(vertices_data(ic));
     }
 
-    /// @brief Ссылка на вешины в форме набора узлов квадратичного отображения
+    /// @brief Ссылка на вершины в форме набора узлов квадратичного отображения
     template <int dim>
     const SqMap<dim>& mapping(index_t ic) const {
         return *reinterpret_cast<const SqMap<dim>*>(vertices_data(ic));
@@ -298,7 +298,7 @@ public:
     /// @param inside Характеристическая функция области, возвращает true для
     /// точек, которые располагаются внутри области.
     /// @details Относительно быстрая функция, проверяет функцию inside только
-    /// на узлах ячейки, позволяет быстро выяснить, содержит ли ячейка
+    /// в узлах ячейки, позволяет быстро выяснить, содержит ли ячейка
     /// границу двух областей. Если ячейка внутри тела, то возвращает строго
     /// единицу 1.0, если снаружи -- строго ноль 0.0.
     double approx_vol_fraction(index_t ic, const InFunction& inside) const;
@@ -310,7 +310,7 @@ public:
     /// inside, погрешность определения объемной доли ~ 1/N.
     double volume_fraction(index_t ic, const InFunction& inside, int n_points) const;
 
-    /// @brief Функция func является константой на ячейке?
+    /// @brief Функция func является константой в ячейке?
     /// @details Проверяется значение функции в узлах и в центре ячейки,
     /// если все значения совпадают, то считается, что функция принимает
     /// постоянное значение в пределах ячейки.
@@ -422,6 +422,8 @@ protected:
 
     /// @brief Увеличить буферы только для массивов данных ячеек
     void shrink_to_fit_cells();
+
+    void push_back_impl(const geom::Polyhedron& poly);
 };
 
 } // namespace zephyr::mesh

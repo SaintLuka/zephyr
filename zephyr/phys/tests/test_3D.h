@@ -50,14 +50,8 @@ public:
     double init_time; ///< Начальный момент времени
     double finish;    ///< Конечный момент времени
 
-    struct params {
-        double gamma = 1.4;
-        double rho0  = 1.0;
-        double E     = 1.0;
-    };
-
     /// @brief Конструктор
-    explicit SedovBlast3D(params p);
+    explicit SedovBlast3D(Sedov3D::params p);
 
     /// @brief Название теста
     std::string name() const final { return "3D Sedov Blast"; }

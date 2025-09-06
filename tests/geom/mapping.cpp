@@ -1,21 +1,16 @@
-// @brief Проверка геометрических функций, сравнение вычислений с результатами
-// численного интегрирования
+// Проверка геометрии линейных отображений (Line, Quad, Cube) и их
+// квадратичных аналогов (SqLine, SqQuad, SqCube), сравнение результатов
+// вычислений с результатами численного интегрирования
 
 #include <iostream>
 #include <iomanip>
 #include <functional>
 
 #include <zephyr/geom/geom.h>
+#include <zephyr/utils/numpy.h>
 
+using namespace zephyr;
 using namespace zephyr::geom;
-
-std::vector<double> linspace(double a, double b, int n) {
-    std::vector<double> res(n);
-    for (int i = 0; i < n; ++i) {
-        res[i] = a + (b - a) * i / (n - 1.0);
-    }
-    return res;
-}
 
 // Одномерный интеграл
 template <class V>
@@ -144,7 +139,7 @@ int main() {
                 };
 
         Vector3d res2 = simpson(
-                linspace(-1.0, 1.0, 51),
+                np::linspace(-1.0, 1.0, 51),
                 func, {0.0, 0.0, 0.0});
 
         std::cout << "    res (formula): " << res1.transpose() << "\n";
@@ -166,7 +161,7 @@ int main() {
                 };
 
         Vector3d res2 = simpson(
-                linspace(-1.0, 1.0, 51),
+                np::linspace(-1.0, 1.0, 51),
                 func, {0.0, 0.0, 0.0});
 
         std::cout << "    res (formula): " << res1.transpose() << "\n";
@@ -187,8 +182,8 @@ int main() {
                 };
 
         double res2 = simpson(
-                linspace(-1.0, 1.0, 51),
-                linspace(-1.0, 1.0, 51),
+                np::linspace(-1.0, 1.0, 51),
+                np::linspace(-1.0, 1.0, 51),
                 func, 0.0);
 
         std::cout << "    res (formula): " << res1 << "\n";
@@ -211,8 +206,8 @@ int main() {
                 };
 
         Vector3d res2 = simpson(
-                linspace(-1.0, 1.0, 51),
-                linspace(-1.0, 1.0, 51),
+                np::linspace(-1.0, 1.0, 51),
+                np::linspace(-1.0, 1.0, 51),
                 func, {0.0, 0.0, 0.0});
 
         std::cout << "    res (formula): " << res1.transpose() << "\n";
@@ -236,8 +231,8 @@ int main() {
                 };
 
         double res2 = simpson(
-                linspace(-1.0, 1.0, 101),
-                linspace(-1.0, 1.0, 101),
+                np::linspace(-1.0, 1.0, 101),
+                np::linspace(-1.0, 1.0, 101),
                 func, 0.0);
 
         std::cout << "    res (formula): " << res1 << "\n";
@@ -258,8 +253,8 @@ int main() {
                 };
 
         double res2 = simpson(
-                linspace(-1.0, 1.0, 51),
-                linspace(-1.0, 1.0, 51),
+                np::linspace(-1.0, 1.0, 51),
+                np::linspace(-1.0, 1.0, 51),
                 func, 0.0);
 
         std::cout << "    res (formula): " << res1 << "\n";
@@ -283,8 +278,8 @@ int main() {
                 };
 
         double res2 = simpson(
-                linspace(-1.0, 1.0, 501),
-                linspace(-1.0, 1.0, 501),
+                np::linspace(-1.0, 1.0, 501),
+                np::linspace(-1.0, 1.0, 501),
                 func, 0.0);
 
         std::cout << "    res (formula): " << res1 << "\n";
@@ -305,9 +300,9 @@ int main() {
                 };
 
         double res2 = simpson(
-                linspace(-1.0, 1.0, 41),
-                linspace(-1.0, 1.0, 41),
-                linspace(-1.0, 1.0, 41),
+                np::linspace(-1.0, 1.0, 41),
+                np::linspace(-1.0, 1.0, 41),
+                np::linspace(-1.0, 1.0, 41),
                 func, 0.0);
 
         std::cout << "    res (formula): " << res1 << "\n";
@@ -330,8 +325,8 @@ int main() {
                 };
 
         Vector3d res2 = simpson(
-                linspace(-1.0, 1.0, 51),
-                linspace(-1.0, 1.0, 51),
+                np::linspace(-1.0, 1.0, 51),
+                np::linspace(-1.0, 1.0, 51),
                 func, {0.0, 0.0, 0.0}) / S;
 
         std::cout << "    res (formula): " << res1.transpose() << "\n";
@@ -354,8 +349,8 @@ int main() {
                 };
 
         Vector3d res2 = simpson(
-                linspace(-1.0, 1.0, 501),
-                linspace(-1.0, 1.0, 501),
+                np::linspace(-1.0, 1.0, 501),
+                np::linspace(-1.0, 1.0, 501),
                 func, {0.0, 0.0, 0.0}) / S;
 
         std::cout << "    res (formula): " << res1.transpose() << "\n";
@@ -377,9 +372,9 @@ int main() {
                 };
 
         Vector3d res2 = simpson(
-                linspace(-1.0, 1.0, 11),
-                linspace(-1.0, 1.0, 11),
-                linspace(-1.0, 1.0, 11),
+                np::linspace(-1.0, 1.0, 11),
+                np::linspace(-1.0, 1.0, 11),
+                np::linspace(-1.0, 1.0, 11),
                 func, {0.0, 0.0, 0.0}) / V;
 
         std::cout << "    res (formula): " << res1.transpose() << "\n";

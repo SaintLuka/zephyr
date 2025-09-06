@@ -54,7 +54,7 @@ void setup_face_features(index_t iface, AmrFaces& faces, const SqMap<dim>& verti
 template <>
 inline void setup_face_features<2>(index_t iface, AmrFaces& faces, const SqQuad& vertices, bool axial) {
     // Точка внутри ячейки
-    Vector3d C = vertices.vs<0, 0>();
+    const Vector3d& C = vertices.vs<0, 0>();
 
     // Вершины грани
     Line vl = {

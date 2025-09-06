@@ -57,7 +57,7 @@ CsvFile::CsvFile(
     variables(variables) {
 }
 
-void CsvFile::save(AmrCells &cells) {
+void CsvFile::save(AmrCells &cells) const {
     save(filename, cells, precision, variables);
 }
 
@@ -76,7 +76,7 @@ void CsvFile::save(
         return;
     }
 
-    int n_variables = int(variables.size());
+    int n_variables = static_cast<int>(variables.size());
 
     file << std::scientific << std::setprecision(precision);
 

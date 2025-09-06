@@ -23,7 +23,7 @@ public:
     }
     
     /// @brief Основная функция. Определение нового ранга ячейки.
-    int rank(EuCell& elem) const final;
+    int rank(const EuCell& elem) const final;
 
     /// @brief Балансировка нагрузки
     void balancing(const std::vector<double>& w) final;

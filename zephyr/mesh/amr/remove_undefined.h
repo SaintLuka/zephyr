@@ -6,12 +6,9 @@
 
 namespace zephyr::mesh::amr {
 
-using zephyr::utils::Stopwatch;
-
 /// @brief Функция меняет индексы соседей через грань на новые, выполняется
 /// для одной ячейки. Предполагается, что в поле element.next записан индекс,
 /// куда ячейка будет перемещена в дальнейшем
-/// @param cell Целевая ячейка
 /// @param locals Хранилище ячеек
 inline void change_adjacent_one1(index_t ic, AmrCells& locals) {
     if (locals.is_undefined(ic)) { return; }
@@ -43,7 +40,6 @@ inline void change_adjacent_one1(index_t ic, AmrCells& locals) {
 /// @brief Функция меняет индексы соседей через грань на новые, выполняется
 /// для одной ячейки. Предполагается, что в поле element.next записан индекс,
 /// куда ячейка будет перемещена в дальнейшем
-/// @param cell Целевая ячейка
 inline void change_adjacent_one2(index_t ic, AmrCells& locals, AmrCells& aliens) {
     if (locals.is_undefined(ic)) { return; }
 
@@ -81,7 +77,7 @@ inline void change_adjacent_one2(index_t ic, AmrCells& locals, AmrCells& aliens)
 /// для всех ячеек в однопоточном режиме. Предполагается, что в поле
 /// element.next записан индекс, куда ячейка будет перемещена в дальнейшем
 /// @param cells Хранилище ячеек
-void change_adjacent(AmrCells& cells) {
+inline void change_adjacent(AmrCells& cells) {
     threads::parallel_for(
             index_t{0}, index_t{cells.size()},
             change_adjacent_one1,
@@ -91,8 +87,7 @@ void change_adjacent(AmrCells& cells) {
 /// @brief Функция меняет индексы соседей через грань на новые, выполняется
 /// для всех ячеек в однопоточном режиме. Предполагается, что в поле
 /// element.next записан индекс, куда ячейка будет перемещена в дальнейшем
-/// @param cells Хранилище ячеек
-void change_adjacent(AmrCells& locals, AmrCells& aliens) {
+inline void change_adjacent(AmrCells& locals, AmrCells& aliens) {
     threads::parallel_for(
             index_t{0}, index_t{locals.size()},
             change_adjacent_one2,
@@ -113,7 +108,7 @@ inline void move_cell(index_t ic, AmrCells& cells) {
 /// ячейки и актуальные ячейки. После обмена местами неопределенных и актуальных
 /// ячеек, все неактуальные ячейки оказываются в конце хранилища.
 struct SwapLists {
-    /// @brief Список индеков неопределенных ячеек, начиная с начала хранилища
+    /// @brief Список индексов неопределенных ячеек, начиная с начала хранилища
     /// @details Массив может содержать не все неопределенные ячейки, которые
     /// есть в хранилище
     std::vector<index_t> undefined_cells;
@@ -160,9 +155,9 @@ struct SwapLists {
 
 #if SCRUTINY
     /// @brief Проверяет свойства перестановки: перестановка состоит только из
-    /// транспозций пар элементов, при этом один элемент в паре должен быть актуальным,
-    /// а один неопределенным, после перестановки актуальный элемент всегда должен
-    /// оказываться ближе к началу списка, чем неопределенный
+    /// транспозиций пар элементов, при этом один элемент в паре должен быть
+    /// актуальным, а один неопределенным, после перестановки актуальный элемент
+    /// всегда должен оказываться ближе к началу списка, чем неопределенный
     static void check_mapping(AmrCells& locals) {
         for (index_t i = 0; i < locals.size(); ++i) {
             auto j = locals.next[i];
@@ -178,7 +173,7 @@ struct SwapLists {
                     throw std::runtime_error("Swap two actual cells");
                 }
                 if (i < j && locals.is_actual(i)) {
-                    // Актуальня ячейка переносится только в начало
+                    // Актуальная ячейка переносится только в начало
                     throw std::runtime_error("Wrong swap #1");
                 }
                 if (i > j && locals.is_undefined(i)) {
@@ -287,7 +282,7 @@ struct SwapLists {
     }
 
     /// @brief Число ячеек для перестановки
-    inline index_t size() const {
+    index_t size() const {
         return actual_cells.size();
     }
 };
@@ -354,6 +349,7 @@ void remove_undefined(AmrCells &cells, const Statistics &count) {
 // ============================================================================
 //                                 MPI VERSION
 // ============================================================================
+#ifdef ZEPHYR_MPI
 template<int dim>
 void remove_undefined(Tourism& tourism, AmrCells& locals, AmrCells& aliens, const Statistics &count) {
     static Stopwatch create_swap_timer;
@@ -390,14 +386,14 @@ void remove_undefined(Tourism& tourism, AmrCells& locals, AmrCells& aliens, cons
 #if CHECK_PERFORMANCE
     static size_t counter = 0;
     if (counter % amr::check_frequency == 0) {
-        mpi::cout << "      Create SwapList: " << std::setw(8) << create_swap_timer.milliseconds() << " ms\n";
-        mpi::cout << "      Setup mapping:   " << std::setw(8) << set_mapping_timer.milliseconds() << " ms\n";
-        mpi::cout << "      Send/Recv next:  " << std::setw(8) << send_next_timer.milliseconds() << " ms\n";
-        mpi::cout << "      Change adjacent: " << std::setw(8) << change_adjacent_timer.milliseconds() << " ms\n";
-        mpi::cout << "      Swap elements:   " << std::setw(8) << swap_elements_timer.milliseconds() << " ms\n";
+        mpi::cout << "      Create SwapList: " << std::setw(8) << create_swap_timer.milliseconds_mpi() << " ms\n";
+        mpi::cout << "      Setup mapping:   " << std::setw(8) << set_mapping_timer.milliseconds_mpi() << " ms\n";
+        mpi::cout << "      Send/Recv next:  " << std::setw(8) << send_next_timer.milliseconds_mpi() << " ms\n";
+        mpi::cout << "      Change adjacent: " << std::setw(8) << change_adjacent_timer.milliseconds_mpi() << " ms\n";
+        mpi::cout << "      Swap elements:   " << std::setw(8) << swap_elements_timer.milliseconds_mpi() << " ms\n";
     }
     ++counter;
 #endif
 }
-
+#endif
 } // namespace zephyr::mesh::amr

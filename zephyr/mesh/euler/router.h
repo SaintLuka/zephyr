@@ -1,18 +1,17 @@
 #pragma once
 
 #include <vector>
-#include <iomanip>
-#include <algorithm>
-#include <numeric>
 #include <future>
 
 #include <zephyr/utils/mpi.h>
+#include <zephyr/utils/buffer.h>
+#include <zephyr/utils/range.h>
 #include <zephyr/mesh/index.h>
 
 namespace zephyr::mesh {
 
 /// @brief MPI-тэги для корректных пересылок
-enum MpiTag : int {
+enum class MpiTag : int {
     NONE = 0,
 
     // Данные ячеек
@@ -54,6 +53,10 @@ inline std::string to_string(MpiTag tag) {
 /// @brief Массив MPI-запросов isend/irecv
 class Requests {
 public:
+    /// @brief Массив "нулевых" запросов
+    explicit Requests()
+        : m_requests(utils::mpi::size(), MPI_REQUEST_NULL) { }
+
     /// @brief Массив "нулевых" запросов
     explicit Requests(int size)
         : m_requests(size, MPI_REQUEST_NULL) { }
@@ -115,6 +118,21 @@ public:
     const std::vector<index_t>& send_offset() const { return m_send_offset; }
     const std::vector<index_t>& recv_offset() const { return m_recv_offset; }
 
+    index_t send_count(int r) const { return m_send_count[r]; }
+    index_t recv_count(int r) const { return m_recv_count[r]; }
+
+    index_t send_offset(int r) const { return m_send_offset[r]; }
+    index_t recv_offset(int r) const { return m_recv_offset[r]; }
+
+    /// @brief Индексы из массива m_border_indices
+    range<index_t> send_indices(int r) const {
+        return {m_send_offset[r], m_send_offset[r] + m_send_count[r]};
+    }
+    /// @brief Индексы из массива aliens при получении
+    range<index_t> recv_indices(int r) const {
+        return {m_recv_offset[r], m_recv_offset[r] + m_recv_count[r]};
+    }
+
     /// @brief Вывести информацию о пересылках
     void print() const;
 
@@ -132,6 +150,8 @@ public:
     template<typename T>
     Requests isend(const std::vector<T>& src, MpiTag tag, MPI_Datatype dtype);
 
+    Requests isend(const utils::Buffer& src, MpiTag tag);
+
 
     /// @brief Асинхронное получение
     template<typename T>
@@ -145,6 +165,8 @@ public:
 
     template<typename T>
     Requests irecv(std::vector<T>& dst, MpiTag tag, MPI_Datatype dtype);
+
+    Requests irecv(utils::Buffer& dst, MpiTag tag);
 
 protected:
 

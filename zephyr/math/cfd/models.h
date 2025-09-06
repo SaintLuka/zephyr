@@ -52,18 +52,18 @@ struct PState {
     void inverse();
 
     // Короткий доступ к полям
-    inline const double& rho() const { return density; }
-    inline const double& u() const { return velocity.x(); }
-    inline const double& v() const { return velocity.y(); }
-    inline const double& w() const { return velocity.z(); }
-    inline const double& P() const { return pressure; }
-    inline const double& e() const { return energy; }
+    const double& rho() const { return density; }
+    const double& u() const { return velocity.x(); }
+    const double& v() const { return velocity.y(); }
+    const double& w() const { return velocity.z(); }
+    const double& P() const { return pressure; }
+    const double& e() const { return energy; }
 
     // Квадрат модуля скорости
-    inline double v2() const { return velocity.squaredNorm(); }
+    double v2() const { return velocity.squaredNorm(); }
 
     // Полная удельная энергия
-    inline double E() const { return energy + 0.5 * v2(); }
+    double E() const { return energy + 0.5 * v2(); }
 
     // Проверить корректность
     bool is_bad(const phys::Eos &eos);
@@ -221,6 +221,18 @@ struct PState {
     inline double alpha(int idx) const {
         return std::isnan(densities[idx]) ? 0.0 :
                std::max(0.0, std::min(mass_frac[idx] * density / densities[idx], 1.0));
+    }
+
+    Fractions vol_fracs() const {
+        Fractions alpha;
+        for (int i = 0; i < Fractions::size(); ++i) {
+            if (mass_frac.has(i)) {
+                // Если есть массовая концентрация beta_i, значит
+                // должна быть определена плотность rho_i !
+                alpha[i] = mass_frac[i] * density / densities[i];
+            }
+        }
+        return alpha;
     }
 
     // Квадрат модуля скорости

@@ -6,8 +6,8 @@ namespace zephyr::phys {
 //                         Sedov Blast 3D Test
 // ============================================================================
 
-SedovBlast3D::SedovBlast3D(params p)
-    : exact(p.gamma, p.rho0, p.E) {
+SedovBlast3D::SedovBlast3D(Sedov3D::params p)
+    : exact(p) {
     m_materials += IdealGas::create(p.gamma);
     
     init_time = exact.time_by_radius(0.4);

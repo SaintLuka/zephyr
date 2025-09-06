@@ -1,26 +1,26 @@
-// @brief Тестирование AMR на задаче со случайной адаптацией.
-// В данном тесте флаги адаптации выбираются случайным образом
-// с некоторыми вероятностями.
+// Тестирование AMR на задаче со случайной адаптацией. В данном тесте флаги
+// адаптации выбираются случайным образом с некоторыми вероятностями.
 
 #include <iomanip>
 
-#include <zephyr/mesh/euler/eu_mesh.h>
-#include <zephyr/geom/generator/rectangle.h>
-#include <zephyr/geom/generator/cuboid.h>
-#include <zephyr/io/pvd_file.h>
 #include <zephyr/utils/stopwatch.h>
+#include <zephyr/utils/threads.h>
+#include <zephyr/geom/generator/rectangle.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/io/pvd_file.h>
 
-using namespace zephyr;
-using namespace mesh;
+using namespace zephyr::mesh;
+using namespace zephyr::geom;
+using namespace zephyr::utils;
 
-using geom::generator::Rectangle;
-using geom::generator::Cuboid;
+using generator::Rectangle;
 using zephyr::io::PvdFile;
-using zephyr::utils::Stopwatch;
 
+
+// Выставить в ячейке случайный флаг адаптации
 void set_flag(EuCell& cell) {
-    const double p_coarse = 0.80;
-    const double p_retain = 0.18;
+    const double p_coarse = 0.80;  // вероятность огрубления
+    const double p_retain = 0.18;  // вероятность сохрнения
 
     double p = rand() / double(RAND_MAX);
 
@@ -38,18 +38,14 @@ void set_flag(EuCell& cell) {
 int main() {
     threads::on();
 
+    Rectangle gen(-1.0, 1.0, -1.0, 1.0);
+    gen.set_nx(50);
+
+    EuMesh mesh(gen);
+    mesh.set_max_level(4);
+
     PvdFile pvd("mesh", "output");
     pvd.variables = {"rank", "index", "next", "level", "flag", "faces2D"};
-
-    Rectangle rect(-1.0, 1.0, -1.0, 1.0);
-    rect.set_nx(50);
-
-    Cuboid cube(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
-    cube.set_nx(10);
-
-    EuMesh mesh(rect);
-
-    mesh.set_max_level(4);
 
     if (mesh.check_base() < 0) {
         std::cout << "Bad init mesh\n";

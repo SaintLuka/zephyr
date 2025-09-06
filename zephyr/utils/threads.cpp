@@ -14,9 +14,7 @@ int threads::n_threads = 1;
 
 #ifdef ZEPHYR_TBB
 std::unique_ptr<tbb::global_control> threads::m_control = nullptr;
-#endif
-
-#ifdef ZEPHYR_STD_THREADS
+#else
 std::unique_ptr<ThreadPool> threads::pool = nullptr;
 #endif
 
@@ -45,13 +43,7 @@ void threads::on(int count) {
     } else {
         m_control = std::make_unique<tbb::global_control>(tbb::global_control::max_allowed_parallelism, n_threads);
     }
-#endif
-
-#ifdef ZEPHYR_OPENMP
-    omp_set_num_threads(n_threads);
-#endif
-
-#ifdef ZEPHYR_STD_THREADS
+#else
     if (n_threads < 2) {
         pool = nullptr;
     } else {
@@ -121,13 +113,7 @@ void threads::off() {
     n_threads = 1;
 #ifdef ZEPHYR_TBB
     m_control = nullptr;
-#endif
-
-#ifdef ZEPHYR_OPENMP
-    omp_set_num_threads(1);
-#endif
-
-#ifdef ZEPHYR_STD_THREADS
+#else
     pool = nullptr;
 #endif
 }

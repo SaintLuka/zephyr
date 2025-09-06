@@ -20,7 +20,7 @@ using namespace zephyr::phys;
 using namespace zephyr::math;
 using namespace zephyr::math::smf;
 
-using zephyr::mesh::generator::Rectangle;
+using zephyr::geom::generator::Rectangle;
 using zephyr::mesh::EuMesh;
 using zephyr::mesh::EuCell;
 using zephyr::math::SmFluid;

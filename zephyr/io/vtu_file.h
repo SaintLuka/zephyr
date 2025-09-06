@@ -10,23 +10,22 @@ class EuMesh;
 
 namespace zephyr::io {
 
-/// @class VtuFile для записи хранилища в файл VTU для неструктурированных
-/// сеток. Частицы также могут быть записаны.
+/// @brief Запись неструктурированной сетки в VTU-файл.
 class VtuFile {
 public:
-
-    /// @brief Все переменные класса имеют публичный доступ, запись файла
-    /// можно осуществлять после настройки всех параметров
+    // Переменные класса имеют публичный доступ, сохранение можно выполнить
+    // после настройки всех параметров
 
     std::string filename;   ///< Полное имя файла
     Variables   variables;  ///< Список переменных на запись
     bool hex_only = true;   ///< Записывать как четырехугольники/шестигранники
 
     /// @brief Интерпретировать трёхмерные ячейки как многогранники общего вида.
-    /// Сохраняет отдельно грани. Работет долго, включать при необходимости.
+    /// Сохраняет отдельно грани. Работает долго, включать при необходимости.
+    /// Необходимо использовать при записи сетки с многогранниками.
     bool polyhedral = false;
     
-    /// @brief Сохранять уникальные вершины, актуально для EuMesh, если сетка
+    /// @brief Сохранять уникальные вершины, актуально для EuMesh. Если сетка
     /// часто перестраивается, то функция выполняется достаточно долго.
     bool unique_nodes = false;
 
@@ -36,25 +35,27 @@ public:
     /// экземпляра класса.
     explicit VtuFile(const std::string &filename,
                      const Variables &variables = {},
-                     bool hex_only   = true,
-                     bool polyhedral = false);
+                     bool hex_only     = true,
+                     bool polyhedral   = false,
+                     bool unique_nodes = false);
 
     /// @brief Базовая функция записи в файл. До вызова функции должен быть
     /// создан экземпляр класса и настроены опции записи.
-    void save(mesh::EuMesh &mesh);
+    void save(mesh::EuMesh &mesh) const;
 
     /// @brief Базовая функция записи в файл. До вызова функции должен быть
     /// создан экземпляр класса и настроены опции записи.
-    void save(mesh::AmrCells &cells);
+    void save(mesh::AmrCells &cells) const;
 
     /// @brief Статическая функция записи в файл. Полный аналог функции-члена
     /// класса save, но вызывается без экземпляра класса, все параметры записи
     /// передаются непосредственно как аргументы функции.
     static void save(const std::string &filename,
                      mesh::AmrCells &locals,
-                     const Variables &variables,
-                     bool hex_only   = false,
-                     bool polyhedral = false);
+                     const Variables &variables = {},
+                     bool hex_only     = true,
+                     bool polyhedral   = false,
+                     bool unique_nodes = false);
 
 };
 

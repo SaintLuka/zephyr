@@ -2,6 +2,7 @@
 
 #include <zephyr/configuration.h>
 #include <zephyr/geom/boundary.h>
+#include <zephyr/geom/vector.h>
 #include <zephyr/geom/generator/generator.h>
 
 namespace zephyr::geom::generator {

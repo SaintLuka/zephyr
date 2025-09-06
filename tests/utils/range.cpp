@@ -1,5 +1,5 @@
 // @brief Тест производительности многопоточности с неравномерным доступом к памяти,
-// а также класса utils::range.
+// а также класса range.
 // Здесь по логике mixed должен давать лучшее ускорение (но это не точно)
 
 #include <iostream>
@@ -14,6 +14,7 @@
 #include <zephyr/utils/threads.h>
 #include <zephyr/utils/range.h>
 
+using namespace zephyr;
 using namespace zephyr::utils;
 
 using Vector = zephyr::geom::Matrix<double, 15, 1>;
