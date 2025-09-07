@@ -1,5 +1,6 @@
 #include <cmath>
 
+#include <zephyr/utils/numpy.h>
 #include <zephyr/geom/curves/interpolant.h>
 
 namespace zephyr::geom::curves {
@@ -87,7 +88,7 @@ std::vector<double> Interpolant::ys(int N) const {
 }
 
 std::vector<double> Interpolant::xs(int N, double x1, double x2) const {
-    return geom::linspace(x1, x2, N);
+    return np::linspace(x1, x2, N);
 }
 
 std::vector<double> Interpolant::ys(int N, double x1, double x2) const {
@@ -116,7 +117,7 @@ Vector3d PInterpolant::get(double t) const {
 }
 
 std::vector<Vector3d> PInterpolant::vs() const {
-    return zip(m_xs, m_ys, m_zs);
+    return np::zip(m_xs, m_ys, m_zs);
 }
 
 const std::vector<double> &PInterpolant::ts() const {
@@ -165,7 +166,7 @@ std::vector<Vector3d> PInterpolant::vs(int N, double t1, double t2) const {
 }
 
 std::vector<double> PInterpolant::ts(int N, double t1, double t2) const {
-    return geom::linspace(t1, t2, N);
+    return np::linspace(t1, t2, N);
 }
 
 std::vector<double> PInterpolant::xs(int N, double t1, double t2) const {

@@ -1,12 +1,11 @@
 #list(APPEND TESTS crp_interface)
-#list(APPEND TESTS cuboid_clip)
+list(APPEND TESTS cuboid_clip)
 #list(APPEND TESTS curves)
-#list(APPEND TESTS game_of_life)
-#list(APPEND TESTS maps_integral)
+#list(APPEND TESTS mapping)
+#list(APPEND TESTS poly_integrate)
 #list(APPEND TESTS polygon_clip)
 #list(APPEND TESTS polyhedra)
 #list(APPEND TESTS splines)
-#list(APPEND TESTS volume_fraction)
 
 # Assume all files in direcory are tests
 if (ZEPHYR_TESTS_ALL)

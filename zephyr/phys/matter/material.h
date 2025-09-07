@@ -106,7 +106,7 @@ public:
     /// @brief Внутрення энергия по давлению и температуре.
     dPdT energy_PT(double pressure, double temperature, const EosOptions &options = {}) const;
 
-    /// @brief Аппроксимация двучленным уравнением состояния в окрестности заданой плотности и давления.
+    /// @brief Аппроксимация двучленным уравнением состояния в окрестности заданной плотности и давления.
     StiffenedGas stiffened_gas(double density, double pressure, const EosOptions &options = {}) const;
 
     /// @brief Минимальное давление, при котором УрС выдает приемлемые значения.

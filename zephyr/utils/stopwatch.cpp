@@ -54,8 +54,20 @@ long Stopwatch::milliseconds() const {
     return int(std::chrono::duration_cast<std::chrono::milliseconds>(elapsed()).count());
 }
 
+Stopwatch::multiple<long> Stopwatch::milliseconds_mpi() const {
+    return multiple<long>(milliseconds());
+}
+
 long Stopwatch::seconds() const {
     return int(std::chrono::duration_cast<std::chrono::seconds>(elapsed()).count());
+}
+
+float Stopwatch::fseconds() const {
+    return 1.0e-3f * std::chrono::duration_cast<std::chrono::milliseconds>(elapsed()).count();
+}
+
+Stopwatch::multiple<float> Stopwatch::fseconds_mpi() const {
+    return multiple<float>(fseconds());
 }
 
 long Stopwatch::minutes() const {

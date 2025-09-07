@@ -55,6 +55,9 @@ public:
     /// @brief Создать сетку общего вида
     Grid make() final;
 
+    /// @brief Инициализация SoA-хранилища сетки
+    void initialize(mesh::AmrCells& cells) final;
+
 
     // Далее не самые полезные get-функции
 
@@ -72,6 +75,9 @@ public:
 
     /// @brief Число ячеек по оси X
     int nx() const;
+
+    /// @brief Граничные условия
+    Boundaries bounds() const { return m_bounds; }
 
     /// @brief Есть ли периодичность по оси X?
     bool periodic_along_x() const;

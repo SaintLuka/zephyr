@@ -1,6 +1,7 @@
-/// @brief Простая демонстрация возможностей встроенного класса VDiagram,
-/// который реализует взвешенные диаграммы Вороного.
+// Простая демонстрация возможностей встроенного класса VDiagram,
+// который реализует взвешенные диаграммы Вороного.
 
+#include <zephyr/math/random.h>
 #include <zephyr/mesh/decomp/vdiagram.h>
 #include <zephyr/utils/matplotlib.h>
 

@@ -6,11 +6,10 @@
 
 #include <zephyr/mesh/decomp/vdiagram.h>
 #include <zephyr/geom/primitives/polygon.h>
-
+#include <zephyr/math/random.h>
+#include <zephyr/utils/numpy.h>
 
 namespace zephyr::mesh::decomp {
-
-using zephyr::geom::Polygon;
 
 VDiagram::VDiagram(const Box& domain, int size)
     : m_domain(domain), m_actual(false) {
@@ -232,27 +231,27 @@ std::vector<Vector3d>& VDiagram::centers() {
 }
 
 std::vector<double> VDiagram::coords_x() const {
-    return zephyr::geom::get_x(m_coords);
+    return np::get_x(m_coords);
 }
 
 std::vector<double> VDiagram::coords_y() const {
-    return zephyr::geom::get_y(m_coords);
+    return np::get_y(m_coords);
 }
 
 std::vector<double> VDiagram::coords_z() const {
-    return zephyr::geom::get_z(m_coords);
+    return np::get_z(m_coords);
 }
 
 std::vector<double> VDiagram::centers_x() const {
-    return zephyr::geom::get_x(m_centers);
+    return np::get_x(m_centers);
 }
 
 std::vector<double> VDiagram::centers_y() const {
-    return zephyr::geom::get_y(m_centers);
+    return np::get_y(m_centers);
 }
 
 std::vector<double> VDiagram::centers_z() const {
-    return zephyr::geom::get_z(m_centers);
+    return np::get_z(m_centers);
 }
 
 std::vector<double> VDiagram::weights() const {
@@ -552,7 +551,7 @@ void VDiagram::balancing() {
 
     std::vector<double> ws(size());
     for (int iGen = 0; iGen < size(); ++iGen) {
-        Polygon poly(m_lines[iGen], true);
+        geom::Polygon poly(m_lines[iGen], true);
         ws[iGen] = poly.area();
     }
     balancing(ws);

@@ -1,9 +1,11 @@
-/// @brief Тестирование многогранников, сечения, объемы и прочее
+// Тестирование многогранников: построение и сечения
 
 #include <zephyr/geom/primitives/polyhedron.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/io/pvd_file.h>
 
 using namespace zephyr::geom;
+using namespace zephyr::mesh;
 using namespace zephyr::io;
 
 void plot_sections(
@@ -13,8 +15,6 @@ void plot_sections(
 
     PvdFile pvd(figname, "output/" + figname);
     pvd.polyhedral = true;
-
-    AmrStorage cell(1);
 
     double p_min = +1.0e100;
     double p_max = -1.0e100;
@@ -31,8 +31,10 @@ void plot_sections(
 
         Polyhedron clip = poly.clip(p, normal);
 
-        cell[0] = zephyr::mesh::AmrCell(clip);
-        pvd.save(cell, i);
+        EuMesh mesh(3, false);
+        mesh.push_back(clip);
+
+        pvd.save(mesh, i / (N - 1.0));
     }
 }
 

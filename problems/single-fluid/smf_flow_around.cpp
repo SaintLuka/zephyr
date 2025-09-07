@@ -5,7 +5,6 @@
 #include <iostream>
 #include <iomanip>
 
-#include <zephyr/mesh/mesh.h>
 
 #include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/geom/generator/collection/wedge.h>
@@ -13,6 +12,9 @@
 #include <zephyr/geom/generator/collection/plane_with_hole.h>
 #include <zephyr/geom/generator/collection/plane_with_cube.h>
 #include <zephyr/geom/generator/cuboid.h>
+
+#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
 
 #include <zephyr/phys/tests/test_1D.h>
 
@@ -36,6 +38,8 @@ using namespace zephyr::math::smf;
 using zephyr::mesh::EuMesh;
 using zephyr::math::SmFluid;
 using zephyr::utils::threads;
+
+#if 0
 
 // Для быстрого доступа по типу
 SmFluid::State U;
@@ -169,3 +173,6 @@ int main() {
 
     return 0;
 }
+#else
+int main() { }
+#endif

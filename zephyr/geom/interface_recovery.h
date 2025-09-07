@@ -1,35 +1,39 @@
 #pragma once
 
+#include <zephyr/mesh/euler/eu_prim.h>
 #include <zephyr/mesh/euler/eu_mesh.h>
 
 namespace zephyr::geom {
 
-using zephyr::mesh::EuCell;
-using zephyr::mesh::EuMesh;
-using zephyr::geom::Vector3d;
-using zephyr::mesh::AmrStorage;
-using zephyr::mesh::VarExtra;
-using zephyr::mesh::Byte;
-
+using mesh::EuCell;
+using mesh::EuMesh;
+using mesh::AmrCells;
+using mesh::Storable;
+using geom::Vector3d;
 
 /// @brief Восстановление интерфейса для многоматериальных задач.
 /// Работает на сетках с произвольными данными, единственное условие: 
 /// в данных должны быть поля для хранения трех величин
 /// 1. Объемная доля
-/// 2. Номаль интерфейса в ячейке
+/// 2. Нормаль интерфейса в ячейке
 /// 3. Точка плоскости внутри ячейке.
 /// Последние две величины определяются с использованием данного класса.
 class InterfaceRecovery {
 public:
 
-    InterfaceRecovery(int volume_offset, int normal_offset, int origin_offset)
-        : a{volume_offset}, n{normal_offset}, p{origin_offset} { }
+    InterfaceRecovery() = default;
+
+    InterfaceRecovery(
+            Storable<double> volume,
+            Storable<Vector3d> normal,
+            Storable<Vector3d> origin)
+        : a{volume}, n{normal}, p{origin} { }
 
     /// @brief Обновить подсеточную реконструкцию
     void update(EuMesh& mesh, int smoothing) const;
 
     /// @brief Преобразовать реконструкцию в сетку
-    AmrStorage body(EuMesh& mesh) const;
+    EuMesh body(EuMesh& mesh) const;
 
 private:
 
@@ -49,9 +53,9 @@ private:
     void adjust_normals(EuMesh& mesh) const;
 
 private:
-    VarExtra<double> a;    ///< Тип извлечения объемной доли
-    VarExtra<Vector3d> n;  ///< Тип для извлечения нормали
-    VarExtra<Vector3d> p;  ///< Тип для извлечения точки сечения
+    Storable<double> a;    ///< Тип извлечения объемной доли
+    Storable<Vector3d> n;  ///< Тип для извлечения нормали
+    Storable<Vector3d> p;  ///< Тип для извлечения точки сечения
 };
 
 } // namespace zephyr::geom

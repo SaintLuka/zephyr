@@ -25,19 +25,19 @@ const double Cv_2 = 2.5;
 const double Cv_3 = 3.5;
 
 
-/// @brief Термодинамически согласованное состояние смеси
+// Термодинамически согласованное состояние смеси
 struct State {
-    double P   = NAN;  ///< Равновесное давление
-    double T   = NAN;  ///< Равновесная температура
-    double rho = NAN;  ///< Смесевая плотность
-    double e   = NAN;  ///< Смесевая энергия
+    double P   = NAN;  // Равновесное давление
+    double T   = NAN;  // Равновесная температура
+    double rho = NAN;  // Смесевая плотность
+    double e   = NAN;  // Смесевая энергия
 
-    Fractions alpha = Fractions::Zero();  ///< Объемные концентрации
-    Fractions beta  = Fractions::Zero();  ///< Массовые концентрации
-    ScalarSet rs    = ScalarSet::NaN();   ///< Истинные плотности
-    ScalarSet es    = ScalarSet::NaN();   ///< Истинные энергии
+    Fractions alpha = Fractions::Zero();  // Объемные концентрации
+    Fractions beta  = Fractions::Zero();  // Массовые концентрации
+    ScalarSet rs    = ScalarSet::NaN();   // Истинные плотности
+    ScalarSet es    = ScalarSet::NaN();   // Истинные энергии
 
-    /// @brief Создать сместь от (P, T)
+    // Создать сместь от (P, T)
     static State Explicit(MixturePT &mixture, Fractions alpha, double P, double T) {
         State z = {.P = P, .T = T, .alpha = alpha};
 
@@ -59,7 +59,7 @@ struct State {
         return z;
     }
 
-    /// @brief Создать сместь от (rho, P)
+    // Создать сместь от (rho, P)
     static State Implicit_rP(MixturePT &mixture, Fractions &beta, double rho, double P) {
         State z = {.P = P, .rho = rho, .beta = beta};
 
@@ -74,7 +74,7 @@ struct State {
         return z;
     }
 
-    /// @brief Создать сместь от (rho, T)
+    // Создать сместь от (rho, T)
     static State Implicit_rT(MixturePT &mixture, Fractions &beta, double rho, double T) {
         State z = {.T = T, .rho = rho, .beta = beta};
 
@@ -89,7 +89,7 @@ struct State {
         return z;
     }
 
-    /// @brief Создать сместь от (rho, e)
+    // Создать сместь от (rho, e)
     static State Implicit_re(MixturePT &mixture, Fractions &beta, double rho, double e) {
         State z = {.rho = rho, .e = e, .beta = beta};
 
@@ -109,7 +109,7 @@ struct State {
         return x;
     }
 
-    /// @brief Вывести информацию о смеси
+    // Вывести информацию о смеси
     void print() const {
         std::cout << std::fixed << std::setprecision(2);
         std::cout << "\tTemperature: " << std::setw(10) << format(T - 0.0_C)    << "  C\n";
@@ -143,7 +143,7 @@ struct State {
     }
 };
 
-/// @brief Проверяет функции УрС
+// Проверяет функции УрС
 void test_consistency(MixturePT& mix, const State&z) {
     std::cout << std::scientific << std::setprecision(2);
 
@@ -186,7 +186,7 @@ void test_consistency(MixturePT& mix, const State&z) {
     }
 }
 
-/// @brief Проверяет производные. Сравнение с численными
+// Проверяет производные. Сравнение с численными
 void test_derivatives(MixturePT& mix, State z) {
     std::cout << std::scientific << std::setprecision(2);
 
@@ -348,7 +348,7 @@ void test_stiffened_gas(const MixturePT& mix, State z) {
     }
 }
 
-/// @brief Полное тестирование
+// Полное тестирование
 void test_mixture(MixturePT& mix, State z) {
     std::cout << "--------------------------------------------------------\n";
     z.print();

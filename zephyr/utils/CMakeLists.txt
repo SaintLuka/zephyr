@@ -1,18 +1,22 @@
 set(ZEPHYR_UTILS_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/json.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/mpi.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/numpy.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/threads.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/stopwatch.cpp
     PARENT_SCOPE)
 
 install(FILES
-    error_list.h
-    json.h
-    matplotlib.h
-    mpi.h
-    thread-pool.h
-    threads.h
-    range.h
-    stopwatch.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/buffer.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/error_list.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/json.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/matplotlib.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/mpi.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/thread-pool.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/threads.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/numpy.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/range.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/span.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/stopwatch.h
     DESTINATION
     include/${PROJECT_NAME}/utils)

@@ -1,5 +1,6 @@
 #include <iostream>
 
+#include <zephyr/utils/numpy.h>
 #include <zephyr/geom/curves/lagrange.h>
 
 namespace zephyr::geom::curves {
@@ -185,7 +186,7 @@ void PLagrange::build(
     // Параметризация
     switch (param) {
         case Parametrization::Uniform:
-            m_ts = linspace(0.0, 1.0, m_xs.size());
+            m_ts = np::linspace(0.0, 1.0, m_xs.size());
             break;
         case Parametrization::Chord:
             m_ts = chord_parametrization(m_xs, m_ys, m_zs);

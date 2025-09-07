@@ -3,10 +3,14 @@
 
 #include <zephyr/geom/box.h>
 #include <zephyr/geom/grid.h>
+#include <zephyr/geom/primitives/quad.h>
 #include <zephyr/utils/json.h>
 #include <zephyr/geom/generator/strip.h>
+#include <zephyr/mesh/euler/amr_cells.h>
 
 namespace zephyr::geom::generator {
+
+using namespace zephyr::mesh;
 
 Strip::Strip(const Json& config)
         : Generator("strip"),
@@ -186,6 +190,116 @@ Grid Strip::make() {
     grid.setup_adjacency();
 
     return grid;
+}
+
+void Strip::initialize(AmrCells& cells) {
+    bool x_period = periodic_along_x();
+
+    double m_ymin = y_min();
+    double m_ymax = y_max();
+
+    index_t m_ny = 1;
+
+    double hx = (m_xmax - m_xmin) / m_nx;
+    double hy = (m_ymax - m_ymin) / m_ny;
+
+    auto get_vertex = [=](index_t i, index_t j) -> Vector3d {
+        return {
+                m_xmin + ((m_xmax - m_xmin) * i) / m_nx,
+                m_ymin + ((m_ymax - m_ymin) * j) / m_ny,
+                0.0
+        };
+    };
+
+    auto neib_index = [=](index_t i, Side2D side) -> index_t {
+        if (side == Side2D::LEFT) {
+            return i == 0 && !x_period ?  i : (i - 1 + m_nx) % m_nx;
+        }
+        else if (side == Side2D::RIGHT) {
+            return i == m_nx - 1 && !x_period ? i : (i + 1 + m_nx) % m_nx;
+        }
+        else {
+            throw std::runtime_error("Strange side #153");
+        }
+    };
+
+    cells.set_dimension(2);
+    cells.set_adaptive(true);
+    cells.set_linear(true);
+    cells.set_axial(false);
+
+    cells.resize_amr(m_nx);
+
+    int n_faces = 8;
+    int n_nodes = 9;
+
+    for (index_t ic = 0; ic < m_nx; ++ic) {
+        cells.next[ic] = ic;
+        cells.rank[ic] = 0;
+        cells.index[ic] = ic;
+
+        cells.flag[ic] = 0;
+        cells.level[ic] = 0;
+        cells.b_idx[ic] = ic;
+        cells.z_idx[ic] = 0;
+
+        SqQuad quad(
+                get_vertex(ic, 0),
+                get_vertex(ic + 1, 0),
+                get_vertex(ic, 1),
+                get_vertex(ic + 1, 1));
+
+        cells.center[ic] = quad.vs<0, 0>();
+        cells.volume[ic] = hx * hy;
+        cells.volume_alt[ic] = NAN;
+        cells.face_begin[ic] = ic * n_faces;
+        cells.node_begin[ic] = ic * n_nodes;
+        cells.face_begin[ic + 1] = cells.face_begin[ic] + n_faces;
+        cells.node_begin[ic + 1] = cells.face_begin[ic] + n_nodes;
+
+        // INIT FACES
+        for (index_t iface: cells.faces_range(ic)) {
+            cells.faces.set_undefined(iface);
+            cells.faces.area_alt[iface] = NAN;
+        }
+
+        index_t iface = ic * n_faces;
+
+        cells.faces.boundary[iface + Side2D::L] = ic > 0 ? Boundary::ORDINARY : m_bounds.left;
+        cells.faces.boundary[iface + Side2D::R] = ic < m_nx - 1 ? Boundary::ORDINARY : m_bounds.right;
+
+        for (auto side: {Side2D::LEFT, Side2D::RIGHT}) {
+            cells.faces.adjacent.rank[iface + side] = 0;
+            cells.faces.adjacent.index[iface + side] = neib_index(ic, side);
+            cells.faces.adjacent.alien[iface + side] = -1;
+            cells.faces.adjacent.basic[iface + side] = ic;
+            cells.faces.vertices[iface + side].fill(-1);
+        }
+
+        cells.faces.normal[iface + Side2D::L] = -Vector3d::UnitX();
+        cells.faces.normal[iface + Side2D::R] =  Vector3d::UnitX();
+        cells.faces.normal[iface + Side2D::B] = -Vector3d::UnitY();
+        cells.faces.normal[iface + Side2D::T] =  Vector3d::UnitY();
+
+        cells.faces.center[iface + Side2D::L] = quad.vs<-1, 0>();
+        cells.faces.center[iface + Side2D::R] = quad.vs<+1, 0>();
+        cells.faces.center[iface + Side2D::B] = quad.vs<0, -1>();
+        cells.faces.center[iface + Side2D::T] = quad.vs<0, +1>();
+
+        cells.faces.area[iface + Side2D::L] = hy;
+        cells.faces.area[iface + Side2D::R] = hy;
+        cells.faces.area[iface + Side2D::B] = hx;
+        cells.faces.area[iface + Side2D::T] = hx;
+
+        cells.faces.vertices[iface + Side2D::L] = Side2D::L.sf();
+        cells.faces.vertices[iface + Side2D::R] = Side2D::R.sf();
+        cells.faces.vertices[iface + Side2D::B] = Side2D::B.sf();
+        cells.faces.vertices[iface + Side2D::T] = Side2D::T.sf();
+
+        for (index_t jn = 0; jn < n_nodes; ++jn) {
+            cells.verts[ic * n_nodes + jn] = quad[jn];
+        }
+    }
 }
 
 } // namespace zephyr::geom::generator

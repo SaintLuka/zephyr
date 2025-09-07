@@ -1,12 +1,6 @@
-/// @file Файл содержит реализацию быстрой функции балансировки флагов адаптации.
-/// Данный файл не устанавливается при установке zephyr, все изложенные описания
-/// алгоритмов и комментарии к функциям предназначены исключительно для разработчиков.
-/// Хотя вряд ли кто-то когда-нибудь попробует в этом разобраться.
-
+// Не устанавливается при установке zephyr, детали алгоритмов и комментарии
+// к функциям предназначены для разработчиков.
 #pragma once
-
-#include <numeric>
-#include <iomanip>
 
 #include <zephyr/mesh/amr/common.h>
 #include <zephyr/mesh/amr/siblings.h>
@@ -22,25 +16,25 @@ namespace zephyr::mesh::amr {
 /// Фактически структура осуществляет соритровку ячеек по уровням (блочная сортировка,
 /// работает за линейное время).
 struct CellsByLevelPartial {
-    AmrStorage &cells;   ///< Ссылка на хранилище
-    size_t from, to;  ///< Диапазон ячеек в хранилище
+    AmrCells &cells;   ///< Ссылка на хранилище
+    index_t from, to;  ///< Диапазон ячеек в хранилище
 
-    std::vector<size_t> n_coarse; ///< Число ячеек каждого уровня, которые хотят огрубиться
-    std::vector<size_t> n_retain; ///< Число ячеек каждого уровня, которые хотят сохраниться
+    std::vector<index_t> n_coarse; ///< Число ячеек каждого уровня, которые хотят огрубиться
+    std::vector<index_t> n_retain; ///< Число ячеек каждого уровня, которые хотят сохраниться
 
     /// @brief Списки ячеек по уровням, которые хотят огрубиться
-    std::vector<std::vector<size_t>> coarse;
+    std::vector<std::vector<index_t>> coarse;
 
     /// @brief Списки ячеек по уровням, которые хотят сохраниться
-    std::vector<std::vector<size_t>> retain;
+    std::vector<std::vector<index_t>> retain;
 
     /// @brief Создание экземпляра класса
-    static CellsByLevelPartial create(AmrStorage& cells, int max_level, size_t from, size_t to) {
+    static CellsByLevelPartial create(AmrCells& cells, int max_level, index_t from, index_t to) {
         return CellsByLevelPartial(cells, max_level, from, to);
     }
 
     /// @brief Конструктор класса
-    explicit CellsByLevelPartial(AmrStorage& cells, int max_level, size_t from, size_t to)
+    explicit CellsByLevelPartial(AmrCells& cells, int max_level, index_t from, index_t to)
     : cells(cells), from(from), to(to) {
         set_count(max_level);
         sort_by_levels(max_level);
@@ -50,9 +44,9 @@ struct CellsByLevelPartial {
     void set_count(int max_level) {
         n_coarse.resize(max_level);
         n_retain.resize(max_level);
-        for (size_t ic = from; ic < to; ++ic) {
-            auto lvl = cells[ic].level;
-            auto flag = cells[ic].flag;
+        for (index_t ic = from; ic < to; ++ic) {
+            auto lvl = cells.level[ic];
+            auto flag = cells.flag[ic];
 
             if (lvl < max_level && flag < 1) {
                 if (flag < 0) {
@@ -73,9 +67,9 @@ struct CellsByLevelPartial {
             retain[lvl].reserve(n_retain[lvl]);
         }
 
-        for (size_t ic = from; ic < to; ++ic) {
-            auto lvl = cells[ic].level;
-            auto flag = cells[ic].flag;
+        for (index_t ic = from; ic < to; ++ic) {
+            auto lvl = cells.level[ic];
+            auto flag = cells.flag[ic];
             if (lvl < max_level && flag < 1) {
                 if (flag < 0) {
                     coarse[lvl].push_back(ic);
@@ -92,61 +86,147 @@ struct CellsByLevelPartial {
 /// только характеризует ячейки со всего хранилища. В многопоточном режиме строится
 /// на основе множества структур CellsByLevelPartial.
 struct CellsByLevel {
-    AmrStorage &cells;   ///< Ссылка на хранилище
-
-    std::vector<size_t> n_coarse; ///< Число ячеек каждого уровня, которые хотят огрубиться
-    std::vector<size_t> n_retain; ///< Число ячеек каждого уровня, которые хотят сохраниться
+    std::vector<index_t> n_coarse; ///< Число ячеек каждого уровня, которые хотят огрубиться
+    std::vector<index_t> n_retain; ///< Число ячеек каждого уровня, которые хотят сохраниться
 
     /// @brief Списки ячеек по уровням, которые хотят огрубиться
-    std::vector<std::vector<size_t>> coarse;
+    std::vector<std::vector<index_t>> coarse;
 
     /// @brief Списки ячеек по уровням, которые хотят сохраниться
-    std::vector<std::vector<size_t>> retain;
+    std::vector<std::vector<index_t>> retain;
 
     /// @brief Однопоточный конструктор класса
     /// @details Вызывается конструктор CellsByLevelPartial для всего диапазона
     /// ячеек хранилища, затем данные перемещаются
-    CellsByLevel(AmrStorage &cells, int max_level)
-            : cells(cells) {
-        serial_constructor(max_level);
+    CellsByLevel(AmrCells &cells, int max_level) {
+        serial_constructor(cells, max_level);
     }
 
-#ifdef ZEPHYR_MULTITHREADING
-    /// @brief Многопоточный конструктор класса
-    /// @details Каждый поток вызывает конструктор CellsByLevelPartial для
-    /// части ячеек, затем полученные данные складываются в один массив
-    CellsByLevel(AmrStorage &cells, int max_level, ThreadPool& threads)
-            : cells(cells) {
-        if (threads.size() < 2) {
-            serial_constructor(max_level);
-            return ;
+#ifdef ZEPHYR_MPI
+    CellsByLevel(Tourism& tourism, AmrCells &locals, AmrCells& aliens, int max_level) {
+        // Также пересылает все флаги
+        coarse_to_send = std::vector(max_level, std::vector<std::vector<int>>(mpi::size()));
+        retain_to_send = std::vector(max_level, std::vector<std::vector<int>>(mpi::size()));
+
+        coarse_to_recv = std::vector(max_level, std::vector<std::vector<int>>(mpi::size()));
+        retain_to_recv = std::vector(max_level, std::vector<std::vector<int>>(mpi::size()));
+
+        const auto& router = tourism.m_cell_route;
+        const auto& border_indices = tourism.border_indices();
+
+        for (int r = 0; r < mpi::size(); ++r) {
+            // Индексы на отправку
+            for (index_t j: router.send_indices(r)) {
+                index_t ic = border_indices[j];
+
+                // Теперь можно не делать prepare
+                tourism.m_border.flag[j] = locals.flag[ic];
+
+                if (locals.level[ic] == max_level || locals.flag[ic] > 0) {
+                    continue;
+                }
+                if (locals.flag[ic] == 0) {
+                    retain_to_send[locals.level[ic]][r].push_back(ic);
+                }
+                else {
+                    coarse_to_send[locals.level[ic]][r].push_back(ic);
+                }
+            }
         }
-        auto num_tasks = threads.size();
-        std::vector<std::future<CellsByLevelPartial>> parts(num_tasks);
+        // Уже подготовили border
+        auto send_flag = tourism.isend<MpiTag::FLAG>();
+        auto recv_flag = tourism.irecv<MpiTag::FLAG>(aliens);
 
-        std::size_t bin = cells.size() / num_tasks + 1;
-        std::size_t pos = 0;
-        for (auto &count: parts) {
-            count = threads.enqueue(&CellsByLevelPartial::create,
-                                    std::ref(cells), max_level,
-                                    pos, std::min(pos + bin, cells.size())
-            );
-            pos += bin;
+        // TODO: Сортировка по тредам
+        serial_constructor(locals, max_level);
+
+        // Получили все флаги
+        send_flag.wait();
+        recv_flag.wait();
+
+        // Теперь прикинем индексы
+        for (int r = 0; r < mpi::size(); ++r) {
+            // Индексы на получение
+            for (index_t ic: router.recv_indices(r)) {
+                if (aliens.level[ic] == max_level || aliens.flag[ic] > 0) {
+                    continue;
+                }
+                if (aliens.flag[ic] == 0) {
+                    retain_to_recv[aliens.level[ic]][r].push_back(ic);
+                }
+                else {
+                    coarse_to_recv[aliens.level[ic]][r].push_back(ic);
+                }
+            }
         }
 
-        n_coarse.resize(max_level, 0);
-        n_retain.resize(max_level, 0);
-        coarse.resize(max_level);
-        retain.resize(max_level);
+        // Зададим буферы
+        send_flags_buf.resize(mpi::size());
+        recv_flags_buf.resize(mpi::size());
 
-        for (auto &result: parts) {
-            auto part = result.get();
-            for (int lvl = 0; lvl < max_level; ++lvl) {
-                n_retain[lvl] += part.n_retain[lvl];
-                n_coarse[lvl] += part.n_coarse[lvl];
+        send_requests.resize(mpi::size(), MPI_REQUEST_NULL);
+        recv_requests.resize(mpi::size(), MPI_REQUEST_NULL);
+    }
 
-                coarse[lvl].insert(coarse[lvl].end(), part.coarse[lvl].begin(), part.coarse[lvl].end());
-                retain[lvl].insert(retain[lvl].end(), part.retain[lvl].begin(), part.retain[lvl].end());
+    void send_retain(AmrCells &locals, AmrCells &aliens, int lvl, int mpi_tag) {
+        send_flags_impl(mpi_tag, locals.flag, retain_to_send[lvl], aliens.flag, retain_to_recv[lvl]);
+    }
+
+    void send_coarse(AmrCells& locals, AmrCells& aliens, int lvl, int mpi_tag) {
+        send_flags_impl(mpi_tag, locals.flag, coarse_to_send[lvl], aliens.flag, coarse_to_recv[lvl]);
+    }
+
+    /// @brief Отправить только часть флагов из массива local_flags в массив alien_flags
+    /// @param local_flags Ссылка на массив локальных флагов адаптации
+    /// @param alien_flags Ссылка на массив флагов адаптации с других процессов
+    /// @param send_indices Индексы флагов из массива local_flags, которые необходимо отправить
+    /// другим процессам, send_indices[rank] нужно отправить на rank.
+    /// @param recv_indices Индексы флагов из массива alien_flags, которые мы получаем с других
+    /// процессов, recv_indices[rank] получаем с других процессов
+    void send_flags_impl(int mpi_tag,
+        const std::vector<int>& local_flags, const std::vector<std::vector<index_t>>& send_indices,
+              std::vector<int>& alien_flags, const std::vector<std::vector<index_t>>& recv_indices) {
+
+        for (int r = 0; r < mpi::size(); ++r) {
+            send_requests[r] = MPI_REQUEST_NULL;
+            if (!send_indices[r].empty()) {
+                // Запакуем в send_flags
+                send_flags_buf[r].resize(send_indices[r].size());
+                for (index_t i = 0; i < send_indices[r].size(); ++i) {
+                    send_flags_buf[r][i] = local_flags[send_indices[r][i]];
+                }
+                // Асинхронная отправка
+                MPI_Isend(send_flags_buf[r].data(), send_indices[r].size(),
+                          mpi::type<int>(), r, mpi_tag, mpi::comm(), &send_requests[r]);
+            }
+        }
+
+        for (int r = 0; r < mpi::size(); ++r) {
+            recv_requests[r] = MPI_REQUEST_NULL;
+            if (!recv_indices[r].empty()) {
+                recv_flags_buf[r].resize(recv_indices[r].size());
+                // Асинхронное получение
+                MPI_Irecv(recv_flags_buf[r].data(), recv_indices[r].size(),
+                          mpi::type<int>(), r, mpi_tag, mpi::comm(), &recv_requests[r]);
+            }
+        }
+
+        // Ждем завершения отправки / получения
+        for (int r = 0; r < mpi::size(); ++r) {
+            if (!send_indices[r].empty()) {
+                MPI_Wait(&send_requests[r], MPI_STATUS_IGNORE);
+            }
+        }
+        for (int r = 0; r < mpi::size(); ++r) {
+            if (!recv_indices[r].empty()) {
+                MPI_Wait(&recv_requests[r], MPI_STATUS_IGNORE);
+            }
+        }
+
+        // Переносим флаги в alien массив
+        for (int r = 0; r < mpi::size(); ++r) {
+            for (index_t i = 0; i < recv_indices[r].size(); ++i) {
+                alien_flags[recv_indices[r][i]] = recv_flags_buf[r][i];
             }
         }
     }
@@ -154,35 +234,55 @@ struct CellsByLevel {
 
 private:
     /// @brief Однопоточный конструктор класса
-    void serial_constructor(int max_level) {
+    void serial_constructor(AmrCells& cells, int max_level) {
         CellsByLevelPartial part(cells, max_level, 0, cells.size());
         n_coarse = std::move(part.n_coarse);
         n_retain = std::move(part.n_retain);
         coarse = std::move(part.coarse);
         retain = std::move(part.retain);
     }
+
+#ifdef ZEPHYR_MPI
+    /// @brief Массив индексов local (border) ячеек, флаги которых retain / coarse,
+    /// и уровень меньше максимального coarse_to_send[lvl][rank]
+    std::vector<std::vector<std::vector<int>>> coarse_to_send;
+    std::vector<std::vector<std::vector<int>>> retain_to_send;
+
+    /// @brief Массив индексов alien ячеек, флаги которых retain / coarse,
+    /// и уровень меньше максимального coarse_to_recv[lvl][rank]
+    std::vector<std::vector<std::vector<int>>> coarse_to_recv;
+    std::vector<std::vector<std::vector<int>>> retain_to_recv;
+
+    // Следующие переменные дополнительные, используются при отправках и получениях,
+    // Их можно было бы создать локально в функции, но я прелагаю переиспользовать
+
+    // Буферы для отправки / получения флагов
+    std::vector<std::vector<int>> send_flags_buf;
+    std::vector<std::vector<int>> recv_flags_buf;
+
+    // Реквесты отправки / получения каждому rank'у
+    std::vector<MPI_Request> send_requests;
+    std::vector<MPI_Request> recv_requests;
+#endif
 };
 
 /// @brief Обновляет флаг ячейки под индексом index, которая имеет флаг 0.
 /// Повышает флаг адаптации, если один из соседей хочет уровень на два выше
-inline void retain_update_flag(int index, AmrStorage &cells) {
-    scrutiny_check(index < cells.size(), "round_1: index >= cells.size()")
-    scrutiny_check(cells[index].flag == 0, "retain_update_flag: cell.flag != 0")
+inline void retain_update_flag(index_t ic, AmrCells &locals, AmrCells& aliens) {
+    scrutiny_check(ic < locals.size(), "round_1: cell_idx >= cells.size()")
+    scrutiny_check(locals.flag[ic] == 0, "retain_update_flag: cell.flag != 0")
 
-    auto& cell = cells[index];
-
-    for (const auto &face: cell.faces) {
-        if (face.is_undefined() or face.is_boundary()) {
+    for (auto iface: locals.faces_range(ic)) {
+        if (locals.faces.is_undefined(iface) || locals.faces.is_boundary(iface)) {
             continue;
         }
 
-        int neib_idx = face.adjacent.index;
-        scrutiny_check(neib_idx < cells.size(), "retain_update_flag: neib_idx >= cells.size()")
+        auto [neibs, jc] = locals.faces.adjacent.get_neib(iface, locals, aliens);
+        scrutiny_check(jc < neibs.size(), "retain_update_flag: neib_idx >= cells.n_cells()")
 
-        const auto& neib = cells[neib_idx];
-        int neib_wanted = neib.level + neib.flag;
-        if (neib_wanted > cell.level + 1) {
-            cell.flag = 1;
+        int neib_wanted = neibs.level[jc] + neibs.flag[jc];
+        if (neib_wanted > locals.level[ic] + 1) {
+            locals.flag[ic] = 1;
             return;
         }
     }
@@ -192,31 +292,29 @@ inline void retain_update_flag(int index, AmrStorage &cells) {
 /// Ставит флаг адаптации 0, если сосед хочет уровень на 1 выше,
 /// ставит флаг адаптации 1, если сосед хочет уровень на 2 выше,
 /// флаги сиблингов не рассматриваются.
-inline void coarse_update_flag(int index, AmrStorage &cells) {
-    scrutiny_check(index < cells.size(), "round_2/3: index >= cells.size()")
+inline void coarse_update_flag(index_t ic, AmrCells &locals, AmrCells& aliens) {
+    scrutiny_check(ic < locals.size(), "round_2/3: cell_idx >= cells.size()")
 
-    auto& cell = cells[index];
-    if (cell.flag >= 0) {
+    if (locals.flag[ic] >= 0) {
         return;
     }
 
-    for (const auto &face: cell.faces) {
-        if (face.is_undefined() || face.is_boundary()) {
+    for (auto iface: locals.faces_range(ic)) {
+        if (locals.faces.is_undefined(iface) || locals.faces.is_boundary(iface)) {
             continue;
         }
 
-        auto neib_idx = face.adjacent.index;
-        scrutiny_check(neib_idx < cells.size(), "coarse_update_flag: neib_idx >= cells.size()")
+        auto [neibs, jc] = locals.faces.adjacent.get_neib(iface, locals, aliens);
+        scrutiny_check(jc < neibs.size(), "coarse_update_flag: neib_idx >= cells.n_cells()")
 
-        const auto& neib = cells[neib_idx];
-        int neib_wanted = neib.level + neib.flag;
+        int neib_wanted = neibs.level[jc] + neibs.flag[jc];
 
-        if (neib_wanted > cell.level) {
-            if (neib_wanted > cell.level + 1) {
-                cell.flag = 1;
+        if (neib_wanted > locals.level[ic]) {
+            if (neib_wanted > locals.level[ic] + 1) {
+                locals.flag[ic] = 1;
                 return;
             } else {
-                cell.flag = 0;
+                locals.flag[ic] = 0;
             }
         }
     }
@@ -225,21 +323,19 @@ inline void coarse_update_flag(int index, AmrStorage &cells) {
 /// @brief Обновляет флаг ячейки, которая имеет флаг -1.
 /// Ставит флаг адаптации 0, если один из сиблингов не хочет огрубляться.
 template <int dim>
-inline void coarse_update_flag_by_sibs(int index, AmrStorage &cells) {
-    scrutiny_check(index < cells.size(), "round_4: index >= cells.size()")
+void coarse_update_flag_by_sibs(index_t ic, AmrCells &locals) {
+    scrutiny_check(ic < locals.size(), "round_4: cell_idx >= cells.size()")
 
-    auto& cell = cells[index];
-
-    if (cell.flag >= 0) {
+    if (locals.flag[ic] >= 0) {
         return;
     }
 
-    auto sibs = get_siblings<dim>(cells, index);
+    auto sibs = get_siblings<dim>(locals, ic);
     for (auto is: sibs) {
-        scrutiny_check(is < cells.size(), "round_4: Sibling index out of range")
+        scrutiny_check(is < locals.size(), "round_4: Sibling index out of range")
 
-        if (cells[is].flag >= 0) {
-            cell.flag = 0;
+        if (locals.flag[is] >= 0) {
+            locals.flag[ic] = 0;
             break;
         }
     }
@@ -249,11 +345,10 @@ inline void coarse_update_flag_by_sibs(int index, AmrStorage &cells) {
 /// свой уровень до 1 за счет высокоуровневых соседей, после выпонения обхода
 /// уровень ячеек больше не меняется
 /// @param indices Индексы ячеек с флагом = 0 в хранилище
-/// @param cells Ссылка на хранилище
-void round_1(const std::vector<size_t> &indices, AmrStorage &cells) {
-    threads::for_each(
-            indices.begin(), indices.end(),
-            retain_update_flag, std::ref(cells));
+/// @param locals Ссылка на хранилище
+inline void round_1(const std::vector<index_t> &indices, AmrCells &locals, AmrCells &aliens) {
+    threads::for_each(indices.begin(), indices.end(),
+                      retain_update_flag, std::ref(locals), std::ref(aliens));
 }
 
 /// @brief Обход диапазона ячеек с флагом = -1, данные ячейки могут повысить
@@ -263,10 +358,9 @@ void round_1(const std::vector<size_t> &indices, AmrStorage &cells) {
 /// флаги на данном обходе (сохранили флаг -1).
 /// @param indices Индексы ячеек с флагом = -1 в хранилище
 /// @param cells Ссылка на хранилище
-void round_2(const std::vector<size_t> &indices, AmrStorage &cells) {
-    threads::for_each(
-            indices.begin(), indices.end(),
-            coarse_update_flag, std::ref(cells));
+inline void round_2(const std::vector<index_t> &indices, AmrCells &cells, AmrCells& aliens) {
+    threads::for_each(indices.begin(), indices.end(),
+                      coarse_update_flag, std::ref(cells), std::ref(aliens));
 }
 
 /// @brief Обход диапазона ячеек с изначальным флагом = -1, данные ячейки могут
@@ -275,10 +369,9 @@ void round_2(const std::vector<size_t> &indices, AmrStorage &cells) {
 /// обхода флаги ячеек ещё могут измениться (@see round_4).
 /// @param indices Индексы ячеек с исходным флагом = -1 в хранилище
 /// @param cells Ссылка на хранилище
-void round_3(const std::vector<size_t> &indices, AmrStorage &cells) {
-    threads::for_each(
-            indices.begin(), indices.end(),
-            coarse_update_flag, std::ref(cells));
+inline void round_3(const std::vector<index_t> &indices, AmrCells &cells, AmrCells& aliens) {
+    threads::for_each(indices.begin(), indices.end(),
+                      coarse_update_flag, std::ref(cells), std::ref(aliens));
 }
 
 /// @brief Заключительный обход диапазона ячеек, у которых после базовых
@@ -289,10 +382,9 @@ void round_3(const std::vector<size_t> &indices, AmrStorage &cells) {
 /// @param indices Индексы ячеек с исходным флагом = -1 в хранилище
 /// @param cells Ссылка на хранилище
 template <int dim>
-void round_4(const std::vector<size_t> &indices, AmrStorage &cells) {
-    threads::for_each(
-            indices.begin(), indices.end(),
-            coarse_update_flag_by_sibs<dim>, std::ref(cells));
+void round_4(const std::vector<index_t> &indices, AmrCells &cells) {
+    threads::for_each(indices.begin(), indices.end(),
+                      coarse_update_flag_by_sibs<dim>, std::ref(cells));
 }
 
 /// @brief Быстрая версия функции балансировки флагов.
@@ -300,7 +392,7 @@ void round_4(const std::vector<size_t> &indices, AmrStorage &cells) {
 /// ограничениями (ячейка нижнего уровня не огрубляется, ячейка верхнего -
 /// не разбивается), а также с сохранением баланса 1:2 у соседних ячеек.
 /// Баланс достигается повышением флагов адаптации (-1 и 0) у части ячеек.
-/// @param cells Ссылка на хранилище ячеек
+/// @param locals Ссылка на хранилище ячеек
 /// @param max_level Максимальный уровень адаптации ячеек
 /// @details Детали алгоритма. На первом этапе на флаги адаптации накладываются
 /// базовые ограничения. На втором этапе ячейки сортируются по уровням (только
@@ -315,7 +407,71 @@ void round_4(const std::vector<size_t> &indices, AmrStorage &cells) {
 /// 4. На заключительном обходе координируются сиблинги, которые хотят
 /// огрубиться (@see round_4), флаги могут повыситься до 0.
 template <int dim>
-void balance_flags_fast(AmrStorage& cells, int max_level) {
+void balance_flags_fast(AmrCells& locals, int max_level) {
+    static Stopwatch restriction_timer;
+    static Stopwatch sorting_timer;
+    static Stopwatch round_timer_1;
+    static Stopwatch round_timer_2;
+    static Stopwatch round_timer_3;
+    static Stopwatch round_timer_4;
+    static int n_step = 0;
+    static int n_total_retain = 0;
+    static int n_total_coarse = 0;
+
+    static AmrCells aliens;
+
+    restriction_timer.resume();
+    base_restrictions<dim>(locals, max_level);
+    restriction_timer.stop();
+
+    sorting_timer.resume();
+    // TODO: Сортировка по тредам
+    CellsByLevel sorted(locals, max_level);
+    sorting_timer.stop();
+
+    for (int lvl = max_level - 1; lvl >= 0; --lvl) {
+        round_timer_1.resume();
+        round_1(sorted.retain[lvl], locals, aliens);
+        round_timer_1.stop();
+
+        round_timer_2.resume();
+        round_2(sorted.coarse[lvl], locals, aliens);
+        round_timer_2.stop();
+
+        round_timer_3.resume();
+        round_3(sorted.coarse[lvl], locals, aliens);
+        round_timer_3.stop();
+
+        round_timer_4.resume();
+        round_4<dim>(sorted.coarse[lvl], locals);
+        round_timer_4.stop();
+    }
+
+#if CHECK_PERFORMANCE
+    n_step += 1;
+    n_total_coarse += std::accumulate(sorted.n_coarse.begin(), sorted.n_coarse.end(), 0);
+    n_total_retain += std::accumulate(sorted.n_retain.begin(), sorted.n_retain.end(), 0);
+
+    static index_t counter = 0;
+    if (counter % amr::check_frequency == 0) {
+        mpi::cout << "    Base restrictions: " << std::setw(8) << restriction_timer.milliseconds() << " ms\n";
+        mpi::cout << "    Sort by level:     " << std::setw(8) << sorting_timer.milliseconds() << " ms\n";
+        mpi::cout << "    Round 1 elapsed:   " << std::setw(8) << round_timer_1.milliseconds() << " ms  ";
+        mpi::cout << "    (avg retain: " << std::setw(10) << n_total_retain / n_step << ")\n";
+        mpi::cout << "    Round 2 elapsed:   " << std::setw(8) << round_timer_2.milliseconds() << " ms  ";
+        mpi::cout << "    (avg coarse: " << std::setw(10) << n_total_coarse / n_step << ")\n";
+        mpi::cout << "    Round 3 elapsed:   " << std::setw(8) << round_timer_3.milliseconds() << " ms\n";
+        mpi::cout << "    Round 4 elapsed:   " << std::setw(8) << round_timer_4.milliseconds() << " ms\n";
+    }
+    ++counter;
+#endif
+}
+
+#ifdef ZEPHYR_ENABLE_MPI
+/// Отличия параллельной реализации?
+/// Объяснить безумие с отправкой флагов.
+template <int dim>
+void balance_flags_fast(Tourism& tourism, AmrCells &locals, AmrCells &aliens, int max_level) {
     static Stopwatch restriction_timer;
     static Stopwatch sorting_timer;
     static Stopwatch round_timer_1;
@@ -327,29 +483,31 @@ void balance_flags_fast(AmrStorage& cells, int max_level) {
     static int n_total_coarse = 0;
 
     restriction_timer.resume();
-    base_restrictions<dim>(cells, max_level);
+    base_restrictions<dim>(locals, max_level);
     restriction_timer.stop();
 
     sorting_timer.resume();
-    // TODO: Сортировка по тредам
-    CellsByLevel sorted(cells, max_level);
+    CellsByLevel sorted(tourism, locals, aliens, max_level);
     sorting_timer.stop();
 
     for (int lvl = max_level - 1; lvl >= 0; --lvl) {
         round_timer_1.resume();
-        round_1(sorted.retain[lvl], cells);
+        round_1(sorted.retain[lvl], locals, aliens);
+        sorted.send_retain(locals, aliens, lvl, 1000 + lvl);
         round_timer_1.stop();
 
         round_timer_2.resume();
-        round_2(sorted.coarse[lvl], cells);
+        round_2(sorted.coarse[lvl], locals, aliens);
+        sorted.send_coarse(locals, aliens, lvl, 2000 + lvl);
         round_timer_2.stop();
 
         round_timer_3.resume();
-        round_3(sorted.coarse[lvl], cells);
+        round_3(sorted.coarse[lvl], locals, aliens);
         round_timer_3.stop();
 
         round_timer_4.resume();
-        round_4<dim>(sorted.coarse[lvl], cells);
+        round_4<dim>(sorted.coarse[lvl], locals);
+        sorted.send_coarse(locals, aliens, lvl, 3000 + lvl);
         round_timer_4.stop();
     }
 
@@ -358,19 +516,20 @@ void balance_flags_fast(AmrStorage& cells, int max_level) {
     n_total_coarse += std::accumulate(sorted.n_coarse.begin(), sorted.n_coarse.end(), 0);
     n_total_retain += std::accumulate(sorted.n_retain.begin(), sorted.n_retain.end(), 0);
 
-    static size_t counter = 0;
+    static index_t counter = 0;
     if (counter % amr::check_frequency == 0) {
-        std::cout << "    Restriction elapsed: " << std::setw(10) << restriction_timer.milliseconds() << " ms\n";
-        std::cout << "    Sorting elapsed:     " << std::setw(10) << sorting_timer.milliseconds() << " ms\n";
-        std::cout << "    Round 1 elapsed:     " << std::setw(10) << round_timer_1.milliseconds() << " ms  ";
-        std::cout << "    (avg retain: " << std::setw(10) << n_total_retain / n_step << ")\n";
-        std::cout << "    Round 2 elapsed:     " << std::setw(10) << round_timer_2.milliseconds() << " ms  ";
-        std::cout << "    (avg coarse: " << std::setw(10) << n_total_coarse / n_step << ")\n";
-        std::cout << "    Round 3 elapsed:     " << std::setw(10) << round_timer_3.milliseconds() << " ms\n";
-        std::cout << "    Round 4 elapsed:     " << std::setw(10) << round_timer_4.milliseconds() << " ms\n";
+        mpi::cout << "    Base restrictions: " << std::setw(8) << restriction_timer.milliseconds_mpi() << " ms\n";
+        mpi::cout << "    Sort by level:     " << std::setw(8) << sorting_timer.milliseconds_mpi() << " ms\n";
+        mpi::cout << "    Round 1 elapsed:   " << std::setw(8) << round_timer_1.milliseconds_mpi() << " ms  ";
+        mpi::cout << "    (avg retain: " << std::setw(10) << n_total_retain / n_step << ")\n";
+        mpi::cout << "    Round 2 elapsed:   " << std::setw(8) << round_timer_2.milliseconds_mpi() << " ms  ";
+        mpi::cout << "    (avg coarse: " << std::setw(10) << n_total_coarse / n_step << ")\n";
+        mpi::cout << "    Round 3 elapsed:   " << std::setw(8) << round_timer_3.milliseconds_mpi() << " ms\n";
+        mpi::cout << "    Round 4 elapsed:   " << std::setw(8) << round_timer_4.milliseconds_mpi() << " ms\n";
     }
     ++counter;
 #endif
 }
+#endif
 
 } // namespace zephyr::mesh::amr

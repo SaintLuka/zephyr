@@ -1,7 +1,7 @@
-/// @file Бенчмарк для тестирования производительности в многопоточном режиме.
-/// Производительность тестируется при обработке массива, который содержит
-/// матрицы относительно большого размера, в качестве трудоемкой операции
-/// используется поиск собственных значений.
+// Бенчмарк для тестирования производительности в многопоточном режиме.
+// Производительность тестируется при обработке массива, который содержит
+// матрицы относительно большого размера, в качестве трудоемкой операции
+// используется поиск собственных значений.
 
 #include <iostream>
 #include <iomanip>
@@ -14,30 +14,30 @@
 
 using namespace zephyr::utils;
 
-/// @return Случайное число от [-1, 1]
+// @return Случайное число от [-1, 1]
 inline double urand() {
     return 2.0 * double(rand()) / RAND_MAX - 1.0;
 }
 
-/// @return Функция знака
+// @return Функция знака
 inline double sign(double x) {
     return x < 0.0 ? -1.0 : 1.0;
 }
 
-const int size = 20; ///< Размерность используемых матриц
+const int size = 20; //< Размерность используемых матриц
 
 using Vector = Eigen::Matrix<double, 1, size>;
 using Matrix = Eigen::Matrix<double, size, size>;
 
-/// @brief Тип для хранения
+// Тип для хранения
 struct Element {
     Matrix mat;
 
-    /// @brief Создать элемент по матрице
+    // Создать элемент по матрице
     explicit Element(const Matrix& _mat) : mat(_mat) { }
 
-    /// @brief Создать случайную матрицу size x size
-    /// с вещественными собственными значениями от -1 до 1.
+    // Создать случайную матрицу size x size
+    // с вещественными собственными значениями от -1 до 1.
     Element() {
         Matrix A;
         Vector L;
@@ -52,8 +52,8 @@ struct Element {
         mat = A.inverse() * L.asDiagonal() * A;
     }
 
-    /// @brief Трудоемкая операция поворота,
-    /// собственные значения матрицы не изменяются
+    // Трудоемкая операция поворота,
+    // собственные значения матрицы не изменяются
     void rotate() {
         Vector L = mat.eigenvalues().real();
         Matrix R = Vector::Ones().asDiagonal();
@@ -79,22 +79,22 @@ struct Element {
         mat = R * mat * R.transpose();
     }
 
-    /// @return Среднее собственное значение
+    // Среднее собственное значение
     double avg_eigen() const {
         return mat.eigenvalues().mean().real();
     }
 
-    /// @brief Оператор сравнения
+    // Оператор сравнения
     bool operator<(const Element& r) const {
         return avg_eigen() < r.avg_eigen();
     }
 
-    /// @brief Оператор сравнения
+    // Оператор сравнения
     bool operator>(const Element& r) const {
         return avg_eigen() > r.avg_eigen();
     }
 
-    /// @brief Корень степени K от каждого элемента матрицы
+    // Корень степени K от каждого элемента матрицы
     static Matrix reduce(Matrix& m, int K) {
         Matrix res;
         for (int i = 0; i < size; ++i) {
@@ -105,39 +105,39 @@ struct Element {
         return res;
     }
 
-    /// @brief Операция суммирования
+    // Операция суммирования
     Element& operator+=(const Element& r) {
         mat += r.mat + 0.0 * Matrix(r.mat.eigenvalues().real().asDiagonal());
         return *this;
     }
 
-    /// @brief Операция свертки (покомпонентный минимум)
+    // Операция свертки (покомпонентный минимум)
     Element& operator&=(const Element& r) {
         mat = mat.cwiseMin(r.mat) + 0.0 * Matrix(r.mat.eigenvalues().real().asDiagonal());
         return *this;
     }
 
-    /// @brief Инициализация при поиске минимума
+    // Инициализация при поиске минимума
     static Element init_min() {
         return Element(+100.0 * Vector::Ones().asDiagonal());
     }
 
-    /// @brief Инициализация при поиске максимума
+    // Инициализация при поиске максимума
     static Element init_max() {
         return Element(-100.0 * Vector::Ones().asDiagonal());
     }
 
-    /// @brief Инициализация при суммировании
+    // Инициализация при суммировании
     static Element init_sum() {
         return Element(Matrix::Zero());
     }
 
-    /// @brief Инициализация при свертке
+    // Инициализация при свертке
     static Element init_reduce() {
         return Element(1.0e300 * Matrix::Ones());
     }
 
-    /// @brief Вытащить блок 3 х 3
+    // Вытащить блок 3 х 3
     Eigen::Matrix3d block() {
         return Eigen::Matrix3d(mat.block<3, 3>(0, 0));
     }

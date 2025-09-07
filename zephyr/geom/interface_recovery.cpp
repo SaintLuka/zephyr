@@ -4,6 +4,7 @@
 #include <zephyr/geom/sections.h>
 #include <zephyr/geom/intersection.h>
 #include <zephyr/geom/interface_recovery.h>
+#include <zephyr/geom/primitives/polygon.h>
 
 namespace zephyr::geom {
 
@@ -111,7 +112,7 @@ void InterfaceRecovery::update(EuMesh &mesh, int smoothing) const {
     }
 }
 
-AmrStorage InterfaceRecovery::body(EuMesh& mesh) const {
+EuMesh InterfaceRecovery::body(EuMesh& mesh) const {
     int count = 0;
     for (auto cell: mesh) {
         if (cell(a) < 1.0e-12) {
@@ -120,7 +121,11 @@ AmrStorage InterfaceRecovery::body(EuMesh& mesh) const {
         ++count;
     }
 
-    AmrStorage cells(count);
+    if (mesh.dim() != 2) {
+        throw std::runtime_error("Interface body 3D");
+    }
+
+    EuMesh cells(mesh.dim(), mesh.axial());
 
     count = 0;
     for (auto cell: mesh) {
@@ -131,22 +136,22 @@ AmrStorage InterfaceRecovery::body(EuMesh& mesh) const {
         if (cell(a) < 1.0 - 1.0e-12) {
             if (cell(n).isZero()) {
                 double d = 0.5 * std::sqrt(cell(a) * cell.volume());
-                Quad quad = {
+                Polygon poly = {
                         cell(p) + Vector3d{-d, -d, 0.0},
                         cell(p) + Vector3d{+d, -d, 0.0},
-                        cell(p) + Vector3d{-d, +d, 0.0},
                         cell(p) + Vector3d{+d, +d, 0.0},
+                        cell(p) + Vector3d{-d, +d, 0.0},
                 };
-                cells[count] = mesh::AmrCell(quad);
+                cells.push_back(poly);
             }
             else {
                 auto poly = cell.polygon();
                 auto part = poly.clip(cell(p), cell(n));
-                cells[count] = mesh::AmrCell(part);
+                cells.push_back(part);
             }
         }
         else {
-            cells[count] = cell.geom();
+            cells.push_back(cell.polygon());
         }
         ++count;
     }

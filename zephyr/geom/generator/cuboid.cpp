@@ -5,6 +5,8 @@
 #include <zephyr/geom/grid.h>
 #include <zephyr/geom/generator/cuboid.h>
 #include <zephyr/utils/json.h>
+#include <zephyr/geom/primitives/cube.h>
+#include <zephyr/mesh/euler/amr_cells.h>
 
 namespace zephyr::geom::generator {
 
@@ -373,16 +375,163 @@ Grid Cuboid::make() {
 
         auto ordinary = Boundary::ORDINARY;
 
-        g_cell.faces[Side::L].boundary = i > 0 ? ordinary : m_bounds.left;
-        g_cell.faces[Side::R].boundary = i < m_nx - 1 ? ordinary : m_bounds.right;
-        g_cell.faces[Side::B].boundary = j > 0 ? ordinary : m_bounds.bottom;
-        g_cell.faces[Side::T].boundary = j < m_ny - 1 ? ordinary : m_bounds.top;
-        g_cell.faces[Side::X].boundary = k > 0 ? ordinary : m_bounds.back;
-        g_cell.faces[Side::F].boundary = k < m_nz - 1 ? ordinary : m_bounds.front;
+        g_cell.faces[Side3D::L].boundary = i > 0 ? ordinary : m_bounds.left;
+        g_cell.faces[Side3D::R].boundary = i < m_nx - 1 ? ordinary : m_bounds.right;
+        g_cell.faces[Side3D::B].boundary = j > 0 ? ordinary : m_bounds.bottom;
+        g_cell.faces[Side3D::T].boundary = j < m_ny - 1 ? ordinary : m_bounds.top;
+        g_cell.faces[Side3D::X].boundary = k > 0 ? ordinary : m_bounds.back;
+        g_cell.faces[Side3D::F].boundary = k < m_nz - 1 ? ordinary : m_bounds.front;
 
         cells[n].geom() = g_cell;
     }
      */
+}
+
+void Cuboid::initialize(mesh::AmrCells& cells)  {
+    using namespace zephyr::mesh;
+
+    bool x_period = periodic_along_x();
+    bool y_period = periodic_along_y();
+    bool z_period = periodic_along_z();
+
+    double hx = (m_xmax - m_xmin) / m_nx;
+    double hy = (m_ymax - m_ymin) / m_ny;
+    double hz = (m_zmax - m_zmin) / m_nz;
+
+    auto get_index = [=](index_t i, index_t j, index_t k) -> index_t {
+        return m_nz * (m_ny * i + j) + k;
+    };
+
+    auto get_index_pair = [=](index_t n) -> std::array<index_t, 3> {
+        return {(n / m_nz) / m_ny, (n / m_nz) % m_ny, n % m_nz};
+    };
+
+    auto get_vertex = [=](index_t i, index_t j, index_t k) -> Vector3d {
+        return {
+                m_xmin + ((m_xmax - m_xmin) * i) / m_nx,
+                m_ymin + ((m_ymax - m_ymin) * j) / m_ny,
+                m_zmin + ((m_zmax - m_zmin) * k) / m_nz
+        };
+    };
+
+    auto neib_index = [=](index_t i, index_t j, index_t k, Side3D side) -> index_t {
+        if (side == Side3D::LEFT) {
+            return i == 0 && !x_period ?  get_index(i, j, k) : get_index((i - 1 + m_nx) % m_nx, j, k);
+        }
+        else if (side == Side3D::RIGHT) {
+            return i == m_nx - 1 && !x_period ? get_index(i, j, k) : get_index((i + 1) % m_nx, j, k);
+        }
+        else if (side == Side3D::BOTTOM) {
+            return j == 0 && !y_period ? get_index(i, j, k) : get_index(i, (j - 1 + m_ny) % m_ny, k);
+        }
+        else if (side == Side3D::TOP) {
+            return j == m_ny - 1 && !y_period ? get_index(i, j, k): get_index(i, (j + 1) % m_ny, k);
+        }
+        else if (side == Side3D::BACK) {
+            return k == 0 && !z_period ? get_index(i, j, k) : get_index(i, j, (k - 1 + m_nz) % m_nz);
+        }
+        else if (side == Side3D::FRONT) {
+            return k == m_nz - 1 && !z_period ? get_index(i, j, k): get_index(i, j, (k + 1) % m_nz);
+        }
+        else {
+            throw std::runtime_error("Strange side #265");
+        }
+    };
+
+    cells.set_dimension(3);
+    cells.set_adaptive(true);
+    cells.set_linear(true);
+    cells.set_axial(false);
+
+    cells.resize_amr(m_size);
+
+    int n_faces = 24;
+    int n_nodes = 27;
+
+    for (index_t ic = 0; ic < m_size; ++ic) {
+        auto[i, j, k] = get_index_pair(ic);
+
+        cells.next[ic] = ic;
+        cells.rank[ic] = 0;
+        cells.index[ic] = ic;
+
+        cells.flag[ic] = 0;
+        cells.level[ic] = 0;
+        cells.b_idx[ic] = ic;
+        cells.z_idx[ic] = 0;
+
+        SqCube cube(get_vertex(i,   j,   k),
+                    get_vertex(i+1, j,   k),
+                    get_vertex(i,   j+1, k),
+                    get_vertex(i+1, j+1, k),
+                    get_vertex(i,   j,   k+1),
+                    get_vertex(i+1, j,   k+1),
+                    get_vertex(i,   j+1, k+1),
+                    get_vertex(i+1, j+1, k+1));
+
+        cells.center[ic] = cube.vs<0, 0, 0>();
+        cells.volume[ic] = hx * hy * hz;
+        cells.volume_alt[ic] = NAN;
+        cells.face_begin[ic] = ic * n_faces;
+        cells.node_begin[ic] = ic * n_nodes;
+        cells.face_begin[ic + 1] = (ic + 1) * n_faces;
+        cells.node_begin[ic + 1] = (ic + 1) * n_nodes;
+
+        // INIT FACES
+        for (auto iface: cells.faces_range(ic)) {
+            cells.faces.set_undefined(iface);
+            cells.faces.area_alt[iface] = NAN;
+        }
+
+        index_t iface = ic * n_faces;
+
+        cells.faces.boundary[iface + Side3D::L] = i > 0 ? Boundary::ORDINARY : m_bounds.left;
+        cells.faces.boundary[iface + Side3D::R] = i < m_nx - 1 ? Boundary::ORDINARY : m_bounds.right;
+        cells.faces.boundary[iface + Side3D::B] = j > 0 ? Boundary::ORDINARY : m_bounds.bottom;
+        cells.faces.boundary[iface + Side3D::T] = j < m_ny - 1 ? Boundary::ORDINARY : m_bounds.top;
+        cells.faces.boundary[iface + Side3D::X] = k > 0 ? Boundary::ORDINARY : m_bounds.back;
+        cells.faces.boundary[iface + Side3D::F] = k < m_nz - 1 ? Boundary::ORDINARY : m_bounds.front;
+
+        for (auto side: Side3D::items()) {
+            cells.faces.adjacent.rank[iface + side] = 0;
+            cells.faces.adjacent.index[iface + side] = neib_index(i, j, k, side);
+            cells.faces.adjacent.alien[iface + side] = -1;
+            cells.faces.adjacent.basic[iface + side] = ic;
+            cells.faces.vertices[iface + side].fill(-1);
+        }
+
+        cells.faces.normal[iface + Side3D::L] = -Vector3d::UnitX();
+        cells.faces.normal[iface + Side3D::R] =  Vector3d::UnitX();
+        cells.faces.normal[iface + Side3D::B] = -Vector3d::UnitY();
+        cells.faces.normal[iface + Side3D::T] =  Vector3d::UnitY();
+        cells.faces.normal[iface + Side3D::X] = -Vector3d::UnitZ();
+        cells.faces.normal[iface + Side3D::F] =  Vector3d::UnitZ();
+
+        cells.faces.center[iface + Side3D::L] = cube.vs<-1, 0, 0>();
+        cells.faces.center[iface + Side3D::R] = cube.vs<+1, 0, 0>();
+        cells.faces.center[iface + Side3D::B] = cube.vs< 0,-1, 0>();
+        cells.faces.center[iface + Side3D::T] = cube.vs< 0,+1, 0>();
+        cells.faces.center[iface + Side3D::X] = cube.vs< 0, 0,-1>();
+        cells.faces.center[iface + Side3D::F] = cube.vs< 0, 0,+1>();
+
+        cells.faces.area[iface + Side3D::L] = hy * hz;
+        cells.faces.area[iface + Side3D::R] = hy * hz;
+        cells.faces.area[iface + Side3D::B] = hx * hz;
+        cells.faces.area[iface + Side3D::T] = hx * hz;
+        cells.faces.area[iface + Side3D::X] = hy * hz;
+        cells.faces.area[iface + Side3D::F] = hy * hz;
+
+        cells.faces.vertices[iface + Side3D::L] = Side3D::L.sf();
+        cells.faces.vertices[iface + Side3D::R] = Side3D::R.sf();
+        cells.faces.vertices[iface + Side3D::B] = Side3D::B.sf();
+        cells.faces.vertices[iface + Side3D::T] = Side3D::T.sf();
+        cells.faces.vertices[iface + Side3D::X] = Side3D::X.sf();
+        cells.faces.vertices[iface + Side3D::F] = Side3D::F.sf();
+
+        for (index_t jn = 0; jn < n_nodes; ++jn) {
+            cells.verts[ic * n_nodes + jn] = cube[jn];
+        }
+    }
 }
 
 } // namespace zephyr::geom::generator

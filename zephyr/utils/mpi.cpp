@@ -39,17 +39,50 @@ mpi::handler::handler() {
     char** argv = nullptr;
 
     mpi_init(argc, argv);
+    default_types.init();
 }
 
 mpi::handler::handler(int &argc, char **&argv) {
     mpi_init(argc, argv);
+    default_types.init();
 }
 
 mpi::handler::~handler() {
+    default_types.free();
+
     int flag;
     MPI_Finalized(&flag);
     if (!flag) {
         MPI_Finalize();
+    }
+}
+
+mpi::DefaultTypes mpi::default_types = {};
+
+void mpi::DefaultTypes::init() {
+    MPI_Type_contiguous(3, MPI_DOUBLE, &vec3);
+    MPI_Type_commit(&vec3);
+
+    MPI_Type_contiguous(4, MPI_INT, &int4);
+    MPI_Type_commit(&int4);
+
+    MPI_Type_contiguous(8, MPI_SHORT, &short8);
+    MPI_Type_commit(&short8);
+
+    byte4_types[0] = MPI_DATATYPE_NULL;
+    for (int i = 1; i < byte4_count; ++i) {
+        MPI_Type_contiguous(4 * i, MPI_BYTE, &byte4_types[i]);
+        MPI_Type_commit(&byte4_types[i]);
+    }
+}
+
+void mpi::DefaultTypes::free() {
+    MPI_Type_free(&vec3);
+    MPI_Type_free(&int4);
+    MPI_Type_free(&short8);
+
+    for (int i = 1; i < byte4_count; ++i) {
+        MPI_Type_free(&byte4_types[i]);
     }
 }
 

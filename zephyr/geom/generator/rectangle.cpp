@@ -4,9 +4,17 @@
 #include <zephyr/geom/box.h>
 #include <zephyr/geom/grid.h>
 #include <zephyr/geom/generator/rectangle.h>
+
+#include <zephyr/geom/primitives/quad.h>
+#include <zephyr/geom/primitives/polygon.h>
+
+#include <zephyr/mesh/euler/amr_cells.h>
+
 #include <zephyr/utils/json.h>
 
 namespace zephyr::geom::generator {
+
+using namespace zephyr::mesh;
 
 Rectangle::Rectangle(const Json& config)
     : Generator("rectangle"),
@@ -109,11 +117,11 @@ void Rectangle::set_nx(int nx) {
     }
     if (!m_voronoi) {
         m_nx = nx;
-        m_ny = int(std::round(m_nx * (m_ymax - m_ymin) / (m_xmax - m_xmin)));
+        m_ny = std::max(int(std::round(m_nx * (m_ymax - m_ymin) / (m_xmax - m_xmin))), 1);
     }
     else {
-        m_nx = int(std::round(nx * std::pow(3.0, 0.25)) / std::sqrt(2.0));
-        m_ny = int(std::round(m_nx * (m_ymax - m_ymin) / (m_xmax - m_xmin) / std::sqrt(3.0)));
+        m_nx = std::max(int(std::round(nx * std::pow(3.0, 0.25)) / std::sqrt(2.0)), 1);
+        m_ny = std::max(int(std::round(m_nx * (m_ymax - m_ymin) / (m_xmax - m_xmin) / std::sqrt(3.0))), 1);
     }
     compute_size();
 }
@@ -124,11 +132,11 @@ void Rectangle::set_ny(int ny) {
     }
     if (!m_voronoi) {
         m_ny = ny;
-        m_nx = int(std::round(ny * (m_xmax - m_xmin) / (m_ymax - m_ymin)));
+        m_nx = std::max(int(std::round(ny * (m_xmax - m_xmin) / (m_ymax - m_ymin))), 1);
     }
     else {
-        m_ny = int(std::round(ny / std::pow(3.0, 0.25)) / std::sqrt(2.0));
-        m_nx = int(std::round(m_ny * (m_xmax - m_xmin) / (m_ymax - m_ymin) * std::sqrt(3.0)));
+        m_ny = std::max(int(std::round(ny / std::pow(3.0, 0.25)) / std::sqrt(2.0)), 1);
+        m_nx = std::max(int(std::round(m_ny * (m_xmax - m_xmin) / (m_ymax - m_ymin) * std::sqrt(3.0))), 1);
     }
     compute_size();
 }
@@ -142,8 +150,8 @@ void Rectangle::set_sizes(int nx, int ny) {
         m_ny = ny;
     }
     else {
-        m_nx = int(std::round(nx * std::pow(3.0, 0.25)) / std::sqrt(2.0));
-        m_ny = int(std::round(ny / std::pow(3.0, 0.25)) / std::sqrt(2.0));
+        m_nx = std::max(int(std::round(nx * std::pow(3.0, 0.25)) / std::sqrt(2.0)), 1);
+        m_ny = std::max(int(std::round(ny / std::pow(3.0, 0.25)) / std::sqrt(2.0)), 1);
     }
     compute_size();
 
@@ -168,15 +176,15 @@ void Rectangle::set_size(int N) {
 
     if (!m_voronoi) {
         double d = std::sqrt((m_xmax - m_xmin) * (m_ymax - m_ymin) / N);
-        m_nx = int(std::round((m_xmax - m_xmin) / d));
-        m_ny = int(std::round((m_ymax - m_ymin) / d));
+        m_nx = std::max(int(std::round((m_xmax - m_xmin) / d)), 1);
+        m_ny = std::max(int(std::round((m_ymax - m_ymin) / d)), 1);
     }
     else {
         double a = std::sqrt(2 * (m_xmax - m_xmin) * (m_ymax - m_ymin) / (std::sqrt(3.0) * N));
         double h = std::sqrt(3.0) * a;
 
-        m_nx = int(std::round((m_xmax - m_xmin) / a));
-        m_ny = int(std::round((m_ymax - m_ymin) / h));
+        m_nx = std::max(int(std::round((m_xmax - m_xmin) / a)), 1);
+        m_ny = std::max(int(std::round((m_ymax - m_ymin) / h)), 1);
     }
     compute_size();
 }
@@ -213,6 +221,10 @@ int Rectangle::nx() const {
 
 int Rectangle::ny() const {
     return m_ny;
+}
+
+Rectangle::Boundaries Rectangle::bounds() const {
+    return m_bounds;
 }
 
 bool Rectangle::periodic_along_x() const {
@@ -446,6 +458,202 @@ Grid Rectangle::create_voronoi() const {
     grid.setup_adjacency();
 
     return grid;
+}
+
+void Rectangle::initialize(AmrCells& cells) {
+    check_size();
+
+    if (m_axial && m_ymin == 0.0) {
+        m_bounds.bottom = Boundary::WALL;
+    }
+
+    if (m_voronoi) {
+        return initialize_voronoi(cells);
+    } else {
+        return initialize_classic(cells);
+    }
+}
+
+void Rectangle::initialize_classic(AmrCells& cells) const {
+    bool x_period = periodic_along_x();
+    bool y_period = periodic_along_y();
+
+    double hx = (m_xmax - m_xmin) / m_nx;
+    double hy = (m_ymax - m_ymin) / m_ny;
+
+    auto get_index = [=](index_t i, index_t j) -> index_t {
+        return i * m_ny + j;
+    };
+
+    auto get_index_pair = [=](index_t n) -> std::array<index_t, 2> {
+        return {n / m_ny, n % m_ny};
+    };
+
+    auto get_vertex = [=](index_t i, index_t j) -> Vector3d {
+        return {
+                m_xmin + ((m_xmax - m_xmin) * i) / m_nx,
+                m_ymin + ((m_ymax - m_ymin) * j) / m_ny,
+                0.0
+        };
+    };
+
+    auto neib_index = [=](index_t i, index_t j, Side2D side) -> index_t {
+        if (side == Side2D::LEFT) {
+            return i == 0 && !x_period ?  get_index(i, j) : get_index((i - 1 + m_nx) % m_nx, j);
+        }
+        else if (side == Side2D::RIGHT) {
+            return i == m_nx - 1 && !x_period ? get_index(i, j) : get_index((i + 1 + m_nx) % m_nx, j);
+        }
+        else if (side == Side2D::BOTTOM) {
+            return j == 0 && !y_period ? get_index(i, j) : get_index(i, (j - 1 + m_ny) % m_ny);
+        }
+        else if (side == Side2D::TOP) {
+            return j == m_ny - 1 && !y_period ? get_index(i, j): get_index(i, (j + 1 + m_ny) % m_ny);
+        }
+        else {
+            throw std::runtime_error("Strange side #142");
+        }
+    };
+
+    cells.set_dimension(2);
+    cells.set_adaptive(true);
+    cells.set_linear(true);
+    cells.set_axial(m_axial);
+
+    cells.resize_amr(m_size);
+
+    int n_faces = 8;
+    int n_nodes = 9;
+
+    for (index_t ic = 0; ic < m_size; ++ic) {
+        auto[i, j] = get_index_pair(ic);
+
+        cells.next[ic] = ic;
+        cells.rank[ic] = 0;
+        cells.index[ic] = ic;
+
+        cells.flag[ic] = 0;
+        cells.level[ic] = 0;
+        cells.b_idx[ic] = ic;
+        cells.z_idx[ic] = 0;
+
+        SqQuad quad(
+                get_vertex(i, j),
+                get_vertex(i + 1, j),
+                get_vertex(i, j + 1),
+                get_vertex(i + 1, j + 1));
+
+        cells.center[ic] = quad.vs<0, 0>();
+        cells.volume[ic] = hx * hy;
+        cells.volume_alt[ic] = NAN;
+        cells.face_begin[ic] = ic * n_faces;
+        cells.node_begin[ic] = ic * n_nodes;
+        cells.face_begin[ic + 1] = (ic + 1) * n_faces;
+        cells.node_begin[ic + 1] = (ic + 1) * n_nodes;
+
+        // INIT FACES
+        for (auto iface: cells.faces_range(ic)) {
+            cells.faces.set_undefined(iface);
+            cells.faces.area_alt[iface] = NAN;
+        }
+
+        index_t iface = ic * n_faces;
+
+        cells.faces.boundary[iface + Side2D::L] = i > 0 ? Boundary::ORDINARY : m_bounds.left;
+        cells.faces.boundary[iface + Side2D::R] = i < m_nx - 1 ? Boundary::ORDINARY : m_bounds.right;
+        cells.faces.boundary[iface + Side2D::B] = j > 0 ? Boundary::ORDINARY : m_bounds.bottom;
+        cells.faces.boundary[iface + Side2D::T] = j < m_ny - 1 ? Boundary::ORDINARY : m_bounds.top;
+
+        for (auto side: Side2D::items()) {
+            cells.faces.adjacent.rank[iface + side] = 0;
+            cells.faces.adjacent.index[iface + side] = neib_index(i, j, side);
+            cells.faces.adjacent.alien[iface + side] = -1;
+            cells.faces.adjacent.basic[iface + side] = ic;
+            cells.faces.vertices[iface + side].fill(-1);
+        }
+
+        cells.faces.normal[iface + Side2D::L] = -Vector3d::UnitX();
+        cells.faces.normal[iface + Side2D::R] =  Vector3d::UnitX();
+        cells.faces.normal[iface + Side2D::B] = -Vector3d::UnitY();
+        cells.faces.normal[iface + Side2D::T] =  Vector3d::UnitY();
+
+        cells.faces.center[iface + Side2D::L] = quad.vs<-1, 0>();
+        cells.faces.center[iface + Side2D::R] = quad.vs<+1, 0>();
+        cells.faces.center[iface + Side2D::B] = quad.vs<0, -1>();
+        cells.faces.center[iface + Side2D::T] = quad.vs<0, +1>();
+
+        cells.faces.area[iface + Side2D::L] = hy;
+        cells.faces.area[iface + Side2D::R] = hy;
+        cells.faces.area[iface + Side2D::B] = hx;
+        cells.faces.area[iface + Side2D::T] = hx;
+
+        cells.faces.vertices[iface + Side2D::L] = Side2D::L.sf();
+        cells.faces.vertices[iface + Side2D::R] = Side2D::R.sf();
+        cells.faces.vertices[iface + Side2D::B] = Side2D::B.sf();
+        cells.faces.vertices[iface + Side2D::T] = Side2D::T.sf();
+
+        for (index_t jn = 0; jn < n_nodes; ++jn) {
+            cells.verts[ic * n_nodes + jn] = quad[jn];
+        }
+
+        if (m_axial) {
+            // "Альтернативный" объем ячейки и площади граней
+            cells.volume_alt[ic] = hx * hy * quad.vs<0, 0>().y();
+            cells.faces.area_alt[iface + Side2D::L] = hy * quad.vs<-1, 0>().y();
+            cells.faces.area_alt[iface + Side2D::R] = hy * quad.vs<+1, 0>().y();
+            cells.faces.area_alt[iface + Side2D::B] = hx * quad.vs< 0,-1>().y();
+            cells.faces.area_alt[iface + Side2D::T] = hx * quad.vs< 0,+1>().y();
+
+            // Смещения барицентров, есть необходимость?
+            cells.center[ic].y() += hy*hy / (12.0 * quad.vs<0, 0>().y());
+            cells.faces.center[iface + Side2D::L].y() += hy*hy / (12.0 * quad.vs<-1, 0>().y());
+            cells.faces.center[iface + Side2D::R].y() += hy*hy / (12.0 * quad.vs<+1, 0>().y());
+        }
+    }
+}
+
+void Rectangle::initialize_voronoi(AmrCells& cells) {
+    Grid grid = make();
+    m_size = grid.n_cells();
+
+    cells.set_dimension(2);
+    cells.set_adaptive(false);
+    cells.set_linear(true);
+    cells.set_axial(m_axial);
+
+    // Зарезервировать ячейки, добавляем push_back'ом
+    cells.reserve(m_size, 6 * m_size, 6 * m_size);
+
+    for (index_t ic = 0; ic < m_size; ++ic) {
+        GCell cell = grid.cell(ic);
+
+        int n_nodes = cell.n_nodes();
+
+        // Уникальные узлы
+        std::vector<GNode::Ptr> nodes(n_nodes, nullptr);
+
+        Polygon poly(n_nodes);
+        for (int i = 0; i < n_nodes; ++i) {
+            nodes[i] = grid.node(cell.node(i).index);
+            poly.set(i, nodes[i]->v);
+        }
+
+        cells.push_back(poly);
+
+        // Смежность
+        for (int i = 0; i < poly.size(); ++i) {
+            index_t iface = cells.face_begin[ic] + i;
+
+            GNode::Ref v1 = nodes[i];
+            GNode::Ref v2 = nodes[(i + 1) % n_nodes];
+
+            cells.faces.boundary[iface] = cell.boundary({v1, v2});
+            cells.faces.adjacent.rank[iface]  = 0;
+            cells.faces.adjacent.index[iface] = cell.adjacent({v1, v2});
+            cells.faces.adjacent.alien[iface] = -1;
+            cells.faces.adjacent.basic[iface] = ic;
+        }
+    }
 }
 
 } // namespace zephyr::geom::generator

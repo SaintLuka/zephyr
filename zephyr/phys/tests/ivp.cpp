@@ -2,6 +2,8 @@
 
 namespace zephyr::phys {
 
+using mesh::EuCell;
+
 const Materials& IVP::materials() const {
     return m_materials;
 }
@@ -75,7 +77,7 @@ bool IVP::inside_t(const Vector3d &r, int idx, double t) const {
     return idx == 0;
 }
 
-double IVP::density_mean(mesh::EuCell& cell, int n) const {
+double IVP::density_mean(EuCell& cell, int n) const {
     auto get_density = [this](const Vector3d &r) -> double {
         return this->density(r);
     };
@@ -89,7 +91,7 @@ double IVP::density_mean(mesh::EuCell& cell, int n) const {
     return M / V;
 }
 
-Vector3d IVP::momentum_mean(mesh::EuCell& cell, int n) const {
+Vector3d IVP::momentum_mean(EuCell& cell, int n) const {
     auto momentum_x = [this](const Vector3d &r) -> double {
         return this->density(r) * this->velocity(r).x();
     };
@@ -108,7 +110,7 @@ Vector3d IVP::momentum_mean(mesh::EuCell& cell, int n) const {
         return {momentum_x(cell.center()),
                 momentum_y(cell.center()),
                 momentum_z(cell.center())};
-    }
+        }
 
     double V = cell.volume();
     Vector3d P = {
@@ -119,7 +121,7 @@ Vector3d IVP::momentum_mean(mesh::EuCell& cell, int n) const {
     return P / V;
 }
 
-double IVP::energy_mean(mesh::EuCell& cell, int n) const {
+double IVP::energy_mean(EuCell& cell, int n) const {
     auto get_energy = [this](const Vector3d &r) -> double {
         Vector3d v = this->velocity(r);
         return this->density(r) * (this->energy(r) + 0.5 * v.dot(v));
@@ -134,11 +136,11 @@ double IVP::energy_mean(mesh::EuCell& cell, int n) const {
     return E / V;
 }
 
-Fractions IVP::mass_fractions(mesh::EuCell& cell, int n) const {
+Fractions IVP::mass_fractions(EuCell& cell, int n) const {
     throw std::runtime_error("IVP::masses");
 }
 
-Fractions IVP::volume_fractions(mesh::EuCell& cell, int n) const {
+Fractions IVP::volume_fractions(EuCell& cell, int n) const {
     throw std::runtime_error("IVP::volumes");
 }
 

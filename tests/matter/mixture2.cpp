@@ -9,11 +9,12 @@
 #include <zephyr/phys/matter/eos/mie_gruneisen.h>
 #include <zephyr/phys/matter/mixture_pt.h>
 
+#include <zephyr/utils/numpy.h>
 #include <zephyr/utils/matplotlib.h>
 
+using namespace zephyr;
 using namespace zephyr::geom;
 using namespace zephyr::phys;
-using namespace zephyr::utils;
 
 namespace plt = zephyr::utils::matplotlib;
 
@@ -38,12 +39,12 @@ int main() {
     mixture += eos1;
     mixture += eos2;
 
-    auto x = linspace(-1.0, 1.0, 10000);
-    //auto x = linspace(-0.65, -0.55, 1000);
-    //auto x = linspace(-0.6, -0.595, 10000);
+    auto x = np::linspace(-1.0, 1.0, 10000);
+    //auto x = np::linspace(-0.65, -0.55, 1000);
+    //auto x = np::linspace(-0.6, -0.595, 10000);
 
-    std::vector<double> a1(x.size());
-    std::vector<double> a2(x.size());
+    auto a1 = np::empty_like(x);
+    auto a2 = np::empty_like(x);
     for (size_t i = 0; i < x.size(); ++i) {
         a1[i] = fraction(x[i]);
         a2[i] = 1.0 - a1[i];
@@ -61,16 +62,16 @@ int main() {
     double enrg2 = eos2->energy_rP(dens2, pres2);
     double tempA = eos2->temperature_rP(dens2, pres2);
 
-    std::vector<double> mix_dens(x.size());
-    std::vector<double> mix_energy(x.size());
-    std::vector<double> mix_pres(x.size());
-    std::vector<double> mix_temp(x.size());
-    std::vector<double> beta1(x.size());
-    std::vector<double> beta2(x.size());
+    auto mix_dens = np::empty_like(x);
+    auto mix_engy = np::empty_like(x);
+    auto mix_pres = np::empty_like(x);
+    auto mix_temp = np::empty_like(x);
+    auto beta1 = np::empty_like(x);
+    auto beta2 = np::empty_like(x);
 
-    std::vector<double> mix_gamma(x.size());
-    std::vector<double> mix_p_min(x.size());
-    std::vector<double> mix_e0(x.size());
+    auto mix_gamma = np::empty_like(x);
+    auto mix_p_min = np::empty_like(x);
+    auto mix_e0    = np::empty_like(x);
 
     for (size_t i = 0; i < x.size(); ++i) {
         mix_dens[i] = a1[i] * dens1 + a2[i] * dens2;
@@ -78,10 +79,10 @@ int main() {
         beta1[i] = a1[i] * dens1 / mix_dens[i];
         beta2[i] = a2[i] * dens2 / mix_dens[i];
 
-        mix_energy[i] = beta1[i] * enrg1 + beta2[i] * enrg2;
+        mix_engy[i] = beta1[i] * enrg1 + beta2[i] * enrg2;
 
         Fractions beta = {beta1[i], beta2[i]};
-        mix_pres[i] = mixture.pressure_re(mix_dens[i], mix_energy[i], beta);
+        mix_pres[i] = mixture.pressure_re(mix_dens[i], mix_engy[i], beta);
         mix_temp[i] = mixture.temperature_rP(mix_dens[i], mix_pres[i], beta);
 
         StiffenedGas gas = mixture.stiffened_gas(mix_dens[i], mix_pres[i], beta);
@@ -108,7 +109,7 @@ int main() {
 
     plt::subplot2grid(2, 3, 0, 2);
     plt::title("Mix energy");
-    plt::plot(x, mix_energy);
+    plt::plot(x, mix_engy);
 
     plt::subplot2grid(2, 3, 1, 1);
     plt::title("Mix pressure");

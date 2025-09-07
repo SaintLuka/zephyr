@@ -4,7 +4,6 @@
 #include <zephyr/geom/intersection.h>
 #include <zephyr/geom/primitives/polyhedron.h>
 
-
 namespace zephyr::geom {
 
 namespace {
@@ -439,51 +438,111 @@ Vector3d Polyhedron::centroid(double vol) const {
     return m_center;
 }
 
-void Polyhedron::replace_face(int idx, int v1, int v2, int v3, int v4) {
-    faces[idx] = {v1, v2, v3, v4};
-    faces_c[idx] = get_center<4>(verts, faces[idx]);
-    faces_s[idx] = get_surface<4>(verts, faces[idx], faces_c[idx]);
+bool Polyhedron::need_simplify(int max_vertices) const {
+    for (auto& face: faces) {
+        if (face.size() > max_vertices) {
+            return true;
+        }
+    }
+    return false;
 }
 
-void Polyhedron::add_face(int v1, int v2, int v3) {
-    faces.push_back({v1, v2, v3});
-    faces_c.push_back(get_center<3>(verts, faces.back()));
-    faces_s.push_back(get_surface<3>(verts, faces.back(), faces_c.back()));
+void Polyhedron::replace_face(int face_idx, const std::vector<int>& vs) {
+    faces[face_idx] = vs;
+    switch (vs.size()) {
+        case 3: {
+            faces_c[face_idx] = get_center <3>(verts, faces[face_idx]);
+            faces_s[face_idx] = get_surface<3>(verts, faces[face_idx], faces_c[face_idx]);
+            break;
+        }
+        case 4: {
+            faces_c[face_idx] = get_center <4>(verts, faces[face_idx]);
+            faces_s[face_idx] = get_surface<4>(verts, faces[face_idx], faces_c[face_idx]);
+            break;
+        }
+        default: {
+            faces_c[face_idx] = get_center (verts, faces[face_idx]);
+            faces_s[face_idx] = get_surface(verts, faces[face_idx], faces_c[face_idx]);
+            break;
+        }
+    }
 }
 
-void Polyhedron::add_face(int v1, int v2, int v3, int v4) {
-    faces.push_back({v1, v2, v3, v4});
-    faces_c.push_back(get_center<4>(verts, faces.back()));
-    faces_s.push_back(get_surface<4>(verts, faces.back(), faces_c.back()));
+void Polyhedron::add_face(const std::vector<int>& vs) {
+    faces.push_back(vs);
+    switch (vs.size()) {
+        case 3: {
+            faces_c.push_back(get_center <3>(verts, faces.back()));
+            faces_s.push_back(get_surface<3>(verts, faces.back(), faces_c.back()));
+            break;
+        }
+        case 4: {
+            faces_c.push_back(get_center <4>(verts, faces.back()));
+            faces_s.push_back(get_surface<4>(verts, faces.back(), faces_c.back()));
+            break;
+        }
+        default: {
+            faces_c.push_back(get_center (verts, faces.back()));
+            faces_s.push_back(get_surface(verts, faces.back(), faces_c.back()));
+            break;
+        }
+    }
 }
 
-void Polyhedron::canonic() {
+std::vector<std::vector<int>> Polyhedron::simplified_faces(int face_idx, int n_verts) const {
+    // 1. Сортируем узлы полигона вдоль некоторого направления
+    // (лучше выбрать направление, вдоль которого полигон вытянут).
+    // 2. Находим положения несколько секущих плоскостей, перпендекулярных
+    // выбраному направлению. Секущие плоскости разделяют вершины полигона
+    // на несколько групп. Нужно расставить плоскости так, чтобы в каждой
+    // группе было максимальное количество вершин, при этом в граничные
+    // группы должно попадать от 2 до n_verts - 1 вершин, во внутренние
+    // группы должно попадать от 1 до n_verts - 2 вершин.
+
+    // TODO: Написать классный алгоритм
+
+    // Пока реализуем простые алгоритмы
+    
+    const std::vector<int>& old_face = faces[face_idx];
+    std::vector<std::vector<int>> new_faces;
+
+    if (old_face.size() <= 2 * n_verts) {
+        // Простой случай: можно разбить на две части
+        int b = old_face.size() / 2 + old_face.size() % 2;
+        new_faces.resize(2);
+        for (int i = 0; i <= b; ++i) {
+            new_faces[0].push_back(old_face[i]);
+        }
+        for (int i = b; i < old_face.size(); ++i) {
+            new_faces[1].push_back(old_face[i]);
+        }
+        new_faces[1].push_back(old_face[0]);
+    }
+    else {
+        new_faces.resize(old_face.size() - 2);
+        for (int i = 0; i < faces[face_idx].size() - 2; ++i) {
+            new_faces[i] = {old_face[0], old_face[i + 1], old_face[i + 2]};
+        }
+    }
+    return new_faces;
+}
+
+void Polyhedron::simplify_faces(int max_vertices) {
     for (int f_idx = 0; f_idx < n_faces(); ++f_idx) {
         int nv = faces[f_idx].size();
-        if (nv <= 4) {
+        if (nv <= max_vertices) {
             continue;
         }
 
-        std::vector<int> old = faces[f_idx];
-        switch (nv) {
-            case 5:
-                add_face(old[3], old[4], old[0]);
-                break;
-            case 6:
-                add_face(old[3], old[4], old[5], old[0]);
-                break;
-            case 7:
-                add_face(old[3], old[4], old[5], old[6]);
-                add_face(old[0], old[3], old[6]);
-                break;
-            case 8:
-                add_face(old[3], old[4], old[5], old[7]);
-                add_face(old[0], old[3], old[4], old[7]);
-                break;
-            default:
-                throw std::runtime_error("Sorry, I'm too lazy");
+        // списки индексов новых граней
+        auto new_faces = simplified_faces(f_idx, max_vertices);
+
+        assert(new_faces.size() > 1);
+
+        replace_face(f_idx, new_faces[0]);
+        for (int i = 1; i < new_faces.size(); ++i) {
+            add_face(new_faces[i]);
         }
-        replace_face(f_idx, old[0], old[1], old[2], old[3]);
     }
 }
 
@@ -631,50 +690,14 @@ Polyhedron Polyhedron::clip(const Vector3d& p, const Vector3d& n) const {
         out_faces.push_back(ids);
     }
 
-    // То же самое для slice
-    if (slice.size() < 9) {
-        // Записать целиком
-        std::vector<int> ids;
-        ids.reserve(slice.size());
+    // Записать целиком, не контролируем число вершин
+    std::vector<int> ids;
+    ids.reserve(slice.size());
 
-        for (auto edge: slice) {
-            ids.push_back(edges[edge].index);
-        }
-        out_faces.push_back(ids);
+    for (auto edge: slice) {
+        ids.push_back(edges[edge].index);
     }
-    else if (slice.size() < 18) {
-        // Черт, придется таки отсортировать вершины в Slice
-        Vector3d slice_c = Vector3d::Zero();
-        for (auto e: slice) {
-            slice_c += edges[e].v;
-        }
-        slice_c /= slice.size();
-
-        SortRule comp(slice_c, n, edges[slice[0]].v);
-        std::sort(slice.begin(), slice.end(),
-                [&comp, &edges](const edge_t& e1, const edge_t& e2) -> bool {
-                    return comp(edges[e1].v, edges[e2].v);
-                });
-
-        // разбить на две части
-        std::vector<int> ids1, ids2;
-        ids1.reserve(slice.size() / 2 + 1);
-        ids2.reserve(slice.size() / 2 + 1);
-
-        for (int i = 0; i <= slice.size() / 2; ++i) {
-            ids1.push_back(edges[slice[i]].index);
-        }
-        for (int i = slice.size() / 2; i < slice.size(); ++i) {
-            ids2.push_back(edges[slice[i]].index);
-        }
-        ids2.push_back(ids1.front());
-
-        out_faces.push_back(ids1);
-        out_faces.push_back(ids2);
-
-    } else {
-        throw std::runtime_error("I'm too lazy");
-    }
+    out_faces.push_back(ids);
 
     return Polyhedron(out_verts, out_faces);
 }

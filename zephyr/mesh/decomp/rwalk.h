@@ -23,7 +23,7 @@ public:
     }
 
     /// @brief Основная функция. Определение нового ранга ячейки.
-    int rank(AmrStorage::Item& elem) const final;
+    int rank(const EuCell& elem) const final;
 
     /// @brief Балансировка нагрузки (ничего не балансирует,
     /// просто смещает генераторы ячеек)

@@ -6,69 +6,53 @@
 #include <iomanip>
 
 #include <zephyr/geom/generator/rectangle.h>
-#include <zephyr/mesh/mesh.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/io/pvd_file.h>
 
 using zephyr::geom::Vector3d;
 using zephyr::geom::Box;
 using zephyr::geom::Boundary;
 using zephyr::geom::generator::Rectangle;
-using zephyr::mesh::Mesh;
-using zephyr::mesh::AmrStorage;
+using zephyr::mesh::Storable;
+using zephyr::mesh::EuMesh;
+using zephyr::mesh::EuCell;
 using zephyr::io::PvdFile;
-
-// Вектор состояния
-struct _U_ {
-    double u1, u2;
-};
-
-// Для быстрого доступа по типу
-_U_ U;
 
 // Векторное поле скорости
 Vector3d velocity(const Vector3d& c) {
     return { 1.0, 0.3 + 0.3*std::sin(4 * M_PI * c.x()), 0.0 };
 }
 
-// Переменные для сохранения
-double get_u(AmrStorage::Item& cell)  {
-    return cell(U).u1;
-}
-
-double get_vx(AmrStorage::Item& cell) {
-    return velocity(cell.center).x();
-}
-
-double get_vy(AmrStorage::Item& cell) {
-    return velocity(cell.center).y();
-}
-
 int main() {
-    // Файл для записи
-    PvdFile pvd("mesh", "output");
-
-    // Переменные для сохранения
-    pvd.variables += {"u",  get_u};
-    pvd.variables += {"vx", get_vx};
-    pvd.variables += {"vy", get_vy};
-
     // Геометрия области
     Rectangle rect(0.0, 1.0, 0.0, 0.6, true);
     rect.set_nx(200);
     rect.set_boundaries({
-            .left   = Boundary::PERIODIC, .right = Boundary::PERIODIC,
-            .bottom = Boundary::PERIODIC, .top   = Boundary::PERIODIC});
+        .left   = Boundary::PERIODIC, .right = Boundary::PERIODIC,
+        .bottom = Boundary::PERIODIC, .top   = Boundary::PERIODIC});
 
     // Создать сетку
-    Mesh mesh(rect, U);
+    EuMesh mesh(rect);
+
+    // Переменные для хранения на сетке
+    auto u1 = mesh.add<double>("u1");
+    auto u2 = mesh.add<double>("u2");
+
+    // Файл для записи
+    PvdFile pvd("mesh", "output");
+
+    // Переменные для сохранения
+    pvd.variables.append("u", u1);
+    pvd.variables += {"vx", [](EuCell cell) -> double { return velocity(cell.center()).x(); } };
+    pvd.variables += {"vy", [](EuCell cell) -> double { return velocity(cell.center()).y(); } };
 
     // Заполняем начальные данные
     Box box = mesh.bbox();
     Vector3d vc = box.center();
     double D = 0.1 * box.diameter();
     for (auto cell: mesh) {
-        cell(U).u1 = (cell.center() - vc).norm() < D ? 1.0 : 0.0;
-        cell(U).u2 = 0.0;
+        cell(u1) = (cell.center() - vc).norm() < D ? 1.0 : 0.0;
+        cell(u2) = 0.0;
     }
 
     // Число Куранта
@@ -82,13 +66,13 @@ int main() {
         if (curr_time >= next_write) {
             std::cout << "\tШаг: " << std::setw(6) << n_step << ";"
                       << "\tВремя: " << std::setw(6) << std::setprecision(3) << curr_time << "\n";
-            pvd.save(mesh.locals(), curr_time);
+            pvd.save(mesh, curr_time);
             next_write += 0.02;
         }
 
         // Определяем dt
         double dt = std::numeric_limits<double>::max();
-        for (auto& cell: mesh) {
+        for (auto cell: mesh) {
             double max_area = 0.0;
             for (auto &face: cell.faces()) {
                 max_area = std::max(max_area, face.area());
@@ -99,27 +83,27 @@ int main() {
         dt *= CFL;
 
         // Расчет по схеме upwind
-        for (auto& cell: mesh) {
-            auto& zc = cell(U);
+        for (auto cell: mesh) {
+            double zc = cell(u1);
 
             double fluxes = 0.0;
             for (auto& face: cell.faces()) {
-                const auto& zn = face.neib(U);
+                double zn = face.neib(u1);
 
                 double af = velocity(face.center()).dot(face.normal());
                 double a_p = std::max(af, 0.0);
                 double a_m = std::min(af, 0.0);
 
-                fluxes += (a_p * zc.u1 + a_m * zn.u1) * face.area();
+                fluxes += (a_p * zc + a_m * zn) * face.area();
             }
 
-            zc.u2 = zc.u1 - dt * fluxes / cell.volume();
+            cell(u2) = zc - dt * fluxes / cell.volume();
         }
 
         // Обновляем слои
-        for (auto& cell: mesh) {
-            cell(U).u1 = cell(U).u2;
-            cell(U).u2 = 0.0;
+        for (auto cell: mesh) {
+            cell(u1) = cell(u2);
+            cell(u2) = 0.0;
         }
 
         n_step += 1;

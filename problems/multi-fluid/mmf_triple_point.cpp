@@ -29,25 +29,22 @@ using zephyr::utils::threads;
 using zephyr::utils::mpi;
 
 
-// Для быстрого доступа по типу
-MmFluid::State U;
-
 /// Переменные для сохранения
-double get_rho(AmrStorage::Item& cell) { return cell(U).density; }
-double get_vx(AmrStorage::Item& cell) { return cell(U).velocity.x(); }
-double get_vy(AmrStorage::Item& cell) { return cell(U).velocity.y(); }
-double get_p(AmrStorage::Item& cell) { return cell(U).pressure; }
-double get_e(AmrStorage::Item& cell) { return cell(U).energy; }
-double get_T(AmrStorage::Item &cell) { return cell(U).temperature; }
-double get_cln(AmrStorage::Item &cell) { return cell(U).mass_frac.index(); }
-double get_mfrac1(AmrStorage::Item &cell) { return cell(U).mass_frac[0]; }
-double get_mfrac2(AmrStorage::Item &cell) { return cell(U).mass_frac[1]; }
-double get_vfrac1(AmrStorage::Item &cell) { return cell(U).vol_frac(0); }
-double get_vfrac2(AmrStorage::Item &cell) { return cell(U).vol_frac(1); }
-double get_rho1(AmrStorage::Item &cell) { return cell(U).densities[0]; }
-double get_rho2(AmrStorage::Item &cell) { return cell(U).densities[1]; }
-double get_normal_x(AmrStorage::Item &cell) { return cell(U).n[0].x(); }
-double get_normal_y(AmrStorage::Item &cell) { return cell(U).n[0].y(); }
+double get_rho(Storable<PState> part, EuCell& cell) { return cell[part].density; }
+double get_vx(Storable<PState> part, EuCell& cell) { return cell[part].velocity.x(); }
+double get_vy(Storable<PState> part, EuCell& cell) { return cell[part].velocity.y(); }
+double get_p(Storable<PState> part, EuCell& cell) { return cell[part].pressure; }
+double get_e(Storable<PState> part, EuCell& cell) { return cell[part].energy; }
+double get_T(Storable<PState> part, EuCell &cell) { return cell[part].temperature; }
+double get_cln(Storable<PState> part, EuCell &cell) { return cell[part].mass_frac.index(); }
+double get_mfrac1(Storable<PState> part, EuCell &cell) { return cell[part].mass_frac[0]; }
+double get_mfrac2(Storable<PState> part, EuCell &cell) { return cell[part].mass_frac[1]; }
+double get_vfrac1(Storable<PState> part, EuCell &cell) { return cell[part].alpha(0); }
+double get_vfrac2(Storable<PState> part, EuCell &cell) { return cell[part].alpha(1); }
+double get_rho1(Storable<PState> part, EuCell &cell) { return cell[part].densities[0]; }
+double get_rho2(Storable<PState> part, EuCell &cell) { return cell[part].densities[1]; }
+double get_normal_x(Storable<VectorSet> part, EuCell &cell) { return cell[part][0].x(); }
+double get_normal_y(Storable<VectorSet> part, EuCell &cell) { return cell[part][0].y(); }
 
 
 int main(int argc, char** argv) {
@@ -62,29 +59,6 @@ int main(int argc, char** argv) {
     // Формальная смесь
     MixturePT mixture = {sg1, sg2, sg3};
 
-    // Файл для записи
-    PvdFile pvd("TP", "output");
-    PvdFile pvd_body0("body0", "output");
-    PvdFile pvd_body1("body1", "output");
-    PvdFile pvd_body2("body2", "output");
-
-    // Переменные для сохранения
-    pvd.variables += {"cln", get_cln};
-    pvd.variables += {"rho", get_rho};
-    pvd.variables += {"vx", get_vx};
-    pvd.variables += {"vy", get_vy};
-    pvd.variables += {"e", get_e};
-    pvd.variables += {"P", get_p};
-    pvd.variables += {"T", get_T};
-    pvd.variables += {"b1", get_mfrac1};
-    pvd.variables += {"b2", get_mfrac2};
-    pvd.variables += {"a1", get_vfrac1};
-    pvd.variables += {"a2", get_vfrac2};
-    pvd.variables += {"rho1", get_rho1};
-    pvd.variables += {"rho2", get_rho2};
-    pvd.variables += {"n.x", get_normal_x};
-    pvd.variables += {"n.y", get_normal_y};
-
     // Создаем одномерную сетку
     Rectangle gen(0.0, 7.0, 0.0, 3.0);
     gen.set_nx(700);
@@ -92,7 +66,7 @@ int main(int argc, char** argv) {
                         .bottom=Boundary::WALL, .top=Boundary::WALL});
 
     // Создать сетку
-    EuMesh mesh(gen, U);
+    EuMesh mesh(gen);
     mesh.set_decomposition("XY");
 
     // Создать решатель
@@ -102,6 +76,30 @@ int main(int argc, char** argv) {
     solver.set_method(Fluxes::CRP);
     solver.set_crp_mode(CrpMode::PLIC);
     solver.set_splitting(DirSplit::SIMPLE);
+    solver.add_types(mesh);
+
+    // Файл для записи
+    PvdFile pvd("TP", "output");
+    PvdFile pvd_body0("body0", "output");
+    PvdFile pvd_body1("body1", "output");
+    PvdFile pvd_body2("body2", "output");
+
+    // Переменные для сохранения
+    pvd.variables += {"cln", std::bind(get_cln, solver.part.init, std::placeholders::_1) };
+    pvd.variables += {"rho", std::bind(get_rho, solver.part.init, std::placeholders::_1)};
+    pvd.variables += {"vx", std::bind(get_vx, solver.part.init, std::placeholders::_1)};
+    pvd.variables += {"vy", std::bind(get_vy, solver.part.init, std::placeholders::_1)};
+    pvd.variables += {"e",  std::bind(get_e, solver.part.init, std::placeholders::_1)};
+    pvd.variables += {"P",  std::bind(get_p, solver.part.init, std::placeholders::_1)};
+    pvd.variables += {"T",  std::bind(get_T, solver.part.init, std::placeholders::_1)};
+    pvd.variables += {"b1", std::bind(get_mfrac1, solver.part.init, std::placeholders::_1)};
+    pvd.variables += {"b2", std::bind(get_mfrac2, solver.part.init, std::placeholders::_1)};
+    pvd.variables += {"a1", std::bind(get_vfrac1, solver.part.init, std::placeholders::_1)};
+    pvd.variables += {"a2", std::bind(get_vfrac2, solver.part.init, std::placeholders::_1)};
+    pvd.variables += {"rho1", std::bind(get_rho1, solver.part.init, std::placeholders::_1)};
+    pvd.variables += {"rho2", std::bind(get_rho2, solver.part.init, std::placeholders::_1)};
+    pvd.variables += {"n.x", std::bind(get_normal_x, solver.part.n, std::placeholders::_1)};
+    pvd.variables += {"n.y", std::bind(get_normal_y, solver.part.n, std::placeholders::_1)};
 
     double R_max = 1.0;
     double R_min = 0.125;

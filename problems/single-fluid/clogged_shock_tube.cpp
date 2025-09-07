@@ -6,7 +6,8 @@
 #include <iomanip>
 
 #include <zephyr/geom/generator/rectangle.h>
-#include <zephyr/mesh/mesh.h>
+#include <zephyr/mesh/euler/eu_prim.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
 
 #include <zephyr/utils/threads.h>
 #include <zephyr/io/pvd_file.h>
@@ -25,6 +26,7 @@ using namespace zephyr::io;
 using generator::Rectangle;
 using zephyr::utils::threads;
 
+#if 0
 
 struct _U_ : public SmFluid::State {
     bool inside;
@@ -266,3 +268,6 @@ int main () {
 
     return 0;
 }
+#else
+int main() { }
+#endif

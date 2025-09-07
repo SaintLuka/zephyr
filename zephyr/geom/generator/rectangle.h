@@ -6,8 +6,8 @@
 
 namespace zephyr::geom::generator {
 
-/// @brief Простой класс для генерации декартовой сетки или сетки
-/// из ячеек Воронного внутри прямоугольной области.
+/// @brief Простой класс для генерации декартовой сетки
+/// или сетки из ячеек Вороного внутри прямоугольной области.
 class Rectangle : public Generator {
 public:
     using Ptr = std::shared_ptr<Rectangle>;
@@ -42,6 +42,9 @@ public:
     /// @brief Использовать осевую симметрию (вращение вокруг оси Ox)
     void set_axial(bool axial = true);
 
+    /// @brief
+    bool structured() const { return !m_voronoi; }
+
     /// @brief Установить желаемое число ячеек сетки по оси Ox
     /// @details Число ячеек по оси Oy подбирается так, чтобы aspect ячеек
     /// был около единицы
@@ -72,6 +75,9 @@ public:
     /// @brief Создать сетку общего вида
     Grid make() final;
 
+    /// @brief Инициализация SoA-хранилища сетки
+    void initialize(mesh::AmrCells& cells) final;
+
 
     // Далее не самые полезные get-функции
 
@@ -93,6 +99,9 @@ public:
     /// @brief Число ячеек по оси Y
     int ny() const;
 
+    /// @brief Граничные условия
+    Boundaries bounds() const;
+
     /// @brief Есть ли периодичность по оси X?
     bool periodic_along_x() const;
 
@@ -111,6 +120,12 @@ private:
 
     /// @brief Создать сетку из шестиугольников
     Grid create_voronoi() const;
+
+    /// @brief Создать классическую декартову сетку
+    void initialize_classic(mesh::AmrCells& cells) const;
+
+    /// @brief Создать сетку из шестиугольников
+    void initialize_voronoi(mesh::AmrCells& cells);
 
 
     int m_nx, m_ny;         ///< Число ячеек по осям

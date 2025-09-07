@@ -1,3 +1,6 @@
+// Расчет производных конечными разностями, сравнение с кодом derivest, 
+// который я где-то подрезал
+
 #include <zephyr/math/calc/derivatives.h>
 
 using namespace zephyr::math;

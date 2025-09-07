@@ -1,195 +1,221 @@
 #pragma once
 
-#include <zephyr/utils/mpi.h>
+#include <zephyr/configuration.h>
+
 #include <zephyr/utils/threads.h>
 
-#include <zephyr/geom/grid.h>
-#include <zephyr/geom/generator/generator.h>
-#include <zephyr/mesh/primitives/amr_cell.h>
-#include <zephyr/mesh/primitives/bnodes.h>
-
+#include <zephyr/mesh/euler/eu_prim.h>
 #include <zephyr/mesh/euler/distributor.h>
-#include <zephyr/mesh/euler/eu_face.h>
-#include <zephyr/mesh/euler/eu_cell.h>
-
+#include <zephyr/utils/mpi.h>
 #include <zephyr/mesh/euler/tourism.h>
 #include <zephyr/mesh/euler/migration.h>
-
 #include <zephyr/mesh/decomp/ORB.h>
 
-namespace zephyr::utils { class Json; }
+// forward declaration
+namespace zephyr::geom {
+class Line;
+class Polygon;
+class Polyhedron;
+class Generator;
+}
 
 namespace zephyr::mesh {
 
-using zephyr::utils::threads;
-using zephyr::utils::mpi;
-using namespace zephyr::geom;
-
-using zephyr::mesh::decomp::Decomposition;
-using zephyr::mesh::decomp::ORB;
-
-/// @brief Класс для хранения распределенной эйлеровой сетки.
-/// Для сеток из четырехугольников и кубоидов допускается адаптация.
-// TODO: Стркуктурировать поля и методы класса
+/// @brief Эйлерова сетка.
+/// @ingroup euler-mesh
+///
+/// Поддерживается три типа сеток:
+///   1. Двумерная AMR сетка, по 8 граней, по 9 вершин на ячейку.
+///   2. Трехмерная AMR сетка, по 24 грани, по 27 вершин на ячейку.
+///   3. Неструктурированная/произвольная сетка. Произвольное число граней
+///      и вершин на ячейку, но вершины не уникальны.
 class EuMesh {
+    if_mpi(using mpi = utils::mpi;)
+    using threads = utils::threads;
+    using ORB = decomp::ORB;
+    using Decomposition = decomp::Decomposition;
+
 public:
-    /// @brief Можно сказать основной конструктор, преобрзаует
-    /// сетку общего вида Grid в специализированную EuMesh
-    /// @param grid Сетка общего вида
-    /// @tparam T Тип данных для хранения в ячейках
-    template <class T>
-    EuMesh(const Grid& grid, const T& val) : m_locals(0, val), m_aliens(0, val) {
-        if (mpi::master()) { initialize(grid); }
-        if_mpi( m_tourism.init_types(m_locals) );
+    /// @{ @name Создание сетки
+
+    /// @brief Создание сетки с помощью сеточного генератора
+    explicit EuMesh(geom::Generator& gen);
+
+    /// @brief Конструируемая сетка, можно добавлять полигоны, но связи
+    /// с соседями не восстанавливаются, используется для визуализации.
+    EuMesh(int dim, bool adaptive, bool axial = false);
+
+    /// @brief Инициализация сетки из json-конфига
+    explicit EuMesh(const utils::Json& config);
+
+
+    /// @brief Добавить на неструктурированную сетку ячейку в виде отрезка
+    /// (сплюснутая четырехугольная ячейка)
+    void push_back(const geom::Line& line);
+
+    /// @brief Добавить на неструктурированную сетку ячейку в виде
+    /// произвольного многоугольника
+    void push_back(const geom::Polygon& poly);
+
+    /// @brief Добавить на неструктурированную сетку ячейку в виде
+    /// произвольного многогранника
+    void push_back(const geom::Polyhedron& poly);
+
+    /// @brief Добавить треугольный маркер (ячейка)
+    void add_marker(const geom::Vector3d& pos, double size);
+
+    /// @}
+
+    /// @{ @name Общие свойства
+
+    /// @brief Размерность сетки (= 2 для сеток с осевой симметрией)
+    int dim() const { return m_locals.dim(); }
+
+    /// @brief Сетка с осевой симметрией?
+    bool axial() const { return m_locals.axial(); }
+
+    /// @brief Отсутствуют ячейки на данном процессе?
+    bool empty() const { return n_cells() == 0; }
+
+    /// @brief Число ячеек на данном процессе
+    index_t n_cells() const { return m_locals.size(); }
+
+    /// @brief Ограничивающий прямоугольник (кубоид) области
+    geom::Box bbox() const;
+
+    /// @}
+
+    /// @{ @name Массивы данных
+
+    /// @brief Добавить несколько массивов данных в хранилище
+    /// @param names Имена массивов данных
+    /// @return Если передан один аргумент, то возвращает единственный Storable<T>,
+    /// при наличии нескольких аргументов возвращает кортеж Storable<T>.
+    template<typename T, typename... Names, typename = std::enable_if_t<
+            (sizeof...(Names) > 0) && (std::is_convertible_v<Names, std::string> && ...)>>
+    auto add(Names&&... names) {
+        if constexpr (sizeof...(Names) == 1) {
+            return add_one<T>(std::string(std::forward<Names>(names))...);
+        } else {
+            // Короче жесть, тут сложно было добиться соблюдения порядка
+            // с круглыми скобками std::tuple() или std::make_tuple() не работают.
+            return std::tuple{add_one<T>(std::string(std::forward<Names>(names)))...};
+        }
     }
 
-    /// @brief Конструктор сетки из генератора
-    /// @param gen Сеточный генератор
-    /// @tparam T Тип данных для хранения в ячейках
-    template<class T>
-    EuMesh(Generator *gen, const T &val) : m_locals(0, val), m_aliens(0, val) {
-        if (mpi::master()) { initialize(gen->make()); }
-        if_mpi( m_tourism.init_types(m_locals) );
-    }
+    /// @brief Поменять местами два массива данных
+    template <typename T>
+    void swap(Storable<T> var1, Storable<T> var2);
 
-    /// @brief Конструктор сетки из генератора
-    /// @param gen Сеточный генератор
-    /// @tparam T Тип данных для хранения в ячейках
-    template<class T>
-    EuMesh(Generator::Ref gen, const T &val) : EuMesh(gen.get(), val) { }
+    /// @}
 
-    /// @brief Конструктор сетки из генератора
-    /// @param gen Сеточный генератор
-    /// @tparam T Тип данных для хранения в ячейках
-    template<class T>
-    EuMesh(Generator &gen, const T &val) : EuMesh(&gen, val) { }
+    /// @{ @name Выбор ячеек
 
-    /// @brief Создание сетки из конфигурации.
-    /// @param datasize Размер данных ячейки в байтах
-    EuMesh(const utils::Json& config, size_t datasize);
+    /// @brief Итератор, указывающий на первую ячейку
+    EuCell_Iter begin();
 
-    /// @brief Локальное количество ячеек
-    inline int n_cells() { return m_locals.size(); }
+    /// @brief Итератор, указывающий на ячейку за последней
+    EuCell_Iter end();
 
-    /// @brief Итератор на начало локального массива ячеек
-    EuCell begin() { return {m_locals, m_aliens, 0}; }
+    /// @brief Локальная ячейка по индексу
+    EuCell operator[](index_t idx);
 
-    /// @brief Итератор на конец локального массива ячеек
-    EuCell end() { return {m_locals, m_aliens, m_locals.size()}; }
+    /// @}
 
-    /// @brief Доступ к локальной ячейке по индексу (idx < n_cells())
-    EuCell operator[](size_t idx) {
-        return {m_locals, m_aliens, idx};
-    }
+    /// @{ @name Многопоточное выполнение функций
 
-    /// @brief Получить ячейку по нескольким индексам подразумевая,
-    /// что сетка является структурированной. Индексы периодически
-    /// замкнуты (допускаются отрицательные индексы и индексы сверх нормы)
-    /// @details Не актуально для распределенных сеток
-    EuCell operator()(int i, int j);
-
-    /// @brief Получить ячейку по нескольким индексам подразумевая,
-    /// что сетка является структурированной. Индексы периодически
-    /// замкнуты (допускаются отрицательные индексы и индексы сверх нормы)
-    /// @details Не актуально для распределенных сеток
-    EuCell operator()(int i, int j, int k);
-
-    /// @brief Неявное преобразование в хранилище. Позволяет передавать
-    /// локальные ячейки в функции, которые работают с хранилищем.
-    operator AmrStorage &() { return m_locals; }
-
-    /// @brief Локальные ячейки
-    AmrStorage &locals() { return m_locals; }
-
-    /// @brief Ячейки с других процессов
-    AmrStorage &aliens() { return m_aliens; }
-
-
-    /// @brief Сетка с аксиальной симметрией?
-    bool axial() const { return m_locals[0].axial; }
-
-    /// @brief Размерность сетки
-    int dimension() const { return m_locals[0].dim; }
-
-
-    /// @brief Проверить базовую сетку после создания.
-    /// @return -1, если сетка не подходит для адаптации.
-    int check_base();
-
-    /// @brief Проверить сетку после адаптации (для дебага).
-    /// @return -1, если сетка имеет неверную структуру.
-    int check_refined();
-
-    /// @brief Адаптивная сетка?
-    bool is_adaptive() const;
-
-    /// @brief Максимальный допустимый уровень адаптации (>= 0)
-    int max_level() const;
-
-    /// @brief Установить максимальный допустимый уровень адаптации (>= 0)
-    void set_max_level(int max_level);
-
-    /// @brief Установить распределитель данных при адаптации
-    void set_distributor(Distributor distr);
-
-    /// @brief Основная функция адаптации, меняет хранилище в соответствии
-    /// с флагами amr.flag ячеек.
-    void refine();
-
-    /// @brief Параллелизация по тредам
-    template<int n_tasks_per_thread = 10, class Func, class... Args>
+    /// @brief Выполнить функцию для всех ячеек сетки
+    template<int n_tasks_per_thread = utils::default_n_tasks_per_thread, class Func, class... Args>
     void for_each(Func &&func, Args&&... args) {
         threads::for_each<n_tasks_per_thread>(begin(), end(),
                 std::forward<Func>(func), std::forward<Args>(args)...);
     }
 
     /// @brief Параллельно по тредам посчитать минимум
-    template<int n_tasks_per_thread = 10, class Func,
-            typename Value = std::invoke_result_t<Func, EuCell&>>
-    auto min(Func &&func, const Value &init)
-    -> typename std::enable_if<!std::is_void<Value>::value, Value>::type {
+    template<int n_tasks_per_thread = utils::default_n_tasks_per_thread, typename Value, class Func>
+    Value min(Func &&func, const Value &init) {
         return threads::min<n_tasks_per_thread>(begin(), end(), init, std::forward<Func>(func));
     }
 
     /// @brief Параллельно по тредам посчитать минимум
-    template<int n_tasks_per_thread = 10, class Func,
-            typename Value = std::invoke_result_t<Func, EuCell&>>
-    auto min(Func &&func)
-    -> typename std::enable_if<std::is_arithmetic<Value>::value, Value>::type {
+    template<int n_tasks_per_thread = utils::default_n_tasks_per_thread, class Func>
+    auto min(Func &&func) {
         return threads::min<n_tasks_per_thread>(begin(), end(), std::forward<Func>(func));
     }
 
     /// @brief Параллельно по тредам посчитать максимум
-    template<int n_tasks_per_thread = 10, class Func,
-            typename Value = std::invoke_result_t<Func, EuCell&>>
-    auto max(Func &&func, const Value &init)
-    -> typename std::enable_if<!std::is_void<Value>::value, Value>::type {
+    template<int n_tasks_per_thread = utils::default_n_tasks_per_thread, typename Value, class Func>
+    Value max(Func &&func, const Value &init) {
         return threads::max<n_tasks_per_thread>(begin(), end(), init, std::forward<Func>(func));
     }
 
-    /// @brief Параллельно по тредам посчитать минимум
-    template<int n_tasks_per_thread = 10, class Func,
-            typename Value = std::invoke_result_t<Func, EuCell&>>
-    auto max(Func &&func)
-    -> typename std::enable_if<std::is_arithmetic<Value>::value, Value>::type {
+    /// @brief Параллельно по тредам посчитать максимум
+    template<int n_tasks_per_thread = utils::default_n_tasks_per_thread, class Func>
+    auto max(Func &&func) {
         return threads::max<n_tasks_per_thread>(begin(), end(), std::forward<Func>(func));
     }
 
-    /// @brief Параллельно по тредам выполнить суммирование
-    template<int n_tasks_per_thread = 10, class Func,
-            typename Value = std::invoke_result_t<Func, EuCell&>>
-    auto sum(Func &&func, const Value &init)
-    -> typename std::enable_if<!std::is_void<Value>::value, Value>::type {
-        return threads::sum<n_tasks_per_thread>(begin(), end(), init, std::forward<Func>(func));
-    }
+    /// @}
 
-    /// @brief Параллельно по тредам выполнить свёртку
-    template<int n_tasks_per_thread = 10, class Func,
-            typename Value = std::invoke_result_t<Func, EuCell&>>
-    auto reduce(Func &&func, const Value &init)
-    -> typename std::enable_if<!std::is_void<Value>::value, Value>::type {
-        return threads::reduce<n_tasks_per_thread>(begin(), end(), init, std::forward<Func>(func));
-    }
+    /// @{ @name Адаптация сетки
+
+    /// @brief Сетка считается адаптивной, если она состоит из AMR-ячеек
+    /// и выставлен максимальный уровень адаптации больше нуля.
+    bool adaptive() const;
+
+    /// @brief Максимальный уровень адаптации сетки
+    int max_level() const;
+
+    /// @brief Установить допустимый уровень адаптации (>= 0).
+    /// Не сработает для сеток общего вида без возможности адаптации.
+    void set_max_level(int max_level);
+
+    /// @brief Установить распределитель данных при адаптации,
+    /// допустимые значения: "empty", "simple".
+    void set_distributor(const std::string& name);
+
+    /// @brief Установить распределитель данных при адаптации
+    void set_distributor(Distributor distr);
+
+    /// @brief Выполнить адаптацию сетки
+    void refine();
+
+    /// @brief Адаптировать сетку целиком до некоторого уровня
+    /// По умолчанию до максимального уровня адаптации.
+    void refine_full(int level = -1);
+
+    /// @brief Поправить референсную сетку
+    void check_reference(bool fix = false);
+
+    /// @}
+
+    /// @{ @name Части распределенной сетки
+
+    /// @brief Неявное преобразование в AmrCells
+    operator AmrCells&() { return locals(); }
+
+    /// @brief Локальные ячейки (принадлежат данному процессу)
+    AmrCells& locals() { return m_locals; }
+
+    /// @brief Локальные ячейки (принадлежат данному процессу)
+    const AmrCells& locals() const { return m_locals; }
+
+    /// @brief Слой обменных ячеек (с других процессов)
+    AmrCells& aliens() { return m_aliens; }
+
+    /// @brief Слой обменных ячеек (с других процессов)
+    const AmrCells& aliens() const { return m_aliens; }
+
+    /// @}
+
+    /// @{ @name Работа с распределенной сеткой
+
+    /// @brief Обмен данными между процессами, в массивы aliens пересылаются
+    /// данные с других процессов. Последовательное выполнение send и recv.
+    /// @param vars Положительное количество параметров типа Storable<T>, для
+    /// которых осуществляется обмен.
+    template <typename... Args, typename = std::enable_if_t<(sizeof...(Args) > 0)> >
+    void sync(Args&&... vars);
 
     /// @brief Ссылка на декомпозицию
     const Decomposition& decomp() const { return *m_decomp; }
@@ -205,123 +231,170 @@ public:
     void set_decomposition(ORB& orb, bool update=true);
 
     /// @brief Добавить ORB декомпозицию сетки, используется простейший
-    /// конструктор ORB декомпозиции, ячейки сразу перераспределяются.
+    /// конструктор ORB декомпозиции.
     /// @param type Тип ORB декомпозиции
-    void set_decomposition(const std::string& type);
+    /// @param update Сразу перераспределить ячейки
+    void set_decomposition(const std::string& type, bool update=true);
 
+    /// @brief Балансирует нагрузку по числу ячеек
+    void balancing();
 
-    /// @brief Перераспределить ячейки между процессами в соответствии с рангом,
-    /// который выдает функция m_decomp::rank().
-    /// До вызова redistribute распределенная сетка должна быть согласована
-    /// и после вызова остается согласованной (массивы locals и aliens
-    /// корректно связаны).
-    void redistribute();
-
-    /// @brief Рассылка данных соседям
-    void send(Post post = Post::FULL);
-
-    /// @brief Получение данных от соседей
-    void recv(Post post = Post::FULL);
-
-    /// @brief Обмен данными между процессами, в массивы aliens записываются
-    /// данные с других процессов. Последовательное выволнение send и recv
-    void sync(Post post = Post::FULL);
+    /// @brief Балансирует нагрузку по полученной нагрузке
+    void balancing(double load);
 
     /// @brief Предбалансировка по числу ячеек
     /// @param n_iters Количество итераций балансировки
     void prebalancing(int n_iters);
 
-    /// @brief Балансирует нагрузку по числу ячеек
-    void balancing();
+    /// @brief Перераспределить ячейки между процессами в соответствии с
+    /// рангом, который возвращает функция m_decomp::rank().
+    ///
+    /// До вызова redistribute распределенная сетка должна быть согласована
+    /// и после вызова остается согласованной (массивы locals и aliens
+    /// корректно связаны). В качестве аргументов передаются параметры,
+    /// которые необходимо сохранить и перенести при декомпозиции.
+    template <typename... Args>
+    void redistribute(Args&&... vars);
 
-    /// @brief Балансирует нагрузку согласно decomposition
-    void balancing(double load);
+    /// @}
 
-    /// @brief Дисбаланс нагрузки
-    double get_imbalance(const std::vector<double>& ws) const {
-        if(m_decomp)
-            return m_decomp->imbalance(ws);
-        return -1;
-    }
+    /// @{ @name Функции структурированной сетки
 
-    /// @brief Найти описывающий параллелепипед (Bounding box)
-    geom::Box bbox();
-
-    /// @brief Заполнен ли массив с уникальными узлами?
-    bool has_nodes() const;
-
-    /// @brief Собрать массивы уникальных узлов
-    void collect_nodes();
-
-    /// @brief Ссылка на массив уникальных узлов
-    const std::vector<Vector3d>& nodes() const {
-        return m_nodes;
-    }
+    /// @brief Структурированная сетка (распределенная = false)
+    bool structured() const { return m_structured; }
 
     /// @brief Число ячеек по оси x для структурированных сеток,
     /// число всех ячеек для сеток общего вида
-    inline int nx() const { return m_nx; };
+    int nx() const { return m_nx; };
 
     /// @brief Число ячеек по оси y для структурированных сеток,
     /// единица для сеток общего вида
-    inline int ny() const { return m_ny; };
+    int ny() const { return m_ny; };
 
     /// @brief Число ячеек по оси z для структурированных сеток,
     /// единица для сеток общего вида
-    inline int nz() const { return m_nz; };
+    int nz() const { return m_nz; };
+
+    /// @brief Получить ячейку по нескольким индексам подразумевая, что сетка
+    /// является структурированной. Индексы периодически замкнуты (допускаются
+    /// отрицательные индексы и индексы сверх нормы)
+    /// @details Не актуально для распределенных сеток
+    EuCell operator()(index_t i, index_t j);
+
+    /// @brief Получить ячейку по нескольким индексам подразумевая, что сетка
+    /// является структурированной. Индексы периодически замкнуты (допускаются
+    /// отрицательные индексы и индексы сверх нормы)
+    /// @details Не актуально для распределенных сеток
+    EuCell operator()(index_t i, index_t j, index_t k);
+
+    /// @}
+
+    /// @{ @name debug functions
+
+    /// @brief Проверить базовую сетку
+    int check_base() const;
+
+    /// @brief Проверить сетку после адаптации
+    int check_refined() const;
+
+    /// @}
 
 private:
-    /// @brief Создать эйлерову сетку из сетки общего вида
-    void initialize(const Grid& gen);
+    /// @brief Реальный конструктор сетки
+    void build(geom::Generator& gen);
 
-    /// @brief Очистить массив узлов, функция вызывается при любом
-    /// перестроении сетки (вроде адаптации)
-    void break_nodes();
+    /// @brief Добавить массив данных в хранилище
+    /// @param name Имя массива данных
+    template <typename T>
+    Storable<T> add_one(const std::string& name);
 
-
-public:
-    // Сделать только балансировку флагов
-    void balance_flags();
-
-    // Применить флаги адаптации (после балансировки)
-    void apply_flags();
-
-    /// @brief Осуществляет инициализацию хранилища перед использованием
-    /// функций адаптации, выполняется один раз после создания хранилища.
+    /// @brief Инициализация параметров AMR-ячеек
     void init_amr();
 
-    /// @brief Перераспределить ячейки между процессами, в соответствии
-    /// со значениями, которые выдает m_decomp
-    void migrate();
+    /// @brief Балансировка флагов адаптации
+    void balance_flags();
 
-public:
+    /// @brief Применение флагов адаптации (после балансировки)
+    void apply_flags();
+
+    /// @brief Выставить новые ранги ячеек по декомпозиции
+    void setup_ranks();
+
     /// @brief Собрать обменные слои (aliens и сопутствующие члены),
     /// принимаются актуальные данные с border слоя.
     void build_aliens();
 
 
+    /// @brief Максимальный уровень адаптации для адаптивной сетки
     int m_max_level = 0;
-    Distributor distributor;
 
-    AmrStorage m_locals;  ///< Локальные ячейки
-    AmrStorage m_aliens;  ///< Ячейки с других процессов
+    /// @brief Процедуры слияния и огрубления данных при адаптации
+    Distributor m_distributor;
+
+    AmrCells m_locals;  ///< Ячейки, которые принадлежат данному процессу
+    AmrCells m_aliens;  ///< Ячейки, получаемые с других процессов
 
     /// @brief Метод декомпозиции
     Decomposition::Ptr m_decomp = nullptr;
 
 #ifdef ZEPHYR_MPI
-    Tourism   m_tourism;    ///< Построение обменных слоев и обмены
-    Migration m_migration;  ///< Пересылка ячеек при изменении декомпозиции
+    Tourism   m_tourists;  ///< Построение обменных слоев и обмены
+    Migration m_migrants;  ///< Пересылка ячеек при изменении декомпозиции
 #endif
 
-    /// @brief Массив уникальных узлов. Используется в редких алгоритмах,
-    /// по умолчанию пустой, заполняются при вызове функции collect_nodes().
-    std::vector<Vector3d> m_nodes;
-
-    /// @brief Структура сетки, если предполагается, что сетка декартова.
-    bool structured = false;
-    int m_nx = 1, m_ny = 1, m_nz = 1;
+    /// @brief Структурированная сетка? (только для однопроцессорных)
+    bool m_structured = false;
+    int m_nx = 1, m_ny = 1, m_nz = 1;  ///< Размеры структурированной сетки
 };
 
+
+// ============================================================================
+//                    Реализации шаблонных функций
+// ============================================================================
+
+template <typename T>
+Storable<T> EuMesh::add_one(const std::string& name) {
+    auto res1 = m_locals.data.add<T>(name);
+    auto res2 = m_aliens.data.add<T>(name);
+    if (res1 != res2) {
+        throw std::runtime_error("EuMesh error: bad add<T> #1");
+    }
+#ifdef ZEPHYR_MPI
+    auto res3 = m_tourists.add<T>(name);
+    if (res1 != res3) {
+        throw std::runtime_error("EuMesh error: bad add<T> #2");
+    }
+#endif
+    return res1;
+}
+
+template <typename T>
+void EuMesh::swap(Storable<T> var1, Storable<T> var2) {
+    m_locals.data.swap<T>(var1, var2);
+    m_aliens.data.swap<T>(var1, var2);
+#ifdef ZEPHYR_MPI
+    m_tourists.swap<T>(var1, var2);
+#endif
+}
+
+template <typename... Args, typename >
+void EuMesh::sync(Args&&... vars) {
+#ifdef ZEPHYR_MPI
+    if (mpi::single()) return;
+    m_tourists.sync(m_locals, m_aliens, std::forward<Args>(vars)...);
+#endif
+}
+
+template <typename... Args>
+void EuMesh::redistribute(Args&&... vars) {
+#ifdef ZEPHYR_MPI
+    if (mpi::single()) return;
+    setup_ranks();
+    m_migrants.migrate(
+            m_tourists, m_locals, m_aliens,
+            std::forward<Args>(vars)...);
+    build_aliens();
+#endif
+}
 
 } // namespace zephyr::mesh

@@ -1,15 +1,15 @@
-list(APPEND PROBLEMS mmf_advection)
-list(APPEND PROBLEMS mmf_bubble_collapse)
-list(APPEND PROBLEMS mmf_test_1D)
-list(APPEND PROBLEMS mmf_triple_point)
+#list(APPEND PROBLEMS mmf_advection)
+#list(APPEND PROBLEMS mmf_bubble_collapse)
+#list(APPEND PROBLEMS mmf_test_1D)
+#list(APPEND PROBLEMS mmf_triple_point)
 
-# Assume all files in direcory are tests
+# Assuming all files in the directory are tests
 if (ZEPHYR_PROBLEMS_ALL)
     file(GLOB PROBLEM_SOURCES *.cpp)
 
     set(PROBLEMS "")
     foreach(filename IN LISTS PROBLEM_SOURCES)
-        # short name without path and extentsion
+        # short name without path and extension
         get_filename_component(problem ${filename} NAME_WE)
         list(APPEND PROBLEMS ${problem})
     endforeach()

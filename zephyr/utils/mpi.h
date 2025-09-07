@@ -9,6 +9,8 @@
 
 #ifdef ZEPHYR_MPI
 #include <mpi.h>
+#include <zephyr/geom/vector.h>
+#include <zephyr/geom/boundary.h>
 
 // Нормальная параллельная версия обертки mpi
 
@@ -146,7 +148,7 @@ public:
     template <class T>
     static std::vector<T> all_gather_vectors(const std::vector<T>& value);
 
-    /// @brief Коллективная операция. Размеры буфферов send и recv совпадают
+    /// @brief Коллективная операция. Размеры буферов send и recv совпадают
     /// и равны числу процессов. Каждая величина из send отправляется своему
     /// процессу, каждая величина в recv получается с определенного процесса.
     template <class T>
@@ -181,37 +183,71 @@ public:
     private:
         /// @brief Приватный конструктор, после создания типа указатель переходит
         /// на хранение в shared_ptr. Создавать datatype допускается только через
-        /// статические функции "конструкторы": contoguous, hvector...
+        /// статические функции "конструкторы": contiguous, hvector...
         explicit datatype(MPI_Datatype* dtype);
 
         std::shared_ptr<MPI_Datatype> m_ptr = nullptr;
     };
+
+    /// @brief Типы по умолчанию, инициализации
+    struct DefaultTypes {
+        MPI_Datatype vec3 = MPI_DATATYPE_NULL;    ///< Для Vector3d
+        MPI_Datatype int4 = MPI_DATATYPE_NULL;    ///< Для std::array<int, 4>
+        MPI_Datatype short8 = MPI_DATATYPE_NULL;  ///< Для std::array<short, 8>
+
+
+        static const int byte4_count = 50;
+
+        /// @brief Типы кратные 4 байтам
+        std::array<MPI_Datatype, byte4_count> byte4_types;
+
+        /// @brief Инициализация MPI-типов
+        void init();
+
+        /// @brief Удаление MPI-типов
+        void free();
+    };
+
+    /// @brief Типы по умолчанию, инициализация при mpi::init()
+    static DefaultTypes default_types;
+
+    /// @brief Примитивные MPI-типы по шаблону
+    /// По умолчанию используются типы contiguous, кратные 4 байтам
+    template<class T>
+    static MPI_Datatype type() {
+        static_assert(sizeof(T) % 4 == 0, "Defaults only for int multiples");
+        static_assert(sizeof(T) / 4 < DefaultTypes::byte4_count);
+
+        return default_types.byte4_types[sizeof(T) / 4];
+    }
 };
 
-template<class T>
-static MPI_Datatype mpi_type();
 
-template <> MPI_Datatype mpi_type<int>()    { return MPI_INT;    }
-template <> MPI_Datatype mpi_type<double>() { return MPI_DOUBLE; }
-template <> MPI_Datatype mpi_type<float>()  { return MPI_FLOAT;  }
-template <> MPI_Datatype mpi_type<long>()   { return MPI_LONG;   }
-template <> MPI_Datatype mpi_type<short>()  { return MPI_SHORT;  }
-template <> MPI_Datatype mpi_type<char>()   { return MPI_BYTE;   }
-template <> MPI_Datatype mpi_type<unsigned char>() { return MPI_BYTE; }
+template <> inline MPI_Datatype mpi::type<int>()    { return MPI_INT;    }
+template <> inline MPI_Datatype mpi::type<double>() { return MPI_DOUBLE; }
+template <> inline MPI_Datatype mpi::type<float>()  { return MPI_FLOAT;  }
+template <> inline MPI_Datatype mpi::type<long>()   { return MPI_LONG;   }
+template <> inline MPI_Datatype mpi::type<short>()  { return MPI_SHORT;  }
+template <> inline MPI_Datatype mpi::type<char>()   { return MPI_BYTE;   }
+template <> inline MPI_Datatype mpi::type<unsigned char>() { return MPI_BYTE; }
 
-template<class T>
-MPI_Datatype mpi_register_contiguous_type(int count) {
-    MPI_Datatype out;
-    MPI_Type_contiguous(
-        count,
-        mpi_type<T>(),
-        &out
-    );
-    MPI_Type_commit(&out);
-    return out;
+// Разные приколы
+template <> inline MPI_Datatype mpi::type<geom::Vector3d>() {
+    return mpi::default_types.vec3;
+}
+template <> inline MPI_Datatype mpi::type<std::array<int, 4>>() {
+    return mpi::default_types.int4;
+}
+template <> inline MPI_Datatype mpi::type<std::array<short, 8>>() {
+    return mpi::default_types.short8;
 }
 
-void mpi_free_type(MPI_Datatype& type);
+// Специализация mpi::type<> для пересылки Boundary
+template<> inline
+MPI_Datatype mpi::type<geom::Boundary>() {
+    static_assert(sizeof(geom::Boundary) == sizeof(int));
+    return MPI_INT;
+}
 
 template <class F>
 void mpi::for_each(F&& f) {
@@ -234,7 +270,7 @@ T mpi::min(const T& value) {
         return value;
     }
     T g_value;
-    MPI_Allreduce(&value, &g_value, 1, mpi_type<T>(), MPI_MIN, comm());
+    MPI_Allreduce(&value, &g_value, 1, mpi::type<T>(), MPI_MIN, comm());
     return g_value;
 }
 
@@ -245,7 +281,7 @@ std::vector<T> mpi::min(const std::vector<T>& values) {
     }
     std::vector<T> g_values(values.size());
     MPI_Allreduce(values.data(), g_values.data(), int(values.size()),
-                  mpi_type<T>(), MPI_MIN, comm());
+                  mpi::type<T>(), MPI_MIN, comm());
     return g_values;
 }
 
@@ -255,7 +291,7 @@ T mpi::max(const T& value) {
         return value;
     }
     T g_value;
-    MPI_Allreduce(&value, &g_value, 1, mpi_type<T>(), MPI_MAX, comm());
+    MPI_Allreduce(&value, &g_value, 1, mpi::type<T>(), MPI_MAX, comm());
     return g_value;
 }
 
@@ -266,7 +302,7 @@ std::vector<T> mpi::max(const std::vector<T>& values) {
     }
     std::vector<T> g_values(values.size());
     MPI_Allreduce(values.data(), g_values.data(), int(values.size()),
-                  mpi_type<T>(), MPI_MAX, comm());
+                  mpi::type<T>(), MPI_MAX, comm());
     return g_values;
 }
 
@@ -276,7 +312,7 @@ T mpi::sum(const T& value) {
         return value;
     }
     T g_value;
-    MPI_Allreduce(&value, &g_value, 1, mpi_type<T>(), MPI_SUM, comm());
+    MPI_Allreduce(&value, &g_value, 1, mpi::type<T>(), MPI_SUM, comm());
     return g_value;
 }
 
@@ -287,7 +323,7 @@ std::vector<T> mpi::sum(const std::vector<T>& values) {
     }
     std::vector<T> g_values(values.size());
     MPI_Allreduce(values.data(), g_values.data(), int(values.size()),
-                  mpi_type<T>(), MPI_SUM, comm());
+                  mpi::type<T>(), MPI_SUM, comm());
     return g_values;
 }
 
@@ -317,27 +353,27 @@ void mpi::broadcast(int root, T& value) {
 template <class T>
 std::vector<T> mpi::all_gather(const T& value) {
     std::vector<T> values(size());
-    MPI_Allgather(&value, 1, mpi_type<T>(), values.data(), 1, mpi_type<T>(), comm());
+    MPI_Allgather(&value, 1, mpi::type<T>(), values.data(), 1, mpi::type<T>(), comm());
     return values;
 }
 
 template <class T>
 void mpi::all_gather(const T& value, std::vector<T>& values) {
     values.resize(size());
-    MPI_Allgather(&value, 1, mpi_type<T>(), values.data(), 1, mpi_type<T>(), comm());
+    MPI_Allgather(&value, 1, mpi::type<T>(), values.data(), 1, mpi::type<T>(), comm());
 }
 
 template <class T>
 std::vector<T> mpi::all_gather_vectors(const std::vector<T>& value) {
     std::vector<T> values(size() * value.size());
-    MPI_Allgather(value.data(), value.size(), mpi_type<T>(), values.data(), value.size(), mpi_type<T>(), comm());
+    MPI_Allgather(value.data(), value.size(), mpi::type<T>(), values.data(), value.size(), mpi::type<T>(), comm());
     return values;
 }
 
 template <class T>
 void mpi::all_to_all(const std::vector<T>& send, std::vector<T>& recv) {
     recv.resize(size());
-    MPI_Alltoall(send.data(), 1, mpi_type<T>(), recv.data(), 1, mpi_type<T>(), comm());
+    MPI_Alltoall(send.data(), 1, mpi::type<T>(), recv.data(), 1, mpi::type<T>(), comm());
 }
 
 } // namespace zephyr::utils
@@ -466,7 +502,7 @@ public:
         values[0] = value;
     }
 
-    /// @brief Коллективная операция. Размеры буфферов send и recv совпадают
+    /// @brief Коллективная операция. Размеры буферов send и recv совпадают
     /// и равны числу процессов. Каждая величина из send отправляется своему
     /// процессу, каждая величина в recv получается с определенного процесса.
     template <class T>

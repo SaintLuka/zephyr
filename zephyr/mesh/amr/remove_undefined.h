@@ -1,74 +1,75 @@
-/// @file Файл содержит реализацию функции remove_undefined, которая очищает хранилище
-/// от неопределенных (не листовых ячеек).
-/// Данный файл не устанавливается при установке zephyr, все изложенные описания
-/// алгоритмов и комментарии к функциям предназначены исключительно для разработчиков.
-
+// Не устанавливается при установке zephyr, детали алгоритмов и комментарии
+// к функциям предназначены для разработчиков.
 #pragma once
 
 #include <zephyr/mesh/amr/common.h>
 
 namespace zephyr::mesh::amr {
 
-using zephyr::utils::Stopwatch;
-
 /// @brief Функция меняет индексы соседей через грань на новые, выполняется
 /// для одной ячейки. Предполагается, что в поле element.next записан индекс,
 /// куда ячейка будет перемещена в дальнейшем
-/// @param cell Целевая ячейка
 /// @param locals Хранилище ячеек
-void change_adjacent_one1(AmrStorage::Item& cell, AmrStorage& locals) {
-    if (cell.is_undefined()) { return; }
+inline void change_adjacent_one1(index_t ic, AmrCells& locals) {
+    if (locals.is_undefined(ic)) { return; }
 
-    for (BFace &face: cell.faces) {
-        if (face.is_undefined()) {
+    for (auto iface: locals.faces_range(ic)) {
+        if (locals.faces.is_undefined(iface)) {
             continue;
         }
+
         // Граничные указывают на ячейку
-        if (face.is_boundary()) {
-            face.adjacent.index = cell.next;
+        if (locals.faces.is_boundary(iface)) {
+            locals.faces.adjacent.index[iface] = locals.next[ic];
+            locals.faces.adjacent.basic[iface] = locals.next[ic];
             continue;
         }
 
-        scrutiny_check(face.adjacent.alien < 0,
+        scrutiny_check(locals.faces.adjacent.alien[iface] < 0,
                        "change_adjacent_one() error: only local neighbors")
 
-        scrutiny_check(face.adjacent.index >= 0 && face.adjacent.index < locals.size(),
-                       "change_adjacent_partial() error: adjacent.index out of range");
+        scrutiny_check(locals.faces.adjacent.index[iface] >= 0 &&
+                       locals.faces.adjacent.index[iface] < locals.size(),
+                       "change_adjacent_one() error: adjacent.index out of range");
 
-        face.adjacent.index = locals[face.adjacent.index].next;
+        locals.faces.adjacent.index[iface] = locals.next[locals.faces.adjacent.index[iface]];
+        locals.faces.adjacent.basic[iface] = locals.next[ic];
     }
 }
 
 /// @brief Функция меняет индексы соседей через грань на новые, выполняется
 /// для одной ячейки. Предполагается, что в поле element.next записан индекс,
 /// куда ячейка будет перемещена в дальнейшем
-/// @param cell Целевая ячейка
-void change_adjacent_one2(AmrStorage::Item& cell, AmrStorage& locals, AmrStorage& aliens) {
-    if (cell.is_undefined()) { return; }
+inline void change_adjacent_one2(index_t ic, AmrCells& locals, AmrCells& aliens) {
+    if (locals.is_undefined(ic)) { return; }
 
-    for (BFace &face: cell.faces) {
-        if (face.is_undefined()) {
+    for (auto iface: locals.faces_range(ic)) {
+        if (locals.faces.is_undefined(iface)) {
             continue;
         }
+
         // Граничные указывают на ячейку
-        if (face.is_boundary()) {
-            face.adjacent.index = cell.next;
+        if (locals.faces.is_boundary(iface)) {
+            locals.faces.adjacent.index[iface] = locals.next[ic];
+            locals.faces.adjacent.basic[iface] = locals.next[ic];
             continue;
         }
 
-        if (face.adjacent.alien < 0) {
+        if (locals.faces.adjacent.alien[iface] < 0) {
             // Локальный сосед
-            scrutiny_check(face.adjacent.index >= 0 && face.adjacent.index < locals.size(),
-                           "change_adjacent_partial() error: adjacent.index out of range");
+            scrutiny_check(locals.faces.adjacent.index[iface] >= 0 &&
+                           locals.faces.adjacent.index[iface] < locals.size(),
+                           "change_adjacent_one() error: adjacent.index out of range");
 
-            face.adjacent.index = locals[face.adjacent.index].next;
+            locals.faces.adjacent.index[iface] = locals.next[locals.faces.adjacent.index[iface]];
         } else {
             // Удаленный сосед
-            scrutiny_check(face.adjacent.alien >= 0 && face.adjacent.alien < aliens.size(),
-                           "change_adjacent_partial() error: adjacent.alien out of range");
+            scrutiny_check(locals.faces.adjacent.alien[iface] < aliens.size(),
+                           "change_adjacent_one() error: adjacent.alien out of range");
 
-            face.adjacent.index = aliens[face.adjacent.alien].next;
+            locals.faces.adjacent.index[iface] = aliens.next[locals.faces.adjacent.alien[iface]];
         }
+        locals.faces.adjacent.basic[iface] = locals.next[ic];
     }
 }
 
@@ -76,23 +77,21 @@ void change_adjacent_one2(AmrStorage::Item& cell, AmrStorage& locals, AmrStorage
 /// для всех ячеек в однопоточном режиме. Предполагается, что в поле
 /// element.next записан индекс, куда ячейка будет перемещена в дальнейшем
 /// @param cells Хранилище ячеек
-void change_adjacent(AmrStorage& locals) {
-    threads::for_each<20>(
-            locals.begin(), locals.end(),
+inline void change_adjacent(AmrCells& cells) {
+    threads::parallel_for(
+            index_t{0}, index_t{cells.size()},
             change_adjacent_one1,
-            std::ref(locals));
+            std::ref(cells));
 }
 
 /// @brief Функция меняет индексы соседей через грань на новые, выполняется
 /// для всех ячеек в однопоточном режиме. Предполагается, что в поле
 /// element.next записан индекс, куда ячейка будет перемещена в дальнейшем
-/// @param cells Хранилище ячеек
-void change_adjacent(AmrStorage& locals, AmrStorage& aliens) {
-    threads::for_each<20>(
-            locals.begin(), locals.end(),
+inline void change_adjacent(AmrCells& locals, AmrCells& aliens) {
+    threads::parallel_for(
+            index_t{0}, index_t{locals.size()},
             change_adjacent_one2,
-            std::ref(locals),
-            std::ref(aliens));
+            std::ref(locals), std::ref(aliens));
 }
 
 /// @brief Выполняет перемещение элемента в соответствии с индексом
@@ -100,35 +99,29 @@ void change_adjacent(AmrStorage& locals, AmrStorage& aliens) {
 /// @details Данные актуальной ячейки перемещаются на место неактуальной
 /// ячейки, индексы смежности не изменяются, они должны быть выставлены
 /// заранее.
-void move_cell(int ic, AmrStorage& cells) {
-    int jc = cells[ic].next;
-
-    // move from jc to ic
-    cells.move_item(jc, ic);
-
-    cells[ic].index = ic;
-    cells[ic].next  = ic;
-    cells[jc].set_undefined();
+inline void move_cell(index_t ic, AmrCells& cells) {
+    cells.move_item(ic);
+    cells.copy_data(ic, cells.next[ic]);
 }
 
 /// @brief Вспомогательная структура, содержит два списка индексов: неопределенные
 /// ячейки и актуальные ячейки. После обмена местами неопределенных и актуальных
 /// ячеек, все неактуальные ячейки оказываются в конце хранилища.
 struct SwapLists {
-    /// @brief Список индеков неопределенных ячеек, начиная с начала хранилища
+    /// @brief Список индексов неопределенных ячеек, начиная с начала хранилища
     /// @details Массив может содержать не все неопределенные ячейки, которые
     /// есть в хранилище
-    std::vector<int> undefined_cells;
+    std::vector<index_t> undefined_cells;
 
     /// @brief Список индексов актуальных ячеек, начиная с конца хранилища,
     /// размер массива обязательно совпадает с размером массива неопределенных
     /// ячеек. При перестановке элементов хранилища с индексами undefined_cells[i]
     /// и actual_cells[i] для всех i, все неопределенные ячейки хранилища
     /// должны оказаться в конце.
-    std::vector<int> actual_cells;
+    std::vector<index_t> actual_cells;
 
     /// @brief Конструктор
-    /// @param cells Хранилище ячеек
+    /// @param locals Хранилище ячеек
     /// @param max_index Максимальный индекс, который будет в массиве неопределенных
     /// ячеек, правильное задание - размер хранилища после удаления всех неопределенных
     /// элементов. Правильное задание параметра гарантирует, что будет выполняться
@@ -136,12 +129,12 @@ struct SwapLists {
     /// @param max_swap_count Максимальное число элементов, для которых может
     /// потребоваться перестановка, размеры списков ограничены данным числом.
     // TODO: Многопоточная версия конструктора
-    SwapLists(AmrStorage& cells, int max_index, int max_swap_count) {
+    SwapLists(AmrCells& locals, index_t max_index, index_t max_swap_count) {
         if (max_swap_count < 1) { return; }
 
         undefined_cells.reserve(max_swap_count);
-        for (int ic = 0; ic < max_index; ++ic) {
-            if (cells[ic].is_undefined()) {
+        for (index_t ic = 0; ic < max_index; ++ic) {
+            if (locals.is_undefined(ic)) {
                 undefined_cells.push_back(ic);
                 if (undefined_cells.size() >= max_swap_count) {
                     break;
@@ -150,8 +143,8 @@ struct SwapLists {
         }
 
         actual_cells.reserve(undefined_cells.size());
-        for (int jc = cells.size() - 1; jc >= 0; --jc) {
-            if (cells[jc].is_actual()) {
+        for (index_t jc = locals.size() - 1; jc >= 0; --jc) {
+            if (locals.is_actual(jc)) {
                 actual_cells.push_back(jc);
                 if (actual_cells.size() >= undefined_cells.size()) {
                     break;
@@ -162,28 +155,28 @@ struct SwapLists {
 
 #if SCRUTINY
     /// @brief Проверяет свойства перестановки: перестановка состоит только из
-    /// транспозций пар элементов, при этом один элемент в паре должен быть актуальным,
-    /// а один неопределенным, после перестановки актуальный элемент всегда должен
-    /// оказываться ближе к началу списка, чем неопределенный
-    void check_mapping(AmrStorage& cells) const {
-        for (int i = 0; i < cells.size(); ++i) {
-            auto j = cells[i].next;
-            if (i != cells[j].next) {
+    /// транспозиций пар элементов, при этом один элемент в паре должен быть
+    /// актуальным, а один неопределенным, после перестановки актуальный элемент
+    /// всегда должен оказываться ближе к началу списка, чем неопределенный
+    static void check_mapping(AmrCells& locals) {
+        for (index_t i = 0; i < locals.size(); ++i) {
+            auto j = locals.next[i];
+            if (i != locals.next[j]) {
                 // Перестановка не является транспозицией
-                std::cout << i << " " << cells[i].next << "\n";
-                std::cout << j << " " << cells[j].next << "\n";
+                std::cout << i << " " << locals.next[i] << "\n";
+                std::cout << j << " " << locals.next[j] << "\n";
                 throw std::runtime_error("Only swaps are allowed");
             }
             if (i != j) {
-                if (cells[i].is_actual() && cells[j].is_actual()) {
+                if (locals.is_actual(i) && locals.is_actual(j)) {
                     // Попытка обменять две актуальные ячейки
                     throw std::runtime_error("Swap two actual cells");
                 }
-                if (i < j && cells[i].is_actual()) {
-                    // Актуальня ячейка переносится только в начало
+                if (i < j && locals.is_actual(i)) {
+                    // Актуальная ячейка переносится только в начало
                     throw std::runtime_error("Wrong swap #1");
                 }
-                if (i > j && cells[i].is_undefined()) {
+                if (i > j && locals.is_undefined(i)) {
                     // Неопределенная ячейка переносится только в конец
                     throw std::runtime_error("Wrong swap #2");
                 }
@@ -195,42 +188,42 @@ struct SwapLists {
     /// @brief Устанавливает тождественную перестановку для части ячеек
     /// @param cells Хранилище ячеек
     /// @param from, to Диапазон ячеек в хранилище
-    void set_identical_mapping_partial(AmrStorage& cells, int from, int to) const {
-        for (int ic = from; ic < to; ++ic) {
-            cells[ic].next = ic;
+    static void set_identical_mapping_partial(AmrCells& cells, index_t from, index_t to) {
+        for (index_t ic = from; ic < to; ++ic) {
+            cells.next[ic] = ic;
         }
     }
 
     /// @brief Устанавливает следующую позицию для части ячеек
-    /// @param cells Ссылка на хранилище ячеек
+    /// @param locals Ссылка на хранилище ячеек
     /// @param from, to Диапазон индексов в массивах actual_cells и undefined_cells
-    void set_swap_mapping_partial(AmrStorage& cells, int from, int to) const {
-        for (int i = from; i < to; ++i) {
+    void set_swap_mapping_partial(AmrCells& locals, const index_t from, const index_t to) const {
+        for (index_t i = from; i < to; ++i) {
             scrutiny_check(i < actual_cells.size(),    "swap_mapping out of range #1")
             scrutiny_check(i < undefined_cells.size(), "swap_mapping out of range #2")
 
-            int ai = actual_cells[i];
-            int ui = undefined_cells[i];
+            const index_t ai = actual_cells[i];
+            const index_t ui = undefined_cells[i];
 
-            scrutiny_check(ai < cells.size(), "swap_mapping out of range #3")
-            scrutiny_check(ui < cells.size(), "swap_mapping out of range #4")
+            scrutiny_check(ai < locals.size(), "swap_mapping out of range #3")
+            scrutiny_check(ui < locals.size(), "swap_mapping out of range #4")
 
-            cells[ui].next = ai;
-            cells[ai].next = ui;
+            locals.next[ui] = ai;
+            locals.next[ai] = ui;
         }
     }
 
     /// @brief Устанавливает следующие позиции ячеек в однопоточном режиме
     /// @details После выполнения операции поле element.next у ячеек указывает
     /// на следующее положение ячейки в хранилище
-    void set_mapping(AmrStorage& cells) const {
-        set_identical_mapping_partial(cells, 0, cells.size());
+    void set_mapping(AmrCells& locals) const {
+        set_identical_mapping_partial(locals, 0, locals.size());
 
         if (actual_cells.empty()) { return; }
 
-        set_swap_mapping_partial(cells, 0, size());
+        set_swap_mapping_partial(locals, 0, size());
 #if SCRUTINY
-        check_mapping(cells);
+        check_mapping(locals);
 #endif
     }
 
@@ -246,8 +239,8 @@ struct SwapLists {
         }
         std::vector<std::future<void>> results(num_tasks);
 
-        int bin = cells.size() / num_tasks + 1;
-        int pos = 0;
+        index_t bin = cells.size() / num_tasks + 1;
+        index_t pos = 0;
         for (auto &res : results) {
             res = threads.enqueue(
                     &SwapLists::set_identical_mapping_partial,
@@ -282,14 +275,14 @@ struct SwapLists {
     /// @details Данные актуальной ячейки перемещаются на место неактуальной
     /// ячейки, индексы смежности не изменяются, они должны быть выставлены
     /// заранее.
-    void move_elements(AmrStorage &cells) const {
-        threads::for_each<20>(
-                undefined_cells.begin(), undefined_cells.end(),
+    void move_elements(AmrCells &cells) const {
+        threads::for_each(
+                actual_cells.begin(), actual_cells.end(),
                 move_cell, std::ref(cells));
     }
 
     /// @brief Число ячеек для перестановки
-    inline int size() const {
+    index_t size() const {
         return actual_cells.size();
     }
 };
@@ -312,18 +305,18 @@ struct SwapLists {
 /// 5. Хранилище меняет размер, все неопределенные ячейки остаются за пределами
 /// хранилища.
 template<int dim>
-void remove_undefined(AmrStorage &cells, const Statistics &count) {
+void remove_undefined(AmrCells &cells, const Statistics &count) {
     static Stopwatch create_swap_timer;
     static Stopwatch set_mapping_timer;
     static Stopwatch change_adjacent_timer;
-    static Stopwatch move_elements_timer;
+    static Stopwatch swap_elements_timer;
 
     if (count.n_cells_large == count.n_cells_short) {
         return;
     }
 
     create_swap_timer.resume();
-    int max_swap_count = count.n_cells_large - count.n_cells_short;
+    index_t max_swap_count = count.n_cells_large - count.n_cells_short;
     SwapLists swap_list(cells, count.n_cells_short, max_swap_count);
     create_swap_timer.stop();
 
@@ -335,33 +328,38 @@ void remove_undefined(AmrStorage &cells, const Statistics &count) {
     change_adjacent(cells);
     change_adjacent_timer.stop();
 
-    move_elements_timer.resume();
+    swap_elements_timer.resume();
     swap_list.move_elements(cells);
-    move_elements_timer.stop();
+    swap_elements_timer.stop();
 
-    cells.resize(count.n_cells_short);
+    cells.resize_amr(count.n_cells_short);
 
 #if CHECK_PERFORMANCE
     static size_t counter = 0;
     if (counter % amr::check_frequency == 0) {
-        std::cout << "      Create SwapList elapsed: " << std::setw(10) << create_swap_timer.milliseconds() << " ms\n";
-        std::cout << "      Set mapping elapsed:     " << std::setw(10) << set_mapping_timer.milliseconds() << " ms\n";
-        std::cout << "      Change adjacent elapsed: " << std::setw(10) << change_adjacent_timer.milliseconds() << " ms\n";
-        std::cout << "      Move elements elapsed:   " << std::setw(10) << move_elements_timer.milliseconds() << " ms\n";
+        mpi::cout << "      Create SwapList: " << std::setw(8) << create_swap_timer.milliseconds() << " ms\n";
+        mpi::cout << "      Setup mapping:   " << std::setw(8) << set_mapping_timer.milliseconds() << " ms\n";
+        mpi::cout << "      Change adjacent: " << std::setw(8) << change_adjacent_timer.milliseconds() << " ms\n";
+        mpi::cout << "      Swap elements:   " << std::setw(8) << swap_elements_timer.milliseconds() << " ms\n";
     }
     ++counter;
 #endif
 }
 
+// ============================================================================
+//                                 MPI VERSION
+// ============================================================================
+#ifdef ZEPHYR_MPI
 template<int dim>
-void remove_undefined(AmrStorage &locals, AmrStorage &aliens, const Statistics &count, EuMesh& mesh) {
+void remove_undefined(Tourism& tourism, AmrCells& locals, AmrCells& aliens, const Statistics &count) {
     static Stopwatch create_swap_timer;
     static Stopwatch set_mapping_timer;
     static Stopwatch change_adjacent_timer;
-    static Stopwatch move_elements_timer;
+    static Stopwatch swap_elements_timer;
+    static Stopwatch send_next_timer;
 
     create_swap_timer.resume();
-    int max_swap_count = count.n_cells_large - count.n_cells_short;
+    index_t max_swap_count = count.n_cells_large - count.n_cells_short;
     SwapLists swap_list(locals, count.n_cells_short, max_swap_count);
     create_swap_timer.stop();
 
@@ -369,30 +367,33 @@ void remove_undefined(AmrStorage &locals, AmrStorage &aliens, const Statistics &
     swap_list.set_mapping(locals);
     set_mapping_timer.stop();
 
-    // получить element.next у alien ячеек
-    mesh.build_aliens();
-    mesh.sync();
+    // Перед remove_undefined сделан частичный build_aliens,
+    // получим актуальные aliens.next.
+    send_next_timer.resume();
+    tourism.sync<MpiTag::NEXT>(locals, aliens);
+    send_next_timer.stop();
 
     change_adjacent_timer.resume();
     change_adjacent(locals, aliens);
     change_adjacent_timer.stop();
 
-    move_elements_timer.resume();
+    swap_elements_timer.resume();
     swap_list.move_elements(locals);
-    move_elements_timer.stop();
+    swap_elements_timer.stop();
 
-    locals.resize(count.n_cells_short);
+    locals.resize_amr(count.n_cells_short);
 
 #if CHECK_PERFORMANCE
     static size_t counter = 0;
     if (counter % amr::check_frequency == 0) {
-        std::cout << "      Create SwapList elapsed: " << std::setw(10) << create_swap_timer.milliseconds() << " ms\n";
-        std::cout << "      Set mapping elapsed:     " << std::setw(10) << set_mapping_timer.milliseconds() << " ms\n";
-        std::cout << "      Change adjacent elapsed: " << std::setw(10) << change_adjacent_timer.milliseconds() << " ms\n";
-        std::cout << "      Move elements elapsed:   " << std::setw(10) << move_elements_timer.milliseconds() << " ms\n";
+        mpi::cout << "      Create SwapList: " << std::setw(8) << create_swap_timer.milliseconds_mpi() << " ms\n";
+        mpi::cout << "      Setup mapping:   " << std::setw(8) << set_mapping_timer.milliseconds_mpi() << " ms\n";
+        mpi::cout << "      Send/Recv next:  " << std::setw(8) << send_next_timer.milliseconds_mpi() << " ms\n";
+        mpi::cout << "      Change adjacent: " << std::setw(8) << change_adjacent_timer.milliseconds_mpi() << " ms\n";
+        mpi::cout << "      Swap elements:   " << std::setw(8) << swap_elements_timer.milliseconds_mpi() << " ms\n";
     }
     ++counter;
 #endif
 }
-
+#endif
 } // namespace zephyr::mesh::amr

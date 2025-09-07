@@ -1,16 +1,20 @@
 #list(APPEND TESTS axial)
 #list(APPEND TESTS balancing)
+#list(APPEND TESTS distributed-amr)
+#list(APPEND TESTS distributed-conv)
+list(APPEND TESTS distributed-conv-amr)
+#list(APPEND TESTS game_of_life)
 #list(APPEND TESTS mesh_generator)
-#list(APPEND TESTS movable_mesh)
+#list(APPEND TESTS storage)
 #list(APPEND TESTS voronoi)
 
-# Assume all files in direcory are tests
+# Assume all files in directory are tests
 if (ZEPHYR_TESTS_ALL)
     file(GLOB TEST_SOURCES *.cpp)
 
     set(TESTS "")
     foreach(filename IN LISTS TEST_SOURCES)
-        # short name without path and extentsion
+        # short name without path and extension
         get_filename_component(test ${filename} NAME_WE)
         list(APPEND TESTS ${test})
     endforeach()

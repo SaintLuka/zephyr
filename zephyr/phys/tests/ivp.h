@@ -3,7 +3,7 @@
 #include <zephyr/geom/vector.h>
 #include <zephyr/geom/generator/rectangle.h>
 
-#include <zephyr/mesh/euler/eu_cell.h>
+#include <zephyr/mesh/euler/eu_prim.h>
 
 #include <zephyr/phys/literals.h>
 #include <zephyr/phys/fractions.h>

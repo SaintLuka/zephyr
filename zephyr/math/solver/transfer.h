@@ -11,8 +11,9 @@ using zephyr::geom::InterfaceRecovery;
 
 using zephyr::mesh::EuCell;
 using zephyr::mesh::EuMesh;
+using zephyr::mesh::AmrCells;
+using zephyr::mesh::Storable;
 using zephyr::mesh::Direction;
-using zephyr::mesh::AmrStorage;
 using zephyr::mesh::Distributor;
 
 
@@ -20,31 +21,15 @@ using zephyr::mesh::Distributor;
 class Transfer {
 public:
 
-    /// @brief Расширенный вектор состояния на котором решается задача
-    struct State {
-        double u1, u2;  ///< Объемные доли
-
-        Vector3d n;     ///< Внешняя нормаль поверхности
-        Vector3d p;     ///< Базисная точка поверхности
-
-        // Нужны для схемы MUSCL
-        double du_dx;
-        double du_dy;
-
-        // Нужны для метода КАБАРЕ
-        double lambda_alpha, lambda_beta;
-        double flow_u[4];
-        double flow_u_tmp[4];
-    };
-
+    /// @brief Список методов решения
     enum class Method {
         // Методики CRP с эвристическими формулами, допускают
         // расщепление по направлениям и расчеты на полигональной сетке
         CRP_V3,      ///<
         CRP_V5,      ///<
         CRP_SE,      ///< Формула Серёжкина
-        CRP_N1,      ///< Формула с учетом нормалей
-        CRP_N2,      ///< Формула с учетом нормалей
+        CRP_N1,      ///< Формула с учетом нормалей (точное пересечение)
+        CRP_N2,      ///< Формула с учетом нормалей (average flux)
 
         // Методики типа VOF с подсеточной реконструкицей границ,
         // допускают расщепление по направлениям и расчеты
@@ -65,15 +50,28 @@ public:
         // направлениям, не подходят для полигональной сетки
         WENO,        ///< WENO интеполяция на грань
         WENO_CRP,    ///< WENO с CRP ограничением
-
-        KABARE       ///< Метод КАБАРЕ
     };
 
-    /// @brief Получить экземпляр расширенного вектора состояния
-    static State datatype();
+    // Расширенный вектор состояния на котором решается задача
+    struct State {
+        Storable<double> u1, u2;  ///< Объемные доли
+        Storable<Vector3d> n;     ///< Внешняя нормаль поверхности
+        Storable<Vector3d> p;     ///< Базисная точка поверхности
+
+        // Градиенты нужны для схемы MUSCL
+        Storable<double> du_dx;
+        Storable<double> du_dy;
+    };
+
+    // Доступ к данным в хранилище
+    State data;
+
 
     /// @brief Конструктор класса, по умолчанию CFL = 0.5
     Transfer();
+
+    /// @brief Добавить типы для хранения на сетку
+    void add_types(EuMesh& mesh);
 
     /// @brief Число Куранта
     double CFL() const;
@@ -86,8 +84,6 @@ public:
 
     /// @brief Версия функции update
     void set_method(Method method);
-
-    void set_mnt(bool flag);
 
     /// @brief Шаг интегрирования на предыдущем вызове update()
     double get_dt() const;
@@ -114,14 +110,10 @@ public:
     /// @brief Установить флаги адаптации
     void set_flags(EuMesh& mesh);
 
-    void prepare(EuMesh& mesh);
-
     /// @brief Распределитель данных при адаптации
     Distributor distributor() const;
 
-    AmrStorage body(EuMesh& mesh);
-
-    AmrStorage scheme(EuMesh& mesh);
+    EuMesh body(EuMesh& mesh);
 
 protected:
 
@@ -129,11 +121,7 @@ protected:
     /// условия Куранта (для одной ячейки)
     double compute_dt(EuCell& cell);
 
-    void compute_slopes(EuMesh& mesh);
-
-    void  compute_all_lambda(EuMesh& mesh);
-
-    void  compte_flow_value(EuCell& cell, int target, bool inverse, double lambda);
+    void compute_slopes(EuMesh& mesh) const;
 
     void update_CRP(EuMesh& mesh, Direction dir);
 
@@ -142,8 +130,6 @@ protected:
     void update_MUSCL(EuMesh& mesh, Direction dir);
 
     void update_WENO(EuMesh& mesh, Direction dir);
-
-    void update_KABARE(EuMesh& mesh);
 
 
     /// @brief Потоки по схеме CRP
@@ -155,16 +141,14 @@ protected:
     /// @brief Потоки по схеме MUSCL
     void fluxes_MUSCL(EuCell& cell, Direction dir = Direction::ANY);
 
-
 protected:
-
     double m_dt;       ///< Шаг интегрирования
     double m_CFL;      ///< Число Куранта
     Method m_method;   ///< Методика вычисления потоков
     Limiter m_limiter; ///< Ограничитель для MUSCL_MC
-    bool mnt;          ///< Монотонизация для схемы КАБАРЕ
 
-    InterfaceRecovery interface; ///< Реконструкция границы
+    /// @brief Реконструкция границы
+    InterfaceRecovery interface;
 };
 
 } // namespace zephyr::math

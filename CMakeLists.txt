@@ -20,18 +20,19 @@ option(ZEPHYR_PROBLEMS_ALL "Build ALL problems" OFF)
 option(ZEPHYR_PYTHON       "Use python libs"    ON)
 option(ZEPHYR_TESTS        "Build tests"        ON)
 option(ZEPHYR_TESTS_ALL    "Build ALL tests"    OFF)
+option(ZEPHYR_ASSERTS      "Enable asserts"     OFF)
 
-set(THREADS_TYPE "STD" CACHE STRING "Choose thread style: STD, OpenMP (not yet), TBB")
-set_property(CACHE THREADS_TYPE PROPERTY STRINGS STD TBB OpenMP)
+set(THREADS_TYPE "STD" CACHE STRING "Choose thread style: STD, TBB")
+set_property(CACHE THREADS_TYPE PROPERTY STRINGS STD TBB)
 if (${THREADS_TYPE} STREQUAL TBB)
     message(STATUS "Use TBB")
     set(ZEPHYR_TBB ON)
-elseif (${THREADS_TYPE} STREQUAL OpenMP)
-    message(STATUS "Use OpenMP")
-    set(ZEPHYR_OPENMP ON)
 else ()
     message(STATUS "Use standard threads")
-    set(ZEPHYR_STD_THREADS ON)
+    set(ZEPHYR_TBB OFF)
+endif ()
+if (CMAKE_BUILD_TYPE STREQUAL Debug)
+    set(ZEPHYR_ASSERTS ON)
 endif ()
 
 configure_file(
@@ -41,8 +42,6 @@ configure_file(
 
 if (ZEPHYR_TBB)
     find_package(TBB REQUIRED)
-elseif (ZEPHYR_OPENMP)
-    find_package(OpenMP)
 else ()
     find_package(Threads REQUIRED)
 endif ()
@@ -64,8 +63,6 @@ set(BUILD_SHARED_LIBS YES)
 add_library(zephyr ${ZEPHYR_SOURCES})
 if (ZEPHYR_TBB)
     target_link_libraries(zephyr PUBLIC TBB::tbb)
-elseif (ZEPHYR_OPENMP)
-    target_link_libraries(zephyr PUBLIC OpenMP::OpenMP_CXX)
 else ()
     target_link_libraries(zephyr PUBLIC ${CMAKE_THREAD_LIBS_INIT})
 endif ()
@@ -124,7 +121,34 @@ endif()
 
 add_subdirectory(python)
 
+# Включить опцию ZEPHYR_DOXYGEN, затем вызвать make docs
 if (ZEPHYR_DOXYGEN)
-    find_package(Doxygen REQUIRED dot)
-    doxygen_add_docs(docs ${PROJECT_SOURCE_DIR}/zephyr)
+    # Поиск Doxygen и Graphviz
+    find_package(Doxygen REQUIRED)
+    find_program(DOXYGEN_DOT_EXECUTABLE dot REQUIRED)
+
+    if(NOT DOXYGEN_FOUND)
+        message(WARNING "Doxygen not found! Documentation will not be generated.")
+    else()
+        # Настройка Doxygen
+        set(DOXYGEN_INPUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+        set(DOXYGEN_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/docs")
+        set(DOXYGEN_HTML_OUTPUT "${DOXYGEN_OUTPUT_DIR}/html")
+        set(DOXYGEN_CONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/Doxyfile")
+
+        # Конфигурация Doxyfile
+        configure_file(
+                "${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in"
+                "${DOXYGEN_CONFIG_FILE}"
+                @ONLY
+        )
+
+        # Добавление цели для генерации документации
+        add_custom_target(docs
+                COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_CONFIG_FILE}
+                WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+                COMMENT "Generating documentation with Doxygen"
+                VERBATIM
+        )
+    endif()
 endif()

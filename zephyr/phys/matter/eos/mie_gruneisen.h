@@ -69,7 +69,7 @@ public:
                    const EosOptions& options = {}) const final;
 
     /// @brief Аппроксимация уравнения состояния двучленным уравнением
-    /// состояния в окрестности заданой плотности и давления.
+    /// состояния в окрестности заданной плотности и давления.
     /// @param options
     StiffenedGas stiffened_gas(double density, double pressure,
                                const EosOptions& options = {}) const final;

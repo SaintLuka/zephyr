@@ -1,19 +1,18 @@
 #pragma once
 
 #include <array>
-#include <vector>
 #include <functional>
 
 #include <zephyr/geom/vector.h>
 
 namespace zephyr::geom {
 
-/// @addtogroup Geom-Primitives
+/// @addtogroup geom-primitives
 /// @{
 
-/// @brief Представление треугольника. Содержит несколько полезных функций,
-/// а также отвечает за отображение из барицентрических координат.
-struct Triangle {
+/// @brief Треугольник в плоскости Oxy.
+/// Отображение из барицентрических координат.
+class Triangle {
 protected:
     /// @brief Набор вершин (против часовой для плоскости (x, y))
     std::array<Vector3d, 3> verts;
@@ -25,15 +24,11 @@ public:
 
     /// @brief Прямой доступ к данным по индексу
     /// @param idx in [0..2]
-    inline Vector3d &operator[](int idx) {
-        return verts[idx];
-    }
+    Vector3d &operator[](int idx) { return verts[idx]; }
 
     /// @brief Прямой доступ к данным по индексу
     /// @param idx in [0..2]
-    inline const Vector3d &operator[](int idx) const {
-        return verts[idx];
-    }
+    const Vector3d &operator[](int idx) const { return verts[idx]; }
 
     /// @brief Отображение по барицентрическим координатам
     /// @details Нормировка x1, x2, x3 не требуется

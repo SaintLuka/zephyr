@@ -2,21 +2,20 @@
 
 #include <zephyr/geom/vector.h>
 
-#include <random>
+namespace zephyr::math {
+class Random2D;
+class QuasiRandom2D;
+}
 
 namespace zephyr::geom {
 
-class Random2D;
-class QuasiRandom2D;
-
-/// @class Box box.h
 /// @brief Ограничивающий кубоид (bounding box).
 /// @details Очень полезная структура для хранения ограничивающего
 /// прямоугольника или кубоида (bounding box). Содержит пару полезных функций.
 /// Ящик считается двумерным прямоугольником, если vmin.z() == vmax.z(),
-/// условие справедливо в том числе для бесконечных и пустых ящиков.
+/// условие справедливо, в том числе для бесконечных и пустых ящиков.
 /// В обратном случае vmin.z() != vmax.z() ящик считается трёхмерном.
-struct Box final {
+struct Box {
     Vector3d vmin = {NAN, NAN, NAN};
     Vector3d vmax = {NAN, NAN, NAN};
 
@@ -30,13 +29,13 @@ struct Box final {
     /// последовательное увеличение путем помещения новых точек.
     /// vmin = {+inf, +inf, +inf}
     /// vmax = {-inf, -inf, -inf}
-    /// @param dim Размерность ящика (1 или 2)
+    /// @param dim Размерность ящика (2 или 3)
     static Box Empty(int dim);
 
     /// @brief Bounding box охватывающий всё пространство
     /// vmin = {-inf, -inf, -inf}
     /// vmax = {+inf, +inf, +inf}
-    /// @param dim Размерность ящика (1 или 2)
+    /// @param dim Размерность ящика (2 или 3)
     static Box Infinite(int dim);
 
     /// @brief Центр ящика
@@ -63,7 +62,7 @@ struct Box final {
     /// @brief Точка находится внутри ящика?
     bool inside(const Vector3d& p) const;
 
-    /// @brief Ограничить координаты точки до границ ящика
+    /// @brief Поместить точку в ящик
     Vector3d shove_in(const Vector3d& p) const;
 
     /// @brief Расширить ящик, чтобы захватить точку
@@ -82,43 +81,15 @@ struct Box final {
     void extend(double margin_x, double margin_y, double margin_z = 0.0);
 
     /// @brief Создать генератор случайных чисел внутри прямоугольника
-    Random2D random2D(int seed = 0) const;
+    math::Random2D random2D(int seed = 0) const;
 
     /// @brief Создать генератор квазислучайной последовательности внутри
     /// прямоугольника
-    QuasiRandom2D quasiRandom2D() const;
+    math::QuasiRandom2D quasiRandom2D() const;
 };
 
+/// @brief Вывод ящика в консоль
 std::ostream& operator<<(std::ostream& os, const Box& box);
-
-/// @brief Случайная двумерная последовательность в прямоугольнике
-class Random2D {
-public:
-
-    Random2D(const Vector3d& vmin, const Vector3d& vmax, int seed = 13);
-
-    Vector3d get();
-
-private:
-    std::mt19937_64 gen;
-    std::uniform_real_distribution<double> distr_x;
-    std::uniform_real_distribution<double> distr_y;
-};
-
-/// @brief Квазислучайная двумерная последовательность
-class QuasiRandom2D {
-public:
-
-    QuasiRandom2D(const Vector3d& vmin, const Vector3d& size);
-
-    Vector3d get();
-
-private:
-    Vector3d shift;
-    Vector3d step;
-    Vector3d vmin;
-    Vector3d size;
-};
 
 } // namespace zephyr::geom
 

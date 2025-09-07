@@ -1,33 +1,31 @@
 #pragma once
 
-#include <cmath>
-#include <mutex>
-#include <zephyr/mesh/mesh.h>
+#include <boost/format.hpp>
+
+#include <zephyr/mesh/euler/eu_prim.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/math/cfd/limiter.h>
 #include <zephyr/phys/matter/eos/eos.h>
-#include <boost/format.hpp>
-#include <zephyr/phys/tests/test_1D.h>
-#include <zephyr/math/solver/riemann.h>
 #include <zephyr/math/cfd/fluxes.h>
 #include <zephyr/math/cfd/gradient.h>
 
 namespace zephyr::math {
 
-using zephyr::geom::Vector3d;
-using zephyr::mesh::Cell;
-using zephyr::mesh::Mesh;
-using zephyr::mesh::Direction;
-using zephyr::mesh::Distributor;
-using zephyr::phys::MixturePT;
-using zephyr::math::gradient::GetState;
-using zephyr::math::gradient::GetBoundary;
+using geom::Vector3d;
+using mesh::EuCell;
+using mesh::EuMesh;
+using mesh::Storable;
+using mesh::Direction;
+using mesh::Distributor;
+using gradient::GetState;
+using gradient::GetBoundary;
 
-using zephyr::phys::Fractions;
-using zephyr::phys::VectorSet;
+using phys::Fractions;
+using phys::VectorSet;
 
 using namespace zephyr::math::mmf;
 
-/// @brief Тип расщеления по направлениям
+/// @brief Тип расщепления по направлениям
 enum class DirSplit {
     NONE,    ///< Без расщепления
     SIMPLE,  ///< Схема первого порядка
@@ -42,34 +40,26 @@ enum class CrpMode {
     MUSCL,      ///< По градиенту объемных долей
 };
 
-/// @class MmFluid mm_fluid.h
 /// @brief Multi-Material Fluid. Решатель для многоматериальной гидро- и
 /// газодинамики с равновесием по давлению и температуре.
 class MmFluid {
 public:
 
     /// @brief Расширенный вектор состояния на котором решается задача
-    struct State {
-        double density;      ///< Плотность смеси
-        Vector3d velocity;   ///< Равновесная скорость
-        double pressure;     ///< Равновесное давление
-        double energy;       ///< Равновесная энергия
-        double temperature;  ///< Равновесная температура
-
-        Fractions mass_frac; ///< Массовые доли веществ
-        ScalarSet densities; ///< Плотности компонент
-
-        PState half;         ///< Состояние на полушаге
-        PState next;         ///< Состояние на следующем шаге
+    struct Parts {
+        Storable<PState> init;  ///< Состояние на начало шага
+        Storable<PState> half;  ///< Состояние на полушаге
+        Storable<PState> next;  ///< Состояние на следующем шаге
 
         /// @brief Градиент вектора состояния
-        PState d_dx, d_dy, d_dz;
+        Storable<PState> d_dx, d_dy, d_dz;
 
-        VectorSet n;      ///< Нормаль к реконструкции границы
-        VectorSet p;      ///< Точка реконструкции границы
-        VectorSet grad_a; ///< Градиент объемных долей (для CrpMode::MUSCL)
+        Storable<VectorSet> n;      ///< Нормаль к реконструкции границы
+        Storable<VectorSet> p;      ///< Точка реконструкции границы
+        Storable<VectorSet> grad_a; ///< Градиент объемных долей (для CrpMode::MUSCL)
+    };
 
-
+    /*
         bool is_bad1() const { return get_state().is_bad(); }
 
         bool is_bad2() const { return half.is_bad(); }
@@ -103,18 +93,22 @@ public:
         Fractions vol_fracs() const;
     };
 
-    /// @brief Получить экземпляр расширенного вектора состояния
-    static State datatype();
-
     /// @brief В поток вывода
     friend std::ostream &operator<<(std::ostream &os, const State &state);
+    */
+
+    Parts part;
+
 
 
     /// @brief Конструктор класса
     explicit MmFluid(const phys::MixturePT &eos);
 
-    /// @brief Декструктор
+    /// @brief Деструктор
     ~MmFluid() = default;
+
+    /// @brief Добавить типы на сетку
+    Parts add_types(EuMesh& mesh);
 
     /// @brief Установить число Куранта
     void set_CFL(double CFL);
@@ -147,13 +141,13 @@ public:
     void set_max_dt(double dt);
 
     /// @brief Основная функция решателя, сделать шаг
-    void update(Mesh &mesh);
+    void update(EuMesh &mesh);
 
     /// @brief Сделать отсечение, построить поверхность
-    mesh::AmrStorage body(Mesh& mesh, int idx) const;
+    EuMesh body(EuMesh& mesh, int idx) const;
 
     /// @brief Установить флаги адаптации
-    void set_flags(Mesh &mesh);
+    void set_flags(EuMesh &mesh);
 
     /// @brief Распределитель данных при адаптации
     Distributor distributor() const;
@@ -162,31 +156,31 @@ public:
 
     /// @brief Посчитать шаг интегрирования по времени с учетом
     /// условия Куранта
-    void compute_dt(Mesh &mesh);
+    void compute_dt(EuMesh &mesh);
 
     /// @brief Проинтегрировать на шаг dt, вдоль направления dir
-    void integrate(Mesh &mesh, double dt, Direction dir = Direction::ANY);
+    void integrate(EuMesh &mesh, double dt, Direction dir = Direction::ANY);
 
     /// @brief Лимитированный градиент вектора состояния
-    void compute_grad(Mesh &mesh, const GetState<PState>& get_state);
+    void compute_grad(EuMesh &mesh, Storable<PState> U);
 
     /// @brief Лимитированный градиент объемных долей
-    void fractions_grad(Mesh &mesh, const GetState<Fractions>& get_state);
+    void fractions_grad(EuMesh &mesh, Storable<PState> U);
 
     /// @brief Подсеточная линейная реконструкция интерфейса
-    void interface_recovery(Mesh &mesh);
+    void interface_recovery(EuMesh &mesh);
 
     /// @brief Расчёт потоков с первым порядком
-    void fluxes(Mesh &mesh, double dt, Direction dir = Direction::ANY);
+    void fluxes(EuMesh &mesh, double dt, Direction dir = Direction::ANY);
 
     /// @brief Стадия предиктора при расчете со вторым порядком
-    void fluxes_stage1(Mesh &mesh, double dt, Direction dir = Direction::ANY);
+    void fluxes_stage1(EuMesh &mesh, double dt, Direction dir = Direction::ANY);
 
     /// @brief Стадия корректора при расчете со вторым порядком
-    void fluxes_stage2(Mesh &mesh, double dt, Direction dir = Direction::ANY);
+    void fluxes_stage2(EuMesh &mesh, double dt, Direction dir = Direction::ANY);
 
     /// @brief Обмен слоев
-    void swap(Mesh &mesh);
+    void swap(EuMesh &mesh);
 
     Flux calc_crp_flux(const PState& zL, const PState& zR, double hL, double hR, int iA, double a_sig, double dt);
 
@@ -209,6 +203,7 @@ protected:
     double m_max_dt;    ///< Максимальный шаг интегрирования
 };
 
+/*
 std::ostream &operator<<(std::ostream &os, const MmFluid::State &state) {
     os << boost::format(
             "Main state: density: %1%, velocity: {%2%, %3%, %4%}, pressure: %5%, temperature: %6%, energy: %7%, mass_frac: %8%\n") %
@@ -224,5 +219,6 @@ std::ostream &operator<<(std::ostream &os, const MmFluid::State &state) {
           state.next.pressure % state.next.temperature % state.next.energy % state.next.mass_frac;
     return os;
 }
+*/
 
 } // namespace zephyr

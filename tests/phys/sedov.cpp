@@ -1,28 +1,26 @@
-#include <vector>
-
+#include <zephyr/utils/numpy.h>
 #include <zephyr/utils/matplotlib.h>
-#include <zephyr/phys/tests/sedov_blast.h>
+#include <zephyr/phys/tests/sedov.h>
 
 namespace plt = zephyr::utils::matplotlib;
 
-using zephyr::phys::SedovBlast3D;
+using namespace zephyr;
+using zephyr::phys::Sedov3D;
 
 int main() {
-    SedovBlast3D test({.gamma=1.4, .rho0=1.0, .E=1.0});
+    Sedov3D test({.gamma=1.4, .rho0=1.0, .E=1.0});
 
     double t0 = test.time_by_radius(0.6);
 
     int n = 300;
-    std::vector<double> r(n);
+    auto r = np::linspace(0.0, 1.0, n);
 
-    std::vector<double> rho(n);
-    std::vector<double> P(n);
-    std::vector<double> v(n);
-    std::vector<double> e(n);
+    auto rho = np::zeros(n);
+    auto P   = np::zeros(n);
+    auto v   = np::zeros(n);
+    auto e   = np::zeros(n);
 
     for (int i = 0; i < n; ++i) {
-        r[i] = double(i) / (n - 1);
-
         rho[i] = test.density (r[i], t0);
         P[i]   = test.pressure(r[i], t0);
         v[i]   = test.velocity(r[i], t0);

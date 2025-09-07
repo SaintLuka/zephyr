@@ -21,9 +21,9 @@ public:
     static VD3::Ptr create(const Box& domain, int size) {
         return std::make_shared<VD3>(domain, size);
     }
-
+    
     /// @brief Основная функция. Определение нового ранга ячейки.
-    int rank(AmrStorage::Item& elem) const final;
+    int rank(const EuCell& elem) const final;
 
     /// @brief Балансировка нагрузки
     void balancing(const std::vector<double>& w) final;

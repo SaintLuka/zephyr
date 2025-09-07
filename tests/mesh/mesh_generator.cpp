@@ -1,7 +1,8 @@
 #include <iostream>
 #include <vector>
 
-#include <zephyr/mesh/mesh.h>
+#if 0
+#include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/io/vtu_file.h>
 
 #include <zephyr/geom/box.h>
@@ -68,11 +69,11 @@ struct Test {
         BlockStruct1, BlockStruct2, BlockStruct3
     };
 
-    std::string name;  ///< Название теста
-    std::string file;  ///< Имя выходного файла
-    std::string desc;  ///< Описание теста
+    std::string name;  //< Название теста
+    std::string file;  //< Имя выходного файла
+    std::string desc;  //< Описание теста
     
-    Generator::Ptr generator;  ///< Сеточный генератор
+    Generator::Ptr generator;  //< Сеточный генератор
     
     Test(TestType test);
 
@@ -508,3 +509,6 @@ LaMesh Test::gen_la() const {
 
     return mesh;
 }
+#else
+int main(int argc, char *argv[]) { return -1; }
+#endif

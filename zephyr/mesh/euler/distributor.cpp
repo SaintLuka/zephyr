@@ -1,30 +1,28 @@
-#include <cstring>
-
 #include <zephyr/mesh/euler/distributor.h>
+#include <zephyr/mesh/euler/eu_prim.h>
 
 namespace zephyr::mesh {
 
 Distributor::Distributor() {
-    split = [](AmrStorage::Item &parent, Children &children) {};
-    merge = [](Children &children, AmrStorage::Item &parent) {};
+    split = [](const EuCell &parent, Children &children) {};
+    merge = [](const Children &children, EuCell &parent) {};
 }
 
 Distributor Distributor::empty() {
-    return Distributor();
+    return {};
 }
 
 Distributor Distributor::simple() {
     Distributor ds;
-
-    ds.split = [](AmrStorage::Item &parent, Children &children) {
-        int ds = children.datasize();
-        for (auto &child: children) {
-            std::memcpy(child.data(), parent.data(), ds);
+    
+    ds.split = [](const EuCell &parent, Children &children) {
+        for (auto child: children) {
+            parent.copy_data_to(child);
         }
     };
 
-    ds.merge = [](Children &children, AmrStorage::Item &parent) {
-        std::memcpy(parent.data(), children[0].data(), children.datasize());
+    ds.merge = [](const Children &children, EuCell &parent) {
+        children[0].copy_data_to(parent);
     };
 
     return ds;

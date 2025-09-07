@@ -1,23 +1,20 @@
 #pragma once
 
 #include <array>
-#include <vector>
 
 #include <zephyr/geom/vector.h>
 #include <zephyr/geom/primitives/quad.h>
 
 namespace zephyr::geom {
 
-/// @addtogroup Geom-Primitives
+/// @addtogroup geom-primitives
 /// @{
 
-/// @struct Cube cube.h
-/// @brief Представление шестигранника (топологический куб)
-/// @details Линейное отображение куба [-1, 1]^3 на произвольный
-/// топологический кубоид.
-struct Cube {
+/// @brief Топологический кубоид.
+/// Полилинейное отображение куба [-1, 1]^3 на произвольный кубоид.
+class Cube {
 protected:
-    /// @brief Вешины (таблица 2 x 2 x 2)
+    /// @brief Вершины (таблица 2 x 2 x 2)
     std::array<Vector3d, 8> verts;
 
 public:
@@ -36,19 +33,15 @@ public:
 
     /// @brief Прямой доступ к данным по индексу
     /// @param idx in [0..7]
-    inline Vector3d &operator[](int idx) {
-        return verts[idx];
-    }
+    Vector3d &operator[](int idx) { return verts[idx]; }
 
     /// @brief Прямой доступ к данным по индексу
     /// @param idx in [0..7]
-    inline const Vector3d &operator[](int idx) const {
-        return verts[idx];
-    }
+    const Vector3d &operator[](int idx) const { return verts[idx]; }
 
     /// @brief Отображает индексы {-1, +1}^3 в [0..7]
     template <int i, int j, int k>
-    inline static constexpr int iss() {
+    static constexpr int iss() {
         static_assert(i * i == 1 && j * j == 1 && k * k == 1,
                       "Available indices: {-1, +1}");
         return 2*(k + 1) + j + 1 + (i + 1) / 2;
@@ -59,18 +52,14 @@ public:
     /// @tparam j in {-1, +1}
     /// @tparam k in {-1, +1}
     template <int i, int j, int k>
-    inline Vector3d &vs() {
-        return verts[iss<i, j, k>()];
-    }
+    Vector3d &vs() { return verts[iss<i, j, k>()]; }
 
     /// @brief Оператор доступа по индексам отображения
     /// @tparam i in {-1, +1}
     /// @tparam j in {-1, +1}
     /// @tparam k in {-1, +1}
     template <int i, int j, int k>
-    inline const Vector3d &vs() const {
-        return verts[iss<i, j, k>()];
-    }
+    const Vector3d &vs() const { return verts[iss<i, j, k>()]; }
 
     /// @brief Непосредственно отображение
     Vector3d operator()(double x, double y, double z) const;
@@ -98,13 +87,11 @@ public:
     Vector3d centroid(double volume = 0.0) const;
 };
 
-/// @struct SqCube cube.h
-/// @brief Представление квадратичного шестигранника (топологический куб)
-/// @details Квадратичное отображение куба [-1, 1]^3 на произвольный
-/// топологический кубоид.
-struct SqCube {
+/// @brief Криволинейный кубоид.
+/// Поликвадратичное отображение куба [-1, 1]^3 на криволинейный кубоид.
+class SqCube {
 protected:
-    /// @brief Вешины (таблица 3 x 3 x 3)
+    /// @brief Вершины (таблица 3 x 3 x 3)
     std::array<Vector3d, 27> verts;
 
 public:
@@ -140,14 +127,12 @@ public:
     SqCube(const SqQuad& quad);
 
     /// @brief Интерпретировать первый слой как двумерное отображение
-    inline SqQuad& as2D() {
-        return *reinterpret_cast<SqQuad *>(verts.data());
-    };
+    SqQuad& as2D() { return *reinterpret_cast<SqQuad *>(verts.data()); }
 
     /// @brief Интерпретировать первый слой как двумерное отображение
-    inline const SqQuad& as2D() const {
+    const SqQuad& as2D() const {
         return *reinterpret_cast<const SqQuad*>(verts.data());
-    };
+    }
 
     /// @brief Удалить промежуточные вершины и вернуть простой кубоид
     Cube reduce() const;
@@ -157,19 +142,15 @@ public:
 
     /// @brief Прямой доступ к данным по индексу
     /// @param idx in [0..27)
-    inline Vector3d &operator[](int idx) {
-        return verts[idx];
-    }
+    Vector3d &operator[](int idx) { return verts[idx]; }
 
     /// @brief Прямой доступ к данным по индексу
     /// @param idx in [0..27)
-    inline const Vector3d &operator[](int idx) const {
-        return verts[idx];
-    }
+    const Vector3d &operator[](int idx) const { return verts[idx]; }
 
     /// @brief Отображает индексы {-1, 0, +1}^3 в [0..27)
     template <int i, int j, int k>
-    inline static constexpr int iss() {
+    static constexpr int iss() {
         static_assert(i * i <= 1 && j * j <= 1 && k * k <= 1,
                       "Available indices: {-1, 0, +1}");
         return 9*(k + 1) + 3*(j + 1) + i + 1;
@@ -180,18 +161,14 @@ public:
     /// @tparam j in {-1, 0, +1}
     /// @tparam k in {-1, 0, +1}
     template <int i, int j, int k = -1>
-    inline Vector3d &vs() {
-        return verts[iss<i, j, k>()];
-    }
+    Vector3d &vs() { return verts[iss<i, j, k>()]; }
 
     /// @brief Оператор доступа по индексам отображения
     /// @tparam i in {-1, 0, +1}
     /// @tparam j in {-1, 0, +1}
     /// @tparam k in {-1, 0, +1}
     template <int i, int j, int k = -1>
-    inline const Vector3d &vs() const {
-        return verts[iss<i, j, k>()];
-    }
+    const Vector3d &vs() const { return verts[iss<i, j, k>()]; }
 
     /// @brief Непосредственно отображение
     Vector3d operator()(double x, double y, double z) const;

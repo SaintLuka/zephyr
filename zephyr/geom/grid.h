@@ -58,9 +58,6 @@ public:
     /// @brief Добавить соседа
     void add_neib_cell(int idx);
 
-    /// @brief Создать базовую вершину для размещения в хранилище
-    mesh::MovNode bnode() const;
-
 private:
     /// @brief Множество граничных условий, для узла может быть более одного
     /// граничного условия
@@ -166,10 +163,8 @@ public:
 
     void setup_adjacency();
 
-
-    mesh::AmrCell amr_cell(int idx) const;
-
-    mesh::MovCell mov_cell(int idx) const;
+    // Интересный код
+    //mesh::AmrCell amr_cell(int idx) const;
 
     void assume_structured(int nx, int ny, int nz = 1);
 

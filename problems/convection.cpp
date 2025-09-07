@@ -7,7 +7,7 @@
 #include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/geom/generator/cuboid.h>
 
-#include <zephyr/mesh/mesh.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
 
 #include <zephyr/math/solver/convection.h>
 
@@ -19,10 +19,11 @@
 using zephyr::geom::Box;
 using zephyr::geom::Boundary;
 using zephyr::geom::Vector3d;
-using zephyr::mesh::generator::Rectangle;
-using zephyr::mesh::generator::Cuboid;
-using zephyr::mesh::AmrStorage;
-using zephyr::mesh::Mesh;
+using zephyr::geom::generator::Rectangle;
+using zephyr::geom::generator::Cuboid;
+using zephyr::mesh::EuCell;
+using zephyr::mesh::EuMesh;
+using zephyr::mesh::Storable;
 using zephyr::io::PvdFile;
 using zephyr::utils::threads;
 using zephyr::utils::Stopwatch;
@@ -40,34 +41,21 @@ public:
     }
 };
 
-// Получим тип данных
-Solver::State U = Solver::datatype();
-
-// Переменные для сохранения
-double get_u(AmrStorage::Item& cell)  { return cell(U).u1; }
-
-double get_ux(AmrStorage::Item& cell)  { return cell(U).ux; }
-
-double get_uy(AmrStorage::Item& cell)  { return cell(U).uy; }
-
-double get_lvl(AmrStorage::Item& cell)  { return cell.level; }
-
 const double margin = 0.0198;
 
 // Начальное условие в виде круга
-void setup_initial_1(Mesh& mesh, double D) {
+void setup_initial_1(EuMesh& mesh, double D, Storable<double> u) {
     //double R = D / 2.0;
     //Vector3d vc = {R + margin, R + margin, 0.2};
     double R = 0.1;
     Vector3d vc = {0.15, 0.15, 0.0};
     for (auto cell: mesh) {
-        cell(U).u1 = (cell.center() - vc).norm() < R ? 1.0 : 0.0;
-        cell(U).u2 = 0.0;
+        cell(u) = (cell.center() - vc).norm() < R ? 1.0 : 0.0;
     }
 }
 
 // Начальное условие в виде квадрата
-void setup_initial_2(Mesh& mesh, double D) {
+void setup_initial_2(EuMesh& mesh, double D, Storable<double> u) {
     double x_min = margin;
     double x_max = D + x_min;
     double y_min = margin;
@@ -77,28 +65,19 @@ void setup_initial_2(Mesh& mesh, double D) {
         Vector3d vc = cell.center();
         if (x_min <= vc.x() && vc.x() <= x_max &&
             y_min <= vc.y() && vc.y() <= y_max) {
-            cell(U).u1 = 1.0;
+            cell(u) = 1.0;
         } else {
-            cell(U).u1 = 0.0;
+            cell(u) = 0.0;
         }
-        cell(U).u2 = 0.0;
+        cell(u) = 0.0;
     }
 }
 
 int main() {
     threads::on();
 
-    // Файл для записи
-    PvdFile pvd("mesh", "output");
-
-    // Переменные для сохранения
-    pvd.variables += {"u",  get_u};
-    pvd.variables += {"ux", get_ux};
-    pvd.variables += {"uy", get_uy};
-    pvd.variables += {"lvl", get_lvl};
-
     // Геометрия области
-#define GENTYPE 1
+#define GENTYPE 3
 
 #if GENTYPE == 1
     // Прямоугольник
@@ -111,7 +90,7 @@ int main() {
 #elif GENTYPE == 2
     // Прямоугольник из сот
     Rectangle gen(0.0, 1.0, 0.0, 0.6, true);
-    gen.set_nx(300);
+    gen.set_nx(500);
     gen.set_boundaries({
         .left   = Boundary::ZOE, .right = Boundary::ZOE,
         .bottom = Boundary::ZOE, .top   = Boundary::ZOE});
@@ -132,14 +111,38 @@ int main() {
     // Настроим решатель
     solver.set_CFL(0.5);
     solver.set_accuracy(3);
-    solver.set_limiter("van Leer");
+    solver.set_limiter("MC");
 
     // Создать сетку
-    Mesh mesh(gen, U);
+    EuMesh mesh(gen);
+
+    /*
+    if (mesh.check_base() < 0) {
+        int res = mesh.check_base();
+        std::cout << "Bad init mesh " << res << "\n";
+        return 0;
+    }
+     */
+
+    // Добавить переменные на сетку
+    solver.add_types(mesh);
 
     // Настраиваем адаптацию
-    mesh.set_max_level(5);
+    mesh.set_max_level(mesh.dim() < 3 ? 5 : 4);
     mesh.set_distributor(solver.distributor());
+
+    // Файл для записи
+    PvdFile pvd("mesh", "output");
+
+    // Переменные для сохранения
+    pvd.variables = {"level"};
+    pvd.variables += {"u", [&solver](EuCell& cell) { return cell(solver.u_curr); } };
+    pvd.variables += {"u2", [&solver](EuCell& cell) { return cell(solver.u_next); } };
+    pvd.variables += {"uh", [&solver](EuCell& cell) { return cell(solver.u_half); } };
+    pvd.variables += {"dx", [&solver](EuCell& cell) { return cell(solver.du_dx); } };
+    pvd.variables += {"dy", [&solver](EuCell& cell) { return cell(solver.du_dy); } };
+    pvd.variables += {"vx", [&solver](EuCell& cell) { return solver.velocity(cell.center()).x(); } };
+    pvd.variables += {"vy", [&solver](EuCell& cell) { return solver.velocity(cell.center()).y(); } };
 
     // Заполняем начальные данные
     Box box = mesh.bbox();
@@ -147,9 +150,17 @@ int main() {
 
     // Адаптация под начальные данные
     for (int k = 0; k < mesh.max_level() + 3; ++k) {
-        setup_initial_1(mesh, D);
+        setup_initial_1(mesh, D, solver.u_curr);
         solver.set_flags(mesh);
         mesh.refine();
+
+        /*
+        if (mesh.check_refined() < 0) {
+            int res = mesh.check_refined();
+            std::cout << "Bad init refinement\n";
+            return 0;
+        }
+         */
     }
 
     Stopwatch elapsed;
@@ -168,7 +179,7 @@ int main() {
         if (curr_time >= next_write) {
             std::cout << "\tШаг: " << std::setw(6) << n_step << ";"
                       << "\tВремя: " << std::setw(6) << std::setprecision(3) << curr_time << "\n";
-            pvd.save(mesh.locals(), curr_time);
+            pvd.save(mesh, curr_time);
             next_write += 0.02;
         }
         sw_write.stop();

@@ -1,20 +1,18 @@
 #pragma once
 
-#include <array>
 #include <vector>
 #include <functional>
 
 #include <zephyr/geom/box.h>
 #include <zephyr/geom/vector.h>
 #include <zephyr/geom/cell_type.h>
-#include <zephyr/geom/primitives/line.h>
 
 namespace zephyr::geom {
 
-/// @addtogroup Geom-Primitives
+/// @addtogroup geom-primitives
 /// @{
 
-/// @brief Представление многогранника
+/// @brief Многогранник общего вида.
 class Polyhedron {
 public:
     /// @brief Пустой многогранник (заглушка)
@@ -49,14 +47,10 @@ public:
     int n_faces() const { return faces.size(); }
 
     /// @brief Вершина по индексу
-    const Vector3d& vertex(int idx) const {
-        return verts[idx];
-    }
+    const Vector3d& vertex(int idx) const { return verts[idx]; }
 
     /// @brief Индексы вершин грани
-    const std::vector<int>& face_indices(int idx) const {
-        return faces[idx];
-    }
+    const std::vector<int>& face_indices(int idx) const { return faces[idx]; }
 
     /// @brief Ограничивающий прямоугольник
     Box bbox() const;
@@ -92,17 +86,21 @@ public:
     /// @details На данный момент приближение -- просто ценр
     Vector3d centroid(double vol = 0.0) const;
 
-    /// @brief Привести к каноническому виду, 3 или 4 вершины на гранях
-    /// @details Новые вершины не добавляются и массив вершин не изменяется,
-    /// всего лишь новые индексы на гранях
-    void canonic();
+    /// @brief Возвращает 'true', если одна из граней имеет более
+    /// max_vertices вершин
+    bool need_simplify(int max_vertices) const;
+
+    /// @brief Разбить грани таким образом, чтобы каждая грань содержала
+    /// не более max_vertices вершин. При этом вершины не добавляются.
+    void simplify_faces(int max_vertices);
 
     /// @brief Объем внутри многогранника на пересечении с характеристической
     /// функцией inside. Вычисляется приближенно с точностью ~ 1 / N
     /// @param inside Характеристическая функция, возвращает true, если точка p
     /// находится внутри области, иначе -- false.
     /// @param N Число пробных точек
-    double clip_volume(const std::function<bool(const Vector3d& p)>& inside, int N = 10000) const;
+    double clip_volume(const std::function<bool(const Vector3d& p)>& inside,
+                       int N = 10000) const;
 
     /// @brief Отсечь от полигона часть с помощью плоскости с внешней нормалью n,
     /// проходящей через точку p
@@ -114,7 +112,7 @@ public:
     /// Равносильно вызову polyhedron.clip(p, n).volume(), но быстрее.
     double clip_volume(const Vector3d& p, const Vector3d& n) const;
 
-    /// @brief Находит отсечение от многогранника с заданой объемной долей
+    /// @brief Находит отсечение от многогранника с заданной объемной долей
     /// @param n Внешняя нормаль плоскости
     /// @param alpha Объемная доля
     /// @return Точка плоскости
@@ -136,7 +134,7 @@ public:
     /// @brief Единичный куб с центром в начале координат
     static Polyhedron Cube() { return Polyhedron::Cuboid(1.0, 1.0, 1.0); }
 
-    /// @brief Прямугольный параллелепипед со сторонами [a, b, c] и центром
+    /// @brief Прямоугольный параллелепипед со сторонами [a, b, c] и центром
     /// в начале координат
     static Polyhedron Cuboid(double a, double b, double c);
 
@@ -146,7 +144,7 @@ public:
     /// @brief Треугольная призма, вписана в единичную сферу
     static Polyhedron Wedge();
 
-    /// @brief Правильный тэтраэдр, вписан в единичную сферу
+    /// @brief Правильный тетраэдр, вписан в единичную сферу
     static Polyhedron Tetrahedron();
 
     /// @brief Правильный октаэдр, вписан в единичную сферу
@@ -165,14 +163,17 @@ protected:
     void build(const std::vector<Vector3d>& vertices,
                const std::vector<std::vector<int>>& face_indices);
 
-    /// @brief Заменить вершины у грани
-    void replace_face(int face_idx, int v1, int v2, int v3, int v4);
+
+    /// @brief Упрощает грань, возвращает массивы индексов, на которых можно
+    /// построить новые грани
+    std::vector<std::vector<int>> simplified_faces(
+            int face_idx, int max_vertices) const;
+
+    /// @brief Заменить вершины грани
+    void replace_face(int face_idx, const std::vector<int>& vs);
 
     /// @brief Добавить грань на существующих вершинах
-    void add_face(int v1, int v2, int v3);
-
-    /// @brief Добавить грань на существующих вершинах
-    void add_face(int v1, int v2, int v3, int v4);
+    void add_face(const std::vector<int>& vs);
 
     // Базовые поля
     std::vector<Vector3d> verts;          ///< Массив вершин
@@ -184,7 +185,8 @@ protected:
     std::vector<Vector3d> faces_s;        ///< Нормаль с площадью
 };
 
-std::ostream& operator<<(std::ostream& os, const Polyhedron& poly);
+/// @brief Вывод многогранника в консоль
+static std::ostream& operator<<(std::ostream& os, const Polyhedron& poly);
 
 /// @}
 

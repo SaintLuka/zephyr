@@ -1,6 +1,5 @@
-#list(APPEND TESTS asigma)
 #list(APPEND TESTS weno)
-list(APPEND TESTS derivatives)
+#list(APPEND TESTS derivatives)
 
 # Assume all files in direcory are tests
 if (ZEPHYR_TESTS_ALL)
@@ -16,7 +15,6 @@ endif()
 
 # Can't compile targets without python
 if (NOT ZEPHYR_PYTHON)
-    list(REMOVE_ITEM TESTS asigma)
     list(REMOVE_ITEM TESTS weno)
 endif()
 

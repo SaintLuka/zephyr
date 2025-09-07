@@ -1,35 +1,31 @@
-/// @file Файл содержит реализацию простой функции балансировки флагов адаптации.
-/// Данный файл не устанавливается при установке zephyr, все изложенные описания
-/// алгоритмов и комментарии к функциям предназначены исключительно для
-/// разработчиков. Хотя вряд ли кто-то когда-нибудь попробует в этом разобраться.
-
+// Не устанавливается при установке zephyr, детали алгоритмов и комментарии
+// к функциям предназначены для разработчиков.
 #pragma once
 
 #include <zephyr/mesh/amr/common.h>
 #include <zephyr/mesh/amr/siblings.h>
 #include <zephyr/mesh/amr/balancing_restrictions.h>
-#include <zephyr/io/vtu_file.h>
 
 namespace zephyr::mesh::amr {
 
-/// @struct Vicinity - окрестность, прикольное слово, да?
-/// @brief Простая структура, содержит ссылки на данные (уровни и флаги)
-/// сосдених ячеек и сиблингов, требуется для быстрого доступа к информации
-/// об обновлении соседей или сиблингов.
-/// Для ячеек с флагом = 1 данные не хранятся (нет необходимости), для
-/// ячеек с флагом = 0 не хранятся данные о сиблингах.
+/// @brief Окрестность ячейки.
+///
+/// Структура содержит ссылки на данные (уровни и флаги) соседних ячеек
+/// и сиблингов, используется для быстрого доступа к информации об
+/// обновлении соседей или сиблингов. Для ячеек с флагом = 1 данные
+/// не хранятся (нет необходимости), для ячеек с флагом = 0 не хранятся
+/// данные о сиблингах.
 template<int dim>
 struct Vicinity {
 private:
-
     /// @brief Тип данных amr.flag
     using flag_type = int;
 
     /// @brief Максимальное число соседей
-    static const int max_neibs_size = FpC(dim) * FpF(dim);
+    static constexpr int max_neibs_size = FpC(dim) * FpF(dim);
 
     /// @brief Максимальное число сиблингов
-    static const int max_sibs_size = CpC(dim) - 1;
+    static constexpr int max_sibs_size = CpC(dim) - 1;
 
     int neib_count;                               ///< Действительное количество соседей
     int neib_levels[max_neibs_size];              ///< Уровни адаптации соседей
@@ -39,77 +35,78 @@ private:
     const flag_type *sibs_flags[max_sibs_size];   ///< Ссылки на флаги адаптации сиблингов
 
 public:
-
     int max_neib_wanted_level;                    ///< Максимальный желаемый уровень среди соседей
     int max_sibs_flag;                            ///< Максимальный флаг сиблинга
-
 
     /// @brief Конструктор по умолчанию - данные отсутствуют
     Vicinity() : neib_count(0), sibs_count(0) {};
 
     /// @brief Заполнение списков соседей для ячейки
-    /// @param cell Целевая ячейка, для которой определяется окрестность
+    /// @param ic Целевая ячейка, для которой определяется окрестность
     /// @param locals Ссылка на локальное хранилище
     /// @param aliens Ссылка на хранилище ячеек с других процессов
-    void setup(const AmrCell& cell, AmrStorage &locals, AmrStorage& aliens) {
-        scrutiny_check(cell.index < locals.size(), "setup: ic >= locals.size()")
+    void setup(index_t ic, AmrCells &locals, AmrCells& aliens) {
+        scrutiny_check(ic < locals.size(), "setup: ic >= locals.size()")
 
         neib_count = 0;
         sibs_count = 0;
 
         // Эти ячейки не интересуют
-        if (cell.flag > 0) {
+        if (locals.flag[ic] > 0) {
             return;
         }
 
+        auto &adj = locals.faces.adjacent;
+
         // Поиск соседей
-        for (auto &face: cell.faces) {
-            if (face.is_undefined() || face.is_boundary()) {
+        for (auto iface: locals.faces_range(ic)) {
+            if (locals.faces.is_undefined(iface) ||
+                locals.faces.is_boundary(iface)) {
                 continue;
             }
 
-            auto &adj = face.adjacent;
 #if SCRUTINY
-            if (adj.rank == cell.rank) {
-                if (adj.index >= locals.size()) {
-                    std::cerr << "rank: " << adj.rank << "\n";
+            if (adj.rank[iface] == locals.rank[ic]) {
+                if (adj.index[iface] >= locals.size()) {
+                    std::cerr << "rank: " << adj.rank[iface] << "\n";
                     std::cerr << "locals.size: " << locals.size() << "\n";
-                    std::cerr << "adj.index: " << adj.index << "\n";
+                    std::cerr << "adj.index: " << adj.index[iface] << "\n";
                     throw std::runtime_error("Vicinity::setup error #11");
                 }
             } else {
-                if (adj.alien >= aliens.size()) {
+                if (adj.alien[iface] >= aliens.size()) {
                     throw std::runtime_error("Vicinity::setup error #2");
                 }
             }
 #endif
-            AmrCell& neib = adj.rank == cell.rank ? locals[adj.index] : aliens[adj.alien];
+            auto [neibs, jc] = adj.get_neib(iface, locals, aliens);
 
-            neib_levels[neib_count] = neib.level;
-            neib_flags[neib_count] = &neib.flag;
+            neib_levels[neib_count] = neibs.level[jc];
+            neib_flags[neib_count] = &neibs.flag[jc];
             ++neib_count;
         }
         scrutiny_check(neib_count <= max_neibs_size, "nei_count > max_neibs_size")
 
         // Поиск сиблингов для ячеек с флагом -1
-        if (cell.flag  < 0) {
-            if (!can_coarse<dim>(cell, locals)) {
-                cell.print_info();
+        if (locals.flag[ic] < 0) {
+#if SCRUTINY
+            if (!can_coarse<dim>(locals, ic)) {
+                locals.print_info(ic);
             }
-            scrutiny_check(can_coarse<dim>(cell, locals), "Can't coarse")
+            scrutiny_check(can_coarse<dim>(locals, ic), "Can't coarse")
+#endif
 
             // Код выполняется только если can_coarse было истинно,
-            // поэтому можно не волноваться о начилии сиблингов
-            auto sibs = get_siblings<dim>(cell, locals);
+            // поэтому можно не волноваться о наличии сиблингов
+            auto sibs = get_siblings<dim>( locals, ic);
             for (auto is: sibs) {
                 scrutiny_check(is < locals.size(), "Vicinity: Sibling index out of range")
 
-                sibs_flags[sibs_count] = &locals[is].flag;
+                sibs_flags[sibs_count] = &locals.flag[is];
                 ++sibs_count;
             }
 
             scrutiny_check(sibs_count == max_sibs_size, "Wrong siblings count")
-
         }
     }
 
@@ -132,14 +129,14 @@ public:
         max_sibs_flag = -1;
         for (int i = 0; i < sibs_count; ++i) {
             scrutiny_check(sibs_flags[i] != nullptr, "Undefined neighbor")
-            max_sibs_flag = std::max(max_sibs_flag, int(*sibs_flags[i]));
+            max_sibs_flag = std::max(max_sibs_flag, static_cast<int>(*sibs_flags[i]));
         }
     }
 };
 
-/// @struct VicinityList - массив структур типа Vicinity.
-/// @brief Для ячеек с флагом = 1 данные не хранятся (нет необходимости),
-/// для ячеек с флагом = 0 не хранятся данные о сиблингах.
+// Массив структур типа Vicinity.
+// Для ячеек с флагом = 1 данные не хранятся (нет необходимости),
+// для ячеек с флагом = 0 не хранятся данные о сиблингах.
 template <int dim>
 struct VicinityList {
     std::vector<Vicinity<dim>> m_list;
@@ -151,27 +148,23 @@ struct VicinityList {
     /// @brief Конструктор построения окружения
     /// @param locals Ссылка на локальное хранилище
     /// @param aliens Ссылка на хранилище ячеек с других процессов
-    void fill(AmrStorage& locals, AmrStorage& aliens) {
+    void fill(AmrCells& locals, AmrCells& aliens) {
         m_list.resize(locals.size());
-        threads::for_each(
-                locals.begin(), locals.end(),
-                [this, &locals, &aliens](const AmrStorage::Item &item) {
-                    m_list[item.index].setup(item, locals, aliens);
+        threads::parallel_for(index_t{0}, index_t{locals.size()},
+                [this, &locals, &aliens](index_t ic) {
+                    m_list[ic].setup(ic, locals, aliens);
                 });
     }
 
     /// @brief Собрать актуальные данные о соседях и сиблингах для всех ячеек.
     /// Функция инициализирует max_neib_wanted_level и max_sibs_flag.
     void update() {
-        threads::for_each(
-                m_list.begin(), m_list.end(),
-                [](Vicinity<dim> &ca) {
-                    ca.update();
-                });
+        threads::for_each( m_list.begin(), m_list.end(),
+            [](Vicinity<dim> &ca) { ca.update(); });
     }
 
     /// @brief Оператор доступа к элементу списка
-    const Vicinity<dim>& operator[](int ic) const {
+    const Vicinity<dim>& operator[](index_t ic) const {
         scrutiny_check(ic < m_list.size(), "ic >= Vicinity.m_list.size()")
         return m_list[ic];
     }
@@ -179,48 +172,48 @@ struct VicinityList {
 
 /// @brief Повышает флаг адаптации для ячейки, соседи которой убегают вперед
 /// (хотят уровень на 2 выше), а также для ячейки, которая хочет огрубиться
-/// в отличае от своих сиблингов.
+/// в отличие от своих сиблингов.
 /// @param cell Целевая ячейка
 /// @param locals Ссылка на локальное хранилище
 /// @param vicinity_list Ссылка на массив с окружением ячеек
 /// @return true если ячейка изменила свой флаг
 template <int dim>
-bool update_flag(AmrCell& cell, const VicinityList<dim>& vicinity_list) {
-    auto vicinity = vicinity_list[cell.index];
+bool update_flag(index_t ic, AmrCells& locals, const VicinityList<dim>& vicinity_list) {
+    scrutiny_check(ic < locals.size(), "update_flag error: ic >= locals.size()")
 
-    if (cell.flag > 0) {
-        return false;
-    }
+    if (locals.flag[ic] > 0) { return false; }
+
+    const auto& vicinity = vicinity_list[ic];
 
     // Максимальный желаемый уровень соседей
     auto neibs_wanted_lvl = vicinity.max_neib_wanted_level;
 
     // Ячейка не хочет меняться
-    if (cell.flag == 0) {
+    if (locals.flag[ic] == 0) {
         // Один из соседей хочет слишком высокий уровень
-        if (neibs_wanted_lvl > cell.level + 1) {
-            cell.flag = 1;
+        if (neibs_wanted_lvl > locals.level[ic] + 1) {
+            locals.flag[ic] = 1;
             return true;
         }
     } else {
         // Ячейка хочет огрубиться, cell.flag < 0
-        scrutiny_check(cell.flag < 0, "update_flag: wrong assumption")
+        scrutiny_check(locals.flag[ic] < 0, "update_flag: wrong assumption")
 
         // Один из соседей хочет слишком высокий уровень
-        if (neibs_wanted_lvl > cell.level + 1) {
-            cell.flag = 1;
+        if (neibs_wanted_lvl > locals.level[ic] + 1) {
+            locals.flag[ic] = 1;
             return true;
         }
 
         // Один из соседей хочет достаточно высокий уровень
-        if (neibs_wanted_lvl > cell.level) {
-            cell.flag = 0;
+        if (neibs_wanted_lvl > locals.level[ic]) {
+            locals.flag[ic] = 0;
             return true;
         }
 
         // Один из сиблингов не хочет огрубляться
         if (vicinity.max_sibs_flag > -1) {
-            cell.flag = 0;
+            locals.flag[ic] = 0;
             return true;
         }
     }
@@ -231,23 +224,24 @@ bool update_flag(AmrCell& cell, const VicinityList<dim>& vicinity_list) {
 /// @brief Выполняет функцию update_flag для всех ячеек
 /// @return true если хотя бы одна ячейка изменила свой флаг
 template <int dim>
-bool flag_balancing_step(AmrStorage& locals, const VicinityList<dim>& vicinity_list) {
+bool flag_balancing_step(AmrCells& locals, const VicinityList<dim>& vicinity_list) {
     // Функция max в данном контексте заменяет логическое "И"
+    range<index_t> range(0, locals.size());
     return threads::max(
-            locals.begin(), locals.end(),
-            update_flag<dim>, std::ref(vicinity_list)
+            range.begin(), range.end(),
+            update_flag<dim>, std::ref(locals), std::ref(vicinity_list)
     );
 }
 
-/// @brief Простая версия функции балансировки флагов.
+/// @brief Простая итерационная версия функции балансировки флагов.
 /// Функция меняет флаги адаптации ячеек в хранилище с сохранением баланса
 /// 1:2 у соседних ячеек. Баланс достигается повышением флагов адаптации
 /// (-1 и 0) у части ячеек.
 /// @param locals Ссылка на локальное хранилище ячеек
 /// @param aliens Ссылка на хранилище ячеек с других процессов
-/// @param max_level Максимальный уровень ячеек
+/// @param max_level Максимальный уровень адаптации ячеек
 /// @details Детали алгоритма. На первом этапе собирается информация об
-/// окружении ячеек (ссылки на флаги и уровни соседей и сиблингов), которая
+/// окружении ячеек (указатели на флаги и уровни соседей и сиблингов), которая
 /// заносится в отдельный массив. Сбор информации необходим для быстрого
 /// доступа к меняющимся в течении алгоритма данным соседей.
 /// На втором этапе выполняется многократный обход всех ячеек с повышением
@@ -258,17 +252,19 @@ bool flag_balancing_step(AmrStorage& locals, const VicinityList<dim>& vicinity_l
 /// (и достаточно эффективно) реализуется многопоточность, также алгоритм легко
 /// обобщается на многопроцессорную систему.
 template<int dim>
-void balance_flags_slow(AmrStorage &locals, AmrStorage& aliens, int max_level) {
-    static Stopwatch base_restrictions_timer;
+void balance_flags_slow(AmrCells& locals, int max_level) {
+    static Stopwatch restriction_timer;
     static Stopwatch setup_vicinity_timer;
     static Stopwatch flag_balancing_timer;
 
+    static AmrCells aliens;
+
+    restriction_timer.resume();
+    base_restrictions<dim>(locals, max_level);
+    restriction_timer.stop();
+
     // Делаем статическим, чтобы не выделять каждый раз память (гениально)
     static VicinityList<dim> vicinity_list;
-
-    base_restrictions_timer.resume();
-    base_restrictions<dim>(locals, max_level);
-    base_restrictions_timer.stop();
 
     setup_vicinity_timer.resume();
     vicinity_list.fill(locals, aliens);
@@ -285,9 +281,9 @@ void balance_flags_slow(AmrStorage &locals, AmrStorage& aliens, int max_level) {
 #if CHECK_PERFORMANCE
     static size_t counter = 0;
     if (counter % amr::check_frequency == 0) {
-        std::cout << "    Restrictions elapsed:   " << std::setw(10) << base_restrictions_timer.milliseconds() << " ms\n";
-        std::cout << "    Setup vicinity elapsed: " << std::setw(10) << setup_vicinity_timer.milliseconds() << " ms\n";
-        std::cout << "    Flag balancing elapsed: " << std::setw(10) << flag_balancing_timer.milliseconds() << " ms\n";
+        mpi::cout << "    Base restrictions: " << std::setw(8) << restriction_timer.milliseconds() << " ms\n";
+        mpi::cout << "    Setup vicinity:    " << std::setw(8) << setup_vicinity_timer.milliseconds() << " ms\n";
+        mpi::cout << "    Flag balancing:    " << std::setw(8) << flag_balancing_timer.milliseconds() << " ms\n";
     }
     ++counter;
 #endif
@@ -295,11 +291,10 @@ void balance_flags_slow(AmrStorage &locals, AmrStorage& aliens, int max_level) {
 
 #ifdef ZEPHYR_MPI
 
-/// @brief Простая версия функции балансировки флагов.
-/// @details Смотреть однопоточную версию.
+/// @brief Простая итерационная версия функции балансировки флагов.
+/// @details Смотреть однопроцессорную версию.
 template<int dim>
-void balance_flags_slow(AmrStorage &locals, AmrStorage &aliens,
-        int max_level, EuMesh& mesh) {
+void balance_flags_slow(Tourism& tourism, AmrCells &locals, AmrCells &aliens, int max_level) {
     using zephyr::utils::Stopwatch;
     static Stopwatch restrictions_timer;
     static Stopwatch setup_vicinity_timer;
@@ -319,7 +314,9 @@ void balance_flags_slow(AmrStorage &locals, AmrStorage &aliens,
     flag_balancing_timer.resume();
     int changed = 1;
     while (changed) {
-        mesh.sync();
+        // Синхронизация флагов адаптации в alien-ячейках
+        tourism.sync<MpiTag::FLAG>(locals, aliens);
+
         vicinity_list.update();
 
         changed = flag_balancing_step(locals, vicinity_list);
@@ -330,9 +327,9 @@ void balance_flags_slow(AmrStorage &locals, AmrStorage &aliens,
 #if CHECK_PERFORMANCE
     static size_t counter = 0;
     if (counter % amr::check_frequency == 0) {
-        std::cout << "    Restrictions elapsed:   " << std::setw(10) << base_restrictions_timer.milliseconds() << " ms\n";
-        std::cout << "    Setup vicinity elapsed: " << std::setw(10) << setup_vicinity_timer.milliseconds() << " ms\n";
-        std::cout << "    Flag balancing elapsed: " << std::setw(10) << flag_balancing_timer.milliseconds() << " ms\n";
+        mpi::cout << "    Base restrictions: " << std::setw(8) << restrictions_timer.milliseconds() << " ms\n";
+        mpi::cout << "    Setup vicinity:    " << std::setw(8) << setup_vicinity_timer.milliseconds() << " ms\n";
+        mpi::cout << "    Flag balancing:    " << std::setw(8) << flag_balancing_timer.milliseconds() << " ms\n";
     }
     ++counter;
 #endif
@@ -340,21 +337,13 @@ void balance_flags_slow(AmrStorage &locals, AmrStorage &aliens,
 
 /// @brief Специализация для процессов без ячеек
 template<>
-void balance_flags_slow<0>(AmrStorage &locals, AmrStorage &aliens,
-                           int max_level, EuMesh& mesh) {
-
-    // ???
-    throw std::runtime_error("IMPLEMENT");
-    /*
-    bool changed = true;
+void balance_flags_slow<0>(Tourism& tourism, AmrCells &locals, AmrCells &aliens, int max_level) {
+    int changed = 1;
     while (changed) {
-        decomposition.send();
-        decomposition.recv();
-        changed = network.max(0);
+        tourism.sync<MpiTag::FLAG>(locals, aliens);
+        changed = mpi::max(0);
     }
-     */
 }
-
 #endif
 
 } // namespace zephyr::mesh::amr
