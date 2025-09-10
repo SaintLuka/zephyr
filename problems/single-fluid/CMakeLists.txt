@@ -1,9 +1,9 @@
 #list(APPEND PROBLEMS clogged_shock_tube)
 #list(APPEND PROBLEMS smf_flow_around)
-#list(APPEND PROBLEMS smf_test_1D)
+list(APPEND PROBLEMS smf_test_1D)
 #list(APPEND PROBLEMS smf_test_2D)
 #list(APPEND PROBLEMS smf_test_3D)
-list(APPEND PROBLEMS smf_test_axial)
+#list(APPEND PROBLEMS smf_test_axial)
 
 # Assuming all files in the directory are tests
 if (ZEPHYR_PROBLEMS_ALL)
