@@ -171,7 +171,7 @@ double face_fraction_n2(EuCell& cell, EuCell& neib, EuFace& face, double vn, con
         }
     }
 
-    auto [a_min, a_max] = minmax(cell(data.u1), neib(data.u1));
+    auto [a_min, a_max] = sorted(cell(data.u1), neib(data.u1));
 
     return between(a_sig, a_min, a_max);
 }
@@ -183,7 +183,7 @@ double best_face_fraction(double a1, double a2, double S, double vn, double dt, 
         return 0.5 * (a1 + a2);
     }
 
-    auto[a_min, a_max] = minmax(a1, a2);
+    auto[a_min, a_max] = sorted(a1, a2);
 
     // Flux и vn имеют один знак
     assert(Flux * vn >= 0.0);

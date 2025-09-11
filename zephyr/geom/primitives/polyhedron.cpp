@@ -83,9 +83,9 @@ struct edge_t {
         }
     }
 
-    inline int v1() const { return m_v1; }
+    int v1() const { return m_v1; }
 
-    inline int v2() const { return m_v2; }
+    int v2() const { return m_v2; }
 
     bool operator==(const edge_t &other) const {
         return m_v1 == other.m_v1 && m_v2 == other.m_v2;
@@ -186,8 +186,8 @@ inline void sort_indices<3>(const std::vector<Vector3d>& vs,
                             const Vector3d& face_c,
                             const Vector3d& cell_c) {
     const Vector3d &v0 = vs[face_inds[0]];
-    const Vector3d &v1 = vs[face_inds[0]];
-    const Vector3d &v2 = vs[face_inds[0]];
+    const Vector3d &v1 = vs[face_inds[1]];
+    const Vector3d &v2 = vs[face_inds[2]];
 
     if ((v1 - v0).cross(v2 - v0).dot(face_c - cell_c) < 0.0) {
         std::swap(face_inds[1], face_inds[2]);

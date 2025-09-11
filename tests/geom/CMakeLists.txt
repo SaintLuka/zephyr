@@ -4,7 +4,7 @@ list(APPEND TESTS cuboid_clip)
 #list(APPEND TESTS mapping)
 #list(APPEND TESTS poly_integrate)
 #list(APPEND TESTS polygon_clip)
-#list(APPEND TESTS polyhedra)
+list(APPEND TESTS polyhedra)
 #list(APPEND TESTS splines)
 
 # Assume all files in direcory are tests
@@ -13,7 +13,7 @@ if (ZEPHYR_TESTS_ALL)
 
     set(TESTS "")
     foreach(filename IN LISTS TEST_SOURCES)
-        # short name without path and extentsion
+        # short name without path and extension
         get_filename_component(test ${filename} NAME_WE)
         list(APPEND TESTS ${test})
     endforeach()
@@ -22,6 +22,7 @@ endif()
 # Can't compile targets without python
 if (NOT ZEPHYR_PYTHON)
     list(REMOVE_ITEM TESTS crp_interface)
+    list(REMOVE_ITEM TESTS cuboid_clip)
     list(REMOVE_ITEM TESTS curves)
     list(REMOVE_ITEM TESTS polygon_clip)
     list(REMOVE_ITEM TESTS splines)

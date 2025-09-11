@@ -8,7 +8,7 @@ namespace zephyr::geom {
 using namespace zephyr::math;
 
 double quad_volume_fraction(const Vector3d &n, double p, double a, double b) {
-    auto[xi, eta] = minmax(a * abs(n.x()), b * abs(n.y()));
+    auto [xi, eta] = sorted(a * abs(n.x()), b * abs(n.y()));
 
     if (std::abs(p) <= 0.5 * (eta - xi)) {
         return 0.5 + p / eta;
@@ -20,7 +20,7 @@ double quad_volume_fraction(const Vector3d &n, double p, double a, double b) {
 }
 
 double quad_find_section(const Vector3d &n, double alpha, double a, double b) {
-    auto[xi, eta] = minmax(a * abs(n.x()), b * abs(n.y()));
+    auto [xi, eta] = sorted(a * abs(n.x()), b * abs(n.y()));
 
     if (alpha <= 0.5 * xi / eta) {
         return -0.5 * (xi + eta) + std::sqrt(2.0 * alpha * xi * eta);
@@ -101,7 +101,7 @@ double face_fraction(double a1, double a2) {
 }
 
 double face_fraction_cos(double a1, double a2) {
-    auto[a_min, a_max] = minmax_unit(a1, a2);
+    auto [a_min, a_max] = minmax_unit(a1, a2);
 
     double tg; // модуль тангенса
     if (3.0 * a_min >= a_max && a_min >= 3.0 * a_max - 2.0) {
@@ -120,8 +120,8 @@ double face_fraction_cos(double a1, double a2) {
 }
 
 double average_flux(double alpha, double cos, double CFL) {
-    auto[xi1, eta1] = minmax(std::abs(cos), std::sqrt(1.0 - cos * cos));
-    auto[xi2, eta2] = minmax(CFL * std::abs(cos), std::sqrt(1.0 - cos * cos));
+    auto [xi1, eta1] = sorted(std::abs(cos), std::sqrt(1.0 - cos * cos));
+    auto [xi2, eta2] = sorted(CFL * std::abs(cos), std::sqrt(1.0 - cos * cos));
 
     // Фактически quad_find_section
     double P1;
@@ -144,58 +144,42 @@ double average_flux(double alpha, double cos, double CFL) {
     }
 }
 
-double cube_volume_fraction(const Vector3d& n, double Pz, double a, double b, double c) {
-    std::vector sizes={std::abs(a * n.x()), std::abs(b * n.y()), std::abs(c * n.z())};
-    std::sort(sizes.begin(), sizes.end());
+double cube_volume_fraction(const Vector3d& n, double p, double a, double b, double c) {
+    auto [xi, eta, chi] = sorted(std::abs(a * n.x()), std::abs(b * n.y()), std::abs(c * n.z()));
+    double s = 0.5 * (xi + eta + chi);
 
-    double xi = sizes[0];
-    double eta = sizes[1];
-    double chi = sizes[2];
+    //if (xi + eta < chi) { std::cout << "quad case\n"; }
+    //else { std::cout << "hex case\n"; }
 
-    std::cout << "  n: " << n.transpose() << "\n";
-    std::cout << "  xi : " << xi << "\n";
-    std::cout << "  eta: " << eta << "\n";
-    std::cout << "  chi: " << chi << "\n";
+    double f = NAN;
+    double ap = std::abs(p);
 
-    double p = Pz + 0.5 * (xi + eta + chi);
-
-    bool inv = p > 0.5 * (xi + eta + chi);
-
-    if (inv) {
-        std::cout << "  Inverse case\n";
-        p = xi + eta + chi - p;
-    }
-
-    double vol = NAN;
-    if (p < xi) {
-        std::cout << "  case 1\n";
-        vol = std::pow(p, 3) / (6.0 * xi * eta * chi);
-    }
-    else if (p < eta) {
-        std::cout << "  case 2\n";
-        vol = (3.0 * p * (p - xi) + xi * xi) / (6.0 * eta * chi);
-    }
-    else if (p < std::min(xi + eta, chi)) {
-        std::cout << "  case 3\n";
-
-        vol = (std::pow(p, 3) - std::pow(p - xi, 3) - std::pow(p - eta, 3)) / (6.0 * xi * eta * chi);
-    }
-    else {
+    if (ap <= 0.5 * std::abs(xi + eta - chi)) {
         if (xi + eta < chi) {
-            std::cout << "  case 4.1\n";
-            vol = (2.0 * p - xi - eta) / (2.0 * chi);
+            // case 4.1. Квадратное сечение в центре
+            f = 2.0 * ap / chi;
         } else {
-            std::cout << "  case 4.2\n";
-
-            vol = (std::pow(p, 3) - std::pow(p - xi, 3) - std::pow(p - eta, 3) - std::pow(p - chi, 3)) / (6.0 * xi * eta * chi);
+            // case 4.2. Шестиугольное сечение в центре
+            f = ap * (xi * eta + xi * chi + eta * chi - 0.5 * (pow(xi, 2) + pow(eta, 2) + pow(chi, 2)) - (2.0/ 3.0) * pow(ap, 2)) / (xi * eta * chi);
         }
     }
-
-    if (inv) {
-        vol = 1.0 - vol;
+    else if (ap <= 0.5 * (xi - eta + chi)) {
+        // case 3:      0.5 |xi + eta - chi| < |p| <= 0.5 (xi - eta + chi)
+        f = 1.0 + (-pow(s - ap, 3) + pow(s - ap - xi, 3) + pow(s - ap - eta, 3)) / (3.0 * xi * eta * chi);
     }
-
-    return vol;
+    else if (ap <= 0.5 * (eta + chi - xi)) {
+        // case 2:      0.5 (xi - eta + chi) < |p| <= 0.5 * (eta + chi - xi)
+        f = 1.0 + (3.0 * (ap - s) * (-ap + s - xi) - xi * xi) / (3.0 * eta * chi);
+    }
+    else if (ap <= s) {
+        // case 1:      0.5 * (eta + chi - xi) < |p| <= s
+        f = 1.0 + pow(ap - s, 3) / (3.0 * xi * eta * chi);
+    }
+    else {
+        // case 0:      |p| > s
+        f = 1.0;
+    }
+    return 0.5 + 0.5 * sign(p) * f;
 }
 
 double cube_find_section(const Vector3d& n, double alpha, double a, double b, double c) {
