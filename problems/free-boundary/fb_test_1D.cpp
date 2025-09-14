@@ -28,8 +28,6 @@ using zephyr::math::FreeBoundary;
 using zephyr::utils::threads;
 using zephyr::utils::mpi;
 
-#define ADAPTIVE
-
 int main() {
     mpi::handler init;
     threads::on();
@@ -44,19 +42,10 @@ int main() {
     Eos::Ptr eos = test.get_eos();
 
     // Создаем одномерную сетку
-#ifdef ADAPTIVE
-    int nx = 100;
-    double h = 0.01 * (test.xmax() - test.xmin());
 
-    Rectangle gen(test.xmin(), test.xmax(), -h, +h);
-    gen.set_boundaries({.left   = Boundary::ZOE,  .right = Boundary::ZOE,
-                        .bottom = Boundary::WALL, .top   = Boundary::WALL});
-    gen.set_sizes(nx, 1);
-#else
     Strip gen(test.xmin(), test.xmax());
     gen.set_boundaries({.left = Boundary::ZOE, .right = Boundary::ZOE});
     gen.set_size(500);
-#endif
 
     // Создать сетку
     EuMesh mesh(gen);
@@ -64,9 +53,6 @@ int main() {
     // Создать решатель
     FreeBoundary solver(eos);
     solver.set_CFL(0.5);
-    solver.set_accuracy(2);
-    solver.set_limiter("MC");
-    solver.set_method(Fluxes::HLLC_M);
 
     // Добавляем типы на сетку, выбираем основной слой
     auto data = solver.add_types(mesh);
@@ -122,17 +108,6 @@ int main() {
         }
     };
 
-#ifdef ADAPTIVE
-    // Сеточная адаптация
-    mesh.set_max_level(5);
-    mesh.set_distributor(solver.distributor());
-
-    for (int k = 0; k < mesh.max_level() + 3; ++k) {
-        init_cells(mesh);
-        solver.set_flags(mesh);
-        mesh.refine();
-    }
-#endif
     init_cells(mesh);
 
     size_t n_step = 0;
@@ -151,11 +126,6 @@ int main() {
 
         // Обновляем слои
         solver.update(mesh);
-
-#ifdef ADAPTIVE
-        solver.set_flags(mesh);
-        mesh.refine();
-#endif
 
         curr_time += solver.dt();
         n_step += 1;

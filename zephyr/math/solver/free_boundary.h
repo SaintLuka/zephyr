@@ -3,14 +3,13 @@
 #include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/phys/matter/eos/eos.h>
 #include <zephyr/math/cfd/fluxes.h>
-#include <zephyr/math/cfd/limiter.h>
 
 namespace zephyr::math {
 
 using zephyr::mesh::EuMesh;
 using zephyr::mesh::EuCell;
-using zephyr::mesh::Storable;
 using zephyr::geom::Vector3d;
+using zephyr::mesh::Storable;
 using zephyr::phys::Eos;
 
 using namespace smf;
@@ -41,12 +40,6 @@ public:
     /// @brief Установить число Куранта
     void set_CFL(double CFL);
 
-    /// @brief Установить осевую симметрию
-    void set_axial(bool axial = true);
-
-    /// @brief Установить метод
-    void set_method(Fluxes method);
-
     /// @brief Число Куранта
     double CFL() const;
 
@@ -69,13 +62,9 @@ public:
     /// @brief Обновление ячеек
     void swap(EuMesh &mesh) const;
 
-    /// @brief Вычислить производные
-    void compute_grad(EuMesh &mesh) const;
-
 protected:
     Eos::Ptr m_eos;          ///< Уравнение состояния
     int m_acc = 1;           ///< Порядок точности
-    bool m_axial;            ///< Осевая симметрия
     double m_CFL = 0.5;      ///< Число Куранта
     double m_dt;             ///< Шаг интегрирования
     double m_max_dt=1.e300;  ///< Максимальный шаг интегрирования
