@@ -37,13 +37,15 @@ void plot_sections(
 }
 
 int main() {
-    Vector3d n = {0.1, 0.2, 0.3};
+    //Vector3d n = {0., 0., 0.5};
+    //Vector3d point = {0.25, 0.25, 0.5};
+    Vector3d n = {0.4, 0.5, 0.1};
+    Vector3d point = {0.4, 0.4, 0.2};
     n.normalize();
 
-    //Vector3d point = {0.5, 0.0, 0.0};
-    //Polyhedron cube = Polyhedron::Cube();
-    //std::cout << cube.clip_volume(point, n) << std::endl;
-    //std::cout << cube.clip(point, n).volume() << std::endl;
+    Polyhedron cube = Polyhedron::Cube();
+    std::cout << cube.clip_volume(point, n) << std::endl;
+    std::cout << cube.clip(point, n).volume() << std::endl;
 
     plot_sections(Polyhedron::Cube(), n, "cube");
     plot_sections(Polyhedron::Cuboid(1.0, 1.2, 0.8), n, "cuboid");
