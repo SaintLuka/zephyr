@@ -73,7 +73,7 @@ int main() {
     auto z = data.init;
 
     // Файл для записи
-    PvdFile pvd("test1D", "output");
+    PvdFile pvd("test1D", "D:\\main_project");
 
     double curr_time = 0.0;
 
