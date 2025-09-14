@@ -4,9 +4,12 @@
 #include <zephyr/mesh/euler/eu_prim.h>
 #include <zephyr/mesh/euler/eu_mesh.h>
 
+#include <zephyr/utils/numpy.h>
 #include <zephyr/utils/matplotlib.h>
+#include <zephyr/math/calc/roots.h>
 
 namespace plt = zephyr::utils::matplotlib;
+namespace np = zephyr::np;
 
 using namespace zephyr::geom;
 using namespace zephyr::mesh;
@@ -16,7 +19,7 @@ const double A = 1.2;
 const double B = 1.4;
 const double C = 1.0;
 
-void test(Polyhedron poly, Vector3d normal) {
+void test1(Polyhedron poly, Vector3d normal) {
     double p_min1 = +1.0e100;
     double p_max1 = -1.0e100;
     for (int i = 0; i < poly.n_verts(); ++i) {
@@ -61,6 +64,33 @@ void test(Polyhedron poly, Vector3d normal) {
     plt::show();
 }
 
+void test2(Polyhedron poly, Vector3d normal) {
+    int N = 501;
+    auto alpha = np::linspace(0.0, 1.0, N);
+
+    auto ps  = np::zeros(N);
+    auto err = np::zeros(N);
+    for (int i = 0; i < N; ++i) {
+        ps[i]  = cube_find_section(normal, alpha[i], A, B, C);
+        err[i] = std::abs(alpha[i] - cube_volume_fraction(normal, ps[i], A, B, C));
+    }
+
+    plt::figure_size(9.0, 4.0, 170);
+
+    plt::subplot(1, 2, 1);
+    plt::title("$p(\\alpha)$");
+    plt::grid(true);
+    plt::plot(alpha, ps, {{"linestyle", "solid"}, {"color", "blue"}, {"label", "clip_volume"}});
+
+    plt::subplot(1, 2, 2);
+    plt::title("$Error$");
+    plt::grid(true);
+    plt::plot(alpha, err, "k");
+
+    plt::tight_layout();
+    plt::show();
+}
+
 int main() {
     auto poly = Polyhedron::Cuboid(A, B, C);
 
@@ -68,7 +98,8 @@ int main() {
     //Vector3d n = {0.51, 0.53, 0.52};
     n.normalize();
 
-    test(poly, n);
+    test1(poly, n);
+    test2(poly, n);
 
     return 0;
 }
