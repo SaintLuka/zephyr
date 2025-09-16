@@ -50,7 +50,7 @@ void test1(Polyhedron poly, Vector3d normal) {
     plt::figure_size(9.0, 4.0, 170);
 
     plt::subplot(1, 2, 1);
-    plt::title("$V(p)$");
+    plt::title("$\\alpha(p)$");
     plt::grid(true);
     plt::plot(ps, Vs1, {{"linestyle", "solid"}, {"color", "blue"}, {"label", "clip_volume"}});
     plt::plot(ps, Vs2, {{"linestyle", "dotted"}, {"color", "orange"}, {"label", "formula"}});

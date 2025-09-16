@@ -180,56 +180,17 @@ double f_func(double x, double xi, double eta, double chi) {
     return 1.0;
 }
 
-// Производная предыдущей функции
-double f_func_deriv(double x, double xi, double eta, double chi) {
-    double s = 0.5 * (xi + eta + chi);
+// Тригонометрическая формула Виета для k-го корня кубического
+// уравнения: y³ + py + q = 0
+// Работает для случая трёх действительных корней
+double viete(double p, double q, int k) {
+    constexpr double c1 = 1.0 / 3.0;
+    constexpr double c2 = 2.0 * M_PI / 3.0;
 
-    if (x <= 0.5 * std::abs(xi + eta - chi)) {
-        if (xi + eta <= chi) {
-            // std::cout << "  case 4.1. Квадратное сечение в центре \n";
-            return 1.0 / chi;
-        } else {
-            // std::cout << "  case 4.2. Шестиугольное сечение в центре \n";
-            return (xi * eta + xi * chi + eta * chi - 0.5 * (pow(xi, 2) + pow(eta, 2) + pow(chi, 2)) - 2.0 * pow(x, 2)) / (2.0 * xi * eta * chi);
-        }
-    }
-    if (x <= 0.5 * (xi - eta + chi)) {
-        // std::cout << "  case 3:      0.5 |xi + eta - chi| < |p| <= 0.5 (xi - eta + chi) \n";
-        return -std::pow(x + s - chi, 2) / (xi * eta * chi) + 2.0 / chi;
-    }
-    if (x <= 0.5 * (eta + chi - xi)) {
-        // std::cout << "  case 2:      0.5 (xi - eta + chi) < |p| <= 0.5 * (eta + chi - xi) \n";
-        return ((s - x) - 0.5 * xi) / (eta * chi);
-    }
-    if (x <= s) {
-        // std::cout << "  case 1:      0.5 * (eta + chi - xi) < |p| <= s \n";
-        return pow(x - s, 2) / (2.0 * xi * eta * chi);
-    }
-    return 0.0;
-}
-
-void print_roots(const roots_t& roots) {
-    std::cout << "Корни уравнения:\n";
-    for (size_t i = 0; i < roots.size(); ++i) {
-        std::cout << "x" << i + 1 << " = ";
-        if (is_real(roots[i])) {
-            std::cout << std::fixed << std::setprecision(10) << roots[i].real();
-        } else {
-            std::cout << roots[i];
-        }
-        std::cout << std::endl;
-    }
-}
-
-// Найти действительный корень на заданном отрезке
-double real_cardano(double p, double q, double x_min, double x_max) {
-    auto roots = cardano(p, q);
-    for (auto& r: roots) {
-        if (-eps <= r.real() && r.real() <= x_max + eps) {
-            return between(r.real(), x_min, x_max);
-        }
-    }
-    throw std::invalid_argument("Can't find real root");
+    double r = 2.0 * std::sqrt(-p / 3.0);
+    double x = between(3.0 * q / (r * p), -1.0, 1.0);
+    double phi = std::acos(x);
+    return r * std::cos(c1 * phi + c2 * k);
 }
 
 // Обратная функция к f_func, также положительная и монотонно возрастающая на отрезке.
@@ -239,33 +200,49 @@ double g_func(double y, double xi, double eta, double chi) {
     double s = 0.5 * (xi + eta + chi);
 
     if (xi + eta <= chi) {
-        // case 4.1. Квадратное сечение в центре
+        // case 4.1: квадратное сечение в центре
         if (y <= (chi - xi - eta) / chi) {
             return 0.5 * y * chi;
         }
     }
     else {
-        // case 4.2. Шестиугольное сечение в центре
+        // case 4.2: шестиугольное сечение в центре
         if (y <= (xi + eta - chi) / chi * (1.0 - std::pow(xi + eta - chi, 2) / (3.0 * xi * eta))) {
             double p = 0.75 * std::pow(xi + eta - chi, 2) - 3.0 * xi * eta;
             double q = 1.5 * xi * eta * chi * y;
-            // TODO: доказать, что это случай трёх корней и p < 0, проверить границы для корня
-            return real_cardano(p, q, 0.0, 0.5 * (xi + eta - chi));
+
+            // Я проверил эти свойства в maple, но мало ли
+            z_assert(p < 1.0e-12, "case 4.2: неверное предположение " + std::to_string(p));
+            z_assert(pow(p / 3, 3) + pow(q / 2, 2) <= 0.0, "case 4.2: не случай трёх корней");
+
+            // Корень должен оказаться на отрезке [0, 0.5 (xi + eta - chi)]
+            z_assert(viete(p, q, 2) > -1.0e-12, "case 4.2: неверная оценка #1");
+            z_assert(viete(p, q, 2) < 0.5 * (xi + eta - chi) + 1.0e-12, "case 4.2: неверная оценка #2");
+
+            return viete(p, q, 2);
         }
     }
     if (y <= (xi - eta + chi) / chi - xi * xi / (3.0 * eta * chi)) {
-        // case 3.
+        // case 3
         double p = -6.0 * xi * eta;
         double q = 3.0 * xi * eta * (xi + eta - chi * (1.0 - y));
-        // TODO: доказать, что это случай трёх корней, проверить границы для корня
-        return 0.5 * (chi - xi - eta) + real_cardano(p, q, 0.0, xi);
+
+        // Я проверил эти свойства в maple, но мало ли
+        z_assert(q > -1.0e-12, "case 3: неверное предположение " + std::to_string(q));
+        z_assert(pow(p / 3, 3) + pow(q / 2, 2) <= 0.0, "case 3: не случай трёх корней");
+
+        // Корень должен оказаться на отрезке [0, xi]
+        z_assert(viete(p, q, 2) > -1.0e-12, "case 3: неверная оценка #1");
+        z_assert(viete(p, q, 2) < xi + 1.0e-12, "case 3: неверная оценка #2");
+
+        return 0.5 * (chi - xi - eta) + viete(p, q, 2);
     }
     if (y <= 1.0 - xi * xi / (3.0 * eta * chi)) {
         // case 2
         return 0.5 * (chi + eta) - std::sqrt(chi * eta * (1.0 - y) - xi * xi / 12.0);
     }
     if (y <= 1.0) {
-        // case 1:
+        // case 1
         return s - std::cbrt(3.0 * xi * eta * chi * (1.0 - y));
     }
     // case 0:
