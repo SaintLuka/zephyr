@@ -52,5 +52,14 @@ int main() {
     plot_sections(Polyhedron::Icosahedron(), n, "icosahedron");
     plot_sections(Polyhedron::TruncatedCube(), n, "truncated_cube");
 
+    Polyhedron cube = Polyhedron::Cuboid(2.0, 2.0, 2.0);
+
+    Vector3d norm = {1.0, 0.0, 0.0};
+    Vector3d p = {0., 0., 0.};
+    Vector3d section_point = cube.find_section(norm, 0.5);
+    std::cout << cube.clip_volume(section_point, norm) << std::endl;
+    std::cout << cube.clip_volume(p, norm) << std::endl;
+    std::cout << cube.clip(section_point, norm).volume() << std::endl;
+    std::cout << cube.clip(p, norm).volume() << std::endl;
     return 0;
 }

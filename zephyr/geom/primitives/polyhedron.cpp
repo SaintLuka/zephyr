@@ -702,13 +702,126 @@ Polyhedron Polyhedron::clip(const Vector3d& p, const Vector3d& n) const {
     return Polyhedron(out_verts, out_faces);
 }
 
-double Polyhedron::clip_volume(const Vector3d& p, const Vector3d& n) const {
-    return NAN;
+double Polyhedron::clip_volume(const Vector3d& p, const Vector3d& n) const { //pometki, shob vspomnit' sho bylo
+    std::vector<double> distances(n_verts()); // ischem rasstoyzniye ot ploskosti do vershin
+    for (int i = 0; i < n_verts(); ++i) {
+        distances[i] = n.dot(verts[i] - p);
+    }
+
+    bool all = true;  // proverka kraynih sluchayevv
+    bool none = true;
+    for (double d : distances) {
+        if (d >= 0) all = false;
+        if (d <= 0) none = false;
+    }
+    if (all) return volume();
+    if (none) return 0.;
+
+    double out = 0.;
+    const double coeff = 1. / 3.;
+
+    for (int i = 0; i < n_faces(); ++i) { //razbivaem na tetraedry i ishem ih obyem
+        const auto& face = faces[i];
+        int nv = face.size();
+
+        std::vector<Vector3d> clipped_face; //Rassmatrivaem rebra i ischem tochku peresecheniya s ploskost'yu koli yest'
+        for (int j = 0; j < nv; ++j) {
+            int v1 = face[j];
+            int v2 = face[(j + 1) % nv];
+            double d1 = distances[v1];
+            double d2 = distances[v2];
+
+            if (d1 <= 0) {
+                clipped_face.push_back(verts[v1]);
+            }
+
+            if (d1 * d2 < 0) {
+                double t = d1 / (d1 - d2);
+                Vector3d new_verts = verts[v1] + t * (verts[v2] - verts[v1]);
+                clipped_face.push_back(new_verts);
+            }
+        }
+
+        if (clipped_face.size() >= 3) {
+            Vector3d face_center = Vector3d::Zero(); //tsentr mass ischem
+            for (const auto& v : clipped_face) {
+                face_center += v;
+            }
+            face_center /= clipped_face.size();
+
+            Vector3d new_faces = Vector3d::Zero(); //vychisl'ayem ploschadi osnovaniy
+            for (size_t j = 0; j < clipped_face.size(); ++j) {
+                size_t k = (j + 1) % clipped_face.size();
+                new_faces += clipped_face[j].cross(clipped_face[k]);
+            }
+            new_faces *= 0.5;
+
+            Vector3d to_center = face_center - p; //vorochaem normal
+            if (new_faces.dot(to_center) < 0) {
+                new_faces = -new_faces;
+            }
+
+            out += coeff * new_faces.dot(face_center - p); //obyem
+        }
+
+    }
+
+    return out; //vse escho problema s vneshnimii graichnymy tochkami
 }
 
 
 Vector3d Polyhedron::find_section(const Vector3d& n, double alpha) const {
-    return {NAN, NAN, NAN};
+    double min_proj = std::numeric_limits<double>::max();
+    double max_proj = std::numeric_limits<double>::lowest();
+
+    for (int i = 0; i < n_verts(); ++i) {
+        double proj = verts[i].dot(n);
+        if (proj < min_proj) min_proj = proj;
+        if (proj > max_proj) max_proj = proj;
+    }
+
+    if (alpha <= 0.0) {
+        return n * (min_proj - 0.1 * (max_proj - min_proj));
+    }
+    if (alpha >= 1.0) {
+        return n * (max_proj + 0.1 * (max_proj - min_proj));
+    }
+
+    double total_volume = volume();
+    double d_low = min_proj;
+    double d_high = max_proj;
+
+    double f_low = -alpha * total_volume;
+
+    int max_iterations = 50;
+    double tolerance = 0.001 * total_volume;
+    int iterations = 0;
+
+    double d_mid;
+    double f_mid;
+
+    while (iterations < max_iterations && (d_high - d_low) > 1.0e-12 * (max_proj - min_proj)) {
+        d_mid = 0.5 * (d_low + d_high);
+        Vector3d plane_point = n * d_mid;
+
+        double clipped_volume = clip_volume(plane_point, n);
+        f_mid = clipped_volume - alpha * total_volume;
+
+        if (std::abs(f_mid) < tolerance) {
+            break;
+        }
+
+        if (f_mid * f_low < 0.0) {
+            d_high = d_mid;
+        } else {
+            d_low = d_mid;
+            f_low = f_mid;
+        }
+
+        iterations++;
+    }
+
+    return n * d_mid;
 }
 
 double Polyhedron::volume_fraction(
