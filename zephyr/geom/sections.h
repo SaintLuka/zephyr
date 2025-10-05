@@ -9,38 +9,47 @@ namespace zephyr::geom {
 /// @param n Внешняя нормаль к прямой
 /// @param p Коэффициент 'p' в уравнении прямой, расстояние со знаком от центра
 /// прямоугольника до прямой.
-/// @param a, b Размеры прямоугольника. Предполагается, что центр
+/// @param A, B Размеры прямоугольника. Предполагается, что центр
 /// прямоугольника совпадает с центром координат, |x| < a/2, |y| < b/2.
-double quad_volume_fraction(const Vector3d& n, double p, double a = 1.0, double b = 1.0);
+double quad_volume_fraction(const Vector3d& n, double p, double A = 1.0, double B = 1.0);
 
 /// @brief Найти сечение прямоугольника прямой, которая отсекает от прямоугольника
 /// заданную объемную долю. Функция, обратная к quad_volume_fraction()
 /// @param n Внешняя нормаль к прямой
 /// @param alpha Объемная доля
-/// @param a, b Размеры прямоугольника. Предполагается, что центр
+/// @param A, B Размеры прямоугольника. Предполагается, что центр
 /// прямоугольника совпадает с центром координат, |x| < a/2, |y| < b/2.
 /// @return Возвращает расстояние от центра прямоугольника до прямой со знаком,
 /// то есть коэффициент 'p' в уравнении прямой (r, n) = p.
-double quad_find_section(const Vector3d& n, double alpha, double a = 1.0, double b = 1.0);
+double quad_find_section(const Vector3d& n, double alpha, double A = 1.0, double B = 1.0);
 
 /// @brief Найти объемную долю, которую отсекает от прямоугольного параллелепипеда
 /// (кубоида) плоскость, заданная уравнением (r, n) = p.
 /// @param n Внешняя нормаль к плоскости
 /// @param p Коэффициент 'p' в уравнении плоскости, расстояние со знаком от центра
 /// кубоида до плоскости.
-/// @param a, b, c Размеры кубоида. Предполагается, что центр кубоида совпадает
+/// @param A, B, C Размеры кубоида. Предполагается, что центр кубоида совпадает
 /// с центром координат, |x| < a/2, |y| < b/2, |z| < c/2.
-double cube_volume_fraction(const Vector3d& n, double p, double a = 1.0, double b = 1.0, double c = 1.0);
+double cube_volume_fraction(const Vector3d& n, double p, double A = 1.0, double B = 1.0, double C = 1.0);
+
+struct vf_grad_t {
+    double dp;
+    Vector3d dn;
+};
+
+vf_grad_t cube_volume_fraction_grad(const Vector3d& n, double p, double A = 1.0, double B = 1.0, double C = 1.0);
 
 /// @brief Найти сечение прямоугольного параллелепипеда (кубоида) плоскостью, которая
 /// отсекает от кубоида заданную объемную долю. Функция, обратная к cube_volume_fraction()
 /// @param n Внешняя нормаль к плоскости
 /// @param alpha Объемная доля
-/// @param a, b, c Размеры кубоида. Предполагается, что центр кубоида совпадает
+/// @param A, B, C Размеры кубоида. Предполагается, что центр кубоида совпадает
 /// с центром координат, |x| < a/2, |y| < b/2, |z| < c/2.
 /// @return Возвращает расстояние от центра прямоугольника до прямой со знаком,
 /// то есть коэффициент 'p' в уравнении прямой (r, n) = p.
-double cube_find_section(const Vector3d& n, double alpha, double a = 1.0, double b = 1.0, double c = 1.0);
+double cube_find_section(const Vector3d& n, double alpha, double A = 1.0, double B = 1.0, double C = 1.0);
+
+int cube_section_case(const Vector3d& n, double p, double A = 1.0, double B = 1.0, double C = 1.0);
 
 /// @brief Эвристика для face_fraction (шаблон V3)
 double face_fraction_v3(double a1, double a2);

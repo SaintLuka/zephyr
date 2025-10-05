@@ -717,6 +717,15 @@ double Polyhedron::volume_fraction(
     return NAN;
 }
 
+void Polyhedron::move(const Vector3d& shift) {
+    for (auto& v: verts) {
+        v += shift;
+    }
+    m_center += shift;
+    for (auto& fc: faces_c) {
+        fc += shift;
+    }
+}
 
 std::ostream& operator<<(std::ostream& os, const Polyhedron& poly) {
     os << "Polyhedron operator<<(): Not yet\n";

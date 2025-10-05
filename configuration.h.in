@@ -17,7 +17,19 @@
     /// @brief Кидает исключение, если условие не выполняется
     #define z_assert(condition, message) if (!(condition)) { \
         std::cerr << message << "\n"; throw std::runtime_error(message); }
+
+    /// @brief Проверить условие и выполнить (при компиляции с ASSERTS)
+    #define if_debug(condition) if (condition)
+
+    /// @brief Выполнить блок кода (при компиляции с ASSERTS)
+    #define debug_code if constexpr (true)
 #else
     /// @brief Если debug отключен, ничего не происходит
     #define z_assert(...)
+
+    /// @brief Проверить условие и выполнить (при компиляции с ASSERTS)
+    #define if_debug(...) if constexpr (false)
+
+    /// @brief Выполнить блок кода (при компиляции с ASSERTS)
+    #define debug_code if constexpr (false)
 #endif

@@ -26,8 +26,8 @@ void test1(Polyhedron poly, Vector3d normal) {
         p_min1 = std::min(p_min1, poly.vertex(i).dot(normal));
         p_max1 = std::max(p_max1, poly.vertex(i).dot(normal));
     }
-    double p_min = p_min1 - 0.5 * (p_max1 - p_min1);
-    double p_max = p_max1 + 0.5 * (p_max1 - p_min1);
+    double p_min = p_min1 - 0.05 * (p_max1 - p_min1);
+    double p_max = p_max1 + 0.05 * (p_max1 - p_min1);
 
     int N = 1001;
 

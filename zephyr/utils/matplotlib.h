@@ -1061,7 +1061,6 @@ bool scatter_colored(const std::vector<NumericX>& x,
     return res;
 }
 
-
 template<typename NumericX, typename NumericY, typename NumericZ>
 bool scatter(const std::vector<NumericX>& x,
              const std::vector<NumericY>& y,
@@ -1158,6 +1157,107 @@ bool scatter(const std::vector<NumericX>& x,
     return res;
 
 }
+
+template<typename NumericX, typename NumericY, typename NumericZ, typename NumericColors>
+bool scatter_colored(const std::vector<NumericX>& x,
+             const std::vector<NumericY>& y,
+             const std::vector<NumericZ>& z,
+             const std::vector<NumericColors>& colors,
+             const double s=1.0, // The marker size in points**2
+             const std::map<std::string, std::string> & keywords = {},
+             const long fig_number=0) {
+    detail::_interpreter::get();
+
+    // Same as with plot_surface: We lazily load the modules here the first time
+    // this function is called because I'm not sure that we can assume "matplotlib
+    // installed" implies "mpl_toolkits installed" on all platforms, and we don't
+    // want to require it for people who don't need 3d plots.
+    static PyObject *mpl_toolkitsmod = nullptr, *axis3dmod = nullptr;
+    if (!mpl_toolkitsmod) {
+        detail::_interpreter::get();
+
+        PyObject* mpl_toolkits = PyString_FromString("mpl_toolkits");
+        PyObject* axis3d = PyString_FromString("mpl_toolkits.mplot3d");
+        if (!mpl_toolkits || !axis3d) { throw std::runtime_error("couldnt create string"); }
+
+        mpl_toolkitsmod = PyImport_Import(mpl_toolkits);
+        Py_DECREF(mpl_toolkits);
+        if (!mpl_toolkitsmod) { throw std::runtime_error("Error loading module mpl_toolkits!"); }
+
+        axis3dmod = PyImport_Import(axis3d);
+        Py_DECREF(axis3d);
+        if (!axis3dmod) { throw std::runtime_error("Error loading module mpl_toolkits.mplot3d!"); }
+    }
+
+    assert(x.size() == y.size());
+    assert(y.size() == z.size());
+
+    PyObject *xarray = detail::get_array(x);
+    PyObject *yarray = detail::get_array(y);
+    PyObject *zarray = detail::get_array(z);
+    PyObject* colors_array = detail::get_array(colors);
+
+    // construct positional args
+    PyObject *args = PyTuple_New(3);
+    PyTuple_SetItem(args, 0, xarray);
+    PyTuple_SetItem(args, 1, yarray);
+    PyTuple_SetItem(args, 2, zarray);
+
+    // Build up the kw args.
+    PyObject *kwargs = PyDict_New();
+    PyDict_SetItemString(kwargs, "c", colors_array);
+
+    for (std::map<std::string, std::string>::const_iterator it = keywords.begin();
+         it != keywords.end(); ++it) {
+        PyDict_SetItemString(kwargs, it->first.c_str(),
+                             PyString_FromString(it->second.c_str()));
+    }
+    PyObject *fig_args = PyTuple_New(1);
+    PyObject* fig = nullptr;
+    PyTuple_SetItem(fig_args, 0, PyLong_FromLong(fig_number));
+    PyObject *fig_exists =
+            PyObject_CallObject(detail::_interpreter::get().s_python_function_fignum_exists, fig_args);
+    if (!PyObject_IsTrue(fig_exists)) {
+        fig = PyObject_CallObject(detail::_interpreter::get().s_python_function_figure,
+                                  detail::_interpreter::get().s_python_empty_tuple);
+    } else {
+        fig = PyObject_CallObject(detail::_interpreter::get().s_python_function_figure,
+                                  fig_args);
+    }
+    Py_DECREF(fig_exists);
+    if (!fig) throw std::runtime_error("Call to figure() failed.");
+
+    PyObject *gca_kwargs = PyDict_New();
+    PyDict_SetItemString(gca_kwargs, "projection", PyString_FromString("3d"));
+
+    PyObject *gca = PyObject_GetAttrString(fig, "gca");
+    if (!gca) throw std::runtime_error("No gca");
+    Py_INCREF(gca);
+    PyObject *axis = PyObject_Call(
+            gca, detail::_interpreter::get().s_python_empty_tuple, gca_kwargs);
+
+    if (!axis) throw std::runtime_error("No axis");
+    Py_INCREF(axis);
+
+    Py_DECREF(gca);
+    Py_DECREF(gca_kwargs);
+
+    PyObject *plot3 = PyObject_GetAttrString(axis, "scatter");
+    if (!plot3) throw std::runtime_error("No 3D line plot");
+    Py_INCREF(plot3);
+    PyObject *res = PyObject_Call(plot3, args, kwargs);
+    if (!res) throw std::runtime_error("Failed 3D line plot");
+    Py_DECREF(plot3);
+
+    Py_DECREF(axis);
+    Py_DECREF(args);
+    Py_DECREF(kwargs);
+    Py_DECREF(fig);
+    if (res) Py_DECREF(res);
+    return res;
+
+}
+
 
 template<typename Numeric>
 bool boxplot(const std::vector<std::vector<Numeric>>& data,

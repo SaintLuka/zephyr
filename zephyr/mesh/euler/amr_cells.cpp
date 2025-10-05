@@ -874,7 +874,7 @@ void AmrCells::push_back_impl(const Polyhedron& poly) {
 
         faces.vertices[iface].fill(-1);
         for (int j = 0; j < n_verts; ++j) {
-            faces.vertices[iface][j] = poly.face_indices(i)[j];
+            faces.vertices[iface][j] = node_begin[ic] + poly.face_indices(i)[j];
         }
     }
 }

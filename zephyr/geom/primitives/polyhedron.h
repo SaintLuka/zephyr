@@ -126,6 +126,9 @@ public:
     double volume_fraction(const std::function<bool(const Vector3d&)>& inside,
                            int n_points = 10000) const;
 
+    /// @brief Сдвинуть вершины на указанный вектор
+    void move(const Vector3d& shift);
+
 
     // ========================================================================
     //                          Несколько пресетов

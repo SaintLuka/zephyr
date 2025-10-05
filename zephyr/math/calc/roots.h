@@ -6,7 +6,6 @@
 #include <optional>
 #include <iomanip>
 #include <complex>
-#include <numbers>
 #include <array>
 
 namespace zephyr::math {
