@@ -467,7 +467,7 @@ void balance_flags_fast(AmrCells& locals, int max_level) {
 #endif
 }
 
-#ifdef ZEPHYR_ENABLE_MPI
+#ifdef ZEPHYR_MPI
 /// Отличия параллельной реализации?
 /// Объяснить безумие с отправкой флагов.
 template <int dim>

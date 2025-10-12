@@ -3,10 +3,10 @@
 #include <zephyr/configuration.h>
 
 #include <zephyr/utils/threads.h>
+#include <zephyr/utils/mpi.h>
 
 #include <zephyr/mesh/euler/eu_prim.h>
 #include <zephyr/mesh/euler/distributor.h>
-#include <zephyr/utils/mpi.h>
 #include <zephyr/mesh/euler/tourism.h>
 #include <zephyr/mesh/euler/migration.h>
 #include <zephyr/mesh/decomp/ORB.h>

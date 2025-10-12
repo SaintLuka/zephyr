@@ -74,6 +74,9 @@ public:
     /// @brief Площадь/длина обычной грани или грани осесимметричной ячейки
     double area(bool axial) const;
 
+    /// @brief Площадь грани осесимметричной ячейки
+    double area_as() const;
+
     /// @brief Число вершин грани
     int n_vertices() const;
 
@@ -248,6 +251,9 @@ public:
 
     /// @brief Объем ячейки
     double volume(bool axial) const;
+
+    /// @brief Объем осесимметричной ячейки
+    double volume_as() const;
 
     /// @brief Линейный размер ячейки
     double linear_size() const;
@@ -523,6 +529,8 @@ inline double EuFace::area() const { return m_cells->faces.area[m_face_idx]; }
 
 inline double EuFace::area(bool axial) const { return m_cells->faces.get_area(m_face_idx, axial); }
 
+inline double EuFace::area_as() const { return m_cells->faces.area_alt[m_face_idx]; }
+
 inline int EuFace::n_vertices() const { return m_cells->faces.n_vertices(m_face_idx); }
 
 inline short EuFace::vertex_index(int idx) const { return m_cells->faces.vertices[m_face_idx][idx]; }
@@ -606,6 +614,8 @@ inline const geom::Vector3d& EuCell::center() const { return m_cells->center[m_i
 inline double EuCell::volume() const { return m_cells->volume[m_index]; }
 
 inline double EuCell::volume(bool axial) const { return m_cells->get_volume(m_index, axial); }
+
+inline double EuCell::volume_as() const { return m_cells->volume_alt[m_index]; }
 
 inline double EuCell::linear_size() const { return m_cells->linear_size(m_index); }
 

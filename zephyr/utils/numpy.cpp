@@ -28,7 +28,7 @@ Array2d zeros_like(const Array2d& arr) {
     return zeros(arr.size(), arr[0].size());
 }
 
-Array<real> random(real min_val, real max_val, size_t N) {
+Array<real> random(size_t N, real min_val, real max_val) {
     std::uniform_real_distribution next(min_val, max_val);
 
     Array<real> arr(N);

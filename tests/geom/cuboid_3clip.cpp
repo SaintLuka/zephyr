@@ -1,4 +1,5 @@
 #include <iostream>
+#include <map>
 #include <zephyr/geom/geom.h>
 #include <zephyr/geom/sections.h>
 #include <zephyr/geom/generator/cuboid.h>
@@ -8,21 +9,19 @@
 #include <zephyr/utils/stopwatch.h>
 
 #include <zephyr/utils/numpy.h>
-#include <zephyr/utils/matplotlib.h>
+#include <zephyr/utils/pyplot.h>
 #include <zephyr/math/calc/roots.h>
 #include <zephyr/math/funcs.h>
 #include <zephyr/utils/stopwatch.h>
 
-namespace plt = zephyr::utils::matplotlib;
-namespace np = zephyr::np;
-
+using namespace zephyr;
 using namespace zephyr::geom;
 using namespace zephyr::mesh;
 using namespace zephyr::math;
 using namespace zephyr::io;
 
 using generator::Cuboid;
-using zephyr::utils::Stopwatch;
+using utils::Stopwatch;
 
 // Записать три исходных кубика
 void save_origin();
@@ -710,6 +709,7 @@ Series ae_optimize(double a0, double a1, double a2, const IterOpts& opts) {
     std::vector ws = {1.0, 1.0};
     std::vector<Vector3d> cs = {Vector3d::UnitX(), Vector3d::UnitY() };
 
+    plot_target(a0, as, cs, ws);
 
     // Так, ну а здесь пытаемся честно оптимизировать
 
@@ -931,9 +931,13 @@ Vector3d plot_target(double a0,
         fs[i] = target_func(n, a0, as, cs, ws).val;
     }
 
-    plt::scatter_colored(xs, ys, zs, fs);
-    plt::tight_layout();
-    plt::show();
+
+    utils::pyplot plt;
+
+    plt.figure();
+    plt.scatter3D(xs, ys, zs, {.c=fs, .colorbar=true});
+    plt.tight_layout();
+    plt.show();
 
     // Наилучший результат в наборе
     size_t idx = std::min_element(fs.begin(), fs.end()) - fs.begin();
@@ -968,7 +972,7 @@ void Series::save(double a0, double a1, double a2) {
 }
 
 void Series::plot(double a0, double a1, double a2) {
-    auto steps = np::arange(ps.size());
+    auto steps = np::arange<double>(ps.size());
     std::vector<double> errs(ps.size());
     std::vector<double> a_es(ps.size());
 
@@ -986,28 +990,20 @@ void Series::plot(double a0, double a1, double a2) {
         a_es[i] = std::abs(a_es[i] - a_es.back());
     }
 
-    plt::figure_size(9.0, 6.0, 170);
+    utils::pyplot plt;
 
-    plt::subplot(2, 2, 1);
-    plt::title("Погрешность от итерации");
-    plt::grid(true);
-    plt::semilogy(steps, errs, "k");
+    plt.figure({.figsize={9.0, 4.0}, .dpi=170});
 
-    plt::subplot(2, 2, 2);
-    plt::title("Погрешность $\\alpha_e$");
-    plt::grid(true);
-    plt::semilogy(steps, a_es, "k");
+    plt.subplot(1, 2, 1);
+    plt.title("Погрешность от итерации");
+    plt.grid(true);
+    plt.semilogy(steps, errs, "k");
 
-    plt::subplot(2, 2, 3);
-    plt::title("Погрешность от итерации");
-    plt::grid(true);
-    plt::semilogy(steps, errs, "k");
+    plt.subplot(1, 2, 2);
+    plt.title("Погрешность $\\alpha_e$");
+    plt.grid(true);
+    plt.semilogy(steps, a_es, "k");
 
-    plt::subplot(2, 2, 4);
-    plt::title("Погрешность $\\alpha_e$");
-    plt::grid(true);
-    plt::semilogy(steps, a_es, "k");
-
-    plt::tight_layout();
-    plt::show();
+    plt.tight_layout();
+    plt.show();
 }

@@ -2,8 +2,6 @@
 #include <iomanip>
 #include <algorithm>
 
-#include <zephyr/utils/error_list.h>
-
 #include <zephyr/phys/literals.h>
 #include <zephyr/phys/matter/eos/ideal_gas.h>
 #include <zephyr/phys/matter/eos/stiffened_gas.h>
@@ -13,9 +11,7 @@
 
 #include <zephyr/utils/numpy.h>
 #include <zephyr/utils/range.h>
-#include <zephyr/utils/matplotlib.h>
-
-namespace plt = zephyr::utils::matplotlib;
+#include <zephyr/utils/pyplot.h>
 
 using namespace zephyr;
 using namespace zephyr::phys;
@@ -49,7 +45,9 @@ int main() {
     double sb2 = 1.0e-6;
     double sb3 = 1.0e-4;
 
-    plt::figure_size(16.0, 8.0, 150);
+    utils::pyplot plt;
+
+    plt.figure({.figsize={16.0, 8.0}, .dpi=150});
 
     auto rho_tests = np::linspace(0.9*rho_test, 1.1*rho_test, 1000);
     auto Pcu_rb0 = np::empty_like(rho_tests);
@@ -86,29 +84,29 @@ int main() {
         Pcu_rb3_e[i] = mixture.pressure_re(rho, e_test, {1.0 - sb3, sb3}, {.deriv=true, .P0=P0, .T0=T0}).dE;
     }
 
-    plt::subplot2grid(2, 3, 0, 0);
-    plt::xlabel("Density");
-    plt::ylabel("Pressure");
-    plt::plot(rho_tests, Pcu_rb0, "g");
-    plt::plot(rho_tests, Pcu_rb1, "k--");
-    plt::plot(rho_tests, Pcu_rb2, "k--");
-    plt::plot(rho_tests, Pcu_rb3, "k--");
+    plt.subplot2grid(2, 3, 0, 0);
+    plt.xlabel("Density");
+    plt.ylabel("Pressure");
+    plt.plot(rho_tests, Pcu_rb0, "g");
+    plt.plot(rho_tests, Pcu_rb1, "k--");
+    plt.plot(rho_tests, Pcu_rb2, "k--");
+    plt.plot(rho_tests, Pcu_rb3, "k--");
 
-    plt::subplot2grid(2, 3, 0, 1);
-    plt::xlabel("Density");
-    plt::ylabel("$dP/dR \\, ( \\approx c^2 )$");
-    plt::plot(rho_tests, Pcu_rb0_r, "g");
-    plt::plot(rho_tests, Pcu_rb1_r, "k--");
-    plt::plot(rho_tests, Pcu_rb2_r, "k--");
-    plt::plot(rho_tests, Pcu_rb3_r, "k--");
+    plt.subplot2grid(2, 3, 0, 1);
+    plt.xlabel("Density");
+    plt.ylabel("$dP/dR \\, ( \\approx c^2 )$");
+    plt.plot(rho_tests, Pcu_rb0_r, "g");
+    plt.plot(rho_tests, Pcu_rb1_r, "k--");
+    plt.plot(rho_tests, Pcu_rb2_r, "k--");
+    plt.plot(rho_tests, Pcu_rb3_r, "k--");
 
-    plt::subplot2grid(2, 3, 0, 2);
-    plt::xlabel("Density");
-    plt::ylabel("dP/dE");
-    plt::plot(rho_tests, Pcu_rb0_e, "g");
-    plt::plot(rho_tests, Pcu_rb1_e, "k--");
-    plt::plot(rho_tests, Pcu_rb2_e, "k--");
-    plt::plot(rho_tests, Pcu_rb3_e, "k--");
+    plt.subplot2grid(2, 3, 0, 2);
+    plt.xlabel("Density");
+    plt.ylabel("dP/dE");
+    plt.plot(rho_tests, Pcu_rb0_e, "g");
+    plt.plot(rho_tests, Pcu_rb1_e, "k--");
+    plt.plot(rho_tests, Pcu_rb2_e, "k--");
+    plt.plot(rho_tests, Pcu_rb3_e, "k--");
 
 
     auto e_tests = np::linspace(0.95*e_test, 1.05*e_test, 100);
@@ -151,33 +149,32 @@ int main() {
         Pcu_eb3_e[i] = mixture.pressure_re(rho_test, engy, {1.0 - sb3, sb3}, {.deriv=true, .P0=P0, .T0=T0}).dE;
     }
 
-    plt::subplot2grid(2, 3, 1, 0);
-    plt::xlabel("Energy");
-    plt::ylabel("Pressure");
-    plt::plot(e_tests, Pcu_eb0, "g");
-    plt::plot(e_tests, Pcu_eb1, "k--");
-    plt::plot(e_tests, Pcu_eb2, "k--");
-    plt::plot(e_tests, Pcu_eb3, "k--");
+    plt.subplot2grid(2, 3, 1, 0);
+    plt.xlabel("Energy");
+    plt.ylabel("Pressure");
+    plt.plot(e_tests, Pcu_eb0, "g");
+    plt.plot(e_tests, Pcu_eb1, "k--");
+    plt.plot(e_tests, Pcu_eb2, "k--");
+    plt.plot(e_tests, Pcu_eb3, "k--");
 
-    plt::subplot2grid(2, 3, 1, 1);
-    plt::xlabel("Energy");
-    plt::ylabel("$dP/dR \\, ( \\approx c^2 )$");
-    plt::plot(e_tests, Pcu_eb0_r, "g");
-    plt::plot(e_tests, Pcu_eb1_r, "k--");
-    plt::plot(e_tests, Pcu_eb2_r, "k--");
-    plt::plot(e_tests, Pcu_eb3_r, "k--");
+    plt.subplot2grid(2, 3, 1, 1);
+    plt.xlabel("Energy");
+    plt.ylabel("$dP/dR \\, ( \\approx c^2 )$");
+    plt.plot(e_tests, Pcu_eb0_r, "g");
+    plt.plot(e_tests, Pcu_eb1_r, "k--");
+    plt.plot(e_tests, Pcu_eb2_r, "k--");
+    plt.plot(e_tests, Pcu_eb3_r, "k--");
 
-    plt::subplot2grid(2, 3, 1, 2);
-    plt::xlabel("Energy");
-    plt::ylabel("dP/dE");
-    plt::plot(e_tests, Pcu_eb0_e, "g");
-    plt::plot(e_tests, Pcu_eb1_e, "k--");
-    plt::plot(e_tests, Pcu_eb2_e, "k--");
-    plt::plot(e_tests, Pcu_eb3_e, "k--");
+    plt.subplot2grid(2, 3, 1, 2);
+    plt.xlabel("Energy");
+    plt.ylabel("dP/dE");
+    plt.plot(e_tests, Pcu_eb0_e, "g");
+    plt.plot(e_tests, Pcu_eb1_e, "k--");
+    plt.plot(e_tests, Pcu_eb2_e, "k--");
+    plt.plot(e_tests, Pcu_eb3_e, "k--");
 
-
-    plt::tight_layout();
-    plt::show();
+    plt.tight_layout();
+    plt.show();
 
     return 0;
 }

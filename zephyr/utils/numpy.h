@@ -49,14 +49,14 @@ inline Array2d empty_like(const Array2d& arr) {
 }
 
 template <typename T = size_t>
-std::enable_if_t<std::is_integral_v<T>, std::vector<T>>
+std::enable_if_t<std::is_arithmetic_v<T>, std::vector<T>>
 arange(size_t N) {
     std::vector<T> arr(N);
     for (T i = T{0}; i < N; ++i) { arr[i] = i; }
     return arr;
 }
 
-Array<real> random(real min_val, real max_val, size_t N);
+Array<real> random(size_t N, real min_val = 0.0, real max_val = 1.0);
 
 /// @}
 

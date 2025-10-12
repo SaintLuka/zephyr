@@ -1,16 +1,13 @@
 #include <iostream>
 #include <zephyr/geom/geom.h>
 #include <zephyr/geom/sections.h>
-#include <zephyr/mesh/euler/eu_prim.h>
 #include <zephyr/mesh/euler/eu_mesh.h>
 
-#include <zephyr/utils/numpy.h>
-#include <zephyr/utils/matplotlib.h>
 #include <zephyr/math/calc/roots.h>
+#include <zephyr/utils/numpy.h>
+#include <zephyr/utils/pyplot.h>
 
-namespace plt = zephyr::utils::matplotlib;
-namespace np = zephyr::np;
-
+using namespace zephyr;
 using namespace zephyr::geom;
 using namespace zephyr::mesh;
 
@@ -47,21 +44,22 @@ void test1(Polyhedron poly, Vector3d normal) {
         err[i] = std::abs(Vs1[i] - Vs2[i]);
     }
 
-    plt::figure_size(9.0, 4.0, 170);
+    utils::pyplot plt;
+    plt.figure({.figsize={9.0, 4.0}, .dpi=170});
 
-    plt::subplot(1, 2, 1);
-    plt::title("$\\alpha(p)$");
-    plt::grid(true);
-    plt::plot(ps, Vs1, {{"linestyle", "solid"}, {"color", "blue"}, {"label", "clip_volume"}});
-    plt::plot(ps, Vs2, {{"linestyle", "dotted"}, {"color", "orange"}, {"label", "formula"}});
+    plt.subplot(1, 2, 1);
+    plt.title("$\\alpha(p)$");
+    plt.grid(true);
+    plt.plot(ps, Vs1, {.linestyle="solid", .color="blue", .label="clip_volume"});
+    plt.plot(ps, Vs2, {.linestyle="dotted", .color="orange", .label="formula"});
 
-    plt::subplot(1, 2, 2);
-    plt::title("$Error$");
-    plt::grid(true);
-    plt::plot(ps, err, "k");
+    plt.subplot(1, 2, 2);
+    plt.title("$Error$");
+    plt.grid(true);
+    plt.plot(ps, err, "k");
 
-    plt::tight_layout();
-    plt::show();
+    plt.tight_layout();
+    plt.show();
 }
 
 void test2(Polyhedron poly, Vector3d normal) {
@@ -75,20 +73,21 @@ void test2(Polyhedron poly, Vector3d normal) {
         err[i] = std::abs(alpha[i] - cube_volume_fraction(normal, ps[i], A, B, C));
     }
 
-    plt::figure_size(9.0, 4.0, 170);
+    utils::pyplot plt;
+    plt.figure({.figsize={9.0, 4.0}, .dpi=170});
 
-    plt::subplot(1, 2, 1);
-    plt::title("$p(\\alpha)$");
-    plt::grid(true);
-    plt::plot(alpha, ps, {{"linestyle", "solid"}, {"color", "blue"}, {"label", "clip_volume"}});
+    plt.subplot(1, 2, 1);
+    plt.title("$p(\\alpha)$");
+    plt.grid(true);
+    plt.plot(alpha, ps, {.color="blue", .label="clip_volume"});
 
-    plt::subplot(1, 2, 2);
-    plt::title("$Error$");
-    plt::grid(true);
-    plt::plot(alpha, err, "k");
+    plt.subplot(1, 2, 2);
+    plt.title("$Error$");
+    plt.grid(true);
+    plt.plot(alpha, err, "k");
 
-    plt::tight_layout();
-    plt::show();
+    plt.tight_layout();
+    plt.show();
 }
 
 int main() {

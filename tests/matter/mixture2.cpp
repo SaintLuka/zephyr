@@ -10,13 +10,11 @@
 #include <zephyr/phys/matter/mixture_pt.h>
 
 #include <zephyr/utils/numpy.h>
-#include <zephyr/utils/matplotlib.h>
+#include <zephyr/utils/pyplot.h>
 
 using namespace zephyr;
 using namespace zephyr::geom;
 using namespace zephyr::phys;
-
-namespace plt = zephyr::utils::matplotlib;
 
 double fraction(double x) {
     double delta = 0.6;
@@ -91,36 +89,38 @@ int main() {
         mix_e0[i] = gas.e0;
     }
 
-    plt::figure_size(15.0, 8.0);
+    utils::pyplot plt;
 
-    plt::subplot2grid(2, 3, 0, 0);
-    plt::title("Vol Fractions");
-    //plt::plot(x, a1, "k-o");
-    plt::plot(x, a2);
+    plt.figure({.figsize={15.0, 8.0}});
 
-    plt::subplot2grid(2, 3, 1, 0);
-    plt::title("Mass Fractions");
-    //plt::plot(x, beta1);
-    plt::plot(x, beta2);
+    plt.subplot2grid(2, 3, 0, 0);
+    plt.title("Vol Fractions");
+    //plt.plot(x, a1, "k-o");
+    plt.plot(x, a2);
 
-    plt::subplot2grid(2, 3, 0, 1);
-    plt::title("Mix density");
-    plt::plot(x, mix_dens);
+    plt.subplot2grid(2, 3, 1, 0);
+    plt.title("Mass Fractions");
+    //plt.plot(x, beta1);
+    plt.plot(x, beta2);
 
-    plt::subplot2grid(2, 3, 0, 2);
-    plt::title("Mix energy");
-    plt::plot(x, mix_engy);
+    plt.subplot2grid(2, 3, 0, 1);
+    plt.title("Mix density");
+    plt.plot(x, mix_dens);
 
-    plt::subplot2grid(2, 3, 1, 1);
-    plt::title("Mix pressure");
-    plt::plot(x, mix_pres);
+    plt.subplot2grid(2, 3, 0, 2);
+    plt.title("Mix energy");
+    plt.plot(x, mix_engy);
 
-    plt::subplot2grid(2, 3, 1, 2);
-    plt::title("Mix temperature");
-    plt::plot(x, mix_temp);
+    plt.subplot2grid(2, 3, 1, 1);
+    plt.title("Mix pressure");
+    plt.plot(x, mix_pres);
 
-    plt::tight_layout();
-    plt::show();
+    plt.subplot2grid(2, 3, 1, 2);
+    plt.title("Mix temperature");
+    plt.plot(x, mix_temp);
+
+    plt.tight_layout();
+    plt.show();
 
     return 0;
 }
