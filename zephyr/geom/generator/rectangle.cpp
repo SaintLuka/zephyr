@@ -570,6 +570,7 @@ void Rectangle::initialize_classic(AmrCells& cells) const {
             cells.faces.adjacent.alien[iface + side] = -1;
             cells.faces.adjacent.basic[iface + side] = ic;
             cells.faces.vertices[iface + side].fill(-1);
+            cells.faces.rotation[iface + side] = 0;
         }
 
         cells.faces.normal[iface + Side2D::L] = -Vector3d::UnitX();

@@ -13,6 +13,7 @@ void split_face_prepare(index_t iface, AmrFaces& faces) {
     constexpr Side<dim> side{int_side};
     
     faces.boundary[iface + side[1]] = faces.boundary[iface + side];
+    faces.rotation[iface + side[1]] = faces.rotation[iface + side];
     faces.adjacent.rank [iface + side[1]] = faces.adjacent.rank [iface + side];
     faces.adjacent.index[iface + side[1]] = faces.adjacent.index[iface + side];
     faces.adjacent.alien[iface + side[1]] = faces.adjacent.alien[iface + side];
@@ -20,12 +21,14 @@ void split_face_prepare(index_t iface, AmrFaces& faces) {
 
     if constexpr (dim > 2) {
         faces.boundary[iface + side[2]] = faces.boundary[iface + side];
+        faces.rotation[iface + side[3]] = faces.rotation[iface + side];
         faces.adjacent.rank [iface + side[2]] = faces.adjacent.rank [iface + side];
         faces.adjacent.index[iface + side[2]] = faces.adjacent.index[iface + side];
         faces.adjacent.alien[iface + side[2]] = faces.adjacent.alien[iface + side];
         faces.adjacent.basic[iface + side[2]] = faces.adjacent.basic[iface + side];
 
         faces.boundary[iface + side[3]] = faces.boundary[iface + side];
+        faces.rotation[iface + side[3]] = faces.rotation[iface + side];
         faces.adjacent.rank [iface + side[3]] = faces.adjacent.rank [iface + side];
         faces.adjacent.index[iface + side[3]] = faces.adjacent.index[iface + side];
         faces.adjacent.alien[iface + side[3]] = faces.adjacent.alien[iface + side];

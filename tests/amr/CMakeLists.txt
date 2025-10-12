@@ -1,6 +1,6 @@
 #list(APPEND TESTS dense)
 #list(APPEND TESTS gradient)
-#list(APPEND TESTS interface)
+list(APPEND TESTS interface)
 #list(APPEND TESTS random)
 #list(APPEND TESTS templates)
 

@@ -64,9 +64,9 @@ void apply_impl(AmrCells &locals, const Distributor& op) {
     geometry_timer.stop();
 
     /// Этап 4. Восстановление соседства
-    connections_timer.resume();
-    restore_connections<dim>(locals, aliens, 0, count);
-    connections_timer.stop();
+    //connections_timer.resume();
+    //restore_connections<dim>(locals, aliens, 0, count);
+    //connections_timer.stop();
 
     /// Этап 5. Удаление неопределенных ячеек
     remove_timer.resume();

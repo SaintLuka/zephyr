@@ -96,6 +96,9 @@ public:
     /// @brief Индексы вершин в массиве вершин ячейки
     std::vector<std::array<short, max_vertices>> vertices;
 
+    /// @brief Преобразование смежной ячейки, @see Rotation
+    std::vector<std::uint8_t> rotation;
+
 
     /// @brief Число граней
     index_t size() const { return boundary.size(); }

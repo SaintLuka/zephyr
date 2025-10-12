@@ -34,6 +34,7 @@ void AmrFaces::resize(index_t n_faces) {
     area.resize(n_faces);
     area_alt.resize(n_faces);
     vertices.resize(n_faces);
+    rotation.resize(n_faces);
 }
 
 void AmrFaces::reserve(index_t n_faces) {
@@ -44,6 +45,7 @@ void AmrFaces::reserve(index_t n_faces) {
     area.reserve(n_faces);
     area_alt.reserve(n_faces);
     vertices.reserve(n_faces);
+    rotation.reserve(n_faces);
 }
 
 void AmrFaces::shrink_to_fit() {
@@ -54,6 +56,7 @@ void AmrFaces::shrink_to_fit() {
     area.shrink_to_fit();
     area_alt.shrink_to_fit();
     vertices.shrink_to_fit();
+    rotation.shrink_to_fit();
 }
 
 void AmrFaces::insert(index_t iface, CellType ctype, int count) {

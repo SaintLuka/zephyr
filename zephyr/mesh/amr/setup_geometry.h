@@ -7,6 +7,7 @@
 #include <zephyr/mesh/amr/retain.h>
 #include <zephyr/mesh/amr/coarse.h>
 #include <zephyr/mesh/amr/statistics.h>
+#include <zephyr/mesh/euler/eu_prim.h>
 
 namespace zephyr::mesh::amr {
 
