@@ -155,6 +155,12 @@ public:
         return threads::max<n_tasks_per_thread>(begin(), end(), std::forward<Func>(func));
     }
 
+    /// @brief Параллельно по тредам посчитать сумму
+    template<int n_tasks_per_thread = utils::default_n_tasks_per_thread, class Func, typename Value>
+    auto sum(Func &&func, const Value& init) {
+        return threads::sum<n_tasks_per_thread>(begin(), end(), init, std::forward<Func>(func));
+    }
+
     /// @}
 
     /// @{ @name Адаптация сетки

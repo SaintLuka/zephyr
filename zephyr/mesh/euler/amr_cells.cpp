@@ -106,6 +106,15 @@ double AmrCells::incircle_diameter(index_t ic) const {
     }
 }
 
+Box AmrCells::bbox(index_t ic) const {
+    // TODO: Сделать оптимальный код для декартовых сеток, и не только здесь
+    Box box = Box::Empty(m_dim);
+    for (index_t iv: nodes_range(ic)) {
+        box.capture(verts[iv]);
+    }
+    return box;
+}
+
 Polygon AmrCells::polygon(index_t ic) const {
     if (m_dim > 2) {
         throw std::runtime_error("AmrCell::polygon() error #1");
@@ -141,6 +150,30 @@ Polygon AmrCells::polygon(index_t ic) const {
     } else {
         return {vertices_data(ic), node_count(ic)};
     }
+}
+
+Polyhedron AmrCells::polyhedron(index_t ic) const {
+    if (m_dim < 3) {
+        throw std::runtime_error("AmrCell::polyhedron() error #1");
+    }
+
+    if (m_adaptive && m_linear) {
+        // Пока я умею делать только кубы
+        const auto& map = mapping<3>(ic);
+        std::vector<Vector3d> vs = {
+            map.vs<-1, -1, -1>(),
+            map.vs<+1, -1, -1>(),
+            map.vs<+1, +1, -1>(),
+            map.vs<-1, +1, -1>(),
+            map.vs<-1, -1, +1>(),
+            map.vs<+1, -1, +1>(),
+            map.vs<+1, +1, +1>(),
+            map.vs<-1, +1, +1>(),
+        };
+        return Polyhedron(CellType::HEXAHEDRON, vs);
+    }
+
+    throw std::runtime_error("AmrCell::polyhedron() error #2");
 }
 
 double AmrCells::approx_vol_fraction(index_t ic, const InFunction &inside) const {
@@ -279,7 +312,10 @@ double AmrCells::volume_fraction(index_t ic, const InFunction &inside, int n_poi
         }
     }
     else {
-        // Трехмерная ячейка
+        if (m_adaptive) {
+            return mapping<3>(ic).reduce().volume_fraction(inside, n_points);
+        }
+        // Трехмерный многогранник
         throw std::runtime_error("AmrCell::volume_fraction #1");
     }
 }
@@ -874,8 +910,10 @@ void AmrCells::push_back_impl(const Polyhedron& poly) {
 
         faces.vertices[iface].fill(-1);
         for (int j = 0; j < n_verts; ++j) {
-            faces.vertices[iface][j] = node_begin[ic] + poly.face_indices(i)[j];
+            faces.vertices[iface][j] = poly.face_indices(i)[j];
         }
+
+        faces.adjacent.basic[iface] = ic;
     }
 }
 

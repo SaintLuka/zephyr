@@ -1,5 +1,6 @@
 #include <zephyr/mesh/euler/eu_prim.h>
 #include <zephyr/geom/primitives/polygon.h>
+#include <zephyr/geom/primitives/polyhedron.h>
 
 namespace zephyr::mesh {
 
@@ -45,8 +46,16 @@ EuFaces::EuFaces(
               cells->face_begin[cell_idx + 1],
               aliens, dir) { }
 
+geom::Box EuCell::bbox() const {
+    return m_cells->bbox(m_index);
+}
+
 geom::Polygon EuCell::polygon() const {
     return m_cells->polygon(m_index);
+}
+
+geom::Polyhedron EuCell::polyhedron() const {
+    return m_cells->polyhedron(m_index);
 }
 
 } // namespace zephyr::mesh

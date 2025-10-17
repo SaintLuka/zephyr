@@ -5,6 +5,7 @@
 #include <variant>
 #include <optional>
 #include <iostream>
+#include <tuple>
 
 #include <zephyr/configuration.h>
 

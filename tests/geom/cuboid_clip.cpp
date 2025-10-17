@@ -39,7 +39,7 @@ void test1(Polyhedron poly, Vector3d normal) {
 
         Polyhedron clip = poly.clip(p, normal);
         Vs1[i] = clip.volume() / poly.volume();
-        Vs2[i] = cube_volume_fraction(normal, p.dot(normal), A, B, C);
+        Vs2[i] = cube_volume_fraction(p.dot(normal), normal, A, B, C);
 
         err[i] = std::abs(Vs1[i] - Vs2[i]);
     }
@@ -69,8 +69,8 @@ void test2(Polyhedron poly, Vector3d normal) {
     auto ps  = np::zeros(N);
     auto err = np::zeros(N);
     for (int i = 0; i < N; ++i) {
-        ps[i]  = cube_find_section(normal, alpha[i], A, B, C);
-        err[i] = std::abs(alpha[i] - cube_volume_fraction(normal, ps[i], A, B, C));
+        ps[i]  = cube_find_section(alpha[i], normal, A, B, C);
+        err[i] = std::abs(alpha[i] - cube_volume_fraction(ps[i], normal, A, B, C));
     }
 
     utils::pyplot plt;

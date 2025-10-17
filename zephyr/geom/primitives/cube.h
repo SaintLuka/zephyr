@@ -85,6 +85,24 @@ public:
     /// @brief Барицентр трехмерной ячейки
     /// @param volume Объем ячейки
     Vector3d centroid(double volume = 0.0) const;
+
+    /// @brief Посчитать объемную долю, которая отсекается от ячейки некоторым
+    /// телом, точки которого определяются характеристической функцией inside
+    /// @param inside Характеристическая функция: true, если точка находится
+    /// внутри тела, иначе false
+    /// @param n_points Число тестовых точек, погрешность ~ 1/N.
+    double volume_fraction(const std::function<bool(const Vector3d&)>& inside,
+            int n_points = 10000) const;
+
+    /// @brief Интеграл скалярной функции по кубическому элементу
+    /// @param n Число подъячеек по осям
+    /// @details Сумма по барицентрам 2-го порядка (low accuracy order)
+    double integrate_low(const std::function<double(const Vector3d&)>& func, int n) const;
+
+    /// @brief Интеграл скалярной функции по кубическому элементу
+    /// @param n Число подъячеек по осям
+    /// @details Метод Гаусса 4-го порядка (middle accuracy order)
+    double integrate_mid(const std::function<double(const Vector3d&)>& func, int n) const;
 };
 
 /// @brief Криволинейный кубоид.

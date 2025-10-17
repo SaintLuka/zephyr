@@ -49,18 +49,18 @@ struct cube_symmetry {
 // если i - индекс дочерней ячейки, то возвращает индекс смежной через
 // грань s дочерней ячейки у соседа. Нужна прям.
 int node_index(int i, Side3D s, cube_symmetry T) {
-
+    return -1;
 }
 
 // Индекс смежной БАЗОВОЙ стороны для LEFT вернет RIGHT в простом случае и т.д.
 Side3D opp_face_base(Side3D s, cube_symmetry T) {
-
+    return -1;
 }
 
 // Индекс смежной сложной стороны.
 // К примеру, моя ячейка разбилась. Нужна ли ?
 Side3D opp_face_full(Side3D s, cube_symmetry T) {
-
+    return -1;
 }
 
 

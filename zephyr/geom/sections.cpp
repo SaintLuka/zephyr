@@ -9,7 +9,7 @@ namespace zephyr::geom {
 
 using namespace zephyr::math;
 
-double quad_volume_fraction(const Vector3d &n, double p, double A, double B) {
+double quad_volume_fraction(double p, const Vector3d &n, double A, double B) {
     auto [a, b] = sorted(A * abs(n.x()), B * abs(n.y()));
 
     if (std::abs(p) <= 0.5 * (b - a)) {
@@ -21,7 +21,7 @@ double quad_volume_fraction(const Vector3d &n, double p, double A, double B) {
     }
 }
 
-double quad_find_section(const Vector3d &n, double alpha, double A, double B) {
+double quad_find_section(double alpha, const Vector3d &n, double A, double B) {
     auto [a, b] = sorted(A * abs(n.x()), B * abs(n.y()));
 
     if (alpha <= 0.5 * a / b) {
@@ -232,10 +232,10 @@ int f_func_case(double x, double a, double b, double c) {
     if (x <= std::abs(s - c)) {
         if (a + b <= c) {
             // case 4.1. Квадратное сечение в центре
-            return 4;
+            return 5;
         } else {
             // case 4.2. Шестиугольное сечение в центре
-            return 5;
+            return 4;
         }
     }
     if (x < s - b) {
@@ -325,12 +325,12 @@ double g_func(double y, double a, double b, double c) {
 
 }
 
-double cube_volume_fraction(const Vector3d& n, double p, double A, double B, double C) {
+double cube_volume_fraction(double p, const Vector3d& n, double A, double B, double C) {
     auto [a, b, c] = sorted(std::abs(A * n.x()), std::abs(B * n.y()), std::abs(C * n.z()));
     return 0.5 + 0.5 * sign(p) * f_func(std::abs(p), a, b, c);
 }
 
-vf_grad_t cube_volume_fraction_grad(const Vector3d& n, double p, double A, double B, double C) {
+vf_grad_t cube_volume_fraction_grad(double p, const Vector3d& n, double A, double B, double C) {
     double a = std::abs(A * n.x());
     double b = std::abs(B * n.y());
     double c = std::abs(C * n.z());
@@ -367,10 +367,10 @@ vf_grad_t cube_volume_fraction_grad(const Vector3d& n, double p, double A, doubl
 
         vf_grad_t grad2;
 
-        auto vf_p  = [A, B, C, n, p](double t) -> double { return cube_volume_fraction(n, t, A, B, C); };
-        auto vf_nx = [A, B, C, n, p](double t) -> double { return cube_volume_fraction(Vector3d{t, n.y(), n.z()}, p, A, B, C); };
-        auto vf_ny = [A, B, C, n, p](double t) -> double { return cube_volume_fraction(Vector3d{n.x(), t, n.z()}, p, A, B, C); };
-        auto vf_nz = [A, B, C, n, p](double t) -> double { return cube_volume_fraction(Vector3d{n.x(), n.y(), t}, p, A, B, C); };
+        auto vf_p  = [A, B, C, n, p](double t) -> double { return cube_volume_fraction(t, n, A, B, C); };
+        auto vf_nx = [A, B, C, n, p](double t) -> double { return cube_volume_fraction(p, Vector3d{t, n.y(), n.z()}, A, B, C); };
+        auto vf_ny = [A, B, C, n, p](double t) -> double { return cube_volume_fraction(p, Vector3d{n.x(), t, n.z()}, A, B, C); };
+        auto vf_nz = [A, B, C, n, p](double t) -> double { return cube_volume_fraction(p, Vector3d{n.x(), n.y(), t}, A, B, C); };
 
         double h = 1.0e-5;
         grad2.dp    = derivative<1>(vf_p, p, h);
@@ -397,12 +397,12 @@ vf_grad_t cube_volume_fraction_grad(const Vector3d& n, double p, double A, doubl
     return grad;
 }
 
-double cube_find_section(const Vector3d& n, double alpha, double A, double B, double C) {
+double cube_find_section(double alpha, const Vector3d& n, double A, double B, double C) {
     auto [a, b, c] = sorted(std::abs(A * n.x()), std::abs(B * n.y()), std::abs(C * n.z()));
     return sign(2.0 * alpha - 1.0) * g_func(std::abs(2.0 * alpha - 1.0), a, b, c);
 }
 
-int cube_section_case(const Vector3d& n, double p, double A, double B, double C) {
+int cube_section_case(double p, const Vector3d& n, double A, double B, double C) {
     auto [a, b, c] = sorted(std::abs(A * n.x()), std::abs(B * n.y()), std::abs(C * n.z()));
     return (p > 0.0 ? 1 : -1) * f_func_case(std::abs(p), a, b, c);
 }

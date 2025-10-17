@@ -80,8 +80,11 @@ public:
     /// @brief Число вершин грани
     int n_vertices() const;
 
-    /// @brief Индекс вершины
-    short vertex_index(int idx) const;
+    /// @brief Локальный индекс вершины (в ячейке)
+    index_t vertex_index(int idx) const;
+
+    /// @brief Глобальный индекс вершины
+    index_t node_index(int idx) const;
 
     /// @brief Получить вершину грани
     Vector3d vs(int idx) const;
@@ -261,8 +264,14 @@ public:
     /// @brief Диаметр вписанной окружности
     double incircle_diameter() const;
 
+    /// @brief Bounding box ячейки
+    geom::Box bbox() const;
+
     /// @brief Создать полигон из ячейки (для 3D ячеек -- UB)
     geom::Polygon polygon() const;
+
+    /// @brief Создать полигон из ячейки (для 2D ячеек -- UB)
+    geom::Polyhedron polyhedron() const;
 
     /// @}
 
@@ -533,12 +542,14 @@ inline double EuFace::area_as() const { return m_cells->faces.area_alt[m_face_id
 
 inline int EuFace::n_vertices() const { return m_cells->faces.n_vertices(m_face_idx); }
 
-inline short EuFace::vertex_index(int idx) const { return m_cells->faces.vertices[m_face_idx][idx]; }
+inline index_t EuFace::vertex_index(int idx) const { return m_cells->faces.vertices[m_face_idx][idx]; }
 
-inline geom::Vector3d EuFace::vs(int idx) const {
+inline index_t EuFace::node_index(int idx) const {
     index_t cell_idx = m_cells->faces.adjacent.basic[m_face_idx];
-    return m_cells->verts[m_cells->node_begin[cell_idx] + m_cells->faces.vertices[m_face_idx][idx]];
+    return m_cells->node_begin[cell_idx] + static_cast<int>(m_cells->faces.vertices[m_face_idx][idx]);
 }
+
+inline geom::Vector3d EuFace::vs(int idx) const { return m_cells->verts[node_index(idx)]; }
 
 inline geom::Vector3d EuFace::symm_point(const Vector3d &p) const {
     return m_cells->faces.symm_point(m_face_idx, p);

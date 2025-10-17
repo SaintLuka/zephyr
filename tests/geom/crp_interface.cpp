@@ -24,8 +24,8 @@ struct Inter {
 Inter face_fraction_direct(Polygon &cell, Polygon& neib, double a1, double a2) {
     auto func = [](double a1, double a2, double cos) -> double {
         Vector3d n = {cos, std::sqrt(1.0 - cos * cos), 0.0};
-        double p1 = quad_find_section(n, a1);
-        double p2 = quad_find_section(n, a2);
+        double p1 = quad_find_section(a1, n);
+        double p2 = quad_find_section(a2, n);
         return p2 + cos - p1;
     };
 
