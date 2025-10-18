@@ -6,17 +6,14 @@
 #include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/io/pvd_file.h>
+#include <zephyr/utils/pyplot.h>
 
-#include <zephyr/utils/matplotlib.h>
-
+using namespace zephyr;
 using namespace zephyr::geom;
 using namespace zephyr::mesh;
 
 using generator::Rectangle;
 using zephyr::io::PvdFile;
-
-namespace plt = zephyr::utils::matplotlib;
-
 
 struct _U_ {
     // Метка целевой ячейки
@@ -436,6 +433,7 @@ int main() {
     }
 
     // Тестирование сеточной сходимости
+    utils::pyplot plt;
     for (int k = 0; k < n_templates(); ++k) {
         std::vector<double> hs;
         std::vector<double> lsm_old;
@@ -480,27 +478,24 @@ int main() {
             }
         }
 
-        plt::figure_size(5.4, 3.6, 250);
-        plt::figure(k + 1);
+        plt.figure(k + 1, {.figsize={5.4, 3.6}, .dpi=250});
 
-        plt::xlabel("Размер ячейки");
-        plt::ylabel("Погрешность");
+        plt.xlabel("Размер ячейки");
+        plt.ylabel("Погрешность");
 
-        plt::grid(true);
+        plt.grid(true);
 
-        plt::loglog(hs, acc_1st, {{"color", "black"}, {"linestyle", "dotted"}});
-        plt::loglog(hs, acc_2nd, {{"color", "black"}, {"linestyle", "dotted"}});
+        plt.loglog(hs, acc_1st, {.linestyle="dotted", .color="black",});
+        plt.loglog(hs, acc_2nd, {.linestyle="dotted", .color="black",});
 
-        plt::loglog(hs, gauss, {{"color", "blue"}, {"label", "Гаусс"}, {"marker", "o"}});
-        plt::loglog(hs, lsm_old, {{"color", "green"}, {"label", "МНК"}, {"marker", "o"}});
-        plt::loglog(hs, lsm_new, {{"color", "orange"}, {"label", "сМНК"}, {"marker", "o"}});
+        plt.loglog(hs, gauss, {.color="blue", .marker="o", .label="Гаусс"});
+        plt.loglog(hs, lsm_old, {.color="green", .marker="o", .label="МНК"});
+        plt.loglog(hs, lsm_new, {.color="orange", .marker="o", .label="сМНК"});
 
-        plt::legend();
-
-        plt::tight_layout();
+        plt.legend();
+        plt.tight_layout();
     }
-
-    plt::show();
+    plt.show();
 
     return 0;
 }

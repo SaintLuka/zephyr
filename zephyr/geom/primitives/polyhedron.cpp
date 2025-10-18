@@ -1,5 +1,6 @@
 #include <iostream>
 #include <map>
+#include <numeric>
 
 #include <zephyr/geom/intersection.h>
 #include <zephyr/geom/primitives/polyhedron.h>
@@ -492,8 +493,8 @@ void Polyhedron::add_face(const std::vector<int>& vs) {
 std::vector<std::vector<int>> Polyhedron::simplified_faces(int face_idx, int n_verts) const {
     // 1. Сортируем узлы полигона вдоль некоторого направления
     // (лучше выбрать направление, вдоль которого полигон вытянут).
-    // 2. Находим положения несколько секущих плоскостей, перпендекулярных
-    // выбраному направлению. Секущие плоскости разделяют вершины полигона
+    // 2. Находим положения несколько секущих плоскостей, перпендикулярных
+    // выбранному направлению. Секущие плоскости разделяют вершины полигона
     // на несколько групп. Нужно расставить плоскости так, чтобы в каждой
     // группе было максимальное количество вершин, при этом в граничные
     // группы должно попадать от 2 до n_verts - 1 вершин, во внутренние
@@ -565,11 +566,15 @@ Polyhedron Polyhedron::clip(const Vector3d& p, const Vector3d& n) const {
     int count_inside  = 0;
     int count_outside = 0;
 
+    // Линейный размер
+    double L = std::cbrt(volume());
+    double eps = 1.0e-12 * L;
+
     // Положения / индикаторы вершин.
     // -1: под/внутри. 0: на плоскости. +1: снаружи
     std::vector<int> vs_pos(n_verts());
     for (int i = 0; i < n_verts(); ++i) {
-        vs_pos[i] = plane.position(verts[i]);
+        vs_pos[i] = plane.position(verts[i], eps);
 
         if (vs_pos[i] > 0) {
             ++count_outside;
@@ -830,10 +835,128 @@ double Polyhedron::volume_fraction(
     return NAN;
 }
 
+void Polyhedron::move(const Vector3d& shift) {
+    for (auto& v: verts) {
+        v += shift;
+    }
+    m_center += shift;
+    for (auto& fc: faces_c) {
+        fc += shift;
+    }
+}
 
-std::ostream& operator<<(std::ostream& os, const Polyhedron& poly) {
-    os << "Polyhedron operator<<(): Not yet\n";
-    return os;
+int Polyhedron::checkout() const {
+    // Минимум 4 вершины и грани (тетраэдр)
+    if (verts.size() < 4) { return -1; }
+    if (faces.size() < 4) { return -2; }
+
+    if (faces.size() != faces_c.size()) { return -3; }
+    if (faces.size() != faces_s.size()) { return -4; }
+
+    if (m_center.hasNaN()) { return -5; }
+    for (auto& v: verts) {
+        if (v.hasNaN()) { return -6; }
+    }
+    for (auto& fc: faces_c) {
+        if (fc.hasNaN()) { return -7; }
+    }
+    for (auto& fs: faces_s) {
+        if (fs.hasNaN()) { return -8; }
+    }
+    for (auto& face: faces) {
+        for (auto j: face) {
+            if (j < 0 || j >= verts.size()) { return -9; }
+        }
+    }
+
+    double L = 0.0;
+    for (auto& v: verts) {
+        L = std::max(L, (v - m_center).norm());
+    }
+    double eps_l = 1.0e-10 * L;
+    double eps_s = 1.0e-10 * L * L;
+
+    Vector3d c = Vector3d::Zero();
+    for (auto& v: verts) { c += v; }
+    c /= verts.size();
+
+    if ((c - m_center).norm() > eps_l) { return -11; }
+
+    // Дублирование вершин
+    for (int i = 0; i < verts.size(); ++i) {
+        for (int j = 0; j < verts.size(); ++j) {
+            if (i == j) { continue; }
+            if ((verts[i] - verts[j]).norm() < eps_l) {
+                return -12;
+            }
+        }
+    }
+
+    for (int i = 0; i < faces.size(); ++i) {
+        Vector3d fc = get_center(verts, faces[i]);
+        if ((fc - faces_c[i]).norm() > eps_l) { return -13; }
+
+        // на грани менее 3 вершин
+        if (faces[i].size() < 3) { return -14; }
+
+        // на грани две одинаковых вершины
+        for (int i1 = 0; i1 < faces[i].size(); ++i1) {
+            for (int i2 = 0; i2 < faces[i].size(); ++i2) {
+                if (i1 == i2) continue;
+                if (faces[i][i1] == faces[i][i2]) {
+                    return -15;
+                }
+            }
+        }
+
+        // выпуклость
+        Vector3d S = get_surface(verts, faces[i], faces_c[i]);
+        if ((faces_c[i] - m_center).dot(S) < 0.0) { return -16; }
+
+        if ((S - faces_s[i]).norm() > eps_s) { return -17; }
+
+        // нулевая грань
+        if (S.norm() < eps_s) {
+            return -18;
+        }
+    }
+
+    // Многогранник замкнутый, если каждое ребро встречается у двух граней
+    std::map<edge_t, std::vector<int>> edge_faces;
+    for (int k = 0; k < faces.size(); ++k) {
+        auto& face = faces[k];
+        for (int i = 0; i < face.size(); ++i) {
+            int j = (i + 1) % face.size();
+
+            edge_t edge(face[i], face[j]);
+            edge_faces[edge].push_back(k);
+        }
+    }
+
+    for (auto& edge: edge_faces) {
+        if (edge.second.size() != 2) {
+            return -19;
+        }
+    }
+
+    return 0;
+}
+
+void Polyhedron::print(std::ostream& os) const {
+    os << "Center: " << m_center.transpose() << "\n";
+    os << "Vertices:\n";
+    for (int i = 0; i < verts.size(); ++i) {
+        os << "  " << i << ": " << verts[i].transpose() << "\n";
+    }
+    os << "Faces:\n";
+    for (int i = 0; i < faces.size(); ++i) {
+        os << "  " << i << ": { ";
+        for (int j: faces[i]) { os << j << " "; }
+        os << "}\n";
+        os << "    face.S: " << faces_s[i].norm() << "\n";
+        os << "    face.n: " << faces_s[i].normalized().transpose() << "\n";
+        os << "    face.c: " << faces_c[i].transpose() << "\n";
+    }
 }
 
 // ============================================================================

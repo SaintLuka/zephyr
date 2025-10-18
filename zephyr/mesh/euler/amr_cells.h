@@ -8,6 +8,7 @@
 
 // forward declaration для классов из geom
 namespace zephyr::geom {
+class Box;
 class Quad;
 class SqQuad;
 class Cube;
@@ -287,8 +288,14 @@ public:
         return *reinterpret_cast<const SqMap<dim>*>(vertices_data(ic));
     }
 
+    /// @brief Bounding box ячейки
+    geom::Box bbox(index_t ic) const;
+
     /// @brief Создать полигон из ячейки (для 3D ячеек -- UB)
     geom::Polygon polygon(index_t ic) const;
+
+    /// @brief Создать полигон из ячейки (для 2D ячеек -- UB)
+    geom::Polyhedron polyhedron(index_t ic) const;
 
     /// @}
 

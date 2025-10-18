@@ -1,10 +1,14 @@
 #list(APPEND TESTS crp_interface)
 list(APPEND TESTS cuboid_clip)
+list(APPEND TESTS cuboid_3clip)
 #list(APPEND TESTS curves)
 #list(APPEND TESTS mapping)
+list(APPEND TESTS PLIC_2D)
+list(APPEND TESTS PLIC_3D)
 #list(APPEND TESTS poly_integrate)
 #list(APPEND TESTS polygon_clip)
 list(APPEND TESTS polyhedra)
+#list(APPEND TESTS rotations)
 #list(APPEND TESTS splines)
 
 # Assume all files in direcory are tests
@@ -25,6 +29,7 @@ if (NOT ZEPHYR_PYTHON)
     list(REMOVE_ITEM TESTS cuboid_clip)
     list(REMOVE_ITEM TESTS curves)
     list(REMOVE_ITEM TESTS polygon_clip)
+    list(REMOVE_ITEM TESTS rotations)
     list(REMOVE_ITEM TESTS splines)
 endif()
 

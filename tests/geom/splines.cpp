@@ -5,21 +5,14 @@
 #include <zephyr/geom/curves/lagrange.h>
 
 #include <zephyr/utils/numpy.h>
-#include <zephyr/utils/matplotlib.h>
+#include <zephyr/utils/pyplot.h>
 
 using namespace zephyr;
 using namespace zephyr::geom;
 using namespace zephyr::geom::curves;
-namespace plt = zephyr::utils::matplotlib;
 
-
-using Dictionary = std::map<std::string, std::string>;
-
-Dictionary node_style = {
-        {"color",      "black"},
-        {"linestyle",  "none"},
-        {"marker",     "o"},
-        {"markersize", "4"}
+utils::line_options node_style = {
+    .linestyle="none", .color="black", .marker="o", .markersize=4
 };
 
 // Обычные интерполянты: y(x)
@@ -51,66 +44,52 @@ void ordinary_interpolants() {
     CubicSpline cubic1(xs, ys, SplineBound::Crop, SplineBound::Free);
     CubicSpline cubic2(xs, ys, SplineBound::Crop, SplineBound::Periodic);
 
-    Dictionary orig_style = {
-            {"label",     "Original"},
-            {"color",     "black"},
-            {"linestyle", "solid"},
-            {"linewidth", "0.5"}
+    utils::line_options orig_style = {
+        .linestyle="solid", .linewidth=0.5, .color="black", .label="Original",
     };
 
-    plt::figure_size(9.0, 5.0, 150);
+    utils::pyplot plt;
+    plt.figure({.figsize={9.0, 5.0}, .dpi=150});
 
     // Crop/Free на границах
-    plt::subplot(2, 1, 1);
-    plt::grid(true);
+    plt.subplot(2, 1, 1);
+    plt.grid(true);
 
-    plt::plot(line1.xs(2000, -0.1 * L, 1.1 * L), line1.ys(2000, -0.1 * L, 1.1 * L),
-              {{"label",     "Linear [Free, Crop]"},
-               {"linestyle", "dashed"},
-               {"color",     "blue"}});
+    plt.plot(line1.xs(2000, -0.1 * L, 1.1 * L), line1.ys(2000, -0.1 * L, 1.1 * L),
+            {.linestyle="dashed", .color="blue", .label="Linear [Free, Crop]"});
 
-    plt::plot(cubic1.xs(200, -0.1 * L, 1.1 * L), cubic1.ys(200, -0.1 * L, 1.1 * L),
-              {{"label",     "Cubic  [Crop, Free]"},
-               {"linestyle", "solid"},
-               {"color",     "orange"}});
+    plt.plot(cubic1.xs(200, -0.1 * L, 1.1 * L), cubic1.ys(200, -0.1 * L, 1.1 * L),
+            {.linestyle="solid", .color="orange", .label="Cubic [Free, Crop]"});
 
-    plt::plot(poly1.xs(200, -0.1 * L, 1.1 * L), poly1.ys(200, -0.1 * L, 1.1 * L),
-              {{"label",     "L poly [Free, Crop]"},
-               {"linestyle", "dashed"},
-               {"color",     "red"}});
+    plt.plot(poly1.xs(200, -0.1 * L, 1.1 * L), poly1.ys(200, -0.1 * L, 1.1 * L),
+            {.linestyle="dashed", .color="red", .label="L poly [Free, Crop]"});
 
-    plt::plot(x_all, y_all, orig_style);
+    plt.plot(x_all, y_all, orig_style);
 
-    plt::plot(xs, ys, node_style);
-    plt::legend();
+    plt.plot(xs, ys, node_style);
+    plt.legend();
 
     // Периодические граничные условия
-    plt::subplot(2, 1, 2);
-    plt::grid(true);
+    plt.subplot(2, 1, 2);
+    plt.grid(true);
 
-    plt::plot(cubic2.xs(200, -L, 1.5 * L), cubic2.ys(200, -L, 1.5 * L),
-              {{"label",     "Cubic  [Periodic]"},
-               {"linestyle", "solid"},
-               {"color",     "orange"}});
+    plt.plot(cubic2.xs(200, -L, 1.5 * L), cubic2.ys(200, -L, 1.5 * L),
+            {.linestyle="solid", .color="orange", .label="Cubic  [Periodic]",});
 
-    plt::plot(line2.xs(2000, -L, 1.5 * L), line2.ys(2000, -L, 1.5 * L),
-              {{"label",     "Linear [Periodic]"},
-               {"linestyle", "dashed"},
-               {"color",     "blue"}});
+    plt.plot(line2.xs(2000, -L, 1.5 * L), line2.ys(2000, -L, 1.5 * L),
+            {.linestyle="dashed", .color="blue", .label="Linear [Periodic]"});
 
-    plt::plot(poly2.xs(200, -L, 1.5 * L), poly2.ys(200, - L, 1.5 * L),
-              {{"label",     "L poly [Periodic]"},
-               {"linestyle", "dashed"},
-               {"color",     "red"}});
+    plt.plot(poly2.xs(200, -L, 1.5 * L), poly2.ys(200, - L, 1.5 * L),
+            {.linestyle="dashed", .color="red", .label="L poly [Periodic]",});
 
-    plt::plot(x_all, y_all, orig_style);
+    plt.plot(x_all, y_all, orig_style);
 
-    plt::plot(xs, ys, node_style);
-    plt::legend();
+    plt.plot(xs, ys, node_style);
+    plt.legend();
 
-    plt::suptitle("Обычные сплайны: $y(x)$");
-    plt::tight_layout();
-    plt::show();
+    plt.suptitle("Обычные сплайны: $y(x)$");
+    plt.tight_layout();
+    plt.show();
 }
 
 // Параметрические интерполянты: x(t), y(t)
@@ -126,61 +105,51 @@ void parametric_interpolants() {
     PCubicSpline cubic1(xs, ys, SplineBound::Crop, SplineBound::Free);
     PCubicSpline cubic2(xs, ys, SplineBound::Crop, SplineBound::Periodic);
 
-    plt::figure_size(9.0, 3.8, 150);
+    utils::pyplot plt;
+    
+    plt.figure({.figsize={9.0, 3.8}, .dpi=150});
 
     // Crop/Free на границах
-    plt::subplot(1, 2, 1);
-    plt::grid(true);
-    plt::set_aspect_equal();
-    plt::xlim(-2.0, 11.0);
-    plt::ylim(-2.0, 7.0);
+    plt.subplot(1, 2, 1);
+    plt.grid(true);
+    plt.set_aspect_equal();
+    plt.xlim(-2.0, 11.0);
+    plt.ylim(-2.0, 7.0);
 
-    plt::plot(line1.xs(2000, -0.1, 1.1), line1.ys(2000, -0.1, 1.1),
-              {{"label",     "Linear [Free, Crop]"},
-               {"linestyle", "dashed"},
-               {"color",     "blue"}});
+    plt.plot(line1.xs(2000, -0.1, 1.1), line1.ys(2000, -0.1, 1.1),
+            {.linestyle="dashed", .color="blue",.label="Linear [Free, Crop]"});
 
-    plt::plot(cubic1.xs(200, -0.1, 1.1), cubic1.ys(200, -0.1, 1.1),
-              {{"label",     "Cubic  [Crop, Free]"},
-               {"linestyle", "solid"},
-               {"color",     "orange"}});
+    plt.plot(cubic1.xs(200, -0.1, 1.1), cubic1.ys(200, -0.1, 1.1),
+            {.linestyle="solid", .color="orange", .label="Cubic  [Crop, Free]"});
 
-    plt::plot(poly1.xs(200, -0.1, 1.1), poly1.ys(200, -0.1, 1.1),
-              {{"label",     "L poly [Free, Crop]"},
-               {"linestyle", "solid"},
-               {"color",     "red"}});
+    plt.plot(poly1.xs(200, -0.1, 1.1), poly1.ys(200, -0.1, 1.1),
+            {.linestyle="solid", .color="red", .label="L poly [Free, Crop]"});
 
-    plt::plot(xs, ys, node_style);
-    plt::legend();
+    plt.plot(xs, ys, node_style);
+    plt.legend();
 
     // Периодические граничные условия
-    plt::subplot(1, 2, 2);
-    plt::grid(true);
-    plt::set_aspect_equal();
-    plt::xlim(-2.0, 11.0);
-    plt::ylim(-2.0, 7.0);
+    plt.subplot(1, 2, 2);
+    plt.grid(true);
+    plt.set_aspect_equal();
+    plt.xlim(-2.0, 11.0);
+    plt.ylim(-2.0, 7.0);
 
-    plt::plot(cubic2.xs(200, 0.0, 1.0), cubic2.ys(200, 0.0, 1.0),
-              {{"label",     "Cubic  [Periodic]"},
-               {"linestyle", "solid"},
-               {"color",     "orange"}});
+    plt.plot(cubic2.xs(200, 0.0, 1.0), cubic2.ys(200, 0.0, 1.0),
+            {.linestyle="solid", .color="orange", .label="Cubic  [Periodic]"});
 
-    plt::plot(line2.xs(2000, 0.0, 1.0), line2.ys(2000, 0.0, 1.0),
-              {{"label",     "Linear [Periodic]"},
-               {"linestyle", "dashed"},
-               {"color",     "blue"}});
+    plt.plot(line2.xs(2000, 0.0, 1.0), line2.ys(2000, 0.0, 1.0),
+            {.linestyle="dashed", .color="blue", .label="Linear [Periodic]"});
 
-    plt::plot(poly2.xs(2000, 0.0, 1.0), poly2.ys(2000, 0.0, 1.0),
-              {{"label",     "L poly [Periodic]"},
-               {"linestyle", "solid"},
-               {"color",     "red"}});
+    plt.plot(poly2.xs(2000, 0.0, 1.0), poly2.ys(2000, 0.0, 1.0),
+            {.linestyle="solid", .color="red", .label="L poly [Periodic]"});
 
-    plt::plot(xs, ys, node_style);
-    plt::legend();
+    plt.plot(xs, ys, node_style);
+    plt.legend();
 
-    plt::suptitle("Параметрические иннтерполянты: $x(t)$, $y(t)$");
-    plt::tight_layout();
-    plt::show();
+    plt.suptitle("Параметрические иннтерполянты: $x(t)$, $y(t)$");
+    plt.tight_layout();
+    plt.show();
 }
 
 // Параметризация кубических сплайнов
@@ -197,88 +166,63 @@ void cubic_parametrization() {
     int n = 50;
     int N = 200;
 
-    plt::figure_size(9.0, 7, 150);
+    utils::pyplot plt;
+    plt.figure({.figsize={9.0, 7}, .dpi=150});
 
     // Все виды параметризации
-    plt::subplot(2, 2, 1);
-    plt::grid(true);
-    plt::set_aspect_equal();
-    plt::xlim(-2.0, 11.0);
-    plt::ylim(-2.0, 7.0);
+    plt.subplot(2, 2, 1);
+    plt.grid(true);
+    plt.set_aspect_equal();
+    plt.xlim(-2.0, 11.0);
+    plt.ylim(-2.0, 7.0);
 
-    plt::plot(cubic1.xs(N), cubic1.ys(N),
-              {{"label", "Uniform"},
-               {"color", "blue"}});
-    plt::plot(cubic2.xs(N), cubic2.ys(N),
-              {{"label", "Chord Length"},
-               {"color", "green"}});
-    plt::plot(cubic3.xs(N), cubic3.ys(N),
-              {{"label", "Chebyshev"},
-               {"color", "orange"}});
+    plt.plot(cubic1.xs(N), cubic1.ys(N), {.color="blue", .label="Uniform"});
+    plt.plot(cubic2.xs(N), cubic2.ys(N), {.color="green", .label="Chord Length"});
+    plt.plot(cubic3.xs(N), cubic3.ys(N), {.color="orange", .label="Chebyshev"});
 
-    plt::plot(xs, ys, node_style);
-    plt::legend();
+    plt.plot(xs, ys, node_style);
+    plt.legend();
 
     // Равномерная параметризация
-    plt::subplot(2, 2, 2);
-    plt::grid(true);
-    plt::set_aspect_equal();
-    plt::xlim(-2.0, 11.0);
-    plt::ylim(-2.0, 7.0);
+    plt.subplot(2, 2, 2);
+    plt.grid(true);
+    plt.set_aspect_equal();
+    plt.xlim(-2.0, 11.0);
+    plt.ylim(-2.0, 7.0);
 
-    plt::plot(cubic1.xs(N), cubic1.ys(N),
-              {{"label", "Uniform"},
-               {"color", "blue"}});
+    plt.plot(cubic1.xs(N), cubic1.ys(N), {.color="blue", .label="Uniform"});
+    plt.plot(cubic1.xs(n), cubic1.ys(n), {.linestyle="none", .color="blue", .marker="."});
 
-    plt::plot(cubic1.xs(n), cubic1.ys(n),
-              {{"linestyle", "none"},
-               {"marker",    "."},
-               {"color",     "blue"}});
-
-    plt::plot(xs, ys, node_style);
-    plt::legend();
+    plt.plot(xs, ys, node_style);
+    plt.legend();
 
     // Параметризация по длине хорд
-    plt::subplot(2, 2, 3);
-    plt::grid(true);
-    plt::set_aspect_equal();
-    plt::xlim(-2.0, 11.0);
-    plt::ylim(-2.0, 7.0);
+    plt.subplot(2, 2, 3);
+    plt.grid(true);
+    plt.set_aspect_equal();
+    plt.xlim(-2.0, 11.0);
+    plt.ylim(-2.0, 7.0);
 
-    plt::plot(cubic2.xs(N), cubic2.ys(N),
-              {{"label", "Chord Length"},
-               {"color", "green"}});
-
-    plt::plot(cubic2.xs(n), cubic2.ys(n),
-              {{"linestyle", "none"},
-               {"marker",    "."},
-               {"color",     "green"}});
-
-    plt::plot(xs, ys, node_style);
-    plt::legend();
+    plt.plot(cubic2.xs(N), cubic2.ys(N), {.color="green", .label="Chord Length"});
+    plt.plot(cubic2.xs(n), cubic2.ys(n), {.linestyle="none", .color="green", .marker="."});
+    plt.plot(xs, ys, node_style);
+    plt.legend();
 
     // Параметризация по корням полинома Чебышёва
-    plt::subplot(2, 2, 4);
-    plt::grid(true);
-    plt::set_aspect_equal();
-    plt::xlim(-2.0, 11.0);
-    plt::ylim(-2.0, 7.0);
+    plt.subplot(2, 2, 4);
+    plt.grid(true);
+    plt.set_aspect_equal();
+    plt.xlim(-2.0, 11.0);
+    plt.ylim(-2.0, 7.0);
 
-    plt::plot(cubic3.xs(N), cubic3.ys(N),
-              {{"label", "Chebyshev"},
-               {"color", "orange"}});
+    plt.plot(cubic3.xs(N), cubic3.ys(N), {.color="orange", .label="Chebyshev"});
+    plt.plot(cubic3.xs(n), cubic3.ys(n), {.linestyle="none", .color="orange", .marker="."});
+    plt.plot(xs, ys, node_style);
+    plt.legend();
 
-    plt::plot(cubic3.xs(n), cubic3.ys(n),
-              {{"linestyle", "none"},
-               {"marker",    "."},
-               {"color",     "orange"}});
-
-    plt::plot(xs, ys, node_style);
-    plt::legend();
-
-    plt::suptitle("Параметризация кубических сплайнов");
-    plt::tight_layout();
-    plt::show();
+    plt.suptitle("Параметризация кубических сплайнов");
+    plt.tight_layout();
+    plt.show();
 }
 
 // Параметризация полиномов Лагранжа
@@ -295,88 +239,67 @@ void lagrange_parametrization() {
     int n = 50;
     int N = 200;
 
-    plt::figure_size(9.0, 7, 150);
+    utils::pyplot plt;
+    plt.figure({.figsize={9.0, 7}, .dpi=150});
 
     // Все виды параметризации
-    plt::subplot(2, 2, 1);
-    plt::grid(true);
-    plt::set_aspect_equal();
-    plt::xlim(-2.0, 11.0);
-    plt::ylim(-2.0, 7.0);
+    plt.subplot(2, 2, 1);
+    plt.grid(true);
+    plt.set_aspect_equal();
+    plt.xlim(-2.0, 11.0);
+    plt.ylim(-2.0, 7.0);
 
-    plt::plot(poly1.xs(N), poly1.ys(N),
-              {{"label", "Uniform"},
-               {"color", "blue"}});
-    plt::plot(poly2.xs(N), poly2.ys(N),
-              {{"label", "Chord Length"},
-               {"color", "green"}});
-    plt::plot(poly3.xs(N), poly3.ys(N),
-              {{"label", "Chebyshev"},
-               {"color", "orange"}});
+    plt.plot(poly1.xs(N), poly1.ys(N), {.color="blue", .label="Uniform"});
+    plt.plot(poly2.xs(N), poly2.ys(N), {.color="green", .label="Chord Length"});
+    plt.plot(poly3.xs(N), poly3.ys(N), {.color="orange", .label="Chebyshev"});
 
-    plt::plot(xs, ys, node_style);
-    plt::legend();
+    plt.plot(xs, ys, node_style);
+    plt.legend();
 
     // Равномерная параметризация
-    plt::subplot(2, 2, 2);
-    plt::grid(true);
-    plt::set_aspect_equal();
-    plt::xlim(-2.0, 11.0);
-    plt::ylim(-2.0, 7.0);
+    plt.subplot(2, 2, 2);
+    plt.grid(true);
+    plt.set_aspect_equal();
+    plt.xlim(-2.0, 11.0);
+    plt.ylim(-2.0, 7.0);
 
-    plt::plot(poly1.xs(N), poly1.ys(N),
-              {{"label", "Uniform"},
-               {"color", "blue"}});
+    plt.plot(poly1.xs(N), poly1.ys(N), {.color="blue", .label="Uniform"});
 
-    plt::plot(poly1.xs(n), poly1.ys(n),
-              {{"linestyle", "none"},
-               {"marker",    "."},
-               {"color",     "blue"}});
+    plt.plot(poly1.xs(n), poly1.ys(n), {.linestyle="none", .color="blue", .marker="."});
 
-    plt::plot(xs, ys, node_style);
-    plt::legend();
+    plt.plot(xs, ys, node_style);
+    plt.legend();
 
     // Параметризация по длине хорд
-    plt::subplot(2, 2, 3);
-    plt::grid(true);
-    plt::set_aspect_equal();
-    plt::xlim(-2.0, 11.0);
-    plt::ylim(-2.0, 7.0);
+    plt.subplot(2, 2, 3);
+    plt.grid(true);
+    plt.set_aspect_equal();
+    plt.xlim(-2.0, 11.0);
+    plt.ylim(-2.0, 7.0);
 
-    plt::plot(poly2.xs(N), poly2.ys(N),
-              {{"label", "Chord Length"},
-               {"color", "green"}});
+    plt.plot(poly2.xs(N), poly2.ys(N), {.color="green", .label="Chord Length"});
+    plt.plot(poly2.xs(n), poly2.ys(n), {.linestyle="none", .color="green", .marker="."});
 
-    plt::plot(poly2.xs(n), poly2.ys(n),
-              {{"linestyle", "none"},
-               {"marker",    "."},
-               {"color",     "green"}});
-
-    plt::plot(xs, ys, node_style);
-    plt::legend();
+    plt.plot(xs, ys, node_style);
+    plt.legend();
 
     // Параметризация по корням полинома Чебышёва
-    plt::subplot(2, 2, 4);
-    plt::grid(true);
-    plt::set_aspect_equal();
-    plt::xlim(-2.0, 11.0);
-    plt::ylim(-2.0, 7.0);
+    plt.subplot(2, 2, 4);
+    plt.grid(true);
+    plt.set_aspect_equal();
+    plt.xlim(-2.0, 11.0);
+    plt.ylim(-2.0, 7.0);
 
-    plt::plot(poly3.xs(N), poly3.ys(N),
-              {{"label", "Chebyshev"},
-               {"color", "orange"}});
+    plt.plot(poly3.xs(N), poly3.ys(N), {.color="orange", .label="Chebyshev"});
 
-    plt::plot(poly3.xs(n), poly3.ys(n),
-              {{"linestyle", "none"},
-               {"marker",    "."},
-               {"color",     "orange"}});
+    plt.plot(poly3.xs(n), poly3.ys(n), {.linestyle="none", .color="orange", .marker="."});
 
-    plt::plot(xs, ys, node_style);
-    plt::legend();
+    plt.plot(xs, ys, node_style);
+    plt.legend();
 
-    plt::suptitle("Параметризация полиномов Лагранжа");
-    plt::tight_layout();
-    plt::show();
+    plt.suptitle("Параметризация полиномов Лагранжа");
+    plt.tight_layout();
+    plt.show();
 }
 
 int main() {

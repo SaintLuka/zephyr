@@ -1,16 +1,13 @@
 #include <iostream>
 #include <zephyr/geom/geom.h>
 #include <zephyr/geom/sections.h>
-#include <zephyr/mesh/euler/eu_prim.h>
 #include <zephyr/mesh/euler/eu_mesh.h>
 
-#include <zephyr/utils/numpy.h>
-#include <zephyr/utils/matplotlib.h>
 #include <zephyr/math/calc/roots.h>
+#include <zephyr/utils/numpy.h>
+#include <zephyr/utils/pyplot.h>
 
-namespace plt = zephyr::utils::matplotlib;
-namespace np = zephyr::np;
-
+using namespace zephyr;
 using namespace zephyr::geom;
 using namespace zephyr::mesh;
 
@@ -26,8 +23,8 @@ void test1(Polyhedron poly, Vector3d normal) {
         p_min1 = std::min(p_min1, poly.vertex(i).dot(normal));
         p_max1 = std::max(p_max1, poly.vertex(i).dot(normal));
     }
-    double p_min = p_min1 - 0.5 * (p_max1 - p_min1);
-    double p_max = p_max1 + 0.5 * (p_max1 - p_min1);
+    double p_min = p_min1 - 0.05 * (p_max1 - p_min1);
+    double p_max = p_max1 + 0.05 * (p_max1 - p_min1);
 
     int N = 1001;
 
@@ -42,26 +39,27 @@ void test1(Polyhedron poly, Vector3d normal) {
 
         Polyhedron clip = poly.clip(p, normal);
         Vs1[i] = clip.volume() / poly.volume();
-        Vs2[i] = cube_volume_fraction(normal, p.dot(normal), A, B, C);
+        Vs2[i] = cube_volume_fraction(p.dot(normal), normal, A, B, C);
 
         err[i] = std::abs(Vs1[i] - Vs2[i]);
     }
 
-    plt::figure_size(9.0, 4.0, 170);
+    utils::pyplot plt;
+    plt.figure({.figsize={9.0, 4.0}, .dpi=170});
 
-    plt::subplot(1, 2, 1);
-    plt::title("$V(p)$");
-    plt::grid(true);
-    plt::plot(ps, Vs1, {{"linestyle", "solid"}, {"color", "blue"}, {"label", "clip_volume"}});
-    plt::plot(ps, Vs2, {{"linestyle", "dotted"}, {"color", "orange"}, {"label", "formula"}});
+    plt.subplot(1, 2, 1);
+    plt.title("$\\alpha(p)$");
+    plt.grid(true);
+    plt.plot(ps, Vs1, {.linestyle="solid", .color="blue", .label="clip_volume"});
+    plt.plot(ps, Vs2, {.linestyle="dotted", .color="orange", .label="formula"});
 
-    plt::subplot(1, 2, 2);
-    plt::title("$Error$");
-    plt::grid(true);
-    plt::plot(ps, err, "k");
+    plt.subplot(1, 2, 2);
+    plt.title("$Error$");
+    plt.grid(true);
+    plt.plot(ps, err, "k");
 
-    plt::tight_layout();
-    plt::show();
+    plt.tight_layout();
+    plt.show();
 }
 
 void test2(Polyhedron poly, Vector3d normal) {
@@ -71,24 +69,25 @@ void test2(Polyhedron poly, Vector3d normal) {
     auto ps  = np::zeros(N);
     auto err = np::zeros(N);
     for (int i = 0; i < N; ++i) {
-        ps[i]  = cube_find_section(normal, alpha[i], A, B, C);
-        err[i] = std::abs(alpha[i] - cube_volume_fraction(normal, ps[i], A, B, C));
+        ps[i]  = cube_find_section(alpha[i], normal, A, B, C);
+        err[i] = std::abs(alpha[i] - cube_volume_fraction(ps[i], normal, A, B, C));
     }
 
-    plt::figure_size(9.0, 4.0, 170);
+    utils::pyplot plt;
+    plt.figure({.figsize={9.0, 4.0}, .dpi=170});
 
-    plt::subplot(1, 2, 1);
-    plt::title("$p(\\alpha)$");
-    plt::grid(true);
-    plt::plot(alpha, ps, {{"linestyle", "solid"}, {"color", "blue"}, {"label", "clip_volume"}});
+    plt.subplot(1, 2, 1);
+    plt.title("$p(\\alpha)$");
+    plt.grid(true);
+    plt.plot(alpha, ps, {.color="blue", .label="clip_volume"});
 
-    plt::subplot(1, 2, 2);
-    plt::title("$Error$");
-    plt::grid(true);
-    plt::plot(alpha, err, "k");
+    plt.subplot(1, 2, 2);
+    plt.title("$Error$");
+    plt.grid(true);
+    plt.plot(alpha, err, "k");
 
-    plt::tight_layout();
-    plt::show();
+    plt.tight_layout();
+    plt.show();
 }
 
 int main() {

@@ -8,12 +8,10 @@
 #include <zephyr/geom/primitives/triangle.h>
 #include <zephyr/geom/sections.h>
 #include <zephyr/utils/numpy.h>
-#include <zephyr/utils/matplotlib.h>
+#include <zephyr/utils/pyplot.h>
 
 using namespace zephyr;
 using namespace zephyr::geom;
-namespace plt = zephyr::utils::matplotlib;
-
 
 // Пересечение грани между парой ячеек
 struct Inter {
@@ -26,8 +24,8 @@ struct Inter {
 Inter face_fraction_direct(Polygon &cell, Polygon& neib, double a1, double a2) {
     auto func = [](double a1, double a2, double cos) -> double {
         Vector3d n = {cos, std::sqrt(1.0 - cos * cos), 0.0};
-        double p1 = quad_find_section(n, a1);
-        double p2 = quad_find_section(n, a2);
+        double p1 = quad_find_section(a1, n);
+        double p2 = quad_find_section(a2, n);
         return p2 + cos - p1;
     };
 
@@ -61,7 +59,7 @@ Inter face_fraction_direct(Polygon &cell, Polygon& neib, double a1, double a2) {
 
     double cos = 0.5 * math::sign(a1 - a2) * std::abs(cos_min + cos_max);
 
-    auto[a_min, a_max] = math::minmax(a1, a2);
+    auto[a_min, a_max] = math::sorted(a1, a2);
 
     double inter;
     if (a_min == 0.0 && a_max == 1.0) {
@@ -122,21 +120,23 @@ void test_interface(double a1, double a2) {
         std::cout << "  Intersection: " << inter1 << " " << inter2 << ";\terror: " << std::abs(inter1 - inter2) << "\n";
 
         // Строим многоугольник и сечение
-        plt::figure_size(10.0, 5.0);
-        plt::title("Интерфейс через пару ячеек");
-        plt::set_aspect_equal();
-        plt::plot(cell.xs(), cell.ys(), {{"color", "black"}});
-        plt::plot(neib.xs(), neib.ys(), {{"color", "black"}});
+        utils::pyplot plt;
 
-        plt::plot({1.0}, {inter1}, {{"marker", "o"},
-                                    {"color",  "black"}});
-        plt::plot({1.0}, {inter2}, {{"marker", "."},
-                                    {"color",  "yellow"}});
-        plt::fill(clip1.xs(), clip1.ys(), {{"color", "#0000ff3f"}});
-        plt::fill(clip2.xs(), clip2.ys(), {{"color", "#00ff003f"}});
+        plt.figure({.figsize={10.0, 5.0}});
+        plt.title("Интерфейс через пару ячеек");
+        plt.set_aspect_equal();
 
-        plt::tight_layout();
-        plt::show();
+        plt.plot(cell.xs(), cell.ys(), {.color="black"});
+        plt.plot(neib.xs(), neib.ys(), {.color="black"});
+
+        plt.marker(1.0, inter1, {.color="black",  .marker="o"});
+        plt.marker(1.0, inter2, {.color="yellow", .marker="."});
+
+        plt.fill(clip1.xs(), clip1.ys(), {.color="#0000ff3f"});
+        plt.fill(clip2.xs(), clip2.ys(), {.color="#00ff003f"});
+
+        plt.tight_layout();
+        plt.show();
     }
 
     auto[V1, V2] = np::meshgrid(
@@ -159,10 +159,25 @@ void test_interface(double a1, double a2) {
         }
     }
 
-    plt::plot_surface(V1, V2, asig1, {{"cmap", "jet"}});
-    plt::plot_surface(V1, V2, asig2, {{"cmap", "jet"}});
-    plt::plot_surface(V1, V2, error, {{"cmap", "jet"}});
-    plt::show();
+    utils::pyplot plt;
+
+    plt.figure({.figsize={6.0, 6.0}});
+    plt.plot_surface(V1, V2, asig1, {.cmap="jet"});
+    plt.title("Итерационное вычисление");
+    plt.tight_layout();
+
+    plt.figure({.figsize={6.0, 6.0}});
+    plt.plot_surface(V1, V2, asig2, {.cmap="jet"});
+    plt.title("Точная формула");
+    plt.tight_layout();
+
+    plt.figure({.figsize={6.0, 6.0}});
+    plt.plot_surface(V1, V2, error, {.cmap="jet"});
+    plt.title("Погрешность");
+    plt.tight_layout();
+
+    plt.show();
+
 }
 
 // Попытки аппроксимации потока? C -- локальное число Куранта?
@@ -202,20 +217,21 @@ void test_flux(double C) {
         auto clip2 = part.clip(p, n);
 
         // Строим многоугольник и сечение
-        plt::figure_size(6.0, 6.0);
-        plt::title("Поток через правую грань");
-        plt::set_aspect_equal();
-        plt::text(0.1, 0.8, "Объемная доля: " + std::to_string(alpha));
-        plt::text(0.1, 0.65, "Поток: " + std::to_string(res1));
-        plt::text(0.1, 0.50, "Поток: " + std::to_string(res2));
-        plt::plot(cell.xs(), cell.ys(), {{"color", "black"}});
-        plt::arrow(p.x(), p.y(), 0.1 * n.x(), 0.1 * n.y(), "k", "k", 0.05, 0.03);
-        plt::plot(part.xs(), part.ys(), {{"color",     "black"},
-                                         {"linestyle", "dashed"}});
-        plt::fill(clip1.xs(), clip1.ys(), {{"color", "#0000ff3f"}});
-        plt::fill(clip2.xs(), clip2.ys(), {{"color", "#00ff003f"}});
+        utils::pyplot plt;
 
-        plt::show();
+        plt.figure({.figsize={6.0, 6.0}, .dpi=150});
+        plt.title("Поток через правую грань");
+        plt.set_aspect_equal();
+        plt.text(0.1, 0.8, "Объемная доля: " + std::to_string(alpha));
+        plt.text(0.1, 0.65, "Поток: " + std::to_string(res1));
+        plt.text(0.1, 0.50, "Поток: " + std::to_string(res2));
+        plt.plot(cell.xs(), cell.ys(), {.color="black"});
+        plt.arrow(p.x(), p.y(), 0.1 * n.x(), 0.1 * n.y(), {.face_color="black", .head_length=0.05, .head_width=0.03});
+        plt.plot(part.xs(), part.ys(), {.linestyle="dashed", .color="black"});
+        plt.fill(clip1.xs(), clip1.ys(), {.color="#0000ff3f"});
+        plt.fill(clip2.xs(), clip2.ys(), {.color="#00ff003f"});
+        plt.tight_layout();
+        plt.show();
     }
 
     int nc = 200;
@@ -244,10 +260,21 @@ void test_flux(double C) {
         }
     }
 
-    plt::plot_surface(cosn, vols, flux1, {{"cmap", "jet"}});
-    plt::plot_surface(cosn, vols, flux2, {{"cmap", "jet"}});
-    plt::plot_surface(cosn, vols, error, {{"cmap", "jet"}});
-    plt::show();
+    utils::pyplot plt;
+
+    plt.figure({.figsize={6.0, 6.0}});
+    plt.plot_surface(cosn, vols, flux1, {.cmap="jet"});
+    plt.tight_layout();
+
+    plt.figure({.figsize={6.0, 6.0}});
+    plt.plot_surface(cosn, vols, flux2, {.cmap="jet"});
+    plt.tight_layout();
+
+    plt.figure({.figsize={6.0, 6.0}});
+    plt.plot_surface(cosn, vols, error, {.cmap="jet"});
+    plt.tight_layout();
+
+    plt.show();
 }
 
 int main() {

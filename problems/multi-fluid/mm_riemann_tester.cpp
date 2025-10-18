@@ -16,7 +16,7 @@ int main() { return 0; }
 #include <zephyr/math/solver/riemann.h>
 #include <zephyr/phys/matter/eos/stiffened_gas.h>
 #include <zephyr/phys/matter/eos/mie_gruneisen.h>
-#include <zephyr/utils/matplotlib.h>
+#include <zephyr/utils/pyplot.h>
 
 
 using namespace zephyr::phys;
@@ -765,15 +765,17 @@ Previous PState: density: 892.942, velocity: {988.304, -123.779, 0}, pressure: 1
         }
     }
 
-    plt::figure_size(14, 8);
-    std::map<std::string, std::string> m({{"color", "orange"}});
+    utils::pyplot plt;
+
+    plt.figure({.figsize={14.0, 8.0});
+    std::map<std::string, std::string> m({.color= "orange"}});
     std::cout << "P: " << P[sol_idx] << ", f: " << f[sol_idx] << '\n';
-    plt::plot(P, f);
+    plt.plot(P, f);
 //    std::vector<double> sub_p(P.begin() + sol_idx - size / 1000, P.begin() + sol_idx + size / 1000);
 //    std::vector<double> sub_f(f.begin() + sol_idx - size / 1000, f.begin() + sol_idx + size / 1000);
-//    plt::plot(sub_p, sub_f);
-    plt::tight_layout();
-    plt::show();
+//    plt.plot(sub_p, sub_f);
+    plt.tight_layout();
+    plt.show();
 
 //    p.pressure = mixture.pressure_re(density, energy, mass_frac, {.P0=P0, .T0=T0});
 //    p.temperature = mixture.temperature_rP(density, pressure, mass_frac, {.T0=T0});

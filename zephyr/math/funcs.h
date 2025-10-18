@@ -1,5 +1,5 @@
-/// @file Некоторые математические функции
-/// Параметрические функции часто в виде функторов
+/// @brief Некоторые математические функции
+#pragma once
 
 #include <cmath>
 #include <tuple>
@@ -37,8 +37,8 @@ inline std::tuple<double, double> sorted(double a, double b) {
 /// @brief Возвращает упорядоченную тройку
 inline std::tuple<double, double, double> sorted(double a, double b, double c) {
     if (a > b) std::swap(a, b);
-    if (a > c) std::swap(a, c);
     if (b > c) std::swap(b, c);
+    if (a > b) std::swap(a, b);
     return {a, b, c};
 }
 

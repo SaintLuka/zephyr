@@ -8,7 +8,7 @@
 #include <zephyr/math/calc/weno.h>
 
 #include <zephyr/utils/numpy.h>
-#include <zephyr/utils/matplotlib.h>
+#include <zephyr/utils/pyplot.h>
 
 using namespace zephyr;
 using namespace zephyr::geom;
@@ -18,8 +18,6 @@ using generator::Strip;
 using generator::Rectangle;
 
 using zephyr::math::WENO5;
-
-namespace plt = zephyr::utils::matplotlib;
 
 struct _U_ {
     double u;
@@ -74,11 +72,12 @@ void test_1D(TestFunc test) {
     }
 
     // Строим все полученные реконструкции
+    utils::pyplot plt;
 
-    plt::figure_size(13, 8, 150);
+    plt.figure({.figsize={13.0, 8.0}, .dpi=150});
 
-    plt::xlim(0.0, 1.0);
-    plt::ylim(-0.1, 1.1);
+    plt.xlim(0.0, 1.0);
+    plt.ylim(-0.1, 1.1);
 
     for (int i = 0; i < cells.nx(); ++i) {
         auto cell = cells[i];
@@ -93,7 +92,7 @@ void test_1D(TestFunc test) {
         auto xs = np::linspace(x1, x2, M);
 
         // Границы ячеек
-        plt::plot({x1, x1}, {-0.1, 1.1}, {{"linestyle", "solid"}, {"color", "lightgray"}, {"linewidth", "0.5"}});
+        plt.plot(std::vector{x1, x1}, std::vector{-0.1, 1.1}, {.linestyle="solid", .linewidth=0.5, .color="lightgray"});
 
         // Точная функция
         std::vector<double> exact(xs);
@@ -101,10 +100,10 @@ void test_1D(TestFunc test) {
             exact[k] = test.func(xs[k]);
         }
 
-        plt::plot(xs, exact, {{"linestyle", "solid"}, {"color", "blue"}, {"linewidth", "0.5"}});
+        plt.plot(xs, exact, {.linestyle="solid", .linewidth=0.5, .color= "blue"});
 
         // Средние значения
-        plt::plot({x1, x2}, {cell(U).u, cell(U).u}, {{"linestyle", "dashed"}, {"color", "black"}, {"linewidth", "1.0"}});
+        plt.plot(std::vector{x1, x2}, std::vector{cell(U).u, cell(U).u}, {.linestyle="dashed", .linewidth=1.0, .color= "black"});
 
         // Наклоны
         std::vector<double> slopes(xs);
@@ -112,7 +111,7 @@ void test_1D(TestFunc test) {
             slopes[k] = cell(U).u + (xs[k] - cell.x()) * cell(U).du_dx;;
         }
 
-        plt::plot(xs, slopes, {{"linestyle", "solid"}, {"color", "green"}, {"linewidth", "1.0"}});
+        plt.plot(xs, slopes, {.linestyle="solid", .linewidth=1.0, .color= "green"});
 
         // WENO
         WENO5 weno {
@@ -123,11 +122,11 @@ void test_1D(TestFunc test) {
             cells(i + 2, 0)(U).u
         };
 
-        plt::plot({x1, x2}, {weno.m(), weno.p()}, {{"linestyle", "solid"}, {"color", "orange"}, {"linewidth", "1.0"}});
+        plt.plot(std::vector{x1, x2}, std::vector{weno.m(), weno.p()}, {.linestyle="solid", .linewidth=1.0, .color= "orange"});
     }
 
-    plt::tight_layout();
-    plt::show();
+    plt.tight_layout();
+    plt.show();
 }
 
 

@@ -6,11 +6,10 @@
 #include <zephyr/geom/primitives/polygon.h>
 #include <zephyr/geom/primitives/triangle.h>
 
-#include <zephyr/utils/matplotlib.h>
+#include <zephyr/utils/pyplot.h>
 
+using namespace zephyr;
 using namespace zephyr::geom;
-namespace plt = zephyr::utils::matplotlib;
-
 
 // Тестовая прямая
 struct TLine {
@@ -54,6 +53,7 @@ int main() {
     std::cout << "Polygon area:  " << poly.area() << "\n\n";
 
     // Сечение многоугольника прямой
+    utils::pyplot plt;
     if (true) {
         // Тестовая прямая
         TLine line(poly[0] + 0.28 * (poly[2] - poly[0]),
@@ -81,12 +81,12 @@ int main() {
         std::cout << "  Section point: " << p.transpose() << ";\terr: " << (p - line.p).dot(line.n) << "\n\n";
 
         // Строим многоугольник и сечение
-        plt::figure_size(14.0, 5.0);
-        plt::subplot(1, 2, 1);
-        plt::title("Сечение многоугольника прямой линией");
-        plt::set_aspect_equal();
-        plt::plot(poly.xs(), poly.ys());
-        plt::fill(clip.xs(), clip.ys(), {{"color", "#0000ff3f"}});
+        plt.figure({.figsize={14.0, 5.0}});
+        plt.subplot(1, 2, 1);
+        plt.title("Сечение многоугольника прямой линией");
+        plt.set_aspect_equal();
+        plt.plot(poly.xs(), poly.ys());
+        plt.fill(clip.xs(), clip.ys(), {.color= "#0000ff3f"});
     }
 
     // Сечение многоугольника окружностью
@@ -139,17 +139,17 @@ int main() {
         std::cout << "  Section point: " << p.transpose() << "\n\n";
 
         // Строим многоугольник и сечение
-        plt::subplot(1, 2, 2);
-        plt::title("Сечение многоугольника окружностью");
-        plt::set_aspect_equal();
-        plt::plot(poly.xs(), poly.ys());
-        //plt::plot({disk.c.x()}, {disk.c.y()}, "kx");
-        plt::fill(dclip.xs(), dclip.ys(), {{"color", "#00ff003f"}});
-        plt::fill(clip.xs(), clip.ys(), {{"color", "#0000ff3f"}});
+        plt.subplot(1, 2, 2);
+        plt.title("Сечение многоугольника окружностью");
+        plt.set_aspect_equal();
+        plt.plot(poly.xs(), poly.ys());
+        //plt.plot({disk.c.x()}, {disk.c.y()}, "kx");
+        plt.fill(dclip.xs(), dclip.ys(), {.color= "#00ff003f"});
+        plt.fill(clip.xs(), clip.ys(), {.color= "#0000ff3f"});
     }
 
-    plt::tight_layout();
-    plt::show();
+    plt.tight_layout();
+    plt.show();
 
     return 0;
 }

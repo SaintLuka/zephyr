@@ -74,11 +74,17 @@ public:
     /// @brief Площадь/длина обычной грани или грани осесимметричной ячейки
     double area(bool axial) const;
 
+    /// @brief Площадь грани осесимметричной ячейки
+    double area_as() const;
+
     /// @brief Число вершин грани
     int n_vertices() const;
 
-    /// @brief Индекс вершины
-    short vertex_index(int idx) const;
+    /// @brief Локальный индекс вершины (в ячейке)
+    index_t vertex_index(int idx) const;
+
+    /// @brief Глобальный индекс вершины
+    index_t node_index(int idx) const;
 
     /// @brief Получить вершину грани
     Vector3d vs(int idx) const;
@@ -249,14 +255,23 @@ public:
     /// @brief Объем ячейки
     double volume(bool axial) const;
 
+    /// @brief Объем осесимметричной ячейки
+    double volume_as() const;
+
     /// @brief Линейный размер ячейки
     double linear_size() const;
 
     /// @brief Диаметр вписанной окружности
     double incircle_diameter() const;
 
+    /// @brief Bounding box ячейки
+    geom::Box bbox() const;
+
     /// @brief Создать полигон из ячейки (для 3D ячеек -- UB)
     geom::Polygon polygon() const;
+
+    /// @brief Создать полигон из ячейки (для 2D ячеек -- UB)
+    geom::Polyhedron polyhedron() const;
 
     /// @}
 
@@ -523,14 +538,18 @@ inline double EuFace::area() const { return m_cells->faces.area[m_face_idx]; }
 
 inline double EuFace::area(bool axial) const { return m_cells->faces.get_area(m_face_idx, axial); }
 
+inline double EuFace::area_as() const { return m_cells->faces.area_alt[m_face_idx]; }
+
 inline int EuFace::n_vertices() const { return m_cells->faces.n_vertices(m_face_idx); }
 
-inline short EuFace::vertex_index(int idx) const { return m_cells->faces.vertices[m_face_idx][idx]; }
+inline index_t EuFace::vertex_index(int idx) const { return m_cells->faces.vertices[m_face_idx][idx]; }
 
-inline geom::Vector3d EuFace::vs(int idx) const {
+inline index_t EuFace::node_index(int idx) const {
     index_t cell_idx = m_cells->faces.adjacent.basic[m_face_idx];
-    return m_cells->verts[m_cells->node_begin[cell_idx] + m_cells->faces.vertices[m_face_idx][idx]];
+    return m_cells->node_begin[cell_idx] + static_cast<int>(m_cells->faces.vertices[m_face_idx][idx]);
 }
+
+inline geom::Vector3d EuFace::vs(int idx) const { return m_cells->verts[node_index(idx)]; }
 
 inline geom::Vector3d EuFace::symm_point(const Vector3d &p) const {
     return m_cells->faces.symm_point(m_face_idx, p);
@@ -606,6 +625,8 @@ inline const geom::Vector3d& EuCell::center() const { return m_cells->center[m_i
 inline double EuCell::volume() const { return m_cells->volume[m_index]; }
 
 inline double EuCell::volume(bool axial) const { return m_cells->get_volume(m_index, axial); }
+
+inline double EuCell::volume_as() const { return m_cells->volume_alt[m_index]; }
 
 inline double EuCell::linear_size() const { return m_cells->linear_size(m_index); }
 
