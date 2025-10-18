@@ -26,16 +26,35 @@ void plot_sections(
     p_max += 0.001 * (p_max - p_min);
 
     int N = 101;
+    double max_epsilon_cv = 0;
+    double max_epsilon_fs = 0;
     for (int i = 0; i < N; ++i) {
         Vector3d p = (p_max - (p_max - p_min) * i / N) * normal;
 
         Polyhedron clip = poly.clip(p, normal);
+
+        double v = poly.volume();
+        double v1 = clip.volume();
+        double v2 = poly.clip_volume(p, normal);
+
+        Vector3d p2 = poly.find_section(normal, v2/v);
+
+        double epsilon_cv = std::abs(v2-v1);
+        if (max_epsilon_cv < epsilon_cv)
+            max_epsilon_cv = epsilon_cv;
+
+        double epsilon_fs = std::abs((p2-p).dot(normal)); //???
+        if (max_epsilon_fs < epsilon_fs)
+            max_epsilon_fs = epsilon_fs;
+
 
         EuMesh mesh(3, false);
         mesh.push_back(clip);
 
         pvd.save(mesh, i / (N - 1.0));
     }
+    std::cout << figname << " clip_volume error: " << max_epsilon_cv << std::endl;
+    std::cout << figname << " find_section error: " << max_epsilon_fs << std::endl;
 }
 
 int main() {
@@ -52,14 +71,29 @@ int main() {
     plot_sections(Polyhedron::Icosahedron(), n, "icosahedron");
     plot_sections(Polyhedron::TruncatedCube(), n, "truncated_cube");
 
-    Polyhedron cube = Polyhedron::Cuboid(2.0, 2.0, 2.0);
-
     Vector3d norm = {1.0, 0.0, 0.0};
     Vector3d p = {0., 0., 0.};
-    Vector3d section_point = cube.find_section(norm, 0.5);
-    std::cout << cube.clip_volume(section_point, norm) << std::endl;
-    std::cout << cube.clip_volume(p, norm) << std::endl;
-    std::cout << cube.clip(section_point, norm).volume() << std::endl;
-    std::cout << cube.clip(p, norm).volume() << std::endl;
+
+    /*Polyhedron cube = Polyhedron::Cuboid(2.0, 2.0, 2.0);
+    Vector3d section_point_c = cube.find_section(norm, 0.5);
+    std::cout << "cube.clip_volume(find_section):" << cube.clip_volume(section_point_c, norm) << std::endl;
+    std::cout << "cube.clip_volume(p):" << cube.clip_volume(p, norm) << std::endl;
+    std::cout << "cube.clip(find_section).volume():" << cube.clip(section_point_c, norm).volume() << std::endl;
+    std::cout << "cube.clip(p).volume():" << cube.clip(p, norm).volume() << std::endl;
+
+    Polyhedron pyramid = Polyhedron::Pyramid();
+    Vector3d section_point_p = pyramid.find_section(norm, 0.5);
+    std::cout << "pyramid.clip_volume(find_section):" << pyramid.clip_volume(section_point_p, norm) << std::endl;
+    std::cout << "pyramid.clip_volume(p):" << pyramid.clip_volume(p, norm) << std::endl;
+    //std::cout << "pyramid.clip(find_section).volume():" << pyramid.clip(section_point_p, norm).volume() << std::endl;
+    //std::cout << "pyramid.clip(p).volume():" << pyramid.clip(p, norm).volume() << std::endl;
+
+    Polyhedron icosahedron = Polyhedron::Icosahedron();
+    Vector3d section_point_i = icosahedron.find_section(norm, 0.5);
+    std::cout << "icosahedron.clip_volume(find_section):" << icosahedron.clip_volume(section_point_i, norm) << std::endl;
+    std::cout << "icosahedron.clip_volume(p):" << icosahedron.clip_volume(p, norm) << std::endl;
+    //std::cout << "icosahedron.clip(find_section).volume():" << icosahedron.clip(section_point_i, norm).volume() << std::endl;
+    //std::cout << "icosahedron.clip(p).volume():" << icosahedron.clip(p, norm).volume() << std::endl;
+    */
     return 0;
 }
