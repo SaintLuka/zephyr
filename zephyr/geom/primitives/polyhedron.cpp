@@ -326,6 +326,16 @@ void Polyhedron::build(const std::vector<Vector3d>& vertices,
     for (int i = 0; i < n_faces; ++i) {
         int nv = faces[i].size();
 
+        if (nv <= 2) {
+            // ЗАГЛУШКА, создать пустой многогранник
+            std::cerr << "Two vertex polyhedron\n";
+            verts.clear();
+            faces.clear();
+            faces_s.clear();
+            faces_c.clear();
+            return;
+        }
+
         assert(nv > 2 && "Two vertex polyhedron");
 
         for (int j = 0; j < nv; ++j) {

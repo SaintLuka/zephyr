@@ -163,7 +163,7 @@ inline void split_face<3>(index_t iface, AmrFaces& faces, const SqCube& vertices
             split_face<3, Side3D::T>(iface, faces, vertices);
             break;
         case Side3D::BACK:
-            split_face<3, Side3D::X>(iface, faces, vertices);
+            split_face<3, Side3D::Z>(iface, faces, vertices);
             break;
         default:
             split_face<3, Side3D::F>(iface, faces, vertices);
@@ -236,7 +236,7 @@ inline void merge_faces<3>(index_t ic, AmrCells& cells, Side3D side) {
             merge_faces<3, Side3D::T>(ic, cells);
             break;
         case Side3D::BACK:
-            merge_faces<3, Side3D::X>(ic, cells);
+            merge_faces<3, Side3D::Z>(ic, cells);
             break;
         default:
             merge_faces<3, Side3D::F>(ic, cells);

@@ -72,7 +72,7 @@ void AmrFaces::insert(index_t iface, CellType ctype, int count) {
             vertices[iface + Side3D::R] = Side3D::R.sf();
             vertices[iface + Side3D::B] = Side3D::B.sf();
             vertices[iface + Side3D::T] = Side3D::T.sf();
-            vertices[iface + Side3D::X] = Side3D::X.sf();
+            vertices[iface + Side3D::Z] = Side3D::Z.sf();
             vertices[iface + Side3D::F] = Side3D::F.sf();
             n_faces = 24;
             break;

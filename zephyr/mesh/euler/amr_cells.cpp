@@ -83,6 +83,22 @@ int AmrCells::face_count(index_t ic) const {
     }
 }
 
+double AmrCells::hx(index_t ic) const {
+    z_assert(m_adaptive, "Not adaptive mesh, can't get 'hx' for cell");
+    return (mapping<2>(ic).vs<+1, 0>() - mapping<2>(ic).vs<-1, 0>()).norm();
+}
+
+double AmrCells::hy(index_t ic) const {
+    z_assert(m_adaptive, "Not adaptive mesh, can't get 'hy' for cell");
+    return (mapping<2>(ic).vs<0, +1>() - mapping<2>(ic).vs<0, -1>()).norm();
+}
+
+double AmrCells::hz(index_t ic) const {
+    z_assert(m_adaptive, "Not adaptive mesh, can't get 'hz' for cell");
+    z_assert(m_dim == 3, "Two dimensional mesh, can't get 'hz' for cell");
+    return (mapping<3>(ic).vs<0, 0, +1>() - mapping<3>(ic).vs<0, 0, -1>()).norm();
+}
+
 double AmrCells::incircle_diameter(index_t ic) const {
     if (m_adaptive) {
         if (m_dim == 2) {

@@ -58,13 +58,6 @@ public:
             return {aliens, alien[iface]};
         }
     }
-
-    /// @brief Получить значение из массива, в котором находится сосед
-    template <typename T>
-    const T& get_value(index_t iface, const std::vector<T> &locals,
-            const std::vector<T> &aliens) const {
-        return alien[iface] < 0 ? locals[index[iface]] : aliens[alien[iface]];
-    }
 };
 
 /// @brief Направление внешней нормали к грани
