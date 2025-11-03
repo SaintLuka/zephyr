@@ -1,46 +1,22 @@
 // PLIC реконструкция интерфейса на трёхмерных декартовых сетках
-
-#include <boost/type_traits/type_with_alignment.hpp>
-#include <zephyr/mesh/euler/eu_mesh.h>
-
-#include <zephyr/geom/generator/cuboid.h>
-
-#include <zephyr/io/pvd_file.h>
-#include <zephyr/geom/sections.h>
-
-#include <zephyr/geom/geom.h>
-
-#include <zephyr/math/funcs.h>
-
-using namespace zephyr;
-using namespace zephyr::io;
-using namespace zephyr::geom;
-using namespace zephyr::mesh;
-
-using generator::Cuboid;
-
-// Радиус и угол в декартовы координаты
-Vector3d to_cartesian(double r, double phi) {
-    return {r * std::cos(phi), r * std::sin(phi), 0.0};
-}
+#include "PLIC.h"
 
 // Нормаль для теста с плоскостью
-static Vector3d some_n = (Vector3d{0.24, 0.13, 0.852}).normalized();
+static Vector3d some_n = Vector3d{0.852, 0.24, 0.13}.normalized();
 
-// Характеристическая функция (функция-индикатор)
-using InFunction = std::function<bool(const Vector3d &)>;
-
-// Пространственная функция
-using SpFunction = std::function<double(const Vector3d &)>;
-
-
-// 0. Нижняя полуплоскость
-InFunction plain_func = [](const Vector3d& v) -> bool {
+// 0. Область под плоскостью
+auto plain_func = [](const Vector3d& v) -> bool {
     return v.dot(some_n) < 0.0;
 };
 
-// 1. Гладкая замкнутая кривая (тор)
-InFunction smooth_func = [](const Vector3d &v) -> bool {
+// 1. Сфера
+InFunction sphere_func = [](const Vector3d &v) -> bool {
+    const double R = 0.8;
+    return (v + 0.5 * Vector3d::UnitZ()).norm() < R;
+};
+
+// 2. Тор
+InFunction torus_func = [](const Vector3d &v) -> bool {
     const double R = 0.6;
     const double r = 0.3;
     double phi = std::atan2(v.y(), v.x());
@@ -48,339 +24,188 @@ InFunction smooth_func = [](const Vector3d &v) -> bool {
     return (v - c).norm() < r;
 };
 
-// 2. Некоторая угловатая функция
-InFunction angle_func = [](const Vector3d &v) -> bool {
-    return false;
+// 3. Сфера с диффузной границей
+SpFunction diffuse_func = [](const Vector3d &v) -> double {
+    const double R = 0.75;
+    const double h = 0.2;
+    double r = (v + 0.5 * Vector3d::UnitZ()).norm();
+    return 0.5 * (1 + math::sign_p(R - r, h));
 };
 
-
+// Объемная доля
 static Storable<double> a;
-static Storable<double> a2;
-// Простые производные
+
+// Центральные разности
 static Storable<Vector3d> n1;
 static Storable<double> p1;
 static Storable<double> e1;
-// Формула из 2D
-static Storable<Vector3d> n4;
-static Storable<double> p4;
-static Storable<double> e4;
-// Моя формула
+
+// Формула Youngs
 static Storable<Vector3d> n2;
 static Storable<double> p2;
 static Storable<double> e2;
-// Формула Young
+
+// Схема ELVIRA
+static Storable<Vector3d> n3;
+static Storable<double> p3;
+static Storable<double> e3;
+
+// Моя формула (2D)
 static Storable<Vector3d> n4;
 static Storable<double> p4;
 static Storable<double> e4;
 
+// Моя формула (3D)
+static Storable<Vector3d> n5;
+static Storable<double> p5;
+static Storable<double> e5;
+
+// Смешанная ячейка?
 inline bool mixed(EuCell& cell) {
     return 0.0 < cell[a] && cell[a] < 1.0;
 }
 
-inline double get_ae(double p, const Vector3d& n) {
-    if (std::abs(n.z()) > 1.0e-15) {
-        double z = (p - 0.5 * n.x() - 0.5 * n.y()) / n.z();
-        return math::between(0.5 + z, 0.0, 1.0);
-    }
-    return n.x() + n.y() > 0.0 ? 0.0 : 1.0;
-}
-
-struct out_t {
-    double p;
-    Vector3d n;
-    double ae;
-};
-
-out_t edge_fraction(double a0, double a1, double a2) {
-    constexpr double eps_a = 1.0e-6;
-    if (a1 <= eps_a || a2 <= eps_a) {
-        return {.p=NAN, .n={NAN, NAN, NAN}, .ae=0.0};
-    }
-    if (a1 >= 1.0 - eps_a || a2 >= 1.0 - eps_a) {
-        return {.p=NAN, .n={NAN, NAN, NAN}, .ae=1.0};
-    }
-    if (a0 <= eps_a || a0 >= 1.0 - eps_a) {
-        // return 0 или 1
-        double ae = 0.5 + 0.5 * math::sign_p(a1 + a2 - 1.0, eps_a);
-        return {.p=NAN, .n={NAN, NAN, NAN}, .ae=ae};
-    }
-
-    // Остались случаи:
-    //  eps_a < a0 < 1 - eps_a,
-    //  eps_a < a1 < 1 - eps_a,
-    //  eps_a < a2 < 1 - eps_a
-
-    // Это как первая итерация в геометрическом методе, работает отлично!
-    // Для простого случая сразу дает ответ.
-    Vector3d n = {a0 - a1, a0 - a2, 1}; n.normalize();
-    double p = (a0 - 0.5) * n.z();
-    double ae = get_ae(p, n);
-
-    constexpr int max_iters = 20;
-    constexpr double eps_r = 1.0e-12;
-    constexpr double eps_p = 1.0e-12;
-    constexpr double eps_n = 1.0e-12;
-    constexpr double eps_ae = 1.0e-12;
-
-    for (int counter = 0; counter < max_iters; ++counter) {
-        double A0 = cube_volume_fraction(p, n);
-        double A1 = cube_volume_fraction(p - n.x(), n);
-        double A2 = cube_volume_fraction(p - n.y(), n);
-
-        Vector4d F = { a0 - A0, a1 - A1, a2 - A2, 0.0 };
-
-        // Условие выхода по максимальной невязке
-        double err_1 = F.cwiseAbs().maxCoeff();
-        if (err_1 < eps_r) {
-            break;
-        }
-
-        vf_grad_t D0 = cube_volume_fraction_grad(p, n);
-        vf_grad_t D1 = cube_volume_fraction_grad(p - n.x(), n);
-        vf_grad_t D2 = cube_volume_fraction_grad(p - n.y(), n);
-
-        Matrix4d M;
-        M << D0.dp, D0.dn.x(),         D0.dn.y(),         D0.dn.z(),
-             D1.dp, D1.dn.x() - D1.dp, D1.dn.y(),         D1.dn.z(),
-             D2.dp, D2.dn.x(),         D2.dn.y() - D2.dp, D2.dn.z(),
-             0.0,   n.x(),             n.y(),             n.z();
-
-        Vector4d delta = M.inverse() * F;
-
-        double   delta_p = delta[0];
-        Vector3d delta_n = {delta[1], delta[2], delta[3]};
-
-        double lambda = 1.0;
-        if (n.z() + delta_n.z() < 0.0) {
-            // Запрет на выход из диапазона n.z() > 0
-            lambda = 0.95 * std::abs(n.z() / delta_n.z());
-        }
-        delta_p *= lambda;
-        delta_n *= lambda;
-
-        n += delta_n; n.normalize();
-        p += delta_p;
-
-        double new_ae = get_ae(p, n);
-
-        if (delta_n.norm() < eps_n) {
-            break;
-        }
-        if (std::abs(delta_p) < eps_p) {
-            break;
-        }
-        if (std::abs(ae - new_ae) < eps_ae) {
-            ae = new_ae;
-            break;
-        }
-        ae = new_ae;
-    }
-    return {.p=p, .n=n, .ae=ae};
-}
-
-double e2f(double ax1, double ax2, double ay1, double ay2) {
-    auto [min_x, max_x] = math::sorted(ax1, ax2);
-    auto [min_y, max_y] = math::sorted(ay1, ay2);
-    return 0.5 * (min_x * max_y + max_x * min_y + max_x * max_y - min_x * min_y);
-}
-
-Vector3d get_normal3D(EuCell& cell, bool verbose = false) {
-    double A = cell[a];
-
-    double AL = cell.face(Side3D::L).neib(a);
-    double AR = cell.face(Side3D::R).neib(a);
-    double AB = cell.face(Side3D::B).neib(a);
-    double AT = cell.face(Side3D::T).neib(a);
-    double AX = cell.face(Side3D::Z).neib(a);
-    double AF = cell.face(Side3D::F).neib(a);
-
-    double a_lb = edge_fraction(A, AL, AB).ae;
-    double a_lt = edge_fraction(A, AL, AT).ae;;
-    double a_lx = edge_fraction(A, AL, AX).ae;;
-    double a_lf = edge_fraction(A, AL, AF).ae;;
-
-    double a_rb = edge_fraction(A, AR, AB).ae;;
-    double a_rt = edge_fraction(A, AR, AT).ae;;
-    double a_rx = edge_fraction(A, AR, AX).ae;;
-    double a_rf = edge_fraction(A, AR, AF).ae;;
-
-    double a_bx = edge_fraction(A, AB, AX).ae;;
-    double a_bf = edge_fraction(A, AB, AF).ae;;
-    double a_bl = edge_fraction(A, AB, AL).ae;;
-    double a_br = edge_fraction(A, AB, AR).ae;;
-
-    double a_tx = edge_fraction(A, AT, AX).ae;;
-    double a_tf = edge_fraction(A, AT, AF).ae;;
-    double a_tl = edge_fraction(A, AT, AL).ae;;
-    double a_tr = edge_fraction(A, AT, AR).ae;;
-
-    double a_xl = edge_fraction(A, AX, AL).ae;;
-    double a_xr = edge_fraction(A, AX, AR).ae;;
-    double a_xb = edge_fraction(A, AX, AB).ae;;
-    double a_xt = edge_fraction(A, AX, AT).ae;;
-
-    double a_fl = edge_fraction(A, AF, AL).ae;;
-    double a_fr = edge_fraction(A, AF, AR).ae;;
-    double a_fb = edge_fraction(A, AF, AB).ae;;
-    double a_ft = edge_fraction(A, AF, AT).ae;;
-
-    double a_l = e2f(a_lb, a_lt, a_lx, a_lf);
-    double a_r = e2f(a_rb, a_rt, a_rx, a_rf);
-    double a_b = e2f(a_bl, a_br, a_bx, a_bf);
-    double a_t = e2f(a_tl, a_tr, a_tx, a_tf);
-    double a_x = e2f(a_xl, a_xr, a_xb, a_xt);
-    double a_f = e2f(a_fl, a_fr, a_fb, a_ft);
-
-    Vector3d n = {a_l - a_r, a_b - a_t, a_x - a_f};
-    n.normalize();
-
-    if (verbose) {
-        double max_a = std::max({A, AL, AR, AB, AT, AX, AF});
-        double min_a = std::min({A, AL, AR, AB, AT, AX, AF});
-
-        std::cout << "A " << A << "\n";
-        std::cout << "AL " << AL << "\n";
-        std::cout << "AR " << AR << "\n";
-        std::cout << "AB " << AB << "\n";
-        std::cout << "AT " << AT << "\n";
-        std::cout << "AX " << AX << "\n";
-        std::cout << "AF " << AF << "\n";
-
-        double h = cell.linear_size();
-        double p = cube_find_section(A, some_n) * h;
-        double P2 = cube_find_section(A, n) * h;
-
-        EuMesh nice1(3, false);
-        Polyhedron poly1 = cell.polyhedron().clip(cell.center() + p * some_n, some_n);
-        nice1.push_back(poly1);
-        VtuFile::save("output/that_cell1.vtu", nice1, {}, false, true);
-
-        EuMesh nice2(3, false);
-        Polyhedron poly2 = cell.polyhedron().clip(cell.center() + P2 * n, n);
-        nice2.push_back(poly2);
-        VtuFile::save("output/that_cell2.vtu", nice2, {}, false, true);
-
-        std::cout << "a_lb: " << edge_fraction(A, AL, AB).ae << "\n";
-        std::cout << "a_lt: " << edge_fraction(A, AL, AT).ae << "\n";
-        std::cout << "a_lx: " << edge_fraction(A, AL, AX).ae << "\n";
-        std::cout << "a_lf: " << edge_fraction(A, AL, AF).ae << "\n";
-
-        std::cout << "a_rb: " << edge_fraction(A, AR, AB).ae << "\n";
-        std::cout << "a_rt: " << edge_fraction(A, AR, AT).ae << "\n";
-        std::cout << "a_rx: " << edge_fraction(A, AR, AX).ae << "\n";
-        std::cout << "a_rf: " << edge_fraction(A, AR, AF).ae << "\n";
-
-        std::cout << "a_bx: " << edge_fraction(A, AB, AX).ae << "\n";
-        std::cout << "a_bf: " << edge_fraction(A, AB, AF).ae << "\n";
-        std::cout << "a_bl: " << edge_fraction(A, AB, AL).ae << "\n";
-        std::cout << "a_br: " << edge_fraction(A, AB, AR).ae << "\n";
-
-        std::cout << "a_tx: " << edge_fraction(A, AT, AX).ae << "\n";
-        std::cout << "a_tf: " << edge_fraction(A, AT, AF).ae << "\n";
-        std::cout << "a_tl: " << edge_fraction(A, AT, AL).ae << "\n";
-        std::cout << "a_tr: " << edge_fraction(A, AT, AR).ae << "\n";
-
-        std::cout << "a_xl: " << edge_fraction(A, AX, AL).ae << "\n";
-        std::cout << "a_xr: " << edge_fraction(A, AX, AR).ae << "\n";
-        std::cout << "a_xb: " << edge_fraction(A, AX, AB).ae << "\n";
-        std::cout << "a_xt: " << edge_fraction(A, AX, AT).ae << "\n";
-
-        std::cout << "a_fl: " << edge_fraction(A, AF, AL).ae << "\n";
-        std::cout << "a_fr: " << edge_fraction(A, AF, AR).ae << "\n";
-        std::cout << "a_fb: " << edge_fraction(A, AF, AB).ae << "\n";
-        std::cout << "a_ft: " << edge_fraction(A, AF, AT).ae << "\n\n";
-
-        std::cout << "a_l: " << e2f(a_lb, a_lt, a_lx, a_lf) << "\n";
-        std::cout << "a_r: " << e2f(a_rb, a_rt, a_rx, a_rf) << "\n";
-        std::cout << "a_b: " << e2f(a_bl, a_br, a_bx, a_bf) << "\n";
-        std::cout << "a_t: " << e2f(a_tl, a_tr, a_tx, a_tf) << "\n";
-        std::cout << "a_x: " << e2f(a_xl, a_xr, a_xb, a_xt) << "\n";
-        std::cout << "a_f: " << e2f(a_fl, a_fr, a_fb, a_ft) << "\n";
-
-        std::cout << "some_n: " << some_n.transpose() << "\n";
-        std::cout << "mine n: " << n.transpose() << "\n";
-        //std::cout << "POLY1\n" << poly1 << "\n";
-        //std::cout << "POLY2\n" << poly2 << "\n";
-    }
-
-    return n;
-}
-
 void make_interface(EuMesh& mesh) {
-    for (EuCell& cell: mesh) {
+    mesh.for_each([](EuCell& cell) {
         if (!mixed(cell)) {
-            cell[n1] = Vector3d::Zero();
-            cell[n4] = Vector3d::Zero();
-            cell[n2] = Vector3d::Zero();
-            cell[n4] = Vector3d::Zero();
-            cell[p1] = 0.0;
-            cell[p4] = 0.0;
-            cell[p2] = 0.0;
-            cell[p4] = 0.0;
-            continue;
+            for (auto n: {n1, n2, n3, n4, n5}) cell[n] = Vector3d::Zero();
+            for (auto p: {p1, p2, p3, p4, p5}) cell[p] = 0.0;
+            for (auto e: {e1, e2, e3, e4, e5}) cell[e] = 0.0;
+            return;
         }
 
-        Vector3d grad1 = Vector3d::Zero();
-        Vector3d grad2 = Vector3d::Zero();
-        for (auto& face: cell.faces()) {
-            double a_f1 = 0.5 * (cell[a] + face.neib(a));
-            Vector3d S = face.area() * face.normal();
-            grad1 -= a_f1 * S;
+        // Размеры ячейки
+        double hx = cell.hx();
+        double hy = cell.hy();
+        double hz = cell.hz();
 
-            double a_f2 = face_fraction(cell[a], face.neib(a));
-            grad2 -= a_f2 * S;
+        // Простая производная
+        Vector3d grad = Vector3d::Zero();
+        for (auto face: cell.faces()) {
+            double a_f = 0.5 * (cell[a] + face.neib(a));
+            grad += a_f * face.area_n();
         }
-        cell[n1] = grad1.normalized();
-        cell[n4] = grad2.normalized();
-        cell[n2] = get_normal3D(cell);
+        cell[n1] = -grad.normalized();
 
-        //Vector3d c = cell.center();
-        //if (std::abs(c.x()) < 0.85 && std::abs(c.y()) < 0.85 && std::abs(c.z()) < 0.35 && cell[n3].dot(some_n) < 0.9999) {
-        //    Vector3d kek = get_normal3D(cell, true);
-        //    throw std::runtime_error("enough");
-        //}
+        Stencil3D C(cell, a);
+        cell[n2] = C.Youngs(hx, hy, hz);
+        cell[n3] = C.ELVIRA(hx, hy, hz);
 
-        double h = cell.linear_size();
-        cell[p1] = cube_find_section(cell[a], cell[n1]) * h;
-        cell[p4] = cube_find_section(cell[a], cell[n4]) * h;
-        cell[p2] = cube_find_section(cell[a], cell[n2]) * h;
-    }
+        // Моя формула (2D)
+        grad = Vector3d::Zero();
+        for (auto face: cell.faces()) {
+            double a_f = face_fraction(cell[a], face.neib(a));
+            grad += a_f * face.area_n();
+        }
+        cell[n4] = -grad.normalized();
 
+        // Моя формула (3D)
+        // Собрать доли в соседних ячейках
+        std::array<double, Side3D::count()> a_neib;
+        for (auto side: Side3D::items()) {
+            a_neib[side] = cell.face(side).neib(a);
+        }
 
-    for (int i = 0; i < mesh.nx(); ++i) {
-        for (int j = 0; j < mesh.ny(); ++j) {
-            for (int k = 0; k < mesh.nz(); ++k) {
-                auto cell = mesh.operator()(i, j, k);
-                if (!mixed(cell)) continue;
+        // Объемные доли на гранях
+        auto a_f = face_fractions(cell[a], a_neib);
 
-                double h = cell.linear_size();
-                double nx = (  mesh(i-1, j+1, k-1)[a] + 2*mesh(i-1, j, k-1)[a] +   mesh(i-1, j-1, k-1)[a] +
-                             2*mesh(i-1, j+1, k  )[a] + 4*mesh(i-1, j, k  )[a] + 2*mesh(i-1, j-1, k  )[a] +
-                               mesh(i-1, j+1, k+1)[a] + 2*mesh(i-1, j, k+1)[a] +   mesh(i-1, j-1, k+1)[a]) -
-                            (  mesh(i+1, j+1, k-1)[a] + 2*mesh(i+1, j, k-1)[a] +   mesh(i+1, j-1, k-1)[a] +
-                             2*mesh(i+1, j+1, k  )[a] + 4*mesh(i+1, j, k  )[a] + 2*mesh(i+1, j-1, k  )[a] +
-                               mesh(i+1, j+1, k+1)[a] + 2*mesh(i+1, j, k+1)[a] +   mesh(i+1, j-1, k+1)[a]);
+        // И обычный Гаусс
+        grad = Vector3d::Zero();
+        for (auto face: cell.faces()) {
+            grad += a_f[face.side()] * face.area_n();
+        }
+        cell[n5] = -grad.normalized();
 
-                double ny = (  mesh(i-1, j-1, k-1)[a] + 2*mesh(i, j-1, k-1)[a] +   mesh(i+1, j-1, k-1)[a] +
-                             2*mesh(i-1, j-1, k  )[a] + 4*mesh(i, j-1, k  )[a] + 2*mesh(i+1, j-1, k  )[a] +
-                               mesh(i-1, j-1, k+1)[a] + 2*mesh(i, j-1, k+1)[a] +   mesh(i+1, j-1, k+1)[a]) -
-                            (  mesh(i-1, j+1, k-1)[a] + 2*mesh(i, j+1, k-1)[a] +   mesh(i+1, j+1, k-1)[a] +
-                             2*mesh(i-1, j+1, k  )[a] + 4*mesh(i, j+1, k  )[a] + 2*mesh(i+1, j+1, k  )[a] +
-                               mesh(i-1, j+1, k+1)[a] + 2*mesh(i, j+1, k+1)[a] +   mesh(i+1, j+1, k+1)[a]);
+        cell[p1] = cube_find_section(cell[a], cell[n1], hx, hy, hz);
+        cell[p2] = cube_find_section(cell[a], cell[n2], hx, hy, hz);
+        cell[p3] = cube_find_section(cell[a], cell[n3], hx, hy, hz);
+        cell[p4] = cube_find_section(cell[a], cell[n4], hx, hy, hz);
+        cell[p5] = cube_find_section(cell[a], cell[n5], hx, hy, hz);
+    });
+}
 
-                double nz = (  mesh(i-1, j-1, k-1)[a] + 2*mesh(i, j-1, k-1)[a] +   mesh(i+1, j-1, k-1)[a] +
-                             2*mesh(i-1, j  , k-1)[a] + 4*mesh(i, j  , k-1)[a] + 2*mesh(i+1, j  , k-1)[a] +
-                               mesh(i-1, j+1, k-1)[a] + 2*mesh(i, j+1, k-1)[a] +   mesh(i+1, j+1, k-1)[a]) -
-                            (  mesh(i-1, j-1, k+1)[a] + 2*mesh(i, j-1, k+1)[a] +   mesh(i+1, j-1, k+1)[a] +
-                             2*mesh(i-1, j  , k+1)[a] + 4*mesh(i, j  , k+1)[a] + 2*mesh(i+1, j  , k+1)[a] +
-                               mesh(i-1, j+1, k+1)[a] + 2*mesh(i, j+1, k+1)[a] +   mesh(i+1, j+1, k+1)[a]);
+void calc_errors(EuMesh& mesh, InFunction func, int nx) {
+    std::atomic err1{0.0};
+    std::atomic err2{0.0};
+    std::atomic err3{0.0};
+    std::atomic err4{0.0};
+    std::atomic err5{0.0};
 
-                Vector3d n = {nx, ny, nz};
-                cell[n4] = n.normalized();
-                cell[p4] = cube_find_section(cell[a], cell[n4]) * h;
+    mesh.for_each([func, nx, &err1, &err2, &err3, &err4, &err5](EuCell& cell) {
+        // Нулевые погрешности
+        cell[e1] = cell[e2] = cell[e3] = cell[e4] = cell[e5] = 0.0;
+
+        if (!mixed(cell)) {
+            return;
+        }
+        for (auto face: cell.faces()) {
+            if (face.is_boundary()) {
+                return;
             }
         }
+
+        double hx = cell.hx();
+        double hy = cell.hy();
+        double hz = cell.hz();
+
+        std::array counter = {0, 0, 0, 0, 0};
+        for (int i = 0; i < nx; ++i) {
+            double x = hx * ((i + 0.5) / nx - 0.5);
+            for (int j = 0; j < nx; ++j) {
+                double y = hy * ((j + 0.5) / nx - 0.5);
+                for (int k = 0; k < nx; ++k) {
+                    double z = hz * ((k + 0.5) / nx - 0.5);
+
+                    // Точка относительно центра ячейки
+                    Vector3d r = {x, y, z};
+
+                    bool inside = func(cell.center() + r);
+                    if (inside != (r.dot(cell[n1]) < cell[p1])) { ++counter[0]; }
+                    if (inside != (r.dot(cell[n2]) < cell[p2])) { ++counter[1]; }
+                    if (inside != (r.dot(cell[n3]) < cell[p3])) { ++counter[2]; }
+                    if (inside != (r.dot(cell[n4]) < cell[p4])) { ++counter[3]; }
+                    if (inside != (r.dot(cell[n5]) < cell[p5])) { ++counter[4]; }
+                }
+            }
+        }
+
+        // Интегральная метрика L1, как у Aulisa
+        double xi = cell.volume() / (nx * nx * nx);
+        cell[e1] = xi * counter[0];
+        cell[e2] = xi * counter[1];
+        cell[e3] = xi * counter[2];
+        cell[e4] = xi * counter[3];
+        cell[e5] = xi * counter[4];
+
+        err1 += cell[e1];
+        err2 += cell[e2];
+        err3 += cell[e3];
+        err4 += cell[e4];
+        err5 += cell[e5];
+    });
+
+    double hx{NAN}, hy{NAN}, hz{NAN};
+    for (auto cell: mesh) {
+        if (mixed(cell)) {
+            hx = cell.hx();
+            hy = cell.hy();
+            hz = cell.hz();
+            break;
+        }
     }
+
+    std::cout << "hx, hy, hz                    Central      Youngs      ELVIRA     CSIR  2D    CSIR  3D\n";
+
+    std::cout << std::setprecision(5) << std::fixed;
+    std::cout << hx << ", " << hy << ", " << hz << ":";
+
+    std::cout << std::setprecision(2) << std::scientific;
+
+    std::cout << std::setw(12) << err1;
+    std::cout << std::setw(12) << err2;
+    std::cout << std::setw(12) << err3;
+    std::cout << std::setw(12) << err4;
+    std::cout << std::setw(12) << err5 << "\n";
 }
 
 EuMesh body(EuMesh& mesh, Storable<double> p, Storable<Vector3d> n) {
@@ -395,201 +220,182 @@ EuMesh body(EuMesh& mesh, Storable<double> p, Storable<Vector3d> n) {
             continue;
         }
 
-        EuMesh clip_i(3, false);
-
-            Vector3d point = cell.center() + cell[p] * cell[n];
-            auto poly1 = cell.polyhedron();
-            auto poly = poly1.clip(point, cell[n]);
-            if (poly.checkout() != 0) {
-                std::cout << "WTF? " << poly.checkout() << " " << cell[a] << " " << cell[p] << " "
-                          << cell[n].transpose() << "\n";
-                continue;
-            }
-            if (!poly.empty()) {
-                clipped.push_back(poly);
-            }
+        Vector3d point = cell.center() + cell[p] * cell[n];
+        auto poly = cell.polyhedron();
+        auto clip = poly.clip(point, cell[n]);
+        if (clip.checkout() != 0) {
+            std::cout << "WTF? " << clip.checkout() << " " << cell[a] << " " << cell[p] << " "
+                      << cell[n].transpose() << "\n";
+            continue;
+        }
+        if (!clip.empty()) {
+            clipped.push_back(clip);
+        }
     }
     return clipped;
 }
 
-std::tuple<double, double, double, double> calc_errors(EuMesh& mesh, InFunction func, int nx) {
-    double err1 = 0.0;
-    double err2 = 0.0;
-    double err3 = 0.0;
-    double err4 = 0.0;
-
-    mesh.for_each([func, nx, &err1, &err2, &err3, &err4](EuCell& cell) {
-        if (!mixed(cell)) {
-            cell[e1] = 0.0;
-            cell[e4] = 0.0;
-            cell[e2] = 0.0;
-            cell[e4] = 0.0;
-            return;
-        }
-
-        Box box = cell.bbox();
-
-        double pos1 = cell[p1];
-        double pos2 = cell[p4];
-        double pos3 = cell[p2];
-        double pos4 = cell[p4];
-        Vector3d norm1 = cell[n1];
-        Vector3d norm2 = cell[n4];
-        Vector3d norm3 = cell[n2];
-        Vector3d norm4 = cell[n4];
-
-        int counter1 = 0;
-        int counter2 = 0;
-        int counter3 = 0;
-        int counter4 = 0;
-        for (int i = 0; i < nx; ++i) {
-            double x = box.vmin.x() + (box.vmax.x() - box.vmin.x()) * (i + 0.5) / nx;
-            for (int j = 0; j < nx; ++j) {
-                double y = box.vmin.y() + (box.vmax.y() - box.vmin.y()) * (j + 0.5) / nx;
-                for (int k = 0; k < nx; ++k) {
-                    double z = box.vmin.z() + (box.vmax.z() - box.vmin.z()) * (k + 0.5) / nx;
-                    Vector3d r = {x, y, z};
-                    bool in0 = func(r);
-                    bool in1 = (r - cell.center()).dot(norm1) < pos1;
-                    bool in2 = (r - cell.center()).dot(norm2) < pos2;
-                    bool in3 = (r - cell.center()).dot(norm3) < pos3;
-                    bool in4 = (r - cell.center()).dot(norm4) < pos4;
-                    if (in0 != in1) { ++counter1; }
-                    if (in0 != in2) { ++counter2; }
-                    if (in0 != in3) { ++counter3; }
-                    if (in0 != in4) { ++counter4; }
-                }
-            }
-        }
-        if (counter1 == nx * nx) {
-            // Выяснить, что здесь такое вообще
-            cell[e1] = 0.0;
-            cell[e4] = 0.0;
-            cell[e2] = 0.0;
-            cell[e4] = 0.0;
-        }
-        else {
-            cell[e1] = double(counter1) / (nx * nx);// * cell.volume();
-            cell[e4] = double(counter2) / (nx * nx);// * cell.volume();
-            cell[e2] = double(counter3) / (nx * nx);// * cell.volume();
-            cell[e4] = double(counter4) / (nx * nx);// * cell.volume();
-
-            err1 += cell[e1];
-            err2 += cell[e4];
-            err3 += cell[e2];
-            err4 += cell[e4];
-        }
-    });
-
-    int mix_count = mesh.sum([](EuCell& cell) -> int {
-        return mixed(cell) ? 1 : 0;
-    }, 0);
-    err1 /= mix_count;
-    err2 /= mix_count;
-    err3 /= mix_count;
-    err4 /= mix_count;
-
-    return {err1, err2, err3, err4};
-}
-
 void save_mesh(EuMesh& mesh) {
-    Variables vars;
+    Variables vars = {"level", "flag"};
     vars.append("a", a);
-    vars.append("a2", a2);
-    vars.append("p1", p1);
-    vars.append("p2", p4);
-    vars.append("p3", p2);
     vars.append("n1", n1);
-    vars.append("n2", n4);
-    vars.append("n3", n2);
+    vars.append("n2", n2);
+    vars.append("n3", n3);
+    vars.append("n4", n4);
+    vars.append("n5", n5);
+    vars.append("p1", p1);
+    vars.append("p2", p2);
+    vars.append("p3", p3);
+    vars.append("p4", p4);
+    vars.append("p5", p5);
     vars.append("e1", e1);
-    vars.append("e2", e4);
-    vars.append("e3", e2);
+    vars.append("e2", e2);
+    vars.append("e3", e3);
+    vars.append("e4", e4);
+    vars.append("e5", e5);
+    vars.append<bool>("mixed", mixed);
+    vars.append<double>("delta", [](EuCell& cell) -> double {
+        return std::min(std::abs(cell[a]), std::abs(1.0 - cell[a]));
+    });
 
     VtuFile::save("output/mesh.vtu", mesh, vars);
 
-    auto body1 = body(mesh, p1, n1);
-    VtuFile::save("output/body1.vtu", body1, {}, false, true);
+    auto body_central = body(mesh, p1, n1);
+    VtuFile::save("output/body(central).vtu", body_central, {}, false, true);
 
-    auto body2 = body(mesh, p4, n4);
-    VtuFile::save("output/body2.vtu", body2, {}, false, true);
+    auto body_youngs = body(mesh, p2, n2);
+    VtuFile::save("output/body(youngs).vtu", body_youngs, {}, false, true);
 
-    auto body3 = body(mesh, p2, n2);
-    VtuFile::save("output/body3.vtu", body3, {}, false, true);
+    auto body_elvira = body(mesh, p3, n3);
+    VtuFile::save("output/body(elvira).vtu", body_elvira, {}, false, true);
 
-    auto body4 = body(mesh, p4, n4);
-    VtuFile::save("output/body4.vtu", body4, {}, false, true);
+    auto body_csir_2D = body(mesh, p4, n4);
+    VtuFile::save("output/body(csir_2D).vtu", body_csir_2D, {}, false, true);
+
+    auto body_csir_3D = body(mesh, p5, n5);
+    VtuFile::save("output/body(csir_3D).vtu", body_csir_3D, {}, false, true);
+}
+
+// Адаптировать, если ячейка или сосед смешанные
+void set_flag(EuCell& cell) {
+    cell.set_flag(-1);
+    if (mixed(cell)) {
+        cell.set_flag(1);
+        return;
+    }
+    for (auto face: cell.faces()) {
+        auto neib = face.neib();
+        if (mixed(neib)) {
+            cell.set_flag(1);
+            return;
+        }
+    }
+}
+
+// Выставить значения объемной доли и провести адаптацию
+void initialize(EuMesh& mesh, std::function<void(EuCell&)> set_alpha) {
+    mesh.set_distributor(Distributor::initializer(set_alpha));
+    mesh.for_each(set_alpha);
+    if (mesh.adaptive()) {
+        for (int i = 0; i <= mesh.max_level(); ++i) {
+            mesh.for_each(set_flag);
+            mesh.make_shuba(2);
+            mesh.refine();
+        }
+    }
 }
 
 // Для плоскости
 void show_plain(EuMesh& mesh) {
-    mesh.for_each([](EuCell& cell) {
-        double h = cell.linear_size();
-        double p = -cell.center().dot(some_n) / h;
-        cell[a] = cube_volume_fraction(p, some_n);
+    initialize(mesh, [](EuCell& cell) {
+        double p = -cell.center().dot(some_n);
+        cell[a] = cube_volume_fraction(p, some_n, cell.hx(), cell.hy(), cell.hz());
     });
 
     make_interface(mesh);
 
-    //auto [error1, error2] = calc_errors(mesh, func, 10);
-    //std::cout << "Error1: " << error1 << "\n";
-    //std::cout << "Error2: " << error2 << "\n";
+    calc_errors(mesh, plain_func, 200);
 
     save_mesh(mesh);
 }
 
 // Для обычной характеристической функции
 void show_classic(EuMesh& mesh, InFunction func) {
-    mesh.for_each([func](EuCell& cell) {
-        cell[a] = cell.volume_fraction(func, 10000);
+    initialize(mesh, [func](EuCell& cell) {
+        cell[a] = cell.volume_fraction(func, 100000);
     });
 
     make_interface(mesh);
 
-    auto [error1, error2, error3, error4] = calc_errors(mesh, func, 10);
-    std::cout << "Error1: " << error1 << "\n";
-    std::cout << "Error2: " << error2 << "\n";
-    std::cout << "Error3: " << error3 << "\n";
-    std::cout << "Error4: " << error4 << "\n";
+    calc_errors(mesh, func, 200);
 
     save_mesh(mesh);
 }
 
-// В норме L_inf: ц.р. не сходятся, мой метод с 1-ым порядком
-// В норме L_1: ц.р. имеют 1-ый порядок, мой метод 2-ой
-// Средняя от L_inf: ц.р. имеют 1-ый порядок, мой метод 2-ой
-// Во всех случаях обычные разности дают погрешности на порядок больше
+void show_diffuse(EuMesh& mesh) {
+    mesh.set_max_level(0);
+
+    mesh.for_each([](EuCell& cell) {
+        double alpha = cell.integrate_low(diffuse_func, 10) / cell.volume();
+        if (alpha < 1.0e-8) alpha = 0.0;
+        if (alpha > 1.0 - 1.0e-8) alpha = 1.0;
+        cell[a] = alpha;
+    });
+
+    make_interface(mesh);
+
+    save_mesh(mesh);
+}
+
 int main() {
+    utils::mpi::handler mpi_init;
     utils::threads::on();
 
     Cuboid gen(-1.0, 1.0, -1.0, 1.0, -0.5, 0.5);
-    gen.set_nx(40);
+    gen.set_nx(22);
+    //gen.set_sizes(21, 17, 11);
 
     EuMesh mesh(gen);
+    mesh.set_max_level(3);
 
     a = mesh.add<double>("a");
-    a2 = mesh.add<double>("a2");
-    p1 = mesh.add<double>("p1");
-    n1 = mesh.add<Vector3d>("n1");
-    e1 = mesh.add<double>("e1");
-    p4 = mesh.add<double>("p2");
-    n4 = mesh.add<Vector3d>("n2");
-    e4 = mesh.add<double>("e2");
-    p2 = mesh.add<double>("p3");
-    n2 = mesh.add<Vector3d>("n3");
-    e2 = mesh.add<double>("e3");
-    p4 = mesh.add<double>("p4");
-    n4 = mesh.add<Vector3d>("n4");
-    e4 = mesh.add<double>("e4");
+    std::tie(p1, p2, p3, p4, p5) = mesh.add<double  >("p1", "p2", "p3", "p4", "p5");
+    std::tie(n1, n2, n3, n4, n5) = mesh.add<Vector3d>("n1", "n2", "n3", "n4", "n5");
+    std::tie(e1, e2, e3, e4, e5) = mesh.add<double  >("e1", "e2", "e3", "e4", "e5");
 
     int test = 1;
 
     switch (test) {
-        case 0: show_plain(mesh); return 0;
-        case 1: show_classic(mesh, smooth_func); return 0;
-        //case 2: show_classic(mesh, angle_func); return 0;
-        //case 3: show_diffuse(mesh); return 0;
-        //case 4: show_noise(mesh, smooth_func); return 0;
-        default: return 0;
+        case 0: show_plain(mesh); break;
+        case 1: show_classic(mesh, sphere_func); break;
+        case 2: show_classic(mesh, torus_func); break;
+        case 3: show_diffuse(mesh); break;
+        default: break;
     }
+    std::cout << "\a";
+    return 0;
 }
+
+/*
+Для теста со сферой. CSIR 3D дает 2-ой порядок, всё норм.
+
+hx, hy, hz                    Central      Youngs      ELVIRA     CSIR  2D    CSIR  3D
+0.09091, 0.09091, 0.09091:    1.17e-02    2.21e-03    1.98e-03    2.12e-03    2.09e-03
+0.04545, 0.04545, 0.04545:    5.96e-03    9.51e-04    5.55e-04    7.76e-04    5.86e-04
+0.02273, 0.02273, 0.02273:    3.12e-03    4.51e-04    1.45e-04    3.10e-04    1.56e-04
+0.01136, 0.01136, 0.01136:    1.59e-03    2.24e-04    3.84e-05    1.35e-04    4.30e-05
+
+Тест для тора. Интересные результаты, Youngs улучшился, мой выигрывает у ELVIRA
+hx, hy, hz                    Central      Youngs      ELVIRA     CSIR  2D    CSIR  3D
+0.09091, 0.09091, 0.09091:    2.51e-02    7.27e-03    1.17e-02    8.22e-03    7.85e-03
+0.04545, 0.04545, 0.04545:    1.12e-02    2.20e-03    2.20e-03    2.21e-03    2.05e-03
+0.02273, 0.02273, 0.02273:    5.49e-03    8.46e-04    5.57e-04    6.95e-04    5.27e-04
+0.01136, 0.01136, 0.01136:    2.77e-03    3.85e-04    1.42e-04    2.54e-04    1.40e-04
+
+Версия с расширенным шаблоном для сферы (незначительное улучшение)
+hx, hy, hz                    Central      Youngs      ELVIRA     CSIR  2D    CSIR  3D
+0.09091, 0.09091, 0.09091:    1.17e-02    2.21e-03    1.98e-03    2.12e-03    1.82e-03
+0.04545, 0.04545, 0.04545:    5.96e-03    9.51e-04    5.55e-04    7.76e-04    4.95e-04
+0.02273, 0.02273, 0.02273:    3.12e-03    4.51e-04    1.45e-04    3.10e-04    1.38e-04
+0.01136, 0.01136, 0.01136:    1.59e-03    2.24e-04    3.84e-05    1.35e-04    3.91e-05
+*/

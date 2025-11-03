@@ -69,8 +69,15 @@ public:
     /// @brief Координата z центра грани
     double z() const { return center().z(); }
 
+    /// @brief Сторона, по которой расположена грань
+    template <int dim = 3>
+    Side<dim> side() const;
+
     /// @brief Площадь/длина обычной грани
     double area() const;
+
+    /// @brief Площадь/длина на внешнюю нормаль
+    Vector3d area_n() const;
 
     /// @brief Площадь/длина обычной грани или грани осесимметричной ячейки
     double area(bool axial) const;
@@ -588,7 +595,15 @@ inline const geom::Vector3d &EuFace::normal() const { return m_cells->faces.norm
 
 inline const geom::Vector3d &EuFace::center() const { return m_cells->faces.center[m_face_idx]; }
 
+template <int dim >
+Side<dim> EuFace::side() const {
+    index_t cell_idx = m_cells->faces.adjacent.basic[m_face_idx];
+    return m_face_idx - m_cells->face_begin[cell_idx];
+}
+
 inline double EuFace::area() const { return m_cells->faces.area[m_face_idx]; }
+
+inline geom::Vector3d EuFace::area_n() const { return m_cells->faces.area[m_face_idx] * m_cells->faces.normal[m_face_idx]; }
 
 inline double EuFace::area(bool axial) const { return m_cells->faces.get_area(m_face_idx, axial); }
 

@@ -1,9 +1,10 @@
 #include <iostream>
 
+#include <zephyr/geom/sections.h>
 #include <zephyr/math/funcs.h>
 #include <zephyr/math/calc/roots.h>
-#include <zephyr/geom/sections.h>
 #include <zephyr/math/calc/derivatives.h>
+#include <zephyr/mesh/side.h>
 
 namespace zephyr::geom {
 
@@ -405,6 +406,137 @@ double cube_find_section(double alpha, const Vector3d& n, double A, double B, do
 int cube_section_case(double p, const Vector3d& n, double A, double B, double C) {
     auto [a, b, c] = sorted(std::abs(A * n.x()), std::abs(B * n.y()), std::abs(C * n.z()));
     return (p > 0.0 ? 1 : -1) * f_func_case(std::abs(p), a, b, c);
+}
+
+inline double get_ae(double p, const Vector3d& n) {
+    if (std::abs(n.z()) > 1.0e-15) {
+        double z = (p - 0.5 * n.x() - 0.5 * n.y()) / n.z();
+        return between(0.5 + z, 0.0, 1.0);
+    }
+    return n.x() + n.y() > 0.0 ? 0.0 : 1.0;
+}
+
+double edge_fraction(double a0, double a1, double a2) {
+    constexpr double eps_a = 1.0e-12;
+    if (a1 <= eps_a || a2 <= eps_a) {
+        return 0.0;
+    }
+    if (a1 >= 1.0 - eps_a || a2 >= 1.0 - eps_a) {
+        return 1.0;
+    }
+    if (a0 <= eps_a || a0 >= 1.0 - eps_a) {
+        // return 0 или 1
+        return 0.5 + 0.5 * math::sign_p(a1 + a2 - 1.0, eps_a);
+    }
+
+    // Остались случаи:
+    //  eps_a < a0 < 1 - eps_a,
+    //  eps_a < a1 < 1 - eps_a,
+    //  eps_a < a2 < 1 - eps_a
+
+    // Это как первая итерация в геометрическом методе, работает отлично!
+    // Для простого случая сразу дает ответ.
+    Vector3d n = {a0 - a1, a0 - a2, 1}; n.normalize();
+    double p = (a0 - 0.5) * n.z();
+    double ae = get_ae(p, n);
+
+    constexpr int max_iters = 20;
+    constexpr double eps_r = 1.0e-12;
+    constexpr double eps_p = 1.0e-12;
+    constexpr double eps_n = 1.0e-12;
+    constexpr double eps_ae = 1.0e-12;
+
+    for (int counter = 0; counter < max_iters; ++counter) {
+        double A0 = cube_volume_fraction(p, n);
+        double A1 = cube_volume_fraction(p - n.x(), n);
+        double A2 = cube_volume_fraction(p - n.y(), n);
+
+        Vector4d F = { a0 - A0, a1 - A1, a2 - A2, 0.0 };
+
+        // Условие выхода по максимальной невязке
+        double err_1 = F.cwiseAbs().maxCoeff();
+        if (err_1 < eps_r) {
+            break;
+        }
+
+        vf_grad_t D0 = cube_volume_fraction_grad(p, n);
+        vf_grad_t D1 = cube_volume_fraction_grad(p - n.x(), n);
+        vf_grad_t D2 = cube_volume_fraction_grad(p - n.y(), n);
+
+        Matrix4d M;
+        M << D0.dp, D0.dn.x(),         D0.dn.y(),         D0.dn.z(),
+             D1.dp, D1.dn.x() - D1.dp, D1.dn.y(),         D1.dn.z(),
+             D2.dp, D2.dn.x(),         D2.dn.y() - D2.dp, D2.dn.z(),
+             0.0,   n.x(),             n.y(),             n.z();
+
+        Vector4d delta = M.inverse() * F;
+
+        double   delta_p = delta[0];
+        Vector3d delta_n = {delta[1], delta[2], delta[3]};
+
+        double lambda = 1.0;
+        if (n.z() + delta_n.z() < 0.0) {
+            // Запрет на выход из диапазона n.z() > 0
+            lambda = 0.95 * std::abs(n.z() / delta_n.z());
+        }
+        delta_p *= lambda;
+        delta_n *= lambda;
+
+        n += delta_n; n.normalize();
+        p += delta_p;
+
+        double new_ae = get_ae(p, n);
+
+        if (delta_n.norm() < eps_n) {
+            break;
+        }
+        if (std::abs(delta_p) < eps_p) {
+            break;
+        }
+        if (std::abs(ae - new_ae) < eps_ae) {
+            ae = new_ae;
+            break;
+        }
+        ae = new_ae;
+    }
+    return ae;
+}
+
+inline double e2f(double ax1, double ax2, double ay1, double ay2) {
+    auto [min_x, max_x] = sorted(ax1, ax2);
+    auto [min_y, max_y] = sorted(ay1, ay2);
+    return 0.5 * (min_x * max_y + max_x * min_y + max_x * max_y - min_x * min_y);
+}
+
+using mesh::Side3D;
+
+std::array<double, Side3D::count()> face_fractions(double a_cell, const std::array<double, Side3D::count()>& a_neib) {
+    // Ребра вдоль Ox
+    double a_bz = edge_fraction(a_cell, a_neib[Side3D::B], a_neib[Side3D::Z]);
+    double a_bf = edge_fraction(a_cell, a_neib[Side3D::B], a_neib[Side3D::F]);
+    double a_tz = edge_fraction(a_cell, a_neib[Side3D::T], a_neib[Side3D::Z]);
+    double a_tf = edge_fraction(a_cell, a_neib[Side3D::T], a_neib[Side3D::F]);
+
+    // Ребра вдоль Oy
+    double a_zl = edge_fraction(a_cell, a_neib[Side3D::Z], a_neib[Side3D::L]);
+    double a_zr = edge_fraction(a_cell, a_neib[Side3D::Z], a_neib[Side3D::R]);
+    double a_fl = edge_fraction(a_cell, a_neib[Side3D::F], a_neib[Side3D::L]);
+    double a_fr = edge_fraction(a_cell, a_neib[Side3D::F], a_neib[Side3D::R]);
+
+    // Ребра вдоль Oz
+    double a_lb = edge_fraction(a_cell, a_neib[Side3D::L], a_neib[Side3D::B]);
+    double a_lt = edge_fraction(a_cell, a_neib[Side3D::L], a_neib[Side3D::T]);
+    double a_rb = edge_fraction(a_cell, a_neib[Side3D::R], a_neib[Side3D::B]);
+    double a_rt = edge_fraction(a_cell, a_neib[Side3D::R], a_neib[Side3D::T]);
+
+    std::array<double, Side3D::count()> res;
+    res[Side3D::L] = e2f(a_lb, a_lt, a_zl, a_fl);
+    res[Side3D::R] = e2f(a_rb, a_rt, a_zr, a_fr);
+    res[Side3D::B] = e2f(a_lb, a_rb, a_bz, a_bf);
+    res[Side3D::T] = e2f(a_lt, a_rt, a_tz, a_tf);
+    res[Side3D::Z] = e2f(a_zl, a_zr, a_bz, a_tz);
+    res[Side3D::F] = e2f(a_fl, a_fr, a_bf, a_tf);
+    return res;
 }
 
 } // namespace zephyr::geom

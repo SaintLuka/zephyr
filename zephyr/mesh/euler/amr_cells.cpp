@@ -404,6 +404,9 @@ double AmrCells::integrate_low(index_t ic, const SpFunction& func, int n_points)
     }
     else {
         // Трехмерная ячейка
+        if (m_adaptive) {
+            return mapping<3>(ic).reduce().integrate_low(func, n_points);
+        }
         throw std::runtime_error("AmrCell::volume_fraction #1");
     }
 }

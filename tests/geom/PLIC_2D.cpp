@@ -1,36 +1,13 @@
 // PLIC реконструкция границы на двумерных декартовых сетках
-
-#include <iomanip>
-#include <atomic>
-#include <zephyr/mesh/euler/eu_mesh.h>
-
-#include <zephyr/geom/generator/rectangle.h>
-
-#include <zephyr/io/pvd_file.h>
-#include <zephyr/geom/sections.h>
-
-#include <zephyr/geom/geom.h>
-#include <zephyr/math/funcs.h>
-
-using namespace zephyr;
-using namespace zephyr::io;
-using namespace zephyr::geom;
-using namespace zephyr::mesh;
-
-using generator::Rectangle;
-
-Vector3d to_cartesian(double r, double phi) {
-    return {r * std::cos(phi), r * std::sin(phi), 0.0};
-}
+#include "PLIC.h"
 
 // Нормаль для теста с плоскостью
 static Vector3d some_n = (Vector3d{0.24, 0.13, 0.0}).normalized();
 
-// Характеристическая функция (функция-индикатор)
-using InFunction = std::function<bool(const Vector3d &)>;
-
-// Пространственная функция
-using SpFunction = std::function<double(const Vector3d &)>;
+// 0. Область под прямой
+auto plain_func = [](const Vector3d& v) -> bool {
+    return v.dot(some_n) < 0.0;
+};
 
 // 1. Гладкая замкнутая кривая
 InFunction smooth_func = [](const Vector3d &v) -> bool {
@@ -81,11 +58,6 @@ SpFunction diffuse_func = [](const Vector3d &v) -> double {
     return 0.25 * (1 + math::sign_p(r - r1, h)) * (1 + math::sign_p(r2 - r, h));
 };
 
-// 4. Зашумленная функция (случайный шум)
-InFunction noise_func = [](const Vector3d &v) -> bool {
-    return false;
-};
-
 // Объемная доля
 static Storable<double> a;
 
@@ -109,91 +81,10 @@ static Storable<Vector3d> n4;
 static Storable<double> p4;
 static Storable<double> e4;
 
+// Смешанная ячейка?
 inline bool mixed(EuCell& cell) {
     return 0.0 < cell[a] && cell[a] < 1.0;
 }
-
-class Stencil {
-    std::array<std::array<double, 3>, 3> arr;
-
-public:
-    Stencil(EuCell& cell) {
-        for (int i: {-1, 0, 1}) {
-            for (int j: {-1, 0, 1}) {
-                C(i, j) = cell.neib(i, j)[a];
-            }
-        }
-    }
-
-    double& C(int i, int j)       { return arr[i + 1][j + 1]; }
-    double  C(int i, int j) const { return arr[i + 1][j + 1]; }
-
-    double& operator()(int i, int j)       { return C(i, j); }
-    double  operator()(int i, int j) const { return C(i, j); }
-
-    Vector3d Youngs(double hx, double hy) const {
-        Vector3d norm = Vector3d::Zero();
-        norm.x() = ((C(-1, +1) + 2 * C(-1, 0) + C(-1, -1)) - (C(+1, +1) + 2 * C(+1, 0) + C(+1, -1))) / hx;
-        norm.y() = ((C(+1, -1) + 2 * C(0, -1) + C(-1, -1)) - (C(+1, +1) + 2 * C(0, +1) + C(-1, +1))) / hy;
-        return norm.normalized();
-    }
-
-    Vector3d ELVIRA(double hx, double hy) const {
-        Vector3d YN = Youngs(hx, hy);
-
-        // Функции столбцов y(x)
-        double y1 = (C(-1, -1) + C(-1, 0) + C(-1, 1)) * hy;
-        double y2 = (C( 0, -1) + C( 0, 0) + C( 0, 1)) * hy;
-        double y3 = (C(+1, -1) + C(+1, 0) + C(+1, 1)) * hy;
-
-        double sgn_ny = math::sign(YN.y());
-
-        double n_xl = (y2 - y1) / hx;
-        double n_xc = (y3 - y1) / (2 * hx);
-        double n_xr = (y3 - y2) / hx;
-
-        // Функции строк x(y)
-        double x1 = (C(-1, -1) + C(0, -1) + C(+1, -1)) * hx;
-        double x2 = (C(-1,  0) + C(0,  0) + C(+1,  0)) * hx;
-        double x3 = (C(-1, +1) + C(0, +1) + C(+1, +1)) * hx;
-
-        double sgn_nx = math::sign(YN.x());
-
-        double n_yb = (x2 - x1) / hy;
-        double n_yc = (x3 - x1) / (2 * hy);
-        double n_yt = (x3 - x2) / hy;
-
-        // Нормали для тестов
-        std::array ns = {
-            Vector3d{-n_xl, sgn_ny, 0.0}.normalized(),
-            Vector3d{-n_xc, sgn_ny, 0.0}.normalized(),
-            Vector3d{-n_xr, sgn_ny, 0.0}.normalized(),
-            Vector3d{sgn_nx, -n_yb, 0.0}.normalized(),
-            Vector3d{sgn_nx, -n_yc, 0.0}.normalized(),
-            Vector3d{sgn_nx, -n_yt, 0.0}.normalized(),
-        };
-
-        std::array<double, 6> errors;
-
-        for (int i = 0; i < 6; ++i) {
-            Vector3d n = ns[i];
-            double p = quad_find_section(C(0, 0), n, hx, hy);
-
-            errors[i] = 0.0;            
-            errors[i] += std::pow(C(-1,  0) - quad_volume_fraction(p + hx * n.x(), n, hx, hy), 2);
-            errors[i] += std::pow(C(+1,  0) - quad_volume_fraction(p - hx * n.x(), n, hx, hy), 2);
-            errors[i] += std::pow(C( 0, -1) - quad_volume_fraction(p + hy * n.y(), n, hx, hy), 2);
-            errors[i] += std::pow(C( 0, +1) - quad_volume_fraction(p - hy * n.y(), n, hx, hy), 2);
-            errors[i] += std::pow(C(-1, -1) - quad_volume_fraction(p + hx * n.x() + hy * n.y(), n, hx, hy), 2);
-            errors[i] += std::pow(C(+1, +1) - quad_volume_fraction(p - hx * n.x() - hy * n.y(), n, hx, hy), 2);
-            errors[i] += std::pow(C(-1, +1) - quad_volume_fraction(p + hx * n.x() - hy * n.y(), n, hx, hy), 2);
-            errors[i] += std::pow(C(+1, -1) - quad_volume_fraction(p - hx * n.x() + hy * n.y(), n, hx, hy), 2);
-        }
-
-        int err_min = std::ranges::min_element(errors) - errors.begin();
-        return ns[err_min];
-    }
-};
 
 void make_interface(EuMesh& mesh) {
     mesh.for_each([](EuCell& cell) {
@@ -212,12 +103,11 @@ void make_interface(EuMesh& mesh) {
         Vector3d grad = Vector3d::Zero();
         for (auto face: cell.faces()) {
             double a_f = 0.5 * (cell[a] + face.neib(a));
-            Vector3d S = face.area() * face.normal();
-            grad += a_f * S;
+            grad += a_f * face.area_n();
         }
         cell[n1] = -grad.normalized();
 
-        Stencil C(cell);
+        Stencil2D C(cell, a);
         cell[n2] = C.Youngs(hx, hy);
         cell[n3] = C.ELVIRA(hx, hy);
 
@@ -225,8 +115,7 @@ void make_interface(EuMesh& mesh) {
         grad = Vector3d::Zero();
         for (auto face: cell.faces()) {
             double a_f = face_fraction(cell[a], face.neib(a));
-            Vector3d S = face.area() * face.normal();
-            grad += a_f * S;
+            grad += a_f * face.area_n();
         }
         cell[n4] = -grad.normalized();
 
@@ -403,10 +292,7 @@ void show_plain(EuMesh& mesh) {
 
     make_interface(mesh);
 
-    auto under_plain = [](const Vector3d& v) -> bool {
-        return v.dot(some_n) < 0.0;
-    };
-    calc_errors(mesh, under_plain, 200);
+    calc_errors(mesh, plain_func, 200);
 
     save_mesh(mesh);
 }
@@ -475,8 +361,8 @@ int main() {
     utils::threads::on();
 
     Rectangle gen(-1.0, 1.0, -1.0, 1.0);
+    gen.set_nx(50);
     //gen.set_sizes(30, 50);
-    gen.set_size(50);
 
     EuMesh mesh(gen);
     mesh.set_max_level(1);
