@@ -40,6 +40,8 @@ configure_file(
     ${CMAKE_CURRENT_BINARY_DIR}/zephyr/configuration.h
 )
 
+set(Boost_DIR "D:\\main_project\\Boost\\lib\\cmake\\Boost-1.89.0")
+
 if (ZEPHYR_TBB)
     find_package(TBB REQUIRED)
 else ()

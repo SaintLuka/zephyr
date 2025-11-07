@@ -3,6 +3,7 @@
 
 #include <zephyr/geom/vector.h>
 #include <zephyr/math/cfd/flux/hllc.h>
+#include "hllc.h"
 
 using namespace zephyr::phys;
 
@@ -142,10 +143,68 @@ smf::WaveConfig3 HLLC::wave_config(
                              .QsR = Q_sR, .FsR = F_sR});
 }
 
+smf::WaveConfig3 HLLC::wave_config_u_R(
+        double u_L,
+        const phys::Eos &eosR, const smf::PState &zR) {
+    double S_C = u_L;
+
+    const double &rho_R = zR.density;
+    const double &u_R = zR.velocity.x();
+    const double &P_R = zR.pressure;
+
+    // Скорость звука справа
+    double c_R = eosR.sound_speed_rP(rho_R, P_R);
+
+    // Оценки скоростей расходящихся волн
+    double S_L = S_C;
+    double S_R = std::max(S_L, u_R) + c_R;
+
+    // Перенос массы через правую волну
+    double a_R = rho_R * (S_R - u_R);
+
+    // Плотность справа от контактного разрыва
+    double rho_sR = a_R / (S_R - S_C);
+
+    // Удельная полная энергия справа от контактного разрыва
+    double E_sR = zR.E() + (S_C - u_R) * (S_C + P_R / a_R);
+
+    // Консервативный вектор справа от контактного разрыва
+    smf::QState Q_sR(rho_sR, {rho_sR * S_C, rho_sR * zR.v(), rho_sR * zR.w()}, rho_sR * E_sR);
+    smf::QState Q_sL(true);
+
+    // Консервативный вектор справа
+    smf::QState Q_R(zR);
+
+    // Дифференциальный поток справа
+    smf::Flux F_R(zR);
+
+    smf::Flux F_sR = F_R.arr() - S_R * (Q_sR.arr() - Q_R.arr());
+    smf::Flux F_sL(true);
+
+    return smf::WaveConfig3({.S_L = S_L, .S_C = S_C, .S_R = S_R,
+                             .QsL = Q_sL, .FsL = F_sL,
+                             .QsR = Q_sR, .FsR = F_sR});
+}
+
+smf::WaveConfig3 HLLC::wave_config_u_L(
+        double u_R,
+        const phys::Eos &eosL, const smf::PState &zL) {
+    smf::PState zl_inversed(zL.density, {-zL.velocity.x(), -zL.velocity.y(), -zL.velocity.z()}, zL.pressure, zL.energy);
+
+    auto[S_L, S_C, S_R, Q_sL, F_sL, Q_sR, F_sR] = HLLC::wave_config_u_R(-u_R, eosL, zl_inversed);
+
+    smf::QState Q_sR_inverted(Q_sR.density, Q_sR.momentum, Q_sR.energy);
+    smf::Flux F_sR_inverted(-F_sR.density, F_sR.momentum, -F_sR.energy);
+
+
+    return smf::WaveConfig3({.S_L = -S_R, .S_C = -S_R, .S_R = -S_C,
+                            .QsL = Q_sR_inverted, .FsL = F_sR_inverted,
+                            .QsR = Q_sL, .FsR = F_sL});
+}
+
 smf::WaveConfig3 HLLC::wave_config(
         const Eos& eosL, const smf::QState& Q_L, const smf::Flux& F_L,
         const Eos& eosR, const smf::QState& Q_R, const smf::Flux& F_R) {
-
     Vector3d v_L = Q_L.momentum / Q_L.density;
     Vector3d v_R = Q_R.momentum / Q_R.density;
     double e_L = Q_L.energy / Q_L.density - 0.5 * v_L.squaredNorm();
@@ -195,7 +254,51 @@ smf::WaveConfig3 HLLC::wave_config(
 
     return smf::WaveConfig3({.S_L = S_L, .S_C = S_C, .S_R = S_R,
                              .QsL = Q_sL, .FsL = F_sL,
-                             .QsR = Q_sR, .FsR = F_sR});
+                             .QsR = Q_sR, .FsR = F_sR});  
+}
+
+smf::WaveConfig3 HLLC::wave_config_u_R(
+        double u_L,
+        const phys::Eos &eosR, const smf::QState &Q_R, const smf::Flux &F_R) {
+    double S_C = u_L;        
+
+    Vector3d v_R = Q_R.momentum / Q_R.density;
+    double e_R = Q_R.energy / Q_R.density - 0.5 * v_R.squaredNorm();
+
+    // Скорость звука справа
+    double c_R = eosR.sound_speed_re(Q_R.density, e_R);
+
+    // Оценки скоростей расходящихся волн
+    double S_L = S_C;
+    double S_R = max(S_L, v_R.x() + c_R, 0.0);
+
+    // Поток через правую волну
+    smf::Flux a_R = F_R.arr() - S_R * Q_R.arr();
+
+    // Плотность справа от контактного разрыва
+    double rho_sR = a_R.density / (S_C - S_R);
+
+    // Удельная полная энергия справа от контактного разрыва
+    double E_sR = std::pow(S_C, 2) + (a_R.energy - S_C * a_R.momentum.x()) / a_R.density;
+
+    // Консервативный вектор справа от контактного разрыва
+    smf::QState Q_sR(rho_sR, {rho_sR * S_C, rho_sR * v_R.y(), rho_sR * v_R.z()}, rho_sR * E_sR);
+    smf:: QState Q_sL(true);
+
+    smf::Flux F_sR = a_R.arr() + S_R * Q_sR.arr();
+    smf::Flux F_sL(true);
+
+#if 0
+    double err1 = ((F_R .arr() - F_sR.arr()) - S_R * (Q_R .arr() - Q_sR.arr())).cwiseAbs().maxCoeff();
+
+    if (err1 > 1.0e-6) {
+        throw std::runtime_error("Rankine-Hugoniot conditions failed");
+    }
+#endif
+
+    return smf::WaveConfig3({.S_L = S_L, .S_C = S_C, .S_R = S_R,
+                             .QsL = Q_sL, .FsL = F_sL,
+                             .QsR = Q_sR, .FsR = F_sR});         
 }
 
 mmf::WaveConfig3 HLLC::wave_config(

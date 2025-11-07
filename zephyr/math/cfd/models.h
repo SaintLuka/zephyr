@@ -83,6 +83,9 @@ struct QState {
     /// @brief Инициализация нулями
     QState();
 
+    /// @brief Инициализация NaN
+    QState(bool isNaN);
+
     /// @brief Инициализация с полным заданием параметров
     QState(const double &mass, const Vector3d &momentum, const double &energy);
 
@@ -122,6 +125,9 @@ struct Flux {
 
     /// @brief Нулевой поток
     Flux();
+
+    /// @brief NaN-поток
+    Flux(bool isNaN);
 
     /// @brief Инициализация с полным заданием параметров
     Flux(double density, const Vector3d &momentum, double energy);

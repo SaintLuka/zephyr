@@ -112,12 +112,12 @@ void FreeBoundary::fluxes(EuMesh &mesh) const {
 
             // Суммируем поток
             // flux.arr() += loc_flux.arr() * face.area(m_axial);
-            flux.arr() += loc_flux.arr();
+            flux.arr() += loc_flux.arr() * face.area();
         }
 
         // Обновляем значение в ячейке (консервативные переменные)
         // q_c.arr() -= (m_dt / cell.volume(m_axial)) * flux.arr();
-        q_c.arr() -= m_dt * flux.arr();
+        q_c.arr() -= (m_dt / cell.volume()) * flux.arr();
 
         // Новое значение примитивных переменных
         cell(part.next) = PState(q_c, *m_eos);

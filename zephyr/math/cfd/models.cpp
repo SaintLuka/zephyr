@@ -14,9 +14,7 @@ PState::PState()
       velocity({0.0, 0.0, 0.0}),
       pressure(0.0),
       energy(0.0)
-{
-
-}
+{}
 
 PState::PState(const double &density, const Vector3d &velocity,
                const double &pressure, const double &energy)
@@ -76,6 +74,18 @@ QState::QState()
 
 }
 
+QState::QState(bool isNaN) : QState{} {
+    if (isNaN) {
+        density = std::numeric_limits<double>::quiet_NaN();
+
+        momentum.x() = std::numeric_limits<double>::quiet_NaN();
+        momentum.y() = std::numeric_limits<double>::quiet_NaN();
+        momentum.z() = std::numeric_limits<double>::quiet_NaN();
+
+        energy = std::numeric_limits<double>::quiet_NaN();
+    }
+}
+
 QState::QState(const double &mass, const Vector3d &momentum, const double &energy)
     : density(mass),
       momentum(momentum),
@@ -119,6 +129,18 @@ Flux::Flux()
       momentum({0.0, 0.0, 0.0}),
       energy(0.0) {
 
+}
+
+Flux::Flux(bool isNaN) : Flux{} {
+    if (isNaN) {
+        density = std::numeric_limits<double>::quiet_NaN();
+
+        momentum.x() = std::numeric_limits<double>::quiet_NaN();
+        momentum.y() = std::numeric_limits<double>::quiet_NaN();
+        momentum.z() = std::numeric_limits<double>::quiet_NaN();
+
+        energy = std::numeric_limits<double>::quiet_NaN();
+    }
 }
 
 Flux::Flux(double mass, const Vector3d &momentum, double energy)
