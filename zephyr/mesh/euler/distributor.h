@@ -32,6 +32,10 @@ struct Distributor {
     /// данных в дочерние ячейки. Для функции merge используется перенос данных
     /// в родительскую ячейку из первой дочерней.
     static Distributor simple();
+
+    /// @brief Создает дистрибутор, который использует функцию func для
+    /// инициализации ячеек. Удобно для задания начальных данных
+    static Distributor initializer(std::function<void(EuCell&)> func);
 };
 
 } // namespace zephyr::mesh

@@ -1,6 +1,9 @@
+#include <random>
 #include <zephyr/utils/numpy.h>
 
 namespace zephyr::np {
+
+static std::mt19937_64 gen(-13);
 
 template <>
 Array<np::real> zeros<np::real>(size_t N) {
@@ -23,6 +26,16 @@ Array1d zeros_like(const Array1d& arr) {
 Array2d zeros_like(const Array2d& arr) {
     if (arr.empty()) { return {}; }
     return zeros(arr.size(), arr[0].size());
+}
+
+Array<real> random(size_t N, real min_val, real max_val) {
+    std::uniform_real_distribution next(min_val, max_val);
+
+    Array<real> arr(N);
+    for (size_t i = 0; i < N; i++) {
+        arr[i] = next(gen);
+    }
+    return arr;
 }
 
 Array<real> linspace(real t1, real t2, size_t N) {

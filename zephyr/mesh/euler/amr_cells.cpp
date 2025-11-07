@@ -83,6 +83,22 @@ int AmrCells::face_count(index_t ic) const {
     }
 }
 
+double AmrCells::hx(index_t ic) const {
+    z_assert(m_adaptive, "Not adaptive mesh, can't get 'hx' for cell");
+    return (mapping<2>(ic).vs<+1, 0>() - mapping<2>(ic).vs<-1, 0>()).norm();
+}
+
+double AmrCells::hy(index_t ic) const {
+    z_assert(m_adaptive, "Not adaptive mesh, can't get 'hy' for cell");
+    return (mapping<2>(ic).vs<0, +1>() - mapping<2>(ic).vs<0, -1>()).norm();
+}
+
+double AmrCells::hz(index_t ic) const {
+    z_assert(m_adaptive, "Not adaptive mesh, can't get 'hz' for cell");
+    z_assert(m_dim == 3, "Two dimensional mesh, can't get 'hz' for cell");
+    return (mapping<3>(ic).vs<0, 0, +1>() - mapping<3>(ic).vs<0, 0, -1>()).norm();
+}
+
 double AmrCells::incircle_diameter(index_t ic) const {
     if (m_adaptive) {
         if (m_dim == 2) {
@@ -104,6 +120,15 @@ double AmrCells::incircle_diameter(index_t ic) const {
         // с площадью volume.
         return 2.0 * std::sqrt(volume[ic] / (n * std::tan(M_PI / n)));
     }
+}
+
+Box AmrCells::bbox(index_t ic) const {
+    // TODO: Сделать оптимальный код для декартовых сеток, и не только здесь
+    Box box = Box::Empty(m_dim);
+    for (index_t iv: nodes_range(ic)) {
+        box.capture(verts[iv]);
+    }
+    return box;
 }
 
 Polygon AmrCells::polygon(index_t ic) const {
@@ -141,6 +166,30 @@ Polygon AmrCells::polygon(index_t ic) const {
     } else {
         return {vertices_data(ic), node_count(ic)};
     }
+}
+
+Polyhedron AmrCells::polyhedron(index_t ic) const {
+    if (m_dim < 3) {
+        throw std::runtime_error("AmrCell::polyhedron() error #1");
+    }
+
+    if (m_adaptive && m_linear) {
+        // Пока я умею делать только кубы
+        const auto& map = mapping<3>(ic);
+        std::vector<Vector3d> vs = {
+            map.vs<-1, -1, -1>(),
+            map.vs<+1, -1, -1>(),
+            map.vs<+1, +1, -1>(),
+            map.vs<-1, +1, -1>(),
+            map.vs<-1, -1, +1>(),
+            map.vs<+1, -1, +1>(),
+            map.vs<+1, +1, +1>(),
+            map.vs<-1, +1, +1>(),
+        };
+        return Polyhedron(CellType::HEXAHEDRON, vs);
+    }
+
+    throw std::runtime_error("AmrCell::polyhedron() error #2");
 }
 
 double AmrCells::approx_vol_fraction(index_t ic, const InFunction &inside) const {
@@ -279,7 +328,10 @@ double AmrCells::volume_fraction(index_t ic, const InFunction &inside, int n_poi
         }
     }
     else {
-        // Трехмерная ячейка
+        if (m_adaptive) {
+            return mapping<3>(ic).reduce().volume_fraction(inside, n_points);
+        }
+        // Трехмерный многогранник
         throw std::runtime_error("AmrCell::volume_fraction #1");
     }
 }
@@ -352,6 +404,9 @@ double AmrCells::integrate_low(index_t ic, const SpFunction& func, int n_points)
     }
     else {
         // Трехмерная ячейка
+        if (m_adaptive) {
+            return mapping<3>(ic).reduce().integrate_low(func, n_points);
+        }
         throw std::runtime_error("AmrCell::volume_fraction #1");
     }
 }
@@ -876,6 +931,8 @@ void AmrCells::push_back_impl(const Polyhedron& poly) {
         for (int j = 0; j < n_verts; ++j) {
             faces.vertices[iface][j] = poly.face_indices(i)[j];
         }
+
+        faces.adjacent.basic[iface] = ic;
     }
 }
 

@@ -99,11 +99,23 @@ public:
         m_list.emplace_back(name, 1, func);
     }
 
-    /// @brief Упрощенный вариант для добавления double полей
-    void append(const std::string& name, std::function<double(mesh::EuCell&)> f) {
-        m_list.emplace_back(name, 1, WriteCell<double>(
-                [f](mesh::EuCell& cell, double *out) {
+    /// @brief Упрощенный вариант для добавления скалярных полей
+    template <typename T = double>
+    std::enable_if_t<std::is_arithmetic_v<T>, void>
+    append(const std::string& name, std::function<T(mesh::EuCell&)> f) {
+        m_list.emplace_back(name, 1, WriteCell<T>(
+                [f](mesh::EuCell& cell, T *out) {
                     out[0] = f(cell);
+                }));
+    }
+
+    /// @brief Упрощенный вариант для добавления векторных полей
+    template <typename T>
+    std::enable_if_t<std::is_same_v<T, geom::Vector3d>, void>
+    append(const std::string& name, std::function<geom::Vector3d(mesh::EuCell&)> f) {
+        m_list.emplace_back(name, 3, WriteCell<double>(
+                [f](mesh::EuCell& cell, double *out) {
+                    *reinterpret_cast<geom::Vector3d*>(out) = f(cell);
                 }));
     }
 

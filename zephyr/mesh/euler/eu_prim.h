@@ -1,6 +1,7 @@
 #pragma once
 
 #include <zephyr/mesh/euler/amr_cells.h>
+#include <zephyr/utils/mpi.h>
 
 namespace zephyr::mesh {
 
@@ -68,17 +69,30 @@ public:
     /// @brief Координата z центра грани
     double z() const { return center().z(); }
 
+    /// @brief Сторона, по которой расположена грань
+    template <int dim = 3>
+    Side<dim> side() const;
+
     /// @brief Площадь/длина обычной грани
     double area() const;
+
+    /// @brief Площадь/длина на внешнюю нормаль
+    Vector3d area_n() const;
 
     /// @brief Площадь/длина обычной грани или грани осесимметричной ячейки
     double area(bool axial) const;
 
+    /// @brief Площадь грани осесимметричной ячейки
+    double area_as() const;
+
     /// @brief Число вершин грани
     int n_vertices() const;
 
-    /// @brief Индекс вершины
-    short vertex_index(int idx) const;
+    /// @brief Локальный индекс вершины (в ячейке)
+    index_t vertex_index(int idx) const;
+
+    /// @brief Глобальный индекс вершины
+    index_t node_index(int idx) const;
 
     /// @brief Получить вершину грани
     Vector3d vs(int idx) const;
@@ -102,6 +116,9 @@ public:
     /// @brief Индекс родительской ячейки в массиве locals
     index_t adj_basic() const;
 
+    /// @brief Проверяет, является сосед через грань локальным
+    bool local_neib() const;
+
     /// @brief Соседняя ячейка по внешней нормали, на границе сетки
     /// гарантированно возвращается сама ячейка
     EuCell neib() const;
@@ -109,6 +126,9 @@ public:
     /// @brief Получить ссылку на данные соседа
     template <typename T>
     const T& neib(Storable<T> type) const;
+
+    /// @brief Флаг адаптации соседней ячейки
+    int neib_flag() const;
 
     /// @brief Центр соседней ячейки
     Vector3d neib_center() const;
@@ -249,14 +269,32 @@ public:
     /// @brief Объем ячейки
     double volume(bool axial) const;
 
+    /// @brief Объем осесимметричной ячейки
+    double volume_as() const;
+
+    /// @brief Линейный размер ячейки по оси x (от левой до правой грани)
+    double hx() const;
+
+    /// @brief Линейный размер ячейки по оси y (от нижней до верхней грани)
+    double hy() const;
+
+    /// @brief Линейный размер ячейки по оси z (от задней до передней грани)
+    double hz() const;
+
     /// @brief Линейный размер ячейки
     double linear_size() const;
 
     /// @brief Диаметр вписанной окружности
     double incircle_diameter() const;
 
+    /// @brief Bounding box ячейки
+    geom::Box bbox() const;
+
     /// @brief Создать полигон из ячейки (для 3D ячеек -- UB)
     geom::Polygon polygon() const;
+
+    /// @brief Создать полигон из ячейки (для 2D ячеек -- UB)
+    geom::Polyhedron polyhedron() const;
 
     /// @}
 
@@ -307,6 +345,12 @@ public:
     /// @brief Получить грань трёхмерной ячейки
     EuFace face(Side3D s) const;
 
+    /// @brief Простая грань на выбранной стороне?
+    bool simple_face(Side2D s) const;
+
+    /// @brief Простая грань на выбранной стороне?
+    bool simple_face(Side3D s) const;
+
     /// @brief Сложная грань на выбранной стороне?
     bool complex_face(Side2D s) const;
 
@@ -329,6 +373,38 @@ public:
     /// @brief Вершины как набор узлов квадратичного отображения
     template <int dim>
     const SqMap<dim>& mapping() const { return m_cells->mapping<dim>(m_index); }
+
+    /// @}
+
+    /// @{ @name Соседние ячейки
+
+    /// @brief Помещает на место текущей ячейки соседнюю ячейку, которая
+    /// находится со стороны loc_face.
+    void replace(int loc_face);
+
+    /// @brief Получить соседнюю ячейку на двумерной сетке, заданы смещения
+    /// относительно ячейки по осям. Функция работает, если вокруг ячейки можно
+    /// построить структурированный шаблон, который также целиком расположен
+    /// на одном процессе. В остальных случаях неопределенное поведение.
+    /// @code
+    ///     for (auto cell: mesh) {
+    ///         auto neib_L = cell.neib(-1, 0);  // сосед слева
+    ///         auto neib_R = cell.neib(+1, 0);  // сосед справа
+    ///     }
+    /// @endcode
+    EuCell neib(index_t i, index_t j) const;
+
+    /// @brief Получить соседнюю ячейку на трёхмерной сетке, заданы смещения
+    /// относительно ячейки по осям. Функция работает, если вокруг ячейки можно
+    /// построить структурированный шаблон, который также целиком расположен
+    /// на одном процессе. В остальных случаях неопределенное поведение.
+    /// @code
+    ///     for (auto cell: mesh) {
+    ///         auto neib_L = cell.neib(-1, 0, 0);  // сосед слева
+    ///         auto neib_R = cell.neib(+1, 0, 0);  // сосед справа
+    ///     }
+    /// @endcode
+    EuCell neib(index_t i, index_t j, index_t k) const;
 
     /// @}
 
@@ -519,18 +595,30 @@ inline const geom::Vector3d &EuFace::normal() const { return m_cells->faces.norm
 
 inline const geom::Vector3d &EuFace::center() const { return m_cells->faces.center[m_face_idx]; }
 
+template <int dim >
+Side<dim> EuFace::side() const {
+    index_t cell_idx = m_cells->faces.adjacent.basic[m_face_idx];
+    return m_face_idx - m_cells->face_begin[cell_idx];
+}
+
 inline double EuFace::area() const { return m_cells->faces.area[m_face_idx]; }
+
+inline geom::Vector3d EuFace::area_n() const { return m_cells->faces.area[m_face_idx] * m_cells->faces.normal[m_face_idx]; }
 
 inline double EuFace::area(bool axial) const { return m_cells->faces.get_area(m_face_idx, axial); }
 
+inline double EuFace::area_as() const { return m_cells->faces.area_alt[m_face_idx]; }
+
 inline int EuFace::n_vertices() const { return m_cells->faces.n_vertices(m_face_idx); }
 
-inline short EuFace::vertex_index(int idx) const { return m_cells->faces.vertices[m_face_idx][idx]; }
+inline index_t EuFace::vertex_index(int idx) const { return m_cells->faces.vertices[m_face_idx][idx]; }
 
-inline geom::Vector3d EuFace::vs(int idx) const {
+inline index_t EuFace::node_index(int idx) const {
     index_t cell_idx = m_cells->faces.adjacent.basic[m_face_idx];
-    return m_cells->verts[m_cells->node_begin[cell_idx] + m_cells->faces.vertices[m_face_idx][idx]];
+    return m_cells->node_begin[cell_idx] + static_cast<int>(m_cells->faces.vertices[m_face_idx][idx]);
 }
+
+inline geom::Vector3d EuFace::vs(int idx) const { return m_cells->verts[node_index(idx)]; }
 
 inline geom::Vector3d EuFace::symm_point(const Vector3d &p) const {
     return m_cells->faces.symm_point(m_face_idx, p);
@@ -544,8 +632,12 @@ inline index_t EuFace::adj_alien() const { return m_cells->faces.adjacent.alien[
 
 inline index_t EuFace::adj_basic() const { return m_cells->faces.adjacent.basic[m_face_idx]; }
 
+inline bool EuFace::local_neib() const {
+    return m_cells->faces.adjacent.is_local(m_face_idx);
+}
+
 inline EuCell EuFace::neib() const {
-    if (m_cells->faces.adjacent.is_local(m_face_idx)) {
+    if (utils::mpi::single() || local_neib()) {
         return {m_cells, adj_index(), m_aliens};
     }
     return {m_aliens, adj_alien(), m_aliens};
@@ -553,24 +645,39 @@ inline EuCell EuFace::neib() const {
 
 template <typename T>
 const T& EuFace::neib(Storable<T> type) const {
-    if (m_cells->faces.adjacent.is_local(m_face_idx)) {
+    if (utils::mpi::single() || local_neib()) {
         return m_cells->data.get_val(type, adj_index());
     }
     return m_aliens->data.get_val(type, adj_alien());
 }
 
+inline int EuFace::neib_flag() const {
+    if (utils::mpi::single() || local_neib()) {
+        return m_cells->flag[adj_index()];
+    }
+    return m_aliens->flag[adj_alien()];
+}
+
 inline geom::Vector3d EuFace::neib_center() const {
-    return m_cells->faces.adjacent.get_value(m_face_idx, m_cells->center, m_aliens->center);
+    if (utils::mpi::single() || local_neib()) {
+        return m_cells->center[adj_index()];
+    }
+    return m_aliens->center[adj_alien()];
 }
 
 inline double EuFace::neib_volume() const {
-    return m_cells->faces.adjacent.get_value(m_face_idx, m_cells->volume, m_aliens->volume);
+    if (utils::mpi::single() || local_neib()) {
+        return m_cells->volume[adj_index()];
+    }
+    return m_aliens->volume[adj_alien()];
 }
 
 inline double EuFace::neib_volume(bool axial) const {
     if (axial) {
-        return m_cells->faces.adjacent.get_value(
-            m_face_idx, m_cells->volume_alt, m_aliens->volume_alt);
+        if (utils::mpi::single() || local_neib()) {
+            return m_cells->volume_alt[adj_index()];
+        }
+        return m_aliens->volume_alt[adj_alien()];
     }
     return neib_volume();
 }
@@ -606,6 +713,14 @@ inline const geom::Vector3d& EuCell::center() const { return m_cells->center[m_i
 inline double EuCell::volume() const { return m_cells->volume[m_index]; }
 
 inline double EuCell::volume(bool axial) const { return m_cells->get_volume(m_index, axial); }
+
+inline double EuCell::volume_as() const { return m_cells->volume_alt[m_index]; }
+
+inline double EuCell::hx() const { return m_cells->hx(m_index); }
+
+inline double EuCell::hy() const { return m_cells->hy(m_index); }
+
+inline double EuCell::hz() const { return m_cells->hz(m_index); }
 
 inline double EuCell::linear_size() const { return m_cells->linear_size(m_index); }
 
@@ -648,6 +763,10 @@ inline EuFace EuCell::face(Side2D s) const {
 inline EuFace EuCell::face(Side3D s) const {
     return {m_cells, m_cells->face_begin[m_index] + s, m_aliens};
 }
+
+inline bool EuCell::simple_face(Side2D s) const { return m_cells->simple_face(m_index, s); }
+
+inline bool EuCell::simple_face(Side3D s) const { return m_cells->simple_face(m_index, s); }
 
 inline bool EuCell::complex_face(Side2D s) const { return m_cells->complex_face(m_index, s); }
 

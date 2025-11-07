@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <iostream>
 #include <functional>
 
 #include <zephyr/geom/box.h>
@@ -126,6 +127,18 @@ public:
     double volume_fraction(const std::function<bool(const Vector3d&)>& inside,
                            int n_points = 10000) const;
 
+    /// @brief Сдвинуть вершины на указанный вектор
+    void move(const Vector3d& shift);
+
+    /// @brief Проверяет многоугольник, выдает код неисправности.
+    /// Если 0, то всё в порядке.
+    int checkout() const;
+
+    /// @brief Вывести в поток
+    void print(std::ostream& os) const;
+
+    /// @brief Вывести в стандартный поток
+    void print() const { print(std::cout); }
 
     // ========================================================================
     //                          Несколько пресетов
@@ -185,8 +198,11 @@ protected:
     std::vector<Vector3d> faces_s;        ///< Нормаль с площадью
 };
 
-/// @brief Вывод многогранника в консоль
-static std::ostream& operator<<(std::ostream& os, const Polyhedron& poly);
+/// @brief Вывод многогранника
+static std::ostream& operator<<(std::ostream& os, const Polyhedron& poly) {
+    poly.print(os);
+    return os;
+}
 
 /// @}
 

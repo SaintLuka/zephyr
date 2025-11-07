@@ -139,8 +139,8 @@ struct Node {
 
 // type Q is Quad or SqQuad
 // N -- число ячеек, точность определения объемной доли ~ 1/N
-template<typename Q>
-double volume_fraction(const Q& quad, const std::function<bool(const Vector3d&)>& inside, int N) {
+template <typename Map2D>
+double volume_fraction(const Map2D& quad, const std::function<bool(const Vector3d&)>& inside, int N) {
     int n = std::round(std::sqrt(N));
     double h = 1.0 / n;
     double res = 0.0;
@@ -153,27 +153,32 @@ double volume_fraction(const Q& quad, const std::function<bool(const Vector3d&)>
             }
         }
     }
-    return res * sqr(2.0 * h) / quad.area();
+    res *= 4.0 * h * h / quad.area();
+    // Округлить до единицы
+    if (std::abs(1.0 - res) < 0.5 / N) {
+        return 1.0;
+    }
+    return res;
 }
 
 // type Q is Quad or SqQuad
-template<typename Q>
-double integrate_low(const Q &map2D, const std::function<double(const Vector3d &)> &func, int n) {
+template <typename Map2D>
+double integrate_low(const Map2D& quad, const std::function<double(const Vector3d &)> &func, int n) {
     double h = 1.0 / n;
     double res = 0.0;
     for (int i = 0; i < n; ++i) {
         double x = (2 * i + 1) * h - 1.0;
         for (int j = 0; j < n; ++j) {
             double y = (2 * j + 1) * h - 1.0;
-            res += func(map2D.get(x, y)) * map2D.Jacobian(x, y);
+            res += func(quad.get(x, y)) * quad.Jacobian(x, y);
         }
     }
     return res * sqr(2.0 * h);
 }
 
 // type Q is Quad or SqQuad
-template<typename Q>
-double integrate_mid(const Q &map2D, const std::function<double(const Vector3d &)> &func, int n) {
+template <typename Map2D>
+double integrate_mid(const Map2D& quad, const std::function<double(const Vector3d &)> &func, int n) {
     static const double cm = 1.0 - 1.0 / std::sqrt(3.0);
     static const double cp = 1.0 + 1.0 / std::sqrt(3.0);
 
@@ -187,18 +192,18 @@ double integrate_mid(const Q &map2D, const std::function<double(const Vector3d &
             double y1 = (2 * j + cm) * h - 1.0;
             double y2 = (2 * j + cp) * h - 1.0;
 
-            res += func(map2D.get(x1, y1)) * map2D.Jacobian(x1, y1) +
-                   func(map2D.get(x1, y2)) * map2D.Jacobian(x1, y2) +
-                   func(map2D.get(x2, y1)) * map2D.Jacobian(x2, y1) +
-                   func(map2D.get(x2, y2)) * map2D.Jacobian(x2, y2);
+            res += func(quad.get(x1, y1)) * quad.Jacobian(x1, y1) +
+                   func(quad.get(x1, y2)) * quad.Jacobian(x1, y2) +
+                   func(quad.get(x2, y1)) * quad.Jacobian(x2, y1) +
+                   func(quad.get(x2, y2)) * quad.Jacobian(x2, y2);
         }
     }
     return res * sqr(h);
 }
 
 // type Q is Quad or SqQuad
-template<typename Q>
-double integrate_high(const Q &map2D, const std::function<double(const Vector3d &)> &func, int n) {
+template <typename Map2D>
+double integrate_high(const Map2D& quad, const std::function<double(const Vector3d &)> &func, int n) {
     static const double a = std::sqrt((114.0 - 3.0 * std::sqrt(583.0)) / 287.0);
     static const double b = std::sqrt((114.0 + 3.0 * std::sqrt(583.0)) / 287.0);
     static const double c = std::sqrt(6.0 / 7.0);
@@ -231,26 +236,26 @@ double integrate_high(const Q &map2D, const std::function<double(const Vector3d 
             double y_mc = y_c - ch;
             double y_pc = y_c + ch;
 
-            res += wa * (func(map2D.get(x_ma, y_ma)) * map2D.Jacobian(x_ma, y_ma) +
-                         func(map2D.get(x_ma, y_pa)) * map2D.Jacobian(x_ma, y_pa) +
-                         func(map2D.get(x_pa, y_ma)) * map2D.Jacobian(x_pa, y_ma) +
-                         func(map2D.get(x_pa, y_pa)) * map2D.Jacobian(x_pa, y_pa)) +
-                   wb * (func(map2D.get(x_mb, y_mb)) * map2D.Jacobian(x_mb, y_mb) +
-                         func(map2D.get(x_mb, y_pb)) * map2D.Jacobian(x_mb, y_pb) +
-                         func(map2D.get(x_pb, y_mb)) * map2D.Jacobian(x_pb, y_mb) +
-                         func(map2D.get(x_pb, y_pb)) * map2D.Jacobian(x_pb, y_pb)) +
-                   wc * (func(map2D.get(x_mc, y_c)) * map2D.Jacobian(x_mc, y_c) +
-                         func(map2D.get(x_pc, y_c)) * map2D.Jacobian(x_pc, y_c) +
-                         func(map2D.get(x_c, y_mc)) * map2D.Jacobian(x_c, y_mc) +
-                         func(map2D.get(x_c, y_pc)) * map2D.Jacobian(x_c, y_pc));
+            res += wa * (func(quad.get(x_ma, y_ma)) * quad.Jacobian(x_ma, y_ma) +
+                         func(quad.get(x_ma, y_pa)) * quad.Jacobian(x_ma, y_pa) +
+                         func(quad.get(x_pa, y_ma)) * quad.Jacobian(x_pa, y_ma) +
+                         func(quad.get(x_pa, y_pa)) * quad.Jacobian(x_pa, y_pa)) +
+                   wb * (func(quad.get(x_mb, y_mb)) * quad.Jacobian(x_mb, y_mb) +
+                         func(quad.get(x_mb, y_pb)) * quad.Jacobian(x_mb, y_pb) +
+                         func(quad.get(x_pb, y_mb)) * quad.Jacobian(x_pb, y_mb) +
+                         func(quad.get(x_pb, y_pb)) * quad.Jacobian(x_pb, y_pb)) +
+                   wc * (func(quad.get(x_mc, y_c)) * quad.Jacobian(x_mc, y_c) +
+                         func(quad.get(x_pc, y_c)) * quad.Jacobian(x_pc, y_c) +
+                         func(quad.get(x_c, y_mc)) * quad.Jacobian(x_c, y_mc) +
+                         func(quad.get(x_c, y_pc)) * quad.Jacobian(x_c, y_pc));
         }
     }
     return res * sqr(h);
 }
 
 // type Q is Quad or SqQuad
-template<typename Q>
-double integrate_extra(const Q &map2D, const std::function<double(const Vector3d &)> &func, int n) {
+template<typename Map2D>
+double integrate_extra(const Map2D& quad, const std::function<double(const Vector3d &)> &func, int n) {
     static const std::array<Node, 37> weights = {
             Node{-9.1324172678365734e-01, -9.3149501298985338e-01, 9.7554807790077372e-03},
             {-9.7865852404709552e-01, -6.1165306951584819e-01, 1.0171445385633233e-02},
@@ -305,14 +310,14 @@ double integrate_extra(const Q &map2D, const std::function<double(const Vector3d
             for (const Node &node: weights) {
                 double x = 0.5 * ((1.0 - node.i) * x1 + (1.0 + node.i) * x2);
                 double y = 0.5 * ((1.0 - node.j) * y1 + (1.0 + node.j) * y2);
-                res += node.w * func(map2D.get(x, y)) * map2D.Jacobian(x, y);
+                res += node.w * func(quad.get(x, y)) * quad.Jacobian(x, y);
             }
         }
     }
     return res * sqr(h);
 }
 
-}
+} // integral2D
 
 double Quad::volume_fraction(const std::function<bool(const Vector3d&)>& inside, int N) const {
     return integral2D::volume_fraction(*this, inside, N);

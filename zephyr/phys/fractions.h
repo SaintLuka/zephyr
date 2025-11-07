@@ -13,10 +13,10 @@ struct ScalarSet;
 struct Fractions {
     /// @brief Меньшие объемные/массовые доли не различимы,
     /// при вычитании из единицы остается единица. Около 5.5e-17
-    constexpr static const double minimal = std::numeric_limits<double>::epsilon() / 4;
+    static constexpr double minimal = std::numeric_limits<double>::epsilon() / 4;
 
     /// @brief Максимальное число компонент
-    static const int max_size = 3;
+    static constexpr int max_size = 3;
 
     /// @brief Массив данных
     std::array<double, max_size> m_data{};
@@ -79,7 +79,7 @@ struct Fractions {
     /// тогда beta.nonzero() равно 3!
     int nonzero() const;
 
-    /// @brief Пара индексов материалов для смешаной ячейки
+    /// @brief Пара индексов материалов для смешанной ячейки
     /// Если ячейка содержит меньше двух материалов, тогда возвращает {-1, -1}.
     /// Если больше двух, тогда возвращает первые два.
     std::array<int, 2> pair() const;
@@ -138,7 +138,7 @@ struct ScalarSet {
     static ScalarSet Pure(int idx, double value);
 
     /// @brief Оператор доступа по индексу
-    inline double &operator[](int idx) {
+    double &operator[](int idx) {
         return m_data[idx];
     }
 
@@ -157,7 +157,7 @@ struct ScalarSet {
 
 std::ostream &operator<<(std::ostream &os, const ScalarSet &frac);
 
-using zephyr::geom::Vector3d;
+using geom::Vector3d;
 
 /// @brief Набор векторов по числу компонент
 struct VectorSet {
@@ -176,12 +176,12 @@ struct VectorSet {
     explicit VectorSet(const std::vector<Vector3d> &vec);
 
     /// @brief Оператор доступа по индексу
-    inline Vector3d &operator[](int idx) {
+    Vector3d &operator[](int idx) {
         return m_data[idx];
     }
 
     /// @brief Оператор доступа по индексу
-    inline const Vector3d &operator[](int idx) const {
+    const Vector3d &operator[](int idx) const {
         return m_data[idx];
     }
 };

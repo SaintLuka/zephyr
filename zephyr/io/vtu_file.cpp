@@ -355,7 +355,7 @@ void write_mesh_primitives(
 
                 some_face[0] = face.n_vertices();
                 for (int j = 0; j < some_face[0]; ++j) {
-                    some_face[j + 1] = face.vertex_index(j);
+                    some_face[j + 1] = face.node_index(j);
                 }
                 file.write((byte_ptr) some_face.data(), (some_face[0] + 1) * sizeof(index_t));
             }

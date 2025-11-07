@@ -379,7 +379,7 @@ Grid Cuboid::make() {
         g_cell.faces[Side3D::R].boundary = i < m_nx - 1 ? ordinary : m_bounds.right;
         g_cell.faces[Side3D::B].boundary = j > 0 ? ordinary : m_bounds.bottom;
         g_cell.faces[Side3D::T].boundary = j < m_ny - 1 ? ordinary : m_bounds.top;
-        g_cell.faces[Side3D::X].boundary = k > 0 ? ordinary : m_bounds.back;
+        g_cell.faces[Side3D::Z].boundary = k > 0 ? ordinary : m_bounds.back;
         g_cell.faces[Side3D::F].boundary = k < m_nz - 1 ? ordinary : m_bounds.front;
 
         cells[n].geom() = g_cell;
@@ -489,7 +489,7 @@ void Cuboid::initialize(mesh::AmrCells& cells)  {
         cells.faces.boundary[iface + Side3D::R] = i < m_nx - 1 ? Boundary::ORDINARY : m_bounds.right;
         cells.faces.boundary[iface + Side3D::B] = j > 0 ? Boundary::ORDINARY : m_bounds.bottom;
         cells.faces.boundary[iface + Side3D::T] = j < m_ny - 1 ? Boundary::ORDINARY : m_bounds.top;
-        cells.faces.boundary[iface + Side3D::X] = k > 0 ? Boundary::ORDINARY : m_bounds.back;
+        cells.faces.boundary[iface + Side3D::Z] = k > 0 ? Boundary::ORDINARY : m_bounds.back;
         cells.faces.boundary[iface + Side3D::F] = k < m_nz - 1 ? Boundary::ORDINARY : m_bounds.front;
 
         for (auto side: Side3D::items()) {
@@ -504,28 +504,28 @@ void Cuboid::initialize(mesh::AmrCells& cells)  {
         cells.faces.normal[iface + Side3D::R] =  Vector3d::UnitX();
         cells.faces.normal[iface + Side3D::B] = -Vector3d::UnitY();
         cells.faces.normal[iface + Side3D::T] =  Vector3d::UnitY();
-        cells.faces.normal[iface + Side3D::X] = -Vector3d::UnitZ();
+        cells.faces.normal[iface + Side3D::Z] = -Vector3d::UnitZ();
         cells.faces.normal[iface + Side3D::F] =  Vector3d::UnitZ();
 
         cells.faces.center[iface + Side3D::L] = cube.vs<-1, 0, 0>();
         cells.faces.center[iface + Side3D::R] = cube.vs<+1, 0, 0>();
         cells.faces.center[iface + Side3D::B] = cube.vs< 0,-1, 0>();
         cells.faces.center[iface + Side3D::T] = cube.vs< 0,+1, 0>();
-        cells.faces.center[iface + Side3D::X] = cube.vs< 0, 0,-1>();
+        cells.faces.center[iface + Side3D::Z] = cube.vs< 0, 0,-1>();
         cells.faces.center[iface + Side3D::F] = cube.vs< 0, 0,+1>();
 
         cells.faces.area[iface + Side3D::L] = hy * hz;
         cells.faces.area[iface + Side3D::R] = hy * hz;
         cells.faces.area[iface + Side3D::B] = hx * hz;
         cells.faces.area[iface + Side3D::T] = hx * hz;
-        cells.faces.area[iface + Side3D::X] = hy * hz;
+        cells.faces.area[iface + Side3D::Z] = hy * hz;
         cells.faces.area[iface + Side3D::F] = hy * hz;
 
         cells.faces.vertices[iface + Side3D::L] = Side3D::L.sf();
         cells.faces.vertices[iface + Side3D::R] = Side3D::R.sf();
         cells.faces.vertices[iface + Side3D::B] = Side3D::B.sf();
         cells.faces.vertices[iface + Side3D::T] = Side3D::T.sf();
-        cells.faces.vertices[iface + Side3D::X] = Side3D::X.sf();
+        cells.faces.vertices[iface + Side3D::Z] = Side3D::Z.sf();
         cells.faces.vertices[iface + Side3D::F] = Side3D::F.sf();
 
         for (index_t jn = 0; jn < n_nodes; ++jn) {

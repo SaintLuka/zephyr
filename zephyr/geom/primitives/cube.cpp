@@ -128,6 +128,102 @@ Vector3d Cube::centroid(double volume) const {
     return C;
 }
 
+// Реализация интегралов по Quad и SqQuad
+namespace integral3D {
+
+// type Map3D is Cube or SqCube
+// N -- число ячеек, точность определения объемной доли ~ 1/N
+template <typename Map3D>
+double volume_fraction(const Map3D& cube, const std::function<bool(const Vector3d&)>& inside, int N) {
+    int n = std::max(int(std::round(std::cbrt(N))), 1);
+    double h = 1.0 / n;
+    double res = 0.0;
+    for (int i = 0; i < n; ++i) {
+        double x = (2 * i + 1) * h - 1.0;
+        for (int j = 0; j < n; ++j) {
+            double y = (2 * j + 1) * h - 1.0;
+            for (int k = 0; k < n; ++k) {
+                double z = (2 * k + 1) * h - 1.0;
+                if (inside(cube.get(x, y, z))) {
+                    res += cube.Jacobian(x, y, z);
+                }
+            }
+        }
+    }
+    res *= std::pow(2.0 * h, 3) / cube.volume();
+    // Округлить до единицы
+    if (std::abs(1.0 - res) < 0.1 / N) {
+        return 1.0;
+    }
+    return res;
+}
+
+// type Map3D is Cube or SqCube
+template <typename Map3D>
+double integrate_low(const Map3D& cube, const std::function<double(const Vector3d &)> &func, int n) {
+    double h = 1.0 / n;
+    double res = 0.0;
+    for (int i = 0; i < n; ++i) {
+        double x = (2 * i + 1) * h - 1.0;
+        for (int j = 0; j < n; ++j) {
+            double y = (2 * j + 1) * h - 1.0;
+            for (int k = 0; k < n; ++k) {
+                double z = (2 * k + 1) * h - 1.0;
+                res += func(cube.get(x, y, z)) * cube.Jacobian(x, y, z);
+            }
+        }
+    }
+    return res * std::pow(2.0 * h, 3);
+}
+
+// type Map3D is Cube or SqCube
+template <typename Map3D>
+double integrate_mid(const Map3D& cube, const std::function<double(const Vector3d &)> &func, int n) {
+    static const double cm = 1.0 - 1.0 / std::sqrt(3.0);
+    static const double cp = 1.0 + 1.0 / std::sqrt(3.0);
+
+    double h = 1.0 / n;
+    double res = 0.0;
+    for (int i = 0; i < n; ++i) {
+        double x1 = (2 * i + cm) * h - 1.0;
+        double x2 = (2 * i + cp) * h - 1.0;
+
+        for (int j = 0; j < n; ++j) {
+            double y1 = (2 * j + cm) * h - 1.0;
+            double y2 = (2 * j + cp) * h - 1.0;
+            
+            for (int k = 0; k < n; ++k) {
+                double z1 = (2 * k + cm) * h - 1.0;
+                double z2 = (2 * k + cp) * h - 1.0;
+
+                res += func(cube.get(x1, y1, z1)) * cube.Jacobian(x1, y1, z1) +
+                       func(cube.get(x1, y2, z1)) * cube.Jacobian(x1, y2, z1) +
+                       func(cube.get(x2, y1, z1)) * cube.Jacobian(x2, y1, z1) +
+                       func(cube.get(x2, y2, z1)) * cube.Jacobian(x2, y2, z1) +
+                       func(cube.get(x1, y1, z2)) * cube.Jacobian(x1, y1, z2) +
+                       func(cube.get(x1, y2, z2)) * cube.Jacobian(x1, y2, z2) +
+                       func(cube.get(x2, y1, z2)) * cube.Jacobian(x2, y1, z2) +
+                       func(cube.get(x2, y2, z2)) * cube.Jacobian(x2, y2, z2);
+            }
+        }
+    }
+    return res * std::pow(h, 3);
+}
+
+} // integral3D
+
+double Cube::volume_fraction(const std::function<bool(const Vector3d&)>& inside, int n_points) const {
+    return integral3D::volume_fraction(*this, inside, n_points);
+}
+
+double Cube::integrate_low(const std::function<double(const Vector3d&)>& func, int n) const {
+    return integral3D::integrate_low(*this, func, n);
+}
+
+double Cube::integrate_mid(const std::function<double(const Vector3d&)>& func, int n) const {
+    return integral3D::integrate_mid(*this, func, n);
+}
+
 // ============================================================================
 //                                  SQ-CUBE
 // ============================================================================

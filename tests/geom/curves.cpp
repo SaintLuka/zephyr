@@ -6,13 +6,11 @@
 #include <zephyr/geom/curves/lagrange.h>
 #include <zephyr/utils/numpy.h>
 
-#include <zephyr/utils/matplotlib.h>
+#include <zephyr/utils/pyplot.h>
 
+using namespace zephyr;
 using namespace zephyr::geom;
 using namespace zephyr::geom::curves;
-namespace np = zephyr::np;
-
-namespace plt = zephyr::utils::matplotlib;
 
 
 // Уравнение спирали в полярных координатах r(phi)
@@ -36,7 +34,7 @@ Vector3d epitr(double t) {
 // t1, t2 -- область изменения параметра
 // M -- число узлов интерполяции
 // bezier -- построить кривую Безье
-// chebyshev -- узлы Чебвшова для полинома Лагранжа
+// chebyshev -- узлы Чебышёва для полинома Лагранжа
 // periodic -- замкнутая периодическая кривая?
 template <typename F>
 void test(F&& f, double t1, double t2, int M, bool bezier, bool chebyshev, bool periodic) {
@@ -55,42 +53,34 @@ void test(F&& f, double t1, double t2, int M, bool bezier, bool chebyshev, bool 
         vs_m[i] = f(phi_m[i]);
     }
 
-    plt::figure_size(12, 8);
+    utils::pyplot plt;
 
-    plt::grid(true);
-    plt::set_aspect_equal();
+    plt.figure({.figsize={12.0, 8.0}});
 
-    plt::plot(np::get_x(vs_n), np::get_y(vs_n), {{"color",     "black"},
-                                         {"linestyle", "dashed"},
-                                         {"label",     "Original"}});
+    plt.grid(true);
+    plt.set_aspect_equal();
+
+    plt.plot(np::get_x(vs_n), np::get_y(vs_n), {.linestyle="dashed", .color="black", .label="Original"});
 
     PLagrange lg(vs_m, SplineBound::Crop, SplineBound::Crop,
                  chebyshev ? Parametrization::Chebyshev : Parametrization::Uniform);
-    plt::plot(lg.xs(N), lg.ys(N), {{"color", "blue"},
-                                   {"label", "Lagrange"}});
+    plt.plot(lg.xs(N), lg.ys(N), {.color="blue", .label="Lagrange"});
 
     PCubicSpline cs(vs_m, SplineBound::Crop,
                     periodic ? SplineBound::Periodic : SplineBound::Crop,
                     Parametrization::Uniform);
-    plt::plot(cs.xs(N), cs.ys(N), {{"color", "green"},
-                                   {"label", "Cubic Spline"}});
+    plt.plot(cs.xs(N), cs.ys(N), {.color="green", .label="Cubic Spline"});
 
     if (bezier) {
         Bezier bz(vs_m);
-        plt::plot(bz.xs(), bz.ys(), {{"color",     "black"},
-                                     {"linestyle", "dotted"},
-                                     {"label",     "Bezier basis"}});
-
-        plt::plot(bz.xs(N, 0.0, 1.05), bz.ys(N, 0.0, 1.05),
-                  {{"color", "orange"},
-                   {"label", "Bezier curve"}});
+        plt.plot(bz.xs(), bz.ys(), {.linestyle="dotted", .color="black", .label="Bezier basis"});
+        plt.plot(bz.xs(N, 0.0, 1.05), bz.ys(N, 0.0, 1.05), {.color="orange", .label="Bezier curve"});
     }
 
-    plt::plot(np::get_x(vs_m), np::get_y(vs_m), "k.");
-
-    plt::legend();
-    plt::tight_layout();
-    plt::show();
+    plt.plot(np::get_x(vs_m), np::get_y(vs_m), "k.");
+    plt.legend();
+    plt.tight_layout();
+    plt.show();
 }
 
 int main() {

@@ -1,5 +1,5 @@
-/// @file Некоторые математические функции
-/// Параметрические функции часто в виде функторов
+/// @brief Некоторые математические функции
+#pragma once
 
 #include <cmath>
 #include <tuple>
@@ -29,15 +29,23 @@ inline double heav(double x) {
 }
 
 /// @brief Возвращает упорядоченную пару (минимум/максимум)
-inline std::tuple<double, double> minmax(double a1, double a2) {
-    if (a1 < a2) return {a1, a2};
-    else         return {a2, a1};
+inline std::tuple<double, double> sorted(double a, double b) {
+    if (a < b) return {a, b};
+    else       return {b, a};
+}
+
+/// @brief Возвращает упорядоченную тройку
+inline std::tuple<double, double, double> sorted(double a, double b, double c) {
+    if (a > b) std::swap(a, b);
+    if (b > c) std::swap(b, c);
+    if (a > b) std::swap(a, b);
+    return {a, b, c};
 }
 
 /// @brief Ограничить значение x сверху и снизу.
 /// Возвращает число между min(x1, x2) и max(x1, x2).
 inline double between(double x, double x1, double x2) {
-    auto[x_min, x_max] = minmax(x1, x2);
+    auto[x_min, x_max] = sorted(x1, x2);
     return std::max(x_min, std::min(x, x_max));
 }
 

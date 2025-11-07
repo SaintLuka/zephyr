@@ -3,10 +3,10 @@
 #include <zephyr/configuration.h>
 
 #include <zephyr/utils/threads.h>
+#include <zephyr/utils/mpi.h>
 
 #include <zephyr/mesh/euler/eu_prim.h>
 #include <zephyr/mesh/euler/distributor.h>
-#include <zephyr/utils/mpi.h>
 #include <zephyr/mesh/euler/tourism.h>
 #include <zephyr/mesh/euler/migration.h>
 #include <zephyr/mesh/decomp/ORB.h>
@@ -155,6 +155,12 @@ public:
         return threads::max<n_tasks_per_thread>(begin(), end(), std::forward<Func>(func));
     }
 
+    /// @brief Параллельно по тредам посчитать сумму
+    template<int n_tasks_per_thread = utils::default_n_tasks_per_thread, class Func, typename Value>
+    auto sum(Func &&func, const Value& init) {
+        return threads::sum<n_tasks_per_thread>(begin(), end(), init, std::forward<Func>(func));
+    }
+
     /// @}
 
     /// @{ @name Адаптация сетки
@@ -176,6 +182,12 @@ public:
 
     /// @brief Установить распределитель данных при адаптации
     void set_distributor(Distributor distr);
+
+    /// @brief Найти ячейки на адаптацию (с флагом 1), поставить флаг
+    /// на адаптацию также у их соседей через грань.
+    /// @param count Сколько раз проделать операцию? За одну операцию флаг
+    /// распространяется к соседям через грань.
+    void make_shuba(int count);
 
     /// @brief Выполнить адаптацию сетки
     void refine();
