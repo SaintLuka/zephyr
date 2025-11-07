@@ -1,6 +1,7 @@
 /// @brief Некоторые математические функции
 #pragma once
 
+#define _USE_MATH_DEFINES
 #include <cmath>
 #include <tuple>
 #include <vector>
