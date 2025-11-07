@@ -24,6 +24,9 @@ public:
     struct Parts {
         Storable<PState> init;  ///< Состояние на основном слое
         Storable<PState> next;  ///< Состояние на следующем шаге
+
+        Storable<double> alpha;   ///< Объемная доля тела/вакуума текущая
+        Storable<double> a_next;  ///< Объемная доля тела/вакуума следующая
     };
 
     Parts part;
@@ -61,6 +64,12 @@ public:
 
     /// @brief Обновление ячеек
     void swap(EuMesh &mesh) const;
+
+    /// @brief Положение границы от времени
+    double bound_pos(double t) const;
+
+    /// @brief Скорость границы от времени
+    double bound_vel(double t) const;
 
 protected:
     Eos::Ptr m_eos;          ///< Уравнение состояния

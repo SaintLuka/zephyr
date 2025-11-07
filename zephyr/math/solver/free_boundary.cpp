@@ -11,6 +11,14 @@ using namespace smf;
 using utils::threads;
 using utils::mpi;
 
+double FreeBoundary::bound_pos(double t) const {
+    return t;
+    // return std::cos(t);
+}
+
+double FreeBoundary::bound_vel(double t) const {
+    return (bound_pos(t + m_dt) - bound_pos(t)) / m_dt;
+}
 
 FreeBoundary::FreeBoundary(Eos::Ptr eos) : m_eos(eos) {
     m_CFL = 0.5;
@@ -21,6 +29,8 @@ FreeBoundary::FreeBoundary(Eos::Ptr eos) : m_eos(eos) {
 FreeBoundary::Parts FreeBoundary::add_types(EuMesh& mesh) {
     part.init = mesh.add<PState>("init");
     part.next = mesh.add<PState>("next");
+    part.alpha = mesh.add<double>("alpha");
+    part.a_next = mesh.add<double>("alpha(next)");
     return part;
 }
 
@@ -111,12 +121,10 @@ void FreeBoundary::fluxes(EuMesh &mesh) const {
             loc_flux.to_global(normal);
 
             // Суммируем поток
-            // flux.arr() += loc_flux.arr() * face.area(m_axial);
             flux.arr() += loc_flux.arr() * face.area();
         }
 
         // Обновляем значение в ячейке (консервативные переменные)
-        // q_c.arr() -= (m_dt / cell.volume(m_axial)) * flux.arr();
         q_c.arr() -= (m_dt / cell.volume()) * flux.arr();
 
         // Новое значение примитивных переменных
@@ -125,9 +133,7 @@ void FreeBoundary::fluxes(EuMesh &mesh) const {
 }
 
 void FreeBoundary::swap(EuMesh &mesh) const {
-    mesh.for_each([this](EuCell &cell) {
-        cell[part.init] = cell(part.next);
-    });
+    mesh.swap(part.init, part.next);
 }
 
 } // namespace zephyr::math
