@@ -1,6 +1,7 @@
 #pragma once
 
 #include <zephyr/geom/vector.h>
+#include <iostream>
 
 namespace zephyr::geom {
 
@@ -73,6 +74,7 @@ struct plane {
     /// @return -1: под, 0: на, +1: над
     int position(const Vector3d& v, double eps=1.0e-15) const {
         double val = (v - p).dot(n);
+        std::cout << "(v - p).dot(n): " << (v - p).dot(n) << std::endl;
         return val > eps ? 1 : (val < -eps ? -1 : 0);
     }
 };

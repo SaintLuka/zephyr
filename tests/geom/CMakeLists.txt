@@ -41,5 +41,12 @@ foreach(test IN LISTS TESTS)
     add_executable(${test} ${test}.cpp)
     target_include_directories(${test} PUBLIC zephyr)
     target_link_libraries(${test} PUBLIC zephyr)
+
+    add_custom_command(TARGET ${test} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:zephyr>
+            $<TARGET_FILE_DIR:${test}>
+    )
+
     install(TARGETS ${test} DESTINATION tests/geom)
 endforeach()
