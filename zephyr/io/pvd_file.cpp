@@ -15,25 +15,8 @@ namespace zephyr::io {
 
 using utils::mpi;
 
-inline bool is_big_endian() {
-    union {
-        uint32_t i;
-        char c[4];
-    } bint = {0x01020304};
-
-    return bint.c[0] == 1;
-}
-
-inline std::string byteorder() {
-    return is_big_endian() ? "BigEndian" : "LittleEndian";
-}
-
 PvdFile::PvdFile()
-    : variables(),
-      hex_only(true),
-      unique_nodes(false),
-      m_open(false),
-      m_counter(0)
+    : m_open(false), m_counter(0)
 {
 }
 
@@ -53,8 +36,8 @@ PvdFile::PvdFile(const utils::Json& config) : PvdFile() {
     }
     std::string filename = config["filename"].as<std::string>();
 
-    if (config["hex_only"]) {
-        hex_only = config["hex_only"].as<bool>();
+    if (config["polyhedral"]) {
+        polyhedral = config["polyhedral"].as<bool>();
     }
     if (config["unique_nodes"]) {
         unique_nodes = config["unique_nodes"].as<bool>();
@@ -153,11 +136,20 @@ void PvdFile::open(const std::string& filename, const std::string& _directory, b
 }
 
 void PvdFile::save(mesh::EuMesh& mesh, double timestep) {
-    save(mesh.locals(), timestep);
+    if (unique_nodes) {
+        mesh.collect_nodes();
+    }
+    if (mesh.has_nodes()) {
+        VtuFile::save(get_filename(), mesh.locals(), mesh.nodes(), variables, polyhedral);
+    }
+    else {
+        VtuFile::save(get_filename(), mesh.locals(), variables, polyhedral);
+    }
+    update_pvd(timestep);
 }
 
 void PvdFile::save(mesh::AmrCells& elements, double timestep) {
-    VtuFile::save(get_filename(), elements, variables, hex_only, polyhedral);
+    VtuFile::save(get_filename(), elements, variables, polyhedral);
     update_pvd(timestep);
 }
 

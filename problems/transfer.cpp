@@ -17,7 +17,7 @@ using generator::Rectangle;
 
 class Solver;
 
-/// @brief Некоторая геметрия
+/// @brief Некоторая геометрия
 class Body {
 public:
     /// @brief Выставить на сетке начальные условия

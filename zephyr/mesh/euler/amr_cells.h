@@ -285,6 +285,11 @@ public:
         return verts.data() + node_begin[ic];
     }
 
+    /// @brief Получить вершину по индексу внутри ячейки
+    const Vector3d& vertex(index_t ic, int iv) const {
+        return verts[node_begin[ic] + iv];
+    }
+
     /// @brief Ссылка на вешены в форме набора узлов квадратичного отображения
     template <int dim>
     SqMap<dim>& mapping(index_t ic) {

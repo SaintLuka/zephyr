@@ -35,8 +35,7 @@ int main() {
     EuMesh mesh(rect);
 
     // Переменные для хранения на сетке
-    auto u1 = mesh.add<double>("u1");
-    auto u2 = mesh.add<double>("u2");
+    auto [u1, u2] = mesh.add<double>("u1", "u2");
 
     // Файл для записи
     PvdFile pvd("mesh", "output");
@@ -51,8 +50,8 @@ int main() {
     Vector3d vc = box.center();
     double D = 0.1 * box.diameter();
     for (auto cell: mesh) {
-        cell(u1) = (cell.center() - vc).norm() < D ? 1.0 : 0.0;
-        cell(u2) = 0.0;
+        cell[u1] = (cell.center() - vc).norm() < D ? 1.0 : 0.0;
+        cell[u2] = 0.0;
     }
 
     // Число Куранта
@@ -84,7 +83,7 @@ int main() {
 
         // Расчет по схеме upwind
         for (auto cell: mesh) {
-            double zc = cell(u1);
+            double zc = cell[u1];
 
             double fluxes = 0.0;
             for (auto& face: cell.faces()) {
@@ -97,13 +96,13 @@ int main() {
                 fluxes += (a_p * zc + a_m * zn) * face.area();
             }
 
-            cell(u2) = zc - dt * fluxes / cell.volume();
+            cell[u2] = zc - dt * fluxes / cell.volume();
         }
 
         // Обновляем слои
         for (auto cell: mesh) {
-            cell(u1) = cell(u2);
-            cell(u2) = 0.0;
+            cell[u1] = cell[u2];
+            cell[u2] = 0.0;
         }
 
         n_step += 1;

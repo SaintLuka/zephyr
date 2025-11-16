@@ -518,8 +518,8 @@ void Cuboid::initialize(mesh::AmrCells& cells)  {
         cells.faces.area[iface + Side3D::R] = hy * hz;
         cells.faces.area[iface + Side3D::B] = hx * hz;
         cells.faces.area[iface + Side3D::T] = hx * hz;
-        cells.faces.area[iface + Side3D::Z] = hy * hz;
-        cells.faces.area[iface + Side3D::F] = hy * hz;
+        cells.faces.area[iface + Side3D::Z] = hx * hy;
+        cells.faces.area[iface + Side3D::F] = hx * hy;
 
         cells.faces.vertices[iface + Side3D::L] = Side3D::L.sf();
         cells.faces.vertices[iface + Side3D::R] = Side3D::R.sf();

@@ -2,7 +2,7 @@
 #list(APPEND TESTS balancing)
 #list(APPEND TESTS distributed-amr)
 #list(APPEND TESTS distributed-conv)
-list(APPEND TESTS distributed-conv-amr)
+#list(APPEND TESTS distributed-conv-amr)
 #list(APPEND TESTS game_of_life)
 #list(APPEND TESTS mesh_generator)
 #list(APPEND TESTS storage)

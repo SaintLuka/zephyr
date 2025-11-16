@@ -33,7 +33,7 @@ struct cube_symmetry {
     std::uint8_t number;
 
     cube_symmetry(int val) : number(val) {
-        z_assert(0 <= val && val < 48);
+        z_assert(0 <= val && val < 48, "oh no..");
     }
 
 };

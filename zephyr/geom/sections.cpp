@@ -442,7 +442,6 @@ double edge_fraction(double a0, double a1, double a2) {
 
     constexpr int max_iters = 20;
     constexpr double eps_r = 1.0e-12;
-    constexpr double eps_p = 1.0e-12;
     constexpr double eps_n = 1.0e-12;
     constexpr double eps_ae = 1.0e-12;
 
@@ -490,9 +489,6 @@ double edge_fraction(double a0, double a1, double a2) {
         if (delta_n.norm() < eps_n) {
             break;
         }
-        if (std::abs(delta_p) < eps_p) {
-            break;
-        }
         if (std::abs(ae - new_ae) < eps_ae) {
             ae = new_ae;
             break;
@@ -528,6 +524,82 @@ std::array<double, Side3D::count()> face_fractions(double a_cell, const std::arr
     double a_lt = edge_fraction(a_cell, a_neib[Side3D::L], a_neib[Side3D::T]);
     double a_rb = edge_fraction(a_cell, a_neib[Side3D::R], a_neib[Side3D::B]);
     double a_rt = edge_fraction(a_cell, a_neib[Side3D::R], a_neib[Side3D::T]);
+
+    /*
+    EuCell cell;
+
+    Cube cube = cell.mapping<3>().reduce();
+
+    obj::plane plane{.p=Vector3d::Zero(), .n=some_n};
+
+    auto edge_fraction = [plane](obj::segment edge) -> double {
+        if (intersection2D::exist(plane, edge)) {
+            Vector3d e = intersection2D::find_fast(plane, edge);
+            if (plane.under(edge.v1)) {
+                return (e - edge.v1).norm() / edge.length();
+            }
+            return (e - edge.v2).norm() / edge.length();
+        }
+        return plane.under(edge.v1) ? 1.0 : 0.0;
+    }
+
+    // Ребра вдоль Ox
+    obj::segment e_bz{cube.vs<-1,-1,-1>(), cube.vs<+1,-1,-1>()};
+    obj::segment e_bf{cube.vs<-1,-1,+1>(), cube.vs<+1,-1,+1>()};
+    obj::segment e_tz{cube.vs<-1,+1,-1>(), cube.vs<+1,+1,-1>()};
+    obj::segment e_tf{cube.vs<-1,+1,+1>(), cube.vs<+1,+1,+1>()};
+
+    // Ребра вдоль Oy
+    obj::segment e_zl{cube.vs<-1,-1,-1>(), cube.vs<-1,+1,-1>()};
+    obj::segment e_zr{cube.vs<+1,-1,-1>(), cube.vs<+1,+1,-1>()};
+    obj::segment e_fl{cube.vs<-1,-1,+1>(), cube.vs<-1,+1,+1>()};
+    obj::segment e_fr{cube.vs<+1,-1,+1>(), cube.vs<+1,+1,+1>()};
+
+    // Ребра вдоль Oz
+    obj::segment e_lb{cube.vs<-1,-1,-1>(), cube.vs<-1,-1,+1>()};
+    obj::segment e_lt{cube.vs<-1,+1,-1>(), cube.vs<-1,+1,+1>()};
+    obj::segment e_rb{cube.vs<+1,-1,-1>(), cube.vs<+1,-1,+1>()};
+    obj::segment e_rt{cube.vs<+1,+1,-1>(), cube.vs<+1,+1,+1>()};
+
+    // Ребра вдоль Ox
+    double a_bz2 = edge_fraction(plane, e_bz);
+    double a_bf2 = edge_fraction(plane, e_bf);
+    double a_tz2 = edge_fraction(plane, e_tz);
+    double a_tf2 = edge_fraction(plane, e_tf);
+
+    // Ребра вдоль Oy
+    double a_zl2 = edge_fraction(plane, e_zl);
+    double a_zr2 = edge_fraction(plane, e_zr);
+    double a_fl2 = edge_fraction(plane, e_fl);
+    double a_fr2 = edge_fraction(plane, e_fr);
+
+    // Ребра вдоль Oz
+    double a_lb2 = edge_fraction(plane, e_lb);
+    double a_lt2 = edge_fraction(plane, e_lt);
+    double a_rb2 = edge_fraction(plane, e_rb);
+    double a_rt2 = edge_fraction(plane, e_rt);
+
+    std::valarray errs = {
+        a_bz2 - a_bz, a_bf2 - a_bf, a_tz2 - a_tz, a_tf2 - a_tf,
+        a_zl2 - a_zl, a_zr2 - a_zr, a_fl2 - a_fl, a_fr2 - a_fr,
+        a_lb2 - a_lb, a_lt2 - a_lt, a_rb2 - a_rb, a_rt2 - a_rt
+    };
+
+    bool boundary = false;
+    for (auto face:cell.faces()) {
+        if (face.is_boundary()) {
+            boundary = true;
+            break;
+        }
+    }
+
+    if (!boundary && a_cell > 0.01 && a_cell < 0.99 && std::abs(errs).max() > 1.0e-5) {
+        for (int i = 0; i < errs.size(); ++i) {
+            std::cout << i << ": " << errs[i] << std::endl;
+        }
+        throw std::runtime_error("Error");
+    }
+    */
 
     std::array<double, Side3D::count()> res;
     res[Side3D::L] = e2f(a_lb, a_lt, a_zl, a_fl);

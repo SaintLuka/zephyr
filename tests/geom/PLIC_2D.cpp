@@ -2,7 +2,7 @@
 #include "PLIC.h"
 
 // Нормаль для теста с плоскостью
-static Vector3d some_n = (Vector3d{0.24, 0.13, 0.0}).normalized();
+static Vector3d some_n = (Vector3d{-0.84, 0.37, 0.0}).normalized();
 
 // 0. Область под прямой
 auto plain_func = [](const Vector3d& v) -> bool {
@@ -54,7 +54,7 @@ SpFunction diffuse_func = [](const Vector3d &v) -> double {
     double r = v.norm();
     double r1 = R1 * (1.0 + e1 * std::sin(k * phi));
     double r2 = R2 * (1.0 + e2 * std::sin(k * phi));
-    double h = 0.08;
+    double h = 0.14;
     return 0.25 * (1 + math::sign_p(r - r1, h)) * (1 + math::sign_p(r2 - r, h));
 };
 
@@ -127,11 +127,13 @@ void make_interface(EuMesh& mesh) {
     });
 }
 
+using atomic_t = std::atomic<double>;
+
 void calc_errors(EuMesh& mesh, InFunction func, int nx) {
-    std::atomic err1{0.0};
-    std::atomic err2{0.0};
-    std::atomic err3{0.0};
-    std::atomic err4{0.0};
+    atomic_t err1{0.0};
+    atomic_t err2{0.0};
+    atomic_t err3{0.0};
+    atomic_t err4{0.0};
 
     mesh.for_each([func, nx, &err1, &err2, &err3, &err4](EuCell& cell) {
         // Нулевые погрешности
@@ -242,16 +244,16 @@ void save_mesh(EuMesh& mesh) {
     VtuFile::save("output/mesh.vtu", mesh, vars);
 
     auto body_central = body(mesh, p1, n1);
-    VtuFile::save("output/body(central).vtu", body_central, {}, false, true);
+    VtuFile::save("output/body(central).vtu", body_central, Variables{});
 
     auto body_youngs = body(mesh, p2, n2);
-    VtuFile::save("output/body(youngs).vtu", body_youngs, {}, false, true);
+    VtuFile::save("output/body(youngs).vtu", body_youngs, Variables{});
 
     auto body_elvira = body(mesh, p3, n3);
-    VtuFile::save("output/body(elvira).vtu", body_elvira, {}, false, true);
+    VtuFile::save("output/body(elvira).vtu", body_elvira, Variables{});
 
     auto body_csir = body(mesh, p4, n4);
-    VtuFile::save("output/body(csir).vtu", body_csir, {}, false, true);
+    VtuFile::save("output/body(csir).vtu", body_csir, Variables{});
 }
 
 // Адаптировать, если ячейка или сосед смешанные
@@ -365,14 +367,14 @@ int main() {
     //gen.set_sizes(30, 50);
 
     EuMesh mesh(gen);
-    mesh.set_max_level(1);
+    mesh.set_max_level(0);
 
     a = mesh.add<double>("a");
     std::tie(p1, p2, p3, p4) = mesh.add<double  >("p1", "p2", "p3", "p4");
     std::tie(n1, n2, n3, n4) = mesh.add<Vector3d>("n1", "n2", "n3", "n4");
     std::tie(e1, e2, e3, e4) = mesh.add<double  >("e1", "e2", "e3", "e4");
 
-    int test = 1;
+    int test = 0;
 
     switch (test) {
         case 0: show_plain(mesh); return 0;

@@ -1,17 +1,14 @@
 #include <iostream>
 #include <map>
+
+#include <zephyr/math/funcs.h>
 #include <zephyr/geom/geom.h>
 #include <zephyr/geom/sections.h>
 #include <zephyr/geom/generator/cuboid.h>
-#include <zephyr/mesh/euler/eu_prim.h>
 #include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/io/vtu_file.h>
-#include <zephyr/utils/stopwatch.h>
-
-#include <zephyr/utils/numpy.h>
+#include <zephyr/io/vtr_file.h>
 #include <zephyr/utils/pyplot.h>
-#include <zephyr/math/calc/roots.h>
-#include <zephyr/math/funcs.h>
 #include <zephyr/utils/stopwatch.h>
 
 using namespace zephyr;
@@ -19,9 +16,9 @@ using namespace zephyr::geom;
 using namespace zephyr::mesh;
 using namespace zephyr::math;
 using namespace zephyr::io;
+using namespace zephyr::utils;
 
 using generator::Cuboid;
-using utils::Stopwatch;
 
 // Записать три исходных кубика
 void save_origin() {
@@ -37,7 +34,7 @@ void save_origin() {
     orig.push_back(poly2);
     orig.push_back(poly3);
 
-    VtuFile::save("out/orig.vtu", orig, {}, false, true);
+    VtuFile::save("out/orig.vtu", orig, {});
 }
 
 // Записать последовательность сечений
@@ -50,7 +47,6 @@ void save_history(const std::vector<double>& ps, const std::vector<Vector3d>& ns
     poly3.move(Vector3d::UnitY());
 
     PvdFile pvd("clipped", "out");
-    pvd.hex_only = false;
     pvd.polyhedral = true;
 
     for (int i = 0; i < ps.size(); ++i) {
@@ -147,7 +143,8 @@ struct res_t {
         n = {NAN, NAN, NAN};
         ae = ae_in;
         count = 0;
-        append(p, n);
+        ps_history.push_back(p);
+        ns_history.push_back(n);
     }
 
     // Когда хотим просто установить плоскость и не париться
@@ -179,13 +176,14 @@ struct res_t {
         std::cout << "  ae: " << a_es.back() << "\n";
         std::cout << "  count: " << count << "\n";
         std::cout << "  out_case: " << out_case << "\n";
+        std::cout << "  error: " << errs.back() << "\n";
 
         // Отклонение от последнего значения
         for (size_t i = 0; i < ps_history.size(); ++i) {
             //a_es[i] = std::abs(a_es[i] - a_es.back());
         }
 
-        utils::pyplot plt;
+        pyplot plt;
 
         plt.figure({.figsize={9.0, 4.0}, .dpi=170});
 
@@ -247,7 +245,6 @@ res_t edge_fraction(double a0, double a1, double a2, const IterOpts& opts) {
     double ae = get_ae(p, n);
 
     constexpr double eps_r = 1.0e-12;
-    constexpr double eps_p = 1.0e-12;
     constexpr double eps_n = 1.0e-12;
     constexpr double eps_ae = 1.0e-12;
 
@@ -305,15 +302,9 @@ res_t edge_fraction(double a0, double a1, double a2, const IterOpts& opts) {
             break;
         }
 
-        if (std::abs(delta_p) < eps_p) {
-            if (opts.verbose) { std::cout << "break 3 (delta point)\n"; }
-            out_case = 3;
-            break;
-        }
-
         if (std::abs(ae - new_ae) < eps_ae) {
-            if (opts.verbose) { std::cout << "break 4 (delta ae)\n"; }
-            out_case = 4;
+            if (opts.verbose) { std::cout << "break 3 (delta ae)\n"; }
+            out_case = 3;
             break;
         }
         ae = new_ae;
@@ -324,94 +315,82 @@ res_t edge_fraction(double a0, double a1, double a2, const IterOpts& opts) {
     return series;
 }
 
+inline std::vector<double> chebyshev(int n) {
+    std::vector res(n, 0.0);
+    for (int i = 0; i < n; ++i) {
+        res[i] = 0.5 + 0.5 * (-std::cos((2 * i + 1) * M_PI / (2 * n)) / std::cos(M_PI / (2 * n)));
+    }
+    return res;
+}
+
 // Построить функцию edge_fraction(a0, a1, a2);
 void ae_full(const std::string& filename) {
-    utils::threads::on();
+    threads::on();
 
-    Cuboid gen = Cuboid(0.0, 1.0, 0.0, 1.0, 0.0, 1.0);
-    gen.set_boundaries({Boundary::WALL, Boundary::WALL, Boundary::WALL,
-        Boundary::WALL, Boundary::WALL, Boundary::WALL});
-    gen.set_sizes(30, 30, 30);
+    int N = 101;
+    std::vector xs = chebyshev(N);
+    std::vector ys = chebyshev(N);
+    std::vector zs = chebyshev(N);
 
-    // Создать сетку
-    EuMesh mesh(gen);
-    auto ae = mesh.add<double>("ae");
-    auto count = mesh.add<int>("count");
-    auto err = mesh.add<double>("err");
-    auto css = mesh.add<cases_t>("cases");
-    auto type = mesh.add<int>("type");
-    auto outc = mesh.add<int>("outc");
-    auto po = mesh.add<double>("point");
-    auto no = mesh.add<Vector3d>("normal");
+#define table(x) std::vector(N, std::vector(N, std::vector(N, x)))
 
-    mesh.set_max_level(3);
-
-    auto setup_value = [&](EuCell& cell) {
-        double a0 = cell.z();
-        double a1 = cell.x();
-        double a2 = cell.y();
-        if (a0 + 0.5 >= a1 + a2 || a1 <= a2) {
-            cell[ae] = NAN;
-            return;
-        }
-
-        auto res = edge_fraction(a0, a1, a2, {.max_iters=50});
-
-        cell[ae] = res.ae;
-        cell[no] = res.n;
-        cell[po] = res.p;
-        cell[count] = res.count;
-        cell[err]   = get_error(res.p, res.n, a0, a1, a2);
-        cell[css]   = cases_t(res.p, res.n);
-        cell[outc]  = res.out_case;
-    };
-
-    auto setup_flags = [&]() {
-        mesh.for_each([&](EuCell& cell) {
-            cell.set_flag(-1);
-            if (std::isnan(cell[ae])) {
-                return;
-            }
-            for (auto face: cell.faces()) {
-                if (face.is_boundary()) {
-                    cell.set_flag(1);
-                    break;
-                }
-                if (face.neib(ae) >= 1.0) {
-                    cell.set_flag(1);
-                    break;
-                }
-                if (face.neib(css) != cell[css]) {
-                    cell.set_flag(1);
-                    break;
-                }
-            }
-        });
-    };
-
-    Distributor distr;
-    distr.split = [&](const EuCell& parent, Children children) {
-        for (auto child: children) { setup_value(child); }
-    };
-    distr.merge = [&](const Children& children, EuCell& parent) {
-        setup_value(parent);
-    };
-    mesh.set_distributor(distr);
+    auto a_e = table(0.0);
+    auto iters = table(0);
+    auto error = table(0.0);
+    auto cases = table(cases_t{});
+    auto type = table(0);
+    auto out_case = table(0);
+    auto dist = table(0.0);
+    auto norm = table(Vector3d{});
 
     Stopwatch elapsed(true);
-    std::cout << "Level " << mesh.max_level() << "\n";
-    mesh.for_each(setup_value);
-    for (int i = 0; i < (mesh.adaptive() ? mesh.max_level() + 2 : 0); ++i) {
-        std::cout << "Level " << i << "\n";
-        setup_flags();
-        mesh.refine();
+    threads::parallel_for(0, N, [&](int i) {
+        double a1 = xs[i];
+        for (int j = 0; j < N; ++j) {
+            double a2 = ys[j];
+            for (int k = 0; k < N; ++k) {
+                double a0 = zs[k];
+
+                auto res = edge_fraction(a0, a1, a2, {.max_iters=50});
+
+                a_e [i][j][k] = res.ae;
+
+                dist[i][j][k] = res.p;
+                norm[i][j][k] = res.n;
+                iters[i][j][k] = res.count;
+                error[i][j][k] = get_error(res.p, res.n, a0, a1, a2);
+                cases[i][j][k] = cases_t(res.p, res.n);
+                out_case[i][j][k] = res.out_case;
+            }
+        }
+    });
+
+    // Внешние границы, a_i in {0, 1}
+    for (int i = 0; i < N; ++i) {
+        for (int j = 0; j < N; ++j) {
+            a_e[0  ][i][j] = 0.0;
+            a_e[N-1][i][j] = 1.0;
+            a_e[i][0  ][j] = 0.0;
+            a_e[i][N-1][j] = 1.0;
+            a_e[i][j][0]   = heav(xs[i] + ys[j] - 1.0);
+            a_e[i][j][N-1] = heav(xs[i] + ys[j] - 1.0);
+        }
     }
-    elapsed.stop();
+    // Плоскость a_e(a0, a1, 1 - a1) = 0.5
+    for (int i = 0; i < N; ++i) {
+        for (int j = 0; j < N; ++j) {
+            a_e[i][N - i - 1][j] = 0.5;
+        }
+    }
 
     // Считаем число случаев
     std::map<cases_t, int> all_cases;
-    for (auto cell: mesh) {
-        all_cases[cell[css]] = 0;
+    for (int i = 0; i < xs.size(); ++i) {
+        for (int j = 0; j < ys.size(); ++j) {
+            for (int k = 0; k < zs.size(); ++k) {
+                all_cases[cases[i][j][k]] = 0;
+            }
+        }
     }
 
     int counter = 0;
@@ -421,26 +400,25 @@ void ae_full(const std::string& filename) {
     }
 
     // Пронумеровать случаи единственным индексом
-    mesh.for_each([&](EuCell& cell) {
-        cell[type] = all_cases[cell[css]];
-    });
+    for (int i = 0; i < xs.size(); ++i) {
+        for (int j = 0; j < ys.size(); ++j) {
+            for (int k = 0; k < zs.size(); ++k) {
+                type[i][j][k] = all_cases[cases[i][j][k]];
+            }
+        }
+    }
+    elapsed.stop();
 
     std::cout << "Cases number: " << all_cases.size() << "\n";
     std::cout << "Compute ae (elapsed): " << elapsed.extended_time() << "\n";
 
+    VtrFile file(filename, xs, ys, zs);
 
-    Variables vars = {"center", "level"};
-    vars.append("ae", ae);
-    vars.append("normal", no);
-    vars.append("count", count);
-    vars.append("err",   err);
-    vars.append<int>("case1", [css](EuCell& cell) -> int { return cell[css].c1; });
-    vars.append<int>("case2", [css](EuCell& cell) -> int { return cell[css].c2; });
-    vars.append<int>("case3", [css](EuCell& cell) -> int { return cell[css].c3; });
-    vars.append("type", type);
-    vars.append("out", outc);
+    file.point_data("a_edge", a_e);
+    file.point_data("n_iters", iters);
+    file.point_data("type", type);
 
-    VtuFile::save(filename, mesh, vars);
+    file.save();
 }
 
 int main() {
@@ -454,7 +432,7 @@ int main() {
     save_history(res.ps_history, res.ns_history);
     res.plot(a0, a1, a2);
 
-    ae_full("out/ae.vtu");
+    ae_full("out/edge_fraction.vtr");
 
     return 0;
 }

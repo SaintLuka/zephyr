@@ -1,7 +1,24 @@
 #include <cstring>
+#include <filesystem>
+
 #include <zephyr/io/vtk_type.h>
 
 namespace zephyr::io {
+
+std::string byteorder() {
+    union { uint32_t i; char c[4]; } bint = {0x01020304};
+    return bint.c[0] == 1 ? "BigEndian" : "LittleEndian";
+}
+
+void create_directories(const std::string& filename) {
+    namespace fs = std::filesystem;
+    fs::path file_path(filename);
+    fs::path dir_path = file_path.parent_path();
+
+    if (!dir_path.empty()) {
+        fs::create_directories(dir_path);
+    }
+}
 
 VtkType::VtkType() {
     m_value = VtkType::Undefined;

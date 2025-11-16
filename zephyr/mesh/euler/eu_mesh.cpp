@@ -1,5 +1,6 @@
 #include <fstream>
 #include <iomanip>
+#include <set>
 
 #include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/mesh/euler/eu_prim.h>
@@ -267,6 +268,8 @@ void EuMesh::make_shuba(int count) {
 
 void EuMesh::refine() {
     if (!adaptive()) { return; }
+
+    m_nodes.clear();
 
     static Stopwatch balance;
     static Stopwatch apply;
@@ -720,6 +723,184 @@ EuCell EuMesh::operator()(int i, int j, int k) {
     j = (j + m_ny) % m_ny;
     k = (k + m_nz) % m_nz;
     return operator[](m_nz * (m_ny * i + j) + k);
+}
+
+inline int nodes_estimation(int n_cells, int dim) {
+    assert(dim == 2 || dim == 3);
+    if (dim < 3) {
+        int nx = int(std::ceil(std::sqrt(n_cells))) + 2;
+        return nx * nx;
+    } else {
+        int nx = int(std::ceil(std::cbrt(n_cells))) + 2;
+        return nx * nx * nx;
+    }
+}
+
+// Владелец узла (любая ячейка, которая содержит узел)
+// Основной владелец: ячейка с минимальным индексом.
+struct NodeOwner {
+    index_t ic; // Индекс ячейки
+    index_t iv; // Индекс вершины
+
+    // Считаем различие только по индексу ячейки
+    bool operator<(const NodeOwner& other) const { return ic < other.ic; }
+};
+
+// Множество ячеек, которые владеют некоторым узлом
+struct NodeOwners {
+    // Добавить владельца
+    void insert(index_t ic, int iv) {
+        owners.insert(NodeOwner{ic, iv});
+    }
+
+    // Имеется владелец с индексом ic?
+    bool contain(index_t ic) const {
+        return owners.count(NodeOwner{ic, -1}) > 0;
+    }
+
+    auto begin() const { return owners.begin(); }
+
+    auto end() const { return owners.end(); }
+
+    std::set<NodeOwner> owners;
+};
+
+NodeOwners find_owners(const AmrCells& cells, index_t ic_start, int iv_start) {
+    // Интересующая нас вершина
+    Vector3d p = cells.verts[iv_start];
+    double eps = 1.0e-10 * cells.linear_size(ic_start);
+
+    // Моделирует стек с ячейками в работе
+    std::vector<NodeOwner> in_work;
+
+    in_work.emplace_back(NodeOwner{ic_start, iv_start});
+
+    NodeOwners owners;
+    while (!in_work.empty()) {
+        // Извлекли из стека последнюю ячейку
+        auto[ic, iv] = in_work.back();
+        in_work.pop_back();
+
+        // Добавили нового владельца
+        owners.insert(ic, iv);
+
+        // Проходим по граням, ищем грани, которые содержат искомую вершину.
+        // Сосед через такую грань также содержит искомую вершину.
+        for (auto iface: cells.faces_range(ic)) {
+            if (cells.faces.is_undefined(iface) ||
+                cells.faces.is_boundary(iface) ||
+                cells.faces.boundary[iface] == Boundary::PERIODIC ||
+                cells.faces.adjacent.is_alien(iface)) {
+                continue;
+            }
+
+            // Проверить, что грань содержит искомую вершину
+            bool contain = false;
+            for (int j = 0; j < AmrFaces::max_vertices; ++j) {
+                int loc_iv = cells.faces.vertices[iface][j];
+                if (loc_iv < 0) break;
+                if (cells.node_begin[ic] + loc_iv == iv) {
+                    contain = true;
+                    break;
+                }
+            }
+
+            if (!contain) continue;
+
+            // Грань содержит целевую вершину
+
+            // Индекс соседа через грань
+            index_t ic_n = cells.faces.adjacent.index[iface];
+            z_assert(ic_n < cells.size(), "Find owners: Out of range");
+
+            // Сосед уже есть в массиве
+            if (owners.contain(ic_n)) continue;
+
+            // Ищем интересующую вершину среди вершин соседа
+            index_t iv_n = -1;
+            for (auto iv2: cells.nodes_range(ic_n)) {
+                if ((cells.verts[iv2] - p).norm() < eps) {
+                    // Проверка на -13??
+                    iv_n = iv2;
+                    break;
+                }
+            }
+
+            z_assert(iv_n >= 0, "AmrFaces::setup_for: Impossible error #1");
+
+            // Соседняя ячейка нам подходит, помещаем в стек
+            in_work.emplace_back(NodeOwner{ic_n, iv_n});
+        }
+    }
+
+    return owners;
+}
+
+bool AmrNodes::empty() const {
+    return nodes.empty();
+}
+
+void AmrNodes::clear() {
+    nodes.clear();
+    unique_verts.clear();
+}
+
+void AmrNodes::setup_for(const AmrCells& cells) {
+    // Стираем существующий массив узлов
+    clear();
+
+    if (cells.empty()) return;
+
+    // Выставляем все индексы на -1
+    nodes.resize(cells.n_nodes(), -1);
+
+    // Помечаем актуальные узлы, которые есть на каких-либо гранях, индексом -13.
+    threads::parallel_for(
+        index_t{0}, cells.n_cells(),
+        [this, &cells](index_t ic) {
+            for (auto iface: cells.faces_range(ic)) {
+                if (cells.faces.is_undefined(iface)) continue;
+
+                for (int j = 0; j < AmrFaces::max_vertices; ++j) {
+                    int loc_iv =  cells.faces.vertices[iface][j];
+                    if (loc_iv < 0) break;
+                    nodes[cells.node_begin[ic] + loc_iv] = -13;
+                }
+            }
+        });
+
+
+    // TODO: Заменить set, vector на быстрые версии на стеке
+    // TODO: Есть только наметки, как это сделать параллельно
+
+    /// Последовательная версия работает за один проход по ячейкам
+    unique_verts.reserve(nodes_estimation(cells.size(), cells.dim()));
+
+    int counter = 0;
+    for (index_t ic = 0; ic < cells.n_cells(); ++ic) {
+        for (index_t iv: cells.nodes_range(ic)) {
+            // Нас интересуют актуальные (отмеченные) узлы, которые
+            // ещё не получили уникальный индекс.
+            if (nodes[iv] != -13) continue;
+
+            // Добавляем узел в массив
+            unique_verts.push_back(cells.verts[iv]);
+
+            // Ищем все ячейки, которые содержат узел
+            auto owners = find_owners(cells, ic, iv);
+
+            // Отмечаем индекс узла у каждого владельца
+            for (auto [ic2, iv2]: owners) {
+                nodes[iv2] = counter;
+            }
+            ++counter;
+        }
+    }
+}
+
+void EuMesh::collect_nodes() {
+    if (has_nodes()) return;
+    m_nodes.setup_for(m_locals);
 }
 
 } // namespace zephyr::mesh
