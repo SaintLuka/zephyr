@@ -1164,7 +1164,7 @@ int Polyhedron::checkout() const {
         L = std::max(L, (v - m_center).norm());
     }
     double eps_l = 1.0e-10 * L;
-    double eps_s = 1.0e-10 * L * L;
+    double eps_s = 1.0e-12 * L * L;
 
     Vector3d c = Vector3d::Zero();
     for (auto& v: verts) { c += v; }
@@ -1207,7 +1207,7 @@ int Polyhedron::checkout() const {
 
         // нулевая грань
         if (S.norm() < eps_s) {
-//            std::cout << "S.norm(): " << S.norm() << ", eps_s: " << eps_s << std::endl;
+            std::cout << "S.norm(): " << S.norm() << ", eps_s: " << eps_s << std::endl;
             return -18;
         }
     }
