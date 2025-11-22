@@ -307,6 +307,7 @@ Polyhedron::Polyhedron(CellType ctype, const std::vector<Vector3d>& vertices) {
 
 void Polyhedron::build(const std::vector<Vector3d>& vertices,
                        const std::vector<std::vector<int>>& face_indices) {
+
     verts = vertices;
     faces = face_indices;
 
@@ -364,6 +365,83 @@ void Polyhedron::build(const std::vector<Vector3d>& vertices,
 
         }
     }
+}
+
+struct Vector3dComparator {
+    bool operator()(const Vector3d& a, const Vector3d& b, double eps = 1e-10) const {
+//        double eps = 1e-10;
+        for (int i = 0; i < 3; ++i) {
+            if (std::abs(a[i] - b[i]) > eps) {
+                return a[i] < b[i];
+            }
+        }
+        return false;
+    }
+};
+
+Polyhedron build_with_duplicats(const std::vector<Vector3d>& vertices,
+                                const std::vector<std::vector<int>>& face_indices) {
+
+    std::vector<Vector3d> cleared_vertices;
+    std::vector<std::vector<int>> cleared_face_indices;
+    std::map<Vector3d, std::vector<int>, Vector3dComparator> vertexMap;
+
+    for (size_t i = 0; i < vertices.size(); ++i) {
+        vertexMap[vertices[i]].push_back(i);
+    }
+
+    std::vector<int> old_to_new_index(vertices.size(), -1);
+
+    for (const auto& [vertex, old_indices] : vertexMap) {
+        int new_index = cleared_vertices.size();
+        cleared_vertices.push_back(vertex);
+
+        for (int old_index : old_indices) {
+            old_to_new_index[old_index] = new_index;
+        }
+    }
+
+    cleared_face_indices.resize(face_indices.size());
+    for (size_t i = 0; i < face_indices.size(); ++i) {
+        const auto& old_face = face_indices[i];
+        auto& new_face = cleared_face_indices[i];
+
+        new_face.resize(old_face.size());
+        for (size_t j = 0; j < old_face.size(); ++j) {
+            int old_vertex_index = old_face[j];
+            new_face[j] = old_to_new_index[old_vertex_index];
+        }
+        std::vector<int> unique_face;
+        for (size_t j = 0; j < new_face.size(); ++j) {
+            bool is_duplicate = false;
+            for (size_t k = 0; k < unique_face.size(); ++k) {
+                if (new_face[j] == unique_face[k]) {
+                    is_duplicate = true;
+                    break;
+                }
+            }
+            if (!is_duplicate) {
+                unique_face.push_back(new_face[j]);
+            }
+        }
+        new_face = unique_face;
+    }
+//    std::cout << "cleared_vertices" << std::endl;
+//    for (size_t i = 0; i < cleared_vertices.size(); ++i) {
+//        const auto& v = cleared_vertices[i];
+//        std::cout << "  [" << i << "] (" << v.x() << ", " << v.y() << ", " << v.z() << ")" << std::endl;
+//    }
+//    std::cout << "cleared_face_indices" << std::endl;
+//    for (size_t i = 0; i < cleared_face_indices.size(); ++i) {
+//        const auto& face = cleared_face_indices[i];
+//        std::cout << "part:" << i << ": [";
+//        for (size_t j = 0; j < face.size(); ++j) {
+//            std::cout << face[j];
+//            if (j < face.size() - 1) std::cout << ", ";
+//        }
+//        std::cout << "]" << std::endl;
+//    }
+    return Polyhedron(cleared_vertices, cleared_face_indices);
 }
 
 Box Polyhedron::bbox() const {
@@ -554,8 +632,195 @@ double Polyhedron::clip_volume(
 }
 
 // TODO: Описание алгоритма
+//Polyhedron Polyhedron::clip(const Vector3d& p, const Vector3d& n) const {
+//    std::cout << "clipping..." << std::endl;
+//
+//    // Плоскость
+//    obj::plane plane{.p=p, .n=n};
+//
+//    // Пересечения рёбер с индексами вершин
+//    std::map<edge_t, point_t> edges;
+//
+//    // Считаем вершины строго снаружи или внутри
+//    int count_inside = 0;
+//    int count_outside = 0;
+//    int count_on = 0;
+//
+//    double L = std::cbrt(volume());
+//    double eps = (1.0e-5) * L;
+//    std::cout << "eps: " << eps << std::endl;
+//
+//    // Положения вершин
+//    std::vector<int> vs_pos(n_verts());
+//    for (int i = 0; i < n_verts(); ++i) {
+//        vs_pos[i] = plane.position(verts[i], eps);
+//        std::cout << "vertex: " << verts[i][0] << " " << verts[i][1] << " " << verts[i][2] << ", pos: " << vs_pos[i] << std::endl;
+//
+//        if (vs_pos[i] > 0) {
+//            ++count_outside;
+//        } else if (vs_pos[i] < 0) {
+//            ++count_inside;
+//        } else {
+//            ++count_on;
+//            // Точки на плоскости сразу добавляем
+//            edges[edge_t(i)] = {.v=verts[i], .index=-1};
+//        }
+//    }
+//
+//    // Многогранник снаружи, нет пересечений
+//    if (count_inside == 0 && count_on == 0) {
+//        return Polyhedron::Empty();
+//    }
+//
+//    // Многогранник целиком внутри, нет пересечений
+//    if (count_outside == 0) {
+//        return *this;
+//    }
+//
+//    std::vector<edge_t> slice;
+//    std::vector<std::vector<edge_t>> parts;
+//
+//    for (int i = 0; i < n_faces(); ++i) {
+//        bool has_inside = false;
+//        bool has_outside = false;
+//        bool has_on_plane = false;
+//
+//        for (auto j: faces[i]) {
+//            if (vs_pos[j] < 0) {
+//                has_inside = true;
+//            } else if (vs_pos[j] > 0) {
+//                has_outside = true;
+//            } else {
+//                has_on_plane = true;
+//            }
+//        }
+//
+//        // Грань целиком снаружи, ничего не делаем
+//        if (!has_inside && !has_on_plane) {
+//            continue;
+//        }
+//
+//        int nv = faces[i].size();
+//
+//        if (!has_outside) {
+//            std::vector<edge_t> part;
+//            part.reserve(nv);
+//            for (int j = 0; j < nv; ++j) {
+//                part.emplace_back(edge_t(faces[i][j]));
+//            }
+//            parts.emplace_back(part);
+//        }
+//        else {
+//            std::vector<edge_t> part;
+//            part.reserve(nv + 2);
+//
+//            for (int j = 0; j < nv; ++j) {
+//                int v_idx1 = faces[i][j];
+//                int v_idx2 = faces[i][(j + 1) % nv];
+//
+//                int pos1 = vs_pos[v_idx1];
+//                int pos2 = vs_pos[v_idx2];
+//
+//                if (pos1 <= 0) {
+//                    edge_t new_vertex(v_idx1);
+//                    if (part.empty() || !(part.back() == new_vertex)) {
+//                        part.emplace_back(new_vertex);
+//                    }
+//                }
+//
+//                bool needs_intersection = false;
+//                if ((pos1 < 0 && pos2 > 0) || (pos1 > 0 && pos2 < 0)) {
+//                    needs_intersection = true;
+//                } else if (pos1 == 0 && pos2 != 0) {
+//                    if (pos2 > 0) {
+//                        needs_intersection = true;
+//                    }
+//                } else if (pos2 == 0 && pos1 != 0) {
+//                    if (pos1 > 0) {
+//                        needs_intersection = true;
+//                    }
+//                }
+//
+//                if (needs_intersection) {
+//                    edge_t edge(v_idx1, v_idx2);
+//
+//                    if (edges.count(edge) > 0) {
+//                        if (part.empty() || !(part.back() == edge)) {
+//                            part.push_back(edge);
+//                            slice.push_back(edge);
+//                        }
+//                    } else {
+//                        obj::segment seg{verts[edge.v1()], verts[edge.v2()]};
+//                        Vector3d new_v = intersection2D::find_fast(plane, seg);
+//                        edges[edge] = {.v=new_v, .index=-1};
+//
+//                        if (part.empty() || !(part.back() == edge)) {
+//                            part.push_back(edge);
+//                        }
+//                        slice.push_back(edge);
+//                    }
+//                }
+//            }
+//
+//            if (!part.empty() && part.size() >= 2 && part.front() == part.back()) {
+//                part.pop_back();
+//            }
+//
+//            if (part.size() >= 3) {
+//                parts.emplace_back(std::move(part));
+//            }
+//        }
+//    }
+//
+//    std::vector<Vector3d> out_verts(edges.size());
+//    int counter = 0;
+//    std::cout << "out_verts: " << std::endl;
+//    for (auto& edge_pair : edges) {
+//        edge_pair.second.index = counter;
+//        out_verts[counter] = edge_pair.second.v;
+//        std::cout << edge_pair.second.v[0] << " " << edge_pair.second.v[1] << " " << edge_pair.second.v[2] << std::endl;
+//        ++counter;
+//    }
+//
+//    std::vector<std::vector<int>> out_faces;
+//    out_faces.reserve(parts.size() + 1);
+//
+//    for (auto& face : parts) {
+//        std::vector<int> ids;
+//        ids.reserve(face.size());
+//        std::cout << "face ids: ";
+//        for (auto edge : face) {
+//            ids.push_back(edges[edge].index);
+//            std::cout << edges[edge].index << " ";
+//        }
+//        std::cout << std::endl;
+//
+//        if (ids.size() >= 3) {
+//            out_faces.push_back(ids);
+//        }
+//    }
+//
+//    if (!slice.empty()) {
+//        std::vector<int> ids;
+//        ids.reserve(slice.size());
+//        std::cout << "slice ids: ";
+//        for (auto edge : slice) {
+//            ids.push_back(edges[edge].index);
+//            std::cout << edges[edge].index << " ";
+//        }
+//        std::cout << std::endl;
+//
+//        if (ids.size() >= 3) {
+//            out_faces.push_back(ids);
+//        }
+//    }
+//
+//    return Polyhedron(out_verts, out_faces);
+//}
+
 Polyhedron Polyhedron::clip(const Vector3d& p, const Vector3d& n) const {
-    std::cout << "clipping..." << std::endl;
+
+//    std::cout << "clipping..." << std::endl;
     // Плоскость
     obj::plane plane{.p=p, .n=n};
     // Пересечения рёбер с индексами вершин (i, j).
@@ -570,14 +835,16 @@ Polyhedron Polyhedron::clip(const Vector3d& p, const Vector3d& n) const {
 
     // Линейный размер
     double L = std::cbrt(volume());
-    double eps = (1.0e-5) * L;
-    std::cout << "eps: " << eps << std::endl;
+    double eps = (1.0e-10) * L;
+
+//    std::cout << "eps: " << eps << std::endl;
+
     // Положения / индикаторы вершин.
     // -1: под/внутри. 0: на плоскости. +1: снаружи
     std::vector<int> vs_pos(n_verts());
     for (int i = 0; i < n_verts(); ++i) {
         vs_pos[i] = plane.position(verts[i], eps);
-        std::cout << "vertex: " << verts[i][0] << verts[i][1] << verts[i][2] << ", pos: " << vs_pos[i] << std::endl;
+//        std::cout << "vertex: " << verts[i][0] << verts[i][1] << verts[i][2] << ", pos: " << vs_pos[i] << std::endl;
         if (vs_pos[i] > 0) {
             ++count_outside;
         }
@@ -593,6 +860,10 @@ Polyhedron Polyhedron::clip(const Vector3d& p, const Vector3d& n) const {
             edges[edge_t(i)] = {.v=verts[i], .index=-1};
 //            std::cout << verts[i] << std::endl;
         }
+    }
+
+    if (count_on != 0) {
+        //return;
     }
 
     // Многогранник снаружи, нет пересечений
@@ -652,23 +923,17 @@ Polyhedron Polyhedron::clip(const Vector3d& p, const Vector3d& n) const {
                 int v_idx2 = faces[i][(j + 1) % nv];
 
                 if (vs_pos[v_idx1] <= 0) {
-//                    part.emplace_back(edge_t(v_idx1));
-
-                    edge_t new_vertex(v_idx1);
-                    if (part.empty() || !(part.back() == new_vertex)) {
-                        part.emplace_back(new_vertex);
-                    }
+                    part.emplace_back(edge_t(v_idx1));
                 }
-                if (vs_pos[v_idx1] * vs_pos[v_idx2] < 0) {
+
+                if (vs_pos[v_idx1] * vs_pos[v_idx2] <= 0) {
                     // Всегда один порядок
                     edge_t edge(v_idx1, v_idx2);
 
                     // Пересечение уже найдено
                     if (edges.count(edge) > 0) {
-//                        part.push_back(edge);
-                        if (part.empty() || !(part.back() == edge)) {
-                            part.push_back(edge);
-                        }
+                        part.push_back(edge);
+
                         continue;
                     }
 
@@ -678,13 +943,11 @@ Polyhedron Polyhedron::clip(const Vector3d& p, const Vector3d& n) const {
                     Vector3d new_v = intersection2D::find_fast(plane, seg);
                     edges[edge] = {.v=new_v, .index=-1};
 
-//                    part.push_back(edge);
-                    if (part.empty() || !(part.back() == edge)) {
-                        part.push_back(edge);
-                    }
+                    part.push_back(edge);
                     slice.push_back(edge);
                 }
             }
+
             parts.emplace_back(std::move(part));
         }
     }
@@ -696,11 +959,11 @@ Polyhedron Polyhedron::clip(const Vector3d& p, const Vector3d& n) const {
     std::vector<Vector3d> out_verts(edges.size());
 
     int counter = 0;
-    std::cout << "out_verts: " << std::endl;;
+//    std::cout << "out_verts: " << std::endl;;
     for (auto& edge: edges) {
         edge.second.index = counter;
         out_verts[counter] = edge.second.v;
-        std::cout << edge.second.v[0] << " " << edge.second.v[1] << " " << edge.second.v[2] << " " << std::endl;;
+//        std::cout << edge.second.v[0] << " " << edge.second.v[1] << " " << edge.second.v[2] << " " << std::endl;;
         ++counter;
     }
 
@@ -710,27 +973,28 @@ Polyhedron Polyhedron::clip(const Vector3d& p, const Vector3d& n) const {
     for (auto& face: parts) {
         std::vector<int> ids;
         ids.reserve(face.size());
-        std::cout << "ids: ";
+//        std::cout << "ids: ";
         for (auto edge: face) {
             ids.push_back(edges[edge].index);
-            std::cout << edges[edge].index << " ";
+//            std::cout << edges[edge].index << " ";
         }
-        std::cout << std::endl;
+//        std::cout << std::endl;
         out_faces.push_back(ids);
     }
 
     // Записать целиком, не контролируем число вершин
     std::vector<int> ids;
     ids.reserve(slice.size());
-    std::cout << "ids: ";
+//    std::cout << "ids: ";
     for (auto edge: slice) {
         ids.push_back(edges[edge].index);
-        std::cout << edges[edge].index << " ";
+//        std::cout << edges[edge].index << " ";
     }
-    std::cout << std::endl;
+//    std::cout << std::endl;
     out_faces.push_back(ids);
 
-    return Polyhedron(out_verts, out_faces);
+    return build_with_duplicats(out_verts, out_faces);
+//    return Polyhedron(out_verts, out_faces);
 }
 
 double Polyhedron::clip_volume(const Vector3d& p, const Vector3d& n) const { //pometki, shob vspomnit' sho bylo
@@ -943,7 +1207,7 @@ int Polyhedron::checkout() const {
 
         // нулевая грань
         if (S.norm() < eps_s) {
-            std::cout << "S.norm(): " << S.norm() << ", eps_s: " << eps_s << std::endl;
+//            std::cout << "S.norm(): " << S.norm() << ", eps_s: " << eps_s << std::endl;
             return -18;
         }
     }

@@ -176,6 +176,10 @@ protected:
     void build(const std::vector<Vector3d>& vertices,
                const std::vector<std::vector<int>>& face_indices);
 
+//    bool eps_equality(Vector3d v1, Vector3d v2);
+//
+//    void build_with_duplicats(const std::vector<Vector3d>& vertices,
+//               const std::vector<std::vector<int>>& face_indices) const;
 
     /// @brief Упрощает грань, возвращает массивы индексов, на которых можно
     /// построить новые грани
