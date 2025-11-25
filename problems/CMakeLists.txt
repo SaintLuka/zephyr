@@ -6,6 +6,7 @@ add_subdirectory(single-fluid)
 #list(APPEND PROBLEMS membrane)
 #list(APPEND PROBLEMS shu_osher)
 #list(APPEND PROBLEMS transfer)
+#list(APPEND PROBLEMS wave)
 
 # Assuming all files in the directory are tests
 if (ZEPHYR_PROBLEMS_ALL)
@@ -24,7 +25,8 @@ if (PROBLEMS)
 endif()
 
 foreach(problem IN LISTS PROBLEMS)
-    add_executable(${problem} ${problem}.cpp)
+    add_executable(${problem} ${problem}.cpp
+            wave.cpp)
     target_include_directories(${problem} PUBLIC zephyr)
     target_link_libraries(${problem} PUBLIC zephyr)
     install(TARGETS ${problem} DESTINATION problems)

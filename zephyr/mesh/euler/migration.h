@@ -3,9 +3,6 @@
 #include <vector>
 
 #include <zephyr/mesh/euler/tourism.h>
-#include <zephyr/io/pvd_file.h>
-
-using zephyr::io::PvdFile;
 
 namespace zephyr::mesh {
 

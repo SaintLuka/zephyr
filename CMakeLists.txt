@@ -121,8 +121,6 @@ if (${ZEPHYR_PROBLEMS} OR ${ZEPHYR_PROBLEMS_ALL})
     add_subdirectory(problems)
 endif()
 
-add_subdirectory(python)
-
 # Включить опцию ZEPHYR_DOXYGEN, затем вызвать make docs
 if (ZEPHYR_DOXYGEN)
     # Поиск Doxygen и Graphviz

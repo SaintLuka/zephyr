@@ -127,15 +127,13 @@ void make_interface(EuMesh& mesh) {
     });
 }
 
-using atomic_t = std::atomic<double>;
-
 void calc_errors(EuMesh& mesh, InFunction func, int nx) {
-    atomic_t err1{0.0};
-    atomic_t err2{0.0};
-    atomic_t err3{0.0};
-    atomic_t err4{0.0};
+    std::atomic<size_t> err1_li{0}, err1_l1{0};
+    std::atomic<size_t> err2_li{0}, err2_l1{0};
+    std::atomic<size_t> err3_li{0}, err3_l1{0};
+    std::atomic<size_t> err4_li{0}, err4_l1{0};
 
-    mesh.for_each([func, nx, &err1, &err2, &err3, &err4](EuCell& cell) {
+    mesh.for_each([&, nx](EuCell& cell) {
         // Нулевые погрешности
         cell[e1] = cell[e2] = cell[e3] = cell[e4] = 0.0;
 
@@ -175,10 +173,17 @@ void calc_errors(EuMesh& mesh, InFunction func, int nx) {
         cell[e3] = xi * counter[2];
         cell[e4] = xi * counter[3];
 
-        err1 += cell[e1];
-        err2 += cell[e2];
-        err3 += cell[e3];
-        err4 += cell[e4];
+        // Интегральная норма L1
+        err1_l1 += counter[0];
+        err2_l1 += counter[1];
+        err3_l1 += counter[2];
+        err4_l1 += counter[3];
+
+        // Интегральная норма L_inf
+        update_max(err1_li, counter[0]);
+        update_max(err2_li, counter[1]);
+        update_max(err3_li, counter[2]);
+        update_max(err4_li, counter[3]);
     });
 
     double hx{NAN}, hy{NAN};
@@ -194,13 +199,25 @@ void calc_errors(EuMesh& mesh, InFunction func, int nx) {
 
     std::cout << std::setprecision(5) << std::fixed;
     std::cout << hx << ", " << hy << ":";
-
     std::cout << std::setprecision(2) << std::scientific;
 
-    std::cout << std::setw(12) << err1;
-    std::cout << std::setw(12) << err2;
-    std::cout << std::setw(12) << err3;
-    std::cout << std::setw(12) << err4 << "\n";
+    double li_coeff = 1.0 / (nx * nx);
+    std::cout << std::setw(12) << li_coeff * err1_li;
+    std::cout << std::setw(12) << li_coeff * err2_li;
+    std::cout << std::setw(12) << li_coeff * err3_li;
+    std::cout << std::setw(12) << li_coeff * err4_li << "\t (L_inf norm)\n";
+
+    std::cout << std::setprecision(5) << std::fixed;
+    std::cout << hx << ", " << hy << ":";
+    std::cout << std::setprecision(2) << std::scientific;
+
+    double l1_coeff = hx * hy / (nx * nx);
+    std::cout << std::setw(12) << l1_coeff * err1_l1;
+    std::cout << std::setw(12) << l1_coeff * err2_l1;
+    std::cout << std::setw(12) << l1_coeff * err3_l1;
+    std::cout << std::setw(12) << l1_coeff * err4_l1 << "\t (L_1   norm)\n";
+
+    std::cout.flush();
 }
 
 EuMesh body(EuMesh& mesh, Storable<double> p, Storable<Vector3d> n) {
@@ -300,14 +317,14 @@ void show_plain(EuMesh& mesh) {
 }
 
 // Для обычной характеристической функции
-void show_classic(EuMesh& mesh, InFunction func) {
-    initialize(mesh, [func](EuCell& cell) {
-        cell[a] = cell.volume_fraction(func, 100000);
+void show_classic(EuMesh& mesh, InFunction func, int nx = 200) {
+    initialize(mesh, [func, nx](EuCell& cell) {
+        cell[a] = cell.volume_fraction(func, nx * nx);
     });
 
     make_interface(mesh);
 
-    calc_errors(mesh, func, 200);
+    calc_errors(mesh, func, nx);
 
     save_mesh(mesh);
 }
@@ -358,6 +375,29 @@ void show_noise(EuMesh& mesh, InFunction func) {
     save_mesh(mesh);
 }
 
+// Исследование сходимости
+void convergence(EuMesh& mesh, InFunction func, int nx) {
+    auto set_alpha = [func, nx](EuCell& cell) {
+        cell[a] = cell.volume_fraction(func, nx * nx);
+    };
+
+    mesh.set_distributor(Distributor::initializer(set_alpha));
+    mesh.for_each(set_alpha);
+    make_interface(mesh);
+    calc_errors(mesh, func, nx);
+
+    if (mesh.adaptive()) {
+        for (int i = 0; i < mesh.max_level(); ++i) {
+            mesh.for_each(set_flag);
+            mesh.make_shuba(1);
+            mesh.refine();
+            make_interface(mesh);
+            calc_errors(mesh, func, nx);
+        }
+    }
+    save_mesh(mesh);
+}
+
 int main() {
     utils::mpi::handler mpi_init;
     utils::threads::on();
@@ -367,14 +407,14 @@ int main() {
     //gen.set_sizes(30, 50);
 
     EuMesh mesh(gen);
-    mesh.set_max_level(0);
+    mesh.set_max_level(2);
 
     a = mesh.add<double>("a");
     std::tie(p1, p2, p3, p4) = mesh.add<double  >("p1", "p2", "p3", "p4");
     std::tie(n1, n2, n3, n4) = mesh.add<Vector3d>("n1", "n2", "n3", "n4");
     std::tie(e1, e2, e3, e4) = mesh.add<double  >("e1", "e2", "e3", "e4");
 
-    int test = 0;
+    int test = 5;
 
     switch (test) {
         case 0: show_plain(mesh); return 0;
@@ -382,18 +422,7 @@ int main() {
         case 2: show_classic(mesh, angle_func); return 0;
         case 3: show_diffuse(mesh); return 0;
         case 4: show_noise(mesh, smooth_func); return 0;
+        case 5: convergence(mesh, smooth_func, 400); return 0;
         default: return 0;
     }
 }
-
-/*
-Classic interface
-hx       hy          Central      Youngs      ELVIRA       CSIR
-0.04000, 0.04000:    1.04e-02    3.17e-03    3.38e-03    2.64e-03
-0.02000, 0.02000:    5.31e-03    9.18e-04    7.65e-04    5.88e-04
-0.01000, 0.01000:    2.66e-03    3.45e-04    1.63e-04    1.39e-04
-0.00500, 0.00500:    1.33e-03    1.56e-04    4.02e-05    3.52e-05
-0.00250, 0.00250:    6.67e-04    7.63e-05    1.01e-05    8.88e-06
-0.00125, 0.00125:    3.33e-04    3.71e-05    2.61e-06    2.26e-06
-0.00062, 0.00062:    1.67e-04    1.85e-05    6.74e-07    6.03e-07
-*/

@@ -23,6 +23,14 @@ using namespace zephyr::mesh;
 using generator::Cuboid;
 using generator::Rectangle;
 
+// val = max(val, count)
+inline void update_max(std::atomic<size_t>& val, size_t count) {
+    size_t current = val.load(std::memory_order_acquire);
+    while (current < count &&
+        !val.compare_exchange_weak(current, count,
+            std::memory_order_release, std::memory_order_acquire)) { }
+}
+
 // Радиус и угол в декартовы координаты
 inline Vector3d to_cartesian(double r, double phi) {
     return {r * std::cos(phi), r * std::sin(phi), 0.0};
