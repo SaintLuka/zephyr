@@ -426,12 +426,14 @@ Polyhedron build_with_duplicats(const std::vector<Vector3d>& vertices,
         }
         new_face = unique_face;
     }
+
 //    std::cout << "cleared_vertices" << std::endl;
 //    for (size_t i = 0; i < cleared_vertices.size(); ++i) {
 //        const auto& v = cleared_vertices[i];
 //        std::cout << "  [" << i << "] (" << v.x() << ", " << v.y() << ", " << v.z() << ")" << std::endl;
 //    }
 //    std::cout << "cleared_face_indices" << std::endl;
+
 //    for (size_t i = 0; i < cleared_face_indices.size(); ++i) {
 //        const auto& face = cleared_face_indices[i];
 //        std::cout << "part:" << i << ": [";
@@ -441,6 +443,7 @@ Polyhedron build_with_duplicats(const std::vector<Vector3d>& vertices,
 //        }
 //        std::cout << "]" << std::endl;
 //    }
+
     return Polyhedron(cleared_vertices, cleared_face_indices);
 }
 

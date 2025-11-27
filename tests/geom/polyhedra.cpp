@@ -25,7 +25,7 @@ void plot_sections(
     p_min -= 0.001 * (p_max - p_min);
     p_max += 0.001 * (p_max - p_min);
 
-    int N = 1001;
+    int N = 1000;
     double max_epsilon_cv = 0;
     double max_epsilon_fs = 0;
     std::vector<int> checks = std::vector<int>();
@@ -84,7 +84,7 @@ void plot_sections(
 }
 
 int main() {
-    Vector3d n = {0.4, 0.5, 0.3};
+    Vector3d n = {0., 0.3, 0.3}; //{0.4, 0.5, 0.3};
 //    Vector3d p = {-0.159999, -0.199999, -0.12};
 //    Vector3d p = {0.16, 0.20, 0.12};
     n.normalize();
@@ -102,6 +102,20 @@ int main() {
     plot_sections(Polyhedron::Icosahedron(), n, "icosahedron");
     plot_sections(Polyhedron::TruncatedCube(), n, "truncated_cube");
 
+    n = {0.4, 0.5, 0.3};
+//    Vector3d p = {-0.159999, -0.199999, -0.12};
+//    Vector3d p = {0.16, 0.20, 0.12};
+    n.normalize();
+
+    plot_sections(Polyhedron::Cube(), n, "cube");
+    plot_sections(Polyhedron::Cuboid(1.0, 1.2, 0.8), n, "cuboid");
+    plot_sections(Polyhedron::Pyramid(), n, "pyramid");
+    plot_sections(Polyhedron::Wedge(), n, "wedge");
+    plot_sections(Polyhedron::Tetrahedron(), n, "tetrahedron");
+    plot_sections(Polyhedron::Octahedron(), n, "octahedron");
+    plot_sections(Polyhedron::Dodecahedron(), n, "dodecahedron");
+    plot_sections(Polyhedron::Icosahedron(), n, "icosahedron");
+    plot_sections(Polyhedron::TruncatedCube(), n, "truncated_cube");
 
 //    std::cout << "Number of vertices: " << wrong_clip.n_verts() << std::endl;
 //    std::cout << "Number of faces: " << wrong_clip.n_faces() << std::endl;
