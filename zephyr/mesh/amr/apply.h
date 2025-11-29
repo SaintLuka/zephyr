@@ -26,10 +26,6 @@ namespace zephyr::mesh::amr {
 /// созданы за границами исходного хранилища)
 /// Этап 3. Создание геометрии ячеек, ячейки создаются на выделенных для них
 /// местах за границами исходного хранилища.
-/// Этап 4. Восстановление связей. На начале данного этапа все ячейки, включая
-/// новые, ссылаются на старые индексы, а новые индексы указаны в amrData.next.
-/// На данном этапе происходит выставление face.adjacent, которые указывают
-/// на новые ячейки.
 /// Этап 5. На начале этапа все ячейки правильно связаны, но внутри хранилища
 /// часть старых ячеек (не листовых) являются неопределенными.
 /// Алгоритм осуществляет удаление данных ячеек.
@@ -38,9 +34,7 @@ void apply_impl(AmrCells &locals, const Distributor& op) {
     static Stopwatch count_timer;
     static Stopwatch positions_timer;
     static Stopwatch geometry_timer;
-    static Stopwatch connections_timer;
     static Stopwatch remove_timer;
-    static Stopwatch sort_timer;
 
     static AmrCells aliens;
 
@@ -63,32 +57,17 @@ void apply_impl(AmrCells &locals, const Distributor& op) {
     setup_geometry<dim>(locals, aliens, count, op);
     geometry_timer.stop();
 
-    /// Этап 4. Восстановление соседства
-    connections_timer.resume();
-    restore_connections<dim>(locals, aliens, 0, count);
-    connections_timer.stop();
-
-    /// Этап 5. Удаление неопределенных ячеек
+    /// Этап 4. Удаление неопределенных ячеек
     remove_timer.resume();
     remove_undefined<dim>(locals, count);
     remove_timer.stop();
-
-    for (index_t ic = 0; ic < locals.size(); ++ic) {
-        locals.index[ic] = ic;
-    }
-
-    /// Этап 6. Сортировка ячеек по уровням (не обязательно)
-    //sort_timer.resume();
-    //sorting(cells);
-    //sort_timer.stop();
 
 #if CHECK_PERFORMANCE
     static size_t counter = 0;
     if (counter % amr::check_frequency == 0) {
         mpi::cout << "    Statistics:       " << std::setw(9) << count_timer.milliseconds() << " ms\n";
-        mpi::cout << "    Positions:        " << std::setw(9) << positions_timer.milliseconds() << " ms\n";
-        mpi::cout << "    Geometry:         " << std::setw(9) << geometry_timer.milliseconds() << " ms\n";
-        mpi::cout << "    Connections:      " << std::setw(9) << connections_timer.milliseconds() << " ms\n";
+        mpi::cout << "    Setup Positions:  " << std::setw(9) << positions_timer.milliseconds() << " ms\n";
+        mpi::cout << "    Setup Geometry:   " << std::setw(9) << geometry_timer.milliseconds() << " ms\n";
         mpi::cout << "    Remove undefined: " << std::setw(9) << remove_timer.milliseconds() << " ms\n";
     }
     ++counter;

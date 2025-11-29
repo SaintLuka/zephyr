@@ -17,7 +17,7 @@ namespace zephyr::mesh::amr {
 /// @param op Оператор распределения данных при огрублении и разбиении
 template<int dim>
 void setup_geometry_one(index_t ic, AmrCells &locals, AmrCells& aliens,
-                        int rank, const Distributor& op) {
+    const Distributor& op, int rank) {
 
     if (locals.flag[ic] == 0) {
         retain_cell<dim>(locals, aliens, ic);
@@ -29,7 +29,7 @@ void setup_geometry_one(index_t ic, AmrCells &locals, AmrCells& aliens,
         return;
     }
 
-    coarse_cell<dim>(locals, aliens, ic, rank, op);
+    coarse_cell<dim>(locals, aliens, ic, op, rank);
 }
 
 /// @brief Осуществляет проход по ячейкам и вызывает для них
@@ -39,18 +39,18 @@ void setup_geometry(AmrCells &locals, AmrCells& aliens, const Statistics &count,
     threads::parallel_for(
             index_t{0}, index_t{count.n_cells},
             setup_geometry_one<dim>,
-            std::ref(locals), std::ref(aliens), 0, std::ref(op));
+            std::ref(locals), std::ref(aliens), std::ref(op), 0);
 }
 
 #ifdef ZEPHYR_MPI
 /// @brief Осуществляет проход по диапазону ячеек и вызывает для них
 /// соответствующие методы адаптации (с MPI и без тредов)
 template<int dim>
-void setup_geometry(AmrCells &locals, AmrCells& aliens, int rank, const Statistics &count, const Distributor& op) {
+void setup_geometry(AmrCells &locals, AmrCells& aliens, const Statistics &count, const Distributor& op, int rank) {
     threads::parallel_for(
             index_t{0}, index_t{count.n_cells},
             setup_geometry_one<dim>,
-            std::ref(locals), std::ref(aliens), rank, std::ref(op));
+            std::ref(locals), std::ref(aliens), std::ref(op), rank);
 }
 #endif
 

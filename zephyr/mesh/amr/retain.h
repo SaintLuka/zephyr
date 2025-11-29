@@ -7,14 +7,12 @@
 
 namespace zephyr::mesh::amr {
 
-/// @brief Функция вызывается для ячеек с флагом адаптации = 0, хотя сама
-/// ячейка не разбивается и не огрубляется, у неё может измениться набор граней:
-/// какие-то грани могут объединиться, а часть разбиться.
+/// @brief Функция вызывается для ячеек с флагом адаптации = 0, хотя сама ячейка
+/// не разбивается и не огрубляется, у неё может измениться набор граней:
+/// какие-то грани могут объединиться, а какие-то разбиться.
 /// @param locals Хранилище локальных ячеек
-/// @param ic Индекс целевой ячейки
-/// @details Если какая-то грань разбивается, то adjacent у подграней
-/// выставляется со старой грани. Если подграни склеиваются, то adjacent
-/// у объединенной грани будет такой, какой был у старой грани.
+/// @param aliens Хранилище ячеек с других процессов
+/// @param ic Индекс целевой ячейки в locals
 template<int dim>
 void retain_cell(AmrCells &locals, AmrCells& aliens, index_t ic) {
     // Ячейка не требует разбиения, необходимо пройти по граням,
@@ -23,9 +21,8 @@ void retain_cell(AmrCells &locals, AmrCells& aliens, index_t ic) {
     auto& adj = locals.faces.adjacent;
 
     for (auto side: Side<dim>::items()) {
-        auto sides = side.subfaces();
-
-        index_t iface = locals.face_begin[ic] + side;
+        index_t face_beg = locals.face_begin[ic];
+        index_t iface = face_beg + side;
 
         if (locals.faces.is_undefined(iface) ||
             locals.faces.is_boundary(iface)) {
@@ -55,10 +52,11 @@ void retain_cell(AmrCells &locals, AmrCells& aliens, index_t ic) {
         if (lvl_c == lvl_n) {
             // Сосед имеет такой же уровень
 #if SCRUTINY
+            auto subfaces = side.subfaces();
             // Сложная грань вместо одинарной
             for (int i = 1; i < FpF(dim); ++i) {
-                if (locals.faces.is_actual(locals.face_begin[ic] + sides[i])) {
-                    std::cout << "Imbalance: lvl_c == lvl_n, complex " << side_to_string(sides[i], dim) << "\n";
+                if (locals.faces.is_actual(face_beg + subfaces[i])) {
+                    std::cout << "Imbalance: lvl_c == lvl_n, complex " << side_to_string(subfaces[i], dim) << "\n";
                     std::cout << "MAIN CELL:\n";
                     locals.print_info(ic);
                     std::cout << "NEIB CELL:\n";
@@ -67,24 +65,33 @@ void retain_cell(AmrCells &locals, AmrCells& aliens, index_t ic) {
                 }
             }
 #endif
-
             // Сосед адаптируется
             if (neibs.flag[jc] > 0) {
-                split_face<dim>(ic, locals, side);
+                split_face<dim>(locals, ic, side);
+
+                index_t neib_next = neibs.next[jc];
+                for (auto subface: side.subfaces()) {
+                    // TODO: MPI VERSION
+                    adj.index[face_beg + subface] = neib_next + subface.neib_child();
+                }
             }
 
             // Сосед ничего не делает - ничего не делаем
             // if (neib.flag == 0) { }
 
-            // Сосед огрубляется - ничего не делаем
-            // if (neib.flag < 0) { }
-        } else if (lvl_c < lvl_n) {
+            // Сосед огрубляется
+            if (neibs.flag[jc] < 0) {
+                // TODO: MPI VERSION
+                adj.index[iface] = neibs.next[jc];
+            }
+        }
+        else if (lvl_c < lvl_n) {
             // Сосед имеет уровень выше
 #if SCRUTINY
             // Одинарная грань вместо сложной
             int counter = 0;
-            for (int s: sides) {
-                if (locals.faces.is_actual(locals.face_begin[ic] + s)) {
+            for (int subface: side.subfaces()) {
+                if (locals.faces.is_actual(face_beg + subface)) {
                     ++counter;
                 }
             }
@@ -107,13 +114,9 @@ void retain_cell(AmrCells &locals, AmrCells& aliens, index_t ic) {
 #endif
             // Сосед огрубляется - объединяем грань
             if (neibs.flag[jc] < 0) {
-                for (int s: sides) {
-                    adj.rank [locals.face_begin[ic] + s] = adj.rank[iface];
-                    adj.index[locals.face_begin[ic] + s] = adj.index[iface];
-                    adj.alien[locals.face_begin[ic] + s] = adj.alien[iface];
-                    adj.basic[locals.face_begin[ic] + s] = ic;
-                }
-                merge_faces<dim>(ic, locals, Side<dim>(side));
+                merge_faces<dim>(locals, ic, side);
+                // TODO: MPI VERSION
+                adj.index[iface] = neibs.next[jc];
             }
 
             // Сосед ничего не делает - ничего не делаем
@@ -122,10 +125,10 @@ void retain_cell(AmrCells &locals, AmrCells& aliens, index_t ic) {
         } else {
             // Сосед имеет уровень ниже
 #if SCRUTINY
+            auto sides = side.subfaces();
             // Сложная грань вместо одинарной
             for (int i = 1; i < FpF(dim); ++i) {
-
-                if (locals.faces.is_actual(locals.face_begin[ic] + sides[i])) {
+                if (locals.faces.is_actual(face_beg + sides[i])) {
                     throw std::runtime_error("Imbalance: lvl_c > lvl_n, complex face");
                 }
             }
@@ -138,8 +141,11 @@ void retain_cell(AmrCells &locals, AmrCells& aliens, index_t ic) {
             // Сосед ничего не делает - ничего не делаем
             // if (cells.flag[jc] == 0) { }
 
-            // Сосед адаптируется - ничего не делаем
-            // if (cells.flag[jc] > 0) { }
+            // Сосед адаптируется
+            if (neibs.flag[jc] > 0) {
+                // TODO: MPI VERSION
+                adj.index[iface] = neibs.next[jc] + side.adjacent_child(locals.z_idx[ic] % CpC(dim));
+            }
         }
     }
 }

@@ -2,6 +2,7 @@ add_subdirectory(single-fluid)
 #add_subdirectory(multi-fluid)
 
 #list(APPEND PROBLEMS advection)
+#list(APPEND PROBLEMS burgers)
 #list(APPEND PROBLEMS convection)
 #list(APPEND PROBLEMS membrane)
 #list(APPEND PROBLEMS shu_osher)
@@ -25,8 +26,7 @@ if (PROBLEMS)
 endif()
 
 foreach(problem IN LISTS PROBLEMS)
-    add_executable(${problem} ${problem}.cpp
-            wave.cpp)
+    add_executable(${problem} ${problem}.cpp)
     target_include_directories(${problem} PUBLIC zephyr)
     target_link_libraries(${problem} PUBLIC zephyr)
     install(TARGETS ${problem} DESTINATION problems)

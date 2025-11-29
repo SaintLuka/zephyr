@@ -7,6 +7,7 @@
 #include <zephyr/utils/stopwatch.h>
 #include <zephyr/utils/threads.h>
 #include <zephyr/geom/primitives/polygon.h>
+#include <zephyr/geom/generator/cuboid.h>
 #include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/io/pvd_file.h>
@@ -15,6 +16,7 @@ using namespace zephyr::mesh;
 using namespace zephyr::geom;
 using namespace zephyr::utils;
 
+using generator::Cuboid;
 using generator::Rectangle;
 using zephyr::io::PvdFile;
 
@@ -27,14 +29,15 @@ struct Star {
     double R;
     Polygon poly;
 
-    // @param R Радиус описаной окружности
+    // @param R Радиус описанной окружности
     explicit Star(double R) : R(R), poly(10) {
         update(0.0);
     }
 
     // @brief Точка внутри полигона?
     bool inside(const Vector3d& v) const {
-        return poly.inside(v);
+        Vector3d v2 = {v.x(), std::sqrt(v.y()*v.y() + v.z()*v.z()), 0.0};
+        return poly.inside(v2);
     }
 
     void update(double t) {
@@ -75,11 +78,13 @@ int main() {
 
     Rectangle gen(-2.0, 2.0, -1.0, 1.0);
     gen.set_nx(50);
+    //Cuboid gen(-2.0, 2.0, -1.0, 1.0, -1.0, 1.0);
+    //gen.set_nx(20);
 
     EuMesh mesh(gen);
     bit = mesh.add<int>("bit");
 
-    mesh.set_max_level(5);
+    mesh.set_max_level(mesh.dim() == 2 ? 5 : 4);
     mesh.set_distributor("simple");
 
     PvdFile pvd("mesh", "output");
@@ -140,9 +145,9 @@ int main() {
         mesh.refine();
         sw_refine.stop();
 
-        //if (mesh.check_refined() < 0) {
-        //    throw std::runtime_error("Bad refined mesh");
-        //}
+        if (mesh.check_refined() < 0) {
+            throw std::runtime_error("Bad refined mesh");
+        }
     }
     elapsed.stop();
 

@@ -62,27 +62,4 @@ using utils::Stopwatch;
 static constexpr size_t check_frequency = 100;
 #endif
 
-// Локальные индексы ячеек, прилегающих к стороне.
-template<int dim>
-constexpr std::array<std::array<int, FpF(dim)>, FpC(dim)> get_children_by_side() {
-    if constexpr (dim == 2) {
-        return {
-            std::array<int, 2>({0, 2}),
-            std::array<int, 2>({1, 3}),
-            std::array<int, 2>({0, 1}),
-            std::array<int, 2>({2, 3})
-        };
-    }
-    else {
-        return {
-            std::array<int, 4>({0, 2, 4, 6}),
-            std::array<int, 4>({1, 3, 5, 7}),
-            std::array<int, 4>({0, 1, 4, 5}),
-            std::array<int, 4>({2, 3, 6, 7}),
-            std::array<int, 4>({0, 1, 2, 3}),
-            std::array<int, 4>({4, 5, 6, 7})
-        };
-    }
-}
-
 } // namespace zephyr::mesh::amr

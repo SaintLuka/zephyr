@@ -31,7 +31,6 @@ if (NOT ZEPHYR_PYTHON)
     list(REMOVE_ITEM TESTS curves)
     list(REMOVE_ITEM TESTS PLIC_plot)
     list(REMOVE_ITEM TESTS polygon_clip)
-    list(REMOVE_ITEM TESTS rotations)
     list(REMOVE_ITEM TESTS splines)
 endif()
 
