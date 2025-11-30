@@ -45,6 +45,7 @@ if (ZEPHYR_TBB)
 else ()
     find_package(Threads REQUIRED)
 endif ()
+find_package(OpenMP REQUIRED)
 find_package(Eigen3  REQUIRED)
 if(POLICY CMP0167)
     cmake_policy(SET CMP0167 NEW)
@@ -73,6 +74,7 @@ if (ZEPHYR_PYTHON)
     target_link_libraries(zephyr PUBLIC pybind11::embed)
 endif()
 target_link_libraries(zephyr PUBLIC Eigen3::Eigen)
+target_link_libraries(zephyr PUBLIC OpenMP::OpenMP_CXX)
 
 target_include_directories(zephyr PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>

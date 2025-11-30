@@ -16,9 +16,7 @@ namespace zephyr::mesh::amr {
 /// @param rank Ранг текущего процесса
 /// @param op Оператор распределения данных при огрублении и разбиении
 template<int dim>
-void setup_geometry_one(index_t ic, AmrCells &locals, AmrCells& aliens,
-    const Distributor& op, int rank) {
-
+void setup_geometry_one(index_t ic, AmrCells &locals, AmrCells& aliens, const Distributor& op, int rank) {
     if (locals.flag[ic] == 0) {
         retain_cell<dim>(locals, aliens, ic);
         return;

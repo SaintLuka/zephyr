@@ -36,6 +36,11 @@ void apply_impl(AmrCells &locals, const Distributor& op) {
     static Stopwatch geometry_timer;
     static Stopwatch remove_timer;
 
+    static Stopwatch create_swap_timer;
+    static Stopwatch set_mapping_timer;
+    static Stopwatch change_adjacent_timer;
+    static Stopwatch swap_elements_timer;
+
     static AmrCells aliens;
 
     /// Этап 1. Сбор статистики
@@ -49,6 +54,7 @@ void apply_impl(AmrCells &locals, const Distributor& op) {
 
     /// Этап 2. Распределяем места для новых ячеек
     positions_timer.resume();
+    locals.resize_amr(count.n_cells_large);
     setup_positions<dim>(locals, count);
     positions_timer.stop();
 
@@ -59,7 +65,25 @@ void apply_impl(AmrCells &locals, const Distributor& op) {
 
     /// Этап 4. Удаление неопределенных ячеек
     remove_timer.resume();
-    remove_undefined<dim>(locals, count);
+    scrutiny_check(count.n_cells_large != count.n_cells, "Strange things");
+
+    create_swap_timer.resume();
+    SwapLists swap_list(count, locals.flag);
+    create_swap_timer.stop();
+
+    set_mapping_timer.resume();
+    swap_list.set_mapping(locals);
+    set_mapping_timer.stop();
+
+    change_adjacent_timer.resume();
+    change_adjacent<dim>(locals);
+    change_adjacent_timer.stop();
+
+    swap_elements_timer.resume();
+    swap_list.move_elements(locals);
+    swap_elements_timer.stop();
+
+    locals.resize_amr(count.n_cells_short);
     remove_timer.stop();
 
 #if CHECK_PERFORMANCE
@@ -69,6 +93,10 @@ void apply_impl(AmrCells &locals, const Distributor& op) {
         mpi::cout << "    Setup Positions:  " << std::setw(9) << positions_timer.milliseconds() << " ms\n";
         mpi::cout << "    Setup Geometry:   " << std::setw(9) << geometry_timer.milliseconds() << " ms\n";
         mpi::cout << "    Remove undefined: " << std::setw(9) << remove_timer.milliseconds() << " ms\n";
+        mpi::cout << "      Create SwapList: " << std::setw(8) << create_swap_timer.milliseconds() << " ms\n";
+        mpi::cout << "      Setup mapping:   " << std::setw(8) << set_mapping_timer.milliseconds() << " ms\n";
+        mpi::cout << "      Change adjacent: " << std::setw(8) << change_adjacent_timer.milliseconds() << " ms\n";
+        mpi::cout << "      Swap elements:   " << std::setw(8) << swap_elements_timer.milliseconds() << " ms\n";
     }
     ++counter;
 #endif
