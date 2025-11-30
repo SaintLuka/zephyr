@@ -36,7 +36,8 @@ struct Star {
 
     // @brief Точка внутри полигона?
     bool inside(const Vector3d& v) const {
-        Vector3d v2 = {v.x(), std::sqrt(v.y()*v.y() + v.z()*v.z()), 0.0};
+        double sgn = v.y() > 0.0 ? 1.0 : -1.0;
+        Vector3d v2 = {v.x(), sgn * std::sqrt(v.y()*v.y() + v.z()*v.z()), 0.0};
         return poly.inside(v2);
     }
 

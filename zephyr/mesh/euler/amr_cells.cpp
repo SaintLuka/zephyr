@@ -411,26 +411,24 @@ double AmrCells::integrate_low(index_t ic, const SpFunction& func, int n_points)
     }
 }
 
-void AmrCells::move_item(index_t ic) {
-    int jc = next[ic];
+void AmrCells::move_item(index_t from, index_t to) {
+    rank[to] = rank[from];
+    next[to] = to;
+    index[to] = to;
 
-    rank[jc] = rank[ic];
-    next[jc] = jc;
-    index[jc] = jc;
+    flag[to] = flag[from];
+    level[to] = level[from];
+    b_idx[to] = b_idx[from];
+    z_idx[to] = z_idx[from];
 
-    flag[jc] = flag[ic];
-    level[jc] = level[ic];
-    b_idx[jc] = b_idx[ic];
-    z_idx[jc] = z_idx[ic];
+    center[to] = center[from];
+    volume[to] = volume[from];
 
-    center[jc] = center[ic];
-    volume[jc] = volume[ic];
+    volume_alt[to] = volume_alt[from];
 
-    volume_alt[jc] = volume_alt[ic];
-
-    for (index_t i = 0; i < face_begin[ic + 1] - face_begin[ic]; ++i) {
-        index_t iface = face_begin[ic] + i;
-        index_t jface = face_begin[jc] + i;
+    for (index_t i = 0; i < face_begin[from + 1] - face_begin[from]; ++i) {
+        index_t iface = face_begin[from] + i;
+        index_t jface = face_begin[to] + i;
 
         faces.boundary[jface] = faces.boundary[iface];
         faces.normal  [jface] = faces.normal  [iface];
@@ -442,16 +440,16 @@ void AmrCells::move_item(index_t ic) {
         faces.adjacent.rank [jface] = faces.adjacent.rank[iface];
         faces.adjacent.index[jface] = faces.adjacent.index[iface];
         faces.adjacent.alien[jface] = faces.adjacent.alien[iface];
-        faces.adjacent.basic[jface] = jc;
+        faces.adjacent.basic[jface] = to;
     }
 
-    for (index_t i = 0; i < node_begin[ic + 1] - node_begin[ic]; ++i) {
-        index_t jv = node_begin[jc] + i;
-        index_t iv = node_begin[ic] + i;
+    for (index_t i = 0; i < node_begin[from + 1] - node_begin[from]; ++i) {
+        index_t jv = node_begin[to] + i;
+        index_t iv = node_begin[from] + i;
         verts[jv] = verts[iv];
     }
 
-    set_undefined(ic);
+    set_undefined(from);
 }
 
 void AmrCells::copy_data(index_t from, index_t to) {

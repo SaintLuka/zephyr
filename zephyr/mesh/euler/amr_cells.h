@@ -346,7 +346,7 @@ public:
 
     /// @{ @name Работа с данными
 
-    void move_item(index_t ic);
+    void move_item(index_t from, index_t to);
 
     /// @brief Скопировать все данные с индекса from на индекс to.
     void copy_data(index_t from, index_t to);

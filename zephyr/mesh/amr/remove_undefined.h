@@ -121,15 +121,6 @@ inline void change_adjacent(AmrCells& locals, AmrCells& aliens) {
             std::ref(locals), std::ref(aliens));
 }
 
-/// @brief Выполняет перемещение элемента в соответствии с индексом
-/// в поле element.next для одной ячейки.
-/// @details Данные актуальной ячейки перемещаются на место неактуальной
-/// ячейки, индексы смежности не изменяются, они должны быть выставлены
-/// заранее.
-inline void move_cell(index_t ic, AmrCells& cells) {
-    cells.move_item(ic);
-    cells.copy_data(ic, cells.next[ic]);
-}
 
 /// @brief Вспомогательная структура, содержит два списка индексов: неопределенные
 /// ячейки и актуальные ячейки. После обмена местами неопределенных и актуальных
@@ -177,6 +168,8 @@ struct SwapLists {
             }
             --jc;
         }
+
+        scrutiny_check(actual_cells.size() == undefined_cells.size(), "actual/undefined size mismath");
     }
 
 #if SCRUTINY
@@ -250,9 +243,19 @@ struct SwapLists {
     /// @details Данные актуальной ячейки перемещаются на место неактуальной
     /// ячейки, индексы смежности должны быть выставлены ранее.
     void move_elements(AmrCells &cells) const {
-        threads::for_each(
-                actual_cells.begin(), actual_cells.end(),
-                move_cell, std::ref(cells));
+        /// @brief Выполняет перемещение элемента в соответствии с индексом
+        /// в поле element.next для одной ячейки.
+        /// @details Данные актуальной ячейки перемещаются на место неактуальной
+        /// ячейки, индексы смежности не изменяются, они должны быть выставлены
+        /// заранее.
+        auto move_cell = [this, &cells](index_t i) {
+            index_t from = actual_cells[i];
+            index_t to   = undefined_cells[i];
+            cells.move_item(from, to);
+            cells.copy_data(from, to);
+        };
+
+        threads::parallel_for(index_t{0}, index_t{size()}, move_cell);
     }
 
     /// @brief Число ячеек для перестановки

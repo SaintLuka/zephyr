@@ -24,8 +24,14 @@ void retain_cell(AmrCells &locals, AmrCells& aliens, index_t ic) {
         index_t face_beg = locals.face_begin[ic];
         index_t iface = face_beg + side;
 
-        if (locals.faces.is_undefined(iface) ||
-            locals.faces.is_boundary(iface)) {
+        if (locals.faces.is_undefined(iface)) {
+            continue;
+        }
+        if (locals.faces.is_boundary(iface)) {
+            // Сама ячейка может переезжать
+            scrutiny_check(locals.simple_face(ic, side), "Complex boundary face");
+            adj.index[iface] = locals.next[ic];
+            adj.basic[iface] = locals.next[ic];
             continue;
         }
 #if SCRUTINY
@@ -44,7 +50,8 @@ void retain_cell(AmrCells &locals, AmrCells& aliens, index_t ic) {
             throw std::runtime_error("AmrCell has no remote neighbor (retain_cell)");
         }
 #endif
-        // Хранилище и индекс соседа
+        // Хранилище и индекс соседа, если соседи более высокого уровня,
+        // то это какой-то из соседей
         auto [neibs, jc] = adj.get_neib(iface, locals, aliens);
 
         auto lvl_n = neibs.level[jc];
@@ -65,28 +72,35 @@ void retain_cell(AmrCells &locals, AmrCells& aliens, index_t ic) {
                 }
             }
 #endif
-            // Сосед адаптируется
+            index_t neib_next = neibs.next[jc];
+
             if (neibs.flag[jc] > 0) {
+                // Сосед адаптируется
                 split_face<dim>(locals, ic, side);
 
-                index_t neib_next = neibs.next[jc];
                 for (auto subface: side.subfaces()) {
                     // TODO: MPI VERSION
-                    adj.index[face_beg + subface] = neib_next + subface.neib_child();
+                    adj.index[face_beg + subface] = locals.next[neib_next + subface.neib_child()];
+                    adj.basic[face_beg + subface] = locals.next[ic];
                 }
             }
+            else {
+                adj.basic[iface] = locals.next[ic];
 
-            // Сосед ничего не делает - ничего не делаем
-            // if (neib.flag == 0) { }
-
-            // Сосед огрубляется
-            if (neibs.flag[jc] < 0) {
-                // TODO: MPI VERSION
-                adj.index[iface] = neibs.next[jc];
+                if (neibs.flag[jc] == 0) {
+                    // Сосед ничего не делает, но может переехать
+                    // TODO: MPI VERSION
+                    adj.index[iface] = neib_next;
+                }
+                else {
+                    // Сосед огрубляется (neib_flag < 0)
+                    // TODO: MPI VERSION
+                    adj.index[iface] = locals.next[neib_next];
+                }
             }
         }
         else if (lvl_c < lvl_n) {
-            // Сосед имеет уровень выше
+            // Соседи (их два/четыре) имеют уровень выше
 #if SCRUTINY
             // Одинарная грань вместо сложной
             int counter = 0;
@@ -112,16 +126,26 @@ void retain_cell(AmrCells &locals, AmrCells& aliens, index_t ic) {
                 throw std::runtime_error("Imbalance None:Split");
             }
 #endif
-            // Сосед огрубляется - объединяем грань
             if (neibs.flag[jc] < 0) {
+                // Соседи огрубляются - объединяем грань
                 merge_faces<dim>(locals, ic, side);
+
                 // TODO: MPI VERSION
-                adj.index[iface] = neibs.next[jc];
+                adj.index[iface] = locals.next[neibs.next[jc]];
+                adj.basic[iface] = locals.next[ic];
             }
+            else {
+                // Сосед ничего не делает, но может переехать
+                for (auto subface: side.subfaces()) {
+                    index_t jface = face_beg + subface;
+                    // Хранилище и индекс соседа
+                    auto [neibs2, kc] = adj.get_neib(jface, locals, aliens);
 
-            // Сосед ничего не делает - ничего не делаем
-            // if (cell[adj.index].flag == 0) { }
-
+                    // TODO: MPI VERSION
+                    adj.index[jface] = neibs2.next[kc];
+                    adj.basic[jface] = locals.next[ic];
+                }
+            }
         } else {
             // Сосед имеет уровень ниже
 #if SCRUTINY
@@ -138,13 +162,18 @@ void retain_cell(AmrCells &locals, AmrCells& aliens, index_t ic) {
                 throw std::runtime_error("Imbalance: lvl_c > lvl_n, flag_n = coarse");
             }
 #endif
-            // Сосед ничего не делает - ничего не делаем
-            // if (cells.flag[jc] == 0) { }
-
-            // Сосед адаптируется
-            if (neibs.flag[jc] > 0) {
+            if (neibs.flag[jc] == 0) {
+                // Сосед ничего не делает, но может переехать
                 // TODO: MPI VERSION
-                adj.index[iface] = neibs.next[jc] + side.adjacent_child(locals.z_idx[ic] % CpC(dim));
+                adj.index[iface] = neibs.next[jc];
+                adj.basic[iface] = locals.next[ic];
+            }
+            else {
+                // Сосед адаптируется (neib_flag > 0)
+                // TODO: MPI VERSION
+                index_t neib_next = neibs.next[jc] + side.adjacent_child(locals.z_idx[ic] % CpC(dim));
+                adj.index[iface] = locals.next[neib_next];
+                adj.basic[iface] = locals.next[ic];
             }
         }
     }

@@ -13,6 +13,7 @@
 #include <zephyr/mesh/amr/balancing.h>
 
 #include <zephyr/utils/json.h>
+#include <zephyr/io/pvd_file.h>
 
 namespace zephyr::mesh {
 
@@ -20,7 +21,8 @@ using namespace geom;
 using namespace utils;
 using generator::Rectangle;
 using generator::Cuboid;
-using zephyr::utils::Stopwatch;
+using utils::Stopwatch;
+using namespace io;
 
 void EuMesh::build(Generator& gen) {
     if (mpi::master()) {

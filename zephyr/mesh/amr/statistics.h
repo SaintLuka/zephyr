@@ -57,13 +57,13 @@ struct Statistics {
     /// @brief Конструктор, однопоточный сбор статистики
     /// @details В многопоточном режиме данные получаются после объединения 
     /// статистики с разных потоков
-    explicit Statistics(const AmrCells &locals) {
-        n_cells = locals.size();
+    explicit Statistics(const std::vector<int>& flags, int dim) {
+        n_cells = flags.size();
 
         scrutiny_check(n_cells >= 0, "Empty AmrStorage statistics");
 
         PartStatistics ps = threads::sum(
-            locals.flag.cbegin(), locals.flag.cend(),
+            flags.cbegin(), flags.cend(),
             PartStatistics{}, cell_statistics);
 
         n_coarse = ps.n_coarse;
@@ -71,11 +71,11 @@ struct Statistics {
         n_refine = ps.n_refine;
 
         // Пересчитаем зависимые величины
-        scrutiny_check(n_coarse % CpC(locals.dim()) == 0, "Refiner::apply() error #2")
+        scrutiny_check(n_coarse % CpC(dim) == 0, "Refiner::apply() error #2")
         scrutiny_check(n_retain + n_refine + n_coarse == n_cells, "Refiner::apply() error #1");
 
-        n_parents =  n_coarse / CpC(locals.dim());
-        n_children = n_refine * CpC(locals.dim());
+        n_parents =  n_coarse / CpC(dim);
+        n_children = n_refine * CpC(dim);
 
         n_cells_large = n_cells + n_parents + n_children;
         n_cells_short = n_retain + n_children + n_parents;

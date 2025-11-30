@@ -100,9 +100,12 @@ void make_parent(AmrCells& locals, AmrCells& aliens, Children& children, index_t
         locals.set_cell(ip, parent_vs<dim>(locals, children));
     }
 
+    index_t ip_next = locals.next[ip];
+
+    scrutiny_check(locals.rank[children.index[0]] == rank, "strange rank");
+
     // Выставляем основные свойства
-    locals.rank [ip] = locals.rank[children.index[0]];
-    locals.next [ip] = ip;
+    locals.rank [ip] = rank;
     locals.index[ip] = ip;
 
     locals.flag [ip] = 0;
@@ -132,12 +135,12 @@ void make_parent(AmrCells& locals, AmrCells& aliens, Children& children, index_t
         index_t face_beg = locals.face_begin[ip];
         locals.faces.boundary[face_beg + side] = locals.faces.boundary[some_ch_face];
 
-        // Внешняя граница, не требуется линковать
+        // Внешняя граница, не требуется связывать
         if (locals.faces.is_boundary(some_ch_face)) {
             adj.rank [face_beg + side] = rank;
-            adj.index[face_beg + side] = ip;
+            adj.index[face_beg + side] = ip_next;
             adj.alien[face_beg + side] = -1;
-            adj.basic[face_beg + side] = ip;
+            adj.basic[face_beg + side] = ip_next;
             continue;
         }
 
@@ -193,8 +196,15 @@ void make_parent(AmrCells& locals, AmrCells& aliens, Children& children, index_t
             // TODO: MPI VERSION
             adj.rank [face_beg + side] = some_neib_rank;
             adj.alien[face_beg + side] = some_neib_alien;
-            adj.index[face_beg + side] = some_neibs.next[some_neib];
-            adj.basic[face_beg + side] = ip;
+            adj.basic[face_beg + side] = ip_next;
+
+            int some_neib_flag = some_neibs.flag[some_neib];
+            if (some_neib_flag == 0) {
+                adj.index[face_beg + side] = some_neibs.next[some_neib];
+            }
+            else {
+                adj.index[face_beg + side] = locals.next[some_neibs.next[some_neib]];
+            }
 
             // Обнуляем неактивные подграни
             for (int i = 1; i < FpF(dim); ++i) {
@@ -208,9 +218,10 @@ void make_parent(AmrCells& locals, AmrCells& aliens, Children& children, index_t
 
         split_face<dim>(locals, ip, side);
 
-        // lvl_c > lvl_n & flag_n == 1
-        // Сосед выше и ничего не делает
-        // Там есть сосед, который делает coarse
+        // Возможно три случая:
+        // lvl_ch > lvl_n & flag_n == 1, сосед такой же как новая родительская, но бьется
+        // lvl_ch = lvl_n & flag_n == 0, то есть сосед выше новой родительской ничего не делает
+        // lvl_ch < lvl_n & flan_n < 0 хотя бы у одного, то есть сосед, который делает coarse
         for (auto subface: side.subfaces()) {
             // TODO: MPI VERSION
             index_t ich = children.index[subface.child()];
@@ -219,19 +230,24 @@ void make_parent(AmrCells& locals, AmrCells& aliens, Children& children, index_t
             scrutiny_check(0 <= jc && jc < neibs.size(), "Out-of-bounds #3");
 
             adj.rank [face_beg + subface] = adj.rank [ch_face];
-            adj.index[face_beg + subface] = -1;
             adj.alien[face_beg + subface] = adj.alien[ch_face];
-            adj.basic[face_beg + subface] = ip;
+            adj.basic[face_beg + subface] = ip_next;
 
             if (locals.level[ich] > neibs.level[jc]) {
+                // Сосед нашего уровня с родительской, но бьется
                 scrutiny_check(neibs.flag[jc] > 0, "Wrong assumption #4");
-                adj.index[face_beg + subface] = neibs.next[jc] + subface.neib_child();
+                index_t adj_next = neibs.next[jc] + subface.neib_child();
+                adj.index[face_beg + subface] = locals.next[adj_next];
             }
             else {
                 scrutiny_check(neibs.flag[jc] <= 0, "Wrong assumption #5");
-                adj.index[face_beg + subface] = neibs.next[jc];
+                if (neibs.flag[jc] == 0) {
+                    adj.index[face_beg + subface] = neibs.next[jc];
+                }
+                else {
+                    adj.index[face_beg + subface] = locals.next[neibs.next[jc]];
+                }
             }
-
             scrutiny_check(adj.index[face_beg + subface] >= 0, "Not all cases");
         }
 
