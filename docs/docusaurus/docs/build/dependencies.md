@@ -1,5 +1,6 @@
 ---
 sidebar_position: 1
+description: "Используемые библиотеки, зависимости, опции CMake"
 ---
 
 # Зависимости
@@ -9,11 +10,11 @@ sidebar_position: 1
 <div class="no-header-table">
 | | | |
 |-|-|-|
-| **Eigen3** | **required** | Библиотека линейной алгебры |
-| **Boost**  | **required** | Распространенное расширение для С++ |
-| TBB    | optional | Threading Building Blocks – библиотека для параллельного программирования от Intel |
-| MPI    | optional | Message Passing Interface – классический интерфейс для параллелизации с распределенной памятью |
-| Python | optional | Библиотека pybind11 позволяет связать код на python и на С++, в проекте для визуализации используется интерпретатор python и matploblib |
+| **Eigen3** | **required** | Библиотека линейной алгебры. |
+| **Boost**  | **required** | Популярная библиотека для С++. |
+| TBB    | optional | Threading Building Blocks – библиотека для параллельного программирования от Intel. |
+| MPI    | optional | Message Passing Interface – классический интерфейс для параллелизации с распределенной памятью. |
+| pybind11 | optional | Библиотека pybind11 позволяет связать код на python и на С++, в проекте для визуализации также используется интерпретатор python, numpy и matploblib. |
 </div>
 
 Из обязательных зависимостей: Eigen3 и Boost.
@@ -22,7 +23,7 @@ sidebar_position: 1
 
 ## Опции CMake
 
-Включить/выключить использование дополнительных библиотек можно с помощью [опций CMake](./cmake.md):
+Включить/выключить использование дополнительных библиотек можно с помощью [опций CMake](./cmake.md#опции-cmake):
 <div class="no-header-table">
 | | | |
 |-|-|-|

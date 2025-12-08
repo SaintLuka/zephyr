@@ -31,3 +31,9 @@
 .no-header-table table thead {
   display: none;
 }
+.hero__title {
+  font-family: 'Literata', serif;
+  font-weight: 400;
+  font-size: 3.5rem;
+  line-height: 1.2;
+}

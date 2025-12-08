@@ -6,7 +6,7 @@ add_subdirectory(single-fluid)
 #list(APPEND PROBLEMS membrane)
 #list(APPEND PROBLEMS shu_osher)
 #list(APPEND PROBLEMS transfer)
-#list(APPEND PROBLEMS wave)
+list(APPEND PROBLEMS wave)
 
 # Assuming all files in the directory are tests
 if (ZEPHYR_PROBLEMS_ALL)

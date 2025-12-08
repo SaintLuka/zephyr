@@ -10,7 +10,7 @@ using generator::Rectangle;
 
 int main() {
     // Геометрия области
-    Rectangle gen(-2.0, 1.0, -2.0, 1.0);
+    Rectangle gen(-2.0, 1.0, -2.0, 1.0);  // [x_min, x_max, y_min, y_max]
     gen.set_nx(400);
     gen.set_boundaries({.left=Boundary::WALL, .right=Boundary::WALL,
                         .bottom=Boundary::WALL, .top=Boundary::WALL});
@@ -34,13 +34,11 @@ int main() {
         cell[u_curr] = cell[u_prev];
     }
 
-    // Зададим скорость и вычислим расчетный шаг
+    // Зададим скорость
     double speed = 1.0;
-    double dt = std::numeric_limits<double>::max();
-    for (auto cell: mesh) {
-        dt = std::min(dt, 0.5 * cell.incircle_diameter() / speed);
-    }
-    dt *= 0.95; // Условие Куранта
+    // Расчетный шаг в соответствии с условием Куранта
+    double h = std::min(mesh[0].hx(), mesh[0].hy());
+    double dt = 0.95 * h / (std::sqrt(2.0) * speed);
 
     // Основной цикл программы
     size_t n_step = 0;

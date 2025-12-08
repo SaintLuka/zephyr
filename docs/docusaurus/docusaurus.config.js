@@ -10,7 +10,7 @@ import {themes as prismThemes} from 'prism-react-renderer';
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
-  title: 'Zephyr',
+  title: 'Zeφyr',
   tagline: 'Очередной CFD код',
   favicon: 'img/favicon.ico',
 
@@ -48,6 +48,8 @@ const config = {
         docs: {
           sidebarPath: require.resolve('./sidebars.js'),
           sidebarPath: './sidebars.js',
+          remarkPlugins: [require('remark-math')],
+          rehypePlugins: [require('rehype-katex')],
         },
         blog: {
           showReadingTime: true,
@@ -59,12 +61,23 @@ const config = {
           onInlineTags: 'warn',
           onInlineAuthors: 'warn',
           onUntruncatedBlogPosts: 'warn',
+          remarkPlugins: [require('remark-math')],
+          rehypePlugins: [require('rehype-katex')],
         },
         theme: {
           customCss: './src/css/custom.css',
         },
       }),
     ],
+  ],  
+  
+  stylesheets: [
+    {
+      href: 'https://cdn.jsdelivr.net/npm/katex@0.13.24/dist/katex.min.css',
+      type: 'text/css',
+      integrity: 'sha384-odtC+0UGzzFL/6PNoE8rX/SPcQDXBJ+uRepguP4QkPCm2LBxH3FA3y+fKSiJ+AmM',
+      crossorigin: 'anonymous',
+    },
   ],
 
   themeConfig:
@@ -76,6 +89,7 @@ const config = {
         respectPrefersColorScheme: true,
       },
       navbar: {
+        title: 'Zeφyr',
         logo: {
           alt: 'My Site Logo',
           src: 'img/logo.svg',
@@ -84,18 +98,21 @@ const config = {
           {
             type: 'docSidebar',
             sidebarId: 'tutorialSidebar',
+            href: '/docs/category/build',
             position: 'left',
             label: 'Сборка',
           },
           {
             type: 'docSidebar',
             sidebarId: 'tutorialSidebar',
+            href: '/docs/category/basics',
             position: 'left',
-            label: 'Модули',
+            label: 'Возможности',
           },
           {
             type: 'docSidebar',
             sidebarId: 'tutorialSidebar',
+            href: '/docs/category/problems',
             position: 'left',
             label: 'Задачи',
           },
