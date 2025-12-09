@@ -45,7 +45,7 @@ void retain_cell(AmrCells &locals, AmrCells& aliens, index_t ic) {
         if (adj.rank[iface] != rank &&
             (adj.alien[iface] < 0 || adj.alien[iface] >= aliens.size())) {
             std::cout << "AmrCell has no remote neighbor through the " <<
-                side_to_string(side, dim) << " side\n";
+                side_to_string(side, dim) << " side; aliens size: " << aliens.size() << "\n";
             locals.print_info(ic);
             throw std::runtime_error("AmrCell has no remote neighbor (retain_cell)");
         }
@@ -79,9 +79,15 @@ void retain_cell(AmrCells &locals, AmrCells& aliens, index_t ic) {
                 split_face<dim>(locals, ic, side);
 
                 for (auto subface: side.subfaces()) {
-                    // TODO: MPI VERSION
-                    adj.index[face_beg + subface] = locals.next[neib_next + subface.neib_child()];
-                    adj.basic[face_beg + subface] = locals.next[ic];
+                    index_t sface = face_beg + subface;
+                    adj.basic[sface] = locals.next[ic];
+                    if (adj.alien[iface] < 0) {
+                        adj.index[sface] = locals.next[neib_next + subface.neib_child()];
+                    }
+                    else {
+                        int zch = subface.neib_child();
+                        adj.alien[sface] = child_next(aliens.next[jc], zch);
+                    }
                 }
             }
             else {
@@ -89,13 +95,21 @@ void retain_cell(AmrCells &locals, AmrCells& aliens, index_t ic) {
 
                 if (neibs.flag[jc] == 0) {
                     // Сосед ничего не делает, но может переехать
-                    // TODO: MPI VERSION
-                    adj.index[iface] = neib_next;
+                    if (adj.alien[iface] < 0) {
+                        adj.index[iface] = neib_next;
+                    }
+                    else {
+                        adj.alien[iface] = neib_next;
+                    }
                 }
                 else {
                     // Сосед огрубляется (neib_flag < 0)
-                    // TODO: MPI VERSION
-                    adj.index[iface] = locals.next[neib_next];
+                    if (adj.alien[iface] < 0) {
+                        adj.index[iface] = locals.next[neib_next];
+                    }
+                    else {
+                        adj.alien[iface] = neib_next;
+                    }
                 }
             }
         }
@@ -130,9 +144,13 @@ void retain_cell(AmrCells &locals, AmrCells& aliens, index_t ic) {
                 // Соседи огрубляются - объединяем грань
                 merge_faces<dim>(locals, ic, side);
 
-                // TODO: MPI VERSION
-                adj.index[iface] = locals.next[neibs.next[jc]];
                 adj.basic[iface] = locals.next[ic];
+                if (adj.alien[iface] < 0) {
+                    adj.index[iface] = locals.next[neibs.next[jc]];
+                }
+                else {
+                    adj.alien[iface] = aliens.next[jc];
+                }
             }
             else {
                 // Сосед ничего не делает, но может переехать
@@ -141,9 +159,14 @@ void retain_cell(AmrCells &locals, AmrCells& aliens, index_t ic) {
                     // Хранилище и индекс соседа
                     auto [neibs2, kc] = adj.get_neib(jface, locals, aliens);
 
-                    // TODO: MPI VERSION
-                    adj.index[jface] = neibs2.next[kc];
                     adj.basic[jface] = locals.next[ic];
+
+                    if (adj.alien[jface] < 0) {
+                        adj.index[jface] = neibs2.next[kc];
+                    }
+                    else {
+                        adj.alien[jface] = neibs2.next[kc];
+                    }
                 }
             }
         } else {
@@ -164,16 +187,27 @@ void retain_cell(AmrCells &locals, AmrCells& aliens, index_t ic) {
 #endif
             if (neibs.flag[jc] == 0) {
                 // Сосед ничего не делает, но может переехать
-                // TODO: MPI VERSION
-                adj.index[iface] = neibs.next[jc];
                 adj.basic[iface] = locals.next[ic];
+
+                if (adj.alien[iface] < 0) {
+                    adj.index[iface] = neibs.next[jc];
+                }
+                else {
+                    adj.alien[iface] = neibs.next[jc];
+                }
             }
             else {
                 // Сосед адаптируется (neib_flag > 0)
-                // TODO: MPI VERSION
-                index_t neib_next = neibs.next[jc] + side.adjacent_child(locals.z_idx[ic] % CpC(dim));
-                adj.index[iface] = locals.next[neib_next];
                 adj.basic[iface] = locals.next[ic];
+
+                int zch = side.adjacent_child(locals.z_idx[ic] % CpC(dim));
+                if (adj.alien[iface] < 0) {
+                    index_t neib_next = neibs.next[jc] + zch;
+                    adj.index[iface] = locals.next[neib_next];
+                }
+                else {
+                    adj.alien[iface] = child_next(aliens.next[jc], zch);
+                }
             }
         }
     }

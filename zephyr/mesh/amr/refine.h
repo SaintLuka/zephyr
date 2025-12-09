@@ -246,7 +246,8 @@ index_t make_children(AmrCells &locals, AmrCells& aliens, index_t ip) {
 
         // Родительская ячейка имела простую грань по стороне
         if (locals.simple_face(ip, side)) {
-            auto [neibs, jc] = adj.get_neib(face_beg + side, locals, aliens);
+            index_t p_face = face_beg + side;
+            auto [neibs, jc] = adj.get_neib(p_face, locals, aliens);
             scrutiny_check(0 <= jc && jc < neibs.size(), "Out fo bounds make children #1");
 
             scrutiny_check(
@@ -260,23 +261,37 @@ index_t make_children(AmrCells &locals, AmrCells& aliens, index_t ip) {
                 index_t ich = main_child + i;
                 index_t ch_face = locals.face_begin[ich] + side;
 
-                // TODO: MPI VERSION
-                adj.rank[ch_face] = adj.rank[face_beg + side];
-                adj.alien[ch_face] = adj.alien[face_beg + side];
+                adj.rank[ch_face] = adj.rank[p_face];
 
-                // TODO: MPI VERSION
                 if (locals.level[ip] > neibs.level[jc]) {
                     // case: lvl_c > lvl_n & flag_n == 1
-                    adj.index[ch_face] = locals.next[neibs.next[jc] + side.adjacent_child(locals.z_idx[ip] % CpC(dim))];
+                    int zch = side.adjacent_child(locals.z_idx[ip] % CpC(dim));
+                    if (adj.alien[p_face] < 0) {
+                        adj.index[ch_face] = locals.next[neibs.next[jc] + zch];
+                    }
+                    else {
+                        adj.alien[ch_face] = child_next(aliens.next[jc], zch);
+                    }
                 }
                 else {
                     if (neibs.flag[jc] == 0) {
                         // case: lvl_c == lvl_n & flag_n == 0
-                        adj.index[ch_face] = locals.next[adj.index[face_beg + side]];
+                        if (adj.alien[p_face] < 0) {
+                            adj.index[ch_face] = locals.next[jc];
+                        }
+                        else {
+                            adj.alien[ch_face] = aliens.next[jc];
+                        }
                     }
                     else {
                         // case: lvl_c == lvl_n & flag_n == 1
-                        adj.index[ch_face] = locals.next[neibs.next[jc] + side.adjacent_child(i)];
+                        int zch = side.adjacent_child(i);
+                        if (adj.alien[p_face] < 0) {
+                            adj.index[ch_face] = locals.next[neibs.next[jc] + zch];
+                        }
+                        else {
+                            adj.alien[ch_face] = child_next(aliens.next[jc], zch);
+                        }
                     }
                 }
             }
@@ -287,24 +302,38 @@ index_t make_children(AmrCells &locals, AmrCells& aliens, index_t ip) {
                 index_t ch_face = locals.face_begin[ich] + side;
 
                 Side<dim> subface = side.subface_by_child(i);
-                auto [neibs, jc] = adj.get_neib(face_beg + subface, locals, aliens);
+                index_t p_face = face_beg + subface;
+                auto [neibs, jc] = adj.get_neib(p_face, locals, aliens);
                 scrutiny_check(0 <= jc && jc < neibs.size(), "Out fo bounds make children #2");
 
-                // TODO: MPI VERSION
-                adj.rank[ch_face] = adj.rank[face_beg + subface];
-                adj.alien[ch_face] = adj.alien[face_beg + subface];
+                adj.rank[ch_face] = adj.rank[p_face];
 
                 if (neibs.flag[jc] == 0) {
-                    adj.index[ch_face] = neibs.next[jc];
+                    if (adj.alien[p_face] < 0) {
+                        adj.index[ch_face] = locals.next[jc];
+                    }
+                    else {
+                        adj.alien[ch_face] = aliens.next[jc];
+                    }
                 }
                 else if (neibs.flag[jc] < 0) {
-                    adj.index[ch_face] = locals.next[neibs.next[jc]];
+                    if (adj.alien[p_face] < 0) {
+                        adj.index[ch_face] = locals.next[neibs.next[jc]];
+                    }
+                    else {
+                        adj.alien[ch_face] = aliens.next[jc];
+                    }
                 }
                 else {
                     // Здесь остался возможный случай, когда сосед ещё разобьется,
                     // тогда у новой дочерней ячейки ещё придется бить грань
                     // Пока что она указывает на устаревший индекс.
-                    adj.index[ch_face] = jc;
+                    if (adj.alien[p_face] < 0) {
+                        adj.index[ch_face] = jc;
+                    }
+                    else {
+                        adj.alien[ch_face] = jc;
+                    }
                 }
             }
         }
@@ -361,6 +390,8 @@ void refine_cell(AmrCells &locals, AmrCells& aliens, index_t ip, const Distribut
             else {
                 // Удаленная ячейка
                 if (adj.alien[iface] < 0 || adj.alien[iface] >= aliens.size()) {
+                    locals.print_info(ip);
+                    locals.print_info(ich);
                     throw std::runtime_error("adjacent.alien out of range (refine_cell)");
                 }
             }
@@ -379,11 +410,17 @@ void refine_cell(AmrCells &locals, AmrCells& aliens, index_t ip, const Distribut
 
                 index_t neib_next = neibs.next[jc];
                 for (auto subface: side.subfaces()) {
-                    // TODO: MPI VERSION
                     index_t ch_face = locals.face_begin[ich] + subface;
                     adj.rank[ch_face] = adj.rank[p_face];
-                    adj.index[ch_face] = locals.next[neib_next + subface.neib_child()];
-                    adj.alien[ch_face] = -1;
+
+                    int zch = subface.neib_child();
+                    if (adj.alien[p_face] < 0) {
+                        adj.index[ch_face] = locals.next[neib_next + zch];
+                        adj.alien[ch_face] = -1;
+                    }
+                    else {
+                        adj.alien[ch_face] = child_next(aliens.next[jc], zch);
+                    }
                 }
             }
         }

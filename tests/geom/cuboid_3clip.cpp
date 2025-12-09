@@ -8,6 +8,7 @@
 #include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/io/vtu_file.h>
 #include <zephyr/io/vtr_file.h>
+#include <zephyr/io/pvd_file.h>
 #include <zephyr/utils/pyplot.h>
 #include <zephyr/utils/stopwatch.h>
 
@@ -342,6 +343,8 @@ void ae_full(const std::string& filename) {
     auto out_case = table(0);
     auto dist = table(0.0);
     auto norm = table(Vector3d{});
+    auto theta = table(0.0);
+    auto phi  = table(0.0);
 
     Stopwatch elapsed(true);
     threads::parallel_for(0, N, [&](int i) {
@@ -361,6 +364,9 @@ void ae_full(const std::string& filename) {
                 error[i][j][k] = get_error(res.p, res.n, a0, a1, a2);
                 cases[i][j][k] = cases_t(res.p, res.n);
                 out_case[i][j][k] = res.out_case;
+
+                theta[i][j][k] = std::acos(res.n.z());
+                phi[i][j][k] = std::atan2(res.n.y(), res.n.x());
             }
         }
     });
@@ -417,6 +423,8 @@ void ae_full(const std::string& filename) {
     file.point_data("a_edge", a_e);
     file.point_data("n_iters", iters);
     file.point_data("type", type);
+    file.point_data("theta", theta);
+    file.point_data("phi", phi);
 
     file.save();
 }

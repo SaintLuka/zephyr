@@ -215,7 +215,14 @@ protected:
           m_data(size * m_element_size),
           m_count(count) {
 #ifdef ZEPHYR_MPI
-        m_dtype = mpi::datatype::contiguous(element_size, MPI_BYTE);
+        int flag;
+        MPI_Initialized(&flag);
+        if (flag) {
+            m_dtype = mpi::datatype::contiguous(element_size, MPI_BYTE);
+        }
+        else {
+            m_dtype = nullptr;
+        }
 #endif
     }
 

@@ -197,9 +197,11 @@ int main() {
 
     Stopwatch elapsed(true);
     for (int n_step = 0; n_step <= 1000; ++n_step) {
-        // redistribute на каждом шаге
-        mesh.balancing(mesh.locals().size());
-        mesh.redistribute();
+        // redistribute на каждом 10-ом шаге
+        if (n_step % 10 == 0) {
+            mesh.balancing(mesh.locals().size());
+            mesh.redistribute();
+        }
 
         setup_values(mesh, 0.01 * n_step, u, wflag);
 

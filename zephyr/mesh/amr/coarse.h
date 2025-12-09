@@ -193,17 +193,26 @@ void make_parent(AmrCells& locals, AmrCells& aliens, Children& children, index_t
 #endif
         // Простой случай: грань родительской ячейки должна быть простой
         if (some_neib_wanted_lvl <= locals.level[ip]) {
-            // TODO: MPI VERSION
-            adj.rank [face_beg + side] = some_neib_rank;
-            adj.alien[face_beg + side] = some_neib_alien;
-            adj.basic[face_beg + side] = ip_next;
+            index_t p_face = face_beg + side;
+            adj.rank [p_face] = some_neib_rank;
+            adj.basic[p_face] = ip_next;
 
             int some_neib_flag = some_neibs.flag[some_neib];
             if (some_neib_flag == 0) {
-                adj.index[face_beg + side] = some_neibs.next[some_neib];
+                if (some_neib_alien < 0) {
+                    adj.index[p_face] = locals.next[some_neib];
+                }
+                else {
+                    adj.alien[p_face] = aliens.next[some_neib];
+                }
             }
             else {
-                adj.index[face_beg + side] = locals.next[some_neibs.next[some_neib]];
+                if (some_neib_alien < 0) {
+                    adj.index[p_face] = locals.next[some_neibs.next[some_neib]];
+                }
+                else {
+                    adj.alien[p_face] = aliens.next[some_neib];
+                }
             }
 
             // Обнуляем неактивные подграни
@@ -223,32 +232,48 @@ void make_parent(AmrCells& locals, AmrCells& aliens, Children& children, index_t
         // lvl_ch = lvl_n & flag_n == 0, то есть сосед выше новой родительской ничего не делает
         // lvl_ch < lvl_n & flan_n < 0 хотя бы у одного, то есть сосед, который делает coarse
         for (auto subface: side.subfaces()) {
-            // TODO: MPI VERSION
             index_t ich = children.index[subface.child()];
             index_t ch_face = locals.face_begin[ich] + side;
             auto[neibs, jc] = adj.get_neib(ch_face, locals, aliens);
             scrutiny_check(0 <= jc && jc < neibs.size(), "Out-of-bounds #3");
 
-            adj.rank [face_beg + subface] = adj.rank [ch_face];
-            adj.alien[face_beg + subface] = adj.alien[ch_face];
-            adj.basic[face_beg + subface] = ip_next;
+            index_t sface = face_beg + subface;
+
+            adj.rank[sface] = adj.rank[ch_face];
+            adj.basic[sface] = ip_next;
 
             if (locals.level[ich] > neibs.level[jc]) {
                 // Сосед нашего уровня с родительской, но бьется
                 scrutiny_check(neibs.flag[jc] > 0, "Wrong assumption #4");
-                index_t adj_next = neibs.next[jc] + subface.neib_child();
-                adj.index[face_beg + subface] = locals.next[adj_next];
+                int zch = subface.neib_child();
+                if (adj.alien[ch_face] < 0) {
+                    index_t adj_next = neibs.next[jc] + zch;
+                    adj.index[sface] = locals.next[adj_next];
+                }
+                else {
+                    adj.alien[sface] = child_next(aliens.next[jc], zch);
+                }
             }
             else {
                 scrutiny_check(neibs.flag[jc] <= 0, "Wrong assumption #5");
                 if (neibs.flag[jc] == 0) {
-                    adj.index[face_beg + subface] = neibs.next[jc];
+                    if (adj.alien[ch_face] < 0) {
+                        adj.index[sface] = locals.next[jc];
+                    }
+                    else {
+                        adj.alien[sface] = aliens.next[jc];
+                    }
                 }
                 else {
-                    adj.index[face_beg + subface] = locals.next[neibs.next[jc]];
+                    if (adj.alien[ch_face] < 0) {
+                        adj.index[sface] = locals.next[neibs.next[jc]];
+                    }
+                    else {
+                        adj.alien[sface] = aliens.next[jc];
+                    }
                 }
             }
-            scrutiny_check(adj.index[face_beg + subface] >= 0, "Not all cases");
+            scrutiny_check(adj.index[sface] >= 0 || adj.alien[sface] >= 0, "Not all cases");
         }
 
 #if SCRUTINY

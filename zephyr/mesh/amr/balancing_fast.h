@@ -511,6 +511,10 @@ void balance_flags_fast(Tourism& tourism, AmrCells &locals, AmrCells &aliens, in
         round_timer_4.stop();
     }
 
+    // TODO: оптимизировать и отправлять не все флаги?
+    // TODO: проверить, нужна ли отправка в slow_balancing
+    tourism.sync<MpiTag::FLAG>(locals, aliens);
+
 #if CHECK_PERFORMANCE
     n_step += 1;
     n_total_coarse += std::accumulate(sorted.n_coarse.begin(), sorted.n_coarse.end(), 0);

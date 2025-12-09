@@ -62,4 +62,20 @@ using utils::Stopwatch;
 static constexpr size_t check_frequency = 100;
 #endif
 
+inline std::tuple<index_t, std::bitset<8>> unpack_children(index_t next) {
+    return {static_cast<std::make_unsigned_t<index_t>>(next) % (1 << 24), std::bitset<8>(next >> 24) };
+}
+
+// coded_children - закодированные дочерние ячейки, формата bitset<8> [01010101]
+// z_ch локальный индекс дочерней ячейки (внутри родительской)
+inline int child_next(index_t coded_next, int z_ch) {
+    auto[next, children] = unpack_children(coded_next);
+    scrutiny_check(children[z_ch], "Has no such children");
+    // Узнать номер nc внутри cset
+    for (int i = 0; i < z_ch; ++i) {
+        if (children[i]) ++next;
+    }
+    return next;
+}
+
 } // namespace zephyr::mesh::amr

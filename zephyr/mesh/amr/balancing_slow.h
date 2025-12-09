@@ -98,7 +98,7 @@ public:
 
             // Код выполняется только если can_coarse было истинно,
             // поэтому можно не волноваться о наличии сиблингов
-            auto sibs = get_siblings<dim>( locals, ic);
+            auto sibs = get_siblings<dim>(locals, ic);
             for (auto is: sibs) {
                 scrutiny_check(is < locals.size(), "Vicinity: Sibling index out of range")
 

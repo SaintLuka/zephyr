@@ -5,6 +5,7 @@
 // к функциям предназначены для разработчиков.
 #pragma once
 
+#include <bitset>
 #include <zephyr/mesh/amr/common.h>
 #include <zephyr/mesh/amr/statistics.h>
 #include <zephyr/mesh/amr/setup_positions.h>
@@ -128,67 +129,59 @@ void apply_impl(Tourism& tourism, AmrCells &locals, AmrCells &aliens, const Dist
     static Stopwatch exchange_timer;
     static Stopwatch alien1_timer;
     static Stopwatch alien2_timer;
+    static Stopwatch create_swap_timer;
+    static Stopwatch set_mapping_timer;
+    static Stopwatch change_adjacent_timer;
+    static Stopwatch swap_elements_timer;
+    static Stopwatch send_next_timer;
 
     int rank = mpi::rank();
 
     /// Этап 1. Сбор статистики
     count_timer.resume();
-    Statistics count(locals);
+    Statistics count(locals.flag, locals.dim());
     count_timer.stop();
+
+    create_swap_timer.resume();
+    SwapLists swap_list(count, locals.flag);
+    create_swap_timer.stop();
 
     /// Этап 2. Распределяем места для новых ячеек
     positions_timer.resume();
-    setup_positions<dim>(locals, count);
-    positions_timer.stop();
+    locals.resize_amr(count.n_cells_large);
+    setup_positions<dim>(locals, count, swap_list);
 
-    // Отправить / получить aliens.next.
-    exchange_timer.resume();
-    tourism.prepare<MpiTag::NEXT>(locals);
-    auto send_next = tourism.isend<MpiTag::NEXT>();
-    auto recv_next = tourism.irecv<MpiTag::NEXT>(aliens);
-    exchange_timer.stop();
+    tourism.setup_positions<dim>(aliens);
+
+    tourism.update_border_indices<dim>(locals.next);
+
+    positions_timer.stop();
 
     /// Этап 3. Восстановление геометрии
     geometry_timer.resume();
-    setup_geometry<dim>(locals, aliens, rank, count, op);
+    setup_geometry<dim>(locals, aliens, count, op, rank);
     geometry_timer.stop();
 
-    // Отправить / получить aliens.index. Если index < 0, то ячейка считается
-    // неактуальной, то есть она переместилась, так мы понимаем, кто удалится.
-    exchange_timer.resume();
-    tourism.prepare<MpiTag::INDEX>(locals);
-    auto send_idx = tourism.isend<MpiTag::INDEX>();
-    auto recv_idx = tourism.irecv<MpiTag::INDEX>(aliens);
-
-    // Дождаться (aliens.index, aliens.next).
-    send_next.wait();
-    recv_next.wait();
-    send_idx.wait();
-    recv_idx.wait();
-    exchange_timer.stop();
-
-    /// Этап 4. Восстановление соседства
-    connections_timer.resume();
-    restore_connections<dim>(locals, aliens, rank, count);
-    connections_timer.stop();
-
-    // Частичное восстановление border/aliens. Возможно, поскольку
-    // в restore_connections верно проставлены (rank, index).
-    // Восстановление нужно, чтобы в дальнейшем получить alien.next.
-    alien1_timer.resume();
-    tourism.build_aliens_basic(locals, aliens);
-    alien1_timer.stop();
-
-    /// Этап 5. Удаление неопределенных ячеек
-    /// Сделать внутри MPI запрос чтобы узнать, куда переместились ячейки !
+    /// Этап 4. Удаление неопределенных ячеек
     remove_timer.resume();
-    remove_undefined<dim>(tourism, locals, aliens, count);
+    swap_list.move_elements(locals);
+    locals.resize_amr(count.n_cells_short);
+    tourism.resize_to_router(aliens);
     remove_timer.stop();
 
-    // Здесь точно нужна, в отличае от предыдущей
-    alien2_timer.resume();
-    tourism.build_aliens(locals, aliens);
-    alien2_timer.stop();
+    // Этап 5. Получить геометрию в alien ячейки
+    tourism.pack_geometry(locals);
+    tourism.send_geometry(aliens);
+
+    // Как будто особо и не нужно
+    for (index_t ic: tourism.m_border_indices) {
+        for (index_t iface: locals.faces_range(ic)) {
+            index_t alien_index = locals.faces.adjacent.alien[iface];
+            if (alien_index >= 0) {
+                locals.faces.adjacent.index[iface] = aliens.index[alien_index];
+            }
+        }
+    }
 
 #if CHECK_PERFORMANCE
     static size_t counter = 0;
@@ -201,6 +194,11 @@ void apply_impl(Tourism& tourism, AmrCells &locals, AmrCells &aliens, const Dist
         mpi::cout << "    Build aliens 1: " << std::setw(11) << alien1_timer.milliseconds_mpi() << " ms\n";
         mpi::cout << "    Build aliens 2: " << std::setw(11) << alien2_timer.milliseconds_mpi() << " ms\n";
         mpi::cout << "    Remove undef:   " << std::setw(11) << remove_timer.milliseconds_mpi() << " ms\n";
+        mpi::cout << "      Create SwapList: " << std::setw(8) << create_swap_timer.milliseconds_mpi() << " ms\n";
+        mpi::cout << "      Setup mapping:   " << std::setw(8) << set_mapping_timer.milliseconds_mpi() << " ms\n";
+        mpi::cout << "      Send/Recv next:  " << std::setw(8) << send_next_timer.milliseconds_mpi() << " ms\n";
+        mpi::cout << "      Change adjacent: " << std::setw(8) << change_adjacent_timer.milliseconds_mpi() << " ms\n";
+        mpi::cout << "      Swap elements:   " << std::setw(8) << swap_elements_timer.milliseconds_mpi() << " ms\n";
     }
     ++counter;
 #endif

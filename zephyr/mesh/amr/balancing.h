@@ -58,7 +58,6 @@ inline void balance_flags(Tourism& tourism, AmrCells &locals, AmrCells& aliens, 
     }
 
 #if SCRUTINY
-    tourism.sync<MpiTag::FLAG>(locals, aliens);
     amr::check_flags(locals, aliens, max_level);
 #endif
 }

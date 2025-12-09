@@ -117,7 +117,7 @@ void Router::print() const {
 
 void Router::print_partial() const {
     std::cout << "Rank " << mpi::rank() << ". send count: " << m_send_count << "\n";
-    std::cout << "         recv count: " << m_recv_count << "\n";
+    std::cout << "        recv count: " << m_recv_count << "\n";
 }
 
 void Router::print_complete() const {

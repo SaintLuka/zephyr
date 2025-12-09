@@ -69,6 +69,9 @@ int main(int argc, char** argv) {
                         -test.zmax(), test.zmax());
     gen.set_nx(20);
     gen.set_boundaries(test.boundaries());
+    //Rectangle gen(-test.xmax(), test.xmax(), -test.ymax(), test.ymax());
+    //gen.set_nx(20);
+    //gen.set_boundaries({Boundary::ZOE, Boundary::ZOE, Boundary::ZOE, Boundary::ZOE});
 
     // Создать сетку
     EuMesh mesh(gen);

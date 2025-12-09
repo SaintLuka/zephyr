@@ -81,13 +81,42 @@ public:
         throw std::runtime_error("irecv<" + to_string(tag) + ">() is not implemented");
     }
 
-private:
+    // Установить индекс NEXT у border-ячеек
+    template<int dim>
+    std::vector<index_t>  setup_border_next();
+
+    // ========================================================================
+    //            Выставить финальные значения m_border_indices
+    // ========================================================================
+    template<int dim>
+    void update_border_indices(const std::vector<index_t>& locals_next);
+
+    // Выставляет next у border и aliens (получает после отправки),
+    // расширяет все массивы. Делает корректные router для пересылок,
+    // но сами слои не заполняет, только resize.
+    // Также выставляет m_border_indices для полностью адаптированной
+    // сетки, это делается по массиву next внутри расширенного locals.
+    // Портит index у border-ячеек, там кодируются дочерние ячейки.
+    // На border слое должны быть предварительно выставлены флаги.
+    // И в целом border-слой должен быть составлен правильно.
+    template<int dim>
+    void setup_positions(AmrCells& aliens);
+
+    // Запаковать и отправить геометрию ячеек
+    void send_geometry(AmrCells& aliens);
+
+    void resize_to_router(AmrCells& aliens);
+
+public:
     // Считает количество примитивов для пересылки, заполняет величины
     // send_count во всех Router, но не recv_count
     void fill_send_count(const AmrCells& locals);
 
     // Заполняет массивы индексов пересылаемых ячеек
     void fill_indices(const AmrCells& locals);
+
+    // Скопировать геометрию в border-ячейки
+    void pack_geometry(const AmrCells& locals);
 
     // Построить обменный border-слой, также подсчитывает количество пересылаемых
     // элементов, копирует геометрию ячеек из locals в созданный border слой.
@@ -97,14 +126,13 @@ private:
     // элементов, копирует геометрию ячеек из locals в созданный border слой.
     void build_border_basic(const AmrCells& locals);
 
-
     // Копирует данные из locals в m_border
     template <typename T>
     void prepare(const AmrCells& locals, Storable<T> var);
 
 public:
     // Уникальные индексы border-ячеек по возрастанию
-    std::vector<index_t> m_unique_border_indices;
+    // std::vector<index_t> m_unique_border_indices;
 
     // Индексы ячеек, которые составляют хранилище m_border
     std::vector<index_t> m_border_indices;
@@ -227,6 +255,15 @@ void Tourism::sync(const AmrCells& locals, AmrCells& aliens) {
     send_req.wait();
     recv_req.wait();
 }
+
+extern template std::vector<index_t> Tourism::setup_border_next<2>();
+extern template std::vector<index_t> Tourism::setup_border_next<3>();
+
+extern template void Tourism::setup_positions<2>(AmrCells& aliens);
+extern template void Tourism::setup_positions<3>(AmrCells& aliens);
+
+extern template void Tourism::update_border_indices<2>(const std::vector<index_t>& locals_next);
+extern template void Tourism::update_border_indices<3>(const std::vector<index_t>& locals_next);
 
 } // namespace zephyr::mesh
 

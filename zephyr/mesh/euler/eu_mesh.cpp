@@ -205,16 +205,27 @@ void EuMesh::balance_flags() {
 
 void EuMesh::apply_flags() {
 #if SCRUTINY
-    static size_t counter = 0;
+    static size_t pvd_counter = 0;
 
-    zephyr::io::Variables vars = {"rank", "index", "next", "level", "flag", "faces2D"};
+    static PvdFile locals_before("app_bef_locals", "debug");
+    static PvdFile aliens_before("app_bef_aliens", "debug");
+    static PvdFile border_before("app_bef_border", "debug");
+    static PvdFile locals_after("app_aft_locals", "debug");
+    static PvdFile aliens_after("app_aft_aliens", "debug");
+    static PvdFile border_after("app_aft_border", "debug");
 
-    static PvdFile locals_before("bef_locals", "output");
-    locals_before.variables = vars;
-    //locals_before.save(m_locals, counter);
-    static PvdFile aliens_before("bef_aliens", "output");
-    aliens_before.variables = vars;
-    //aliens_before.save(m_aliens, counter);
+    if (pvd_counter == 0) {
+        Variables vars = {"rank", "index", "next", "level", "flag", "faces2D"};
+        locals_before.variables = vars;
+        aliens_before.variables = vars;
+        border_before.variables = vars;
+        locals_after.variables = vars;
+        aliens_after.variables = vars;
+        border_after.variables = vars;
+    }
+    //locals_before.save(m_locals, pvd_counter);
+    //aliens_before.save(m_aliens, pvd_counter);
+    //border_before.save(m_tourists.m_border, pvd_counter);
     mpi::barrier();
 #endif
 
@@ -228,15 +239,11 @@ void EuMesh::apply_flags() {
 #endif
 
 #if SCRUTINY
-    static PvdFile locals_after("aft_locals", "output");
-    locals_after.variables = vars;
-    //locals_after.save(m_locals, counter);
-    static PvdFile aliens_after("aft_aliens", "output");
-    aliens_after.variables = vars;
-    //aliens_after.save(m_aliens, counter);
+    //locals_after.save(m_locals, pvd_counter);
+    //aliens_after.save(m_aliens, pvd_counter);
+    //border_after.save(m_tourists.m_border, pvd_counter);
     mpi::barrier();
-
-    ++counter;
+    ++pvd_counter;
 
     mpi::for_each([&]() {
         if (check_refined() < 0) {
