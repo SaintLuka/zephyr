@@ -19,7 +19,7 @@ option(ZEPHYR_MPI          "Use MPI functions"  OFF)
 option(ZEPHYR_PROBLEMS     "Build problems"     ON)
 option(ZEPHYR_PROBLEMS_ALL "Build ALL problems" OFF)
 option(ZEPHYR_PYTHON       "Use python libs"    OFF)
-option(ZEPHYR_TESTS        "Build tests"        ON)
+option(ZEPHYR_TESTS        "Build tests"        OFF)
 option(ZEPHYR_TESTS_ALL    "Build ALL tests"    OFF)
 
 set(THREADS_TYPE "STD" CACHE STRING "Choose thread style: STD, TBB")

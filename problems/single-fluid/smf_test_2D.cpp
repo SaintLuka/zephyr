@@ -22,7 +22,7 @@ using namespace zephyr::phys;
 using namespace zephyr::math;
 using namespace zephyr::math::smf;
 
-using zephyr::geom::generator::Rectangle;
+using generator::Rectangle;
 using zephyr::mesh::EuMesh;
 using zephyr::mesh::EuCell;
 using zephyr::math::SmFluid;
@@ -31,18 +31,19 @@ using zephyr::utils::threads;
 using zephyr::utils::Stopwatch;
 
 
-int main() {
-    mpi::handler mpi_init;
-    threads::on();
+int main(int argc, char** argv) {
+    mpi::handler mpi_init(argc, argv);
+    threads::init(argc, argv);
+    threads::info();
 
     // Тестовая задача
-    //Riemann2D test(6);
+    Riemann2D test(6);
     //ToroTest2D test(1, 0.3 * M_PI);
     //SkewShockWave test(5.0, M_PI/6, 0.2);
     //RichtmyerMeshkov test;
     //SodTest test_1D;
-    ToroTest test_1D(1);
-    RotatedTest test(test_1D, M_PI / 3.0);
+    //ToroTest test_1D(1);
+    //RotatedTest test(test_1D, M_PI / 3.0);
 
     auto eos = test.get_eos();
 
