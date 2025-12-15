@@ -225,11 +225,13 @@ public:
     /// @brief Локальные ячейки (принадлежат данному процессу)
     const AmrCells& locals() const { return m_locals; }
 
+#ifdef ZEPHYR_MPI
     /// @brief Слой обменных ячеек (с других процессов)
-    AmrCells& aliens() { return m_aliens; }
+    AmrCells& aliens() { return m_tourists.aliens(); }
 
     /// @brief Слой обменных ячеек (с других процессов)
-    const AmrCells& aliens() const { return m_aliens; }
+    const AmrCells& aliens() const { return m_tourists.aliens(); }
+#endif
 
     /// @}
 
@@ -358,11 +360,6 @@ private:
     /// @brief Выставить новые ранги ячеек по декомпозиции
     void setup_ranks();
 
-    /// @brief Собрать обменные слои (aliens и сопутствующие члены),
-    /// принимаются актуальные данные с border слоя.
-    void build_aliens();
-
-
     /// @brief Максимальный уровень адаптации для адаптивной сетки
     int m_max_level = 0;
 
@@ -370,7 +367,7 @@ private:
     Distributor m_distributor;
 
     AmrCells m_locals;  ///< Ячейки, которые принадлежат данному процессу
-    AmrCells m_aliens;  ///< Ячейки, получаемые с других процессов
+    //AmrCells m_aliens;  ///< Ячейки, получаемые с других процессов
 
     /// @brief Метод декомпозиции
     Decomposition::Ptr m_decomp = nullptr;
@@ -396,13 +393,9 @@ private:
 template <typename T>
 Storable<T> EuMesh::add_one(const std::string& name) {
     auto res1 = m_locals.data.add<T>(name);
-    auto res2 = m_aliens.data.add<T>(name);
-    if (res1 != res2) {
-        throw std::runtime_error("EuMesh error: bad add<T> #1");
-    }
 #ifdef ZEPHYR_MPI
-    auto res3 = m_tourists.add<T>(name);
-    if (res1 != res3) {
+    auto res2 = m_tourists.add<T>(name);
+    if (res1 != res2) {
         throw std::runtime_error("EuMesh error: bad add<T> #2");
     }
 #endif
@@ -412,7 +405,6 @@ Storable<T> EuMesh::add_one(const std::string& name) {
 template <typename T>
 void EuMesh::swap(Storable<T> var1, Storable<T> var2) {
     m_locals.data.swap<T>(var1, var2);
-    m_aliens.data.swap<T>(var1, var2);
 #ifdef ZEPHYR_MPI
     m_tourists.swap<T>(var1, var2);
 #endif
@@ -422,7 +414,7 @@ template <typename... Args, typename >
 void EuMesh::sync(Args&&... vars) {
 #ifdef ZEPHYR_MPI
     if (mpi::single()) return;
-    m_tourists.sync(m_locals, m_aliens, std::forward<Args>(vars)...);
+    m_tourists.sync(m_locals, std::forward<Args>(vars)...);
 #endif
 }
 
@@ -430,11 +422,11 @@ template <typename... Args>
 void EuMesh::redistribute(Args&&... vars) {
 #ifdef ZEPHYR_MPI
     if (mpi::single()) return;
+
     setup_ranks();
     m_migrants.migrate(
-            m_tourists, m_locals, m_aliens,
-            std::forward<Args>(vars)...);
-    build_aliens();
+        m_tourists, m_locals,
+        std::forward<Args>(vars)...);
 #endif
 }
 

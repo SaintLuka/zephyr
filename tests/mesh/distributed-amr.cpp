@@ -81,17 +81,17 @@ struct Membrane {
     }
 };
 
-// Поле cell(u) задается из Membrane, функция
-// Поле cell(wflag) задается по процентилям от cell(u)
+// Поле cell[u] задается из Membrane, функция
+// Поле cell[wflag] задается по процентилям от cell[u]
 void setup_values(EuMesh& mesh, double t,
-        Storable<double> val, Storable<double> wflag) {
+        Storable<double> var, Storable<double> wflag) {
     static Membrane func_u(1);
 
     double u_min = +1.0e300;
     double u_max = -1.0e300;
     for (auto &cell: mesh) {
         double u = func_u(cell.center(), t);
-        cell(val) = u;
+        cell[var] = u;
         u_min = std::min(u, u_min);
         u_max = std::max(u, u_max);
     }
@@ -101,7 +101,7 @@ void setup_values(EuMesh& mesh, double t,
 
     // Нормируем от 0.0 до 1.0
     for (auto &cell: mesh) {
-        cell(val) = (cell(val) - u_min) / (u_max - u_min);
+        cell[var] = (cell[var] - u_min) / (u_max - u_min);
     }
 
     double count = 100.0;
@@ -110,7 +110,7 @@ void setup_values(EuMesh& mesh, double t,
     std::vector<double> vols_u(count);
     for (auto &cell: mesh) {
         // Индекс от 0 до count
-        double idx_u = std::floor(cell(val) * count);
+        double idx_u = std::floor(cell[var] * count);
 
         double V = cell.volume();
         vols_u[idx_u] += V;
@@ -127,17 +127,17 @@ void setup_values(EuMesh& mesh, double t,
     }
 
     for (auto &cell: mesh) {
-        int idx_u = int(std::floor(cell(val) * count));
-        cell(wflag) = vols_u[idx_u];
+        int idx_u = int(std::floor(cell[var] * count));
+        cell[wflag] = vols_u[idx_u];
     }
 }
 
 // Флаги выставляются по процентилям в wflag
 void set_flags(EuMesh& mesh, Storable<double> wflag) {
     for (auto cell: mesh) {
-        if (cell(wflag) < 0.5) {
+        if (cell[wflag] < 0.5) {
             cell.set_flag(-1);
-        } else if (cell(wflag) < 0.9) {
+        } else if (cell[wflag] < 0.9) {
             cell.set_flag(0);
         } else {
             cell.set_flag(1);

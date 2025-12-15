@@ -45,14 +45,14 @@ void set_wanted(EuCell& cell, int level, double t) {
 
     double xi = std::max(0.0, 1.0 - dist / H);
 
-    cell(wanted) = int(std::floor((level + 0.99) * std::pow(xi, 8)));
+    cell[wanted] = int(std::floor((level + 0.99) * std::pow(xi, 8)));
 }
 
 void set_flag(EuCell& cell) {
-    if (cell.level() < cell(wanted)) {
+    if (cell.level() < cell[wanted]) {
         cell.set_flag(1);
     }
-    else if (cell.level() == cell(wanted)) {
+    else if (cell.level() == cell[wanted]) {
         cell.set_flag(0);
     }
     else {
@@ -60,8 +60,10 @@ void set_flag(EuCell& cell) {
     }
 }
 
-int main() {
-    threads::on();
+int main(int argc, char** argv) {
+    mpi::handler init(argc, argv);
+    threads::init(argc, argv);
+    threads::info();
 
     Rectangle rect(-1.0, 1.0, -1.0, 1.0);
     rect.set_nx(20);
@@ -71,20 +73,21 @@ int main() {
 
     mesh.set_max_level(5);
     mesh.set_distributor("simple");
+    mesh.set_decomposition("XY");
 
     PvdFile pvd("mesh", "output");
     pvd.variables = {"rank", "index", "next", "level", "flag", "faces2D"};
-    pvd.variables += {"wanted", [](EuCell& cell) -> double { return cell(wanted); }};
+    pvd.variables.append("wanted", wanted);
 
     if (mesh.check_base() < 0) {
-        std::cout << "Bad init mesh\n";
+        mpi::cout << "Bad init mesh\n";
         return 0;
     }
 
     // Начальная адаптация
-    std::cout << "Init refinement\n";
+    mpi::cout << "Init refinement\n";
     for (int lvl = 0; lvl < mesh.max_level() + 2; ++lvl) {
-        std::cout << "  Level " << lvl << "\n";
+        mpi::cout << "  Level " << lvl << "\n";
         mesh.for_each(set_wanted, mesh.max_level(), 0.0);
         mesh.for_each(set_flag);
         mesh.refine();
@@ -96,19 +99,27 @@ int main() {
 
     Stopwatch elapsed;
     Stopwatch sw_write;
+    Stopwatch sw_balancing;
     Stopwatch sw_wanted;
     Stopwatch sw_set_flags;
     Stopwatch sw_refine;
 
-    std::cout << "RUN\n";
+    mpi::cout << "RUN\n";
     elapsed.start();
     for (int step = 0; step < 1000; ++step) {
         sw_write.resume();
         if (step % 20 == 0) {
-            std::cout << "  Step " << std::setw(4) << step << " / 1000\n";
+            mpi::cout << "  Step " << std::setw(4) << step << " / 1000\n";
             pvd.save(mesh, step);
         }
         sw_write.stop();
+
+        sw_balancing.resume();
+        if (step % 20 == 0) {
+            mesh.balancing();
+            mesh.redistribute();
+        }
+        sw_balancing.stop();
 
         sw_wanted.resume();
         mesh.for_each(set_wanted, mesh.max_level(), step / 1000.0);
@@ -128,20 +139,12 @@ int main() {
     }
     elapsed.stop();
 
-    std::cout << "\nElapsed:      " << elapsed.extended_time()
-              << " ( " << elapsed.milliseconds() << " ms)\n";
-
-    std::cout << "  Write:      " << sw_write.extended_time()
-              << " ( " << sw_write.milliseconds() << " ms)\n";
-
-    std::cout << "  Set wanted: " << sw_wanted.extended_time()
-              << " ( " << sw_wanted.milliseconds() << " ms)\n";
-
-    std::cout << "  Set flags:  " << sw_set_flags.extended_time()
-              << " ( " << sw_set_flags.milliseconds() << " ms)\n";
-
-    std::cout << "  Refine:     " << sw_refine.extended_time()
-              << " ( " << sw_refine.milliseconds() << " ms)\n";
+    mpi::cout << "\nElapsed:     " << elapsed.extended_time() << " ( " << elapsed.milliseconds() << " ms)\n";
+    mpi::cout << "  Write:      " << sw_write.extended_time() << " ( " << sw_write.milliseconds() << " ms)\n";
+    mpi::cout << "  Balancing:  " << sw_balancing.extended_time() << " ( " << sw_balancing.milliseconds() << " ms)\n";
+    std::cout << "  Set wanted: " << sw_wanted.extended_time() << " ( " << sw_wanted.milliseconds() << " ms)\n";
+    mpi::cout << "  Set flags:  " << sw_set_flags.extended_time() << " ( " << sw_set_flags.milliseconds() << " ms)\n";
+    mpi::cout << "  Refine:     " << sw_refine.extended_time() << " ( " << sw_refine.milliseconds() << " ms)\n";
 
     return 0;
 }

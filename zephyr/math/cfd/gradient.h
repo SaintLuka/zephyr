@@ -233,7 +233,7 @@ Grad<State> LSM(EuCell &cell, Storable<State> state,
     // Делает матрицу A безразмерной
     double w0 = cell.dim() < 3 ? 1.0 : 1.0 / cell.linear_size();
 
-    State zc = cell(state);
+    State zc = cell[state];
     Vector3d cell_c = cell.center();
 
     Array Fx = Array::Zero();
@@ -423,7 +423,7 @@ Grad<State> limiting(EuCell &cell, const Limiter& limiter,
     // Делает матрицу A безразмерной
     double w0 = cell.dim() < 3 ? 1.0 : 1.0 / cell.linear_size();
 
-    State zc = cell(state);
+    State zc = cell[state];
     Vector3d cell_c = cell.center();
 
     Array Fx = Array::Zero();

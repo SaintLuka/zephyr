@@ -251,87 +251,9 @@ void neib_child_gen_3D() {
     std::cout << "};\n";
 }
 
-void neib_child_border_gen() {
-    int ncssb_2D[quad_symmetries.size()][Side2D::n_subfaces()];
-
-    for (int symm = 0; symm < quad_symmetries.size(); ++symm) {
-        for (Side2D side: Side2D::items()) {
-            // Индексы соседей [0, 4)
-            std::array<int, 2> neibs = {
-                neib_child_by_symm_subface_2D[symm][side[0]],
-                neib_child_by_symm_subface_2D[symm][side[1]],
-            };
-
-            // Ну в 2D легко упорядочить
-            if (neibs[0] < neibs[1]) {
-                ncssb_2D[symm][side[0]] = 0;
-                ncssb_2D[symm][side[1]] = 1;
-            }
-            else {
-                ncssb_2D[symm][side[0]] = 1;
-                ncssb_2D[symm][side[1]] = 0;
-            }
-        }
-    }
-
-    std::cout << "static constexpr int neib_bchild_by_symm_subface_2D[8][8] = {\n";
-    for (int i = 0; i < quad_symmetries.size(); ++i) {
-        std::cout << "    {";
-        for (int j = 0; j < Side2D::n_subfaces() - 1; ++j) {
-            std::cout << ncssb_2D[i][j] << ", ";
-        }
-        std::cout << ncssb_2D[i][Side2D::n_subfaces() - 1] << "},\n";
-    }
-    std::cout << "};\n\n";
-
-    int ncssb_3D[cube_symmetries.size()][Side3D::n_subfaces()];
-
-    for (int symm = 0; symm < cube_symmetries.size(); ++symm) {
-        for (Side3D side: Side3D::items()) {
-            // Индексы соседей [0, 8)
-            std::array<int, 4> neibs = {
-                neib_child_by_symm_subface_3D[symm][side[0]],
-                neib_child_by_symm_subface_3D[symm][side[1]],
-                neib_child_by_symm_subface_3D[symm][side[2]],
-                neib_child_by_symm_subface_3D[symm][side[3]],
-            };
-            std::array<int, 4> sorted_neibs = neibs;
-            std::sort(sorted_neibs.begin(), sorted_neibs.end());
-
-            ncssb_3D[symm][side[0]] = std::find(sorted_neibs.begin(), sorted_neibs.end(), neibs[0]) - sorted_neibs.begin();
-            ncssb_3D[symm][side[1]] = std::find(sorted_neibs.begin(), sorted_neibs.end(), neibs[1]) - sorted_neibs.begin();
-            ncssb_3D[symm][side[2]] = std::find(sorted_neibs.begin(), sorted_neibs.end(), neibs[2]) - sorted_neibs.begin();
-            ncssb_3D[symm][side[3]] = std::find(sorted_neibs.begin(), sorted_neibs.end(), neibs[3]) - sorted_neibs.begin();
-        }
-    }
-    std::cout << "static constexpr int neib_bchild_by_symm_subface_3D[48][24] = {\n";
-    for (int i = 0; i < cube_symmetries.size(); ++i) {
-        std::cout << "    {";
-        for (int j = 0; j < Side3D::n_subfaces() - 1; ++j) {
-            std::cout << ncssb_3D[i][j] << ", ";
-        }
-        std::cout << ncssb_3D[i][Side3D::n_subfaces() - 1] << "},\n";
-    }
-    std::cout << "};\n";
-}
-
-#include <bitset>
-
 int main() {
-    std::bitset<8> bits{};
-    bits[4] = true;
-
-    int num = static_cast<int>(bits.to_ulong());
-
-    std::cout << bits << "\n";
-    std::cout << num << "\n";
-
-    bits = std::bitset<8>(num);
-    std::cout << bits << "\n";
-
-    //subface_by_side_child_gen();
-    //neib_child_gen_2D();
-    //neib_child_gen_3D();
-    //neib_child_border_gen();
+    subface_by_side_child_gen();
+    neib_child_gen_2D();
+    neib_child_gen_3D();
     return 0;
 }

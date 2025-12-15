@@ -13,12 +13,8 @@ using namespace zephyr::mesh;
 
 using generator::Rectangle;
 
-
-struct _U_ {
-    int u1, u2;
-};
-
-static const _U_ U{};
+static Storable<int> u1;
+static Storable<int> u2;
 
 void update(EuMesh& mesh) {
    for (int i = 0; i < mesh.nx(); ++i) {
@@ -26,44 +22,44 @@ void update(EuMesh& mesh) {
            auto cell = mesh(i, j);
 
            // Не очень нравятся такие )( двойные скобки
-           int s = mesh(i + 1, j)(U).u1 +
-                   mesh(i - 1, j)(U).u1 +
-                   mesh(i, j + 1)(U).u1 +
-                   mesh(i, j - 1)(U).u1 +
-                   mesh(i + 1, j + 1)(U).u1 +
-                   mesh(i + 1, j - 1)(U).u1 +
-                   mesh(i - 1, j + 1)(U).u1 +
-                   mesh(i - 1, j - 1)(U).u1;
+           int s = mesh(i + 1, j)[u1] +
+                   mesh(i - 1, j)[u1] +
+                   mesh(i, j + 1)[u1] +
+                   mesh(i, j - 1)[u1] +
+                   mesh(i + 1, j + 1)[u1] +
+                   mesh(i + 1, j - 1)[u1] +
+                   mesh(i - 1, j + 1)[u1] +
+                   mesh(i - 1, j - 1)[u1];
 
-           if (cell(U).u1 > 0) {
-               cell(U).u2 = (s == 2 || s == 3) ? 1 : 0;
+           if (cell[u1] > 0) {
+               cell[u2] = (s == 2 || s == 3) ? 1 : 0;
            }
            else {
-               cell(U).u2 = s == 3 ? 1 : 0;
+               cell[u2] = s == 3 ? 1 : 0;
            }
        }
    }
 
    for (auto cell: mesh) {
-       cell(U).u1 = cell(U).u2;
+       cell[u1] = cell[u2];
    }
 }
 
 void set_random(EuMesh& mesh) {
     for (auto cell: mesh) {
-        cell(U).u1 = rand() % 2;
+        cell[u1] = rand() % 2;
     }
 }
 
 void set_glider(EuMesh& mesh, int i, int j) {
     for (auto cell: mesh) {
-        cell(U).u1 = 0;
+        cell[u1] = 0;
     }
-    mesh(i + 0, j + 0)(U).u1 = 1;
-    mesh(i + 1, j + 0)(U).u1 = 1;
-    mesh(i + 1, j + 1)(U).u1 = 1;
-    mesh(i + 2, j + 1)(U).u1 = 1;
-    mesh(i + 0, j + 2)(U).u1 = 1;
+    mesh(i + 0, j + 0)[u1] = 1;
+    mesh(i + 1, j + 0)[u1] = 1;
+    mesh(i + 1, j + 1)[u1] = 1;
+    mesh(i + 2, j + 1)[u1] = 1;
+    mesh(i + 0, j + 2)[u1] = 1;
 }
 
 int main() {
@@ -71,10 +67,11 @@ int main() {
     rect.set_nx(50);
 
     EuMesh mesh(rect);
-    mesh.add<_U_>("U");
+    u1 = mesh.add<int>("u1");
+    u2 = mesh.add<int>("u2");
 
     PvdFile pvd("life", "output");
-    pvd.variables += {"u", [](EuCell& cell) -> double { return cell(U).u1; }};
+    pvd.variables.append("u", u1);
 
     set_random(mesh);
     //set_glider(mesh, 20, 20);

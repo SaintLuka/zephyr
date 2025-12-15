@@ -116,9 +116,9 @@ void SmFluid::compute_grad(EuMesh &mesh) const {
         auto grad = gradient::LSM<PState>(cell, part.init, boundary_value);
         grad = gradient::limiting<PState>(cell, m_limiter, grad, part.init, boundary_value);
 
-        cell(part.d_dx) = grad.x;
-        cell(part.d_dy) = grad.y;
-        cell(part.d_dz) = grad.z;
+        cell[part.d_dx] = grad.x;
+        cell[part.d_dy] = grad.y;
+        cell[part.d_dz] = grad.z;
     });
 }
 
@@ -167,7 +167,7 @@ void SmFluid::fluxes(EuMesh &mesh) const {
         }
 
         // Новое значение примитивных переменных
-        cell(part.next) = PState(q_c, *m_eos);
+        cell[part.next] = PState(q_c, *m_eos);
     });
 }
 
@@ -205,8 +205,8 @@ void SmFluid::fluxes_stage1(EuMesh &mesh) const {
             }
 
             auto face_extra = FaceExtra::Direct(
-                    z_c, cell(part.d_dx), cell(part.d_dy), cell(part.d_dz),
-                    z_n, neib(part.d_dx), neib(part.d_dy), neib(part.d_dz),
+                    z_c, cell[part.d_dx], cell[part.d_dy], cell[part.d_dz],
+                    z_n, neib[part.d_dx], neib[part.d_dy], neib[part.d_dz],
                     cell_c, neib_c, face_c);
 
             // Интерполяция на грань со стороны ячейки
@@ -238,7 +238,7 @@ void SmFluid::fluxes_stage1(EuMesh &mesh) const {
         }
 
         // Значение примитивных переменных на полушаге
-        cell(part.half) = PState(q_c, *m_eos);
+        cell[part.half] = PState(q_c, *m_eos);
     });
 }
 
@@ -251,7 +251,7 @@ void SmFluid::fluxes_stage2(EuMesh &mesh) const {
         PState z_c = cell[part.init];
 
         // Примитивный вектор на полуслое
-        PState z_ch = cell(part.half);
+        PState z_ch = cell[part.half];
 
         // Консервативный вектор в ячейке на прошлом шаге
         QState q_c(z_c);
@@ -272,7 +272,7 @@ void SmFluid::fluxes_stage2(EuMesh &mesh) const {
             if (!face.is_boundary()) {
                 neib_c = neib.center();
                 z_n  = neib[part.init];
-                z_nh = neib(part.half);
+                z_nh = neib[part.half];
             }
             else {
                 neib_c = face.symm_point(cell_c);
@@ -282,8 +282,8 @@ void SmFluid::fluxes_stage2(EuMesh &mesh) const {
 
             // Параметры интерполяции с предыдущего (!) слоя
             auto face_extra = FaceExtra::Direct(
-                    z_c, cell(part.d_dx), cell(part.d_dy), cell(part.d_dz),
-                    z_n, neib(part.d_dx), neib(part.d_dy), neib(part.d_dz),
+                    z_c, cell[part.d_dx], cell[part.d_dy], cell[part.d_dz],
+                    z_n, neib[part.d_dx], neib[part.d_dy], neib[part.d_dz],
                     cell_c, neib_c, face_c);
 
             // Интерполяция на грань со стороны ячейки
@@ -331,13 +331,13 @@ void SmFluid::fluxes_stage2(EuMesh &mesh) const {
         }
 
         // Значение примитивных переменных на новом слое
-        cell(part.next) = PState(q_c, *m_eos);
+        cell[part.next] = PState(q_c, *m_eos);
     });
 }
 
 void SmFluid::swap(EuMesh &mesh) const {
     mesh.for_each([this](EuCell &cell) {
-        cell[part.init] = cell(part.next);
+        cell[part.init] = cell[part.next];
     });
 }
 
@@ -373,9 +373,9 @@ Distributor SmFluid::distributor(const std::string& type) const {
     // Снос по градиентам
     auto split_slope = [this](const EuCell &parent, Children &children) {
         const PState& z_p  = parent[part.init];
-        const PState& d_dx = parent(part.d_dx);
-        const PState& d_dy = parent(part.d_dy);
-        const PState& d_dz = parent(part.d_dz);
+        const PState& d_dx = parent[part.d_dx];
+        const PState& d_dy = parent[part.d_dy];
+        const PState& d_dz = parent[part.d_dz];
 
         auto P = m_eos->pressure_re(z_p.density, z_p.energy, {.deriv = true});
 

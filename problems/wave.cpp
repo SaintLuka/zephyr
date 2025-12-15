@@ -1,4 +1,6 @@
-// Решение волнового уравнения в квадрате
+/// @file wave.cpp
+/// @brief Решение волнового уравнения в квадрате
+
 #include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/io/pvd_file.h>

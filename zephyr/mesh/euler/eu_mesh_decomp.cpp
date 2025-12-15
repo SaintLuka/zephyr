@@ -16,12 +16,11 @@ void EuMesh::set_decomposition(Decomposition::Ref decmp, bool update) {
     m_decomp = decmp;
     if (update) {
         // вызываю, чтобы инициализировать m_tourists
-        build_aliens();
+        m_tourists.update(m_locals);
         redistribute();
 
         // Вероятно, первый (и единственный) redistribute, почистим память
         m_locals.shrink_to_fit();
-        m_aliens.shrink_to_fit();
 
         m_tourists.shrink_to_fit();
 
@@ -73,12 +72,15 @@ void EuMesh::balancing(double load){
 
 void EuMesh::prebalancing(int n_iters) {
 #ifdef ZEPHYR_MPI
-    if (mpi::single()) { return; }
+    if (mpi::single()) return;
 
-    throw std::runtime_error("Prebalancing not implemented");
+    if (mpi::master()) {
+        std::cerr << "Warning: prebalancing is not optimal\n";
+    }
 
     for (int i = 0; i < n_iters; ++i) {
         balancing();
+        redistribute();
     }
 #endif
 }
@@ -88,14 +90,6 @@ void EuMesh::setup_ranks() {
     for_each([this](EuCell cell) {
         cell.set_rank(m_decomp->rank(cell));
     });
-}
-
-void EuMesh::build_aliens() {
-#ifdef ZEPHYR_MPI
-    if (mpi::single()) return;
-
-    m_tourists.build_aliens(m_locals, m_aliens);
-#endif
 }
 
 } // namespace zephyr::mesh

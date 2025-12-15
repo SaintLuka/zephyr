@@ -61,7 +61,7 @@ double Convection::compute_dt(EuCell &cell) const {
 }
 
 void Convection::compute_grad(EuCell &cell, int stage) const {
-    double uc = stage < 1 ? cell(u_curr) : cell(u_half);
+    double uc = stage < 1 ? cell[u_curr] : cell[u_half];
 
     Vector3d grad = Vector3d::Zero();
     for (auto face: cell.faces()) {
@@ -70,16 +70,16 @@ void Convection::compute_grad(EuCell &cell, int stage) const {
     }
     grad /= cell.volume();
 
-    cell(du_dx) = grad.x();
-    cell(du_dy) = grad.y();
-    cell(du_dz) = grad.z();
+    cell[du_dx] = grad.x();
+    cell[du_dy] = grad.y();
+    cell[du_dz] = grad.z();
 }
 
 void Convection::fluxes(EuCell &cell, int stage) {
-    double uc = stage < 1 ? cell(u_curr) : cell(u_half);
-    double uc_dx = cell(du_dx);
-    double uc_dy = cell(du_dy);
-    double uc_dz = cell(du_dz);
+    double uc = stage < 1 ? cell[u_curr] : cell[u_half];
+    double uc_dx = cell[du_dx];
+    double uc_dy = cell[du_dy];
+    double uc_dz = cell[du_dz];
 
     double fluxes = 0.0;
     for (auto &face: cell.faces()) {
@@ -131,9 +131,9 @@ void Convection::fluxes(EuCell &cell, int stage) {
     }
 
     if (stage < 1) {
-        cell(u_half) = cell(u_curr) - 0.5 * m_dt * fluxes / cell.volume();
+        cell[u_half] = cell[u_curr] - 0.5 * m_dt * fluxes / cell.volume();
     } else {
-        cell(u_next) = cell(u_curr) - m_dt * fluxes / cell.volume();
+        cell[u_next] = cell[u_curr] - m_dt * fluxes / cell.volume();
     }
 }
 
@@ -149,7 +149,7 @@ void Convection::update(EuMesh &mesh) {
         // на промежуточный слой
         mesh.for_each(
                 [this](EuCell cell) {
-                    cell(u_half) = cell(u_curr);
+                    cell[u_half] = cell[u_curr];
                 });
     } else {
         // Схема высокого порядка, считаем производные,
@@ -190,8 +190,8 @@ void Convection::set_flags(EuMesh& mesh) {
     }
 
     mesh.for_each([this](EuCell cell) {
-        double min_val = cell(u_curr);
-        double max_val = cell(u_curr);
+        double min_val = cell[u_curr];
+        double max_val = cell[u_curr];
 
         for (auto face: cell.faces()) {
             if (face.is_boundary()) {
@@ -215,19 +215,19 @@ Distributor Convection::distributor() const {
     distr.split = [&](const EuCell &parent, Children &children) {
         for (auto child: children) {
             Vector3d dr = parent.center() - child.center();
-            child(u_curr) = parent(u_curr) +
-                            parent(du_dx) * dr.x() +
-                            parent(du_dy) * dr.y() +
-                            parent(du_dz) * dr.z();
+            child[u_curr] = parent[u_curr] +
+                            parent[du_dx] * dr.x() +
+                            parent[du_dy] * dr.y() +
+                            parent[du_dz] * dr.z();
         }
     };
 
     distr.merge = [&](const Children &children, EuCell &parent) {
         double sum = 0.0;
         for (auto child: children) {
-            sum += child(u_curr) * child.volume();
+            sum += child[u_curr] * child.volume();
         }
-        parent(u_curr) = sum / parent.volume();
+        parent[u_curr] = sum / parent.volume();
     };
 
     return distr;

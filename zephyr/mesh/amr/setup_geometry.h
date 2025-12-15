@@ -33,7 +33,8 @@ void setup_geometry_one(index_t ic, AmrCells &locals, AmrCells& aliens, const Di
 /// @brief Осуществляет проход по ячейкам и вызывает для них
 /// соответствующие методы адаптации (без MPI)
 template<int dim>
-void setup_geometry(AmrCells &locals, AmrCells& aliens, const Statistics &count, const Distributor& op) {
+void setup_geometry(AmrCells &locals, const Statistics &count, const Distributor& op) {
+    static AmrCells aliens;
     threads::parallel_for(
             index_t{0}, index_t{count.n_cells},
             setup_geometry_one<dim>,
@@ -44,7 +45,9 @@ void setup_geometry(AmrCells &locals, AmrCells& aliens, const Statistics &count,
 /// @brief Осуществляет проход по диапазону ячеек и вызывает для них
 /// соответствующие методы адаптации (с MPI и без тредов)
 template<int dim>
-void setup_geometry(AmrCells &locals, AmrCells& aliens, const Statistics &count, const Distributor& op, int rank) {
+void setup_geometry(AmrCells &locals, Tourism& tourism, const Statistics &count, const Distributor& op) {
+    int rank = mpi::rank();
+    AmrCells& aliens = tourism.aliens();
     threads::parallel_for(
             index_t{0}, index_t{count.n_cells},
             setup_geometry_one<dim>,

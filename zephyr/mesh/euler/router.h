@@ -54,12 +54,7 @@ inline std::string to_string(MpiTag tag) {
 class Requests {
 public:
     /// @brief Массив "нулевых" запросов
-    explicit Requests()
-        : m_requests(utils::mpi::size(), MPI_REQUEST_NULL) { }
-
-    /// @brief Массив "нулевых" запросов
-    explicit Requests(int size)
-        : m_requests(size, MPI_REQUEST_NULL) { }
+    explicit Requests(int size);
 
     /// @brief Получить запрос по номеру ранга
     MPI_Request& operator[](int r) { return m_requests[r]; }
@@ -68,7 +63,23 @@ public:
     void wait() const;
 
 private:
-    std::vector<MPI_Request> m_requests;
+    int m_size;
+    // Фактически запрет копирования
+    std::unique_ptr<MPI_Request[]> m_requests;
+};
+
+class RequestsList {
+public:
+    RequestsList() = default;
+
+    void reserve(int size);
+
+    void operator+=(Requests&& requests);
+
+    void wait() const;
+
+private:
+    std::vector<Requests> m_requests;
 };
 
 /// @brief Управляет обменными операциями
@@ -77,9 +88,6 @@ public:
     /// @brief По умолчанию, size = mpi::size()
     /// Массивы инициализируются нулями
     Router();
-
-    /// @brief Конструктор без инициализации массивов
-    //explicit Router(int size);
 
     /// @brief Установить число элементов для отправки
     void set_send_count(const std::vector<index_t>& send_count);
@@ -106,10 +114,10 @@ public:
     /// @brief Количество пересылок с i-го процесса на j-ый
     index_t operator()(int i, int j) const;
 
-    /// @brief Необходимый размер буфера для отправки сообещений
+    /// @brief Необходимый размер буфера для отправки сообщений
     index_t send_buffer_size() const;
 
-    /// @brief Необходимый размер буфера для получения сообещений
+    /// @brief Необходимый размер буфера для получения сообщений
     index_t recv_buffer_size() const;
 
     const std::vector<index_t>& send_count() const { return m_send_count; }
@@ -128,6 +136,7 @@ public:
     range<index_t> send_indices(int r) const {
         return {m_send_offset[r], m_send_offset[r] + m_send_count[r]};
     }
+
     /// @brief Индексы из массива aliens при получении
     range<index_t> recv_indices(int r) const {
         return {m_recv_offset[r], m_recv_offset[r] + m_recv_count[r]};
@@ -150,7 +159,7 @@ public:
     template<typename T>
     Requests isend(const std::vector<T>& src, MpiTag tag, MPI_Datatype dtype);
 
-    Requests isend(const utils::Buffer& src, MpiTag tag);
+    Requests isend(const utils::Buffer& src, MpiTag tag) const;
 
 
     /// @brief Асинхронное получение
@@ -166,7 +175,7 @@ public:
     template<typename T>
     Requests irecv(std::vector<T>& dst, MpiTag tag, MPI_Datatype dtype);
 
-    Requests irecv(utils::Buffer& dst, MpiTag tag);
+    Requests irecv(utils::Buffer& dst, MpiTag tag) const;
 
 protected:
 

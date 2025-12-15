@@ -52,10 +52,10 @@ double foo(const Vector3d& v) {
 std::vector<double> calc_loads(EuMesh& mesh, int size, Data data) {
     std::vector<double> ws(size, 1.0e-3);
     for (auto cell: mesh) {
-        if (cell(data.rank) < 0 || cell(data.rank) > size) {
+        if (cell[data.rank] < 0 || cell[data.rank] > size) {
             throw std::runtime_error("Wrong rank");
         }
-        ws[cell(data.rank)] += cell(data.load);
+        ws[cell[data.rank]] += cell[data.load];
     }
     return ws;
 }
@@ -85,7 +85,7 @@ int main() {
 
     // Заполняем данные о нагрузке ячеек
     for (auto cell: mesh) {
-        cell(data.load) = foo(cell.center());
+        cell[data.load] = foo(cell.center());
     }
 
     // Различные варианты инициализации ORB декомпозиции
@@ -98,7 +98,7 @@ int main() {
     for (int step = 0; step < 1000; ++step) {
         // Вычисляем новый ранг ячеек
         for (auto &cell: mesh.locals()) {
-            cell(data.rank) = decmp->rank(cell);
+            cell[data.rank] = decmp->rank(cell);
         }
 
         if (step % 10 == 0) {

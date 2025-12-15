@@ -47,11 +47,9 @@ void EuMesh::build(Generator& gen) {
         }
     }
 
+    // установить dim/adapt/axial
     m_tourists.init_types(m_locals);
 #endif
-
-    // установить dim/adapt/axial
-    m_aliens = m_locals.same();
 
     m_structured = false;
     m_nx = n_cells();
@@ -198,7 +196,7 @@ void EuMesh::balance_flags() {
     }
 #ifdef ZEPHYR_MPI
     else {
-        amr::balance_flags(m_tourists, m_locals, m_aliens, m_max_level);
+        amr::balance_flags(m_locals, m_max_level, m_tourists);
     }
 #endif
 }
@@ -234,7 +232,7 @@ void EuMesh::apply_flags() {
     }
 #ifdef ZEPHYR_MPI
     else {
-        amr::apply(m_tourists, m_locals, m_aliens, m_distributor);
+        amr::apply(m_locals, m_distributor, m_tourists);
     }
 #endif
 
@@ -260,7 +258,7 @@ void EuMesh::make_shuba(int count) {
     for (int i = 1; i <= count; i++) {
 #ifdef ZEPHYR_MPI
         if (!mpi::single()) {
-            m_tourists.sync<MpiTag::FLAG>(m_locals, m_aliens);
+            m_tourists.sync<MpiTag::FLAG>(m_locals);
         }
 #endif
         for_each([&](EuCell& cell) {
@@ -576,7 +574,12 @@ int EuMesh::check_base() const {
         if (res < 0) return res;
 
         // Проверка смежности
-        res = m_locals.check_connectivity(ic, m_aliens);
+#ifdef ZEPHYR_MPI
+        res = m_locals.check_connectivity(ic, m_tourists.aliens());
+#else
+        AmrCells aliens = m_locals.same();
+        res = m_locals.check_connectivity(ic, aliens);
+#endif
         if (res < 0) return res;
     }
 
@@ -655,7 +658,12 @@ int EuMesh::check_refined() const {
         if (res < 0) return res;
 
         // Проверка смежности
-        res = m_locals.check_connectivity(ic, m_aliens);
+#ifdef ZEPHYR_MPI
+        res = m_locals.check_connectivity(ic, m_tourists.aliens());
+#else
+        AmrCells aliens = m_locals.same();
+        res = m_locals.check_connectivity(ic, aliens);
+#endif
         if (res < 0) return res;
     }
 
@@ -710,15 +718,18 @@ void EuMesh::add_marker(const geom::Vector3d& pos, double size) {
 }
 
 EuCell_Iter EuMesh::begin() {
-    return {&m_locals, 0, &m_aliens};
+    return {&m_locals, 0,
+        mpi_cond(&m_tourists.aliens(), nullptr) };
 }
 
 EuCell_Iter EuMesh::end() {
-    return {&m_locals, m_locals.size(), &m_aliens};
+    return {&m_locals, m_locals.size(),
+        mpi_cond(&m_tourists.aliens(), nullptr) };
 }
 
 EuCell EuMesh::operator[](index_t idx) {
-    return {&m_locals, idx, &m_aliens};
+    return {&m_locals, idx,
+        mpi_cond(&m_tourists.aliens(), nullptr) };
 }
 
 EuCell EuMesh::operator()(int i, int j) {
@@ -735,7 +746,7 @@ EuCell EuMesh::operator()(int i, int j, int k) {
 }
 
 inline int nodes_estimation(int n_cells, int dim) {
-    assert(dim == 2 || dim == 3);
+    z_assert(dim == 2 || dim == 3, "bad dimension");
     if (dim < 3) {
         int nx = int(std::ceil(std::sqrt(n_cells))) + 2;
         return nx * nx;

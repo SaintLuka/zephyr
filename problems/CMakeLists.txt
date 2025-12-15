@@ -22,7 +22,7 @@ if (ZEPHYR_PROBLEMS_ALL)
 endif()
 
 if (PROBLEMS)
-    message(STATUS "Build some problems:\n   ${PROBLEMS}")
+    message(STATUS "Build basic problems:\n   ${PROBLEMS}")
 endif()
 
 foreach(problem IN LISTS PROBLEMS)

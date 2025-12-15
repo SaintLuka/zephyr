@@ -50,6 +50,9 @@ public:
     /// @brief Установить неопределенную грань
     void set_undefined() const;
 
+    /// @brief Установить флаг граничных условий
+    void set_boundary(Boundary flag) const;
+
     /// @}
 
     /// @{ @name Геометрия грани
@@ -302,29 +305,11 @@ public:
 
     /// @brief Ссылка на данные ячейки
     template <typename T>
-    T& operator()(Storable<T> var);
-    template <typename T>
     T& operator[](Storable<T> var);
 
     /// @brief Константная ссылка на данные ячейки
     template <typename T>
-    const T& operator()(Storable<T> var) const;
-    template <typename T>
     const T& operator[](Storable<T> var) const;
-
-    /// @brief Ссылка на данные ячейки, вызов актуален, только если сетка
-    /// содержит единственный массив данных такого типа
-    template <typename T>
-    T& operator()(const T& var);
-    template <typename T>
-    T& operator[](const T& var);
-
-    /// @brief Константная ссылка на данные ячейки, вызов актуален, только
-    /// если сетка содержит единственный массив данных такого типа
-    template <typename T>
-    const T& operator()(const T& var) const;
-    template <typename T>
-    const T& operator[](const T& var) const;
 
     /// @brief Скопировать данные в другую ячейку
     void copy_data_to(EuCell& dst_cell) const;
@@ -591,6 +576,19 @@ inline bool EuFace::is_undefined() const { return m_cells->faces.is_undefined(m_
 
 inline void EuFace::set_undefined() const { m_cells->faces.set_undefined(m_face_idx); }
 
+inline void EuFace::set_boundary(Boundary flag) const {
+    if (flag == Boundary::ORDINARY || flag == Boundary::PERIODIC) {
+        std::cerr << "You can't just set Ordinary or Periodic boundary flag\n";
+    }
+    else {
+        index_t basic = m_cells->faces.adjacent.basic[m_face_idx];
+        m_cells->faces.boundary[m_face_idx] = flag;
+        m_cells->faces.adjacent.rank[m_face_idx] = m_cells->rank[basic];
+        m_cells->faces.adjacent.index[m_face_idx] = basic;
+        m_cells->faces.adjacent.alien[m_face_idx] = -1;
+    }
+}
+
 inline const geom::Vector3d &EuFace::normal() const { return m_cells->faces.normal[m_face_idx]; }
 
 inline const geom::Vector3d &EuFace::center() const { return m_cells->faces.center[m_face_idx]; }
@@ -727,24 +725,10 @@ inline double EuCell::linear_size() const { return m_cells->linear_size(m_index)
 inline double EuCell::incircle_diameter() const { return m_cells->incircle_diameter(m_index); }
 
 template <typename T>
-T& EuCell::operator()(Storable<T> var) { return m_cells->data.get_val(var, m_index); }
-template <typename T>
 T& EuCell::operator[](Storable<T> var) { return m_cells->data.get_val(var, m_index); }
 
 template <typename T>
-const T& EuCell::operator()(Storable<T> var) const { return m_cells->data.get_val(var, m_index); }
-template <typename T>
  const T& EuCell::operator[](Storable<T> var) const { return m_cells->data.get_val(var, m_index); }
-
-template <typename T>
-T& EuCell::operator()(const T& var) { return m_cells->data.get_val<T>(m_index); }
-template <typename T>
-T& EuCell::operator[](const T& var) { return m_cells->data.get_val<T>(m_index); }
-
-template <typename T>
-const T& EuCell::operator()(const T& var) const { return m_cells->data.get_val<T>(m_index); }
-template <typename T>
-const T& EuCell::operator[](const T& var) const { return m_cells->data.get_val<T>(m_index); }
 
 inline void EuCell::copy_data_to(EuCell &dst_cell) const {
     m_cells->copy_data(m_index, dst_cell.m_cells, dst_cell.m_index);

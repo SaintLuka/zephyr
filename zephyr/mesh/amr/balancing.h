@@ -37,22 +37,22 @@ inline void balance_flags(AmrCells &cells, int max_level) {
 #ifdef ZEPHYR_MPI
 
 /// @brief Функция балансировки флагов верхнего уровня
-inline void balance_flags(Tourism& tourism, AmrCells &locals, AmrCells& aliens, int max_level) {
+inline void balance_flags(AmrCells &locals, int max_level, Tourism& tourism) {
     if (locals.empty()) {
-        amr::balance_flags_slow<0>(tourism, locals, aliens, max_level);
+        amr::balance_flags_slow<0>(locals, max_level, tourism);
     }
     else {
 #if FAST_BALANCING
         if (locals.dim() < 3) {
-            amr::balance_flags_fast<2>(tourism, locals, aliens, max_level);
+            amr::balance_flags_fast<2>(locals, max_level, tourism);
         } else {
-            amr::balance_flags_fast<3>(tourism, locals, aliens, max_level);
+            amr::balance_flags_fast<3>(locals, max_level, tourism);
         }
 #else
         if (locals.dim() < 3) {
-            amr::balance_flags_slow<2>(tourism, locals, aliens, max_level);
+            amr::balance_flags_slow<2>(locals, max_level, tourism);
         } else {
-            amr::balance_flags_slow<3>(tourism, locals, aliens, max_level);
+            amr::balance_flags_slow<3>(locals, max_level, tourism);
         }
 #endif
     }

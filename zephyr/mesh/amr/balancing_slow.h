@@ -238,7 +238,6 @@ bool flag_balancing_step(AmrCells& locals, const VicinityList<dim>& vicinity_lis
 /// 1:2 у соседних ячеек. Баланс достигается повышением флагов адаптации
 /// (-1 и 0) у части ячеек.
 /// @param locals Ссылка на локальное хранилище ячеек
-/// @param aliens Ссылка на хранилище ячеек с других процессов
 /// @param max_level Максимальный уровень адаптации ячеек
 /// @details Детали алгоритма. На первом этапе собирается информация об
 /// окружении ячеек (указатели на флаги и уровни соседей и сиблингов), которая
@@ -294,11 +293,12 @@ void balance_flags_slow(AmrCells& locals, int max_level) {
 /// @brief Простая итерационная версия функции балансировки флагов.
 /// @details Смотреть однопроцессорную версию.
 template<int dim>
-void balance_flags_slow(Tourism& tourism, AmrCells &locals, AmrCells &aliens, int max_level) {
-    using zephyr::utils::Stopwatch;
+void balance_flags_slow(AmrCells &locals, int max_level, Tourism& tourism) {
     static Stopwatch restrictions_timer;
     static Stopwatch setup_vicinity_timer;
     static Stopwatch flag_balancing_timer;
+
+    AmrCells &aliens = tourism.aliens();
 
     // Делаем статическим, чтобы не выделять каждый раз память (гениально)
     static VicinityList<dim> vicinity_list;
@@ -315,7 +315,7 @@ void balance_flags_slow(Tourism& tourism, AmrCells &locals, AmrCells &aliens, in
     int changed = 1;
     while (changed) {
         // Синхронизация флагов адаптации в alien-ячейках
-        tourism.sync<MpiTag::FLAG>(locals, aliens);
+        tourism.sync<MpiTag::FLAG>(locals);
 
         vicinity_list.update();
 
@@ -336,11 +336,11 @@ void balance_flags_slow(Tourism& tourism, AmrCells &locals, AmrCells &aliens, in
 }
 
 /// @brief Специализация для процессов без ячеек
-template<>
-void balance_flags_slow<0>(Tourism& tourism, AmrCells &locals, AmrCells &aliens, int max_level) {
+template<> inline
+void balance_flags_slow<0>(AmrCells &locals, int max_level, Tourism& tourism) {
     int changed = 1;
     while (changed) {
-        tourism.sync<MpiTag::FLAG>(locals, aliens);
+        tourism.sync<MpiTag::FLAG>(locals);
         changed = mpi::max(0);
     }
 }

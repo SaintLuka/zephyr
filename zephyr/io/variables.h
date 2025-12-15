@@ -136,14 +136,14 @@ public:
     /// Variables vars;
     /// vars += {"rho", rho};
     template <typename T>
-    void append(std::string name, const mesh::Storable<T>& p) {
+    void append(std::string name, mesh::Storable<T> p) {
         if (VtkType::get<T>().is_undefined()) {
             if constexpr (std::is_same_v<T, geom::Vector3d>) {
                 append(name, 3, WriteCell<double>(
                         [p](mesh::EuCell &cell, double *out) {
-                            out[0] = cell(p).x();
-                            out[1] = cell(p).y();
-                            out[2] = cell(p).z();
+                            out[0] = cell[p].x();
+                            out[1] = cell[p].y();
+                            out[2] = cell[p].z();
                         }));
             } else {
                 throw std::runtime_error("Can't add as VTK type");
@@ -152,7 +152,7 @@ public:
         else {
             append(name, 1, WriteCell<T>(
                 [p](mesh::EuCell &cell, T *out) {
-                    out[0] = cell(p);
+                    out[0] = cell[p];
                 }));
         }
     }

@@ -9,8 +9,10 @@
 
 #ifdef ZEPHYR_MPI
     #define if_mpi(...) __VA_ARGS__
+    #define mpi_cond(expr1, expr2) expr1
 #else
     #define if_mpi(...)
+    #define mpi_cond(expr1, expr2) expr2
 #endif
 
 #ifdef ZEPHYR_ASSERTS

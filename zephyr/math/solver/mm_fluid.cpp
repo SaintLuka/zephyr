@@ -460,7 +460,7 @@ void MmFluid::compute_grad(EuMesh &mesh, Storable<PState> U)  {
     mesh.for_each([this, U](EuCell &cell) {
         // Для смешанных ячеек в CRP режиме производные равны нулю
         if (m_crp_mode != CrpMode::NONE) {
-            bool set_zero = cell(U).mass_frac.index() < 0;
+            bool set_zero = cell[U].mass_frac.index() < 0;
             if (!set_zero) {
                 for (auto face: cell.faces()) {
                     if (face.neib(U).mass_frac.index() < 0) {

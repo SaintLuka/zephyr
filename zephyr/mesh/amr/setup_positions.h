@@ -5,7 +5,7 @@
 #include <zephyr/mesh/amr/common.h>
 #include <zephyr/mesh/amr/siblings.h>
 #include <zephyr/mesh/amr/statistics.h>
-#include <zephyr/mesh/amr/remove_undefined.h>
+#include <zephyr/mesh/amr/swap_lists.h>
 
 namespace zephyr::mesh::amr {
 

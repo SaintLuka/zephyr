@@ -103,7 +103,12 @@ struct CellsByLevel {
     }
 
 #ifdef ZEPHYR_MPI
-    CellsByLevel(Tourism& tourism, AmrCells &locals, AmrCells& aliens, int max_level) {
+    CellsByLevel(Tourism& tourism, AmrCells &locals, int max_level) {
+        AmrCells& border = tourism.border();
+        const AmrCells& aliens = tourism.aliens();
+        const auto& router = tourism.cell_router();
+        const auto& border_indices = tourism.border_indices();
+
         // Также пересылает все флаги
         coarse_to_send = std::vector(max_level, std::vector<std::vector<int>>(mpi::size()));
         retain_to_send = std::vector(max_level, std::vector<std::vector<int>>(mpi::size()));
@@ -111,16 +116,13 @@ struct CellsByLevel {
         coarse_to_recv = std::vector(max_level, std::vector<std::vector<int>>(mpi::size()));
         retain_to_recv = std::vector(max_level, std::vector<std::vector<int>>(mpi::size()));
 
-        const auto& router = tourism.m_cell_route;
-        const auto& border_indices = tourism.border_indices();
-
         for (int r = 0; r < mpi::size(); ++r) {
             // Индексы на отправку
             for (index_t j: router.send_indices(r)) {
                 index_t ic = border_indices[j];
 
                 // Теперь можно не делать prepare
-                tourism.m_border.flag[j] = locals.flag[ic];
+                border.flag[j] = locals.flag[ic];
 
                 if (locals.level[ic] == max_level || locals.flag[ic] > 0) {
                     continue;
@@ -135,7 +137,7 @@ struct CellsByLevel {
         }
         // Уже подготовили border
         auto send_flag = tourism.isend<MpiTag::FLAG>();
-        auto recv_flag = tourism.irecv<MpiTag::FLAG>(aliens);
+        auto recv_flag = tourism.irecv<MpiTag::FLAG>();
 
         // TODO: Сортировка по тредам
         serial_constructor(locals, max_level);
@@ -471,7 +473,7 @@ void balance_flags_fast(AmrCells& locals, int max_level) {
 /// Отличия параллельной реализации?
 /// Объяснить безумие с отправкой флагов.
 template <int dim>
-void balance_flags_fast(Tourism& tourism, AmrCells &locals, AmrCells &aliens, int max_level) {
+void balance_flags_fast(AmrCells &locals, int max_level, Tourism& tourism) {
     static Stopwatch restriction_timer;
     static Stopwatch sorting_timer;
     static Stopwatch round_timer_1;
@@ -482,12 +484,14 @@ void balance_flags_fast(Tourism& tourism, AmrCells &locals, AmrCells &aliens, in
     static int n_total_retain = 0;
     static int n_total_coarse = 0;
 
+    AmrCells& aliens = tourism.aliens();
+
     restriction_timer.resume();
     base_restrictions<dim>(locals, max_level);
     restriction_timer.stop();
 
     sorting_timer.resume();
-    CellsByLevel sorted(tourism, locals, aliens, max_level);
+    CellsByLevel sorted(tourism, locals, max_level);
     sorting_timer.stop();
 
     for (int lvl = max_level - 1; lvl >= 0; --lvl) {
@@ -513,7 +517,7 @@ void balance_flags_fast(Tourism& tourism, AmrCells &locals, AmrCells &aliens, in
 
     // TODO: оптимизировать и отправлять не все флаги?
     // TODO: проверить, нужна ли отправка в slow_balancing
-    tourism.sync<MpiTag::FLAG>(locals, aliens);
+    tourism.sync<MpiTag::FLAG>(locals);
 
 #if CHECK_PERFORMANCE
     n_step += 1;

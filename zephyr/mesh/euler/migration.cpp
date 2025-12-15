@@ -42,14 +42,14 @@ void Migration::fill_router(AmrCells& locals) {
     }
 
     // Установить число ячеек на отправку
-    cell_route.set_send_count(cell_send_count);
-    face_route.set_send_count(face_send_count);
-    node_route.set_send_count(node_send_count);
+    m_cell_router.set_send_count(cell_send_count);
+    m_face_router.set_send_count(face_send_count);
+    m_node_router.set_send_count(node_send_count);
 
     // Получение полной матрицы пересылок (all to all)
-    cell_route.fill_complete();
-    face_route.fill_complete();
-    node_route.fill_complete();
+    m_cell_router.fill_complete();
+    m_face_router.fill_complete();
+    m_node_router.fill_complete();
 
     /*
     // Количество разных штук на отправку и получение
@@ -69,7 +69,7 @@ void Migration::reindexing(Tourism& tourism, AmrCells& locals, AmrCells& aliens)
     // Отправим новые ранги ячеек
     tourism.prepare<MpiTag::RANK>(locals);
     auto send_rnk_1 = tourism.isend<MpiTag::RANK>();
-    auto recv_rnk_1 = tourism.irecv<MpiTag::RANK>(aliens);
+    auto recv_rnk_1 = tourism.irecv<MpiTag::RANK>();
 
     // Переиндексируем локальные ячейки
 
@@ -79,9 +79,9 @@ void Migration::reindexing(Tourism& tourism, AmrCells& locals, AmrCells& aliens)
     std::vector<index_t> node_index(mpi::size(), 0);
     for (int r = 0; r < mpi::size(); ++r) {
         for (int i = 0; i < mpi::rank(); ++i) {
-            cell_index[r] += cell_route(i, r);
-            face_index[r] += face_route(i, r);
-            node_index[r] += node_route(i, r);
+            cell_index[r] += m_cell_router(i, r);
+            face_index[r] += m_face_router(i, r);
+            node_index[r] += m_node_router(i, r);
         }
     }
 
@@ -92,7 +92,7 @@ void Migration::reindexing(Tourism& tourism, AmrCells& locals, AmrCells& aliens)
 
     tourism.prepare<MpiTag::INDEX>(locals);
     auto send_idx_1 = tourism.isend<MpiTag::INDEX>();
-    auto recv_idx_1 = tourism.irecv<MpiTag::INDEX>(aliens);
+    auto recv_idx_1 = tourism.irecv<MpiTag::INDEX>();
 
     // Дождемся получения новых rank и index ячеек
     send_rnk_1.wait();

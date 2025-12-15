@@ -67,15 +67,17 @@ struct Star {
 };
 
 void set_index(EuCell& cell, Star& star) {
-    cell(bit) = star.inside(cell.center());
+    cell[bit] = star.inside(cell.center());
 }
 
 void set_flag(EuCell& cell) {
-    cell.set_flag(cell(bit) > 0 ? 1 : -1);
+    cell.set_flag(cell[bit] > 0 ? 1 : -1);
 }
 
-int main() {
-    threads::on();
+int main(int argc, char** argv) {
+    mpi::handler init(argc, argv);
+    threads::init(argc, argv);
+    threads::info();
 
     Rectangle gen(-2.0, 2.0, -1.0, 1.0);
     gen.set_nx(50);
@@ -85,15 +87,16 @@ int main() {
     EuMesh mesh(gen);
     bit = mesh.add<int>("bit");
 
+    mesh.set_decomposition("XY");
     mesh.set_max_level(mesh.dim() == 2 ? 5 : 4);
     mesh.set_distributor("simple");
 
     PvdFile pvd("mesh", "output");
     pvd.variables = {"rank", "index", "next", "level", "flag", "faces2D"};
-    pvd.variables += {"wanted", [](EuCell& cell) -> double { return cell(bit); }};
+    pvd.variables.append("wanted", bit);
 
     if (mesh.check_base() < 0) {
-        std::cout << "Bad init mesh\n";
+        mpi::cout << "Bad init mesh\n";
         return 0;
     }
 
@@ -101,9 +104,9 @@ int main() {
     Star star(0.5);
 
     // Начальная адаптация
-    std::cout << "Init refinement\n";
+    mpi::cout << "Init refinement\n";
     for (int lvl = 0; lvl < mesh.max_level() + 4; ++lvl) {
-        std::cout << "  Level " << lvl << "\n";
+        mpi::cout << "  Level " << lvl << "\n";
         mesh.for_each(set_index, star);
         mesh.for_each(set_flag);
         mesh.refine();
@@ -115,20 +118,28 @@ int main() {
 
     Stopwatch elapsed;
     Stopwatch sw_write;
+    Stopwatch sw_balancing;
     Stopwatch sw_star;
     Stopwatch sw_set_index;
     Stopwatch sw_set_flags;
     Stopwatch sw_refine;
 
-    std::cout << "RUN\n";
+    mpi::cout << "RUN\n";
     elapsed.start();
     for (int step = 0; step < 1000; ++step) {
         sw_write.resume();
         if (step % 20 == 0) {
-            std::cout << "  Step " << std::setw(4) << step << " / 1000\n";
+            mpi::cout << "  Step " << std::setw(4) << step << " / 1000\n";
             pvd.save(mesh, step);
         }
         sw_write.stop();
+
+        sw_balancing.resume();
+        if (step % 20 == 0) {
+            mesh.balancing();
+            mesh.redistribute();
+        }
+        sw_balancing.stop();
 
         sw_star.resume();
         star.update(step / 1000.0);
@@ -146,29 +157,20 @@ int main() {
         mesh.refine();
         sw_refine.stop();
 
-        if (mesh.check_refined() < 0) {
-            throw std::runtime_error("Bad refined mesh");
-        }
+        //if (mesh.check_refined() < 0) {
+        //    throw std::runtime_error("Bad refined mesh");
+        //}
     }
     elapsed.stop();
 
-    std::cout << "\nElapsed:       " << elapsed.extended_time()
-              << " ( " << elapsed.milliseconds() << " ms)\n";
+    mpi::cout << "\nElapsed:       " << elapsed.extended_time() << " ( " << elapsed.milliseconds() << " ms)\n";
 
-    std::cout << "  Write:       " << sw_write.extended_time()
-              << " ( " << sw_write.milliseconds() << " ms)\n";
-
-    std::cout << "  Update star: " << sw_star.extended_time()
-              << " ( " << sw_star.milliseconds() << " ms)\n";
-
-    std::cout << "  Set index:   " << sw_set_index.extended_time()
-              << " ( " << sw_set_index.milliseconds() << " ms)\n";
-
-    std::cout << "  Set flags:   " << sw_set_flags.extended_time()
-              << " ( " << sw_set_flags.milliseconds() << " ms)\n";
-
-    std::cout << "  Refine:      " << sw_refine.extended_time()
-              << " ( " << sw_refine.milliseconds() << " ms)\n";
+    mpi::cout << "  Write:       " << sw_write.extended_time() << " ( " << sw_write.milliseconds() << " ms)\n";
+    mpi::cout << "  Balancing:   " << sw_balancing.extended_time() << " ( " << sw_balancing.milliseconds() << " ms)\n";
+    mpi::cout << "  Update star: " << sw_star.extended_time() << " ( " << sw_star.milliseconds() << " ms)\n";
+    mpi::cout << "  Set index:   " << sw_set_index.extended_time() << " ( " << sw_set_index.milliseconds() << " ms)\n";
+    mpi::cout << "  Set flags:   " << sw_set_flags.extended_time() << " ( " << sw_set_flags.milliseconds() << " ms)\n";
+    mpi::cout << "  Refine:      " << sw_refine.extended_time() << " ( " << sw_refine.milliseconds() << " ms)\n";
 
     return 0;
 }

@@ -6,7 +6,7 @@
 #pragma once
 
 #define SCRUTINY 0           // Тщательная проверка вычислений
-#define CHECK_PERFORMANCE 1  // Выводить производительность частей алгоритма
+#define CHECK_PERFORMANCE 0  // Выводить производительность частей алгоритма
 #define FAST_BALANCING 1     // Быстрая функция балансировки флагов
 
 #if SCRUTINY
@@ -18,6 +18,7 @@
 #endif
 
 #include <array>
+#include <bitset>
 
 #include <zephyr/configuration.h>
 
@@ -61,6 +62,11 @@ using utils::Stopwatch;
 // Частота вывода сообщений о производительности
 static constexpr size_t check_frequency = 100;
 #endif
+
+inline index_t pack_children(index_t next, std::bitset<8> children) {
+    z_assert(next < (1 << 23), "Too large next");
+    return static_cast<index_t>((children.to_ulong() << 24) + next);
+}
 
 inline std::tuple<index_t, std::bitset<8>> unpack_children(index_t next) {
     return {static_cast<std::make_unsigned_t<index_t>>(next) % (1 << 24), std::bitset<8>(next >> 24) };

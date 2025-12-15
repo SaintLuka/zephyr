@@ -5,13 +5,10 @@
 // к функциям предназначены для разработчиков.
 #pragma once
 
-#include <bitset>
 #include <zephyr/mesh/amr/common.h>
 #include <zephyr/mesh/amr/statistics.h>
 #include <zephyr/mesh/amr/setup_positions.h>
 #include <zephyr/mesh/amr/setup_geometry.h>
-#include <zephyr/mesh/amr/restore_connections.h>
-#include <zephyr/mesh/amr/remove_undefined.h>
 #include <zephyr/mesh/euler/tourism.h>
 
 namespace zephyr::mesh::amr {
@@ -21,15 +18,28 @@ namespace zephyr::mesh::amr {
 /// сбалансированы.
 /// @param locals Ссылка на хранилище ячеек
 /// @param op Осуществляет распределение данных
-/// @details Описание деталей алгоритма:
+/// @details Детали алгоритма:
 /// Этап 1. Сбор данных о количестве ячеек для огрубления, разбиения и т. д.
-/// Этап 2. Определение позиций для создания новых ячеек (все ячейки будут
-/// созданы за границами исходного хранилища)
-/// Этап 3. Создание геометрии ячеек, ячейки создаются на выделенных для них
-/// местах за границами исходного хранилища.
-/// Этап 5. На начале этапа все ячейки правильно связаны, но внутри хранилища
-/// часть старых ячеек (не листовых) являются неопределенными.
-/// Алгоритм осуществляет удаление данных ячеек.
+/// Этап 2. Создание обменных списков. Подразумевается, что новые ячейки из
+/// конца хранилища будут перемещены на места удаленных ячеек.
+/// Этап 3. Определение позиций для создания новых ячеек, а также финальные
+/// позиции всех ячеек, включая новые. Индексы выставляются в поле NEXT.
+/// Новые ячейки будут созданы за границами исходного хранилища.
+/// В исходном хранилище NEXT указывает:
+///   - флаг = 0: NEXT это финальное положение ячейки в хранилище.
+///   - флаг < 0: NEXT это положение родительской (за границей исходного).
+///   - флаг > 0: NEXT это положение первой дочерней (за границей исходного).
+/// В расширенной части хранилища NEXT всегда указывает на финальное
+/// положение ячейки. Таким образом, NEXT позволяет точно определить куда
+/// в результате будут перемещены все ячейки, в том числе новые.
+/// Этап 4. Создание геометрии ячеек, ячейки создаются на выделенных для них
+/// местах за границами исходного хранилища. Все связи выставляются точно,
+/// исходя из финальных позиций всех ячеек (поле NEXT).
+/// Этап 5. На начале этапа все ячейки правильно связаны с указанием финальных
+/// индексов, но внутри хранилища часть старых ячеек (не листовых) являются
+/// неопределенными. При этом за пределами исходного хранилища созданы новые
+/// ячейки. Необходимо выполнить цикл по обменным спискам и сделать перемещение
+/// ячеек из конца хранилища на места неопределенных ячеек.
 template<int dim>
 void apply_impl(AmrCells &locals, const Distributor& op) {
     static Stopwatch count_timer;
@@ -38,34 +48,33 @@ void apply_impl(AmrCells &locals, const Distributor& op) {
     static Stopwatch geometry_timer;
     static Stopwatch remove_timer;
 
-    static AmrCells aliens;
-
     /// Этап 1. Сбор статистики
     count_timer.resume();
     const Statistics count(locals.flag, locals.dim());
     //count.print();
     count_timer.stop();
 
-    swap_timer.resume();
-    SwapLists swap_list(count, locals.flag);
-    swap_timer.stop();
-
     // Нечего адаптировать
     if (count.n_cells_large <= count.n_cells) return;
     scrutiny_check(count.n_cells_large != count.n_cells, "Strange things");
 
-    /// Этап 2. Распределяем места для новых ячеек
+    // Этап 2. Определение обменных списков
+    swap_timer.resume();
+    SwapLists swap_list(count, locals.flag);
+    swap_timer.stop();
+
+    /// Этап 3. Распределяем места для новых ячеек
     positions_timer.resume();
     locals.resize_amr(count.n_cells_large);
     setup_positions<dim>(locals, count, swap_list);
     positions_timer.stop();
 
-    /// Этап 3. Восстановление геометрии
+    /// Этап 4. Создание новых ячеек
     geometry_timer.resume();
-    setup_geometry<dim>(locals, aliens, count, op);
+    setup_geometry<dim>(locals, count, op);
     geometry_timer.stop();
 
-    /// Этап 4. Удаление неопределенных ячеек
+    /// Этап 5. Перемещение готовых ячеек
     remove_timer.resume();
     swap_list.move_elements(locals);
     locals.resize_amr(count.n_cells_short);
@@ -86,8 +95,7 @@ void apply_impl(AmrCells &locals, const Distributor& op) {
 
 /// @brief Автоматический выбор размерности
 inline void apply(AmrCells &cells, const Distributor& op) {
-    if (cells.empty())
-        return;
+    if (cells.empty()) return;
 
     if (cells.dim() < 3) {
         amr::apply_impl<2>(cells, op);
@@ -101,104 +109,117 @@ inline void apply(AmrCells &cells, const Distributor& op) {
 /// @brief Многопроцессорная версия функции, выполняет непосредственную
 /// адаптацию ячеек в хранилище в соответствии с флагами адаптации.
 /// Предполагается, что флаги адаптации сбалансированы.
+/// @param tourism Обменные слои
+/// @param locals Ссылка на хранилище ячеек
+/// @param op Осуществляет распределение данных
 /// @details Алгоритм практически совпадает с однопроцессорной версией,
 /// поскольку не допускается огрубление ячеек, у которых сиблинги находятся
 /// на различных процессах. Детали алгоритма:
-/// Этап 1. Сбор данных о количестве ячеек для огрубления, разбиения и т.д.
-/// Этап 2. Определение позиций для создания новых ячеек (все ячейки будут
-/// созданы за границами исходного хранилища)
-/// Этап 3. Создание геометрии ячеек, ячейки создаются на выделенных для них
-/// местах за границами исходного хранилища.
-/// Этап 4. Восстановление связей. На начале данного этапа все ячейки, включая
-/// новые, ссылаются на старые индексы, а новые индексы указаны в amrData.next.
-/// На данном этапе происходит выставление face.adjacent, которые указывают
-/// на новые ячейки. Для граней между процессами ничего не происходит, на данном
-/// этапе ссылки указывают на старые ячейки (до адаптации)
-/// Этап 5. На начале этапа все ячейки правильно связаны, но внутри
-/// хранилища часть старых ячеек (не листовых) являются неопределенными.
-/// Алгоритм осуществляет удаление данных ячеек.
+/// Этап 1. Сбор данных о количестве ячеек для огрубления, разбиения и т. д.
+/// Этап 2. Создание обменных списков. Подразумевается, что новые ячейки из
+/// конца хранилища будут перемещены на места удаленных ячеек.
+/// Этап 3а. Выполняется для locals ячеек.
+/// Определение позиций для создания новых ячеек, а также финальные
+/// позиции всех ячеек, включая новые. Индексы выставляются в поле NEXT.
+/// Новые ячейки будут созданы за границами исходного хранилища.
+/// В исходном хранилище NEXT указывает:
+///   - флаг = 0: NEXT это финальное положение ячейки в хранилище.
+///   - флаг < 0: NEXT это положение родительской (за границей исходного).
+///   - флаг > 0: NEXT это положение первой дочерней (за границей исходного).
+/// В расширенной части хранилища NEXT всегда указывает на финальное
+/// положение ячейки. Таким образом, NEXT позволяет точно определить куда
+/// в результате будут перемещены все ячейки, в том числе новые.
+/// Этап 3б. Выполняется для aliens ячеек. Также проставляет параметр NEXT,
+/// но только для border и aliens ячеек. Правил индексации NEXT отличаются.
+/// Используется другой алгоритм формирования списка border. Ячейки не
+/// перемещаются из конца на неопределенные места, а располагаются на тех же
+/// местах последовательно. Для split ячейки её дети (которые принадлежат
+/// border границе), будут располагаться все вместе в итоговом border на
+/// том же месте, где была ячейка (ну разве что ячейку сдвинут).
+/// Итого, в aliens массивах NEXT указывает:
+///   - флаг = 0: NEXT это финальное положение ячейки в aliens-хранилище.
+///   - флаг < 0: NEXT это финальное положение ячейки в aliens-хранилище.
+///   - флаг > 0: NEXT закодированное положение первой дочерней ячейки в
+///                    aliens-хранилище + закодированные дети.///
+/// Этап 4. Создание геометрии ячеек, ячейки создаются на выделенных для них
+/// местах за границами исходного хранилища. Все связи выставляются точно,
+/// исходя из финальных позиций всех ячеек (поле NEXT). А также с правильными
+/// ссылками на финальную версию aliens.
+/// Этап 5. На начале этапа все ячейки правильно связаны с указанием финальных
+/// индексов, но внутри хранилища часть старых ячеек (не листовых) являются
+/// неопределенными. При этом за пределами исходного хранилища созданы новые
+/// ячейки. Необходимо выполнить цикл по обменным спискам и сделать перемещение
+/// ячеек из конца хранилища на места неопределенных ячеек.
+/// В конце этапа все хранилища масштабируются под финальные размеры.
+/// Этап 6. Обменные слои все сделаны корректно, необходимо только запаковать
+/// и отправить геометрию из border в aliens.
+/// Этап 7. Проставить индексы adjacent.index для alien-ячеек.
 template<int dim>
-void apply_impl(Tourism& tourism, AmrCells &locals, AmrCells &aliens, const Distributor& op) {
-    using utils::Stopwatch;
-
+void apply_impl(AmrCells &locals, const Distributor& op, Tourism& tourism) {
     static Stopwatch count_timer;
-    static Stopwatch positions_timer;
+    static Stopwatch swap_timer;
+    static Stopwatch positions_timer1;
+    static Stopwatch positions_timer2;
     static Stopwatch geometry_timer;
-    static Stopwatch connections_timer;
     static Stopwatch remove_timer;
     static Stopwatch exchange_timer;
-    static Stopwatch alien1_timer;
-    static Stopwatch alien2_timer;
-    static Stopwatch create_swap_timer;
-    static Stopwatch set_mapping_timer;
-    static Stopwatch change_adjacent_timer;
-    static Stopwatch swap_elements_timer;
-    static Stopwatch send_next_timer;
+    static Stopwatch restore_timer;
 
-    int rank = mpi::rank();
-
-    /// Этап 1. Сбор статистики
+    // Этап 1. Сбор статистики
     count_timer.resume();
-    Statistics count(locals.flag, locals.dim());
+    const Statistics count(locals.flag, locals.dim());
     count_timer.stop();
 
-    create_swap_timer.resume();
-    SwapLists swap_list(count, locals.flag);
-    create_swap_timer.stop();
+    // Этап 2. Определение обменных списков
+    swap_timer.resume();
+    const SwapLists swap_list(count, locals.flag);
+    swap_timer.stop();
 
-    /// Этап 2. Распределяем места для новых ячеек
-    positions_timer.resume();
+    /// Этап 3а. Распределяем места для новых ячеек
+    positions_timer1.resume();
     locals.resize_amr(count.n_cells_large);
     setup_positions<dim>(locals, count, swap_list);
+    positions_timer1.stop();
 
-    tourism.setup_positions<dim>(aliens);
+    // Этап 3б. Сделать setup_positions для alien-ячеек
+    positions_timer2.resume();
+    tourism.setup_positions<dim>(locals.next);
+    positions_timer2.stop();
 
-    tourism.update_border_indices<dim>(locals.next);
-
-    positions_timer.stop();
-
-    /// Этап 3. Восстановление геометрии
+    /// Этап 4. Создание новых ячеек
     geometry_timer.resume();
-    setup_geometry<dim>(locals, aliens, count, op, rank);
+    setup_geometry<dim>(locals, tourism, count, op);
     geometry_timer.stop();
 
-    /// Этап 4. Удаление неопределенных ячеек
+    /// Этап 5. Перемещение готовых ячеек
     remove_timer.resume();
     swap_list.move_elements(locals);
     locals.resize_amr(count.n_cells_short);
-    tourism.resize_to_router(aliens);
+    tourism.resize_border();
+    tourism.resize_aliens();
     remove_timer.stop();
 
-    // Этап 5. Получить геометрию в alien ячейки
-    tourism.pack_geometry(locals);
-    tourism.send_geometry(aliens);
+    // Этап 6. Пересылка геометрии locals -> aliens
+    exchange_timer.resume();
+    tourism.send_geometry(locals);
+    exchange_timer.stop();
 
     // Как будто особо и не нужно
-    for (index_t ic: tourism.m_border_indices) {
-        for (index_t iface: locals.faces_range(ic)) {
-            index_t alien_index = locals.faces.adjacent.alien[iface];
-            if (alien_index >= 0) {
-                locals.faces.adjacent.index[iface] = aliens.index[alien_index];
-            }
-        }
-    }
+    restore_timer.resume();
+    tourism.restore_indices(locals);
+    restore_timer.stop();
 
 #if CHECK_PERFORMANCE
     static size_t counter = 0;
     if (counter % amr::check_frequency == 0) {
-        mpi::cout << "    Statistics:     " << std::setw(11) << count_timer.milliseconds_mpi() << " ms\n";
-        mpi::cout << "    Positions:      " << std::setw(11) << positions_timer.milliseconds_mpi() << " ms\n";
-        mpi::cout << "    Geometry:       " << std::setw(11) << geometry_timer.milliseconds_mpi() << " ms\n";
-        mpi::cout << "    Send/Recv:      " << std::setw(11) << exchange_timer.milliseconds_mpi() << " ms\n";
-        mpi::cout << "    Connections:    " << std::setw(11) << connections_timer.milliseconds_mpi() << " ms\n";
-        mpi::cout << "    Build aliens 1: " << std::setw(11) << alien1_timer.milliseconds_mpi() << " ms\n";
-        mpi::cout << "    Build aliens 2: " << std::setw(11) << alien2_timer.milliseconds_mpi() << " ms\n";
-        mpi::cout << "    Remove undef:   " << std::setw(11) << remove_timer.milliseconds_mpi() << " ms\n";
-        mpi::cout << "      Create SwapList: " << std::setw(8) << create_swap_timer.milliseconds_mpi() << " ms\n";
-        mpi::cout << "      Setup mapping:   " << std::setw(8) << set_mapping_timer.milliseconds_mpi() << " ms\n";
-        mpi::cout << "      Send/Recv next:  " << std::setw(8) << send_next_timer.milliseconds_mpi() << " ms\n";
-        mpi::cout << "      Change adjacent: " << std::setw(8) << change_adjacent_timer.milliseconds_mpi() << " ms\n";
-        mpi::cout << "      Swap elements:   " << std::setw(8) << swap_elements_timer.milliseconds_mpi() << " ms\n";
+        mpi::cout << "    Statistics:       " << std::setw(9) << count_timer.milliseconds_mpi() << " ms\n";
+        mpi::cout << "    Create SwapList:  " << std::setw(9) << swap_timer.milliseconds_mpi() << " ms\n";
+        mpi::cout << "    Local Positions:  " << std::setw(9) << positions_timer1.milliseconds_mpi() << " ms\n";
+        mpi::cout << "    Alien Positions:  " << std::setw(9) << positions_timer2.milliseconds_mpi() << " ms\n";
+        mpi::cout << "    Setup Geometry:   " << std::setw(9) << geometry_timer.milliseconds_mpi() << " ms\n";
+        mpi::cout << "    Remove undefined: " << std::setw(9) << remove_timer.milliseconds() << " ms\n";
+        mpi::cout << "    Send geometry:    " << std::setw(9) << exchange_timer.milliseconds() << " ms\n";
+        mpi::cout << "    Restore indices:  " << std::setw(9) << restore_timer.milliseconds() << " ms\n";
     }
     ++counter;
 #endif
@@ -206,19 +227,19 @@ void apply_impl(Tourism& tourism, AmrCells &locals, AmrCells &aliens, const Dist
 
 /// @brief Специализация для пустых хранилищ
 template<>
-inline void apply_impl<0>(Tourism& tourism, AmrCells &locals, AmrCells &aliens, const Distributor& op) {
+inline void apply_impl<0>(AmrCells &locals, const Distributor& op, Tourism& tourism) {
     throw std::runtime_error("MPI amr::apply<0> not implemented #1");
 }
 
 /// @brief Автоматический выбор размерности
-inline void apply(Tourism& tourism, AmrCells &locals, AmrCells &aliens, const Distributor& op) {
+inline void apply(AmrCells &locals, const Distributor& op, Tourism& tourism) {
     if (locals.empty()) {
-        amr::apply_impl<0>(tourism, locals, aliens, op);
+        amr::apply_impl<0>(locals, op, tourism);
     } else {
         if (locals.dim() < 3) {
-            amr::apply_impl<2>(tourism, locals, aliens, op);
+            amr::apply_impl<2>(locals, op, tourism);
         } else {
-            amr::apply_impl<3>(tourism, locals, aliens, op);
+            amr::apply_impl<3>(locals, op, tourism);
         }
     }
 }

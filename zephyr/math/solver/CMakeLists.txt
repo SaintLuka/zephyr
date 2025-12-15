@@ -1,5 +1,4 @@
 set(ZEPHYR_MATH_SOLVER_SRC
-        ${CMAKE_CURRENT_SOURCE_DIR}/burgers.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/convection.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/sm_fluid.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/mm_fluid.cpp
@@ -8,7 +7,6 @@ set(ZEPHYR_MATH_SOLVER_SRC
         PARENT_SCOPE)
 
 install(FILES
-        ${CMAKE_CURRENT_SOURCE_DIR}/burgers.h
         ${CMAKE_CURRENT_SOURCE_DIR}/convection.h
         ${CMAKE_CURRENT_SOURCE_DIR}/sm_fluid.h
         ${CMAKE_CURRENT_SOURCE_DIR}/mm_fluid.h

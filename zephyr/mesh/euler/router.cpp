@@ -32,11 +32,30 @@ inline std::ostream &operator<<(std::ostream &os, const std::vector<index_t> &ar
 }
 
 #ifdef ZEPHYR_MPI
+Requests::Requests(int size) : m_size(size) {
+    m_requests = std::make_unique<MPI_Request[]>(m_size);
+    std::fill_n(m_requests.get(), m_size, MPI_REQUEST_NULL);
+}
+
 void Requests::wait() const {
-    for (auto r: m_requests) {
-        if (r != MPI_REQUEST_NULL) {
-            MPI_Wait(&r, MPI_STATUS_IGNORE);
+    for (int r = 0; r < m_size; ++r) {
+        if (m_requests[r] != MPI_REQUEST_NULL) {
+            MPI_Wait(&m_requests[r], MPI_STATUS_IGNORE);
         }
+    }
+}
+
+void RequestsList::reserve(int size) {
+    m_requests.reserve(size);
+}
+
+void RequestsList::operator+=(Requests&& requests) {
+    m_requests.emplace_back(std::move(requests));
+}
+
+void RequestsList::wait() const {
+    for (auto& req: m_requests) {
+        req.wait();
     }
 }
 
@@ -138,7 +157,7 @@ void Router::print_complete() const {
     std::cout << "\n";
 }
 
-Requests Router::isend(const utils::Buffer& src, MpiTag tag) {
+Requests Router::isend(const utils::Buffer& src, MpiTag tag) const {
     Requests send_req(m_size);
     for (int r = 0; r < m_size; ++r) {
         if (m_send_count[r] > 0) {
@@ -149,7 +168,7 @@ Requests Router::isend(const utils::Buffer& src, MpiTag tag) {
     return send_req;
 }
 
-Requests Router::irecv(utils::Buffer& dst, MpiTag tag) {
+Requests Router::irecv(utils::Buffer& dst, MpiTag tag) const {
     Requests recv_req(m_size);
     for (int r = 0; r < m_size; ++r) {
         if (m_recv_count[r] > 0) {
