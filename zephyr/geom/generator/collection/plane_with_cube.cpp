@@ -33,22 +33,22 @@ PlaneWithCube::PlaneWithCube(
 void PlaneWithCube::set_nx(int Nx) {
 
     // TODO
-    m_blocks[0].set_size(v1, v7, 8);
-    m_blocks[0].set_size(v1, v5, 20);
+    m_blocks[0]->set_size(v1, v7, 8);
+    m_blocks[0]->set_size(v1, v5, 20);
 
-    m_blocks[1].set_size(v1, v2, 8);
+    m_blocks[1]->set_size(v1, v2, 8);
 
-    m_blocks[2].set_size(v2, v3, 8);
+    m_blocks[2]->set_size(v2, v3, 8);
 
-    m_blocks[3].set_size(v3, v10, 8);
+    m_blocks[3]->set_size(v3, v10, 8);
 
-    m_blocks[4].set_size(v10, v16, 8);
+    m_blocks[4]->set_size(v10, v16, 8);
 
-    m_blocks[5].set_size(v15, v16, 8);
+    m_blocks[5]->set_size(v15, v16, 8);
 
-    m_blocks[6].set_size(v14, v15, 8);
+    m_blocks[6]->set_size(v14, v15, 8);
 
-    m_blocks[7].set_size(v7, v14, 8);
+    m_blocks[7]->set_size(v7, v14, 8);
 }
 
 
@@ -105,37 +105,37 @@ void PlaneWithCube::init_blocks() {
     top->set_boundary(m_bounds.top);
 
     // Генератор сетки
-    m_blocks[0] = {v1, v5, v7, v8};
-    m_blocks[0].set_boundary(v1, v7, left);
-    m_blocks[0].set_boundary(v5, v8, cube_side1);
+    *m_blocks[0] = {v1, v5, v7, v8};
+    m_blocks[0]->set_boundary(v1, v7, left);
+    m_blocks[0]->set_boundary(v5, v8, cube_side1);
 
-    m_blocks[1] = {v1, v2, v4, v5};
-    m_blocks[1].set_boundary(v1, v2, bottom);
-    m_blocks[1].set_boundary(v4, v5, cube_side1);
+    *m_blocks[1] = {v1, v2, v4, v5};
+    m_blocks[1]->set_boundary(v1, v2, bottom);
+    m_blocks[1]->set_boundary(v4, v5, cube_side1);
 
-    m_blocks[2] = {v2, v3, v4, v6};
-    m_blocks[2].set_boundary(v2, v3, bottom);
-    m_blocks[2].set_boundary(v4, v6, cube_side2);
+    *m_blocks[2] = {v2, v3, v4, v6};
+    m_blocks[2]->set_boundary(v2, v3, bottom);
+    m_blocks[2]->set_boundary(v4, v6, cube_side2);
 
-    m_blocks[3] = {v3, v6, v9, v10};
-    m_blocks[3].set_boundary(v6, v9, cube_side2);
-    m_blocks[3].set_boundary(v3, v10, right);
+    *m_blocks[3] = {v3, v6, v9, v10};
+    m_blocks[3]->set_boundary(v6, v9, cube_side2);
+    m_blocks[3]->set_boundary(v3, v10, right);
 
-    m_blocks[4] = {v9, v10, v12, v16};
-    m_blocks[4].set_boundary(v9, v12, cube_side3);
-    m_blocks[4].set_boundary(v10, v16, right);
+    *m_blocks[4] = {v9, v10, v12, v16};
+    m_blocks[4]->set_boundary(v9, v12, cube_side3);
+    m_blocks[4]->set_boundary(v10, v16, right);
 
-    m_blocks[5] = {v12, v13, v15, v16};
-    m_blocks[5].set_boundary(v12, v13, cube_side3);
-    m_blocks[5].set_boundary(v15, v16, top);
+    *m_blocks[5] = {v12, v13, v15, v16};
+    m_blocks[5]->set_boundary(v12, v13, cube_side3);
+    m_blocks[5]->set_boundary(v15, v16, top);
 
-    m_blocks[6] = {v11, v13, v14, v15};
-    m_blocks[6].set_boundary(v11, v13, cube_side4);
-    m_blocks[6].set_boundary(v14, v15, top);
+    *m_blocks[6] = {v11, v13, v14, v15};
+    m_blocks[6]->set_boundary(v11, v13, cube_side4);
+    m_blocks[6]->set_boundary(v14, v15, top);
 
-    m_blocks[7] = {v7, v8, v11, v14};
-    m_blocks[7].set_boundary(v8, v11, cube_side4);
-    m_blocks[7].set_boundary(v7, v14, left);
+    *m_blocks[7] = {v7, v8, v11, v14};
+    m_blocks[7]->set_boundary(v8, v11, cube_side4);
+    m_blocks[7]->set_boundary(v7, v14, left);
 
     // Необходимо связать блоки
     link();

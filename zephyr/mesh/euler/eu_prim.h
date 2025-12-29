@@ -577,7 +577,7 @@ inline bool EuFace::is_undefined() const { return m_cells->faces.is_undefined(m_
 inline void EuFace::set_undefined() const { m_cells->faces.set_undefined(m_face_idx); }
 
 inline void EuFace::set_boundary(Boundary flag) const {
-    if (flag == Boundary::ORDINARY || flag == Boundary::PERIODIC) {
+    if (flag == Boundary::INNER || flag == Boundary::PERIODIC) {
         std::cerr << "You can't just set Ordinary or Periodic boundary flag\n";
     }
     else {

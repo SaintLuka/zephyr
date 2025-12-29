@@ -66,18 +66,11 @@ public:
     /// @brief Установить флаги граничных условий
     void set_boundaries(Boundaries bounds);
 
-    /// @brief Количество ячеек сетки
-    int size() const final;
-
     /// @brief Ограничивающий объем
     Box bbox() const final;
 
     /// @brief Создать сетку общего вида
     Grid make() final;
-
-    /// @brief Инициализация SoA-хранилища сетки
-    void initialize(mesh::AmrCells& cells) final;
-
 
     // Далее не самые полезные get-функции
 
@@ -98,6 +91,9 @@ public:
 
     /// @brief Число ячеек по оси Y
     int ny() const;
+
+    /// @brief Осевая симметрия?
+    bool axial() const;
 
     /// @brief Граничные условия
     Boundaries bounds() const;
@@ -120,13 +116,6 @@ private:
 
     /// @brief Создать сетку из шестиугольников
     Grid create_voronoi() const;
-
-    /// @brief Создать классическую декартову сетку
-    void initialize_classic(mesh::AmrCells& cells) const;
-
-    /// @brief Создать сетку из шестиугольников
-    void initialize_voronoi(mesh::AmrCells& cells);
-
 
     int m_nx, m_ny;         ///< Число ячеек по осям
     int m_size;             ///< Суммарное число ячеек

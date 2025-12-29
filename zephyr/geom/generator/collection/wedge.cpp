@@ -61,9 +61,9 @@ void Wedge::set_nx(int Nx) {
 
     // Нет необходимости устанавливать все размеры
     // у каждого блока, поскольку они связаны
-    m_blocks[0].set_size(v1, v4, Ny);
-    m_blocks[0].set_size(v1, v2, Nx1);
-    m_blocks[1].set_size(v2, v3, Nx2);
+    m_blocks[0]->set_size(v1, v4, Ny);
+    m_blocks[0]->set_size(v1, v2, Nx1);
+    m_blocks[1]->set_size(v2, v3, Nx2);
 }
 
 
@@ -99,15 +99,15 @@ void Wedge::init_blocks() {
     wedge->set_boundary(Boundary::WALL);
 
     // Генератор сетки
-    m_blocks[0] = {v1, v2, v4, v5};
-    m_blocks[0].set_boundary(v1, v4, left);
-    m_blocks[0].set_boundary(v1, v2, bottom);
-    m_blocks[0].set_boundary(v4, v5, top);
+    *m_blocks[0] = {v1, v2, v4, v5};
+    m_blocks[0]->set_boundary(v1, v4, left);
+    m_blocks[0]->set_boundary(v1, v2, bottom);
+    m_blocks[0]->set_boundary(v4, v5, top);
 
-    m_blocks[1] = {v2, v3, v5, v6};
-    m_blocks[1].set_boundary(v2, v3, wedge);
-    m_blocks[1].set_boundary(v5, v6, top);
-    m_blocks[1].set_boundary(v3, v6, right);
+    *m_blocks[1] = {v2, v3, v5, v6};
+    m_blocks[1]->set_boundary(v2, v3, wedge);
+    m_blocks[1]->set_boundary(v5, v6, top);
+    m_blocks[1]->set_boundary(v3, v6, right);
 
     // Необходимо связать блоки
     link();

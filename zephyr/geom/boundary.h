@@ -9,7 +9,7 @@ namespace zephyr::geom {
 /// @brief Тип граничных условий
 enum class Boundary : int {
     UNDEFINED =-1,  ///< Не определено.
-    ORDINARY  = 0,  ///< Обычное соседство (внутри сетки).
+    INNER     = 0,  ///< Обычное соседство (внутри сетки).
     WALL      = 1,  ///< Непроницаемая стенка.
     ZOE       = 2,  ///< Отображение данных запрашиваемой ячейки (простой снос).
     PERIODIC  = 3,  ///< Периодичность.
@@ -19,8 +19,8 @@ enum class Boundary : int {
 /// @brief Преобразовать тип граничного условия в строку
 inline std::string to_string(Boundary type) {
     switch (type) {
-        case Boundary::ORDINARY:
-            return "ordinary";
+        case Boundary::INNER:
+            return "inner";
         case Boundary::WALL:
             return "wall";
         case Boundary::ZOE:
@@ -44,8 +44,8 @@ inline std::ostream &operator<<(std::ostream &os, Boundary boundary) {
 inline Boundary boundary_from_string(std::string flag) {
     std::transform(flag.begin(), flag.end(), flag.begin(), ::tolower);
 
-    if (flag == "ordinary") {
-        return Boundary::ORDINARY;
+    if (flag == "inner") {
+        return Boundary::INNER;
     } else if (flag == "wall") {
         return Boundary::WALL;
     } else if (flag == "zoe") {

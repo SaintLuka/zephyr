@@ -16,6 +16,13 @@ class SqCube;
 class Line;
 class Polygon;
 class Polyhedron;
+class Grid;
+
+namespace generator {
+class Strip;
+class Rectangle;
+class Cuboid;
+}
 }
 
 namespace zephyr::mesh {
@@ -109,6 +116,18 @@ public:
 
     /// @brief Создать пустой набор ячеек с таким же набором типов
     AmrCells same() const;
+
+    /// @brief Простой встроенный генератор квази-одномерной сетки
+    AmrCells(const geom::generator::Strip& rect);
+
+    /// @brief Простой встроенный генератор прямоугольной декартовой сетки
+    AmrCells(const geom::generator::Rectangle& rect);
+
+    /// @brief Простой встроенный генератор трёхмерной декартовой сетки
+    AmrCells(const geom::generator::Cuboid& rect);
+
+    /// @brief Построение сетки общего вида, grid - finalized.
+    AmrCells(const geom::Grid& grid);
 
     /// @}
 

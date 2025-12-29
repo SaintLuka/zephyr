@@ -11,7 +11,7 @@ namespace zephyr::mesh::amr {
 template<int i, int j, int x, int y>
 void make_link_2D(AmrCells& cells, index_t main_child, int rank) {
     index_t iface = cells.face_begin[main_child + Quad::iss<i, j>()] + Side2D::by_dir<x, y>();
-    cells.faces.boundary[iface] = Boundary::ORDINARY;
+    cells.faces.boundary[iface] = Boundary::INNER;
     cells.faces.adjacent.rank[iface] = rank;
     cells.faces.adjacent.index[iface] = cells.next[main_child + Quad::iss<i + 2 * x, j + 2 * y>()];
     cells.faces.adjacent.alien[iface] = -1;
@@ -21,7 +21,7 @@ void make_link_2D(AmrCells& cells, index_t main_child, int rank) {
 template<int i, int j, int k, int x, int y, int z>
 void make_link_3D(AmrCells& cells, index_t main_child, int rank) {
     index_t iface = cells.face_begin[main_child + Cube::iss<i, j, k>()] +  + Side3D::by_dir<x, y, z>();
-    cells.faces.boundary[iface] = Boundary::ORDINARY;
+    cells.faces.boundary[iface] = Boundary::INNER;
     cells.faces.adjacent.rank[iface] = rank;
     cells.faces.adjacent.index[iface] = cells.next[main_child + Cube::iss<i + 2 * x, j + 2 * y, k + 2 * z>()];
     cells.faces.adjacent.alien[iface] = -1;

@@ -2,6 +2,7 @@
 
 #include <zephyr/geom/generator/curve/curve.h>
 #include <zephyr/geom/generator/bs_vertex.h>
+#include <zephyr/geom/generator/block.h>
 
 
 namespace zephyr::geom::generator {
@@ -48,11 +49,12 @@ void BsVertex::set_adjacent_vertices(const std::vector<BsVertex::Ptr> &vertices)
     }
 
     std::sort(vec_verts.begin(), vec_verts.end(),
-              [](const std::pair<double, BsVertex::Ptr> &p1, const
-              std::pair<double, BsVertex::Ptr> &p2) {
+              [](const std::pair<double, BsVertex::Ptr> &p1,
+                 const std::pair<double, BsVertex::Ptr> &p2) {
                   return p1.first < p2.first;
               });
 
+    m_adjacent.clear();
     m_adjacent.reserve(vec_verts.size());
     for (auto &p: vec_verts) {
         m_adjacent.emplace_back(p.second.get());
@@ -85,7 +87,9 @@ std::set<Boundary> BsVertex::boundaries() const {
 }
 
 void BsVertex::add_boundary(Curve *boundary) {
-    m_boundaries.insert(boundary);
+    if (boundary) {
+        m_boundaries.insert(boundary);
+    }
 }
 
 BaseVertex::BaseVertex(const Vector3d &v, bool fixed)
@@ -112,16 +116,15 @@ int BaseVertex::degree() const {
     return m_adjacent_blocks.size();
 }
 
-void BaseVertex::add_adjacent_block(Block *block) {
-    for (auto b: m_adjacent_blocks) {
-        if (b == block) {
-            return;
-        }
-    }
-    m_adjacent_blocks.push_back(block);
+void BaseVertex::add_adjacent_block(Block::Ref block) {
+    m_adjacent_blocks.insert(block);
 }
 
-const std::vector<Block *> &BaseVertex::adjacent_blocks() const {
+void BaseVertex::clear_adjacent_blocks() {
+    m_adjacent_blocks.clear();
+}
+
+const BaseVertex::AdjBlocks &BaseVertex::adjacent_blocks() const {
     return m_adjacent_blocks;
 }
 

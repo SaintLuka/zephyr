@@ -66,13 +66,13 @@ Box Generator::bbox() const {
 }
 
 
-void Generator::check_size() const {
-    if (size() < 1) {
+void Generator::check_size(size_t size) const {
+    if (size < 1) {
         std::string message = "'" + m_name + "' generator error: Please set mesh size";
         std::cerr << message << "\n";
         throw std::runtime_error(message);
     }
-    if (size() > 10000000) {
+    if (size > 10000000) {
         std::string message =
                 "'" + m_name +
                 "' generator error: "

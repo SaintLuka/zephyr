@@ -4,7 +4,6 @@
 #include <memory>
 
 namespace zephyr::utils { class Json; }
-namespace zephyr::mesh { class AmrCells; }
 
 namespace zephyr::geom {
 
@@ -31,7 +30,7 @@ public:
 
     /// @brief Проверить, что можно преобразовать к наследнику
     template <class T>
-    typename std::enable_if<std::is_base_of<Generator, T>::value, bool>::type
+    std::enable_if_t<std::is_base_of_v<Generator, T>, bool>
     can_cast() { return dynamic_cast<T*>(this) != nullptr; };
 
     /// @brief Приведение к конкретному типу
@@ -47,9 +46,6 @@ public:
     /// @brief Тип сеточного генератора
     const std::string &name() const;
 
-    /// @brief Количество ячеек сетки
-    virtual int size() const = 0;
-
     /// @brief Ограничивающий объем
     /// @details Не реализована по умолчанию
     virtual Box bbox() const;
@@ -57,12 +53,9 @@ public:
     /// @brief Создать сетку общего вида
     virtual Grid make() = 0;
 
-    /// @brief Инициализация SoA-хранилища сетки
-    virtual void initialize(mesh::AmrCells& cells) { throw std::runtime_error("not implemented"); }
-
 protected:
     /// @brief Проверить размеры сетки перед созданием
-    virtual void check_size() const;
+    virtual void check_size(size_t size) const;
 
     /// @brief Проверить параметры сетки перед созданием
     virtual void check_params() const;

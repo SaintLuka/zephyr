@@ -1,3 +1,4 @@
+list(APPEND TESTS blocks)
 #list(APPEND TESTS crp_interface)
 #list(APPEND TESTS cuboid_clip)
 #list(APPEND TESTS cuboid_3clip)

@@ -9,6 +9,7 @@ set(ZEPHYR_UTILS_SRC
 
 install(FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/buffer.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/csr.h
         ${CMAKE_CURRENT_SOURCE_DIR}/error_list.h
         ${CMAKE_CURRENT_SOURCE_DIR}/json.h
         ${CMAKE_CURRENT_SOURCE_DIR}/pyplot.h

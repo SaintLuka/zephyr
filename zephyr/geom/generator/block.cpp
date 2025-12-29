@@ -9,6 +9,8 @@
 #include <zephyr/geom/generator/bs_vertex.h>
 #include <zephyr/geom/generator/curve/curve.h>
 
+#include <zephyr/geom/intersection.h>
+#include <zephyr/geom/primitives/triangle.h>
 
 namespace zephyr::geom::generator {
 
@@ -22,21 +24,6 @@ inline int prev(int idx) {
 
 inline int opp(int idx) {
     return (idx + 2) % 4;
-}
-
-Block::Block(int index)
-    : m_index(index) {
-
-    m_size1 = 0;
-    m_size2 = 0;
-    m_boundaries = {nullptr, nullptr, nullptr, nullptr};
-    m_base_vertices = {nullptr, nullptr, nullptr, nullptr};
-    m_adjacent_blocks = {nullptr, nullptr, nullptr, nullptr};
-    m_rotations = {-1, -1, -1, -1};
-}
-
-int Block::index() const {
-    return m_index;
 }
 
 int Block::size(BaseVertex::Ref bv1, BaseVertex::Ref bv2) const {
@@ -92,9 +79,9 @@ Block &Block::operator=(std::initializer_list<BaseVertex::Ptr> vertices) {
 
 bool Block::is_boundary(BaseVertex::Ref v) const {
     for (auto block: v->adjacent_blocks()) {
-        int v_idx = block->vertex_index(v);
-        if (block->boundary(v_idx) != nullptr ||
-            block->boundary(prev(v_idx)) != nullptr) {
+        int v_idx = block.lock()->vertex_index(v);
+        if (block.lock()->boundary(v_idx) != nullptr ||
+            block.lock()->boundary(prev(v_idx)) != nullptr) {
             return true;
         }
     }
@@ -105,8 +92,11 @@ Curve::Ref Block::boundary(int f_idx) const {
     return m_boundaries[f_idx];
 }
 
-Block* Block::adjacent_block(int f_idx) const {
-    return m_adjacent_blocks[f_idx];
+Block::Ptr Block::adjacent_block(int f_idx) const {
+    if (m_adjacent_blocks[f_idx].expired()) {
+        return nullptr;
+    }
+    return m_adjacent_blocks[f_idx].lock();
 }
 
 BaseVertex::Ptr Block::base_vertex(int v_idx) const {
@@ -156,23 +146,27 @@ int Block::size(int f_idx) const {
     return f_idx % 2 ? m_size2 : m_size1;
 }
 
-void Block::set_size(BaseVertex::Ref v1, BaseVertex::Ref v2, int N) {
-    int k = face_index(v1, v2);
-    if (k % 2) {
+void Block::set_size_to_face(int f_idx, int N) {
+    if (f_idx % 2) {
         m_size2 = N;
     } else {
         m_size1 = N;
     }
 
-    for (int l: {k, opp(k)}) {
-        if (m_adjacent_blocks[l]) {
+    for (int l: {f_idx, opp(f_idx)}) {
+        if (!m_adjacent_blocks[l].expired()) {
             BaseVertex::Ref BV1 = m_base_vertices[l];
             BaseVertex::Ref BV2 = m_base_vertices[next(l)];
-            if (m_adjacent_blocks[l]->size(BV1, BV2) != N) {
-                m_adjacent_blocks[l]->set_size(BV1, BV2, N);
+            if (m_adjacent_blocks[l].lock()->size(BV1, BV2) != N) {
+                m_adjacent_blocks[l].lock()->set_size(BV1, BV2, N);
             }
         }
     }
+}
+
+void Block::set_size(BaseVertex::Ref v1, BaseVertex::Ref v2, int N) {
+    int f_idx = face_index(v1, v2);
+    set_size_to_face(f_idx, N);
 }
 
 BsVertex::Ptr &Block::corner_vertex(int v_idx) {
@@ -218,7 +212,8 @@ int Block::neib_face(int f_idx) const {
     return (f_idx - m_rotations[f_idx] + 4) % 4;
 }
 
-void Block::link(Block* block) {
+void Block::link(Block::Ref block) {
+    // Ищем просто полным перебором
     for (int f1 = 0; f1 < 4; ++f1) {
         BaseVertex::Ptr a1 = base_vertex(f1);
         BaseVertex::Ptr b1 = base_vertex(next(f1));
@@ -229,9 +224,9 @@ void Block::link(Block* block) {
 
             if (a1 == b2 && b1 == a2) {
                 m_adjacent_blocks[f1] = block;
-                block->m_adjacent_blocks[f2] = this;
-
                 m_rotations[f1] = (f1 - f2 + 4) % 4;
+
+                block->m_adjacent_blocks[f2] = shared_from_this();
                 block->m_rotations[f2] = (f2 - f1 + 4) % 4;
             }
         }
@@ -324,12 +319,12 @@ void Block::create_vertices() {
     for (int i = 0; i < 4; ++i) {
         auto neib = m_adjacent_blocks[i];
 
-        if (!neib) {
+        if (neib.expired()) {
             continue;
         }
 
         // Сосед есть и уже с вершинами
-        if (neib->m_vertices.empty()) {
+        if (neib.lock()->m_vertices.empty()) {
             continue;
         }
 
@@ -337,7 +332,7 @@ void Block::create_vertices() {
 
         int N = size(i);
         for (int k = 0; k <= N; ++k) {
-            boundary_vertex(i, k) = neib->boundary_vertex(j, N - k);
+            boundary_vertex(i, k) = neib.lock()->boundary_vertex(j, N - k);
         }
     }
 }
@@ -368,7 +363,7 @@ void Block::link_vertices() {
         // Вершина на границе
         if (is_boundary(bv)) {
             int f_idx = v_idx;
-            Block* block = this;
+            Block::Ptr block = shared_from_this();
 
             while (block) {
                 adj_vertices.insert(
@@ -378,7 +373,7 @@ void Block::link_vertices() {
 
                 boundary = block->boundary(f_idx).get();
 
-                Block *next_block = block->adjacent_block(f_idx);
+                Block::Ptr next_block = block->adjacent_block(f_idx);
                 f_idx = next(block->neib_face(f_idx));
                 block = next_block;
 
@@ -388,7 +383,7 @@ void Block::link_vertices() {
             }
 
             f_idx = prev(v_idx);
-            block = this;
+            block = shared_from_this();
 
             while (block) {
                 adj_vertices.push_back(
@@ -397,7 +392,7 @@ void Block::link_vertices() {
 
                 boundary = block->boundary(f_idx).get();
 
-                Block *next_block = block->adjacent_block(f_idx);
+                Block::Ptr next_block = block->adjacent_block(f_idx);
                 f_idx = prev(block->neib_face(f_idx));
                 block = next_block;
 
@@ -412,8 +407,8 @@ void Block::link_vertices() {
 
         } else {
             for (auto adj: bv->adjacent_blocks()) {
-                auto v_idx2 = adj->vertex_index(bv);
-                adj_vertices.emplace_back(adj->boundary_vertex(v_idx2, 1));
+                auto v_idx2 = adj.lock()->vertex_index(bv);
+                adj_vertices.emplace_back(adj.lock()->boundary_vertex(v_idx2, 1));
             }
         }
 
@@ -421,7 +416,7 @@ void Block::link_vertices() {
         corner_vertex(v_idx)->set_adjacent_vertices(adj_vertices);
     }
 
-    // Вершины на границе
+    // Вершины на границах блока
     for (int f_idx = 0; f_idx < 4; ++f_idx) {
         if (!boundary(f_idx) && !adjacent_block(f_idx)) {
             throw std::runtime_error("BFace is not boundary and has no neighbor");
@@ -447,7 +442,7 @@ void Block::link_vertices() {
             }
 
         } else {
-            auto neib = m_adjacent_blocks[f_idx];
+            auto neib = m_adjacent_blocks[f_idx].lock();
             int fn_idx = neib_face(f_idx);
 
             for (int idx = 1; idx < N; ++idx) {
@@ -483,6 +478,48 @@ void Block::link_vertices() {
     }
 }
 
+double Block::calc_modulus() const {
+    int Nx = m_size1;
+    int Ny = m_size2;
+
+    double sum_x = 0.0;
+    double sum_y = 0.0;
+    for (int i = 0; i < Nx; ++i) {
+        for (int j = 0; j < Ny; ++j) {
+            Vector3d v1 = m_vertices[i][j]->v1;
+            Vector3d v2 = m_vertices[i+1][j]->v1;
+            Vector3d v3 = m_vertices[i+1][j+1]->v1;
+            Vector3d v4 = m_vertices[i][j+1]->v1;
+
+            // Triangle Method
+            Triangle T1 = {v4, v1, v2};
+            Triangle T2 = {v1, v2, v3};
+            Triangle T3 = {v2, v3, v4};
+            Triangle T4 = {v3, v4, v1};
+
+            double A1 = T1.area();
+            double A2 = T2.area();
+            double A3 = T3.area();
+            double A4 = T4.area();
+
+            double int_x = (v2 - v3).squaredNorm() * (1/A2 + 1/A3) + (v1 - v4).squaredNorm() * (1/A1 + 1/A4);
+            double int_y = (v1 - v2).squaredNorm() * (1/A1 + 1/A2) + (v3 - v4).squaredNorm() * (1/A3 + 1/A4);
+            int_x /= (8 * Nx * Nx);
+            int_y /= (8 * Ny * Ny);
+
+            sum_x += int_x;
+            sum_y += int_y;
+        }
+    }
+
+    std::cout << "M: " << sum_x << "; 1/Mt: " << sum_y << "; 1: " << sum_x * sum_y << std::endl;
+
+    std::cout << "M avg: " << std::sqrt(sum_x / sum_y) << std::endl;
+    std::cout << "M avg: " << 0.5 * (sum_x + 1.0 / sum_y) << std::endl;
+
+    return 0.5 * (sum_x + 1.0/sum_y);
+}
+
 double Block::smooth() {
     double err = 0.0;
 
@@ -490,40 +527,68 @@ double Block::smooth() {
         for (auto& vertex: row) {
             auto &adjacent = vertex->adjacent_vertices();
 
-            Vector3d avg = {0.0, 0.0, 0.0};
+            Vector3d next = {0.0, 0.0, 0.0};
 
             if (adjacent.empty()) {
                 // Фиксированная вершина
-                avg = vertex->v1;
+                next = vertex->v1;
             } else if (!vertex->inner()) {
                 // Вершина на границе
                 if (vertex->corner()) {
-                    avg = vertex->v1;
+                    next = vertex->v1;
                 }
                 else {
                     Curve *boundary = vertex->boundary();
 
-                    // bug for PlaneWithHole
-                    // vertex->boundary() is 0
+                    // Какому направлению блока принадлежит
+                    int dir = (m_boundaries[0].get() == boundary ||
+                               m_boundaries[2].get() == boundary) ? 0 : 1;
 
-                    avg += adjacent[0]->v1 / 2.0;
-                    for (int n = 1; n < int(adjacent.size()) - 1; ++n) {
-                        avg += boundary->projection(adjacent[n]->v1);
+                    double sum = 0.0;
+                    double w1 = 0.5;
+                    double w2 = 1.0;
+
+                    if (dir == 0) {
+                        w1 /= m_modulus;
+                        w2 *= m_modulus;
                     }
-                    avg += adjacent.back()->v1 / 2.0;
-                    avg /= adjacent.size() - 1.0;
+                    else {
+                        w1 *= m_modulus;
+                        w2 /= m_modulus;
+                    }
 
-                    avg = vertex->boundary()->projection(avg);
+                    next += w1 * adjacent[0]->v1;
+                    sum += w1;
+                    for (int n = 1; n < int(adjacent.size()) - 1; ++n) {
+                        next += w2 * boundary->projection(adjacent[n]->v1);
+                        sum += w2;
+                    }
+                    sum += w1;
+                    next += w1 * adjacent.back()->v1;
+                    next /= sum;
+
+                    next = vertex->boundary()->projection(next);
                 }
             } else {
                 // Внутренняя вершина
-                for (auto neib: adjacent) {
-                    avg += neib->v1;
-                }
-                avg /= vertex->n_adjacent();
+
+                //next = intersection2D::find_fast(
+                //    obj::segment{vertex->v1 - 0.5 * (adjacent[2]->v1 - adjacent[0]->v1), vertex->v1 + 0.5 * (adjacent[2]->v1 - adjacent[0]->v1)},
+                //    obj::segment{adjacent[1]->v1, adjacent[3]->v1}
+                //);
+
+                double L1 = 1.0 / m_modulus;
+                double L2 = m_modulus;
+                next = L1 * (adjacent[0]->v1 + adjacent[2]->v1) + L2 * (adjacent[1]->v1 + adjacent[3]->v1);
+                next /= 2.0 * (L1 + L2);
+
+                // for (auto neib: adjacent) {
+                //     next += neib->v1;
+                // }
+                // next /= vertex->n_adjacent();
             }
 
-            vertex->v2 = avg;
+            vertex->v2 = next;
 
             double L = 0.0;
             for (auto adj: adjacent) {

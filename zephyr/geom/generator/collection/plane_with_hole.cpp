@@ -140,17 +140,17 @@ void PlaneWithHole::set_nx(int Nx) {
 
     // Нет необходимости устанавливать все размеры
     // у каждого блока, поскольку они связаны
-    m_blocks[0].set_size(v1, v2, Nx1);
-    m_blocks[1].set_size(v2, v3, np);
-    m_blocks[2].set_size(v3, v4, Nx2);
-    m_blocks[10].set_size(v18, v19, np);
+    m_blocks[0]->set_size(v1, v2, Nx1);
+    m_blocks[1]->set_size(v2, v3, np);
+    m_blocks[2]->set_size(v3, v4, Nx2);
+    m_blocks[10]->set_size(v18, v19, np);
 
-    m_blocks[0].set_size(v1, v5, Ny1); 
-    m_blocks[3].set_size(v5, v13, np);
-    m_blocks[9].set_size(v13, v17, Ny2);
-    m_blocks[8].set_size(v8, v16, np);
+    m_blocks[0]->set_size(v1, v5, Ny1); 
+    m_blocks[3]->set_size(v5, v13, np);
+    m_blocks[9]->set_size(v13, v17, Ny2);
+    m_blocks[8]->set_size(v8, v16, np);
 
-    m_blocks[4].set_size(v6, v9, nr);
+    m_blocks[4]->set_size(v6, v9, nr);
 }
 */
 
@@ -182,17 +182,17 @@ void PlaneWithHole::set_nx(int Nx) {
     int Nr3 = (int)(std::log(xi2) / std::log(1.0 + a3 / N2));
     int Nr4 = (int)(std::log(xi2) / std::log(1.0 + a4 / N2)); 
 
-    m_blocks[0].set_size(v2, v1, Nr1);
-    m_blocks[0].set_size(v2, v8, Ny);
+    m_blocks[0]->set_size(v2, v1, Nr1);
+    m_blocks[0]->set_size(v2, v8, Ny);
 
-    m_blocks[1].set_size(v3, v4, Nr3);
-    m_blocks[1].set_size(v1, v3, Ny);
+    m_blocks[1]->set_size(v3, v4, Nr3);
+    m_blocks[1]->set_size(v1, v3, Ny);
 
-    m_blocks[2].set_size(v6, v5, Nr4);
-    m_blocks[2].set_size(v4, v6, Ny);
+    m_blocks[2]->set_size(v6, v5, Nr4);
+    m_blocks[2]->set_size(v4, v6, Ny);
 
-    m_blocks[3].set_size(v7, v8, Nr2);
-    m_blocks[3].set_size(v5, v7, Ny);
+    m_blocks[3]->set_size(v7, v8, Nr2);
+    m_blocks[3]->set_size(v5, v7, Ny);
 }
 
 void PlaneWithHole::set_boundaries(Boundaries bounds) {
@@ -252,44 +252,44 @@ void PlaneWithHole::init_blocks() {
 
     // Генератор сетки
     m_blocks[0] = {v1, v2, v5, v6};
-    m_blocks[0].set_boundary(v1, v5, left);
-    m_blocks[0].set_boundary(v1, v2, bottom);
+    m_blocks[0]->set_boundary(v1, v5, left);
+    m_blocks[0]->set_boundary(v1, v2, bottom);
 
     m_blocks[1] = {v2, v3, v7, v6};
-    m_blocks[1].set_boundary(v2, v3, bottom);
+    m_blocks[1]->set_boundary(v2, v3, bottom);
 
     m_blocks[2] = {v3, v4, v8, v7};
-    m_blocks[2].set_boundary(v3, v4, bottom);
-    m_blocks[2].set_boundary(v4, v8, right);
+    m_blocks[2]->set_boundary(v3, v4, bottom);
+    m_blocks[2]->set_boundary(v4, v8, right);
 
     m_blocks[3] = {v5, v6, v14, v13};
-    m_blocks[3].set_boundary(v5, v13, left);
+    m_blocks[3]->set_boundary(v5, v13, left);
 
     m_blocks[4] = {v6, v9, v11, v14};
-    m_blocks[4].set_boundary(v9, v11, circle);
+    m_blocks[4]->set_boundary(v9, v11, circle);
 
     m_blocks[5] = {v6, v7, v10, v9};
-    m_blocks[5].set_boundary(v9, v10, circle);
+    m_blocks[5]->set_boundary(v9, v10, circle);
 
     m_blocks[6] = {v10, v7, v15, v12};
-    m_blocks[6].set_boundary(v10, v12, circle);
+    m_blocks[6]->set_boundary(v10, v12, circle);
 
     m_blocks[7] = {v11, v12, v15, v14};
-    m_blocks[7].set_boundary(v11, v12, circle);
+    m_blocks[7]->set_boundary(v11, v12, circle);
 
     m_blocks[8] = {v7, v8, v16, v15};
-    m_blocks[8].set_boundary(v8, v16, right);
+    m_blocks[8]->set_boundary(v8, v16, right);
 
     m_blocks[9] = {v13, v14, v18, v17};
-    m_blocks[9].set_boundary(v13, v17, left);
-    m_blocks[9].set_boundary(v17, v18, top);
+    m_blocks[9]->set_boundary(v13, v17, left);
+    m_blocks[9]->set_boundary(v17, v18, top);
 
     m_blocks[10] = {v14, v15, v19, v18};
-    m_blocks[10].set_boundary(v18, v19, top);
+    m_blocks[10]->set_boundary(v18, v19, top);
 
     m_blocks[11] = {v15, v16, v20, v19};
-    m_blocks[11].set_boundary(v16, v20, right);
-    m_blocks[11].set_boundary(v19, v20, top);
+    m_blocks[11]->set_boundary(v16, v20, right);
+    m_blocks[11]->set_boundary(v19, v20, top);
 
     // Необходимо связать блоки
     link();
@@ -307,7 +307,7 @@ void PlaneWithHole::init_blocks() {
     v5 = BaseVertex::create(m_xmax, m_ymax, true);
     v7 = BaseVertex::create(m_xmin, m_ymax, true);
 
-    v2 = BaseVertex::create(m_xc - m_r * std::sin(M_PI / 5.0), 
+    v2 = BaseVertex::create(m_xc - m_r * std::sin(M_PI / 5.0),
                             m_yc - m_r * std::cos(M_PI / 5.0), 
                             true);
     v4 = BaseVertex::create(m_xc + m_r * std::sin(M_PI / 3.0),
@@ -334,21 +334,21 @@ void PlaneWithHole::init_blocks() {
     circle->set_boundary(m_bounds.hole);
 
     // Генератор сетки
-    m_blocks[0] = {v1, v2, v7, v8};
-    m_blocks[0].set_boundary(v1, v7, left);
-    m_blocks[0].set_boundary(v2, v8, circle);
+    *m_blocks[0] = {v1, v2, v7, v8};
+    m_blocks[0]->set_boundary(v1, v7, left);
+    m_blocks[0]->set_boundary(v2, v8, circle);
 
-    m_blocks[1] = {v1, v3, v2, v4};
-    m_blocks[1].set_boundary(v1, v3, bottom);
-    m_blocks[1].set_boundary(v2, v4, circle);
+    *m_blocks[1] = {v1, v3, v2, v4};
+    m_blocks[1]->set_boundary(v1, v3, bottom);
+    m_blocks[1]->set_boundary(v2, v4, circle);
 
-    m_blocks[2] = {v3, v4, v6, v5};
-    m_blocks[2].set_boundary(v3, v5, right);
-    m_blocks[2].set_boundary(v4, v6, circle);
+    *m_blocks[2] = {v3, v4, v6, v5};
+    m_blocks[2]->set_boundary(v3, v5, right);
+    m_blocks[2]->set_boundary(v4, v6, circle);
 
-    m_blocks[3] = {v5, v6, v7, v8};
-    m_blocks[3].set_boundary(v5, v7, top);
-    m_blocks[3].set_boundary(v6, v8, circle);
+    *m_blocks[3] = {v5, v6, v7, v8};
+    m_blocks[3]->set_boundary(v5, v7, top);
+    m_blocks[3]->set_boundary(v6, v8, circle);
 
     // Необходимо связать блоки
     link();

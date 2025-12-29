@@ -1,6 +1,15 @@
 #include <iostream>
 #include <vector>
 
+#include <zephyr/geom/grid.h>
+#include <zephyr/geom/generator/generator.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/io/vtu_file.h>
+
+using namespace zephyr::geom;
+using namespace zephyr::mesh;
+using namespace zephyr::io;
+
 #if 0
 #include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/io/vtu_file.h>
@@ -510,5 +519,63 @@ LaMesh Test::gen_la() const {
     return mesh;
 }
 #else
-int main(int argc, char *argv[]) { return -1; }
+
+int main(int argc, char *argv[]) {
+    using BuildOptions = Grid::BuildOptions;
+    using FaceOption = Grid::BuildOptions::FaceOption;
+
+
+    Grid grid;
+
+    constexpr int nx = 10;
+    constexpr int ny = 10;
+    std::array<std::array<NodeInput, ny + 1>, nx + 1> ps{};
+    for (int i = 0; i <= nx; ++i) {
+        for (int j = 0; j <= ny; ++j) {
+            ps[i][j].pos = Vector3d{0.1 * i, 0.2 * j, 0.0};
+        }
+    }
+
+    for (int i = 0; i <= nx; ++i) {
+        for (int j = 0; j <= ny; ++j) {
+            grid.add_node(&ps[i][j]);
+        }
+    }
+
+
+    for (int i = 0; i < nx; ++i) {
+        for (int j = 0; j < ny; ++j) {
+            if (rand() % 2 == 0) {
+                grid.add_cell(CellType::QUAD, {&ps[i][j], &ps[i+1][j], &ps[i+1][j+1], &ps[i][j+1]});
+            }
+            else {
+                grid.add_cell(CellType::TRIANGLE, {&ps[i][j], &ps[i+1][j], &ps[i+1][j+1]});
+                grid.add_cell(CellType::TRIANGLE, {&ps[i][j], &ps[i+1][j+1], &ps[i][j+1]});
+            }
+        }
+    }
+
+    BuildOptions opts{
+        .faces=FaceOption::per_cell,
+        .build_face_local_indices=true,
+        .build_twin_face=false,
+        .build_edges=false,
+        .build_node_cells=true,
+        .build_node_faces=true,
+        .compute_face_geometry=true,
+        .compute_cell_geometry=true
+    };
+
+    grid.finalize(opts);
+
+    std::string report;
+    grid.validate_finalized_full(&report);
+    std::cout << report << std::endl;
+
+    EuMesh mesh(std::move(grid));
+
+    VtuFile::save("out/mesh.vtu", mesh, Variables{"index", "faces2D"});
+
+    return 0;
+}
 #endif

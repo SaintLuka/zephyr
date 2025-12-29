@@ -633,14 +633,14 @@ int AmrCells::check_connectivity(index_t ic, const AmrCells& aliens) const {
             }
         }
         if (counter < 1) {
-            std::cout << "\tHas no neighbor across ordinary " << f_name << "\n";
+            std::cout << "\tHas no neighbor across inner " << f_name << "\n";
             print_info(ic);
             std::cout << "\tNeighbor:\n";
             neibs.print_info(jc);
             return -1;
         }
         if (counter > 1) {
-            std::cout << "\tMore than one neighbor across ordinary face\n";
+            std::cout << "\tMore than one neighbor across inner face\n";
             print_info(ic);
             return -1;
         }

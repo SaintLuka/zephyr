@@ -11,27 +11,24 @@ namespace zephyr::geom::generator {
 /// четырехугольных элементов.
 class BlockStructured : public Generator {
 public:
-    using Ptr = std::shared_ptr<BlockStructured>;
-
     /// @brief Конструктор
-    /// @param n_blocks Число блоков, нельзя изменить в дальнейшем
-    explicit BlockStructured(int n_blocks);
+    BlockStructured(int n_blocks = 0);
 
-    /// @brief Создать указатель на класс
-    template <class... Args>
-    static BlockStructured::Ptr create(Args&&... args){
-        return std::make_shared<BlockStructured>(std::forward<Args>(args)...);
-    }
+    /// @brief Увеличить (!) число блоков
+    void resize(int n_blocks);
 
     /// @brief Ссылка на структурированный блок по индексу
     Block &operator[](int idx);
 
-    /// @brief Ссылка на структурированный блок по индексу
-    const Block &operator[](int idx) const;
-
     /// @brief Связать структурированные блоки.
     /// Добавленные блоки должны опираться на одинаковые базисные вершины.
     void link();
+
+    /// @brief Построить блоки
+    void plot() const;
+
+    /// @brief Инициализировать хранилище
+    Grid make() override;
 
     /// @brief Установить точность сглаживания
     /// @param eps Безразмерная величина меньше единицы
@@ -40,19 +37,19 @@ public:
     /// @brief Вывод информации при генерации
     void set_verbose(bool v = true);
 
-    /// @brief Количество ячеек
-    int size() const final;
-
-    /// @brief Инициализировать хранилище
-    Grid make() override;
-
     /// @brief Установить условие на узлы, которые не сглаживаются
     /// @param func Функция, возвращает true для неподвижных узлов.
     void set_fixed(std::function<bool(const Vector3d&)> func) {
         m_fixed = func;
     }
 
-protected:
+public:
+    enum Stage {
+        EDITABLE,
+        LINKED,
+        OPTIMIZED,
+    };
+
     /// @brief Количество ячеек
     int calc_cells() const;
 
@@ -60,18 +57,22 @@ protected:
     int calc_nodes() const;
 
     void initialize();
+    void optimize();
 
     /// @brief Проверяет размеры блоков
     void check_consistency() const;
 
+    /// @brief Стадия редактирования
+    Stage m_stage = EDITABLE;
+
     /// @brief Массив блоков
-    std::vector<Block> m_blocks;
+    std::vector<Block::Ptr> m_blocks{};
 
     /// @brief Точность сглаживания
-    double m_epsilon;
+    double m_epsilon{1.0e-3};
 
     /// @brief Вывод информации при генерации
-    bool m_verbose;
+    bool m_verbose{false};
 
     /// @brief Условие стационарных узлов
     std::function<bool(const Vector3d&)> m_fixed;

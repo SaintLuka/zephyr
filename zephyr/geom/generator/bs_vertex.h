@@ -16,6 +16,11 @@ class Curve;
 /// Через базисные вершины проходят границы области, на базисных вершинах
 /// строятся базовые структурированные блоки.
 class BaseVertex {
+    using Block_Ref = const std::shared_ptr<Block>&;
+    using Block_WPtr = std::weak_ptr<Block>;
+
+    using AdjBlocks = std::set<Block_WPtr, std::owner_less<Block_WPtr>>;
+
 public:
     using Ptr = std::shared_ptr<BaseVertex>;
     using Ref = const std::shared_ptr<BaseVertex> &;
@@ -55,10 +60,13 @@ public:
 
     /// @brief Добавить смежный блок
     /// @details Производится проверка, что такой блок отсутствует
-    void add_adjacent_block(Block *block);
+    void add_adjacent_block(Block_Ref block);
+
+    /// @brief Очистить список смежных блоков
+    void clear_adjacent_blocks();
 
     /// @brief Массив смежных блоков
-    const std::vector<Block *> &adjacent_blocks() const;
+    const AdjBlocks &adjacent_blocks() const;
 
 private:
 
@@ -72,7 +80,7 @@ private:
     bool m_fixed;
 
     /// @brief Смежные блоки
-    std::vector<Block *> m_adjacent_blocks;
+    AdjBlocks m_adjacent_blocks;
 };
 
 /// @brief Внутренний тип вершины для класса Block
@@ -101,7 +109,7 @@ public:
     /// структурированных блоков.
     int n_adjacent() const;
 
-    /// @brief Зафиксировать вершину (удалеет смежные)
+    /// @brief Зафиксировать вершину (удаляет смежные)
     void fix();
 
     /// @brief Смежные вершины
@@ -123,7 +131,7 @@ public:
     /// @throw runtime_error, если более одной границы
     Curve *boundary() const;
 
-    /// @brief Множнство граничных условий, пустое множество
+    /// @brief Множество граничных условий, пустое множество
     /// для внутренних вершин.
     std::set<Boundary> boundaries() const;
 

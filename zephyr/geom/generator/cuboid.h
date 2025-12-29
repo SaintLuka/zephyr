@@ -63,18 +63,11 @@ public:
     /// @brief Установить флаги граничных условий
     void set_boundaries(Boundaries bounds);
 
-    /// @brief Количество ячеек сетки
-    int size() const final;
-
     /// @brief Ограничивающий объем
     Box bbox() const final;
 
     /// @brief Создать сетку общего вида
     Grid make() final;
-
-    /// @brief Инициализация SoA-хранилища сетки
-    void initialize(mesh::AmrCells& cells) final;
-
 
     // Далее не самые полезные get-функции
 
@@ -98,6 +91,9 @@ public:
 
     /// @brief Число ячеек по оси Z
     int nz() const;
+
+    /// @brief Граничные условия
+    Boundaries bounds() const;
 
     /// @brief Есть ли периодичность по оси X?
     bool periodic_along_x() const;

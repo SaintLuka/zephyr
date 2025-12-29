@@ -45,14 +45,14 @@ void SemicircleCutout::set_ny(int Ny) {
 
     // Нет необходимости устанавливать все размеры
     // у каждого блока, поскольку они связаны
-    m_blocks[0].set_size(v1, v9, Ny);
-    m_blocks[0].set_size(v1, v2, Nxl);
+    m_blocks[0]->set_size(v1, v9, Ny);
+    m_blocks[0]->set_size(v1, v2, Nxl);
 
-    m_blocks[2].set_size(v4, v10, Nr);
-    m_blocks[2].set_size(v4, v5, Nxc);
+    m_blocks[2]->set_size(v4, v10, Nr);
+    m_blocks[2]->set_size(v4, v5, Nxc);
 
-    m_blocks[4].set_size(v7, v8, Nxr);
-    m_blocks[4].set_size(v8, v12, Ny);
+    m_blocks[4]->set_size(v7, v8, Nxr);
+    m_blocks[4]->set_size(v8, v12, Ny);
 }
 
 
@@ -106,27 +106,27 @@ void SemicircleCutout::init_blocks() {
     circle->set_boundary(m_bounds.bottom);
 
     // Генератор сетки
-    m_blocks[0] = {v1, v2, v9, v10};
-    m_blocks[0].set_boundary(v1, v9, left);
-    m_blocks[0].set_boundary(v1, v2, bottom);
-    m_blocks[0].set_boundary(v9, v10, top);
+    *m_blocks[0] = {v1, v2, v9, v10};
+    m_blocks[0]->set_boundary(v1, v9, left);
+    m_blocks[0]->set_boundary(v1, v2, bottom);
+    m_blocks[0]->set_boundary(v9, v10, top);
 
-    m_blocks[1] = {v2, v3, v4, v10};
-    m_blocks[1].set_boundary(v2, v3, bottom);
-    m_blocks[1].set_boundary(v3, v4, circle);
+    *m_blocks[1] = {v2, v3, v4, v10};
+    m_blocks[1]->set_boundary(v2, v3, bottom);
+    m_blocks[1]->set_boundary(v3, v4, circle);
 
-    m_blocks[2] = {v4, v5, v10, v11};
-    m_blocks[2].set_boundary(v4, v5, circle);
-    m_blocks[2].set_boundary(v10, v11, top);
+    *m_blocks[2] = {v4, v5, v10, v11};
+    m_blocks[2]->set_boundary(v4, v5, circle);
+    m_blocks[2]->set_boundary(v10, v11, top);
 
-    m_blocks[3] = {v6, v7, v5, v11};
-    m_blocks[3].set_boundary(v6, v7, bottom);
-    m_blocks[3].set_boundary(v5, v6, circle);
+    *m_blocks[3] = {v6, v7, v5, v11};
+    m_blocks[3]->set_boundary(v6, v7, bottom);
+    m_blocks[3]->set_boundary(v5, v6, circle);
 
-    m_blocks[4] = {v7, v8, v11, v12};
-    m_blocks[4].set_boundary(v7, v8, bottom);
-    m_blocks[4].set_boundary(v11, v12, top);
-    m_blocks[4].set_boundary(v8, v12, right);
+    *m_blocks[4] = {v7, v8, v11, v12};
+    m_blocks[4]->set_boundary(v7, v8, bottom);
+    m_blocks[4]->set_boundary(v11, v12, top);
+    m_blocks[4]->set_boundary(v8, v12, right);
 
     // Необходимо связать блоки
     link();

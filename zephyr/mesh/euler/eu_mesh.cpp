@@ -8,6 +8,7 @@
 #include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/geom/generator/cuboid.h>
 #include <zephyr/geom/primitives/polygon.h>
+#include <zephyr/geom/grid.h>
 
 #include <zephyr/mesh/amr/apply.h>
 #include <zephyr/mesh/amr/balancing.h>
@@ -24,11 +25,35 @@ using generator::Cuboid;
 using utils::Stopwatch;
 using namespace io;
 
-void EuMesh::build(Generator& gen) {
-    if (mpi::master()) {
-        gen.initialize(m_locals);
+namespace {
+
+AmrCells make_locals(geom::Grid&& grid) {
+    // Опции генерации сетки
+    constexpr Grid::BuildOptions opts{
+        .faces=Grid::BuildOptions::FaceOption::per_cell,
+        .build_face_local_indices=true,
+        .build_twin_face=false,
+        .build_edges=false,
+        .build_node_cells=false,
+        .build_node_faces=false,
+        .compute_face_geometry=true,
+        .compute_cell_geometry=true
+    };
+
+    grid.finalize(opts);
+
+    if (true) {
+        std::string report;
+        grid.validate_finalized_full(&report);
+        std::cout << report << std::endl;
     }
 
+    return AmrCells(grid);
+}
+
+} // anonymous namespace
+
+void EuMesh::sync_params_() {
 #ifdef ZEPHYR_MPI
     if (!mpi::single()) {
         int dim = m_locals.dim();
@@ -50,12 +75,16 @@ void EuMesh::build(Generator& gen) {
     // установить dim/adapt/axial
     m_tourists.init_types(m_locals);
 #endif
+}
 
-    m_structured = false;
-    m_nx = n_cells();
-    m_ny = 1;
-    m_nz = 1;
+void EuMesh::build_(Generator& gen) {
+    if (mpi::master()) {
+        Grid grid = gen.make();
+        m_locals = make_locals(std::move(grid));
+    }
+    sync_params_();
 
+    // Иногда генератор позволяет восстановить структуру сетки
     if (mpi::single()) {
         // Структурированность не работает для распределенных расчетов
         if (gen.can_cast<Rectangle>()) {
@@ -76,8 +105,15 @@ void EuMesh::build(Generator& gen) {
     }
 }
 
+EuMesh::EuMesh(Grid&& grid) {
+    if (mpi::master()) {
+        m_locals = make_locals(std::move(grid));
+    }
+    sync_params_();
+}
+
 EuMesh::EuMesh(Generator& gen) {
-    build(gen);
+    build_(gen);
 }
 
 EuMesh::EuMesh(int dim, bool adaptive, bool axial)
@@ -87,7 +123,7 @@ EuMesh::EuMesh(int dim, bool adaptive, bool axial)
 EuMesh::EuMesh(const Json& config) {
     // Создать сетку на master-процессе
     auto gen = Generator::create(config);
-    build(*gen);
+    build_(*gen);
 
     m_max_level = 0;
     if (config["max_level"]) {

@@ -680,7 +680,7 @@ void AmrCells::set_cell(index_t ic, const Quad& quad) {
         faces.area[iface]     = vs.length();
         faces.center[iface]   = vs.center();
         faces.normal[iface]   = vs.normal(center[ic]);
-        faces.boundary[iface] = Boundary::ORDINARY;
+        faces.boundary[iface] = Boundary::INNER;
     }
 }
 
@@ -737,7 +737,7 @@ void AmrCells::set_cell(index_t ic, const Quad& quad, bool axial) {
         faces.area[iface]     = vs.length();
         faces.center[iface]   = vs.centroid(axial);
         faces.normal[iface]   = vs.normal(center[ic]);
-        faces.boundary[iface] = Boundary::ORDINARY;
+        faces.boundary[iface] = Boundary::INNER;
 
         if (axial) {
             faces.area_alt[iface] = vs.area_as();
@@ -791,7 +791,7 @@ void AmrCells::set_cell(index_t ic, const Cube& cube) {
         faces.area[iface]     = vs.area();
         faces.center[iface]   = vs.center();
         faces.normal[iface]   = vs.normal(center[ic]);
-        faces.boundary[iface] = Boundary::ORDINARY;
+        faces.boundary[iface] = Boundary::INNER;
     }
 }
 
@@ -850,7 +850,7 @@ void AmrCells::push_back(const Polygon& poly) {
         faces.area[iface]     = vs.length();
         faces.center[iface]   = vs.centroid();
         faces.normal[iface]   = vs.normal(center[ic]);
-        faces.boundary[iface] = Boundary::ORDINARY;
+        faces.boundary[iface] = Boundary::INNER;
 
         if (m_axial) {
             faces.area_alt[iface] = vs.area_as();
@@ -912,7 +912,7 @@ void AmrCells::push_back_impl(const Polyhedron& poly) {
         faces.area[iface] = poly.face_area(i);
         faces.center[iface] = poly.face_center(i);
         faces.normal[iface] = poly.face_normal(i);
-        faces.boundary[iface] = Boundary::ORDINARY;
+        faces.boundary[iface] = Boundary::INNER;
 
         faces.area_alt[iface] = NAN;
 

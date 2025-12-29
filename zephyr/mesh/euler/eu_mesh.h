@@ -17,6 +17,10 @@ class Line;
 class Polygon;
 class Polyhedron;
 class Generator;
+
+namespace cgrid {
+class Grid;
+}
 }
 
 namespace zephyr::mesh {
@@ -61,6 +65,7 @@ public:
     /// @brief Инициализация сетки из json-конфига
     explicit EuMesh(const utils::Json& config);
 
+    explicit EuMesh(geom::Grid&& grid);
 
     /// @brief Добавить на неструктурированную сетку ячейку в виде отрезка
     /// (сплюснутая четырехугольная ячейка)
@@ -341,7 +346,10 @@ public:
 
 private:
     /// @brief Реальный конструктор сетки
-    void build(geom::Generator& gen);
+    void build_(geom::Generator& gen);
+
+    /// @brief Синхронизовать общие параметры сетки
+    void sync_params_();
 
     /// @brief Добавить массив данных в хранилище
     /// @param name Имя массива данных
@@ -367,7 +375,6 @@ private:
     Distributor m_distributor;
 
     AmrCells m_locals;  ///< Ячейки, которые принадлежат данному процессу
-    //AmrCells m_aliens;  ///< Ячейки, получаемые с других процессов
 
     /// @brief Метод декомпозиции
     Decomposition::Ptr m_decomp = nullptr;
@@ -381,8 +388,8 @@ private:
     AmrNodes m_nodes;
 
     /// @brief Структурированная сетка? (только для однопроцессорных)
-    bool m_structured = false;
-    int m_nx = 1, m_ny = 1, m_nz = 1;  ///< Размеры структурированной сетки
+    bool m_structured{false};
+    int m_nx{1}, m_ny{1}, m_nz{1};  ///< Размеры структурированной сетки
 };
 
 

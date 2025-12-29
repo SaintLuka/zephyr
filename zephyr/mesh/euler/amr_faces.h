@@ -138,7 +138,7 @@ public:
 
 
 inline bool AmrFaces::is_boundary(index_t iface) const {
-    return boundary[iface] != Boundary::ORDINARY &&
+    return boundary[iface] != Boundary::INNER &&
            boundary[iface] != Boundary::PERIODIC &&
            boundary[iface] != Boundary::UNDEFINED;
 }

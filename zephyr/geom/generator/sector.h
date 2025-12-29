@@ -46,9 +46,6 @@ public:
     /// @brief Использовать осевую симметрию
     void set_axial(bool axial);
 
-    /// @brief Количество ячеек сетки
-    int size() const final;
-
     /// @brief Ограничивающий объем
     Box bbox() const final;
 

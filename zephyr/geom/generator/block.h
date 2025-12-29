@@ -11,8 +11,14 @@ namespace zephyr::geom::generator {
 /// @brief Представление четырехугольного блока.
 /// Основа блочно-структурированной сетки, большинство функций класса открыты
 /// только для управляющего класса BlockStructured.
-class Block {
+class Block : public std::enable_shared_from_this<Block> {
 public:
+    using Ptr = std::shared_ptr<Block>;
+    using Ref = const std::shared_ptr<Block>&;
+    using WPtr = std::weak_ptr<Block>;
+
+    /// @brief Пустой блок
+    Block() = default;
 
     /// @brief Инициализация структурированного блока.
     /// @details Вершины сортируются, чтобы получить обход против часовой
@@ -32,17 +38,13 @@ public:
     /// @brief Получить вершину
     BsVertex::Ptr vertex(int i, int j) const;
 
+    double calc_modulus() const;
+
+    int index;
 
 private:
-
     /// @brief Управляющий класс
     friend class BlockStructured;
-
-    /// @brief Пустой блок
-    explicit Block(int index);
-
-    /// @brief Индекс блока
-    int index() const;
 
     /// @brief Разбиение вдоль граней (v1, v2) и (v3, v4)
     int size1() const;
@@ -54,9 +56,12 @@ private:
     /// @param f_idx Индекс грани
     int size(int f_idx) const;
 
+    /// @brief Установить число ячеек вдоль грани
+    void set_size_to_face(int f_idx, int N);
+
     /// @brief Смежный блок
     /// @param f_idx Индекс грани
-    Block *adjacent_block(int f_idx) const;
+    Block::Ptr adjacent_block(int f_idx) const;
 
     /// @brief Лежит ли вершина на границе
     bool is_boundary(BaseVertex::Ref v) const;
@@ -80,7 +85,7 @@ private:
     int neib_face(int f_idx) const;
 
     /// @brief Связать блок с соседним
-    void link(Block *block);
+    void link(Block::Ref block);
 
     /// @brief Сгенерировать узлы сетки
     void create_vertices();
@@ -89,7 +94,7 @@ private:
     void link_vertices();
 
     /// @brief Сглаживание вершин в блоке
-    /// @return Максимальный относительный сдивг вершин
+    /// @return Максимальный относительный сдвиг вершин
     double smooth();
 
     /// @brief Обновить положение вершин
@@ -104,26 +109,32 @@ private:
     /// @brief Вершина со второго ряда от границы
     BsVertex::Ptr &preboundary_vertex(int f_idx, int idx);
 
-    /// @brief Индекс блока
-    int m_index;
+
+    // -------- Основные топологические параметры --------
 
     /// @brief Базовые вершины обходятся против часовой стрелки
-    std::array<BaseVertex::Ptr, 4> m_base_vertices;
+    std::array<BaseVertex::Ptr, 4> m_base_vertices{}; // nullptr
 
     /// @brief Границы области (nullptr для внутренних границ)
-    std::array<Curve::Ptr, 4> m_boundaries;
+    std::array<Curve::Ptr, 4> m_boundaries{}; // nullptr
 
     /// @brief Ссылки на соседние блоки (nullptr для границ области)
-    std::array<Block *, 4> m_adjacent_blocks;
+    std::array<Block::WPtr, 4> m_adjacent_blocks{}; // nullptr
 
     /// @brief Поворот соседнего блока [0..3]
-    std::array<int, 4> m_rotations;
+    std::array<int, 4> m_rotations{-1, -1, -1, -1};
 
-    int m_size1;     ///< Число ячеек вдоль граней (v1, v2) и (v3, v4)
-    int m_size2;     ///< Число ячеек вдоль вершин (v1, v4) и (v2, v3)
+    // ???
+    double m_modulus{1.0};
+
+
+    // -------- Дополнительные параметры --------
+
+    int m_size1{0};  ///< Число ячеек вдоль граней (v1, v2) и (v3, v4)
+    int m_size2{0};  ///< Число ячеек вдоль вершин (v1, v4) и (v2, v3)
 
     /// @brief Двумерный массив с вершинами
-    std::vector<std::vector<BsVertex::Ptr>> m_vertices;
+    std::vector<std::vector<BsVertex::Ptr>> m_vertices{};
 };
 
 } // namespace zephyr::mesh::generator

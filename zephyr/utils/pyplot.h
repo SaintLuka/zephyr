@@ -122,7 +122,7 @@ public:
 
     void grid(bool enable) const nopython;
 
-    void set_aspect_equal() const;
+    void set_aspect_equal() const nopython;
 
     void xlim(double xmin, double xmax) const nopython;
 

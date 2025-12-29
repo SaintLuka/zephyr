@@ -1,6 +1,7 @@
 set(ZEPHYR_MESH_EULER_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/amr_cells.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/amr_cells_dbg.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/amr_cells_gen.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/amr_faces.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/distributor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/eu_prim.cpp
