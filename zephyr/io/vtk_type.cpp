@@ -100,11 +100,11 @@ std::string VtkType::string_conversion() const {
 }
 
 bool VtkType::operator==(const VtkType& value) const {
-    return m_value == value;
+    return m_value == value.m_value;
 }
 
 bool VtkType::operator!=(const VtkType& value) const {
-    return m_value != value;
+    return m_value != value.m_value;
 }
 
 bool VtkType::is_undefined() const {

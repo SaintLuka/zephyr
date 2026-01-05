@@ -102,7 +102,7 @@ struct SolPU {
     bool conv;  ///< Хорошая сходимость
 
     /// @brief Конструктор по умолчанию
-    SolPU() : P(0.0 / 0.0), U(0.0 / 0.0), conv(false) {}
+    SolPU() : P(NAN), U(NAN), conv(false) {}
 
     /// @brief Простейший конструктор
     SolPU(cref P, cref U, bool conv)

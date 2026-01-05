@@ -194,10 +194,6 @@ mpi::datatype mpi::datatype::hvector(int count, int blocklength,
     return mpi::datatype(newtype);
 }
 
-#else
-
-std::ostream& mpi::cout = std::cout;
-
 #endif
 
 } // namespace zephyr::utils

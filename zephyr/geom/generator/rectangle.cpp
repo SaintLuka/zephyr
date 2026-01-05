@@ -481,15 +481,15 @@ void Rectangle::initialize_classic(AmrCells& cells) const {
     double hx = (m_xmax - m_xmin) / m_nx;
     double hy = (m_ymax - m_ymin) / m_ny;
 
-    auto get_index = [=](index_t i, index_t j) -> index_t {
+    auto get_index = [this](index_t i, index_t j) -> index_t {
         return i * m_ny + j;
     };
 
-    auto get_index_pair = [=](index_t n) -> std::array<index_t, 2> {
+    auto get_index_pair = [this](index_t n) -> std::array<index_t, 2> {
         return {n / m_ny, n % m_ny};
     };
 
-    auto get_vertex = [=](index_t i, index_t j) -> Vector3d {
+    auto get_vertex = [=, this](index_t i, index_t j) -> Vector3d {
         return {
                 m_xmin + ((m_xmax - m_xmin) * i) / m_nx,
                 m_ymin + ((m_ymax - m_ymin) * j) / m_ny,
@@ -497,7 +497,7 @@ void Rectangle::initialize_classic(AmrCells& cells) const {
         };
     };
 
-    auto neib_index = [=](index_t i, index_t j, Side2D side) -> index_t {
+    auto neib_index = [=, this](index_t i, index_t j, Side2D side) -> index_t {
         if (side == Side2D::LEFT) {
             return i == 0 && !x_period ?  get_index(i, j) : get_index((i - 1 + m_nx) % m_nx, j);
         }
