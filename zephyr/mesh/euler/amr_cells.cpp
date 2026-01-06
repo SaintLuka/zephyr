@@ -1,4 +1,5 @@
 #include <iostream>
+#include <cassert>
 
 #include <zephyr/geom/geom.h>
 #include <zephyr/math/funcs.h>

@@ -20,25 +20,26 @@ private:
     T m_begin;  ///< Начальный элемент диапазона
     T m_end;    ///< Конечный элемент диапазона (не включительно)
 
-    static_assert(std::is_integral<T>::value,
-                  "Integral type is required for the range");
+    static_assert(std::is_integral_v<T>, "Integral type is required for the range");
 
 public:
 
     /// @brief Примитивный итератор
     class iterator {
     private:
-        T m_val; ///< Значение из диапазона
+        T m_val{}; ///< Значение из диапазона
 
     public:
         /// @brief Категория random_access
         using iterator_category = std::random_access_iterator_tag;
-        using difference_type   = std::make_signed_t<T>;
+        using difference_type   = std::ptrdiff_t;
         using value_type = T;
         using pointer    = T*;
         using reference  = T;
 
-        iterator(const T &val) : m_val(val) {}
+        iterator() = default;
+
+        explicit iterator(T val) : m_val(val) {}
 
         operator T() { return m_val; }
 
@@ -61,10 +62,10 @@ public:
         T operator[](difference_type n) const { return m_val + n; }
 
         /// @brief Инкремент на шаг step
-        void operator+=(size_t step) { m_val += step; }
+        void operator+=(difference_type step) { m_val += step; }
 
         /// @brief Инкремент на шаг step
-        iterator operator+(size_t val) const { return m_val + val; }
+        iterator operator+(difference_type val) const { return iterator(m_val + val); }
 
         /// @brief Расстояние между итераторами
         difference_type operator-(const iterator &other) const {
@@ -84,19 +85,18 @@ public:
 
     /// @brief Конструктор по конечному элементу
     /// @param end Конечный элемент диапазона (не включительно)
-    explicit range(const T &end) : m_begin{}, m_end(end) {}
+    explicit range(T end) : m_begin{}, m_end(end) {}
 
     /// @brief Конструктор по начальному и конечному элементу
     /// @param begin Начальный элемент диапазона
     /// @param end Конечный элемент диапазона (не включительно)
-    range(const T &begin, const T &end)
-            : m_begin(begin), m_end(end) {}
+    range(T begin, T end) : m_begin(begin), m_end(end) {}
 
     /// @brief Начало диапазона
-    iterator begin() const { return m_begin; }
+    iterator begin() const { return iterator(m_begin); }
 
     /// @brief Конечный элемент диапазона (не включительно)
-    iterator end() const { return m_end; }
+    iterator end() const { return iterator(m_end); }
 };
 
 /// @brief Аналог enumerate из python, можно использовать в циклах со

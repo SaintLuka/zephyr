@@ -207,14 +207,17 @@ class EuCell final {
     using SpFunction = std::function<double(const Vector3d &)>;
 
 private:
-    AmrCells* m_cells;  //< Указатель на сетку (обычно locals)
-    index_t   m_index;  //< Индекс ячейки
+    AmrCells* m_cells{nullptr};  //< Указатель на сетку (обычно locals)
+    index_t   m_index{-1};       //< Индекс ячейки
 
     /// @brief Нулевое значение допускается, но не проверяется в целях
     /// оптимизации, поэтому ловите segfaults.
-    AmrCells* m_aliens = nullptr;
+    AmrCells* m_aliens{nullptr};
 
 public:
+    /// @brief Конструктор по умолчанию (иногда требует TBB)
+    EuCell() = default;    
+
     EuCell(AmrCells* cells, index_t index, AmrCells* aliens = nullptr)
         : m_cells(cells), m_index(index), m_aliens(aliens) { }
 
@@ -428,7 +431,7 @@ public:
 /// @brief Итератор по ячейкам из EuMesh или AmrCells
 class EuCell_Iter final {
 private:
-    EuCell m_eu_cell;  ///< Реальная ячейка
+    EuCell m_eu_cell{};  ///< Реальная ячейка
 
 public:
     using iterator_category = std::random_access_iterator_tag;
@@ -436,6 +439,9 @@ public:
     using value_type = EuCell;
     using pointer    = EuCell *;
     using reference  = EuCell &;
+
+    /// @brief Конструктор по умолчанию (иногда требует TBB)
+    EuCell_Iter() = default;
 
     /// @brief Конструктор как у ячейки
     EuCell_Iter(AmrCells *cells, index_t index, AmrCells *aliens = nullptr)

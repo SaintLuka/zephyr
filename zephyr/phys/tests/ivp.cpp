@@ -1,3 +1,4 @@
+#include <cassert>
 #include <zephyr/phys/tests/ivp.h>
 
 namespace zephyr::phys {

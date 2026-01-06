@@ -45,12 +45,6 @@ if (CMAKE_BUILD_TYPE STREQUAL Debug)
     set(ZEPHYR_ASSERTS ON)
 endif ()
 
-add_definitions(-D_USE_MATH_DEFINES)
-configure_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/configuration.h.in
-    ${CMAKE_CURRENT_BINARY_DIR}/zephyr/configuration.h
-)
-
 if (ZEPHYR_TBB)
     find_package(TBB REQUIRED)
 else ()
@@ -64,7 +58,25 @@ find_package(Boost   COMPONENTS program_options REQUIRED)
 if (ZEPHYR_PYTHON)
     find_package(Python3 COMPONENTS Interpreter Development NumPy REQUIRED)
     find_package(pybind11 REQUIRED)
+    
+    get_filename_component(PYTHON_EXE_DIR "${Python3_EXECUTABLE}" DIRECTORY)
+    get_filename_component(PYTHONHOME "${PYTHON_EXE_DIR}" ABSOLUTE)
+
+    if(WIN32)
+        file(TO_CMAKE_PATH "${PYTHONHOME}" PYTHONHOME_CMAKE)
+        string(REPLACE "/" "\\" PYTHONHOME_NATIVE "${PYTHONHOME_CMAKE}")        
+        string(REPLACE "\\" "\\\\" PYTHONHOME_CPP "${PYTHONHOME_NATIVE}")
+        set(PYTHONHOME "${PYTHONHOME_CPP}")
+    endif()
+
+    message(STATUS "PYTHONHOME: ${PYTHONHOME}")
 endif()
+
+add_definitions(-D_USE_MATH_DEFINES)
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/configuration.h.in
+    ${CMAKE_CURRENT_BINARY_DIR}/zephyr/configuration.h
+)
 
 add_subdirectory(zephyr)
 

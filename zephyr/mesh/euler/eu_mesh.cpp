@@ -120,7 +120,7 @@ EuMesh::EuMesh(const Json& config) {
             int dim = m_locals.empty() ? 0 : m_locals.dim();
             dim = mpi::max(dim);
 
-            assert((dim == 2 || dim == 3) && "Strange dimension, EuMesh constructed by json");
+            z_assert((dim == 2 || dim == 3), "Strange dimension, EuMesh constructed by json");
 
             // По умолчанию что-то такое
             set_decomposition(dim < 3 ? "XY" : "XYZ");

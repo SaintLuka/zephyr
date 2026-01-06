@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cassert>
 #include <array>
 #include <map>
 #include <set>
