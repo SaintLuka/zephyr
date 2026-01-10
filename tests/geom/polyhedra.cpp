@@ -27,6 +27,7 @@ void plot_sections(
 
     int N = 1000;
     double max_epsilon_cv = 0;
+    double avarage_epsilon_cv = 0;
     double max_epsilon_fs = 0;
     std::vector<int> checks = std::vector<int>();
     bool flag = false;
@@ -52,10 +53,11 @@ void plot_sections(
         Vector3d p2 = poly.find_section(normal, v2/v);
 
         double epsilon_cv = std::abs(v2-v1);
+        avarage_epsilon_cv += epsilon_cv;
         if (max_epsilon_cv < epsilon_cv)
             max_epsilon_cv = epsilon_cv;
 
-        double epsilon_fs = std::abs((p2-p).dot(normal)); //???
+        double epsilon_fs = std::abs((p2-p).dot(normal));
         if (max_epsilon_fs < epsilon_fs)
             max_epsilon_fs = epsilon_fs;
 
@@ -70,8 +72,9 @@ void plot_sections(
             break;
         }
     }
-//    std::cout << figname << " clip_volume error: " << max_epsilon_cv << std::endl;
-//    std::cout << figname << " find_section error: " << max_epsilon_fs << std::endl;
+    std::cout << figname << " clip_volume max error: " << max_epsilon_cv << std::endl;
+    std::cout << figname << " clip_volume avg error: " << avarage_epsilon_cv / N << std::endl;
+    std::cout << figname << " find_section error: " << max_epsilon_fs << std::endl;
     std::cout << " checks's size: " << checks.size() << " , checks: ";
     for (size_t i = 0; i < checks.size(); ++i) {
         std::cout << checks[i];
@@ -84,14 +87,19 @@ void plot_sections(
 }
 
 int main() {
-    Vector3d n = {0., 0.3, 0.3}; //{0.4, 0.5, 0.3};
+//    Vector3d n = {0.4, 0.5, 0.3};
 //    Vector3d p = {-0.159999, -0.199999, -0.12};
+//    Vector3d p = {-0.479999, -0.599999, -0.359999};
 //    Vector3d p = {0.16, 0.20, 0.12};
-    n.normalize();
+//    n.normalize();
 //    auto cube = Polyhedron::Cube();
 //    std::cout << Polyhedron::Cube().clip(p, n).checkout()  << std::endl;
 
-//    auto wrong_clip = plot_sections(Polyhedron::Cube(), n, "cube");
+    Vector3d n = {-1, 0, 1};
+    n.normalize();
+    Vector3d p = {0.5, 0.5, 0.5};
+//    auto cube = Polyhedron::Cube();
+//    std::cout << Polyhedron::Cube().clip(p, n).checkout()  << std::endl;
     plot_sections(Polyhedron::Cube(), n, "cube");
     plot_sections(Polyhedron::Cuboid(1.0, 1.2, 0.8), n, "cuboid");
     plot_sections(Polyhedron::Pyramid(), n, "pyramid");
@@ -101,21 +109,24 @@ int main() {
     plot_sections(Polyhedron::Dodecahedron(), n, "dodecahedron");
     plot_sections(Polyhedron::Icosahedron(), n, "icosahedron");
     plot_sections(Polyhedron::TruncatedCube(), n, "truncated_cube");
+//
+//    std::cout << "Polyhedron::Tetrahedron().volume(): " << Polyhedron::Tetrahedron().volume() << std::endl;
+//    std::cout << "Polyhedron::Octahedron().volume(): " << Polyhedron::Octahedron().volume() << std::endl;
 
-    n = {0.4, 0.5, 0.3};
+//    n = {0.4, 0.5, 0.3};
 //    Vector3d p = {-0.159999, -0.199999, -0.12};
 //    Vector3d p = {0.16, 0.20, 0.12};
-    n.normalize();
+//    n.normalize();
 
-    plot_sections(Polyhedron::Cube(), n, "cube");
-    plot_sections(Polyhedron::Cuboid(1.0, 1.2, 0.8), n, "cuboid");
-    plot_sections(Polyhedron::Pyramid(), n, "pyramid");
-    plot_sections(Polyhedron::Wedge(), n, "wedge");
-    plot_sections(Polyhedron::Tetrahedron(), n, "tetrahedron");
-    plot_sections(Polyhedron::Octahedron(), n, "octahedron");
-    plot_sections(Polyhedron::Dodecahedron(), n, "dodecahedron");
-    plot_sections(Polyhedron::Icosahedron(), n, "icosahedron");
-    plot_sections(Polyhedron::TruncatedCube(), n, "truncated_cube");
+//    plot_sections(Polyhedron::Cube(), n, "cube");
+//    plot_sections(Polyhedron::Cuboid(1.0, 1.2, 0.8), n, "cuboid");
+//    plot_sections(Polyhedron::Pyramid(), n, "pyramid");
+//    plot_sections(Polyhedron::Wedge(), n, "wedge");
+//    plot_sections(Polyhedron::Tetrahedron(), n, "tetrahedron");
+//    plot_sections(Polyhedron::Octahedron(), n, "octahedron");
+//    plot_sections(Polyhedron::Dodecahedron(), n, "dodecahedron");
+//    plot_sections(Polyhedron::Icosahedron(), n, "icosahedron");
+//    plot_sections(Polyhedron::TruncatedCube(), n, "truncated_cube");
 
 //    std::cout << "Number of vertices: " << wrong_clip.n_verts() << std::endl;
 //    std::cout << "Number of faces: " << wrong_clip.n_faces() << std::endl;
