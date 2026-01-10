@@ -29,6 +29,7 @@ void plot_sections(
     double max_epsilon_cv = 0;
     double avarage_epsilon_cv = 0;
     double max_epsilon_fs = 0;
+    double avg_epsilon_fs = 0;
     std::vector<int> checks = std::vector<int>();
     bool flag = false;
     for (int i = 0; i < N; ++i) {
@@ -58,6 +59,7 @@ void plot_sections(
             max_epsilon_cv = epsilon_cv;
 
         double epsilon_fs = std::abs((p2-p).dot(normal));
+        avg_epsilon_fs += epsilon_fs;
         if (max_epsilon_fs < epsilon_fs)
             max_epsilon_fs = epsilon_fs;
 
@@ -72,9 +74,10 @@ void plot_sections(
             break;
         }
     }
-    std::cout << figname << " clip_volume max error: " << max_epsilon_cv << std::endl;
-    std::cout << figname << " clip_volume avg error: " << avarage_epsilon_cv / N << std::endl;
-    std::cout << figname << " find_section error: " << max_epsilon_fs << std::endl;
+//    std::cout << figname << " clip_volume max error: " << max_epsilon_cv << std::endl;
+//    std::cout << figname << " clip_volume avg error: " << avarage_epsilon_cv / N << std::endl;
+//    std::cout << figname << " find_section max error: " << max_epsilon_fs << std::endl;
+//    std::cout << figname << " find_section avg error: " << avg_epsilon_fs / N << std::endl;
     std::cout << " checks's size: " << checks.size() << " , checks: ";
     for (size_t i = 0; i < checks.size(); ++i) {
         std::cout << checks[i];
@@ -95,11 +98,14 @@ int main() {
 //    auto cube = Polyhedron::Cube();
 //    std::cout << Polyhedron::Cube().clip(p, n).checkout()  << std::endl;
 
-    Vector3d n = {-1, 0, 1};
-    n.normalize();
-    Vector3d p = {0.5, 0.5, 0.5};
+//    Vector3d n = {-1, 0, 1};
+//    n.normalize();
+//    Vector3d p = {0.5, 0.5, 0.5};
 //    auto cube = Polyhedron::Cube();
 //    std::cout << Polyhedron::Cube().clip(p, n).checkout()  << std::endl;
+
+    Vector3d n = {-1, 0, 1};
+    n.normalize();
     plot_sections(Polyhedron::Cube(), n, "cube");
     plot_sections(Polyhedron::Cuboid(1.0, 1.2, 0.8), n, "cuboid");
     plot_sections(Polyhedron::Pyramid(), n, "pyramid");
@@ -109,6 +115,59 @@ int main() {
     plot_sections(Polyhedron::Dodecahedron(), n, "dodecahedron");
     plot_sections(Polyhedron::Icosahedron(), n, "icosahedron");
     plot_sections(Polyhedron::TruncatedCube(), n, "truncated_cube");
+
+    n = {0.4, 0.5, 0.3};
+    n.normalize();
+
+    plot_sections(Polyhedron::Cube(), n, "cube");
+    plot_sections(Polyhedron::Cuboid(1.0, 1.2, 0.8), n, "cuboid");
+    plot_sections(Polyhedron::Pyramid(), n, "pyramid");
+    plot_sections(Polyhedron::Wedge(), n, "wedge");
+    plot_sections(Polyhedron::Tetrahedron(), n, "tetrahedron");
+    plot_sections(Polyhedron::Octahedron(), n, "octahedron");
+    plot_sections(Polyhedron::Dodecahedron(), n, "dodecahedron");
+    plot_sections(Polyhedron::Icosahedron(), n, "icosahedron");
+    plot_sections(Polyhedron::TruncatedCube(), n, "truncated_cube");
+
+    n = {0.5, 0.5, 0.5};
+    n.normalize();
+
+    plot_sections(Polyhedron::Cube(), n, "cube");
+    plot_sections(Polyhedron::Cuboid(1.0, 1.2, 0.8), n, "cuboid");
+    plot_sections(Polyhedron::Pyramid(), n, "pyramid");
+    plot_sections(Polyhedron::Wedge(), n, "wedge");
+    plot_sections(Polyhedron::Tetrahedron(), n, "tetrahedron");
+    plot_sections(Polyhedron::Octahedron(), n, "octahedron");
+    plot_sections(Polyhedron::Dodecahedron(), n, "dodecahedron");
+    plot_sections(Polyhedron::Icosahedron(), n, "icosahedron");
+    plot_sections(Polyhedron::TruncatedCube(), n, "truncated_cube");
+
+    n = {0.5, 0, 0};
+    n.normalize();
+
+    plot_sections(Polyhedron::Cube(), n, "cube");
+    plot_sections(Polyhedron::Cuboid(1.0, 1.2, 0.8), n, "cuboid");
+    plot_sections(Polyhedron::Pyramid(), n, "pyramid");
+    plot_sections(Polyhedron::Wedge(), n, "wedge");
+    plot_sections(Polyhedron::Tetrahedron(), n, "tetrahedron");
+    plot_sections(Polyhedron::Octahedron(), n, "octahedron");
+    plot_sections(Polyhedron::Dodecahedron(), n, "dodecahedron");
+    plot_sections(Polyhedron::Icosahedron(), n, "icosahedron");
+    plot_sections(Polyhedron::TruncatedCube(), n, "truncated_cube");
+
+    n = {0.3, 12, 53};
+    n.normalize();
+
+    plot_sections(Polyhedron::Cube(), n, "cube");
+    plot_sections(Polyhedron::Cuboid(1.0, 1.2, 0.8), n, "cuboid");
+    plot_sections(Polyhedron::Pyramid(), n, "pyramid");
+    plot_sections(Polyhedron::Wedge(), n, "wedge");
+    plot_sections(Polyhedron::Tetrahedron(), n, "tetrahedron");
+    plot_sections(Polyhedron::Octahedron(), n, "octahedron");
+    plot_sections(Polyhedron::Dodecahedron(), n, "dodecahedron");
+    plot_sections(Polyhedron::Icosahedron(), n, "icosahedron");
+    plot_sections(Polyhedron::TruncatedCube(), n, "truncated_cube");
+
 //
 //    std::cout << "Polyhedron::Tetrahedron().volume(): " << Polyhedron::Tetrahedron().volume() << std::endl;
 //    std::cout << "Polyhedron::Octahedron().volume(): " << Polyhedron::Octahedron().volume() << std::endl;
