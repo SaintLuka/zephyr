@@ -818,8 +818,7 @@ double Polyhedron::clip_volume(const Vector3d& p, const Vector3d& n) const { //p
     return out; //vse escho problema s vneshnimii graichnymy tochkami
 }
 
-
-Vector3d Polyhedron::find_section(const Vector3d& n, double alpha) const {
+Vector3d Polyhedron::find_section(const Vector3d& n, double alpha) const { //Я где то в сентябре писал это и уже забыл, надо наверно переписать с нуля
     double min_proj = std::numeric_limits<double>::max();
     double max_proj = std::numeric_limits<double>::lowest();
 
@@ -853,7 +852,7 @@ Vector3d Polyhedron::find_section(const Vector3d& n, double alpha) const {
         d_mid = 0.5 * (d_low + d_high);
         Vector3d plane_point = n * d_mid;
 
-        double clipped_volume = clip_volume(plane_point, n);
+        double clipped_volume = clip(plane_point, n).volume(); //Пока я решил оставить clip_volume и временно работаю без него
         f_mid = clipped_volume - alpha * total_volume;
 
         if (std::abs(f_mid) < tolerance) {
@@ -871,6 +870,53 @@ Vector3d Polyhedron::find_section(const Vector3d& n, double alpha) const {
     }
 
     return n * d_mid;
+}
+
+Vector3d Polyhedron::find_section_newton(const Vector3d& n, double alpha) const {
+    double L = std::cbrt(volume()); // характерестический размер
+    double eps = (1.0e-7) * L;
+
+    double V0 = volume(); // Объём исходного многогранника
+
+    Vector3d p = m_center;
+    Polyhedron P = clip(p, n);
+
+    if (P.n_faces() == 0) {
+        return n * (n.dot(m_center));
+    }
+
+    double d = n.dot(p); //Проекция точки на нормаль к плоскости
+    double V = P.volume(); //Объём итерации
+    double S = P.face_area(P.n_faces() - 1); //Площадь итерации
+    double F = V-alpha*V0; //Я так понимаю это можно назвать невязкой
+
+    //Ниже цикл для проверки того, что clip вообще чот отрезал и есть грань сечения
+    //Пока закомментировано
+    /* double S = 0;
+       for (int i = 0; i < P.n_faces(); ++i) {
+        Vector3d face_norm = P.face_normal(i);
+        if (std::abs(face_norm.dot(n) - 1.0) < 1e-6) { // почти параллельны
+            S = face_area(i);
+        }
+    }*/
+    int counter = 0;
+    while (abs(F) > eps && counter < 100000) {
+        d -= F / S;
+        p = m_center - (n.dot(m_center) - d) * n; //Проекция центра многогранника на плоскость сечения
+        P = clip(p, n);
+        V = P.volume(); //Объём итерации
+
+        if (P.n_faces() == 0) {
+            break;
+        }
+
+        S = P.face_area(P.n_faces() - 1); //Площадь итерации
+
+        F = V-alpha*V0; //Я так понимаю это можно назвать невязкой
+
+        counter++;
+    }
+    return p;
 }
 
 double Polyhedron::volume_fraction(

@@ -49,20 +49,25 @@ void plot_sections(
 
         double v = poly.volume();
         double v1 = clip.volume();
-        double v2 = poly.clip_volume(p, normal);
+//        double v2 = poly.clip_volume(p, normal);
 
-        Vector3d p2 = poly.find_section(normal, v2/v);
+        Vector3d p2 = poly.find_section_newton(normal, v1/v);
 
-        double epsilon_cv = std::abs(v2-v1);
-        avarage_epsilon_cv += epsilon_cv;
-        if (max_epsilon_cv < epsilon_cv)
-            max_epsilon_cv = epsilon_cv;
+//        double epsilon_cv = std::abs(v2-v1);
+//        avarage_epsilon_cv += epsilon_cv;
+//        if (max_epsilon_cv < epsilon_cv)
+//            max_epsilon_cv = epsilon_cv;
 
         double epsilon_fs = std::abs((p2-p).dot(normal));
         avg_epsilon_fs += epsilon_fs;
         if (max_epsilon_fs < epsilon_fs)
             max_epsilon_fs = epsilon_fs;
-
+//        if (epsilon_fs > 1) {
+//            std::cout << " p: " << p[0] << " " << p[1] << " " << p[2] << std::endl;
+//            std::cout << " p2: " << p2[0] << " " << p2[1] << " " << p2[2] << std::endl;
+//            std::cout << " v2/v: " << v1/v << std::endl;
+//            std::cout << " i: " << i << std::endl;
+//        }
 
         EuMesh mesh(3, false);
         mesh.push_back(clip);
@@ -76,9 +81,9 @@ void plot_sections(
     }
 //    std::cout << figname << " clip_volume max error: " << max_epsilon_cv << std::endl;
 //    std::cout << figname << " clip_volume avg error: " << avarage_epsilon_cv / N << std::endl;
-//    std::cout << figname << " find_section max error: " << max_epsilon_fs << std::endl;
-//    std::cout << figname << " find_section avg error: " << avg_epsilon_fs / N << std::endl;
-    std::cout << " checks's size: " << checks.size() << " , checks: ";
+    std::cout << figname << " find_section_newton max error: " << max_epsilon_fs << std::endl;
+    std::cout << figname << " find_section_newton avg error: " << avg_epsilon_fs / N << std::endl;
+//    std::cout << " checks's size: " << checks.size() << " , checks: ";
     for (size_t i = 0; i < checks.size(); ++i) {
         std::cout << checks[i];
         if (i != checks.size() - 1) {
@@ -97,6 +102,7 @@ int main() {
 //    n.normalize();
 //    auto cube = Polyhedron::Cube();
 //    std::cout << Polyhedron::Cube().clip(p, n).checkout()  << std::endl;
+//    std::cout << Polyhedron::Cube().center().transpose() << std::endl;
 
 //    Vector3d n = {-1, 0, 1};
 //    n.normalize();
@@ -104,8 +110,9 @@ int main() {
 //    auto cube = Polyhedron::Cube();
 //    std::cout << Polyhedron::Cube().clip(p, n).checkout()  << std::endl;
 
-    Vector3d n = {-1, 0, 1};
+    Vector3d n = {0.4, 0.5, 0.3};
     n.normalize();
+//    std::cout << Polyhedron::Tetrahedron().find_section_newton(n, 0.999998).transpose()  << std::endl;
     plot_sections(Polyhedron::Cube(), n, "cube");
     plot_sections(Polyhedron::Cuboid(1.0, 1.2, 0.8), n, "cuboid");
     plot_sections(Polyhedron::Pyramid(), n, "pyramid");
@@ -116,7 +123,7 @@ int main() {
     plot_sections(Polyhedron::Icosahedron(), n, "icosahedron");
     plot_sections(Polyhedron::TruncatedCube(), n, "truncated_cube");
 
-    n = {0.4, 0.5, 0.3};
+    n = {-1, 0, 1};
     n.normalize();
 
     plot_sections(Polyhedron::Cube(), n, "cube");
