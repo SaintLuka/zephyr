@@ -1,6 +1,7 @@
 #include <iostream>
 #include <map>
 #include <numeric>
+#include <random>
 
 #include <zephyr/geom/intersection.h>
 #include <zephyr/geom/primitives/polyhedron.h>
@@ -874,24 +875,34 @@ Vector3d Polyhedron::find_section(const Vector3d& n, double alpha) const { //Я 
 
 Vector3d Polyhedron::find_section_newton(const Vector3d& n, double alpha) const {
     double L = std::cbrt(volume()); // характерестический размер
-    double eps = (1.0e-7) * L;
+    double eps = (1.0e-6) * L;
 
     double V0 = volume(); // Объём исходного многогранника
 
-    Vector3d p = m_center;
-    Polyhedron P = clip(p, n);
-
-    if (P.n_faces() == 0) {
-        return n * (n.dot(m_center));
+    std::vector<double> ds;
+    for (int i = 0; i < n_verts(); ++i) { //Ищем интервал параметра
+        ds.push_back(n.dot(verts[i]));
     }
-
-    double d = n.dot(p); //Проекция точки на нормаль к плоскости
+    std::sort(ds.begin(), ds.end());
+    double d_min = ds[0];
+    double d_max = ds[ds.size()-1];
+//    std::cout << "d_min: " << d_min << ", d_max: " << d_max << std::endl;
+    double d = n.dot(m_center); //Проекция точки на нормаль к плоскости
+    Vector3d p = m_center; //Точка на плоскости
+    Polyhedron P = clip(p, n); //Отсекаемый многогранник
     double V = P.volume(); //Объём итерации
-    double S = P.face_area(P.n_faces() - 1); //Площадь итерации
+    double S = eps;
+     //Площадь итерации
+    if (V >= V0 || P.n_faces() == 0) {
+        S = eps;
+    }
+    else {
+        S = P.face_area(P.n_faces() - 1);
+    }
     double F = V-alpha*V0; //Я так понимаю это можно назвать невязкой
 
     //Ниже цикл для проверки того, что clip вообще чот отрезал и есть грань сечения
-    //Пока закомментировано
+    //Пока закомментировано, ни разу не столкнулся с тем, чтобы текущий способ давал сбой
     /* double S = 0;
        for (int i = 0; i < P.n_faces(); ++i) {
         Vector3d face_norm = P.face_normal(i);
@@ -899,23 +910,42 @@ Vector3d Polyhedron::find_section_newton(const Vector3d& n, double alpha) const 
             S = face_area(i);
         }
     }*/
+
     int counter = 0;
-    while (abs(F) > eps && counter < 100000) {
-        d -= F / S;
+    while (abs(F) > eps && counter < 1000) {
+        d -= F / S; // Проблема тут, площадь не всегда диффиринцируема, из-за чего метод Ньютона может выйти за границы первой операцией, и я пока это не проверяю
+        if (d > d_max || d < d_min) { //
+            std::random_device rd;
+            std::mt19937 gen(rd());
+            std::uniform_real_distribution<double> dis(0.0, 1.0);
+
+            double a = dis(gen);
+            d = (1-a) * d_min + a * d_max;
+        }
+//        std::cout << "d: " << d << std::endl;
         p = m_center - (n.dot(m_center) - d) * n; //Проекция центра многогранника на плоскость сечения
         P = clip(p, n);
         V = P.volume(); //Объём итерации
-
-        if (P.n_faces() == 0) {
+//        std::cout << "V: " << V << std::endl;
+        if (P.n_faces() == 0) { // || (V-alpha*V0 == F)) {
             break;
         }
 
-        S = P.face_area(P.n_faces() - 1); //Площадь итерации
-
+        if (V >= V0 || P.n_faces() == 0) { //Площадь итерации
+            S = eps;
+        }
+        else {
+            S = P.face_area(P.n_faces() - 1);
+        }
+//        std::cout << "S: " << S << std::endl;
         F = V-alpha*V0; //Я так понимаю это можно назвать невязкой
-
+//        std::cout << "F: " << F << std::endl;
         counter++;
+//        std::cout << std::endl;
     }
+
+//    std::cout << counter << std::endl;
+//    std::cout << std::endl;
     return p;
 }
 

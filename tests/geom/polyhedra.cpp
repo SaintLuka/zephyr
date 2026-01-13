@@ -62,12 +62,12 @@ void plot_sections(
         avg_epsilon_fs += epsilon_fs;
         if (max_epsilon_fs < epsilon_fs)
             max_epsilon_fs = epsilon_fs;
-//        if (epsilon_fs > 1) {
+        if (epsilon_fs > 1) {
 //            std::cout << " p: " << p[0] << " " << p[1] << " " << p[2] << std::endl;
 //            std::cout << " p2: " << p2[0] << " " << p2[1] << " " << p2[2] << std::endl;
-//            std::cout << " v2/v: " << v1/v << std::endl;
-//            std::cout << " i: " << i << std::endl;
-//        }
+            std::cout << " v2/v: " << v1/v << std::endl;
+            std::cout << " i: " << i << std::endl;
+        }
 
         EuMesh mesh(3, false);
         mesh.push_back(clip);
@@ -110,9 +110,13 @@ int main() {
 //    auto cube = Polyhedron::Cube();
 //    std::cout << Polyhedron::Cube().clip(p, n).checkout()  << std::endl;
 
+//    Vector3d n = {0.4, 0.5, 0.3};
+//    n.normalize();
+//    std::cout << Polyhedron::Tetrahedron().find_section_newton(n, 0.949853).transpose()  << std::endl;
+//    std::cout << Polyhedron::Cube().find_section_newton(n, 0.888431).transpose()  << std::endl;
+
     Vector3d n = {0.4, 0.5, 0.3};
     n.normalize();
-//    std::cout << Polyhedron::Tetrahedron().find_section_newton(n, 0.999998).transpose()  << std::endl;
     plot_sections(Polyhedron::Cube(), n, "cube");
     plot_sections(Polyhedron::Cuboid(1.0, 1.2, 0.8), n, "cuboid");
     plot_sections(Polyhedron::Pyramid(), n, "pyramid");
