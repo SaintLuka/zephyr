@@ -1,5 +1,5 @@
 ---
-sidebar_position: 4
+sidebar_position: 5
 description: "Что такое CMake, настройка проекта, список опций CMake"
 ---
 
