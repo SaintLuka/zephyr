@@ -133,13 +133,13 @@ public:
     index_t recv_offset(int r) const { return m_recv_offset[r]; }
 
     /// @brief Индексы из массива m_border_indices
-    range<index_t> send_indices(int r) const {
-        return {m_send_offset[r], m_send_offset[r] + m_send_count[r]};
+    range_t<index_t> send_indices(int r) const {
+        return range(m_send_offset[r], m_send_offset[r] + m_send_count[r]);
     }
 
     /// @brief Индексы из массива aliens при получении
-    range<index_t> recv_indices(int r) const {
-        return {m_recv_offset[r], m_recv_offset[r] + m_recv_count[r]};
+    range_t<index_t> recv_indices(int r) const {
+        return range(m_recv_offset[r], m_recv_offset[r] + m_recv_count[r]);
     }
 
     /// @brief Вывести информацию о пересылках

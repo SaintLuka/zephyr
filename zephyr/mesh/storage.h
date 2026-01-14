@@ -5,6 +5,7 @@
 #include <vector>
 #include <string>
 #include <tuple>
+#include <span>
 #include <type_traits>
 
 #include <zephyr/utils/buffer.h>
@@ -176,13 +177,13 @@ public:
 
     /// @brief Получить span на изменяемый участок
     template<typename T>
-    utils::span<T> get_val(Storable<T[]> var, size_t idx) {
+    std::span<T> get_val(Storable<T[]> var, size_t idx) {
         return m_data[var.index].template get_val<T[]>(idx);
     }
 
     /// @brief Получить span на константный участок
     template<typename T>
-    utils::span<const T> get_val(Storable<T[]> var, size_t idx) const {
+    std::span<const T> get_val(Storable<T[]> var, size_t idx) const {
         return m_data[var.index].template get_val<T[]>(idx);
     }
 

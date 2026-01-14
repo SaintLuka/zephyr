@@ -205,8 +205,8 @@ public:
     }
 
     /// @brief Полный диапазон граней ячейки (могут встречаться неактуальные)
-    range<index_t> faces_range(index_t ic) const {
-        return {face_begin[ic], face_begin[ic + 1]};
+    range_t<index_t> faces_range(index_t ic) const {
+        return std::views::iota(face_begin[ic], face_begin[ic + 1]);
     }
 
     /// @brief Число вершин, оно же максимальное, хранение неактуальных вершин
@@ -222,8 +222,8 @@ public:
     }
 
     /// @brief Полный диапазон вершин ячейки
-    range<index_t> nodes_range(index_t ic) const {
-        return {node_begin[ic], node_begin[ic + 1]};
+    range_t<index_t> nodes_range(index_t ic) const {
+        return std::views::iota(node_begin[ic], node_begin[ic + 1]);
     }
 
     /// @brief Простая грань на стороне?
