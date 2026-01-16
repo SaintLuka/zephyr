@@ -13,9 +13,16 @@ namespace zephyr::geom {
 /// @addtogroup geom-primitives
 /// @{
 
+///Структура для хранения объёма и площади
+struct VolArea {
+    double volume;
+    double area;
+};
+
 /// @brief Многогранник общего вида.
 class Polyhedron {
 public:
+
     /// @brief Пустой многогранник (заглушка)
     Polyhedron() = default;
 
@@ -112,6 +119,10 @@ public:
     /// проходящей через точку p.
     /// Равносильно вызову polyhedron.clip(p, n).volume(), но быстрее.
     double clip_volume(const Vector3d& p, const Vector3d& n) const;
+
+    /// @brief Объем многогранника, отсекаемого прямой с внешней нормалью n и площадь грани сечения
+    /// проходящей через точку p.
+    VolArea clip_volume_and_area(const Vector3d& p, const Vector3d& n) const;
 
     /// @brief Находит отсечение от многогранника с заданной объемной долей
     /// @param n Внешняя нормаль плоскости

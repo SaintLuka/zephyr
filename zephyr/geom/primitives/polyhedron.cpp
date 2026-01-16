@@ -102,6 +102,8 @@ protected:
     int m_v1, m_v2;
 };
 
+
+
 /// @private
 // Компаратор.
 // Сортировщик для точек на плоскости, позволяет упорядочить
@@ -790,26 +792,110 @@ double Polyhedron::clip_volume(const Vector3d& p, const Vector3d& n) const {
                 clipped_face.push_back(new_verts);
             }
         }
-        if (clipped_face.size() >= 3) { //Иногда выделяются рёбра, но вместо "исправления" этого достаточно просто сказать,
-                                        // что объём от этой грани даёт нулевой вклад
+        if (clipped_face.size() >= 3) { //Проверка на то, что хотя бы три вершины было получено от грани.
             Vector3d face_center = Vector3d::Zero(); //Ищем центр грани
             for (const auto& v : clipped_face) {
                 face_center += v;
             }
             face_center /= clipped_face.size();
 
-            Vector3d new_faces = Vector3d::Zero(); //Ищем площадь грани методом веерной триангуляции
+            Vector3d area = Vector3d::Zero(); //Ищем вектор площади грани методом веерной триангуляции (получить площадь можно посчитав модуль)
             for (size_t j = 0; j < clipped_face.size(); ++j) {
                 size_t k = (j + 1) % clipped_face.size();
-                new_faces += clipped_face[j].cross(clipped_face[k]);
+                area += clipped_face[j].cross(clipped_face[k]);
             }
-            new_faces *= 0.5;
+            area *= 0.5;
 
-            volume += new_faces.dot(face_center - p) / 3.; //Вычисляем объём пирамиды
+            volume += area.dot(face_center - p) / 3.; //Вычисляем объём пирамиды
+            //Когда p - внешняя некоторые пирамиды имеют отрицательный объём
+            //(Сначала я сам не верил, что получится то что надо в случае внешних точек)
         }
     }
 
     return volume;
+}
+
+VolArea Polyhedron::clip_volume_and_area(const Vector3d& p, const Vector3d& n) const {
+    VolArea out;
+    out.volume = 0.;
+    out.area = 0.;
+
+    std::vector<double> distances(n_verts()); // Поиск направленных расстояний от вершин до плоскости сечения
+    for (int i = 0; i < n_verts(); ++i) {
+        distances[i] = n.dot(verts[i] - p);
+    }
+
+    bool all = true;  // Проверяем случаи если все вершины над/под
+    bool none = true;
+    for (double d : distances) {
+        if (d >= 0) all = false;
+        if (d <= 0) none = false;
+        if (!all && !none) break;
+    }
+    if (all) {
+        out.volume = volume();
+        return out;
+    };
+    if (none) {
+        return out;
+    }
+
+    std::vector<Vector3d> cut_face; //Массив для грани сечения
+
+    for (int i = 0; i < n_faces(); ++i) { //Цикл по граням
+        const auto& face = faces[i];
+        int nv = face.size();
+
+        std::vector<Vector3d> clipped_face; //Массив для отсечения от текущей грани
+        for (int j = 0; j < nv; ++j) { //Цикл по рёбрам грани
+            int v1 = face[j];
+            int v2 = face[(j + 1) % nv];
+            double d1 = distances[v1];
+            double d2 = distances[v2];
+
+            if (d1 <= 0) { // Добавляем первую вершину ребра, если она под/на
+                clipped_face.push_back(verts[v1]);
+            }
+            if (d1 == 0) { // Если вершина на плоскости сечения - добавим её.
+                cut_face.push_back(verts[v1]);
+            }
+            if (d1 * d2 < 0) {  // Если есть пересечение добавляем новую вершину
+                double t = d1 / (d1 - d2);
+                Vector3d new_vert = verts[v1] + t * (verts[v2] - verts[v1]);
+                clipped_face.push_back(new_vert);
+                cut_face.push_back(new_vert);
+            }
+        }
+        if (clipped_face.size() >= 3) { //Проверка на то, что хотя бы три вершины было получено от грани.
+            Vector3d face_center = Vector3d::Zero(); //Ищем центр грани
+            for (const auto& v : clipped_face) {
+                face_center += v;
+            }
+            face_center /= clipped_face.size();
+
+            Vector3d area = Vector3d::Zero(); //Ищем вектор площади грани методом веерной триангуляции (получить площадь можно посчитав модуль)
+            for (size_t j = 0; j < clipped_face.size(); ++j) {
+                size_t k = (j + 1) % clipped_face.size();
+                area += clipped_face[j].cross(clipped_face[k]);
+            }
+            area *= 0.5;
+
+            out.volume += area.dot(face_center - p) / 3.; //Вычисляем объём пирамиды
+            //Когда p - внешняя некоторые пирамиды имеют отрицательный объём
+            //(Сначала я сам не верил, что получится то что надо в случае внешних точек)
+        }
+    }
+
+    Vector3d area = Vector3d::Zero(); //Ищем вектор площади грани методом веерной триангуляции (получить площадь можно посчитав модуль)
+    for (size_t j = 0; j < cut_face.size(); ++j) {
+        size_t k = (j + 1) % cut_face.size();
+        area += cut_face[j].cross(cut_face[k]);
+    }
+    area *= 0.5;
+
+    out.area = area.norm();
+
+    return out;
 }
 
 Vector3d Polyhedron::find_section(const Vector3d& n, double alpha) const { //Я где то в сентябре писал это и уже забыл, надо наверно переписать с нуля
@@ -879,24 +965,18 @@ Vector3d Polyhedron::find_section_newton(const Vector3d& n, double alpha) const 
     std::sort(ds.begin(), ds.end());
     double d_min = ds[0];
     double d_max = ds[ds.size()-1];
-    double d = n.dot(m_center); //Проекция точки на нормаль к плоскости
-    Vector3d p = m_center; //Точка на плоскости
-    Polyhedron P = clip(p, n); //Отсекаемый многогранник
-    double V = P.volume(); //Объём итерации
-    double S = eps;
-     //Площадь итерации
-    if (V >= V0 || P.n_faces() == 0) {
-        S = eps;
+    double d = d_min + alpha * (d_max - d_min); //Проекция точки на нормаль к плоскости
+    Vector3d p = n * d; //Точка на плоскости
+    VolArea VS = clip_volume_and_area(p, n); //Объём и площадь итерации
+    if (VS.volume >= V0 || VS.volume <= 0) {
+        VS.area = eps;
     }
-    else {
-        S = P.face_area(P.n_faces() - 1);
-    }
-    double F = V-alpha*V0; //Я так понимаю это можно назвать невязкой
+    double F = VS.volume-alpha*V0; //Я так понимаю это можно назвать невязкой
 
     int counter = 0;
     while (abs(F) > eps && counter < 1000) {
         double d_prev = d;
-        d -= F / S; // Проблема тут, площадь не всегда диффиринцируема, из-за чего метод Ньютона может выйти за границы первой операцией, и я пока это не проверяю
+        d -= F / VS.area; // Проблема тут, площадь не всегда диффиринцируема, из-за чего метод Ньютона может выйти за границы первой операцией, и я пока это не проверяю
         if (d > d_max) { //
             d = d_prev * 0.9 + 0.1 * d_max;
         }
@@ -904,19 +984,13 @@ Vector3d Polyhedron::find_section_newton(const Vector3d& n, double alpha) const 
             d = d_min * 0.9 + 0.1 * d_prev;
         }
         p = m_center - (n.dot(m_center) - d) * n; //Проекция центра многогранника на плоскость сечения
-        P = clip(p, n);
-        V = P.volume(); //Объём итерации
-        if (P.n_faces() == 0) { // || (V-alpha*V0 == F)) {
-            break;
+        VS = clip_volume_and_area(p, n); //Объём и площадь итерации
+
+        if (VS.volume >= V0 || VS.volume <= 0) {
+            VS.area = eps;
         }
 
-        if (V >= V0 || P.n_faces() == 0) { //Площадь итерации
-            S = eps;
-        }
-        else {
-            S = P.face_area(P.n_faces() - 1);
-        }
-        F = V-alpha*V0; //Я так понимаю это можно назвать невязкой
+        F = VS.volume-alpha*V0; //Я так понимаю это можно назвать невязкой
         counter++;
     }
 
