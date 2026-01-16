@@ -556,7 +556,6 @@ double Polyhedron::clip_volume(
 }
 
 Polyhedron Polyhedron::clip(const Vector3d& p, const Vector3d& n) const {
-
 //    std::cout << "clipping..." << std::endl;
     // Плоскость
     obj::plane plane{.p=p, .n=n}; // Создаём отсекающую плоскость
@@ -752,71 +751,65 @@ Polyhedron Polyhedron::clip(const Vector3d& p, const Vector3d& n) const {
     return Polyhedron(out_verts, out_faces); //Просто билд строящий многогранник, старый, бескостыльный вариант.
 }
 
-double Polyhedron::clip_volume(const Vector3d& p, const Vector3d& n) const { //pometki, shob vspomnit' sho bylo
-    std::vector<double> distances(n_verts()); // ischem rasstoyzniye ot ploskosti do vershin
+double Polyhedron::clip_volume(const Vector3d& p, const Vector3d& n) const {
+    std::vector<double> distances(n_verts()); // Поиск направленных расстояний от вершин до плоскости сечения
     for (int i = 0; i < n_verts(); ++i) {
         distances[i] = n.dot(verts[i] - p);
     }
 
-    bool all = true;  // proverka kraynih sluchayevv
+    bool all = true;  // Проверяем случаи если все вершины над/под
     bool none = true;
     for (double d : distances) {
         if (d >= 0) all = false;
         if (d <= 0) none = false;
+        if (!all && !none) break;
     }
     if (all) return volume();
     if (none) return 0.;
 
-    double out = 0.;
-    const double coeff = 1. / 3.;
+    double volume = 0.;
 
-    for (int i = 0; i < n_faces(); ++i) { //razbivaem na tetraedry i ishem ih obyem
+    for (int i = 0; i < n_faces(); ++i) { //Цикл по граням
         const auto& face = faces[i];
         int nv = face.size();
 
-        std::vector<Vector3d> clipped_face; //Rassmatrivaem rebra i ischem tochku peresecheniya s ploskost'yu koli yest'
-        for (int j = 0; j < nv; ++j) {
+        std::vector<Vector3d> clipped_face; //Массив для отсечения от текущей грани
+        for (int j = 0; j < nv; ++j) { //Цикл по рёбрам грани
             int v1 = face[j];
             int v2 = face[(j + 1) % nv];
             double d1 = distances[v1];
             double d2 = distances[v2];
 
-            if (d1 <= 0) {
+            if (d1 <= 0) { // Добавляем первую вершину ребра, если она под/на
                 clipped_face.push_back(verts[v1]);
             }
 
-            if (d1 * d2 < 0) {
+            if (d1 * d2 < 0) {  // Если есть пересечение добавляем новую вершину
                 double t = d1 / (d1 - d2);
                 Vector3d new_verts = verts[v1] + t * (verts[v2] - verts[v1]);
                 clipped_face.push_back(new_verts);
             }
         }
-
-        if (clipped_face.size() >= 3) {
-            Vector3d face_center = Vector3d::Zero(); //tsentr mass ischem
+        if (clipped_face.size() >= 3) { //Иногда выделяются рёбра, но вместо "исправления" этого достаточно просто сказать,
+                                        // что объём от этой грани даёт нулевой вклад
+            Vector3d face_center = Vector3d::Zero(); //Ищем центр грани
             for (const auto& v : clipped_face) {
                 face_center += v;
             }
             face_center /= clipped_face.size();
 
-            Vector3d new_faces = Vector3d::Zero(); //vychisl'ayem ploschadi osnovaniy
+            Vector3d new_faces = Vector3d::Zero(); //Ищем площадь грани методом веерной триангуляции
             for (size_t j = 0; j < clipped_face.size(); ++j) {
                 size_t k = (j + 1) % clipped_face.size();
                 new_faces += clipped_face[j].cross(clipped_face[k]);
             }
             new_faces *= 0.5;
 
-            Vector3d to_center = face_center - p; //vorochaem normal
-            if (new_faces.dot(to_center) < 0) {
-                new_faces = -new_faces;
-            }
-
-            out += coeff * new_faces.dot(face_center - p); //obyem
+            volume += new_faces.dot(face_center - p) / 3.; //Вычисляем объём пирамиды
         }
-
     }
 
-    return out; //vse escho problema s vneshnimii graichnymy tochkami
+    return volume;
 }
 
 Vector3d Polyhedron::find_section(const Vector3d& n, double alpha) const { //Я где то в сентябре писал это и уже забыл, надо наверно переписать с нуля
@@ -886,7 +879,6 @@ Vector3d Polyhedron::find_section_newton(const Vector3d& n, double alpha) const 
     std::sort(ds.begin(), ds.end());
     double d_min = ds[0];
     double d_max = ds[ds.size()-1];
-//    std::cout << "d_min: " << d_min << ", d_max: " << d_max << std::endl;
     double d = n.dot(m_center); //Проекция точки на нормаль к плоскости
     Vector3d p = m_center; //Точка на плоскости
     Polyhedron P = clip(p, n); //Отсекаемый многогранник
@@ -901,32 +893,19 @@ Vector3d Polyhedron::find_section_newton(const Vector3d& n, double alpha) const 
     }
     double F = V-alpha*V0; //Я так понимаю это можно назвать невязкой
 
-    //Ниже цикл для проверки того, что clip вообще чот отрезал и есть грань сечения
-    //Пока закомментировано, ни разу не столкнулся с тем, чтобы текущий способ давал сбой
-    /* double S = 0;
-       for (int i = 0; i < P.n_faces(); ++i) {
-        Vector3d face_norm = P.face_normal(i);
-        if (std::abs(face_norm.dot(n) - 1.0) < 1e-6) { // почти параллельны
-            S = face_area(i);
-        }
-    }*/
-
     int counter = 0;
     while (abs(F) > eps && counter < 1000) {
+        double d_prev = d;
         d -= F / S; // Проблема тут, площадь не всегда диффиринцируема, из-за чего метод Ньютона может выйти за границы первой операцией, и я пока это не проверяю
-        if (d > d_max || d < d_min) { //
-            std::random_device rd;
-            std::mt19937 gen(rd());
-            std::uniform_real_distribution<double> dis(0.0, 1.0);
-
-            double a = dis(gen);
-            d = (1-a) * d_min + a * d_max;
+        if (d > d_max) { //
+            d = d_prev * 0.9 + 0.1 * d_max;
         }
-//        std::cout << "d: " << d << std::endl;
+        else if (d < d_min) {
+            d = d_min * 0.9 + 0.1 * d_prev;
+        }
         p = m_center - (n.dot(m_center) - d) * n; //Проекция центра многогранника на плоскость сечения
         P = clip(p, n);
         V = P.volume(); //Объём итерации
-//        std::cout << "V: " << V << std::endl;
         if (P.n_faces() == 0) { // || (V-alpha*V0 == F)) {
             break;
         }
@@ -937,15 +916,10 @@ Vector3d Polyhedron::find_section_newton(const Vector3d& n, double alpha) const 
         else {
             S = P.face_area(P.n_faces() - 1);
         }
-//        std::cout << "S: " << S << std::endl;
         F = V-alpha*V0; //Я так понимаю это можно назвать невязкой
-//        std::cout << "F: " << F << std::endl;
         counter++;
-//        std::cout << std::endl;
     }
 
-//    std::cout << counter << std::endl;
-//    std::cout << std::endl;
     return p;
 }
 
