@@ -1,7 +1,7 @@
 #include <iostream>
 #include <map>
 #include <numeric>
-#include <random>
+#include <set>
 
 #include <zephyr/geom/intersection.h>
 #include <zephyr/geom/primitives/polyhedron.h>
@@ -680,8 +680,7 @@ Polyhedron Polyhedron::clip(const Vector3d& p, const Vector3d& n) const {
                     edge_t edge(v_idx1, v_idx2); // Ребро (индексы вершин ребра)
 
                     // Пересечение уже найдено
-                    if (edges.count(edge) >
-                        0) { //Проверяем есть ли уже это ребро как ключ в мапе вершина/ребро - координаты
+                    if (edges.count(edge) > 0) { //Проверяем есть ли уже это ребро как ключ в мапе вершина/ребро - координаты
                         part.push_back(edge); //Если есть - добавляем это ребро в грань
                         continue; //Идём к следующему ребру игнорируя нахождение пересечения
                     }
@@ -746,6 +745,11 @@ Polyhedron Polyhedron::clip(const Vector3d& p, const Vector3d& n) const {
         ids.push_back(edges[edge].index); // Берём из упорядоченной мапы индексы вершин, образованных пересечением.
 //        std::cout << edges[edge].index << " ";
     }
+
+//    std::cout << "clip: " << std::endl;
+//    for (auto v: ids) {
+//        std::cout << out_verts[v][0] << " " << out_verts[v][1] << " " << out_verts[v][2] << " " << std::endl;
+//    }
 //    std::cout << std::endl;
 
     out_faces.push_back(ids); //Добавляем грань отсечения ко всем
@@ -841,6 +845,7 @@ VolArea Polyhedron::clip_volume_and_area(const Vector3d& p, const Vector3d& n) c
     }
 
     std::vector<Vector3d> cut_face; //Массив для грани сечения
+    std::set<edge_t> edges; //Рёбра, уже давшие одну из вершин грани сечения
 
     for (int i = 0; i < n_faces(); ++i) { //Цикл по граням
         const auto& face = faces[i];
@@ -856,14 +861,20 @@ VolArea Polyhedron::clip_volume_and_area(const Vector3d& p, const Vector3d& n) c
             if (d1 <= 0) { // Добавляем первую вершину ребра, если она под/на
                 clipped_face.push_back(verts[v1]);
             }
-            if (d1 == 0) { // Если вершина на плоскости сечения - добавим её.
+            if (d1 == 0 && edges.count(edge_t(v1)) == 0) { // Если вершина на плоскости сечения - добавим её.
+                edge_t edge(v1);
+                edges.insert(edge);
                 cut_face.push_back(verts[v1]);
             }
             if (d1 * d2 < 0) {  // Если есть пересечение добавляем новую вершину
                 double t = d1 / (d1 - d2);
                 Vector3d new_vert = verts[v1] + t * (verts[v2] - verts[v1]);
                 clipped_face.push_back(new_vert);
-                cut_face.push_back(new_vert);
+                edge_t edge(v1, v2);
+                if (edges.count(edge) == 0) {
+                    edges.insert(edge);
+                    cut_face.push_back(new_vert);
+                }
             }
         }
         if (clipped_face.size() >= 3) { //Проверка на то, что хотя бы три вершины было получено от грани.
@@ -886,12 +897,48 @@ VolArea Polyhedron::clip_volume_and_area(const Vector3d& p, const Vector3d& n) c
         }
     }
 
+    Vector3d section_center = Vector3d::Zero(); // Находим центр точек сечения
+    for (const auto& point : cut_face) {
+        section_center += point;
+    }
+    section_center /= cut_face.size();
+
+    std::sort(cut_face.begin(), cut_face.end(), // Сортируем точки в порядке обхода вокруг нормали
+                                                         // Иначе выдаёт как clip, а там в некоторых случаях сортировка
+                                                         // уже в build происходить, чего тут нет
+              [&](const Vector3d& a, const Vector3d& b) {
+                  Vector3d va = a - section_center;
+                  Vector3d vb = b - section_center;
+
+                  // Проекции на плоскость, перпендикулярную n
+                  // Находим произвольный базис в плоскости
+                  Vector3d basis_x;
+                  if (std::abs(n.x()) > std::abs(n.y())) {
+                      basis_x = Vector3d(-n.z(), 0, n.x()).normalized();
+                  } else {
+                      basis_x = Vector3d(0, n.z(), -n.y()).normalized();
+                  }
+                  Vector3d basis_y = n.cross(basis_x).normalized();
+                  //находим и сравниваем полярные углы
+                  double angle_a = std::atan2(va.dot(basis_y), va.dot(basis_x));
+                  double angle_b = std::atan2(vb.dot(basis_y), vb.dot(basis_x));
+
+                  return angle_a < angle_b;
+              });
+
     Vector3d area = Vector3d::Zero(); //Ищем вектор площади грани методом веерной триангуляции (получить площадь можно посчитав модуль)
     for (size_t j = 0; j < cut_face.size(); ++j) {
         size_t k = (j + 1) % cut_face.size();
         area += cut_face[j].cross(cut_face[k]);
     }
     area *= 0.5;
+
+    //тут закомменчена проверка на грань, проверял, совпадает ли clip, нужна ли сортировка, которая выше
+//    std::cout << "clip_volume_and_area: " << std::endl;
+//    for (size_t j = 0; j < cut_face.size(); ++j) {
+//        std::cout << cut_face[j][0] << " " << cut_face[j][1] << " " << cut_face[j][2] << " " << std::endl;
+//    }
+//    std::cout << std::endl;
 
     out.area = area.norm();
 
@@ -958,13 +1005,16 @@ Vector3d Polyhedron::find_section_newton(const Vector3d& n, double alpha) const 
 
     double V0 = volume(); // Объём исходного многогранника
 
-    std::vector<double> ds;
-    for (int i = 0; i < n_verts(); ++i) { //Ищем интервал параметра
-        ds.push_back(n.dot(verts[i]));
+    double d_min = n.dot(verts[0]);
+    double d_max = n.dot(verts[0]);
+    for (int i = 1; i < n_verts(); ++i) { //Ищем интервал параметра
+        if (d_min > n.dot(verts[i])) {
+            d_min = n.dot(verts[i]);
+        }
+        if (d_max < n.dot(verts[i])) {
+            d_max = n.dot(verts[i]);
+        }
     }
-    std::sort(ds.begin(), ds.end());
-    double d_min = ds[0];
-    double d_max = ds[ds.size()-1];
     double d = d_min + alpha * (d_max - d_min); //Проекция точки на нормаль к плоскости
     Vector3d p = n * d; //Точка на плоскости
     VolArea VS = clip_volume_and_area(p, n); //Объём и площадь итерации
