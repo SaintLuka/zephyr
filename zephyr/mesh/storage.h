@@ -12,14 +12,6 @@
 
 namespace zephyr::mesh {
 
-// Появляется в C++20
-template <class T>
-struct remove_cvref { using type = std::remove_cv_t<std::remove_reference_t<T>>; };
-
-template <class T>
-using remove_cvref_t = typename remove_cvref<T>::type;
-
-
 /// @brief Структура для доступа к полям Storage
 template<typename T>
 class Storable {
@@ -35,16 +27,82 @@ public:
     /// @brief MPI-тэг, используется в пересылках
     int tag() const { return 123000 + index; }
 
+    /// @brief Число компонент
+    constexpr int size() const { return 1; }
+
 private:
     /// @brief Только Storage может создавать
     friend class Storage;
 
     /// @brief Создать из целочисленного типа, может только Storage
-    template <typename V, typename = std::enable_if_t<std::is_integral_v<V>>>
+    template <std::integral V>
     explicit Storable(V index) : index(static_cast<int>(index)) { }
 
     /// @brief Смещение в массиве структур
     int index = -1;
+};
+
+/// @brief Структура для доступа к полям Storage
+/// (специализация для статических массивов)
+template <typename T, std::size_t N>
+class Storable<T[N]> {
+public:
+    using type = T; ///< Хранимый тип
+
+    Storable() = default;
+
+    bool operator!=(Storable<T[N]> other) const { return index != other.index; }
+
+    bool operator==(Storable<T[N]> other) const { return index == other.index; }
+
+    /// @brief MPI-тэг, используется в пересылках
+    int tag() const { return 123000 + index; }
+
+    /// @brief Число компонент
+    constexpr int size() { return static_cast<int>(N); }
+
+private:
+    /// @brief Только Storage может создавать
+    friend class Storage;
+
+    /// @brief Создать из целочисленного типа, может только Storage
+    template <std::integral V>
+    explicit Storable(V index) : index(static_cast<int>(index)) { }
+
+    /// @brief Смещение в массиве структур
+    int index = -1;
+};
+
+/// @brief Структура для доступа к полям Storage
+/// (специализация для статических массивов)
+template <typename T>
+class Storable<T[]> {
+public:
+    using type = T; ///< Хранимый тип
+
+    Storable() = default;
+
+    bool operator!=(Storable<T[]> other) const { return index != other.index; }
+
+    bool operator==(Storable<T[]> other) const { return index == other.index; }
+
+    /// @brief MPI-тэг, используется в пересылках
+    int tag() const { return 123000 + index; }
+
+    /// @brief Число компонент
+    constexpr int size() const { return size_; }
+
+private:
+    /// @brief Только Storage может создавать
+    friend class Storage;
+
+    /// @brief Создать из целочисленного типа, может только Storage
+    template <std::integral V>
+    explicit Storable(V index, int size) : index(static_cast<int>(index)), size_(size) { }
+
+    /// @brief Смещение в массиве структур
+    int index = -1;
+    int size_ = -1;
 };
 
 namespace soa {
@@ -98,29 +156,37 @@ public:
     /// @brief Изменить размеры буферов под размеры данных
     void shrink_to_fit();
 
-    /// @brief Добавить одно или несколько **скалярных** полей
-    /// @param names Имена полей данных, должны быть уникальными
-    /// @tparam Names Произвольное число аргументов (> 0), которые можно
-    /// конвертировать в `std::string`, для всех выполнится `add_one<T>`.
-    /// @return Единственный `Storable<T>` при одном аргументе, кортеж из
-    /// `Storable<T>` для нескольких аргументов (для structure binding).
-    template<typename T, typename... Names, typename = std::enable_if_t<
-            (sizeof...(Names) > 0) && (std::is_convertible_v<Names, std::string> && ...)>>
-    auto add(Names&&... names) {
-        static_assert(utils::is_simple_type_v<T>, "T must be simple type");
-        if constexpr (sizeof...(Names) == 1) {
-            return add_one<T>(std::forward<Names>(names)...);
-        } else {
-            // Тут сложно было добиться соблюдения порядка, варианты
-            // с круглыми скобками std::tuple() или std::make_tuple() не работают.
-            return std::tuple{add_one<T>(std::string(std::forward<Names>(names)))...};
-        }
-    }
-
-    /// @brief Добавить новое **векторное** поле
+    /// @brief Добавить новое поле данных
     /// @param name Имя поля данных должно быть уникальным
-    template<typename T>
-    Storable<T[]> add(const std::string &name, int count);
+    /// @code
+    ///     Storable<int> a = s.add<int>("a");       // скалярный тип
+    ///     Storable<int[4]> b = s.add<int[4]>("b"); // статический векторный тип
+    /// @endcode
+    template <typename T>
+    Storable<T> add(const std::string &name);
+
+    /// @brief Добавить новое векторное поле данных
+    /// @param name Имя поля данных должно быть уникальным
+    /// @param count Число компонент
+    /// @code
+    ///     Storable<int[]> a = s.add<int[]>("a", 4); // векторный тип
+    /// @endcode
+    template <typename T>
+    Storable<T> add(const std::string &name, int count);
+
+    /// @brief Добавить несколько одинаковых **скалярных** полей
+    /// @param names Имена полей данных, должны быть уникальными
+    /// @tparam Names Произвольное число аргументов (> 1), которые можно
+    /// конвертировать в `std::string`, для всех выполнится `add<T>`.
+    /// @return Кортеж из `Storable<T>` для нескольких аргументов (для structure binding).
+    template<typename T, typename... Names, typename = std::enable_if_t<
+            (sizeof...(Names) > 1) && (std::is_convertible_v<Names, std::string> && ...)>>
+    auto add_multi(Names&&... names) {
+        static_assert(utils::is_simple_type_v<T>, "T must be simple type");
+        // Тут сложно было добиться соблюдения порядка, варианты
+        // с круглыми скобками std::tuple() или std::make_tuple() не работают.
+        return std::tuple{add<T>(std::string(std::forward<Names>(names)))...};
+    }
 
     /// @brief Содержит поле с именем name?
     bool contain(const std::string &name) const {
@@ -155,38 +221,49 @@ public:
     }
 
     /// @brief Значение или span (предполагается единственный массив)
-    template<typename T>
+    template <typename T>
     T& get_val(size_t idx) { return m_data[0].get_val<T>(idx); }
 
     /// @brief Значение или span (предполагается единственный массив)
-    template<typename T>
-    T& get_val(size_t idx) const { return m_data[0].get_val<T>(idx); }
+    template <typename T>
+    const T& get_val(size_t idx) const { return m_data[0].get_val<T>(idx); }
 
 
     /// @brief Получить ссылку на значение
-    template<typename T>
+    template <typename T>
     T& get_val(Storable<T> var, size_t idx) {
         return m_data[var.index].template get_val<T>(idx);
     }
 
-    /// @brief Получить константную ссылку на значение
-    template<typename T>
-    const T& get_val(Storable<T> var, size_t idx) const {
-        return m_data[var.index].template get_val<T>(idx);
-    }
-
-    /// @brief Получить span на изменяемый участок
-    template<typename T>
+    /// @brief Получить ссылку на значение
+    template <typename T>
     std::span<T> get_val(Storable<T[]> var, size_t idx) {
         return m_data[var.index].template get_val<T[]>(idx);
     }
 
-    /// @brief Получить span на константный участок
-    template<typename T>
+    /// @brief Получить ссылку на значение
+    template <typename T, size_t N>
+    std::span<T, N> get_val(Storable<T[N]> var, size_t idx) {
+        return m_data[var.index].template get_val<T[N]>(idx);
+    }
+
+    /// @brief Получить константную ссылку на значение
+    template <typename T>
+    const T& get_val(Storable<T> var, size_t idx) const {
+        return m_data[var.index].template get_val<T>(idx);
+    }
+
+    /// @brief Получить константную ссылку на значение
+    template <typename T>
     std::span<const T> get_val(Storable<T[]> var, size_t idx) const {
         return m_data[var.index].template get_val<T[]>(idx);
     }
 
+    /// @brief Получить константную ссылку на значение
+    template <typename T, size_t N>
+    std::span<const T, N> get_val(Storable<T[N]> var, size_t idx) const {
+        return m_data[var.index].template get_val<T[N]>(idx);
+    }
 
     /// @brief Получить буфер, соответствующий `Storable<T>`
     template<typename T>
@@ -237,18 +314,13 @@ public:
     /// @return Кортеж переменных типа `<Storable<T1>, Storable<T2>, ...>`, который
     /// соответствует входным аргументам.
     template <typename... Vars>
-    std::tuple<remove_cvref_t<Vars>...> add_replace(
+    std::tuple<std::remove_cvref_t<Vars>...> add_replace(
         const Storage& s, const std::tuple<Vars...>& vars);
 
 public:
     size_t                   m_size;  ///< Длина всех массивов данных
     std::vector<Buffer>      m_data;  ///< Массивы данных
     std::vector<std::string> m_names; ///< Массив имён данных
-
-    /// @brief Добавить новое **скалярное* поле
-    /// @param name Имя поля данных должно быть уникальным
-    template<typename T>
-    Storable<T> add_one(const std::string &name);
 };
 
 // ============================================================================
@@ -256,8 +328,9 @@ public:
 // ============================================================================
 
 template<typename T>
-Storable<T> Storage::add_one(const std::string &name) {
-    static_assert(utils::is_simple_type_v<T>, "T must be simple type");
+Storable<T> Storage::add(const std::string &name) {
+    static_assert(!std::is_array_v<T> || (std::is_array_v<T> && std::extent_v<T> > 0),
+        "Scalar type or fixed-size array (int[3] for example)");
 
     // Проверка на наличие массива данных с таким именем
     if (contain(name)) {
@@ -271,15 +344,20 @@ Storable<T> Storage::add_one(const std::string &name) {
 }
 
 template<typename T>
-Storable<T[]> Storage::add(const std::string &name, int count) {
-    static_assert(utils::is_simple_type_v<T>, "T must be simple type");
+Storable<T> Storage::add(const std::string &name, int count) {
+    static_assert(std::is_array_v<T> && std::extent_v<T> == 0,
+        "Only dynamic size array (int[] for example)");
+
     // Проверка на наличие массива данных с таким именем
     if (contain(name)) {
         throw std::runtime_error("Storable \"" + name + "\" already exists");
     }
+    if (count <= 0) {
+        throw std::runtime_error("Storable \"" + name + "\" wrong count <= 0");
+    }
 
-    Storable<T[]> var{m_data.size()};
-    m_data.emplace_back(Buffer::make<T[]>(count, m_size));
+    Storable<T> var{m_data.size(), count};
+    m_data.emplace_back(Buffer::make<T>(count, m_size));
     m_names.emplace_back(name);
     return var;
 }
@@ -305,7 +383,7 @@ void Storage::print(Storable<T> var) const {
 }
 
 template <typename... Vars>
-std::tuple<remove_cvref_t<Vars>...> Storage::add_replace(
+std::tuple<std::remove_cvref_t<Vars>...> Storage::add_replace(
     const Storage& s, const std::tuple<Vars...>& vars) {
     soa::assert_storable<Vars...>();
 

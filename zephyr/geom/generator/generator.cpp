@@ -72,11 +72,11 @@ void Generator::check_size() const {
         std::cerr << message << "\n";
         throw std::runtime_error(message);
     }
-    if (size() > 10000000) {
+    if (size() > 1000000000) {
         std::string message =
                 "'" + m_name +
                 "' generator error: "
-                "You are trying to create mesh that contains more than 10 million elements, "
+                "You are trying to create mesh that contains more than 1 billion elements, "
                 "I just want to keep your RAM.";
         std::cerr << message << "\n";
         throw std::runtime_error(message);

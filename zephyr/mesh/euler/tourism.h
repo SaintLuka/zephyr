@@ -26,8 +26,12 @@ public:
     void shrink_to_fit();
 
     /// @brief Добавить тип данных в border/aliens
+    template <typename T>
+    Storable<T> add(const std::string& name);
+
+    /// @brief Добавить векторный тип данных в border/aliens
     template<typename T>
-    auto add(const std::string& name);
+    Storable<T> add(const std::string& name, int count);
 
     /// @brief Поменять местами два типа в хранилище
     template<typename T>
@@ -196,9 +200,8 @@ private:
 //                        Реализации шаблонных функций
 // ============================================================================
 
-/// @brief Добавить тип данных в border/aliens
 template<typename T>
-auto Tourism::add(const std::string& name) {
+Storable<T> Tourism::add(const std::string& name) {
     auto res1 = m_border.data.add<T>(name);
     auto res2 = m_aliens.data.add<T>(name);
     if (res1 != res2) {
@@ -207,7 +210,16 @@ auto Tourism::add(const std::string& name) {
     return res1;
 }
 
-/// @brief Поменять местами два типа в хранилище
+template<typename T>
+Storable<T> Tourism::add(const std::string& name, int count) {
+    auto res1 = m_border.data.add<T>(name, count);
+    auto res2 = m_aliens.data.add<T>(name, count);
+    if (res1 != res2) {
+        throw std::runtime_error("EuMesh error: bad add<T> #1");
+    }
+    return res1;
+}
+
 template<typename T>
 void Tourism::swap(Storable<T> var1, Storable<T> var2) {
     m_border.data.swap<T>(var1, var2);

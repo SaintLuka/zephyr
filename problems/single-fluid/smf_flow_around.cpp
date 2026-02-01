@@ -38,11 +38,8 @@ using zephyr::utils::threads;
 int main() {
     threads::on();
 
-    // Тестовая задача
+    // Test problems
     ShockWave test(3.0, 0.1, 1.0);
-
-    // Уравнение состояния
-    auto eos = test.get_eos();
 
     // Сеточные генераторы на выбор
     Rectangle gen(0.0, 1.0, 0.0, 0.2);
@@ -87,25 +84,39 @@ int main() {
     // gen.set_ny(30);
     // gen.set_nz(30);
 
-    // Создать сетку
+    // Create mesh
     EuMesh mesh(gen);
 
-    // Создать решатель
+    // Test class provides EoS
+    auto eos = test.get_eos();
+
+    // Create and configure solver
     SmFluid solver(eos);
     solver.set_accuracy(2);
     solver.set_CFL(0.5);
     solver.set_limiter("MC");
     solver.set_method(Fluxes::HLLC_M);
 
-    // Добавляем типы на сетку, выбираем основной слой
+    // Add data fields, choose main data layer
     auto data = solver.add_types(mesh);
     auto z = data.init;
 
-    // Настройка сетки
+    // Configure mesh
     mesh.set_max_level(3);
     mesh.set_distributor(solver.distributor());
 
-    // Начальные данные
+    // Files for output
+    PvdFile pvd("flow", "output");
+
+    // Variables to save
+    pvd.variables = {"level"};
+    pvd.variables += {"density",  [z](EuCell& cell) -> double { return cell[z].density; }};
+    pvd.variables += {"vel.x",    [z](EuCell& cell) -> double { return cell[z].velocity.x(); }};
+    pvd.variables += {"vel.y",    [z](EuCell& cell) -> double { return cell[z].velocity.y(); }};
+    pvd.variables += {"pressure", [z](EuCell& cell) -> double { return cell[z].pressure; }};
+    pvd.variables += {"energy",   [z](EuCell& cell) -> double { return cell[z].energy; }};
+
+    // Setup initial conditions
     auto init_cell = [&test, z](EuCell& cell) {
         auto cell_c = cell.center();
         cell[z].density  = test.density(cell_c);
@@ -114,18 +125,7 @@ int main() {
         cell[z].energy   = test.energy(cell_c);
     };
 
-    // Файл для записи
-    PvdFile pvd("flow", "output");
-
-    // Переменные для сохранения
-    pvd.variables = {"level"};
-    pvd.variables += {"density",  [z](EuCell& cell) -> double { return cell[z].density; }};
-    pvd.variables += {"vel.x",    [z](EuCell& cell) -> double { return cell[z].velocity.x(); }};
-    pvd.variables += {"vel.y",    [z](EuCell& cell) -> double { return cell[z].velocity.y(); }};
-    pvd.variables += {"pressure", [z](EuCell& cell) -> double { return cell[z].pressure; }};
-    pvd.variables += {"energy",   [z](EuCell& cell) -> double { return cell[z].energy; }};
-
-    // Инициализация начальными данными
+    // Initial conditions (adaptive to initial data)
     for (int k = 0; k < mesh.max_level() + 3; ++k) {
         mesh.for_each(init_cell);
         solver.set_flags(mesh);
@@ -145,10 +145,10 @@ int main() {
             next_write += test.max_time() / 100;
         }
 
-        // Точное завершение в end_time
+        // Finish exactly at max_time
         solver.set_max_dt(test.max_time() - curr_time);
 
-        // Обновляем слои
+        // Integration step
         solver.update(mesh);
         solver.set_flags(mesh);
         mesh.refine();

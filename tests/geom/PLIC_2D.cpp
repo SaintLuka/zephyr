@@ -61,25 +61,10 @@ SpFunction diffuse_func = [](const Vector3d &v) -> double {
 // Объемная доля
 static Storable<double> a;
 
-// Центральные разности
-static Storable<Vector3d> n1;
-static Storable<double> p1;
-static Storable<double> e1;
-
-// Формула Youngs
-static Storable<Vector3d> n2;
-static Storable<double> p2;
-static Storable<double> e2;
-
-// Схема ELVIRA
-static Storable<Vector3d> n3;
-static Storable<double> p3;
-static Storable<double> e3;
-
-// Моя формула
-static Storable<Vector3d> n4;
-static Storable<double> p4;
-static Storable<double> e4;
+// Cent. diff | P&Y | ELVIRA | CSIR
+static Storable<Vector3d[4]> ns; // Нормали
+static Storable<double[4]>   ps; // Положения
+static Storable<double[4]>   es; // Погрешности
 
 // Смешанная ячейка?
 inline bool mixed(EuCell& cell) {
@@ -89,9 +74,9 @@ inline bool mixed(EuCell& cell) {
 void make_interface(EuMesh& mesh) {
     mesh.for_each([](EuCell& cell) {
         if (!mixed(cell)) {
-            for (auto n: {n1, n2, n3, n4}) cell[n] = Vector3d::Zero();
-            for (auto p: {p1, p2, p3, p4}) cell[p] = 0.0;
-            for (auto e: {e1, e2, e3, e4}) cell[e] = 0.0;
+            for (auto& n: cell[ns]) n = Vector3d::Zero();
+            for (auto& p: cell[ps]) p = 0.0;
+            for (auto& e: cell[es]) e = 0.0;
             return;
         }
 
@@ -105,11 +90,11 @@ void make_interface(EuMesh& mesh) {
             double a_f = 0.5 * (cell[a] + face.neib(a));
             grad += a_f * face.area_n();
         }
-        cell[n1] = -grad.normalized();
+        cell[ns][0] = -grad.normalized();
 
         Stencil2D C(cell, a);
-        cell[n2] = C.Youngs(hx, hy);
-        cell[n3] = C.ELVIRA(hx, hy);
+        cell[ns][1] = C.Youngs(hx, hy);
+        cell[ns][2] = C.ELVIRA(hx, hy);
 
         // Моя формула
         grad = Vector3d::Zero();
@@ -117,13 +102,12 @@ void make_interface(EuMesh& mesh) {
             double a_f = face_fraction(cell[a], face.neib(a));
             grad += a_f * face.area_n();
         }
-        cell[n4] = -grad.normalized();
+        cell[ns][3] = -grad.normalized();
 
         // Пересчитываем позиции прямых
-        cell[p1] = quad_find_section(cell[a], cell[n1], hx, hy);
-        cell[p2] = quad_find_section(cell[a], cell[n2], hx, hy);
-        cell[p3] = quad_find_section(cell[a], cell[n3], hx, hy);
-        cell[p4] = quad_find_section(cell[a], cell[n4], hx, hy);
+        for (int i = 0; i < 4; ++i) {
+            cell[ps][i] = quad_find_section(cell[a], cell[ns][i], hx, hy);
+        }
     });
 }
 
@@ -135,7 +119,7 @@ void calc_errors(EuMesh& mesh, InFunction func, int nx) {
 
     mesh.for_each([&, nx](EuCell& cell) {
         // Нулевые погрешности
-        cell[e1] = cell[e2] = cell[e3] = cell[e4] = 0.0;
+        for (auto& e: cell[es]) e = 0.0;
 
         if (!mixed(cell)) {
             return;
@@ -159,19 +143,17 @@ void calc_errors(EuMesh& mesh, InFunction func, int nx) {
                 Vector3d r = {x, y, 0.0};
 
                 bool inside = func(cell.center() + r);
-                if (inside != (r.dot(cell[n1]) < cell[p1])) { ++counter[0]; }
-                if (inside != (r.dot(cell[n2]) < cell[p2])) { ++counter[1]; }
-                if (inside != (r.dot(cell[n3]) < cell[p3])) { ++counter[2]; }
-                if (inside != (r.dot(cell[n4]) < cell[p4])) { ++counter[3]; }
+                for (int k = 0; k < 4; ++k) {
+                    if (inside != (r.dot(cell[ns][k]) < cell[ps][k])) { ++counter[k]; }
+                }
             }
         }
 
         // Интегральная метрика L1, как у Aulisa
         double xi = cell.volume() / (nx * nx);
-        cell[e1] = xi * counter[0];
-        cell[e2] = xi * counter[1];
-        cell[e3] = xi * counter[2];
-        cell[e4] = xi * counter[3];
+        for (int i = 0; i < 4; ++i) {
+            cell[es][i] = xi * counter[i];
+        }
 
         // Интегральная норма L1
         err1_l1 += counter[0];
@@ -220,19 +202,19 @@ void calc_errors(EuMesh& mesh, InFunction func, int nx) {
     std::cout.flush();
 }
 
-EuMesh body(EuMesh& mesh, Storable<double> p, Storable<Vector3d> n) {
+EuMesh body(EuMesh& mesh, int k) {
     EuMesh clipped(2, false);
     for (auto cell: mesh) {
-        if (cell[a] <= 0.0 || (cell[a] < 0.5 && cell[n].isZero())) {
+        if (cell[a] <= 0.0 || (cell[a] < 0.5 && cell[ns][k].isZero())) {
             continue;
         }
-        if (cell[a] >= 1.0 || (cell[a] > 0.5 && cell[n].isZero())) {
+        if (cell[a] >= 1.0 || (cell[a] > 0.5 && cell[ns][k].isZero())) {
             clipped.push_back(cell.polygon());
             continue;
         }
 
-        Vector3d point = cell.center() + cell[p] * cell[n];
-        auto poly = cell.polygon().clip(point, cell[n]);
+        Vector3d point = cell.center() + cell[ps][k] * cell[ns][k];
+        auto poly = cell.polygon().clip(point, cell[ns][k]);
         clipped.push_back(poly);
     }
     return clipped;
@@ -241,18 +223,9 @@ EuMesh body(EuMesh& mesh, Storable<double> p, Storable<Vector3d> n) {
 void save_mesh(EuMesh& mesh) {
     Variables vars = {"level", "flag"};
     vars.append("a", a);
-    vars.append("n1", n1);
-    vars.append("n2", n2);
-    vars.append("n3", n3);
-    vars.append("n4", n4);
-    vars.append("p1", p1);
-    vars.append("p2", p2);
-    vars.append("p3", p3);
-    vars.append("p4", p4);
-    vars.append("e1", e1);
-    vars.append("e2", e2);
-    vars.append("e3", e3);
-    vars.append("e4", e4);
+    //vars.append("ns", ns);
+    //vars.append("ps", ps);
+    //vars.append("es", es);
     vars.append<bool>("mixed", mixed);
     vars.append<double>("delta", [](EuCell& cell) -> double {
         return std::min(std::abs(cell[a]), std::abs(1.0 - cell[a]));
@@ -260,16 +233,16 @@ void save_mesh(EuMesh& mesh) {
 
     VtuFile::save("output/mesh.vtu", mesh, vars);
 
-    auto body_central = body(mesh, p1, n1);
+    auto body_central = body(mesh, 0);
     VtuFile::save("output/body(central).vtu", body_central, Variables{});
 
-    auto body_youngs = body(mesh, p2, n2);
+    auto body_youngs = body(mesh, 1);
     VtuFile::save("output/body(youngs).vtu", body_youngs, Variables{});
 
-    auto body_elvira = body(mesh, p3, n3);
+    auto body_elvira = body(mesh, 2);
     VtuFile::save("output/body(elvira).vtu", body_elvira, Variables{});
 
-    auto body_csir = body(mesh, p4, n4);
+    auto body_csir = body(mesh, 3);
     VtuFile::save("output/body(csir).vtu", body_csir, Variables{});
 }
 
@@ -410,9 +383,9 @@ int main() {
     mesh.set_max_level(2);
 
     a = mesh.add<double>("a");
-    std::tie(p1, p2, p3, p4) = mesh.add<double  >("p1", "p2", "p3", "p4");
-    std::tie(n1, n2, n3, n4) = mesh.add<Vector3d>("n1", "n2", "n3", "n4");
-    std::tie(e1, e2, e3, e4) = mesh.add<double  >("e1", "e2", "e3", "e4");
+    ps = mesh.add<double[4]>("ps");
+    ns = mesh.add<Vector3d[4]>("ns");
+    es = mesh.add<double[4]>("es");
 
     int test = 5;
 

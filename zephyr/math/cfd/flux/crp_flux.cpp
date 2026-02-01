@@ -125,7 +125,7 @@ mmf::Flux CrpFlux::classic(const mmf::PState& zLA, const mmf::PState& zLB, const
     mmf::Flux   F_R(zRB);
 
     // Характеристика начального контакта
-    Char C_0 = {.x = -delta, .t = 0.0, .S = zLA.u()};
+    Char C_0 = {.x = -delta, .t = 0.0, .S = zLA.vx()};
 
     // Характеристики из точки O
     auto[S_0L, S_0C, S_0R, Q_s0L, F_s0L, Q_s0R, F_s0R] = HLLC::wave_config(mixture, qLB, fLB, Q_R, F_R);

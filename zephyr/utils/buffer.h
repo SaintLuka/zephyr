@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iostream>
 #include <string>
 #include <span>
 #include <zephyr/geom/vector.h>

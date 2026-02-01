@@ -33,9 +33,9 @@ MmFluid::Parts MmFluid::add_types(EuMesh& mesh) {
     part.half = mesh.add<PState>("half");
     part.next = mesh.add<PState>("next");
 
-    part.n = mesh.add<VectorSet>("normals");
-    part.p = mesh.add<VectorSet>("origins");
-    part.grad_a = mesh.add<VectorSet>("vol_grad");
+    part.n = mesh.add<Vector3d[]>("normals", mixture.size());
+    part.p = mesh.add<double[]>("origins", mixture.size());
+    part.grad_a = mesh.add<Vector3d[]>("grad_a", mixture.size());
     return part;
 }
 
@@ -99,8 +99,8 @@ PState boundary_value(const PState &zc, const Vector3d &normal, Boundary flag) {
     }
 
     PState zn(zc);
-    Vector3d Vn = normal * zc.velocity.dot(normal);
-    zn.velocity = zc.velocity - 2.0 * Vn;
+    Vector3d Vn = normal * zc.vel().dot(normal);
+    zn.vel() = zc.vel() - 2.0 * Vn;
 
     return zn;
 }
@@ -175,13 +175,12 @@ void MmFluid::compute_dt(EuMesh &mesh) {
         double dt = std::numeric_limits<double>::max();
 
         // скорость звука
-        const auto&z = cell[part.init];
-        double c = mixture.sound_speed_rP(z.density, z.pressure, z.mass_frac,
-                                          {.T0=z.temperature, .rhos=&z.densities});
+        const PState& z = cell[part.init];
+        double c = mixture.sound_speed_rP(z.rho(), z.P(), z.beta(), {.T0=z.T(), .rhos=z.rhos()});
 
         for (auto &face: cell.faces()) {
             // Нормальная составляющая скорости
-            double vn = cell[part.init].velocity.dot(face.normal());
+            double vn = cell[part.init].vel().dot(face.normal());
 
             // Максимальное по модулю СЗ
             double lambda = std::abs(vn) + c;
@@ -207,14 +206,14 @@ int master_component(const mmf::PState &zm, const mmf::PState &zp) {
     // Но в целом вопрос дискуссионный.
 
     // Скорость интерфейса
-    double vi = 0.5 * (zm.u() + zp.u());
+    double vi = 0.5 * (zm.vx() + zp.vx());
     const mmf::PState &z = vi > 0.0 ? zm : zp;
 
     int master = 0;
     double alpha_max = 0.0;
 
-    for (int i = 0; i < Fractions::size(); ++i) {
-        if (z.mass_frac.has(i)) {
+    for (int i = 0; i < z.beta().size(); ++i) {
+        if (z.beta().has(i)) {
             double alpha = z.alpha(i);
 
             if (alpha > alpha_max) {
@@ -251,7 +250,7 @@ double alpha_sigma(CrpMode mode, EuCell &cell, const MmFluid::Parts& part, EuFac
         }
         default: {
             // Фактически CrpMode::PLIC
-            double vi = 0.5 * (zm.u() + zp.u()); // Скорость интерфейса
+            double vi = 0.5 * (zm.vx() + zp.vx()); // Скорость интерфейса
             bool upwind = vi > 0.0;
             double CFL = dt * std::abs(vi) / (upwind ? hL : hR);
             double cos = face.normal().dot(upwind ? cell[part.n][idx] : -face.neib(part.n)[idx]);
@@ -323,7 +322,7 @@ Flux MmFluid::calc_crp_flux(const PState& zL, const PState& zR, double hL, doubl
         return a_sig * flux_A.arr() + (1.0 - a_sig) * flux_B.arr();
     }
 
-    // Две строго смешаные ячейки
+    // Две строго смешанные ячейки
     assert((0.0 < aL && aL < 1.0) && (0.0 < aR && aR < 1.0));
 
     // Расщепление
@@ -353,8 +352,8 @@ Flux MmFluid::calc_flux(EuCell& cell, EuFace& face,
         return m_nf->flux(z_L, z_R, mixture);
     }
 
-    int idx_L = z_L.mass_frac.index();
-    int idx_R = z_R.mass_frac.index();
+    int idx_L = z_L.beta().index();
+    int idx_R = z_R.beta().index();
 
     // Пара чистых материалов
     if (idx_L >= 0 && idx_R >= 0) {
@@ -378,8 +377,6 @@ void MmFluid::fluxes(EuMesh &mesh, double dt, Direction dir) {
 
         // Примитивный вектор в ячейке
         PState z_c = cell[part.init];
-
-        const Box box = {.vmin={0.0030, 0.0060, 0.0}, .vmax={0.0031, 0.0061, 0.0}};
 
         // Переменная для потока
         Flux flux;
@@ -410,49 +407,21 @@ void MmFluid::fluxes(EuMesh &mesh, double dt, Direction dir) {
             double h_L = V_c / S;
             double h_R = V_n / S;
 
-            if (box.inside(cell.center())) {
-                std::cout << "stop\n";
-
-            }
-
             Flux loc_flux = calc_flux(cell, face, z_m, z_p, h_L, h_R, dt);
             loc_flux.to_global(normal);
-
-            if (loc_flux.arr().hasNaN()) {
-
-                Flux loc2 = calc_flux(cell, face, z_m, z_p, h_L, h_R, dt);
-            }
-
-            if (box.inside(cell.center())) {
-                std::cout << "z_m: " << z_m << "\n";
-                std::cout << "z_p: " << z_p << "\n";
-
-                std::cout << "loc_flux: " << loc_flux << "\n";
-            }
 
             // Суммируем поток
             flux.arr() += loc_flux.arr() * S;
         }
 
-
         // Консервативный вектор в ячейке
         QState q_c(z_c);
-
-        if (box.inside(cell.center())) {
-            std::cout << "\tz_c: " << z_c << "\n";
-            std::cout << "\tq_c: " << q_c << "\n";
-        }
 
         // Обновляем значение в ячейке (консервативные переменные)
         q_c.arr() -= (dt / V_c) * flux.arr();
 
         // Новое значение примитивных переменных
         cell[part.next] = PState(q_c, mixture, z_c.P(), z_c.T(), z_c.rhos());
-
-        if (box.inside(cell.center())) {
-            std::cout << "\tq_c: " << q_c << "\n";
-            std::cout << "\tz_h: " << cell[part.next] << "\n";
-        }
     });
 }
 
@@ -460,10 +429,10 @@ void MmFluid::compute_grad(EuMesh &mesh, Storable<PState> U)  {
     mesh.for_each([this, U](EuCell &cell) {
         // Для смешанных ячеек в CRP режиме производные равны нулю
         if (m_crp_mode != CrpMode::NONE) {
-            bool set_zero = cell[U].mass_frac.index() < 0;
+            bool set_zero = cell[U].beta().index() < 0;
             if (!set_zero) {
                 for (auto face: cell.faces()) {
-                    if (face.neib(U).mass_frac.index() < 0) {
+                    if (face.neib(U).beta().index() < 0) {
                         set_zero = true;
                         break;
                     }
@@ -488,50 +457,53 @@ void MmFluid::compute_grad(EuMesh &mesh, Storable<PState> U)  {
 
 void MmFluid::fractions_grad(EuMesh& mesh, Storable<PState> U) {
     auto get_vol_fracs = [U](EuCell& cell) -> Fractions {
-        return cell[U].vol_fracs();
+        return cell[U].volume_fractions();
     };
 
     mesh.for_each([this, &get_vol_fracs](EuCell &cell) {
         auto grad = gradient::LSM<Fractions>(cell, get_vol_fracs, boundary_value_a);
         grad = gradient::limiting<Fractions>(cell, m_limiter, grad, get_vol_fracs, boundary_value_a);
 
-        auto& grad_a = cell[part.grad_a];
-        for (int i = 0; i < Fractions::size(); ++i) {
-            grad_a[i] = {grad.x[i], grad.y[i], grad.z[i]};
+        for (int i = 0; i < mixture.size(); ++i) {
+            cell[part.grad_a][i] = {grad.x[i], grad.y[i], grad.z[i]};
         }
     });
 }
 
 void MmFluid::interface_recovery(EuMesh &mesh) {
-    // Сделаю пока простую схему для квадратов,
-    // точка p не восстанавливается, плевать на неё.
+    z_assert(part.n.size() == mixture.size(), "Bad normals size #1");
+    z_assert(part.p.size() == mixture.size(), "Bad normals size #2");
 
+    // Сделаю пока простую схему для квадратов
     mesh.for_each([this](EuCell& cell) {
+        for (auto& n: cell[part.n]) n = Vector3d::Zero();
+        for (auto& p: cell[part.p]) p = 0.0;
+
         // Чистый материал, нечего восстанавливать
-        if (cell[part.init].mass_frac.is_pure()) {
-            cell[part.n] = VectorSet{};
+        if (cell[part.init].beta().is_pure()) {
             return;
         }
 
-        VectorSet ns;
+        auto ns = cell[part.n];
+        auto ps = cell[part.p];
 
-        Fractions a_c = cell[part.init].vol_fracs();
+        Fractions a_c = cell[part.init].volume_fractions();
         for (auto face: cell.faces()) {
-            Vector3d S = face.area() * face.normal();
-
-            // На границе возвращает саму ячейку
-            Fractions a_n = face.neib(part.init).vol_fracs();
-            for (int i = 0; i < Fractions::max_size; ++i) {
+            auto S = face.area_n();
+            for (int i = 0; i < mixture.size(); ++i) {
                 if (a_c.has(i)) {
-                    ns[i] -= face_fraction(a_c[i], a_n[i]) * S;
+                    double a_n = face.neib(part.init).alpha(i);
+                    ns[i] -= face_fraction(a_c[i], a_n) * S;
                 }
             }
         }
 
-        for (int i = 0; i < Fractions::max_size; ++i) {
-            if (a_c.has(i)) { ns[i].normalize(); }
+        for (int i = 0; i < ns.size(); ++i) {
+            if (a_c.has(i)) {
+                ns[i].normalize();
+                ps[i] = quad_find_section(a_c[i], ns[i], cell.hx(), cell.hy());
+            }
         }
-        cell[part.n] = ns;
     });
 }
 
@@ -541,7 +513,7 @@ void MmFluid::fluxes_stage1(EuMesh &mesh, double dt, Direction dir)  {
         PState z_c = cell[part.init];
 
         // Смешанные ячейки продвигаем
-        if (z_c.mass_frac.index() < 0) {
+        if (z_c.beta().index() < 0) {
             cell[part.half] = z_c;
             return;
         }
@@ -696,8 +668,35 @@ void MmFluid::swap(EuMesh &mesh) {
     mesh.swap(part.init, part.next);
 }
 
-EuMesh MmFluid::body(EuMesh& mesh, int idx) const {
-    throw std::runtime_error("MmFluid::body: Not implemented");
+EuMesh MmFluid::domain(EuMesh& mesh, int idx) const {
+    if (idx >= mixture.size()) {
+        throw std::runtime_error("No such material");
+    }
+    z_assert(part.n.size() == mixture.size(), "Bad normals size (body) #1");
+    z_assert(part.p.size() == mixture.size(), "Bad normals size (body) #2");
+
+    // Сделаю пока для квадратов / кубов
+    if (mesh.dim() == 2) {
+        EuMesh clipped(2, false);
+        for (auto cell: mesh) {
+            if (cell[part.init].alpha(idx) <= 0.0 || (cell[part.init].alpha(idx) < 0.5 && cell[part.n][idx].isZero())) {
+                continue;
+            }
+            if (cell[part.init].alpha(idx) >= 1.0 || (cell[part.init].alpha(idx) > 0.5 && cell[part.n][idx].isZero())) {
+                clipped.push_back(cell.polygon());
+                continue;
+            }
+
+            Vector3d point = cell.center() + cell[part.p][idx] * cell[part.n][idx];
+            auto poly = cell.polygon().clip(point, cell[part.n][idx]);
+            clipped.push_back(poly);
+        }
+        return clipped;
+    }
+    else {
+        throw std::runtime_error("Not implemented 3D body");
+    }
+
 #if 0
     int count = 0;
     for (auto cell: mesh) {
@@ -761,13 +760,16 @@ Distributor MmFluid::distributor() const {
                            parent[part.d_dz].arr() * dr.z();
 
             PState zc;
-            zc.density   = zp.density + delta.density;
-            zc.velocity  = zp.velocity + (zp.density / zc.density) * delta.velocity;
-            zc.mass_frac = zp.mass_frac.arr() + (zp.density / zc.density) * delta.mass_frac.arr();
-            zc.mass_frac.normalize();
-            zc.energy    = zp.energy + 0.5 * (zp.velocity - zc.velocity).squaredNorm() + (zp.density / zc.density) * delta.energy;
-            zc.pressure = mixture.pressure_re(zc.density, zc.energy, zc.mass_frac, {.P0 = zp.pressure, .T0 = zp.temperature});
-            zc.temperature = mixture.temperature_rP(zc.density, zc.pressure, zc.mass_frac, {.T0 = zp.temperature});
+            zc.rho() = zp.rho() + delta.rho();
+            zc.vel() = zp.vel() + (zp.rho() / zc.rho()) * delta.vel();
+            for (int i = 0; i < mixture.size(); ++i) {
+                zc.beta(i) = zp.beta(i) + (zp.rho() / zc.rho()) * delta.beta(i);
+            }
+            zc.beta().normalize();
+            zc.e() = zp.e() + 0.5 * (zp.vel() - zc.vel()).squaredNorm() + (zp.rho() / zc.rho()) * delta.e();
+
+            zc.P() = mixture.pressure_re(zc.rho(), zc.e(), zc.beta(), {.P0 = zp.P(), .T0 = zp.T()});
+            zc.T() = mixture.temperature_rP(zc.rho(), zc.P(), zc.beta(), {.T0 = zp.T()});
 
             if (zc.is_bad()) {
                 std::cerr << "Failed to calc child PState in split\n";
@@ -798,11 +800,11 @@ Distributor MmFluid::distributor() const {
         mean_p /= parent.volume();
         mean_t /= parent.volume();
 
-        for (auto &b: sum.mass_frac.m_data) {
+        for (auto &b: sum.mass_frac) {
             b = std::max(0.0, b);
         }
 
-        PState state(sum, mixture, mean_p, mean_t, Fractions::NaN());
+        PState state(sum, mixture, mean_p, mean_t);
         if (state.is_bad()) {
             std::cerr << "Failed to calc parent PState in merge\n";
             std::cerr << "QState: " << sum << '\n';
@@ -820,16 +822,27 @@ void MmFluid::set_flags(EuMesh &mesh) {
     compute_grad(mesh, part.init);
 
     mesh.for_each([this](EuCell &cell) -> void {
-        double rho = cell[part.init].density;
-        double p   = cell[part.init].pressure;
+        if (!cell[part.init].beta().is_pure()) {
+            cell.set_flag(1);
+            return;
+        }
 
-        Fractions mass_frac = cell[part.init].mass_frac;
+        int idx = cell[part.init].beta().index();
+
+        double rho = cell[part.init].rho();
+        double p   = cell[part.init].P();
+
+        Fractions mass_frac = cell[part.init].beta();
         bool need_split = false;
         for (auto face: cell.faces()) {
             if (face.is_boundary()) {
                 continue;
             }
-
+            if (face.neib(part.init).beta().index() != idx) {
+                need_split = true;
+                break;
+            }
+            /*
             // проверяем большой перепад давлений
             if (std::abs(face.neib(part.init).pressure - p) > 0.3 * abs(p)) {
                 need_split = true;
@@ -849,10 +862,11 @@ void MmFluid::set_flags(EuMesh &mesh) {
                     break;
                 }
             }
+            */
         }
 
         cell.set_flag(need_split ? 1 : -1);
     });
 }
 
-}
+} // namespace zephyr::math

@@ -1,6 +1,6 @@
 /// @file shu_osher.cpp
 /// @brief Решатель газодинамики в одном файле на примере теста Шу-Ошера.
-#include <iostream>
+
 #include <iomanip>
 
 #include <zephyr/geom/generator/strip.h>

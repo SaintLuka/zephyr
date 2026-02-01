@@ -1,5 +1,6 @@
 #list(APPEND PROBLEMS clogged_shock_tube)
 #list(APPEND PROBLEMS smf_flow_around)
+list(APPEND PROBLEMS smf_skew_wave)
 #list(APPEND PROBLEMS smf_test_1D)
 #list(APPEND PROBLEMS smf_test_2D)
 #list(APPEND PROBLEMS smf_test_3D)

@@ -1,21 +1,30 @@
-/// @file Двумерная задача переноса
+/// @file mmf_triple_point.cpp
+/// @brief Triple point problem. Two or three material problem.
+/// Shock wave in gases and Kelvin-Helmholtz instability.
+///
+/// [1] Pan S., Han L., Hu X., Adams N. A conservative interface-interaction
+/// method for compressible multi-material flows // Journal of Computational
+/// Physics. –– 2018. –– Vol. 371. –– P. 870–895.
+/// [2] Dobrev V., Ellis T., Kolev T., Rieben R. High-order curvilinear finite
+/// elements for axisymmetric lagrangian hydrodynamics // Computers and Fluids.
+/// –– 2013. –– Vol. 83. –– P. 58–69.
+/// [3] Galera S., Maire P.-H., Breil J. A two-dimensional unstructured cell-centered
+/// multi-material ale scheme using vof interface reconstruction // Journal of
+/// Computational Physics. –- 2010. –- Vol. 229, no. 16. –- P. 5755–5787.
 
-#include <iostream>
 #include <iomanip>
 
-#include <zephyr/geom/generator/strip.h>
-#include <zephyr/mesh/mesh.h>
+#include <zephyr/geom/generator/rectangle.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
 
-#include <zephyr/phys/tests/test_1D.h>
-
-#include <zephyr/math/solver/riemann.h>
+#include <zephyr/phys/matter/eos/ideal_gas.h>
+#include <zephyr/phys/matter/mixture_pt.h>
 #include <zephyr/math/solver/mm_fluid.h>
 
 #include <zephyr/io/pvd_file.h>
-#include <zephyr/io/csv_file.h>
-
-#include <zephyr/utils/stopwatch.h>
 #include <zephyr/utils/mpi.h>
+#include <zephyr/utils/threads.h>
+#include <zephyr/utils/stopwatch.h>
 
 using namespace zephyr::io;
 using namespace zephyr::phys;
@@ -28,79 +37,7 @@ using zephyr::utils::Stopwatch;
 using zephyr::utils::threads;
 using zephyr::utils::mpi;
 
-
-/// Переменные для сохранения
-double get_rho(Storable<PState> part, EuCell& cell) { return cell[part].density; }
-double get_vx(Storable<PState> part, EuCell& cell) { return cell[part].velocity.x(); }
-double get_vy(Storable<PState> part, EuCell& cell) { return cell[part].velocity.y(); }
-double get_p(Storable<PState> part, EuCell& cell) { return cell[part].pressure; }
-double get_e(Storable<PState> part, EuCell& cell) { return cell[part].energy; }
-double get_T(Storable<PState> part, EuCell &cell) { return cell[part].temperature; }
-double get_cln(Storable<PState> part, EuCell &cell) { return cell[part].mass_frac.index(); }
-double get_mfrac1(Storable<PState> part, EuCell &cell) { return cell[part].mass_frac[0]; }
-double get_mfrac2(Storable<PState> part, EuCell &cell) { return cell[part].mass_frac[1]; }
-double get_vfrac1(Storable<PState> part, EuCell &cell) { return cell[part].alpha(0); }
-double get_vfrac2(Storable<PState> part, EuCell &cell) { return cell[part].alpha(1); }
-double get_rho1(Storable<PState> part, EuCell &cell) { return cell[part].densities[0]; }
-double get_rho2(Storable<PState> part, EuCell &cell) { return cell[part].densities[1]; }
-double get_normal_x(Storable<VectorSet> part, EuCell &cell) { return cell[part][0].x(); }
-double get_normal_y(Storable<VectorSet> part, EuCell &cell) { return cell[part][0].y(); }
-
-
-int main(int argc, char** argv) {
-    mpi::handler init(argc, argv);
-    threads::off();
-
-    // Материал
-    Eos::Ptr sg1 = IdealGas::create(1.4, 1.0);
-    Eos::Ptr sg2 = IdealGas::create(1.5, 1.0);
-    Eos::Ptr sg3 = IdealGas::create(1.5, 1.0);
-
-    // Формальная смесь
-    MixturePT mixture = {sg1, sg2, sg3};
-
-    // Создаем одномерную сетку
-    Rectangle gen(0.0, 7.0, 0.0, 3.0);
-    gen.set_nx(700);
-    gen.set_boundaries({.left=Boundary::WALL, .right=Boundary::WALL,
-                        .bottom=Boundary::WALL, .top=Boundary::WALL});
-
-    // Создать сетку
-    EuMesh mesh(gen);
-    mesh.set_decomposition("XY");
-
-    // Создать решатель
-    MmFluid solver(mixture);
-    solver.set_CFL(0.5);
-    solver.set_accuracy(1);
-    solver.set_method(Fluxes::CRP);
-    solver.set_crp_mode(CrpMode::PLIC);
-    solver.set_splitting(DirSplit::SIMPLE);
-    solver.add_types(mesh);
-
-    // Файл для записи
-    PvdFile pvd("TP", "output");
-    PvdFile pvd_body0("body0", "output");
-    PvdFile pvd_body1("body1", "output");
-    PvdFile pvd_body2("body2", "output");
-
-    // Переменные для сохранения
-    pvd.variables += {"cln", std::bind(get_cln, solver.part.init, std::placeholders::_1) };
-    pvd.variables += {"rho", std::bind(get_rho, solver.part.init, std::placeholders::_1)};
-    pvd.variables += {"vx", std::bind(get_vx, solver.part.init, std::placeholders::_1)};
-    pvd.variables += {"vy", std::bind(get_vy, solver.part.init, std::placeholders::_1)};
-    pvd.variables += {"e",  std::bind(get_e, solver.part.init, std::placeholders::_1)};
-    pvd.variables += {"P",  std::bind(get_p, solver.part.init, std::placeholders::_1)};
-    pvd.variables += {"T",  std::bind(get_T, solver.part.init, std::placeholders::_1)};
-    pvd.variables += {"b1", std::bind(get_mfrac1, solver.part.init, std::placeholders::_1)};
-    pvd.variables += {"b2", std::bind(get_mfrac2, solver.part.init, std::placeholders::_1)};
-    pvd.variables += {"a1", std::bind(get_vfrac1, solver.part.init, std::placeholders::_1)};
-    pvd.variables += {"a2", std::bind(get_vfrac2, solver.part.init, std::placeholders::_1)};
-    pvd.variables += {"rho1", std::bind(get_rho1, solver.part.init, std::placeholders::_1)};
-    pvd.variables += {"rho2", std::bind(get_rho2, solver.part.init, std::placeholders::_1)};
-    pvd.variables += {"n.x", std::bind(get_normal_x, solver.part.n, std::placeholders::_1)};
-    pvd.variables += {"n.y", std::bind(get_normal_y, solver.part.n, std::placeholders::_1)};
-
+void init_cells(EuMesh& mesh, const MixturePT& mixture, Storable<PState> init) {
     double R_max = 1.0;
     double R_min = 0.125;
     double P_max = 1.0;
@@ -109,7 +46,9 @@ int main(int argc, char** argv) {
     double x_barrier = 1.0;
     double y_barrier = 1.5;
 
-    for (auto cell: mesh) {
+    int n = mixture.size() - 1;
+
+    mesh.for_each([&](EuCell cell) {
         Vector3d v = cell.center();
 
         PState z = PState::Zero();
@@ -117,26 +56,100 @@ int main(int argc, char** argv) {
             z.density   = R_max;
             z.pressure  = P_min;
             z.mass_frac = Fractions::Pure(0);
-            z.densities = ScalarSet::Pure(0, R_max);
+            z.densities = ScalarSet::PureNaN(0, R_max);
         }
         else if (v.x() < x_barrier) {
             z.density   = R_max;
             z.pressure  = P_max;
             z.mass_frac = Fractions::Pure(1);
-            z.densities = ScalarSet::Pure(1, R_max);
+            z.densities = ScalarSet::PureNaN(1, R_max);
         }
         else {
+            // second or third material
             z.density   = R_min;
             z.pressure  = P_min;
-            z.mass_frac = Fractions::Pure(2);
-            z.densities = ScalarSet::Pure(2, R_min);
+            z.mass_frac = Fractions::Pure(n);
+            z.densities = ScalarSet::PureNaN(n, R_min);
         }
 
-        z.energy      = mixture.energy_rP     (z.density, z.pressure, z.mass_frac);
-        z.temperature = mixture.temperature_rP(z.density, z.pressure, z.mass_frac);
+        z.e() = mixture.energy_rP(z.rho(), z.P(), z.beta());
+        z.T() = mixture.temperature_rP(z.rho(), z.P(), z.beta());
 
-        cell(U).set_state(z);
+        cell[init] = z;
+    });
+}
+
+int main(int argc, char** argv) {
+    mpi::handler handler(argc, argv);
+    threads::init(argc, argv);
+    threads::info();
+    //threads::off();
+
+    // Generator of a Cartesian grid
+    generator::Rectangle gen(0.0, 7.0, 0.0, 3.0);
+    gen.set_nx(350);
+    gen.set_boundaries({.left=Boundary::WALL, .right=Boundary::WALL,
+                        .bottom=Boundary::WALL, .top=Boundary::WALL});
+
+    // Create mesh
+    EuMesh mesh(gen);
+
+    // Create EoS of materials and mixture
+    MixturePT mixture;
+    mixture += IdealGas::create(1.4, 1.0);
+    mixture += IdealGas::create(1.5, 1.0);
+    // optional, same as the second material
+    mixture += IdealGas::create(1.5, 1.0);
+
+    // Create and configure solver
+    MmFluid solver(mixture);
+    solver.set_CFL(0.5);
+    solver.set_accuracy(1);
+    solver.set_method(Fluxes::CRP);
+    solver.set_crp_mode(CrpMode::PLIC);
+    solver.set_splitting(DirSplit::SIMPLE);
+
+    // Add data fields, choose main data layer
+    auto data = solver.add_types(mesh);
+    auto z = data.init;
+
+    // Configure mesh
+    mesh.set_max_level(1);
+    mesh.set_decomposition("XY");
+    mesh.set_distributor(solver.distributor());
+
+    // Files for output
+    PvdFile pvd("TP", "output");
+    std::vector<PvdFile> pvd_domains;
+    for (int i = 0; i < mixture.size(); ++i) {
+        pvd_domains.emplace_back("domain" + std::to_string(i), "output");
     }
+
+    // Variables to save
+    pvd.variables = {"level"};
+    pvd.variables += {"cln", [z](EuCell cell) -> double { return cell[z].mass_frac.index(); }};
+    pvd.variables += {"rho", [z](EuCell cell) -> double { return cell[z].density; }};
+    pvd.variables += {"vx",  [z](EuCell cell) -> double { return cell[z].velocity.x(); }};
+    pvd.variables += {"vy",  [z](EuCell cell) -> double { return cell[z].velocity.y(); }};
+    pvd.variables += {"e",   [z](EuCell cell) -> double { return cell[z].energy; }};
+    pvd.variables += {"P",   [z](EuCell cell) -> double { return cell[z].pressure; }};
+    pvd.variables += {"T",   [z](EuCell cell) -> double { return cell[z].temperature; }};
+    pvd.variables += {"b0",  [z](EuCell cell) -> double { return cell[z].mass_frac[0]; }};
+    pvd.variables += {"b1",  [z](EuCell cell) -> double { return cell[z].mass_frac[1]; }};
+    pvd.variables += {"a0",  [z](EuCell cell) -> double { return cell[z].alpha(0); }};
+    pvd.variables += {"a1",  [z](EuCell cell) -> double { return cell[z].alpha(1); }};
+    pvd.variables += {"rho0",[z](EuCell cell) -> double { return cell[z].densities[0]; }};
+    pvd.variables += {"rho1",[z](EuCell cell) -> double { return cell[z].densities[1]; }};
+    pvd.variables += {"n.x", [n=data.n](EuCell cell) -> double { return cell[n][0].x(); }};
+    pvd.variables += {"n.y", [n=data.n](EuCell cell) -> double { return cell[n][0].y(); }};
+
+    // Initial conditions (adaptive to initial data)
+    for (int k = 0; mesh.adaptive() && k < mesh.max_level() + 3; ++k) {
+        init_cells(mesh, mixture, z);
+        solver.set_flags(mesh);
+        mesh.refine();
+    }
+    init_cells(mesh, mixture, z);
 
     size_t n_step = 0;
     double curr_time = 0.0;
@@ -151,21 +164,21 @@ int main(int argc, char** argv) {
             pvd.save(mesh, curr_time);
 
             solver.interface_recovery(mesh);
-            auto body_mesh0 = solver.body(mesh, 0);
-            auto body_mesh1 = solver.body(mesh, 1);
-            auto body_mesh2 = solver.body(mesh, 2);
-            pvd_body0.save(body_mesh0, curr_time);
-            pvd_body1.save(body_mesh1, curr_time);
-            pvd_body2.save(body_mesh2, curr_time);
+            for (int i = 0; i < mixture.size(); ++i) {
+                auto domain = solver.domain(mesh, i);
+                pvd_domains[i].save(domain, curr_time);
+            }
 
             next_write += max_time / 50;
         }
 
-        // Точное завершение в end_time
+        // Finish exactly at max_time
         solver.set_max_dt(max_time - curr_time);
 
-        // Обновляем слои
+        // Integration step
         solver.update(mesh);
+        solver.set_flags(mesh);
+        mesh.refine();
 
         curr_time += solver.dt();
         n_step += 1;
@@ -173,12 +186,10 @@ int main(int argc, char** argv) {
     pvd.save(mesh, max_time);
 
     solver.interface_recovery(mesh);
-    auto body_mesh0 = solver.body(mesh, 0);
-    auto body_mesh1 = solver.body(mesh, 1);
-    auto body_mesh2 = solver.body(mesh, 2);
-    pvd_body0.save(body_mesh0, max_time);
-    pvd_body1.save(body_mesh1, max_time);
-    pvd_body2.save(body_mesh2, max_time);
+    for (int i = 0; i < mixture.size(); ++i) {
+        auto domain = solver.domain(mesh, i);
+        pvd_domains[i].save(domain, curr_time);
+    }
 
     elapsed.stop();
 

@@ -158,7 +158,7 @@ int main() {
     mesh.set_max_level(3);
 
     // Добавить переменные на сетку
-    auto [u, wflag] = mesh.add<double>("u", "wflag");
+    auto [u, wflag] = mesh.add_multi<double>("u", "wflag");
 
     // Файл для записи
     PvdFile pvd("mesh", "output");
