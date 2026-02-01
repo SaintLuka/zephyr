@@ -1,4 +1,6 @@
 #list(APPEND TESTS axial)
+list(APPEND TESTS backup_save)
+list(APPEND TESTS backup_read)
 #list(APPEND TESTS balancing)
 #list(APPEND TESTS distributed-amr)
 #list(APPEND TESTS distributed-conv)

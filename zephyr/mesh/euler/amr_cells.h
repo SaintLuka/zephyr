@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <zephyr/utils/range.h>
 
 #include <zephyr/mesh/side.h>
@@ -431,6 +432,14 @@ public:
 
     /// @brief Проверка связности ячеек в MPI версии
     int check_connectivity(index_t ic, const AmrCells& aliens) const;
+
+    /// @brief Полное сохранение сетки
+    /// @param root Корневая директория для бэкапа (существует и пустая)
+    /// @param file Открытый файл для записи (backup.json)
+    /// @param tab Отступ секции в json файле
+    /// @param variables Список имен переменных для сохранения
+    void backup(const std::filesystem::path& root, std::ofstream& file,
+        const std::string& tab, const std::vector<std::string>& variables) const;
 
     /// @}
 

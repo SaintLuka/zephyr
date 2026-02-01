@@ -345,6 +345,11 @@ public:
     /// @brief Проверить сетку после адаптации
     int check_refined() const;
 
+    /// @brief Полностью сохранить сетку
+    /// @param sroot Корневая директория для сохранения
+    /// @param variables Переменные для сохранения
+    void backup(const std::string& sroot, const std::vector<std::string>& variables) const;
+
     /// @}
 
 private:

@@ -1,3 +1,4 @@
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <set>
@@ -275,6 +276,7 @@ void EuMesh::make_shuba(int count) {
 
 void EuMesh::refine() {
     if (!adaptive()) { return; }
+    m_structured = false;
 
     m_nodes.clear();
 
@@ -921,6 +923,52 @@ void AmrNodes::setup_for(const AmrCells& cells) {
 void EuMesh::collect_nodes() {
     if (has_nodes()) return;
     m_nodes.setup_for(m_locals);
+}
+
+void EuMesh::backup(const std::string& sroot, const std::vector<std::string>& variables) const {
+    namespace fs = std::filesystem;
+
+    const fs::path root = sroot;
+
+    if (mpi::master()) {
+        if (fs::exists(root)) {
+            fs::remove_all(root);
+        }
+        fs::create_directories(root);
+    }
+
+    // Основной json
+    std::ofstream file;
+    if (mpi::master()) {
+        file.open(root / "backup.json", std::ios::out | std::ios::trunc);
+        file << "{\n";
+        file << "  \"mesh\": {\n";
+    }
+
+    if (mpi::master()) {
+        file << std::boolalpha;
+        file << "    \"max_level\":  " << m_max_level << ",\n";
+        file << "    \"structured\": " << m_structured << ",\n";
+        if (m_structured) {
+            file << "    \"nx\": " << m_nx << ",\n";
+            file << "    \"ny\": " << m_ny << ",\n";
+            file << "    \"nz\": " << m_nz << ",\n";
+        }
+    }
+
+    if (mpi::master()) {
+        fs::create_directory(root / "cells");
+        file << "    \"cells\": {\n";
+    }
+
+    m_locals.backup(root, file, "      ", variables);
+
+    if (mpi::master()) {
+        file << "    }\n"; // mesh.cells
+        file << "  }\n"; // mesh
+        file << "}";
+        file.close();
+    }
 }
 
 } // namespace zephyr::mesh

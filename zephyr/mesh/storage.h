@@ -207,7 +207,6 @@ public:
         return false;
     }
 
-
     /// @brief Извлечь поле с именем name для типа T
     template<typename T>
     Storable<T> find(const std::string &name) const {
@@ -273,6 +272,10 @@ public:
     template<typename T>
     const Buffer& operator[](Storable<T> var) const { return m_data[var.index]; }
 
+    /// @brief Получить ссылку на буфер по имени. Кидает исключение (!),
+    /// если буфера с таким именем нет
+    const Buffer& operator[](const std::string& name) const;
+
     /// @brief Получить массив указателей на данные (может быть пустым)
     /// @tparam Args Произвольное число аргументов, каждый из которых имеет
     /// тип `Storable<T>`
@@ -298,6 +301,7 @@ public:
         std::swap(m_data[var1.index], m_data[var2.index]);
     }
 
+    /// @brief Вывести имена буферов в строку через запятую
     void print_names() const;
 
     /// @brief Вывести в консоль массивы данных. Массивы пользовательских
@@ -317,7 +321,7 @@ public:
     std::tuple<std::remove_cvref_t<Vars>...> add_replace(
         const Storage& s, const std::tuple<Vars...>& vars);
 
-public:
+private:
     size_t                   m_size;  ///< Длина всех массивов данных
     std::vector<Buffer>      m_data;  ///< Массивы данных
     std::vector<std::string> m_names; ///< Массив имён данных
@@ -360,15 +364,6 @@ Storable<T> Storage::add(const std::string &name, int count) {
     m_data.emplace_back(Buffer::make<T>(count, m_size));
     m_names.emplace_back(name);
     return var;
-}
-
-inline void Storage::print_names() const {
-    if (m_names.empty()) { return; }
-    std::cout << "Buffer names: ";
-    for (size_t i = 0; i < m_names.size() - 1; ++i) {
-        std::cout << m_names[i] << ", ";
-    }
-    std::cout << m_names.back() << "\n";
 }
 
 template<typename T>
