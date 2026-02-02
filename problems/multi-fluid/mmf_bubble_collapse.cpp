@@ -30,7 +30,9 @@ using zephyr::utils::mpi;
 using zephyr::utils::threads;
 using zephyr::utils::Stopwatch;
 
-void init_cells(EuMesh& mesh, const MixturePT& mixture, Storable<PState> z) {
+void init_cells(EuMesh& mesh, MixturePT& mixture, Storable<PState> z) {
+    mixture.adjust_cv({1.0_kg_m3, 1000.0_kg_m3}, 1.0_bar, 300.0);
+
     PState z_air(
             1.0_kg_m3,          // density
             Vector3d::Zero(),   // velocity
@@ -81,6 +83,10 @@ void init_cells(EuMesh& mesh, const MixturePT& mixture, Storable<PState> z) {
             mmf::PState &z0 = z_air;
             mmf::PState &z1 = z_water;
 
+            //double T = vol_frac0 * z0.temperature + vol_frac1 * z1.temperature;
+            //z0.density = 1.0 / mixture[0].volume_PT(z0.pressure, T);
+            //z1.density = 1.0 / mixture[1].volume_PT(z1.pressure, T);
+
             // rho = sum a_i rho_i
             double    density   = vol_frac0 * z0.density + vol_frac1 * z1.density;
             Fractions mass_frac = {vol_frac0 * z0.density / density, vol_frac1 * z1.density / density};
@@ -99,12 +105,11 @@ int main(int argc, char** argv) {
     mpi::handler handler(argc, argv);
     threads::init(argc, argv);
     threads::info();
-    threads::off();
 
     // Generator of a Cartesian grid
     generator::Rectangle gen(0.0_cm, 1.2_cm, 0.0_cm, 1.2_cm);
     gen.set_nx(120);
-    gen.set_boundaries({.left=Boundary::ZOE, .right=Boundary::WALL,
+    gen.set_boundaries({.left=Boundary::ZOE, .right=Boundary::ZOE,
                         .bottom=Boundary::WALL, .top=Boundary::WALL});
 
     // Create mesh
@@ -129,7 +134,7 @@ int main(int argc, char** argv) {
 
     // Configure mesh
     mesh.set_decomposition("XY");
-    mesh.set_max_level(0);
+    mesh.set_max_level(4);
     mesh.set_distributor(solver.distributor());
 
     // Files for output
@@ -151,6 +156,8 @@ int main(int argc, char** argv) {
     pvd.variables += {"a1",  [z](EuCell cell) -> double { return cell[z].alpha(1); }};
     pvd.variables += {"rho0",[z](EuCell cell) -> double { return cell[z].densities[0]; }};
     pvd.variables += {"rho1",[z](EuCell cell) -> double { return cell[z].densities[1]; }};
+    //pvd.variables += {"e0",[z,mixture](EuCell cell) -> double { return cell[z].true_energy(mixture, 0); }};
+    //pvd.variables += {"e1",[z,mixture](EuCell cell) -> double { return cell[z].true_energy(mixture, 1); }};
     pvd.variables += {"n.x", [n=data.n](EuCell cell) -> double { return cell[n][0].x(); }};
     pvd.variables += {"n.y", [n=data.n](EuCell cell) -> double { return cell[n][0].y(); }};
 
@@ -165,7 +172,7 @@ int main(int argc, char** argv) {
     size_t n_step = 0;
     double curr_time = 0.0;
     double next_write = 0.0;
-    double max_time = 2.0 * 4.5_us;
+    double max_time = 4.5_us;
 
     Stopwatch elapsed(true);
     while (curr_time < max_time) {
@@ -178,7 +185,7 @@ int main(int argc, char** argv) {
             auto bubble = solver.domain(mesh, 0);
             pvd_bubble.save(bubble, curr_time);
 
-            next_write += 0.0; //max_time / 50;
+            next_write += max_time / 50;
         }
 
         // Finish exactly at max_time
@@ -186,6 +193,8 @@ int main(int argc, char** argv) {
 
         // Integration step
         solver.update(mesh);
+        solver.set_flags(mesh);
+        mesh.refine();
 
         curr_time += solver.dt();
         n_step += 1;

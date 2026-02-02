@@ -169,10 +169,10 @@ public:
     double min_pressure(const Fractions& beta) const;
 
     /// @brief Подгон теплоемкости Cv
-    void adjust_cv(double rho_ref, double P_ref, double T_ref);
+    void adjust_cv(const std::vector<double>& rho_ref, double P_ref, double T_ref) const;
 
     /// @brief Подгон аддитивной постоянной T_0
-    void adjust_T0(double rho_ref, double P_ref, double T_ref);
+    void adjust_T0(const std::vector<double> &rho_ref, double P_ref, double T_ref) const;
 
 
     // Предыдущие функции повторяют интерфейс обычных УрС.

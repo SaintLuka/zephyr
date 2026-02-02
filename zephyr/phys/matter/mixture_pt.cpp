@@ -178,15 +178,21 @@ double MixturePT::min_pressure(const Fractions &beta) const {
     return P_min;
 }
 
-void MixturePT::adjust_cv(double rho_ref, double P_ref, double T_ref) {
-    for (auto& mat: m_materials) {
-        mat->adjust_cv(rho_ref, P_ref, T_ref);
+void MixturePT::adjust_cv(const std::vector<double>& rho_ref, double P_ref, double T_ref) const {
+    if (rho_ref.size() != size()) {
+        throw std::invalid_argument("MixturePT::adjust_cv() rho_ref.size() != materials.size()");
+    }
+    for (int i = 0; i < size(); ++i) {
+        m_materials[i]->adjust_cv(rho_ref[i], P_ref, T_ref);
     }
 }
 
-void MixturePT::adjust_T0(double rho_ref, double P_ref, double T_ref) {
-    for (auto& mat: m_materials) {
-        mat->adjust_T0(rho_ref, P_ref, T_ref);
+void MixturePT::adjust_T0(const std::vector<double>& rho_ref, double P_ref, double T_ref) const {
+    if (rho_ref.size() != size()) {
+        throw std::invalid_argument("MixturePT::adjust_T0() rho_ref.size() != materials.size()");
+    }
+    for (int i = 0; i < size(); ++i) {
+        m_materials[i]->adjust_T0(rho_ref[i], P_ref, T_ref);
     }
 }
 
