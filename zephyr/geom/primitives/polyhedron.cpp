@@ -945,58 +945,44 @@ VolArea Polyhedron::clip_volume_and_area(const Vector3d& p, const Vector3d& n) c
     return out;
 }
 
-Vector3d Polyhedron::find_section(const Vector3d& n, double alpha) const { //Я где то в сентябре писал это и уже забыл, надо наверно переписать с нуля
-    double min_proj = std::numeric_limits<double>::max();
-    double max_proj = std::numeric_limits<double>::lowest();
+Vector3d Polyhedron::find_section(const Vector3d& n, double alpha) const {
+    double L = std::cbrt(volume()); // характерестический размер
+    double eps = (1.0e-10) * L;
 
-    for (int i = 0; i < n_verts(); ++i) {
-        double proj = verts[i].dot(n);
-        if (proj < min_proj) min_proj = proj;
-        if (proj > max_proj) max_proj = proj;
-    }
+    double V0 = volume(); // Объём исходного многогранника
 
-    if (alpha <= 0.0) {
-        return n * (min_proj - 0.1 * (max_proj - min_proj));
-    }
-    if (alpha >= 1.0) {
-        return n * (max_proj + 0.1 * (max_proj - min_proj));
-    }
-
-    double total_volume = volume();
-    double d_low = min_proj;
-    double d_high = max_proj;
-
-    double f_low = -alpha * total_volume;
-
-    int max_iterations = 50;
-    double tolerance = 0.001 * total_volume;
-    int iterations = 0;
-
-    double d_mid;
-    double f_mid;
-
-    while (iterations < max_iterations && (d_high - d_low) > 1.0e-12 * (max_proj - min_proj)) {
-        d_mid = 0.5 * (d_low + d_high);
-        Vector3d plane_point = n * d_mid;
-
-        double clipped_volume = clip(plane_point, n).volume(); //Пока я решил оставить clip_volume и временно работаю без него
-        f_mid = clipped_volume - alpha * total_volume;
-
-        if (std::abs(f_mid) < tolerance) {
-            break;
+    double d_min = n.dot(verts[0]);
+    double d_max = n.dot(verts[0]);
+    for (int i = 1; i < n_verts(); ++i) { //Ищем интервал параметра
+        if (d_min > n.dot(verts[i])) {
+            d_min = n.dot(verts[i]);
         }
-
-        if (f_mid * f_low < 0.0) {
-            d_high = d_mid;
-        } else {
-            d_low = d_mid;
-            f_low = f_mid;
+        if (d_max < n.dot(verts[i])) {
+            d_max = n.dot(verts[i]);
         }
-
-        iterations++;
+    }
+    double d = d_min + alpha * (d_max - d_min);
+    Vector3d p = m_center - (n.dot(m_center) - d) * n; //Точка на плоскости
+    double V = clip_volume(p, n); //Объём
+    double F = abs(V-alpha*V0);
+    double target = alpha*V0;
+    int counter = 0;
+    while (F > eps && counter < 10000) {
+        if (V > alpha*V0) {
+            d_max = d;
+            d = (d_min + d) / 2;
+        }
+        else if (V < alpha*V0) {
+            d_min = d;
+            d = (d_max + d) / 2;
+        }
+        p = m_center - (n.dot(m_center) - d) * n; //Точка на плоскости
+        V = clip_volume(p, n);
+        F = abs(V-alpha*V0);
+        counter++;
     }
 
-    return n * d_mid;
+    return p;
 }
 
 Vector3d Polyhedron::find_section_newton(const Vector3d& n, double alpha) const {
@@ -1016,23 +1002,27 @@ Vector3d Polyhedron::find_section_newton(const Vector3d& n, double alpha) const 
         }
     }
     double d = d_min + alpha * (d_max - d_min); //Проекция точки на нормаль к плоскости
-    Vector3d p = n * d; //Точка на плоскости
+    std::cout << "d: " << d << std::endl;
+    Vector3d p = m_center - (n.dot(m_center) - d) * n; //Точка на плоскости
+    std::cout << "p0: " << p[0] << " " << p[1] << " " << p[2] << std::endl;
     VolArea VS = clip_volume_and_area(p, n); //Объём и площадь итерации
     if (VS.volume >= V0 || VS.volume <= 0) {
         VS.area = eps;
     }
     double F = VS.volume-alpha*V0; //Я так понимаю это можно назвать невязкой
+    std::cout << "F: " << F << std::endl;
 
     int counter = 0;
     while (abs(F) > eps && counter < 1000) {
         double d_prev = d;
-        d -= F / VS.area; // Проблема тут, площадь не всегда диффиринцируема, из-за чего метод Ньютона может выйти за границы первой операцией, и я пока это не проверяю
+        d -= F / VS.area;
         if (d > d_max) { //
-            d = d_prev * 0.9 + 0.1 * d_max;
+            d = d_prev * 0.95 + 0.05 * d_max;
         }
         else if (d < d_min) {
-            d = d_min * 0.9 + 0.1 * d_prev;
+            d = d_min * 0.95 + 0.05 * d_prev;
         }
+        std::cout << "d: " << d << std::endl;
         p = m_center - (n.dot(m_center) - d) * n; //Проекция центра многогранника на плоскость сечения
         VS = clip_volume_and_area(p, n); //Объём и площадь итерации
 
@@ -1041,6 +1031,7 @@ Vector3d Polyhedron::find_section_newton(const Vector3d& n, double alpha) const 
         }
 
         F = VS.volume-alpha*V0; //Я так понимаю это можно назвать невязкой
+        std::cout << "F: " << F << std::endl;
         counter++;
     }
 

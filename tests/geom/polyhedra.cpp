@@ -28,8 +28,13 @@ void plot_sections(
     int N = 1000;
     double max_epsilon_cv = 0;
     double avarage_epsilon_cv = 0;
+
     double max_epsilon_fs = 0;
     double avg_epsilon_fs = 0;
+
+    double max_epsilon_fsn = 0;
+    double avg_epsilon_fsn = 0;
+
     double max_epsilon_cs = 0;
     double avarage_epsilon_cs = 0;
     std::vector<int> checks = std::vector<int>();
@@ -54,41 +59,35 @@ void plot_sections(
         double v2 = poly.clip_volume_and_area(p, normal).volume;
 
         double s1 = clip.face_area(clip.n_faces() - 1);
-        if (i == 0) {
+        if (i == 0 || i == N-1) {
             s1 = 0;
         }
         double s2 = poly.clip_volume_and_area(p, normal).area;
 
-        Vector3d p2 = poly.find_section_newton(normal, v1/v);
+//        Vector3d p2 = poly.find_section_newton(normal, v1/v);
+        Vector3d p3 = poly.find_section(normal, v1/v);
 
 //        double epsilon_cs = std::abs(s2-s1);
 //        avarage_epsilon_cs += epsilon_cs;
 //        if (max_epsilon_cs < epsilon_cs)
 //            max_epsilon_cs = epsilon_cs;
 //
-//        if (epsilon_cs > 0.5) {
-//            std::cout << " p: " << p[0] << " " << p[1] << " " << p[2] << std::endl;
-//            std::cout << " s1: " << s1 << std::endl;
-//            std::cout << " s2: " << s2 << std::endl;
-//            std::cout << " i: " << i << std::endl;
-//            std::cout << std::endl;
-//        }
-
 //        double epsilon_cv = std::abs(v2-v1);
 //        avarage_epsilon_cv += epsilon_cv;
 //        if (max_epsilon_cv < epsilon_cv)
 //            max_epsilon_cv = epsilon_cv;
 
-//        std::cout << " avarage_epsilon_cv: " << avarage_epsilon_cv << std::endl;
-//        std::cout << " i: " << i << std::endl;
-//        std::cout << std::endl;
-
-        double epsilon_fs = std::abs((p2-p).dot(normal));
+        double epsilon_fs = std::abs((p3-p).dot(normal));
         avg_epsilon_fs += epsilon_fs;
         if (max_epsilon_fs < epsilon_fs)
             max_epsilon_fs = epsilon_fs;
 
-//        if (epsilon_fs > 1) {
+//        double epsilon_fsn = std::abs((p2-p).dot(normal));
+//        avg_epsilon_fsn += epsilon_fsn;
+//        if (max_epsilon_fsn < epsilon_fsn)
+//            max_epsilon_fsn = epsilon_fsn;
+////
+//        if (epsilon_fsn > 0.5) {
 //            std::cout << " p: " << p[0] << " " << p[1] << " " << p[2] << std::endl;
 //            std::cout << " p2: " << p2[0] << " " << p2[1] << " " << p2[2] << std::endl;
 //            std::cout << " v2/v: " << v1/v << std::endl;
@@ -107,10 +106,15 @@ void plot_sections(
     }
 //    std::cout << figname << " clip_area max error: " << max_epsilon_cs << std::endl;
 //    std::cout << figname << " clip_area avg error: " << avarage_epsilon_cs / N << std::endl;
+//
 //    std::cout << figname << " clip_volume max error: " << max_epsilon_cv << std::endl;
 //    std::cout << figname << " clip_volume avg error: " << avarage_epsilon_cv / N << std::endl;
-    std::cout << figname << " find_section_newton max error: " << max_epsilon_fs << std::endl;
-    std::cout << figname << " find_section_newton avg error: " << avg_epsilon_fs / N << std::endl;
+
+    std::cout << figname << " find_section max error: " << max_epsilon_fs << std::endl;
+    std::cout << figname << " find_section avg error: " << avg_epsilon_fs / N << std::endl;
+
+//    std::cout << figname << " find_section_newton max error: " << max_epsilon_fsn << std::endl;
+//    std::cout << figname << " find_section_newton avg error: " << avg_epsilon_fsn / N << std::endl;
 //    std::cout << " checks's size: " << checks.size() << " , checks: ";
     for (size_t i = 0; i < checks.size(); ++i) {
         std::cout << checks[i];
@@ -150,7 +154,11 @@ int main() {
 //    std::cout << clip.face_area(clip.n_faces() - 1) << std::endl;
 
     //    std::cout << Polyhedron::Tetrahedron().find_section_newton(n, 0.949853).transpose()  << std::endl;
-//    std::cout << Polyhedron::Cube().find_section_newton(n, 0.888431).transpose()  << std::endl;
+//    Vector3d n = {0.4, 0.5, 0.3};
+//    n.normalize();
+//    auto p = Polyhedron::Pyramid().find_section(n, 0.945854);
+//    std::cout << "p: " << p.transpose() << std::endl;
+//    std::cout << "alpha: " << Polyhedron::Pyramid().clip_volume(p, n) / Polyhedron::Pyramid().volume() << std::endl;
 
     Vector3d n = {0.4, 0.5, 0.3};
     n.normalize();
