@@ -1,3 +1,5 @@
+#include "bs_vertex.h"
+
 #include <algorithm>
 #include <ranges>
 
@@ -24,23 +26,28 @@ BsVertex::Ptr BsVertex::create(double x, double y) {
     return std::make_shared<BsVertex>(x, y);
 }
 
-int BsVertex::n_adjacent() const {
-    return m_adjacent.size();
+int BsVertex::degree() const {
+    return m_edges.size();
 }
 
 void BsVertex::fix() {
-    m_adjacent.clear();
+    m_edges.clear();
 }
 
-const std::vector<BsVertex *> &BsVertex::adjacent_vertices() const {
-    return m_adjacent;
+void BsVertex::clear() {
+    m_boundaries.clear();
+    m_edges.clear();
 }
 
-void BsVertex::set_adjacent_vertices(const std::vector<BsVertex::Ptr> &vertices) {
-    std::vector<std::pair<double, BsVertex::Ptr>> sorted;
-    sorted.reserve(vertices.size());
-    for (auto &v: vertices) {
-        sorted.emplace_back(std::atan2(v->v1.y() - v1.y(), v->v1.x() - v1.x()), v);
+const std::vector<BsVertex::Edge> &BsVertex::adjacent() const {
+    return m_edges;
+}
+
+void BsVertex::set_edges(const std::vector<Edge> &edges) {
+    std::vector<std::pair<double, Edge>> sorted;
+    sorted.reserve(edges.size());
+    for (auto &edge: edges) {
+        sorted.emplace_back(std::atan2(edge.neib->y() - v1.y(), edge.neib->x() - v1.x()), edge);
     }
 
     for (size_t i = 1; i < sorted.size(); ++i) {
@@ -50,15 +57,15 @@ void BsVertex::set_adjacent_vertices(const std::vector<BsVertex::Ptr> &vertices)
     }
 
     std::ranges::sort(sorted,
-                      [](const std::pair<double, BsVertex::Ptr> &p1,
-                         const std::pair<double, BsVertex::Ptr> &p2) {
+                      [](const std::pair<double, Edge> &p1,
+                         const std::pair<double, Edge> &p2) {
                           return p1.first < p2.first;
                       });
 
-    m_adjacent.clear();
-    m_adjacent.reserve(sorted.size());
-    for (auto& val : sorted | std::views::values) {
-        m_adjacent.emplace_back(val.get());
+    m_edges.clear();
+    m_edges.reserve(sorted.size());
+    for (auto& val: sorted | std::views::values) {
+        m_edges.emplace_back(val);
     }
 }
 

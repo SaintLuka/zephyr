@@ -59,8 +59,10 @@ public:
     /// @brief Максимальное число узлов
     int calc_nodes() const;
 
-    void initialize();
+    void initialize() const;
     void optimize();
+    void optimize2();
+    void optimize3();
 
     /// @brief Проверяет размеры блоков
     void check_consistency() const;

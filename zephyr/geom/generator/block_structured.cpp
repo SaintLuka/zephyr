@@ -110,7 +110,7 @@ void BlockStructured::link() {
 
 void BlockStructured::plot() const {
     utils::pyplot plt;
-    plt.figure({.dpi=170});
+    plt.figure({.dpi=210});
 
     plt.set_aspect_equal();
 
@@ -176,6 +176,10 @@ void BlockStructured::plot() const {
     for (int ib = 0; ib < m_blocks.size(); ++ib) {
         Vector3d bc = m_blocks[ib]->center();
         //plt.text(bc.x(), bc.y(), std::format("B{}", ib));
+
+        auto ptr1 = reinterpret_cast<uintptr_t>(m_blocks[ib]->ratio_ptr(0));
+        auto ptr2 = reinterpret_cast<uintptr_t>(m_blocks[ib]->ratio_ptr(1));
+        //std::cout << std::format("  Block {}: {}, {}\n", ib, ptr1 % 97, ptr2 % 97);
     }
 
     // Связи блоков
@@ -198,14 +202,15 @@ void BlockStructured::plot() const {
 
     // Сетка для оптимизации
     for (const auto& block: m_blocks) {
-        if (block->m_vertices.empty()) { continue; }
-        const auto& verts = block->m_vertices;
+        auto& verts = block->vertices();
+
+        if (verts.empty()) { continue; }
         std::vector<double> xs1(block->size1() + 1);
         std::vector<double> ys1(block->size1() + 1);
         for (int j = 0; j <= block->size2(); ++j) {
             for (int i = 0; i <= block->size1(); ++i) {
-                xs1[i] = verts(i, j)->v1.x();
-                ys1[i] = verts(i, j)->v1.y();
+                xs1[i] = verts(i, j)->x();
+                ys1[i] = verts(i, j)->y();
             }
             plt.plot(xs1, ys1, {.linewidth=1.0, .color="black"});
         }
@@ -214,15 +219,15 @@ void BlockStructured::plot() const {
         std::vector<double> ys2(block->size2() + 1);
         for (int i = 0; i <= block->size1(); ++i) {
             for (int j = 0; j <= block->size2(); ++j) {
-                xs2[j] = verts(i, j)->v1.x();
-                ys2[j] = verts(i, j)->v1.y();
+                xs2[j] = verts(i, j)->x();
+                ys2[j] = verts(i, j)->y();
             }
-            plt.plot(xs2, ys2, {.linestyle="solid", .linewidth=1.0, .color="black"});
+            plt.plot(xs2, ys2, {.linewidth=1.0, .color="black"});
         }
 
         for (int i = 0; i <= block->size1(); ++i) {
             for (int j = 0; j <= block->size2(); ++j) {
-                //plt.text(verts(i, j)->v1.x(), verts(i, j)->v2.y(), std::to_string(verts(i, j)->n_adjacent()));
+                // plt.text(verts(i, j)->x(), verts(i, j)->y(), std::to_string(verts(i,j)->degree()));
             }
         }
 
@@ -230,13 +235,17 @@ void BlockStructured::plot() const {
         for (int i = 0; i <= block->size1(); ++i) {
             for (int j = 0; j <= block->size2(); ++j) {
                 Vector3d v1 = verts(i, j)->v1;
-                if (verts(i,j)->n_adjacent() < 4) { continue; }
-
-                for (auto adj: verts(i, j)->adjacent_vertices()) {
-                    Vector3d v2 = adj->v1;
+                for (auto edge: verts(i, j)->adjacent()) {
+                    Vector3d v2 = edge.neib->v1;
                     Vector3d dr = 0.25 * (v2 - v1);
 
                     //plt.arrow(v1.x(), v1.y(), dr.x(), dr.y());
+
+                    Vector3d vc = 0.5 * (v1 + v2);
+                    auto ptr1 = reinterpret_cast<uintptr_t>(edge.ratio1);
+                    auto ptr2 = reinterpret_cast<uintptr_t>(edge.ratio2);
+                    if (ptr1 > ptr2) std::swap(ptr1, ptr2);
+                    //plt.text(vc.x(), vc.y(), std::format("({}, {})", ptr1 % 97, ptr2 % 97), {.ha = "center", .va = "center"});
                 }
             }
         }
@@ -285,8 +294,8 @@ void BlockStructured::check_consistency() const {
             if (neib) {
                 Side2D twin = block->neib_face(side);
 
-                int size1 = block->get_size(side);
-                int size2 = neib->get_size(twin);
+                int size1 = block->size(side);
+                int size2 = neib->size(twin);
 
                 if (size1 != size2) {
                     std::cout << "side : " << side << "\n";
@@ -300,10 +309,10 @@ void BlockStructured::check_consistency() const {
     }
 }
 
-void BlockStructured::initialize() {
+void BlockStructured::initialize() const {
     check_consistency();
 
-    for (auto &block: m_blocks) {
+    for (const auto &block: m_blocks) {
         block->create_vertices();
     }
 
@@ -345,16 +354,12 @@ void BlockStructured::initialize() {
 }
 
 void BlockStructured::optimize() {
-    int N1 = 30;
+    int N1 = 10;
     int N2 = 10;
     for (const auto& block: m_blocks) {
-        block->set_size(Side2D::B, N1);
-        block->set_size(Side2D::L, N2);
+        block->set_size(0, N1);
+        block->set_size(1, N2);
     }
-    //m_blocks[0]->set_size_to_face(0, 5);
-    //m_blocks[0]->set_size_to_face(1, 10);
-    //m_blocks[1]->set_size_to_face(0, 20);
-    //m_blocks[1]->set_size_to_face(1, 10);
 
     check_consistency();
 
@@ -379,17 +384,173 @@ void BlockStructured::optimize() {
             std::cout << "\tstep " << std::setw(8) << counter << "\t\teps: " << error << "\n";
         }
         error = 0.0;
-        for (auto &block: m_blocks) {
+        for (const auto &block: m_blocks) {
             double err = block->smooth();
             error = std::max(error, err);
         }
-        for (auto &block: m_blocks) {
+        for (const auto &block: m_blocks) {
             block->update();
+            block->update_modulus();
+        }
+        ++counter;
+    }
+    plot();
+}
 
-            // Update modulus
-            double M = block->calc_modulus();
-            block->m_modulus = M;
-            //std::cout << "setup: " << block->m_modulus << "\n";
+void BlockStructured::optimize2() {
+    // Очистим блоки
+    for (auto& block: m_blocks) {
+        block->set_size(0, 1);
+        block->set_size(1, 1);
+        block->m_vertices = {};
+    }
+
+    double max_modulus = 1.0;
+    Block::Ptr bad_block;
+    int axis = 0;
+    for (auto& block: m_blocks) {
+        if (block->modulus() > max_modulus) {
+            max_modulus = block->modulus();
+            bad_block = block;
+            axis = 1;
+        }
+        if (1.0 / block->modulus() > max_modulus) {
+            max_modulus = 1.0 / block->modulus();
+            bad_block = block;
+            axis = 0;
+        }
+    }
+    std::cout << "max_modulus: " << max_modulus << "; bad block: " << bad_block->index << "\n";
+
+    bad_block->set_size(axis, 10);
+
+    for (int i = 0; i < 3; ++i) {
+        for (auto block: m_blocks) {
+            std::cout << "block sizes: " << block->size1() << " " << block->size2() << "\n";
+            if (block->size1() == 1 && block->size2() > 1) {
+                block->set_size(0, std::max(static_cast<int>(std::round(block->size2() * block->modulus())), 1));
+                std::cout << "HERE " << block->size2() << " " <<  block->modulus() << " " << block->size1() << "\n";
+            }
+            if (block->size1() > 1 && block->size2() == 1) {
+                block->set_size(1, std::max(static_cast<int>(std::round(block->size1() / block->modulus())), 1));
+                std::cout << "HERE " << block->size1() << " " <<  block->modulus() << " " << block->size2() << "\n";
+            }
+        }
+    }
+
+    check_consistency();
+
+    for (const auto &block: m_blocks) {
+        block->create_vertices();
+    }
+
+    for (const auto& block: m_blocks) {
+        block->link_vertices();
+    }
+    plot();
+    //return;
+
+    //m_blocks[0]->m_modulus = 1.0;
+    //m_blocks[1]->m_modulus = 1.0;
+
+    int counter = 0;
+    double error = 1.0;
+
+    for (int i = 0; i < 5000; ++i) {
+        if (m_verbose && counter % 100 == 0) {
+            std::cout << std::scientific << std::setprecision(2);
+            std::cout << "\tstep " << std::setw(8) << counter << "\t\teps: " << error << "\n";
+        }
+        error = 0.0;
+        for (const auto &block: m_blocks) {
+            double err = block->smooth();
+            error = std::max(error, err);
+        }
+        for (const auto &block: m_blocks) {
+            block->update();
+            block->update_modulus();
+        }
+        ++counter;
+    }
+    plot();
+}
+
+void BlockStructured::optimize3() {
+    // Очистим блоки
+    for (auto& block: m_blocks) {
+        block->set_size(0, 1);
+        block->set_size(1, 1);
+        block->m_vertices = {};
+    }
+
+    double max_modulus = 1.0;
+    Block::Ptr bad_block;
+    int axis = 0;
+    for (auto& block: m_blocks) {
+        if (block->modulus() > max_modulus) {
+            max_modulus = block->modulus();
+            bad_block = block;
+            axis = 1;
+        }
+        if (1.0 / block->modulus() > max_modulus) {
+            max_modulus = 1.0 / block->modulus();
+            bad_block = block;
+            axis = 0;
+        }
+    }
+    std::cout << "max_modulus: " << max_modulus << "; bad block: " << bad_block->index << "\n";
+
+    bad_block->set_size(axis, 10);
+
+    for (int i = 0; i < 3; ++i) {
+        for (auto block: m_blocks) {
+            std::cout << "block sizes: " << block->size1() << " " << block->size2() << "\n";
+            if (block->size1() == 1 && block->size2() > 1) {
+                block->set_size(0, std::max(static_cast<int>(std::round(block->size2() * block->modulus())), 1));
+                std::cout << "HERE " << block->size2() << " " <<  block->modulus() << " " << block->size1() << "\n";
+            }
+            if (block->size1() > 1 && block->size2() == 1) {
+                block->set_size(1, std::max(static_cast<int>(std::round(block->size1() / block->modulus())), 1));
+                std::cout << "HERE " << block->size1() << " " <<  block->modulus() << " " << block->size2() << "\n";
+            }
+        }
+    }
+
+    check_consistency();
+
+    for (const auto &block: m_blocks) {
+        block->create_vertices();
+    }
+
+    for (const auto& block: m_blocks) {
+        block->link_vertices();
+    }
+    plot();
+    //return;
+
+    //m_blocks[0]->m_modulus = 1.0;
+    //m_blocks[1]->m_modulus = 1.0;
+
+    int counter = 0;
+    double error = 1.0;
+
+    for (auto block: m_blocks) {
+        block->m_ratio = {1.0, 1.0};
+    }
+
+    for (int i = 0; i < 5000; ++i) {
+        if (m_verbose && counter % 100 == 0) {
+            std::cout << std::scientific << std::setprecision(2);
+            std::cout << "\tstep " << std::setw(8) << counter << "\t\teps: " << error << "\n";
+        }
+        error = 0.0;
+        for (const auto &block: m_blocks) {
+            double err = block->smooth();
+            error = std::max(error, err);
+        }
+        for (const auto &block: m_blocks) {
+            block->update();
+            // block->update_modulus();
         }
         ++counter;
     }

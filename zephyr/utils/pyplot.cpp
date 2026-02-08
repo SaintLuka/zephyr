@@ -113,6 +113,13 @@ py::kwargs get_kwargs(const surface_options& opts) {
     return kwargs;
 }
 
+py::kwargs get_kwargs(const text_options& opts) {
+    py::kwargs kwargs;
+    if (opts.ha.has_value()) { kwargs["ha"] = py::str(opts.ha.value()); }
+    if (opts.va.has_value()) { kwargs["va"] = py::str(opts.va.value()); }
+    return kwargs;
+}
+
 }
 
 class pyplot::pyport {
@@ -221,8 +228,9 @@ void pyplot::ylabel(const std::string& text) const {
     impl->plt.attr("ylabel")(text);
 }
 
-void pyplot::text(double x, double y, const std::string& text) const {
-    impl->plt.attr("text")(x, y, text);
+void pyplot::text(double x, double y, const std::string& text, const text_options& args) const {
+    auto kwargs = get_kwargs(args);
+    impl->plt.attr("text")(x, y, text, **kwargs);
 }
 
 void pyplot::marker(double x, double y, const line_options& args) const {

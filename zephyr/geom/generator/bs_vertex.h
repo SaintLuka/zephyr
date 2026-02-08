@@ -12,11 +12,31 @@ namespace zephyr::geom::generator {
 class Block;
 class Curve;
 
+
 /// @brief Внутренний тип вершины для класса Block
-struct BsVertex {
+class BsVertex {
 public:
     using Ptr = std::shared_ptr<BsVertex>;
     using Ref = const std::shared_ptr<BsVertex> &;
+
+    /// @brief Связь с соседней вершиной, если связь с внутренней вершиной,
+    /// тогда есть указатели на ratio1 и ratio2, если связь на границе,
+    /// тогда ratio2 = nullptr.
+    struct Edge {
+        BsVertex* neib{nullptr};
+        double* ratio1{nullptr};
+        double* ratio2{nullptr};
+
+        bool boundary() const {
+            return ratio2 == nullptr;
+        }
+
+        double ratio() const {
+            z_assert(ratio1 != nullptr, "ratio1 is null");
+            if (boundary()) { return (*ratio1); }
+            return std::sqrt((*ratio1) * (*ratio2));
+        }
+    };
 
     /// @brief Конструктор
     explicit BsVertex(const Vector3d &v);
@@ -36,18 +56,21 @@ public:
     /// смежных вершин равно четырем. В этих случаях вершина считается регулярной,
     /// иначе - сингулярной. Сингулярные вершины встречаются только в углах
     /// структурированных блоков.
-    int n_adjacent() const;
+    int degree() const;
 
     /// @brief Зафиксировать вершину (удаляет смежные)
     void fix();
 
+    /// @brief Очистить все списки
+    void clear();
+
     /// @brief Смежные вершины
-    const std::vector<BsVertex *> &adjacent_vertices() const;
+    const std::vector<Edge> &adjacent() const;
 
     /// @brief Установить соседние вершины. Вершины массива переставляются
     /// в соответствии с правилами обхода для смежных вершин. Первая вершина
     /// остается в начале.
-    void set_adjacent_vertices(const std::vector<BsVertex::Ptr> &vertices);
+    void set_edges(const std::vector<Edge> &edges);
 
     /// @brief Вершина считается внутренней, если она не лежит на границе
     bool inner() const;
@@ -67,6 +90,9 @@ public:
     /// @brief Установить границу
     void add_boundary(Curve *boundary);
 
+    double x() const { return v1.x(); }
+    double y() const { return v1.y(); }
+
 
     int index;
     Vector3d v1;  ///< Основное положение
@@ -76,14 +102,14 @@ private:
     /// @brief Кривые, на которых лежит вершина.
     /// Если кривая отсутствует (nullptr), то вершина считается внутренней.
     /// Если кривая одна -- обычная вершина на границе.
-    /// Если более одной -- вершина в углу.
-    std::set<Curve *> m_boundaries;
+    /// Если более одной -- вершина в углу, должна быть неподвижна.
+    std::set<Curve*> m_boundaries;
 
     /// @brief Список смежных вершин. Используется строгий порядок заполнения.
     /// Вершины обходятся против часовой стрелки внутри области. Таким образом,
     /// для граничной вершины крайние вершины внутри списка m_adjacent также
     /// должны быть граничными.
-    std::vector<BsVertex *> m_adjacent;
+    std::vector<Edge> m_edges;
 };
 
 } // namespace zephyr::geom::generator
