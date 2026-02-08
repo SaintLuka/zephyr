@@ -1052,6 +1052,94 @@ Vector3d Polyhedron::find_section_newton(const Vector3d& n, double alpha) const 
     return p;
 }
 
+Vector3d Polyhedron::find_section_brent(const Vector3d& n, double alpha) const {
+    double L = std::cbrt(volume());
+    double eps = (1.0e-8) * L;
+    double V0 = volume();
+    double target = alpha * V0;
+
+    double a = n.dot(verts[0]);
+    double b = n.dot(verts[0]);
+    for (int i = 1; i < n_verts(); ++i) {
+        double d = n.dot(verts[i]);
+        if (d < a) a = d;
+        if (d > b) b = d;
+    }
+
+    Vector3d p_a = a * n;
+    Vector3d p_b = b * n;
+    double fa = clip_volume(p_a, n) - target;
+    double fb = clip_volume(p_b, n) - target;
+
+    double c = a;
+    double fc = fa;
+    double d = 0.0;
+    double e = 0.0;
+
+    if (std::abs(fa) < std::abs(fb)) {
+        std::swap(a, b);
+        std::swap(fa, fb);
+    }
+
+    double tol = eps;
+    int iter = 0;
+    const int max_iter = 100;
+    bool mflag = true;
+
+    while (iter < max_iter) {
+        iter++;
+
+        if (std::abs(fb) < tol || std::abs(b - a) < tol) {
+            return b * n;
+        }
+
+        double s;
+
+        if (fa != fc && fb != fc && fa != fb) {
+            s = a * fb * fc / ((fa - fb) * (fa - fc))
+                + b * fa * fc / ((fb - fa) * (fb - fc))
+                + c * fa * fb / ((fc - fa) * (fc - fb));
+        } else {
+            s = b - fb * (b - a) / (fb - fa);
+        }
+
+        bool condition1 = (s < (3*a + b)/4 || s > b);
+        bool condition2 = (mflag && std::abs(s - b) >= std::abs(b - c)/2);
+        bool condition3 = (!mflag && std::abs(s - b) >= std::abs(c - d)/2);
+        bool condition4 = (mflag && std::abs(b - c) < tol);
+        bool condition5 = (!mflag && std::abs(c - d) < tol);
+
+        if (condition1 || condition2 || condition3 || condition4 || condition5) {
+            s = (a + b) / 2.0;
+            mflag = true;
+        } else {
+            mflag = false;
+        }
+
+        Vector3d p_s = s * n;
+        double fs = clip_volume(p_s, n) - target;
+
+        d = c;
+        c = b;
+        fc = fb;
+
+        if (fa * fs < 0) {
+            b = s;
+            fb = fs;
+        } else {
+            a = s;
+            fa = fs;
+        }
+
+        if (std::abs(fa) < std::abs(fb)) {
+            std::swap(a, b);
+            std::swap(fa, fb);
+        }
+    }
+
+    return b * n;
+}
+
 double Polyhedron::volume_fraction(
         const std::function<bool(const Vector3d&)>& inside,
         int n_points) const {

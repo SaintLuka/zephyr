@@ -131,6 +131,8 @@ public:
     Vector3d find_section(const Vector3d& n, double alpha) const;
     //Тоже самое методом Ньютона
     Vector3d find_section_newton(const Vector3d& n, double alpha) const;
+    //Тоже самое методом Брента
+    Vector3d find_section_brent(const Vector3d& n, double alpha) const;
 
     /// @brief Посчитать объемную долю, которая отсекается от ячейки некоторым
     /// телом, точки которого определяются характеристической функцией inside
