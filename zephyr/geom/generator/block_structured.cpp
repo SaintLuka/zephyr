@@ -1,8 +1,12 @@
 #include <array>
 #include <algorithm>
+#include <format>
+#include <map>
 #include <iomanip>
+#include <ranges>
 
 #include <zephyr/geom/grid.h>
+#include <zephyr/mesh/side.h>
 #include <zephyr/geom/generator/bs_vertex.h>
 #include <zephyr/geom/generator/curve/curve.h>
 #include <zephyr/geom/generator/block.h>
@@ -11,6 +15,16 @@
 
 
 namespace zephyr::geom::generator {
+
+constexpr int node(Side2D side, int idx) {
+    switch (side) {
+        case Side2D::L: return std::array{0, 2}[idx];
+        case Side2D::R: return std::array{1, 3}[idx];
+        case Side2D::B: return std::array{0, 1}[idx];
+        case Side2D::T: return std::array{2, 3}[idx];
+        default: throw std::runtime_error("Invalid side");
+    }
+}
 
 BlockStructured::BlockStructured(int n_blocks)
     : Generator("block_structured") {
@@ -46,104 +60,152 @@ Block &BlockStructured::operator[](int idx) {
     return *m_blocks[idx];
 }
 
+void BlockStructured::remove_null_blocks() {
+    const auto it = std::remove(m_blocks.begin(), m_blocks.end(), nullptr);
+    m_blocks.erase(it, m_blocks.end());
+}
+
 void BlockStructured::link() {
     if (m_stage != EDITABLE) {
         throw std::runtime_error("BlockStructured::link() is available only at edit stage");
     }
 
-    // Удаляем нулевые блоки
-    const auto it = std::remove(m_blocks.begin(), m_blocks.end(), nullptr);
-    m_blocks.erase(it, m_blocks.end());
+    // Удалить нулевые блоки
+    remove_null_blocks();
 
-    // Собираем уникальные вершины, чистим ссылки на блоки
-    std::set<BaseVertex::Ptr> nodes;
+    // Собираем уникальные узлы
+    std::map<BaseNode::Ptr, std::set<Block::Ptr>> nodes;
     for (const auto& block: m_blocks) {
-        for (int i = 0; i < 4; ++i) {
-            auto v = block->base_vertex(i);
-            v->clear_adjacent_blocks();
-            nodes.insert(v);
+        for (const auto& v: block->base_nodes()) {
+            v->reset();
+            nodes[v] = {};
         }
     }
 
-    // Для всех вершин выставляем смежные блоки
+    // Для каждого узла собираем смежные блоки
     for (auto& block: m_blocks) {
-        for (int i = 0; i < 4; ++i) {
-            auto v = block->base_vertex(i);
-            v->add_adjacent_block(block);
+        for (const auto& v: block->base_nodes()) {
+            nodes[v].insert(block);
         }
+    }
+
+    // Завершить формирование узлов (задать смежные блоки)
+    for (auto& [node, adj]: nodes) {
+        node->finalize(adj);
     }
 
     // Для каждой вершины проходим по смежным блокам
-    for (auto &bv: nodes) {
-        auto &adj = bv->adjacent_blocks();
-        for (auto it_b1 = adj.begin(); it_b1 != adj.end(); ++it_b1) {
-            if (it_b1->expired()) continue;
-
-            auto it_b2 = it_b1; ++it_b2;
-            for (; it_b2 != adj.end(); ++it_b2) {
-                if (it_b2->expired()) continue;
-
-                it_b1->lock()->link(it_b2->lock());
-            }
+    for (const auto& node: nodes | std::views::keys) {
+        if (node->n_adjacent_blocks() <= 1) {
+            continue;
+        }
+        auto& adj = node->adjacent_blocks();
+        for (int i = 0; i < adj.size(); ++i) {
+            int j = (i + 1) % adj.size();
+            Block::link(adj[i].lock(), adj[j].lock());
         }
     }
-
     m_stage = LINKED;
 }
 
 void BlockStructured::plot() const {
-    // Собираем уникальные вершины
-    std::set<BaseVertex::Ptr> nodes;
-    for (const auto& block: m_blocks) {
-        for (int i = 0; i < 4; ++i) {
-            nodes.insert(block->base_vertex(i));
-        }
-    }
-
-    std::vector<double> nxs; nxs.reserve(nodes.size());
-    std::vector<double> nys; nys.reserve(nodes.size());
-    for (auto node: nodes) {
-        nxs.push_back(node->v().x());
-        nys.push_back(node->v().y());
-    }
-
     utils::pyplot plt;
     plt.figure({.dpi=170});
 
     plt.set_aspect_equal();
-    //plt.plot(nxs, nys, {.linestyle="none", .marker="o"});
 
-    std::vector<double> bxs(5);
-    std::vector<double> bys(5);
+    // Собираем уникальные вершины
+    std::set<BaseNode::Ptr> unique_nodes;
+    for (const auto& block: m_blocks) {
+        for (const auto& node: block->base_nodes()) {
+            unique_nodes.insert(node);
+        }
+    }
+
+    // Построить узлы
+    std::vector<double> nodes_x, nodes_y;
+    for (const auto& node: unique_nodes) {
+        nodes_x.push_back(node->x());
+        nodes_y.push_back(node->y());
+    }
+    //plt.plot(nodes_x, nodes_y, {.linestyle="none", .marker="o"});
+
+    // Проставить смежность
+    for (const auto& node: unique_nodes) {
+        int n_nodes = node->n_adjacent_nodes();
+        int n_blocks = node->n_adjacent_blocks();
+        //plt.text(node->x(), node->y(), std::format("{}, {}", n_blocks, n_nodes));
+    }
+
+    // Обходы по смежным
+    for (const auto& node: unique_nodes) {
+        double rn{0.03}, rb{0.05};
+        std::vector<double> points_x, points_y;
+        for (auto& adj_node: node->adjacent_nodes()) {
+            double phi = std::atan2(adj_node.lock()->y() - node->y(), adj_node.lock()->x() - node->x());
+            points_x.push_back(node->x() + rn * std::cos(phi));
+            points_y.push_back(node->y() + rn * std::sin(phi));
+        }
+        //plt.plot({points_x.front()}, {points_y.front()}, {.linewidth=3.0, .color="green", .marker="o"});
+        //plt.plot(points_x, points_y, {.linewidth=1.0, .color="green", .marker="."});
+        //plt.plot({points_x.back()}, {points_y.back()}, {.linewidth=3.0, .color="green", .marker="x"});
+
+        points_x.clear(); points_y.clear();
+        for (auto& adj_block: node->adjacent_blocks()) {
+            Vector3d vc = adj_block.lock()->center() - node->pos();
+            double phi = std::atan2(vc.y(), vc.x());
+            points_x.push_back(node->x() + rb * std::cos(phi));
+            points_y.push_back(node->y() + rb * std::sin(phi));
+        }
+        //plt.plot({points_x.front()}, {points_y.front()}, {.linewidth=1.0, .color="blue", .marker="o"});
+        //plt.plot(points_x, points_y, {.linewidth=1.0, .color="blue", .marker="."});
+        //plt.plot({points_x.back()}, {points_y.back()}, {.linewidth=1.0, .color="blue", .marker="x"});
+    }
+
+    // Очертания блоков
+    for (const auto& block: m_blocks) {
+        std::vector<double> bxs, bys;
+        for (int i: {0, 1, 3, 2, 0}) {
+            bxs.push_back(block->base_node(i)->x());
+            bys.push_back(block->base_node(i)->y());
+        }
+        //plt.plot(bxs, bys, {.linestyle="solid", .marker="."});
+    }
+
+    // Центры блоков
     for (int ib = 0; ib < m_blocks.size(); ++ib) {
-        auto& block = m_blocks[ib];
+        Vector3d bc = m_blocks[ib]->center();
+        //plt.text(bc.x(), bc.y(), std::format("B{}", ib));
+    }
 
-        /*
-        for (int iv = 0; iv <= 4; ++iv) {
-            bxs[iv] = block->base_vertex(iv % 4)->v().x();
-            bys[iv] = block->base_vertex(iv % 4)->v().y();
+    // Связи блоков
+    for (const auto& block: m_blocks) {
+        Vector3d c1 = block->center();
+        for (Side2D side: Side2D::items()) {
+            auto adj = block->adjacent_block(side);
+            if (!adj) continue;
+
+            Vector3d v1 = block->base_node(node(side, 0))->pos();
+            Vector3d v2 = block->base_node(node(side, 1))->pos();
+            Vector3d c2 = adj->center();
+
+            Vector3d vc = 0.5 * (v1 + v2);
+            Vector3d dc = 0.05 * (c2 - c1);
+
+            //plt.arrow(vc.x(), vc.y(), dc.x(), dc.y());
         }
-        double xc = 0.25 * std::accumulate(bxs.begin(), bxs.end() - 1, 0.0);
-        double yc = 0.25 * std::accumulate(bys.begin(), bys.end() - 1, 0.0);
+    }
 
-        plt.plot(bxs, bys, {.linestyle="solid", .marker="."});
-        plt.text(xc, yc, "B" + std::to_string(ib));
-        */
-
-        for (int iv = 0; iv < 4; ++iv) {
-            double x = block->base_vertex(iv % 4)->v().x();
-            double y = block->base_vertex(iv % 4)->v().y();
-            //plt.text(x, y, std::to_string(block->base_vertex(iv)->adjacent_blocks().size()));
-        }
-
+    // Сетка для оптимизации
+    for (const auto& block: m_blocks) {
+        if (block->m_vertices.empty()) { continue; }
         const auto& verts = block->m_vertices;
-
         std::vector<double> xs1(block->size1() + 1);
         std::vector<double> ys1(block->size1() + 1);
         for (int j = 0; j <= block->size2(); ++j) {
             for (int i = 0; i <= block->size1(); ++i) {
-                xs1[i] = verts[i][j]->v1.x();
-                ys1[i] = verts[i][j]->v1.y();
+                xs1[i] = verts(i, j)->v1.x();
+                ys1[i] = verts(i, j)->v1.y();
             }
             plt.plot(xs1, ys1, {.linewidth=1.0, .color="black"});
         }
@@ -152,15 +214,30 @@ void BlockStructured::plot() const {
         std::vector<double> ys2(block->size2() + 1);
         for (int i = 0; i <= block->size1(); ++i) {
             for (int j = 0; j <= block->size2(); ++j) {
-                xs2[j] = verts[i][j]->v1.x();
-                ys2[j] = verts[i][j]->v1.y();
+                xs2[j] = verts(i, j)->v1.x();
+                ys2[j] = verts(i, j)->v1.y();
             }
-            plt.plot(xs2, ys2, {.linewidth=1.0, .color="black"});
+            plt.plot(xs2, ys2, {.linestyle="solid", .linewidth=1.0, .color="black"});
         }
 
         for (int i = 0; i <= block->size1(); ++i) {
             for (int j = 0; j <= block->size2(); ++j) {
-                //plt.text(verts[i][j]->v1.x(), verts[i][j]->v2.y(), std::to_string(verts[i][j]->n_adjacent()));
+                //plt.text(verts(i, j)->v1.x(), verts(i, j)->v2.y(), std::to_string(verts(i, j)->n_adjacent()));
+            }
+        }
+
+        // Связи с соседями
+        for (int i = 0; i <= block->size1(); ++i) {
+            for (int j = 0; j <= block->size2(); ++j) {
+                Vector3d v1 = verts(i, j)->v1;
+                if (verts(i,j)->n_adjacent() < 4) { continue; }
+
+                for (auto adj: verts(i, j)->adjacent_vertices()) {
+                    Vector3d v2 = adj->v1;
+                    Vector3d dr = 0.25 * (v2 - v1);
+
+                    //plt.arrow(v1.x(), v1.y(), dr.x(), dr.y());
+                }
             }
         }
     }
@@ -199,21 +276,20 @@ void BlockStructured::check_consistency() const {
             throw std::runtime_error("Zero size of some block");
         }
 
-        for (int f1 = 0; f1 < 4; ++f1) {
-            if (block->boundary(f1)) {
+        for (Side2D side: Side2D::items()) {
+            if (block->boundary(side)) {
                 continue;
             }
 
-            Block::Ptr neib = block->adjacent_block(f1);
-            std::cout << "side : " << f1 << "\n";
-
+            auto neib = block->adjacent_block(side);
             if (neib) {
-                int f2 = block->neib_face(f1);
+                Side2D twin = block->neib_face(side);
 
-                int size1 = block->size(f1);
-                int size2 = neib->size(f2);
+                int size1 = block->get_size(side);
+                int size2 = neib->get_size(twin);
 
                 if (size1 != size2) {
+                    std::cout << "side : " << side << "\n";
                     throw std::runtime_error("Sizes mismatch");
                 }
             }
@@ -243,11 +319,10 @@ void BlockStructured::initialize() {
 
     // Фиксируем часть вершин по критерию
     for (auto& block: m_blocks) {
-        for (auto &row: block->m_vertices) {
-            for (auto &node: row) {
-                if (m_fixed(node->v1)) {
-                    node->fix();
-                }
+        for (int i = 0; i < block->m_vertices.size1(); ++i) {
+            for (int j = 0; j < block->m_vertices.size2(); ++j) {
+                auto node = block->m_vertices(i, j);
+                if (m_fixed(node->v1)) { node->fix(); }
             }
         }
     }
@@ -270,30 +345,35 @@ void BlockStructured::initialize() {
 }
 
 void BlockStructured::optimize() {
-    int N1 = 20;
-    int N2 = 20;
-    for (auto& block: m_blocks) {
-        block->set_size_to_face(0, N1);
-        block->set_size_to_face(1, N2);
+    int N1 = 30;
+    int N2 = 10;
+    for (const auto& block: m_blocks) {
+        block->set_size(Side2D::B, N1);
+        block->set_size(Side2D::L, N2);
     }
+    //m_blocks[0]->set_size_to_face(0, 5);
+    //m_blocks[0]->set_size_to_face(1, 10);
+    //m_blocks[1]->set_size_to_face(0, 20);
+    //m_blocks[1]->set_size_to_face(1, 10);
 
     check_consistency();
 
-    for (auto &block: m_blocks) {
+    for (const auto &block: m_blocks) {
         block->create_vertices();
     }
 
-    for (auto& block: m_blocks) {
+    for (const auto& block: m_blocks) {
         block->link_vertices();
     }
+    plot();
 
-    m_blocks[0]->m_modulus = N2 / double(N1);
-    //plot();
+    //m_blocks[0]->m_modulus = 1.0;
+    //m_blocks[1]->m_modulus = 1.0;
 
     int counter = 0;
     double error = 1.0;
 
-    for (int i = 0; i < 5500; ++i) {
+    for (int i = 0; i < 5000; ++i) {
         if (m_verbose && counter % 100 == 0) {
             std::cout << std::scientific << std::setprecision(2);
             std::cout << "\tstep " << std::setw(8) << counter << "\t\teps: " << error << "\n";
@@ -308,7 +388,8 @@ void BlockStructured::optimize() {
 
             // Update modulus
             double M = block->calc_modulus();
-            block->m_modulus = block->size2() / (M * block->size1());
+            block->m_modulus = M;
+            //std::cout << "setup: " << block->m_modulus << "\n";
         }
         ++counter;
     }

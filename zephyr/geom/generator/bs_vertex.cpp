@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <ranges>
 
 #include <zephyr/geom/generator/curve/curve.h>
 #include <zephyr/geom/generator/bs_vertex.h>
@@ -36,28 +37,28 @@ const std::vector<BsVertex *> &BsVertex::adjacent_vertices() const {
 }
 
 void BsVertex::set_adjacent_vertices(const std::vector<BsVertex::Ptr> &vertices) {
-    std::vector<std::pair<double, BsVertex::Ptr>> vec_verts;
-    vec_verts.reserve(vertices.size());
+    std::vector<std::pair<double, BsVertex::Ptr>> sorted;
+    sorted.reserve(vertices.size());
     for (auto &v: vertices) {
-        vec_verts.emplace_back(std::make_pair(std::atan2(v->v1.y() - v1.y(), v->v1.x() - v1.x()), v));
+        sorted.emplace_back(std::atan2(v->v1.y() - v1.y(), v->v1.x() - v1.x()), v);
     }
 
-    for (size_t i = 1; i < vec_verts.size(); ++i) {
-        if (vec_verts[i].first < vec_verts[0].first) {
-            vec_verts[i].first += 2.0 * M_PI;
+    for (size_t i = 1; i < sorted.size(); ++i) {
+        if (sorted[i].first < sorted[0].first) {
+            sorted[i].first += 2.0 * M_PI;
         }
     }
 
-    std::sort(vec_verts.begin(), vec_verts.end(),
-              [](const std::pair<double, BsVertex::Ptr> &p1,
-                 const std::pair<double, BsVertex::Ptr> &p2) {
-                  return p1.first < p2.first;
-              });
+    std::ranges::sort(sorted,
+                      [](const std::pair<double, BsVertex::Ptr> &p1,
+                         const std::pair<double, BsVertex::Ptr> &p2) {
+                          return p1.first < p2.first;
+                      });
 
     m_adjacent.clear();
-    m_adjacent.reserve(vec_verts.size());
-    for (auto &p: vec_verts) {
-        m_adjacent.emplace_back(p.second.get());
+    m_adjacent.reserve(sorted.size());
+    for (auto& val : sorted | std::views::values) {
+        m_adjacent.emplace_back(val.get());
     }
 }
 
@@ -90,42 +91,6 @@ void BsVertex::add_boundary(Curve *boundary) {
     if (boundary) {
         m_boundaries.insert(boundary);
     }
-}
-
-BaseVertex::BaseVertex(const Vector3d &v, bool fixed)
-    : m_v(v), m_fixed(fixed) {
-}
-
-BaseVertex::Ptr BaseVertex::create(const Vector3d &v, bool fixed) {
-    return std::make_shared<BaseVertex>(v, fixed);
-}
-
-BaseVertex::Ptr BaseVertex::create(double x, double y, bool fixed) {
-    return std::make_shared<BaseVertex>(Vector3d(x, y, 0.0), fixed);
-}
-
-bool BaseVertex::is_fixed() const {
-    return m_fixed;
-}
-
-const Vector3d &BaseVertex::v() const {
-    return m_v;
-}
-
-int BaseVertex::degree() const {
-    return m_adjacent_blocks.size();
-}
-
-void BaseVertex::add_adjacent_block(Block::Ref block) {
-    m_adjacent_blocks.insert(block);
-}
-
-void BaseVertex::clear_adjacent_blocks() {
-    m_adjacent_blocks.clear();
-}
-
-const BaseVertex::AdjBlocks &BaseVertex::adjacent_blocks() const {
-    return m_adjacent_blocks;
 }
 
 } // namespace zephyr::geom::generator

@@ -12,10 +12,10 @@ struct Boundaries {
 
 // Ромб, конформный модуль M = 1
 BlockStructured test1() {
-    auto v1 = BaseVertex::create(-1.0, 0.0, true);
-    auto v2 = BaseVertex::create(0.0, -0.5, true);
-    auto v3 = BaseVertex::create(+1.0, 0.0, true);
-    auto v4 = BaseVertex::create(0.0, +1.5, true);
+    auto v1 = BaseNode::create(-1.0, 0.0, true);
+    auto v2 = BaseNode::create(0.0, -0.5, true);
+    auto v3 = BaseNode::create(+1.0, 0.0, true);
+    auto v4 = BaseNode::create(0.0, +1.5, true);
 
     // Ограничивающие прямые области
     auto left   = Plane::create(v1, v2);
@@ -40,22 +40,23 @@ BlockStructured test1() {
     return blocks;
 }
 
-// сектор с конформным модулем M
-BlockStructured test2(double M) {
-    double R = std::exp(M * M_PI / 2.0);
+// Сектор с конформным модулем M
+BlockStructured test2(double M, double alpha=0.5*M_PI) {
+    double R0 = 1.0;
+    double R1 = std::exp(M * alpha);
 
-    auto v1 = BaseVertex::create(0.0, 1.0, true);
-    auto v2 = BaseVertex::create(0.0, R, true);
-    auto v3 = BaseVertex::create(1.0, 0.0, true);
-    auto v4 = BaseVertex::create(R, 0.0, true);
+    double sin = std::sin(0.5*alpha);
+    double cos = std::cos(0.5*alpha);
+    auto v1 = BaseNode::create(R0*cos, -R0*sin, true);
+    auto v2 = BaseNode::create(R1*cos, -R1*sin, true);
+    auto v3 = BaseNode::create(R0*cos, +R0*sin, true);
+    auto v4 = BaseNode::create(R1*cos, +R1*sin, true);
 
     // Ограничивающие прямые области
-    auto left  = Plane::create(v1, v2);
-    auto right = Plane::create(v3, v4);
-    //auto inner = Plane::create(v1, v3);
-    //auto outer = Plane::create(v2, v4);
+    auto right = Plane::create(v1, v2);
+    auto left  = Plane::create(v3, v4);
     auto inner = Circle::create(1.0, Vector3d::Zero());
-    auto outer = Circle::create(R, Vector3d::Zero());
+    auto outer = Circle::create(R1, Vector3d::Zero());
 
     left->set_boundary(Boundary::WALL);
     right->set_boundary(Boundary::ZOE);
@@ -66,14 +67,117 @@ BlockStructured test2(double M) {
 
     // Генератор сетки
     blocks[0] = {v1, v2, v3, v4};
-    blocks[0].set_boundary(v1, v2, left);
-    blocks[0].set_boundary(v3, v4, right);
+    blocks[0].set_boundary(v1, v2, right);
+    blocks[0].set_boundary(v3, v4, left);
     blocks[0].set_boundary(v1, v3, inner);
     blocks[0].set_boundary(v2, v4, outer);
 
     return blocks;
 }
 
+// Сектор, разделенный на две части, конформные модули M1 и M2 у левой и
+// правой частей. Позволяет протестировать сопряжение двух блоков.
+BlockStructured test3(double M1, double M2, double angle=0.5*M_PI) {
+    double R0 = 1.0;
+    double R1 = std::exp(M1 * angle);
+    double R2 = std::exp((M1 + M2) * angle);
+
+    double sin = std::sin(0.5*angle);
+    double cos = std::cos(0.5*angle);
+    auto v1 = BaseNode::create(R0*cos, -R0*sin, true);
+    auto v2 = BaseNode::create(R1*cos, -R1*sin, true);
+    auto v3 = BaseNode::create(R2*cos, -R2*sin, true);
+    auto v4 = BaseNode::create(R0*cos, +R0*sin, true);
+    auto v5 = BaseNode::create(R1*cos, +R1*sin, true);
+    auto v6 = BaseNode::create(R2*cos, +R2*sin, true);
+
+    // Ограничивающие прямые области
+    auto left  = Plane::create(v4, v6);
+    auto right = Plane::create(v1, v3);
+    auto inner = Circle::create(R0, Vector3d::Zero());
+    auto outer = Circle::create(R2, Vector3d::Zero());
+
+    left->set_boundary(Boundary::WALL);
+    right->set_boundary(Boundary::ZOE);
+    inner->set_boundary(Boundary::WALL);
+    outer->set_boundary(Boundary::ZOE);
+
+    BlockStructured blocks(2);
+
+    // Генератор сетки
+    blocks[0] = {v1, v2, v4, v5};
+    blocks[0].set_boundary(v1, v4, inner);
+    blocks[0].set_boundary(v4, v5, left);
+    blocks[0].set_boundary(v1, v2, right);
+
+    blocks[1] = {v2, v3, v5, v6};
+    blocks[1].set_boundary(v2, v3, right);
+    blocks[1].set_boundary(v5, v6, left);
+    blocks[1].set_boundary(v3, v6, outer);
+
+    return blocks;
+}
+
+// Сектор, разделенный на четыре части, у трёх частей заданы конформные
+// модули M, Mx, My. Позволяет протестировать сопряжение четырёх блоков.
+BlockStructured test4(double M, double Mx, double My, double angle=0.5*M_PI) {
+    double x1 = 0.0, x2 = M, x3 = M + Mx;
+    double y1 = 0.0, y2 = 1.0, y3 = (1.0 + My / M);
+
+    // w(z) = exp((angle / y3) * z)
+    // r_i = exp(x_i), phi_i = angle / y3 * y_i
+    double R0 = std::exp((angle / y3) * x1);
+    double R1 = std::exp((angle / y3) * x2);
+    double R2 = std::exp((angle / y3) * x3);
+
+    double phi1 = (angle / y3) * y1;
+    double phi2 = (angle / y3) * y2;
+    double phi3 = (angle / y3) * y3;
+
+    using std::sin; using std::cos;
+
+    auto v1 = BaseNode::create(R0*cos(phi1), R0*sin(phi1), true);
+    auto v2 = BaseNode::create(R1*cos(phi1), R1*sin(phi1), true);
+    auto v3 = BaseNode::create(R2*cos(phi1), R2*sin(phi1), true);
+    auto v4 = BaseNode::create(R0*cos(phi2), R0*sin(phi2), true);
+    auto v5 = BaseNode::create(R1*cos(phi2), R1*sin(phi2), false);
+    auto v6 = BaseNode::create(R2*cos(phi2), R2*sin(phi2), true);
+    auto v7 = BaseNode::create(R0*cos(phi3), R0*sin(phi3), true);
+    auto v8 = BaseNode::create(R1*cos(phi3), R1*sin(phi3), true);
+    auto v9 = BaseNode::create(R2*cos(phi3), R2*sin(phi3), true);
+
+    // Ограничивающие прямые области
+    auto left  = Plane::create(v7, v9);
+    auto right = Plane::create(v1, v3);
+    auto inner = Circle::create(R0, Vector3d::Zero());
+    auto outer = Circle::create(R2, Vector3d::Zero());
+
+    left->set_boundary(Boundary::WALL);
+    right->set_boundary(Boundary::ZOE);
+    inner->set_boundary(Boundary::WALL);
+    outer->set_boundary(Boundary::ZOE);
+
+    BlockStructured blocks(4);
+
+    // Генератор сетки
+    blocks[0] = {v1, v2, v4, v5};
+    blocks[0].set_boundary(v1, v2, right);
+    blocks[0].set_boundary(v1, v4, inner);
+
+    blocks[1] = {v2, v3, v5, v6};
+    blocks[1].set_boundary(v2, v3, right);
+    blocks[1].set_boundary(v3, v6, outer);
+
+    blocks[2] = {v4, v5, v7, v8};
+    blocks[2].set_boundary(v4, v7, inner);
+    blocks[2].set_boundary(v7, v8, left);
+
+    blocks[3] = {v5, v6, v8, v9};
+    blocks[3].set_boundary(v8, v9, left);
+    blocks[3].set_boundary(v6, v9, outer);
+
+    return blocks;
+}
 
 BlockStructured test8() {
     // params
@@ -86,21 +190,21 @@ BlockStructured test8() {
         Boundary::WALL
     };
 
-    auto v1 = BaseVertex::create(xmin, ymin, true);
-    auto v3 = BaseVertex::create(xmax, ymin, true);
-    auto v5 = BaseVertex::create(xmax, ymax, true);
-    auto v7 = BaseVertex::create(xmin, ymax, true);
+    auto v1 = BaseNode::create(xmin, ymin, true);
+    auto v3 = BaseNode::create(xmax, ymin, true);
+    auto v5 = BaseNode::create(xmax, ymax, true);
+    auto v7 = BaseNode::create(xmin, ymax, true);
 
-    auto v2 = BaseVertex::create(xc - r0 * std::sin(M_PI / 4.0),
+    auto v2 = BaseNode::create(xc - r0 * std::sin(M_PI / 4.0),
                             yc - r0 * std::cos(M_PI / 4.0),
                             false);
-    auto v4 = BaseVertex::create(xc + r0 * std::sin(M_PI / 4.0),
+    auto v4 = BaseNode::create(xc + r0 * std::sin(M_PI / 4.0),
                             yc - r0 * std::cos(M_PI / 4.0),
                             false);
-    auto v6 = BaseVertex::create(xc + r0 * std::sin(M_PI / 4.0),
+    auto v6 = BaseNode::create(xc + r0 * std::sin(M_PI / 4.0),
                             yc + r0 * std::cos(M_PI / 4.0),
                             false);
-    auto v8 = BaseVertex::create(xc - r0 * std::sin(M_PI / 4.0),
+    auto v8 = BaseNode::create(xc - r0 * std::sin(M_PI / 4.0),
                             yc + r0 * std::cos(M_PI / 4.0),
                             false);
 
@@ -160,30 +264,30 @@ BlockStructured test9() {
     double a = r0 / std::sqrt(2.0);
 
     // Задаем базисные вершины для струтурированных блоков
-    auto v1 = BaseVertex::create(xmin, ymin, true);
-    auto v2 = BaseVertex::create(x_l,    ymin, false);
-    auto v3 = BaseVertex::create(x_r,    ymin, false);
-    auto v4 = BaseVertex::create(xmax, ymin, true);
+    auto v1 = BaseNode::create(xmin, ymin, true);
+    auto v2 = BaseNode::create(x_l,    ymin, false);
+    auto v3 = BaseNode::create(x_r,    ymin, false);
+    auto v4 = BaseNode::create(xmax, ymin, true);
 
-    auto v5 = BaseVertex::create(xmin, y_b, false);
-    auto v6 = BaseVertex::create(x_l,    y_b, false);
-    auto v7 = BaseVertex::create(x_r,    y_b, false);
-    auto v8 = BaseVertex::create(xmax, y_b, false);
+    auto v5 = BaseNode::create(xmin, y_b, false);
+    auto v6 = BaseNode::create(x_l,    y_b, false);
+    auto v7 = BaseNode::create(x_r,    y_b, false);
+    auto v8 = BaseNode::create(xmax, y_b, false);
 
-    auto v9  = BaseVertex::create(xc - a, yc - a, false);
-    auto v10 = BaseVertex::create(xc + a, yc - a, false);
-    auto v11 = BaseVertex::create(xc - a, yc + a, false);
-    auto v12 = BaseVertex::create(xc + a, yc + a, false);
+    auto v9  = BaseNode::create(xc - a, yc - a, false);
+    auto v10 = BaseNode::create(xc + a, yc - a, false);
+    auto v11 = BaseNode::create(xc - a, yc + a, false);
+    auto v12 = BaseNode::create(xc + a, yc + a, false);
 
-    auto v13 = BaseVertex::create(xmin, y_t, false);
-    auto v14 = BaseVertex::create(x_l,    y_t, false);
-    auto v15 = BaseVertex::create(x_r,    y_t, false);
-    auto v16 = BaseVertex::create(xmax, y_t, false);
+    auto v13 = BaseNode::create(xmin, y_t, false);
+    auto v14 = BaseNode::create(x_l,  y_t, false);
+    auto v15 = BaseNode::create(x_r,  y_t, false);
+    auto v16 = BaseNode::create(xmax, y_t, false);
 
-    auto v17 = BaseVertex::create(xmin, ymax, true);
-    auto v18 = BaseVertex::create(x_l,    ymax, false);
-    auto v19 = BaseVertex::create(x_r,    ymax, false);
-    auto v20 = BaseVertex::create(xmax, ymax, true);
+    auto v17 = BaseNode::create(xmin, ymax, true);
+    auto v18 = BaseNode::create(x_l,   ymax, false);
+    auto v19 = BaseNode::create(x_r,    ymax, false);
+    auto v20 = BaseNode::create(xmax, ymax, true);
 
     // Ограничивающие прямые области
     auto circle = Circle::create(r0, {xc, yc, 0.0});
@@ -292,7 +396,11 @@ BlockStructured test9() {
 }
 
 int main() {
-    BlockStructured blocks = test9();
+    //BlockStructured blocks = test1();
+    //BlockStructured blocks = test2(2.4, 0.3);
+    //BlockStructured blocks = test3(0.5, 2.0, 0.3);
+    BlockStructured blocks = test4(1.0, 1.5, 0.25, 0.3);
+    //BlockStructured blocks = test9();
 
     blocks.link();
     blocks.optimize();

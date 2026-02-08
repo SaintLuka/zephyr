@@ -61,8 +61,8 @@ private:
 
     // Куча параметров
     // Базисные вершины для струтурированных блоков
-    BaseVertex::Ptr v1, v2, v3;
-    BaseVertex::Ptr v4, v5, v6;
+    BaseNode::Ptr v1, v2, v3;
+    BaseNode::Ptr v4, v5, v6;
 
     // Ограничивающие кривые области
     Curve::Ptr left;

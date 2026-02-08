@@ -6,7 +6,7 @@
 
 namespace zephyr::geom::generator {
 
-class BaseVertex;
+class BaseNode;
 
 /// @brief Кривая в виде кубического сплайна от параметра.
 /// То есть функции X(t), Y(t) являются кубическими сплайнами от параметра
@@ -14,7 +14,7 @@ class BaseVertex;
 /// в узлах t = -1, -1/3, 1/3, 1.
 class Cubic : public Curve {
 private:
-    using BaseVertex_Ref = const std::shared_ptr<BaseVertex> &;
+    using BaseVertex_Ref = const std::shared_ptr<BaseNode> &;
 
 public:
     /// @brief Конструктор сплайна по четырем точкам

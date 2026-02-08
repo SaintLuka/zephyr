@@ -150,8 +150,8 @@ mmf::Flux CrpFlux::classic(const mmf::PState& zLA, const mmf::PState& zLB, const
 
         // Характеристики из точки O1
         auto[S_1L, S_1C, S_1R, Q_s1L, F_s1L, Q_s1R, F_s1R] = HLLC::wave_config(mixture, Q_L, F_L, Q_s0L, F_s0L);
-        Char C_1C = {.x = O1.x, .t = O1.t, S_1C};
-        Char C_1R = {.x = O1.x, .t = O1.t, S_1R};
+        Char C_1C = {.x = O1.x, .t = O1.t, .S = S_1C};
+        Char C_1R = {.x = O1.x, .t = O1.t, .S = S_1R};
 
         double tau1 = C_1R.edge_t() / dt;
         if (tau1 >= 1.0) {
@@ -190,7 +190,7 @@ mmf::Flux CrpFlux::classic(const mmf::PState& zLA, const mmf::PState& zLB, const
 
         // Характеристики из точки O1
         auto[S_1L, S_1C, S_1R, Q_s1L, F_s1L, Q_s1R, F_s1R] = HLLC::wave_config(mixture, Q_L, F_L, Q_s0L, F_s0L);
-        Char C_1R = {.x = O1.x, .t = O1.t, S_1R};
+        Char C_1R = {.x = O1.x, .t = O1.t, .S = S_1R};
 
         Point O2 = C_1R.cross(C_0C);
 

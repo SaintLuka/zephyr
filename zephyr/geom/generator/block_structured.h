@@ -7,6 +7,7 @@
 
 namespace zephyr::geom::generator {
 
+
 /// @brief Генератор двумерной блочно-структурированной сетки из
 /// четырехугольных элементов.
 class BlockStructured : public Generator {
@@ -49,6 +50,8 @@ public:
         LINKED,
         OPTIMIZED,
     };
+
+    void remove_null_blocks();
 
     /// @brief Количество ячеек
     int calc_cells() const;

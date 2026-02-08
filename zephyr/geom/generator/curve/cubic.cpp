@@ -1,6 +1,6 @@
 #include <algorithm>
 
-#include <zephyr/geom/generator/bs_vertex.h>
+#include <zephyr/geom/generator/base_node.h>
 #include <zephyr/geom/generator/curve/cubic.h>
 
 namespace zephyr::geom::generator {
@@ -26,9 +26,9 @@ Curve::Ptr Cubic::create(const Vector3d &v1, const Vector3d &v2,
     return std::make_shared<Cubic>(v1, v2, v3, v4);
 }
 
-Curve::Ptr Cubic::create(BaseVertex::Ref v1, BaseVertex::Ref v2,
-                         BaseVertex::Ref v3, BaseVertex::Ref v4) {
-    return std::make_shared<Cubic>(v1->v(), v2->v(), v3->v(), v4->v());
+Curve::Ptr Cubic::create(BaseNode::Ref v1, BaseNode::Ref v2,
+                         BaseNode::Ref v3, BaseNode::Ref v4) {
+    return std::make_shared<Cubic>(v1->pos(), v2->pos(), v3->pos(), v4->pos());
 }
 
 double Cubic::get_X(double t) const {

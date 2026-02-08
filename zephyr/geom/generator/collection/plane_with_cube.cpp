@@ -61,28 +61,28 @@ void PlaneWithCube::init_blocks() {
     check_params();
 
     //снизу вверх
-    v1 = BaseVertex::create(m_xmin, m_ymin, true);
-    v2 = BaseVertex::create(m_xc,   m_ymin, false);
-    v3 = BaseVertex::create(m_xmax, m_ymin, true);
+    v1 = BaseNode::create(m_xmin, m_ymin, true);
+    v2 = BaseNode::create(m_xc,   m_ymin, false);
+    v3 = BaseNode::create(m_xmax, m_ymin, true);
 
-    v4 = BaseVertex::create(m_xc, m_yc - m_r, true);
+    v4 = BaseNode::create(m_xc, m_yc - m_r, true);
 
-    v5 = BaseVertex::create(m_xc - 0.5 * m_r, m_yc - 0.5 * m_r, false);
-    v6 = BaseVertex::create(m_xc + 0.5 * m_r, m_yc - 0.5 * m_r, false);
+    v5 = BaseNode::create(m_xc - 0.5 * m_r, m_yc - 0.5 * m_r, false);
+    v6 = BaseNode::create(m_xc + 0.5 * m_r, m_yc - 0.5 * m_r, false);
 
-    v7 = BaseVertex::create(m_xmin,      m_yc, false);
-    v8 = BaseVertex::create(m_xc - m_r,  m_yc, true);
-    v9 = BaseVertex::create(m_xc + m_r,  m_yc, true);
-    v10 = BaseVertex::create(m_xmax,     m_yc, false);
+    v7 = BaseNode::create(m_xmin,      m_yc, false);
+    v8 = BaseNode::create(m_xc - m_r,  m_yc, true);
+    v9 = BaseNode::create(m_xc + m_r,  m_yc, true);
+    v10 = BaseNode::create(m_xmax,     m_yc, false);
 
-    v11 = BaseVertex::create(m_xc - 0.5 * m_r, m_yc + 0.5 * m_r, false);
-    v12 = BaseVertex::create(m_xc + 0.5 * m_r, m_yc + 0.5 * m_r, false);
+    v11 = BaseNode::create(m_xc - 0.5 * m_r, m_yc + 0.5 * m_r, false);
+    v12 = BaseNode::create(m_xc + 0.5 * m_r, m_yc + 0.5 * m_r, false);
 
-    v13 = BaseVertex::create(m_xc, m_yc + m_r, true);
+    v13 = BaseNode::create(m_xc, m_yc + m_r, true);
 
-    v14 = BaseVertex::create(m_xmin, m_ymax, true);
-    v15 = BaseVertex::create(m_xc,   m_ymax, false);
-    v16 = BaseVertex::create(m_xmax, m_ymax, true);
+    v14 = BaseNode::create(m_xmin, m_ymax, true);
+    v15 = BaseNode::create(m_xc,   m_ymax, false);
+    v16 = BaseNode::create(m_xmax, m_ymax, true);
 
 
     // Ограничивающие прямые области

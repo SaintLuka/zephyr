@@ -77,12 +77,12 @@ void Wedge::init_blocks() {
     double m_yw = m_ymin + (m_xmax - m_xw) * std::tan(m_phi);
 
     // Задаем базисные вершины для струтурированных блоков
-    v1 = BaseVertex::create(m_xmin, m_ymin, true);
-    v2 = BaseVertex::create(m_xw,   m_ymin, true);
-    v3 = BaseVertex::create(m_xmax, m_yw,   true);
-    v4 = BaseVertex::create(m_xmin, m_ymax, true);
-    v5 = BaseVertex::create(m_xw,   m_ymax, false);
-    v6 = BaseVertex::create(m_xmax, m_ymax, true);
+    v1 = BaseNode::create(m_xmin, m_ymin, true);
+    v2 = BaseNode::create(m_xw,   m_ymin, true);
+    v3 = BaseNode::create(m_xmax, m_yw,   true);
+    v4 = BaseNode::create(m_xmin, m_ymax, true);
+    v5 = BaseNode::create(m_xw,   m_ymax, false);
+    v6 = BaseNode::create(m_xmax, m_ymax, true);
 
     // Ограничивающие прямые области
     left   = Plane::create(v1, v4);

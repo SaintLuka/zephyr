@@ -9,12 +9,12 @@ namespace zephyr::mesh::amr {
 /// @brief Содержит статистику о числе ячеек с флагами -1, 0 и 1 в некотором
 /// диапазоне ячеек. В том числе и для одной ячейки.
 struct PartStatistics {
-    index_t n_coarse = 0; ///< Число ячеек в диапазоне для огрубления
-    index_t n_retain = 0; ///< Число ячеек в диапазоне, которые сохраняют уровень
-    index_t n_refine = 0; ///< Число ячеек в диапазоне для разбиения
+    index_t n_coarse{}; ///< Число ячеек в диапазоне для огрубления
+    index_t n_retain{}; ///< Число ячеек в диапазоне, которые сохраняют уровень
+    index_t n_refine{}; ///< Число ячеек в диапазоне для разбиения
 
     /// @brief Конструктор по умолчанию с нулями.
-    PartStatistics() = default;
+    //PartStatistics() = default;
 
     /// @brief Для суммирования статистики в тредах
     PartStatistics& operator+=(const PartStatistics& other) {

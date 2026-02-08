@@ -302,21 +302,21 @@ void PlaneWithHole::init_blocks() {
 void PlaneWithHole::init_blocks() {
     check_params();
 
-    v1 = BaseVertex::create(m_xmin, m_ymin, true);
-    v3 = BaseVertex::create(m_xmax, m_ymin, true);
-    v5 = BaseVertex::create(m_xmax, m_ymax, true);
-    v7 = BaseVertex::create(m_xmin, m_ymax, true);
+    v1 = BaseNode::create(m_xmin, m_ymin, true);
+    v3 = BaseNode::create(m_xmax, m_ymin, true);
+    v5 = BaseNode::create(m_xmax, m_ymax, true);
+    v7 = BaseNode::create(m_xmin, m_ymax, true);
 
-    v2 = BaseVertex::create(m_xc - m_r * std::sin(M_PI / 5.0),
+    v2 = BaseNode::create(m_xc - m_r * std::sin(M_PI / 5.0),
                             m_yc - m_r * std::cos(M_PI / 5.0), 
                             true);
-    v4 = BaseVertex::create(m_xc + m_r * std::sin(M_PI / 3.0),
+    v4 = BaseNode::create(m_xc + m_r * std::sin(M_PI / 3.0),
                             m_yc - m_r * std::cos(M_PI / 3.0),
                             true);
-    v6 = BaseVertex::create(m_xc + m_r * std::sin(M_PI / 3.0),
+    v6 = BaseNode::create(m_xc + m_r * std::sin(M_PI / 3.0),
                             m_yc + m_r * std::cos(M_PI / 3.0), 
                             true);
-    v8 = BaseVertex::create(m_xc - m_r * std::sin(M_PI / 5.0),
+    v8 = BaseNode::create(m_xc - m_r * std::sin(M_PI / 5.0),
                             m_yc + m_r * std::cos(M_PI / 5.0), 
                             true);
 

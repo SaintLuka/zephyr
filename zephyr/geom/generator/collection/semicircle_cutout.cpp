@@ -79,18 +79,18 @@ void SemicircleCutout::init_blocks() {
 
 
     // Задаем базисные вершины для структурированных блоков
-    v1 = BaseVertex::create(m_xmin, m_ymin, true);
-    v2 = BaseVertex::create(x1,     m_ymin, false);
-    v3 = BaseVertex::create(x2,     m_ymin, true);
-    v4 = BaseVertex::create(x3,     yc,     false);
-    v5 = BaseVertex::create(x4,     yc,     false);
-    v6 = BaseVertex::create(x5,     m_ymin, true);
-    v7 = BaseVertex::create(x6,     m_ymin, false);
-    v8 = BaseVertex::create(m_xmax, m_ymin, true);
-    v9 = BaseVertex::create(m_xmin,  m_ymax, true);
-    v10 = BaseVertex::create(x1,     m_ymax, false);
-    v11 = BaseVertex::create(x6,     m_ymax, false);
-    v12 = BaseVertex::create(m_xmax, m_ymax, true);
+    v1 = BaseNode::create(m_xmin, m_ymin, true);
+    v2 = BaseNode::create(x1,     m_ymin, false);
+    v3 = BaseNode::create(x2,     m_ymin, true);
+    v4 = BaseNode::create(x3,     yc,     false);
+    v5 = BaseNode::create(x4,     yc,     false);
+    v6 = BaseNode::create(x5,     m_ymin, true);
+    v7 = BaseNode::create(x6,     m_ymin, false);
+    v8 = BaseNode::create(m_xmax, m_ymin, true);
+    v9 = BaseNode::create(m_xmin,  m_ymax, true);
+    v10 = BaseNode::create(x1,     m_ymax, false);
+    v11 = BaseNode::create(x6,     m_ymax, false);
+    v12 = BaseNode::create(m_xmax, m_ymax, true);
 
     // Ограничивающие прямые области
     left   = Plane::create(v1, v9);
