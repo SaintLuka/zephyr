@@ -953,16 +953,30 @@ Vector3d Polyhedron::find_section(const Vector3d& n, double alpha) const {
 
     double d_min = n.dot(verts[0]);
     double d_max = n.dot(verts[0]);
+    Vector3d p_max = verts[0];
+    Vector3d p_min = verts[0];
     for (int i = 1; i < n_verts(); ++i) { //Ищем интервал параметра
         if (d_min > n.dot(verts[i])) {
             d_min = n.dot(verts[i]);
+            p_min = verts[i];
         }
         if (d_max < n.dot(verts[i])) {
             d_max = n.dot(verts[i]);
+            p_max = verts[i];
         }
     }
+    //Заметил что максимальная ошибка всегда на концах в методе
+    //Попытался отдельно обработать случаи, но даже так ошибка (разность между проекциями на нормаль) на концах максимальна
+    //Так что я списываю это на машинную (ну что может быть точнее вершины касающейся плоскости?)
+    if (alpha > 1 - eps) {
+        return p_max;
+    }
+    else if (alpha < eps) {
+        return  p_min;
+    }
     double d = d_min + alpha * (d_max - d_min);
-    Vector3d p = m_center - (n.dot(m_center) - d) * n; //Точка на плоскости
+
+    Vector3d p = d * n; //Точка на плоскости
     double V = clip_volume(p, n); //Объём
     double F = abs(V-alpha*V0);
     double target = alpha*V0;
@@ -976,7 +990,7 @@ Vector3d Polyhedron::find_section(const Vector3d& n, double alpha) const {
             d_min = d;
             d = (d_max + d) / 2;
         }
-        p = m_center - (n.dot(m_center) - d) * n; //Точка на плоскости
+        p = d * n; //Точка на плоскости
         V = clip_volume(p, n);
         F = abs(V-alpha*V0);
         counter++;

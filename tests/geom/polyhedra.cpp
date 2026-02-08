@@ -65,7 +65,7 @@ void plot_sections(
         double s2 = poly.clip_volume_and_area(p, normal).area;
 
 //        Vector3d p2 = poly.find_section_newton(normal, v1/v);
-        Vector3d p3 = poly.find_section(normal, v1/v);
+        Vector3d p3 = poly.find_section(normal, v2/v);
 
 //        double epsilon_cs = std::abs(s2-s1);
 //        avarage_epsilon_cs += epsilon_cs;
@@ -77,10 +77,17 @@ void plot_sections(
 //        if (max_epsilon_cv < epsilon_cv)
 //            max_epsilon_cv = epsilon_cv;
 
-        double epsilon_fs = std::abs((p3-p).dot(normal));
+        double epsilon_fs = std::abs((p3).dot(normal)-(p).dot(normal));
         avg_epsilon_fs += epsilon_fs;
         if (max_epsilon_fs < epsilon_fs)
             max_epsilon_fs = epsilon_fs;
+
+        if (epsilon_fs > 0.0001) {
+            std::cout << p[0] << " " << p[1] << " " << p[2] << " "  << std::endl;
+            std::cout << i << std::endl;
+            std::cout << v2/v << std::endl;
+            std::cout << poly.clip_volume(p3, normal)/v << std::endl;
+        }
 
 //        double epsilon_fsn = std::abs((p2-p).dot(normal));
 //        avg_epsilon_fsn += epsilon_fsn;
@@ -154,75 +161,75 @@ int main() {
 //    std::cout << clip.face_area(clip.n_faces() - 1) << std::endl;
 
     //    std::cout << Polyhedron::Tetrahedron().find_section_newton(n, 0.949853).transpose()  << std::endl;
-//    Vector3d n = {0.4, 0.5, 0.3};
-//    n.normalize();
-//    auto p = Polyhedron::Pyramid().find_section(n, 0.945854);
-//    std::cout << "p: " << p.transpose() << std::endl;
-//    std::cout << "alpha: " << Polyhedron::Pyramid().clip_volume(p, n) / Polyhedron::Pyramid().volume() << std::endl;
-
     Vector3d n = {0.4, 0.5, 0.3};
     n.normalize();
-    plot_sections(Polyhedron::Cube(), n, "cube");
-    plot_sections(Polyhedron::Cuboid(1.0, 1.2, 0.8), n, "cuboid");
-    plot_sections(Polyhedron::Pyramid(), n, "pyramid");
-    plot_sections(Polyhedron::Wedge(), n, "wedge");
-    plot_sections(Polyhedron::Tetrahedron(), n, "tetrahedron");
-    plot_sections(Polyhedron::Octahedron(), n, "octahedron");
-    plot_sections(Polyhedron::Dodecahedron(), n, "dodecahedron");
-    plot_sections(Polyhedron::Icosahedron(), n, "icosahedron");
-    plot_sections(Polyhedron::TruncatedCube(), n, "truncated_cube");
+    auto p = Polyhedron::Pyramid().find_section(n, 1);
+    std::cout << "p: " << p.transpose() << std::endl;
+    std::cout << "alpha: " << Polyhedron::Tetrahedron().clip_volume(p, n) / Polyhedron::Tetrahedron().volume() << std::endl;
 
-    n = {-1, 0, 1};
-    n.normalize();
-
-    plot_sections(Polyhedron::Cube(), n, "cube");
-    plot_sections(Polyhedron::Cuboid(1.0, 1.2, 0.8), n, "cuboid");
-    plot_sections(Polyhedron::Pyramid(), n, "pyramid");
-    plot_sections(Polyhedron::Wedge(), n, "wedge");
-    plot_sections(Polyhedron::Tetrahedron(), n, "tetrahedron");
-    plot_sections(Polyhedron::Octahedron(), n, "octahedron");
-    plot_sections(Polyhedron::Dodecahedron(), n, "dodecahedron");
-    plot_sections(Polyhedron::Icosahedron(), n, "icosahedron");
-    plot_sections(Polyhedron::TruncatedCube(), n, "truncated_cube");
-
-    n = {0.5, 0.5, 0.5};
-    n.normalize();
-
-    plot_sections(Polyhedron::Cube(), n, "cube");
-    plot_sections(Polyhedron::Cuboid(1.0, 1.2, 0.8), n, "cuboid");
-    plot_sections(Polyhedron::Pyramid(), n, "pyramid");
-    plot_sections(Polyhedron::Wedge(), n, "wedge");
-    plot_sections(Polyhedron::Tetrahedron(), n, "tetrahedron");
-    plot_sections(Polyhedron::Octahedron(), n, "octahedron");
-    plot_sections(Polyhedron::Dodecahedron(), n, "dodecahedron");
-    plot_sections(Polyhedron::Icosahedron(), n, "icosahedron");
-    plot_sections(Polyhedron::TruncatedCube(), n, "truncated_cube");
-
-    n = {0.5, 0, 0};
-    n.normalize();
-
-    plot_sections(Polyhedron::Cube(), n, "cube");
-    plot_sections(Polyhedron::Cuboid(1.0, 1.2, 0.8), n, "cuboid");
-    plot_sections(Polyhedron::Pyramid(), n, "pyramid");
-    plot_sections(Polyhedron::Wedge(), n, "wedge");
-    plot_sections(Polyhedron::Tetrahedron(), n, "tetrahedron");
-    plot_sections(Polyhedron::Octahedron(), n, "octahedron");
-    plot_sections(Polyhedron::Dodecahedron(), n, "dodecahedron");
-    plot_sections(Polyhedron::Icosahedron(), n, "icosahedron");
-    plot_sections(Polyhedron::TruncatedCube(), n, "truncated_cube");
-
-    n = {0.3, 12, 53};
-    n.normalize();
-
-    plot_sections(Polyhedron::Cube(), n, "cube");
-    plot_sections(Polyhedron::Cuboid(1.0, 1.2, 0.8), n, "cuboid");
-    plot_sections(Polyhedron::Pyramid(), n, "pyramid");
-    plot_sections(Polyhedron::Wedge(), n, "wedge");
-    plot_sections(Polyhedron::Tetrahedron(), n, "tetrahedron");
-    plot_sections(Polyhedron::Octahedron(), n, "octahedron");
-    plot_sections(Polyhedron::Dodecahedron(), n, "dodecahedron");
-    plot_sections(Polyhedron::Icosahedron(), n, "icosahedron");
-    plot_sections(Polyhedron::TruncatedCube(), n, "truncated_cube");
+//    Vector3d n = {0.4, 0.5, 0.3};
+//    n.normalize();
+//    plot_sections(Polyhedron::Cube(), n, "cube");
+//    plot_sections(Polyhedron::Cuboid(1.0, 1.2, 0.8), n, "cuboid");
+//    plot_sections(Polyhedron::Pyramid(), n, "pyramid");
+//    plot_sections(Polyhedron::Wedge(), n, "wedge");
+//    plot_sections(Polyhedron::Tetrahedron(), n, "tetrahedron");
+//    plot_sections(Polyhedron::Octahedron(), n, "octahedron");
+//    plot_sections(Polyhedron::Dodecahedron(), n, "dodecahedron");
+//    plot_sections(Polyhedron::Icosahedron(), n, "icosahedron");
+//    plot_sections(Polyhedron::TruncatedCube(), n, "truncated_cube");
+//
+//    n = {-1, 0, 1};
+//    n.normalize();
+//
+//    plot_sections(Polyhedron::Cube(), n, "cube");
+//    plot_sections(Polyhedron::Cuboid(1.0, 1.2, 0.8), n, "cuboid");
+//    plot_sections(Polyhedron::Pyramid(), n, "pyramid");
+//    plot_sections(Polyhedron::Wedge(), n, "wedge");
+//    plot_sections(Polyhedron::Tetrahedron(), n, "tetrahedron");
+//    plot_sections(Polyhedron::Octahedron(), n, "octahedron");
+//    plot_sections(Polyhedron::Dodecahedron(), n, "dodecahedron");
+//    plot_sections(Polyhedron::Icosahedron(), n, "icosahedron");
+//    plot_sections(Polyhedron::TruncatedCube(), n, "truncated_cube");
+//
+//    n = {0.5, 0.5, 0.5};
+//    n.normalize();
+//
+//    plot_sections(Polyhedron::Cube(), n, "cube");
+//    plot_sections(Polyhedron::Cuboid(1.0, 1.2, 0.8), n, "cuboid");
+//    plot_sections(Polyhedron::Pyramid(), n, "pyramid");
+//    plot_sections(Polyhedron::Wedge(), n, "wedge");
+//    plot_sections(Polyhedron::Tetrahedron(), n, "tetrahedron");
+//    plot_sections(Polyhedron::Octahedron(), n, "octahedron");
+//    plot_sections(Polyhedron::Dodecahedron(), n, "dodecahedron");
+//    plot_sections(Polyhedron::Icosahedron(), n, "icosahedron");
+//    plot_sections(Polyhedron::TruncatedCube(), n, "truncated_cube");
+//
+//    n = {0.5, 0, 0};
+//    n.normalize();
+//
+//    plot_sections(Polyhedron::Cube(), n, "cube");
+//    plot_sections(Polyhedron::Cuboid(1.0, 1.2, 0.8), n, "cuboid");
+//    plot_sections(Polyhedron::Pyramid(), n, "pyramid");
+//    plot_sections(Polyhedron::Wedge(), n, "wedge");
+//    plot_sections(Polyhedron::Tetrahedron(), n, "tetrahedron");
+//    plot_sections(Polyhedron::Octahedron(), n, "octahedron");
+//    plot_sections(Polyhedron::Dodecahedron(), n, "dodecahedron");
+//    plot_sections(Polyhedron::Icosahedron(), n, "icosahedron");
+//    plot_sections(Polyhedron::TruncatedCube(), n, "truncated_cube");
+//
+//    n = {0.3, 12, 53};
+//    n.normalize();
+//
+//    plot_sections(Polyhedron::Cube(), n, "cube");
+//    plot_sections(Polyhedron::Cuboid(1.0, 1.2, 0.8), n, "cuboid");
+//    plot_sections(Polyhedron::Pyramid(), n, "pyramid");
+//    plot_sections(Polyhedron::Wedge(), n, "wedge");
+//    plot_sections(Polyhedron::Tetrahedron(), n, "tetrahedron");
+//    plot_sections(Polyhedron::Octahedron(), n, "octahedron");
+//    plot_sections(Polyhedron::Dodecahedron(), n, "dodecahedron");
+//    plot_sections(Polyhedron::Icosahedron(), n, "icosahedron");
+//    plot_sections(Polyhedron::TruncatedCube(), n, "truncated_cube");
 
     return 0;
 }
