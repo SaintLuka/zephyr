@@ -3,28 +3,35 @@
 #include <vector>
 #include <memory>
 
+#include <zephyr/geom/generator/array2d.h>
 #include <zephyr/geom/generator/base_node.h>
 #include <zephyr/geom/generator/bs_vertex.h>
 #include <zephyr/geom/generator/curve/curve.h>
-#include <zephyr/utils/array2d.h>
 
 namespace zephyr::geom::generator {
 
-using utils::Array2D;
+template <typename T>
+struct axis_pair {
+    axis_pair() = default;
 
-/// @brief Две оси четырёхугольного блока
-enum class Axis : int { X = 0, Y = 1 };
+    axis_pair(const std::array<T, 2>& arr) : vals(arr) { }
 
-/// @brief Стороны четырёхугольного блока
-enum class Side : int {
-    L = 0, LEFT   = 0,
-    R = 1, RIGHT  = 1,
-    B = 2, BOTTOM = 2,
-    T = 3, TOP    = 3,
+    operator const std::array<T, 2>&() const { return vals; }
+
+    T& operator[](int axis) { return vals[axis]; }
+
+    const T& operator[](int axis) const { return vals[axis]; }
+
+    T& operator[](Axis axis) { return vals[static_cast<int>(axis)]; }
+
+    const T& operator[](Axis axis) const { return vals[static_cast<int>(axis)]; }
+
+    T& operator[](Side side) { return vals[static_cast<int>(to_axis(side))]; }
+
+    const T& operator[](Side side) const { return vals[static_cast<int>(to_axis(side))]; }
+
+    std::array<T, 2> vals{};
 };
-
-/// @brief Список всех сторон четырёхугольника
-constexpr std::array sides_2D = {Side::L, Side::R, Side::B, Side::T};
 
 class BlockStructured;
 
@@ -187,27 +194,6 @@ public:
     Side twin_face(Side side) const;
 
 
-    // ----------------------- Внутренние вершины блока -----------------------
-
-    /// @brief Ссылка на двумерный массив вершин
-    const Array2D<BsVertex::Ptr>& vertices() const { return m_vertices; }
-
-    /// @brief Получить вершину блока
-    BsVertex::Ptr& vertex(int i, int j) { return m_vertices(i, j); }
-    
-    /// @brief Получить вершину блока
-    BsVertex::Ref vertex(int i, int j) const { return m_vertices(i, j); }
-
-    /// @brief Угловая вершина блока
-    BsVertex::Ptr& corner_vertex(int v_idx);
-
-    /// @brief Граничная вершина блока
-    BsVertex::Ptr& boundary_vertex(Side side, int idx);
-
-    /// @brief Вершина со второго ряда от границы
-    BsVertex::Ptr& near_boundary_vertex(Side side, int idx);
-
-
     // -------------------------- Конформные приколы --------------------------
 
     /// @brief Конформный модуль криволинейного четырехугольника
@@ -237,35 +223,19 @@ public:
     /// @brief Связать два блока
     static void link(Block::Ref B1, Block::Ref B2);
 
-    /// @brief Очистить массив внутренних узлов
-    void clear_vertices();
-
-    /// @brief Проверить размеры смежных блоков перед созданием вершин
-    void check_consistency() const;
-
     /// @brief Сгенерировать узлы сетки с нуля
-    void create_vertices_init();
+    Array2D<BsVertex::Ptr> create_vertices(axis_pair<int> sizes) const;
 
-    /// @brief Сгенерировать узлы сетки на основе предыдущих
-    void create_vertices_again();
-
-    /// @brief Склеить узлы на границах блоков
-    void merge_vertices();
-
-    /// @brief Связать узлы сетки
-    void link_vertices();
-
-    /// @brief Сглаживание вершин в блоке
-    void smooth();
-
-    /// @brief Обновить положение вершин
-    /// @return Максимальный относительный сдвиг вершин
-    double move_vertices();
+    /// @brief Сгенерировать узлы сетки на основе сохраненного отображения
+    Array2D<BsVertex::Ptr> create_vertices_again(axis_pair<int> sizes) const;
 
     /// @brief Пересчитывает модуль и коэффициенты сглаживания
-    void update_modulus();
+    void update_modulus(const Array2D<BsVertex::Ptr>& vertices);
 
-private:
+    /// @brief Сохранить текущее отображение
+    void set_mapping(const Array2D<BsVertex::Ptr>& vertices);
+
+public:
     // Основные топологические параметры, задаются пользователем
 
     /// @brief Индекс блока в общем списке блоков
@@ -291,12 +261,10 @@ private:
 
     // Число ячеек вдоль граней (v1, v2) и (v3, v4)
     // Число ячеек вдоль граней (v1, v3) и (v2, v4)
-    std::array<int, 2> m_sizes{0, 0};
+    axis_pair<int> m_sizes{std::array<int, 2>{0, 0}};
 
-    /// @brief Двумерный массив с вершинами (до вызова create_vertices
-    /// может не соответствовать размерам в m_sizes).
-    Array2D<BsVertex::Ptr> m_vertices{};
-
+    /// @brief Конформное отображение блока в виде таблицы вершин
+    Array2D<Vector3d> m_mapping{};
 
     // Геометрические параметры, находятся и используются при оптимизации
 
@@ -304,10 +272,10 @@ private:
     double m_modulus{NAN};
 
     /// @brief Коэффициенты для анизотропного сглаживания Лапласа
-    std::array<double, 2> m_lambda{NAN, NAN};
+    axis_pair<double> m_lambda{std::array<double, 2>{NAN, NAN}};
 
     /// @brief Относительные размеры блока
-    std::array<double, 2> m_rel_sizes{NAN, NAN};
+    axis_pair<double> m_rel_sizes{std::array<double, 2>{NAN, NAN}};
 };
 
 } // namespace zephyr::mesh::generator

@@ -39,6 +39,8 @@ install(FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/rectangle.h
 	${CMAKE_CURRENT_SOURCE_DIR}/sector.h
 	${CMAKE_CURRENT_SOURCE_DIR}/cuboid.h
+	${CMAKE_CURRENT_SOURCE_DIR}/array2d.h
+	${CMAKE_CURRENT_SOURCE_DIR}/base_node.h
 	${CMAKE_CURRENT_SOURCE_DIR}/bs_vertex.h
 	${CMAKE_CURRENT_SOURCE_DIR}/block.h
 	${CMAKE_CURRENT_SOURCE_DIR}/block_structured.h

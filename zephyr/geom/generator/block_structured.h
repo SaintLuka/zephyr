@@ -2,6 +2,7 @@
 
 #include <vector>
 
+#include <zephyr/geom/generator/array2d.h>
 #include <zephyr/geom/generator/block.h>
 #include <zephyr/geom/generator/generator.h>
 
@@ -60,6 +61,8 @@ struct hash<zephyr::geom::generator::node_pair_t> {
 
 namespace zephyr::geom::generator {
 
+using Tables2D = std::vector<Array2D<BsVertex::Ptr>>;
+
 /// @brief Генератор двумерной блочно-структурированной сетки из
 /// четырехугольных элементов.
 class BlockStructured : public Generator {
@@ -88,6 +91,9 @@ public:
         m_fixed = func;
     }
 
+    /// @brief Проверить размеры смежных блоков перед созданием вершин
+    void check_consistency() const;
+
     /// @brief Полный цикл оптимизаций. Последовательный вызов optimize на сетках
     /// различного размера, в зависимости от переданных настроек.
     void optimize(const optimize_options& opts = {});
@@ -98,8 +104,30 @@ public:
     /// @brief Построить блоки с разбиением
     void plot() const;
 
+    /// @brief Построить блоки с разбиением
+    static void plot(const Tables2D& all_vertices);
+
     /// @brief Сгенерировать сетку
     Grid make() override;
+
+    /// @brief Сгенерировать узлы сетки с нуля
+    Tables2D create_vertices(const std::vector<axis_pair<int>>& sizes) const;
+
+    /// @brief Сгенерировать узлы сетки на основе сохраненного отображения
+    Tables2D create_vertices_again(const std::vector<axis_pair<int>>& sizes) const;
+
+    /// @brief Склеить узлы на границах блоков
+    void merge_vertices(Tables2D& all_vertices) const;
+
+    /// @brief Связать узлы сетки
+    void link_vertices(Tables2D& all_vertices) const;
+
+    /// @brief Сглаживание вершин в блоке
+    static void smooth_vertices(const Tables2D& all_vertices);
+
+    /// @brief Обновить положение вершин
+    /// @return Максимальный относительный сдвиг вершин
+    static double update_vertices(const Tables2D& all_vertices);
 
 protected:
     enum Stage {
