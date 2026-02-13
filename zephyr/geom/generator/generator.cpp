@@ -72,7 +72,7 @@ void Generator::check_size(size_t size) const {
         std::cerr << message << "\n";
         throw std::runtime_error(message);
     }
-    if (size > 10000000) {
+    if (size > 100000000) {
         std::string message =
                 "'" + m_name +
                 "' generator error: "

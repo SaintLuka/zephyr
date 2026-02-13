@@ -1,9 +1,9 @@
 #include <algorithm>
 #include <array>
 #include <map>
+#include <memory>
 #include <set>
 #include <format>
-#include <bits/fs_fwd.h>
 
 #include <zephyr/geom/primitives/cube.h>
 
@@ -13,51 +13,87 @@
 
 #include <zephyr/geom/intersection.h>
 #include <zephyr/geom/primitives/triangle.h>
+#include <zephyr/math/funcs.h>
+
+#include "zephyr/geom/curves/cubic_spline.h"
 
 namespace zephyr::geom::generator {
 
-constexpr int next(int idx) { return (idx + 1) % 4; }
+inline bool bad_number(double num) {
+    return std::isinf(num) || std::isnan(num) || num <= 0.0;
+}
 
-constexpr int prev(int idx) { return (idx + 3) % 4; }
+inline bool good_number(double num) {
+    return !std::isinf(num) && !std::isnan(num) && num > 0.0;
+}
 
-// Стороны вдоль первой оси (оси X)
-constexpr bool axes1(Side2D side) { return side == Side2D::B || side == Side2D::T; }
+// Перпендикулярная ось
+constexpr Axis opposite(Axis axis) {
+    return axis == Axis::X ? Axis::Y : Axis::X;
+}
 
-constexpr Side2D next(Side2D side) {
+// Выбрать ось блока, вдоль которой лежит сторона
+constexpr Axis to_axis(Side side) {
+    return (side == Side::B || side == Side::T) ? Axis::X : Axis::Y;
+}
+
+// Стороны, которые лежат вдоль выбранной оси
+constexpr std::array<Side, 2> sides_by_axis(Axis axis) {
+    return axis == Axis::X? std::array{Side::B, Side::T} : std::array{Side::L, Side::R};
+}
+
+// Переход к индексации сторон против часовой стрелки
+constexpr int side_to_idx(Side side) {
     switch (side) {
-        case Side2D::L: return Side2D::B;
-        case Side2D::R: return Side2D::T;
-        case Side2D::B: return Side2D::R;
-        case Side2D::T: return Side2D::L;
+        case Side::BOTTOM: return 0;
+        case Side::RIGHT:  return 1;
+        case Side::TOP:    return 2;
+        case Side::LEFT:   return 3;
+        default: throw std::invalid_argument("Invalid side");
+    }
+}
+
+// Переход от индексации сторон против часовой стрелки
+constexpr Side idx_to_side(int idx) {
+    switch (idx) {
+        case 0: return Side::BOTTOM;
+        case 1: return Side::RIGHT;
+        case 2: return Side::TOP;
+        case 3: return Side::LEFT;
+        default: throw std::invalid_argument("Invalid side");
+    }
+}
+
+// Индекс базисной вершины на стороне
+constexpr int node_idx(Side side, int idx) {
+    switch (side) {
+        case Side::LEFT:   return std::array{0, 2}[idx];
+        case Side::RIGHT:  return std::array{1, 3}[idx];
+        case Side::BOTTOM: return std::array{0, 1}[idx];
+        case Side::TOP:    return std::array{2, 3}[idx];
         default: throw std::runtime_error("Invalid side");
     }
 }
 
-constexpr Side2D prev(Side2D side) {
-    switch (side) {
-        case Side2D::L: return Side2D::T;
-        case Side2D::R: return Side2D::B;
-        case Side2D::B: return Side2D::L;
-        case Side2D::T: return Side2D::R;
-        default: throw std::runtime_error("Invalid side");
+// Поворот одного блока относительно другого при смежных сторонах (side1, side2)
+constexpr int rotation(Side side1, Side side2) {
+    int f1 = side_to_idx(side1);
+    int f2 = side_to_idx(side2);
+    return (f1 - f2 + 4) % 4;
+}
+
+// Пара сторон, связанных с вершиной (обход против часовой внутри блока)
+constexpr std::tuple<Side, Side> node_adjacent_sides(int v_idx) {
+    switch (v_idx) {
+        case 0: return {Side::B, Side::L};
+        case 1: return {Side::R, Side::B};
+        case 2: return {Side::L, Side::T};
+        case 3: return {Side::T, Side::R};
+        default: throw std::runtime_error("Invalid base node index");
     }
 }
 
-constexpr int node(Side2D side, int idx) {
-    switch (side) {
-        case Side2D::L: return std::array{0, 2}[idx];
-        case Side2D::R: return std::array{1, 3}[idx];
-        case Side2D::B: return std::array{0, 1}[idx];
-        case Side2D::T: return std::array{2, 3}[idx];
-        default: throw std::runtime_error("Invalid side");
-    }
-}
-
-Block &Block::operator=(const std::array<BaseNode::Ptr, 4>& vertices) {
-    if (vertices.size() != 4) {
-        throw std::runtime_error("Wrong number of base vertices");
-    }
-
+Block::Block(const std::array<BaseNode::Ptr, 4>& vertices) {
     // Центр блока
     Vector3d vc = Vector3d::Zero();
     for (const auto& v: vertices) {
@@ -65,7 +101,7 @@ Block &Block::operator=(const std::array<BaseNode::Ptr, 4>& vertices) {
     }
     vc *= 0.25;
 
-    // Пары (угол вершина)
+    // Пары (угол, вершина)
     std::vector<std::pair<double, BaseNode::Ptr>> sorted(4);
     for (int i = 0; i < 4; ++i) {
         sorted[i].second = vertices[i];
@@ -88,7 +124,61 @@ Block &Block::operator=(const std::array<BaseNode::Ptr, 4>& vertices) {
     m_base_nodes[1] = sorted[1].second;
     m_base_nodes[2] = sorted[3].second;
     m_base_nodes[3] = sorted[2].second;
-    return *this;
+}
+
+Block::Ptr Block::create(const std::array<BaseNode::Ptr, 4>& vertices) {
+    return std::make_shared<Block>(vertices);
+}
+
+void Block::set_index(int i) {
+    if (i < 0) {
+        throw std::invalid_argument("Block::set_index error: Invalid index");
+    }
+    m_index = i;
+}
+
+// ---------- Геометрия ------------------------------------------------------------------------------------------------
+
+Vector3d Block::center() const {
+    return 0.25 * (m_base_nodes[0]->pos() + m_base_nodes[1]->pos() + m_base_nodes[2]->pos() + m_base_nodes[3]->pos());
+}
+
+Vector3d Block::center(Side side) const {
+    Vector3d v1 = base_node(node_idx(side, 0))->pos();
+    Vector3d v2 = base_node(node_idx(side, 1))->pos();
+    Vector3d vc = 0.5 * (v1 + v2);
+    if (boundary(side)) {
+        vc = boundary(side)->projection(vc);
+    }
+    return vc;
+}
+
+double Block::length(Side side) const {
+    Vector3d v1 = base_node(node_idx(side, 0))->pos();
+    Vector3d v2 = base_node(node_idx(side, 1))->pos();
+    return (v2 - v1).norm();
+}
+
+// ---------- Базисные вершины -----------------------------------------------------------------------------------------
+
+int Block::base_node_index(const BaseNode* v) const {
+    for (int idx = 0; idx < 4; ++idx) {
+        if (m_base_nodes[idx].get() == v) {
+            return idx;
+        }
+    }
+    throw std::runtime_error("Can't find base node");
+}
+
+std::tuple<Side, Side> Block::adjacent_sides(const BaseNode* v) const {
+    if (!v) {
+        throw std::runtime_error("Block::adjacent_sides() error: Invalid BaseNode");
+    }
+    return node_adjacent_sides(base_node_index(v));
+}
+
+std::tuple<Side, Side> Block::adjacent_sides(BaseNode::Ref v) const {
+    return adjacent_sides(v.get());
 }
 
 std::tuple<BaseNode::Ptr, BaseNode::Ptr> Block::adjacent_nodes(const BaseNode* v) const {
@@ -100,50 +190,148 @@ std::tuple<BaseNode::Ptr, BaseNode::Ptr> Block::adjacent_nodes(const BaseNode* v
         case 1: return {base_node(3), base_node(0)};
         case 2: return {base_node(0), base_node(3)};
         case 3: return {base_node(2), base_node(1)};
-        default: throw std::runtime_error("Invalid index");
+        default: throw std::runtime_error("Invalid base node index");
     }
 }
 
-constexpr std::tuple<Side2D, Side2D> node_adjacent_sides(int v_idx) {
-    switch (v_idx) {
-        case 0: return {Side2D::B, Side2D::L};
-        case 1: return {Side2D::R, Side2D::B};
-        case 2: return {Side2D::L, Side2D::T};
-        case 3: return {Side2D::T, Side2D::R};
-        default: throw std::runtime_error("Invalid index");
-    }
+std::tuple<BaseNode::Ptr, BaseNode::Ptr> Block::base_nodes(Side side) const {
+    return {base_node(node_idx(side, 0)), base_node(node_idx(side, 1))};
 }
 
-std::tuple<Side2D, Side2D> Block::adjacent_sides(const BaseNode* v) const {
-    if (!v) {
-        throw std::runtime_error("Block::adjacent_sides() error: Invalid BaseNode");
-    }
-    return node_adjacent_sides(base_node_index(v));
+// ---------- Размеры блока ----------------------------------------- --------------------------------------------------
+
+int Block::size(Axis axis) const {
+    return m_sizes[static_cast<int>(axis)];
 }
 
-std::tuple<Side2D, Side2D> Block::adjacent_sides(BaseNode::Ref v) const {
-    return adjacent_sides(v.get());
+int Block::size(Side side) const {
+    return m_sizes[static_cast<int>(to_axis(side))];
 }
 
-Block::Ptr Block::adjacent_block(Side2D side) const {
-    return m_adjacent_blocks[side].lock();
+int Block::size(BaseNode::Ref v1, BaseNode::Ref v2) const {
+    return m_sizes[static_cast<int>(get_axis(v1, v2))];
 }
 
-int Block::base_node_index(const BaseNode* v) const {
-    for (int idx = 0; idx < 4; ++idx) {
-        if (m_base_nodes[idx].get() == v) {
-            return idx;
+void Block::set_size(Axis axis, int N) {
+    if (m_sizes[static_cast<int>(axis)] == N) return;
+    m_sizes[static_cast<int>(axis)] = N;
+    update_lambda();
+    for (Side side: sides_by_axis(axis)) {
+        auto block = adjacent_block(side);
+        if (block) {
+            BaseNode::Ref v1 = m_base_nodes[node_idx(side, 0)];
+            BaseNode::Ref v2 = m_base_nodes[node_idx(side, 1)];
+            if (block->size(v1, v2) != N) {
+                block->set_size(v1, v2, N);
+            }
         }
     }
-    throw std::runtime_error("Can't find base node");
+}
+
+void Block::set_size(Side side, int N) {
+    set_size(to_axis(side), N);
+}
+
+void Block::set_size(BaseNode::Ref v1, BaseNode::Ref v2, int N) {
+    set_size(get_axis(v1, v2), N);
+}
+
+std::string Block::sizes_info() const {
+    return std::format("Block {:3}.  K: {:.2f};  sizes: ({:3}, {:3})", m_index, m_modulus, m_sizes[0], m_sizes[1]);
+}
+
+double Block::rel_size(Axis axis) const {
+    return m_rel_sizes[static_cast<int>(axis)];
+}
+
+double Block::rel_size(BaseNode::Ref v1, BaseNode::Ref v2) const {
+    return m_rel_sizes[static_cast<int>(get_axis(v1, v2))];
+}
+
+void Block::reset_rel_sizes() {
+    m_rel_sizes[0] = NAN;
+    m_rel_sizes[1] = NAN;
+}
+
+void Block::init_rel_sizes() {
+    if (std::isnan(m_modulus)) {
+        throw std::runtime_error("Invalid Modulus");
+    }
+    set_rel_size(Axis::X, m_modulus);
+    set_rel_size(Axis::Y, 1.0);
+}
+
+bool Block::update_rel_sizes() {
+    if (std::isnan(m_modulus)) {
+        throw std::runtime_error("update_rel_sizes error: Invalid Modulus");
+    }
+    if (bad_number(rel_size(Axis::X)) && good_number(rel_size(Axis::Y))) {
+        set_rel_size(Axis::X, rel_size(Axis::Y) * modulus());
+    }
+    if (bad_number(rel_size(Axis::Y)) && good_number(rel_size(Axis::X))) {
+        set_rel_size(Axis::Y, rel_size(Axis::X) / modulus());
+    }
+    return good_number(rel_size(Axis::X)) && good_number(rel_size(Axis::Y));
+}
+
+void Block::set_rel_size(Axis axis, double N) {
+    if (m_rel_sizes[static_cast<int>(axis)] == N) return;
+
+    m_rel_sizes[static_cast<int>(axis)] = N;
+    //std::cout << "  Block " << index << ". set size axis " << static_cast<int>(axis) << ": " << N << "; ";
+    //std::cout << "new sizes: (" << m_rel_sizes[0] << ", " << m_rel_sizes[1] << ")\n";
+    for (Side side: sides_by_axis(axis)) {
+        auto block = adjacent_block(side);
+        if (block) {
+            BaseNode::Ref v1 = m_base_nodes[node_idx(side, 0)];
+            BaseNode::Ref v2 = m_base_nodes[node_idx(side, 1)];
+            if (block->rel_size(v1, v2) != N) {
+                block->set_rel_size(v1, v2, N);
+            }
+        }
+    }
+}
+
+void Block::set_rel_size(Side side, double N) {
+    set_rel_size(to_axis(side), N);
+}
+
+void Block::set_rel_size(BaseNode::Ref v1, BaseNode::Ref v2, double N) {
+    set_rel_size(get_axis(v1, v2), N);
+}
+
+void Block::set_rel_sizes(double Nx, double Ny) {
+    set_rel_size(Axis::X, Nx);
+    set_rel_size(Axis::Y, Ny);
+}
+
+// ---------- Границы блока ------------------ -------------------------------------------------------------------------
+
+Curve::Ref Block::boundary(Side side) const {
+    return m_boundaries[static_cast<int>(side)];
 }
 
 bool Block::is_boundary(const BaseNode* v) const {
-    auto[side1, side2] = adjacent_sides(v);
+    auto [side1, side2] = adjacent_sides(v);
     return is_boundary(side1) || is_boundary(side2);
 }
 
-Side2D Block::get_side(BaseNode::Ref v1, BaseNode::Ref v2) const {
+bool Block::is_boundary(Side side) const {
+    return boundary(side) != nullptr;
+}
+
+void Block::set_boundary(Side side, Curve::Ref curve) {
+    m_boundaries[static_cast<int>(side)] = curve;
+    m_adjacent_blocks[static_cast<int>(side)].reset();
+}
+
+void Block::set_boundary(BaseNode::Ref v1, BaseNode::Ref v2, Curve::Ref curve) {
+    set_boundary(get_side(v1, v2), curve);
+}
+
+// ---------- Выбор сторон и смежные блоки ----------- -----------------------------------------------------------------
+
+Side Block::get_side(BaseNode::Ref v1, BaseNode::Ref v2) const {
     // Глупый полный перебор, хотя тут всего по 4 узла/грани
     int idx_v1 = base_node_index(v1);
     int idx_v2 = base_node_index(v2);
@@ -154,9 +342,9 @@ Side2D Block::get_side(BaseNode::Ref v1, BaseNode::Ref v2) const {
         std::swap(idx_v1, idx_v2);
     }
 
-    for (Side2D side: Side2D::items()) {
-        int idx_w1 = node(side, 0);
-        int idx_w2 = node(side, 1);
+    for (Side side: sides_2D) {
+        int idx_w1 = node_idx(side, 0);
+        int idx_w2 = node_idx(side, 1);
         if (idx_w2 < idx_w1) {
             std::swap(idx_w1, idx_w2);
         }
@@ -166,9 +354,9 @@ Side2D Block::get_side(BaseNode::Ref v1, BaseNode::Ref v2) const {
         }
     }
 
-    for (Side2D side: Side2D::items()) {
-        int idx_w1 = node(side, 0);
-        int idx_w2 = node(side, 1);
+    for (Side side: sides_2D) {
+        int idx_w1 = node_idx(side, 0);
+        int idx_w2 = node_idx(side, 1);
         if (idx_w2 < idx_w1) {
             std::swap(idx_w1, idx_w2);
         }
@@ -180,54 +368,20 @@ Side2D Block::get_side(BaseNode::Ref v1, BaseNode::Ref v2) const {
     throw std::runtime_error("Can't find face between two vertices");
 }
 
-int Block::get_axis(BaseNode::Ref v1, BaseNode::Ref v2) const {
-    auto side = get_side(v1, v2);
-    return to_axis(side);
+Axis Block::get_axis(BaseNode::Ref v1, BaseNode::Ref v2) const {
+    return to_axis(get_side(v1, v2));
 }
 
-Vector3d Block::center() const {
-    return 0.25 * (m_base_nodes[0]->pos() + m_base_nodes[1]->pos() + m_base_nodes[2]->pos() + m_base_nodes[3]->pos());
+Block::Ptr Block::adjacent_block(Side side) const {
+    return m_adjacent_blocks[static_cast<int>(side)].lock();
 }
 
-Vector3d Block::center(Side2D side) const {
-    Vector3d v1 = base_node(node(side, 0))->pos();
-    Vector3d v2 = base_node(node(side, 1))->pos();
-    Vector3d vc = 0.5 * (v1 + v2);
-    if (m_boundaries[side]) {
-       vc = m_boundaries[side]->projection(vc);
-    }
-    return vc;
+Side Block::twin_face(Side side) const {
+    int f_idx = side_to_idx(side);
+    return idx_to_side((f_idx - m_rotations[static_cast<int>(side)] + 4) % 4);
 }
 
-void Block::set_boundary(Side2D side, Curve::Ref curve) {
-    m_boundaries[side] = curve;
-    m_adjacent_blocks[side].reset();
-}
-
-void Block::set_boundary(BaseNode::Ref v1, BaseNode::Ref v2, Curve::Ref curve) {
-    set_boundary(get_side(v1, v2), curve);
-}
-
-void Block::set_size(int axis, int N) {
-    m_sizes[axis] = N;
-    for (Side2D l: sides(axis)) {
-        if (!m_adjacent_blocks[l].expired()) {
-            BaseNode::Ref v1 = m_base_nodes[node(l, 0)];
-            BaseNode::Ref v2 = m_base_nodes[node(l, 1)];
-            if (m_adjacent_blocks[l].lock()->size(v1, v2) != N) {
-                m_adjacent_blocks[l].lock()->set_size(v1, v2, N);
-            }
-        }
-    }
-}
-
-void Block::set_size(Side2D side, int N) {
-    set_size(to_axis(side), N);
-}
-
-void Block::set_size(BaseNode::Ref v1, BaseNode::Ref v2, int N) {
-    set_size(get_axis(v1, v2), N);
-}
+// ---------- Внутренние вершины блока ---------------------------------------------------------------------------------
 
 BsVertex::Ptr& Block::corner_vertex(int v_idx) {
     switch (v_idx) {
@@ -235,39 +389,92 @@ BsVertex::Ptr& Block::corner_vertex(int v_idx) {
         case 1: return vertex(-1,  0);
         case 2: return vertex( 0, -1);
         case 3: return vertex(-1, -1);
-        default: throw std::runtime_error("Invalid vertex index");
+        default: throw std::runtime_error("Invalid base node index");
     }
 }
 
-BsVertex::Ptr& Block::boundary_vertex(Side2D side, int idx) {
+BsVertex::Ptr& Block::boundary_vertex(Side side, int idx) {
     switch (side) {
-        case Side2D::B: return vertex(idx, 0);
-        case Side2D::R: return vertex(-1, idx);
-        case Side2D::T: return vertex(size1() - idx, -1);
-        case Side2D::L: return vertex(0, size2() - idx);
-        default: throw std::runtime_error("Invalid vertex index");
+        case Side::B: return vertex(idx, 0);
+        case Side::R: return vertex(-1, idx);
+        case Side::T: return vertex(-idx - 1, -1);
+        case Side::L: return vertex(0, -idx - 1);
+        default: throw std::runtime_error("Invalid base node index");
     }
 }
 
-BsVertex::Ptr& Block::preboundary_vertex(Side2D side, int idx) {
+BsVertex::Ptr& Block::near_boundary_vertex(Side side, int idx) {
     switch (side) {
-        case Side2D::B: return vertex(idx, 1);
-        case Side2D::R: return vertex(-2, idx);
-        case Side2D::T: return vertex(size1() - idx, -2);
-        case Side2D::L: return vertex(1, size2() - idx);
-        default: throw std::runtime_error("Invalid vertex index");
+        case Side::B: return vertex(idx, 1);
+        case Side::R: return vertex(-2, idx);
+        case Side::T: return vertex(-idx - 1, -2);
+        case Side::L: return vertex(1, -idx - 1);
+        default: throw std::runtime_error("Invalid base node index");
     }
 }
 
-Side2D Block::neib_face(Side2D side) const {
-    int f_idx = to_face_idx(side);
-    return idx_to_side((f_idx - m_rotations[side] + 4) % 4);
+// ---------- Конформные приколы ---------------------------------------------------------------------------------------
+
+double Block::modulus() const { return m_modulus; }
+
+void Block::estimate_modulus() {
+    double len1 = length(Side::B) + length(Side::T);
+    double len2 = length(Side::L) + length(Side::R);
+    set_modulus(len1 / len2);
 }
 
-constexpr int rotation(Side2D side1, Side2D side2) {
-    int f1 = to_face_idx(side1);
-    int f2 = to_face_idx(side2);
-    return (f1 - f2 + 4) % 4;
+inline double restricted_modulus(double K) {
+    static constexpr double max_modulus = 100.0;
+    static constexpr double min_modulus = 1.0 / max_modulus;
+    if (K > max_modulus) {
+        std::cerr << "Modulus exceeded max\n";
+        K = max_modulus;
+    }
+    if (K < min_modulus) {
+        std::cerr << "Modulus exceeded min\n";
+        K = min_modulus;
+    }
+    return K;
+}
+
+void Block::set_modulus(double K) {
+    if (bad_number(K)) {
+        throw std::runtime_error("Block::update_ratio: bad modulus");
+    }
+    m_modulus = restricted_modulus(K);
+    if (size1() >= 1 && size2() >= 1) {
+        m_lambda[1] = m_modulus * size2() / size1();
+        m_lambda[0] = 1.0 / m_lambda[1];
+    }
+    else {
+        m_lambda[0] = m_lambda[1] = 0.0;
+    }
+}
+
+double* Block::lambda_ptr(Axis axis) { return &m_lambda[static_cast<int>(axis)]; }
+
+double* Block::lambda_ptr(Side side) { return &m_lambda[static_cast<int>(to_axis(side))]; }
+
+void Block::update_lambda() {
+    if (good_number(m_modulus) && size1() >= 1 && size2() >= 1) {
+        m_lambda[1] = m_modulus * size2() / size1();
+        m_lambda[0] = 1.0 / m_lambda[1];
+    }
+    else {
+        m_lambda[0] = m_lambda[1] = NAN;
+    }
+}
+
+std::string Block::conformal_info() const {
+    return std::format("Block {:3}.  K: {:.2f};  λ_1: {:.2f}; λ_2: {:.2f}", m_index, m_modulus, m_lambda[0], m_lambda[1]);
+}
+
+// ---------- Функции "верхнего уровня" --------------------------------------------------------------------------------
+
+void Block::clear_vertices() {
+    set_size(Axis::X, 0);
+    set_size(Axis::Y, 0);
+    m_vertices = {};
 }
 
 void Block::link(Block::Ref B1, Block::Ref B2) {
@@ -279,35 +486,40 @@ void Block::link(Block::Ref B1, Block::Ref B2) {
     }
 
     // Ищем просто полным перебором
-    for (Side2D side1: Side2D::items()) {
-        BaseNode::Ptr a1 = B1->base_node(node(side1, 0));
-        BaseNode::Ptr b1 = B1->base_node(node(side1, 1));
+    for (Side side1: sides_2D) {
+        BaseNode::Ptr a1 = B1->base_node(node_idx(side1, 0));
+        BaseNode::Ptr b1 = B1->base_node(node_idx(side1, 1));
         if (a1.get() > b1.get()) std::swap(a1, b1);
 
-        for (Side2D side2: Side2D::items()) {
-            BaseNode::Ptr a2 = B2->base_node(node(side2, 0));
-            BaseNode::Ptr b2 = B2->base_node(node(side2, 1));
+        for (Side side2: sides_2D) {
+            BaseNode::Ptr a2 = B2->base_node(node_idx(side2, 0));
+            BaseNode::Ptr b2 = B2->base_node(node_idx(side2, 1));
             if (a2.get() > b2.get()) std::swap(a2, b2);
 
             if (a1 == a2 && b1 == b2) {
                 if (B1->boundary(side1)) {
                     throw std::runtime_error("Try link through boundary #1");
                 }
-                B1->m_adjacent_blocks[side1] = B2;
-                B1->m_rotations[side1] = rotation(side1, side2);
+                B1->m_adjacent_blocks[static_cast<int>(side1)] = B2;
+                B1->m_rotations[static_cast<int>(side1)] = rotation(side1, side2);
 
                 if (B2->boundary(side2)) {
                     throw std::runtime_error("Try link through boundary #2");
                 }
-                B2->m_adjacent_blocks[side2] = B1;
-                B2->m_rotations[side2] = rotation(side2, side1);
+                B2->m_adjacent_blocks[static_cast<int>(side2)] = B1;
+                B2->m_rotations[static_cast<int>(side2)] = rotation(side2, side1);
             }
         }
     }
 }
 
-void Block::create_vertices() {
+void Block::create_vertices_init() {
     using geom::SqQuad;
+
+    check_consistency();
+    if (size1() * size2() > 1000000) {
+        throw std::runtime_error("Too much vertices");
+    }
 
     m_vertices.resize({size1() + 1, size2() + 1}, nullptr);
 
@@ -315,10 +527,10 @@ void Block::create_vertices() {
     Vector3d v1 = base_node(1)->pos();
     Vector3d v2 = base_node(2)->pos();
     Vector3d v3 = base_node(3)->pos();
-    Vector3d vL = center(Side2D::L);
-    Vector3d vR = center(Side2D::R);
-    Vector3d vB = center(Side2D::B);
-    Vector3d vT = center(Side2D::T);
+    Vector3d vL = center(Side::L);
+    Vector3d vR = center(Side::R);
+    Vector3d vB = center(Side::B);
+    Vector3d vT = center(Side::T);
 
     Vector3d vC = (vL + vR + vB + vT) / 4.0;
     SqQuad quad = {
@@ -343,36 +555,24 @@ void Block::create_vertices() {
 
     // Сглаживание границы
     for (int k = 0; k < 10; ++k) {
-        for (Side2D side: Side2D::items()) {
+        for (Side side: sides_2D) {
             if (!boundary(side)) { continue; }
 
             for (int idx = 1; idx < size(side); ++idx) {
-                Vector3d v = (boundary_vertex(side, idx - 1)->v1 +
-                              boundary_vertex(side, idx + 1)->v1) / 2.0;
+                Vector3d v = (boundary_vertex(side, idx - 1)->pos +
+                              boundary_vertex(side, idx + 1)->pos) / 2.0;
                 v = boundary(side)->projection(v);
-                boundary_vertex(side, idx)->v2 = v;
+                boundary_vertex(side, idx)->next = v;
             }
         }
 
-        for (Side2D side: Side2D::items()) {
+        for (Side side: sides_2D) {
             if (!boundary(side)) { continue; }
-
             for (int idx = 1; idx < size(side); ++idx) {
-                boundary_vertex(side, idx)->v1 = boundary_vertex(side, idx)->v2;
+                boundary_vertex(side, idx)->pos = boundary_vertex(side, idx)->next;
             }
         }
     }
-
-    /*
-    // Генерация внутренних вершин, биквадратичное отображение
-    for (int i = 1; i < size1(); ++i) {
-        for (int j = 1; j < size2(); ++j) {
-            double x = (2.0 * i - size1()) / size1();
-            double y = (2.0 * j - size2()) / size2();
-            vertex(i, j) = BsVertex::create(quad(x, y));
-        }
-    }
-    */
 
     // Генерация внутренних вершин, Coons patch.
     for (int i = 1; i < size1(); ++i) {
@@ -380,17 +580,72 @@ void Block::create_vertices() {
             double t = double(i) / size1();
             double s = double(j) / size2();
 
-            Vector3d Lc = (1 - t) * vertex(0, j)->v1 + t * vertex(-1, j)->v1;
-            Vector3d Ld = (1 - s) * vertex(i, 0)->v1 + s * vertex(i, -1)->v1;
-            Vector3d B = (1 - t) * (1 - s) * vertex(0, 0)->v1 + (1 - t) * s * vertex(0, -1)->v1 +
-                         t * (1 - s) * vertex(-1, 0)->v1 + t * s * vertex(-1, -1)->v1;
+            Vector3d Lc = (1 - t) * vertex(0, j)->pos + t * vertex(-1, j)->pos;
+            Vector3d Ld = (1 - s) * vertex(i, 0)->pos + s * vertex(i, -1)->pos;
+            Vector3d B = (1 - t) * (1 - s) * vertex(0, 0)->pos + (1 - t) * s * vertex(0, -1)->pos +
+                         t * (1 - s) * vertex(-1, 0)->pos + t * s * vertex(-1, -1)->pos;
             Vector3d v = Lc + Ld - B;
             vertex(i, j) = BsVertex::create(v.x(), v.y());
         }
     }
+}
 
+void Block::create_vertices_again() {
+    check_consistency();
+    if (size1() * size2() > 1000000) {
+        throw std::runtime_error("Too much vertices");
+    }
+
+    if (m_vertices.empty()) {
+        throw std::runtime_error("Empty previous vertices array");
+    }
+
+    if (m_vertices.size1() < 2 || m_vertices.size2() < 2) {
+        throw std::runtime_error("Empty previous vertices array");
+    }
+
+    // Берем прошлые вершины за основу
+    Array2D<Vector3d> prev(m_vertices.sizes(), Vector3d::Zero());
+    for (int i = 0; i < m_vertices.size1(); ++i) {
+        for (int j = 0; j < m_vertices.size2(); ++j) {
+            prev(i, j) = m_vertices(i, j)->pos;
+        }
+    }
+
+    auto bilinear = [&prev](double x, double y) -> Vector3d {
+        double i = x * (prev.size1() - 1);
+        double j = y * (prev.size2() - 1);
+        int i1 = std::min(static_cast<int>(std::floor(i)), prev.size1() - 2);
+        int j1 = std::min(static_cast<int>(std::floor(j)), prev.size2() - 2);
+        int i2 = i1 + 1;
+        int j2 = j1 + 1;
+        return (j2 - j) * ((i2 - i) * prev(i1, j1) + (i - i1) * prev(i2, j1)) +
+               (j - j1) * ((i2 - i) * prev(i1, j2) + (i - i1) * prev(i2, j2));
+    };
+
+    m_vertices = Array2D<BsVertex::Ptr>({size1() + 1, size2() + 1}, nullptr);
+    for (int i = 0; i <= size1(); ++i) {
+        for (int j = 0; j <= size2(); ++j) {
+            double x = math::between(double(i) / size1(), 0.0, 1.0);
+            double y = math::between(double(j) / size2(), 0.0, 1.0);
+            m_vertices(i,  j) = BsVertex::create(bilinear(x, y));
+        }
+    }
+
+    // Проекция на границах
+    for (Side side: sides_2D) {
+        if (!boundary(side)) { continue; }
+
+        for (int idx = 0; idx <= size(side); ++idx) {
+            Vector3d v = boundary_vertex(side, idx)->pos;
+            boundary_vertex(side, idx)->pos = boundary(side)->projection(v);
+        }
+    }
+}
+
+void Block::merge_vertices() {
     // Связать вершины с соседом
-    for (Side2D side: Side2D::items()) {
+    for (Side side: sides_2D) {
         auto neib = adjacent_block(side);
 
         if (!neib) { continue; }
@@ -400,7 +655,7 @@ void Block::create_vertices() {
             continue;
         }
 
-        Side2D twin = neib_face(side);
+        Side twin = twin_face(side);
 
         int N = size(side);
         for (int k = 0; k <= N; ++k) {
@@ -421,47 +676,35 @@ void Block::link_vertices() {
     for (int i = 1; i < size1(); ++i) {
         for (int j = 1; j < size2(); ++j) {
             // Справа, сверху, слева, снизу
-            std::vector<BsVertex::Edge> edges {
-                {.neib = vertex(i + 1, j).get(), .ratio1 = ratio_ptr(0), .ratio2 = ratio_ptr(0)},
-                {.neib = vertex(i, j + 1).get(), .ratio1 = ratio_ptr(1), .ratio2 = ratio_ptr(1)},
-                {.neib = vertex(i - 1, j).get(), .ratio1 = ratio_ptr(0), .ratio2 = ratio_ptr(0)},
-                {.neib = vertex(i, j - 1).get(), .ratio1 = ratio_ptr(1), .ratio2 = ratio_ptr(1)}
+            std::vector edges {
+                BsEdge::Inside(vertex(i + 1, j), lambda_ptr(Axis::X)),
+                BsEdge::Inside(vertex(i, j + 1), lambda_ptr(Axis::Y)),
+                BsEdge::Inside(vertex(i - 1, j), lambda_ptr(Axis::X)),
+                BsEdge::Inside(vertex(i, j - 1), lambda_ptr(Axis::Y))
             };
             vertex(i, j)->set_edges(edges);
         }
     }
 
     // Вершины на границах блока (без угловых)
-    for (Side2D side: Side2D::items()) {
+    for (Side side: sides_2D) {
         if (!boundary(side) && !adjacent_block(side)) {
             throw std::runtime_error("BFace is not boundary and has no neighbor");
         }
 
-        int axis = to_axis(side);
-        int perp_axis = (axis + 1) % 2;
+        Axis axis = to_axis(side);
+        Axis perp_axis = opposite(axis);
 
         if (boundary(side)) {
             for (int idx = 1; idx < size(side); ++idx) {
                 // Добавить границу
                 boundary_vertex(side, idx)->add_boundary(boundary(side).get());
-
                 // Добавить связи (три штуки)
-                std::vector<BsVertex::Edge> edges;
-                edges.push_back({
-                    .neib   = boundary_vertex(side, idx + 1).get(),
-                    .ratio1 = ratio_ptr(axis),
-                    .ratio2 = nullptr
-                });
-                edges.push_back({
-                    .neib   = preboundary_vertex(side, idx).get(),
-                    .ratio1 = ratio_ptr(perp_axis),
-                    .ratio2 = ratio_ptr(perp_axis)
-                });
-                edges.push_back({
-                    .neib   = boundary_vertex(side, idx - 1).get(),
-                    .ratio1 = ratio_ptr(axis),
-                    .ratio2 = nullptr
-                });
+                std::vector edges {
+                    BsEdge::Border(boundary_vertex(side, idx + 1), lambda_ptr(axis)),
+                    BsEdge::Inside(near_boundary_vertex(side, idx),  lambda_ptr(perp_axis)),
+                    BsEdge::Border(boundary_vertex(side, idx - 1), lambda_ptr(axis))
+                };
                 boundary_vertex(side, idx)->set_edges(edges);
             }
         } else {
@@ -471,33 +714,17 @@ void Block::link_vertices() {
             }
 
             int N = size(side);
-            Side2D twin = neib_face(side);
+            Side twin = twin_face(side);
 
-            int neib_axis = to_axis(twin);
-            int prep_neib_axis = (neib_axis + 1) % 2;
-
+            Axis neib_axis = to_axis(twin);
+            Axis prep_neib_axis = opposite(neib_axis);
             for (int idx = 1; idx < N; ++idx) {
-                std::vector<BsVertex::Edge> edges;
-                edges.push_back({
-                    .neib   = boundary_vertex(side, idx + 1).get(),
-                    .ratio1 = ratio_ptr(axis),
-                    .ratio2 = neib->ratio_ptr(neib_axis)
-                });
-                edges.push_back({
-                    .neib   = preboundary_vertex(side, idx).get(),
-                    .ratio1 = ratio_ptr(perp_axis),
-                    .ratio2 = ratio_ptr(perp_axis)
-                });
-                edges.push_back({
-                    .neib   = boundary_vertex(side, idx - 1).get(),
-                    .ratio1 = ratio_ptr(axis),
-                    .ratio2 = neib->ratio_ptr(neib_axis)
-                });
-                edges.push_back({
-                    .neib   = neib->preboundary_vertex(twin, N - idx).get(),
-                    .ratio1 = neib->ratio_ptr(prep_neib_axis),
-                    .ratio2 = neib->ratio_ptr(prep_neib_axis)
-                });
+                std::vector edges {
+                    BsEdge::Inside(boundary_vertex(side, idx + 1), lambda_ptr(axis), neib->lambda_ptr(neib_axis)),
+                    BsEdge::Inside(near_boundary_vertex(side, idx), lambda_ptr(perp_axis)),
+                    BsEdge::Inside(boundary_vertex(side, idx - 1), lambda_ptr(axis), neib->lambda_ptr(neib_axis)),
+                    BsEdge::Inside(neib->near_boundary_vertex(twin, N - idx), neib->lambda_ptr(prep_neib_axis))
+                };
                 boundary_vertex(side, idx)->set_edges(edges);
             }
         }
@@ -516,7 +743,7 @@ void Block::link_vertices() {
 
         // Угловая вершина области по другому критерию
         if (auto [side1, side2] = node_adjacent_sides(v_idx);
-            m_boundaries[side1] && m_boundaries[side2]) {
+            boundary(side1) && boundary(side2)) {
             continue;
         }
 
@@ -531,7 +758,7 @@ void Block::link_vertices() {
             }
 
             auto corner = corner_vertex(v_idx);
-            std::vector<BsVertex::Edge> edges;
+            std::vector<BsEdge> edges;
 
             // Первая граничная вершина
             {
@@ -543,11 +770,10 @@ void Block::link_vertices() {
                     throw std::runtime_error("Block::link_vertices: invalid block (not boundary)");
                 }
                 corner->add_boundary(block->boundary(side).get());
-                edges.push_back({
-                    .neib = block->boundary_vertex(side, 1).get(),
-                    .ratio1 = block->ratio_ptr(to_axis(side)),
-                    .ratio2 = nullptr
-                });
+                edges.push_back(BsEdge::Border(
+                    block->boundary_vertex(side, 1),
+                    block->lambda_ptr(side)
+                ));
             }
             // Внутренние вершины
             for (int i = 1; i < adjacent_blocks.size(); ++i) {
@@ -556,13 +782,13 @@ void Block::link_vertices() {
                 Block::Ptr block = adjacent_blocks[i].lock();
                 auto prev_block = adjacent_blocks[i - 1].lock();
                 if (!block || !prev_block) { throw std::runtime_error("Block::link_vertices: invalid block"); }
-                Side2D side = block->get_side(node, node2);
-                Side2D prev_side = prev_block->get_side(node, node2);
-                edges.push_back({
-                    .neib   = block->boundary_vertex(side, 1).get(),
-                    .ratio1 = block->ratio_ptr(side),
-                    .ratio2 = prev_block->ratio_ptr(prev_side),
-                });
+                Side side = block->get_side(node, node2);
+                Side prev_side = prev_block->get_side(node, node2);
+                edges.push_back(BsEdge::Inside(
+                    block->boundary_vertex(side, 1),
+                    block->lambda_ptr(side),
+                    prev_block->lambda_ptr(prev_side)
+                ));
                 if (block->boundary(side)) {
                     throw std::runtime_error("Block::link_vertices: invalid block (why boundary)");
                 }
@@ -572,12 +798,11 @@ void Block::link_vertices() {
                 BaseNode::Ptr node2 = adjacent_nodes.back().lock();
                 Block::Ptr block = adjacent_blocks.back().lock();
                 if (!node2 || !block) { throw std::runtime_error("Block::link_vertices: invalid block"); }
-                Side2D side = block->get_side(node, node2);
-                edges.push_back({
-                    .neib = block->boundary_vertex(side, block->size(side) - 1).get(),
-                    .ratio1 = block->ratio_ptr(side),
-                    .ratio2 = nullptr
-                });
+                Side side = block->get_side(node, node2);
+                edges.push_back(BsEdge::Border(
+                    block->boundary_vertex(side, block->size(side) - 1),
+                    block->lambda_ptr(side)
+                ));
                 if (!block->boundary(side)) {
                     throw std::runtime_error("Block::link_vertices: invalid block (not boundary)");
                 }
@@ -596,7 +821,7 @@ void Block::link_vertices() {
             }
 
             auto corner = corner_vertex(v_idx);
-            std::vector<BsVertex::Edge> edges;
+            std::vector<BsEdge> edges;
 
             for (int i = 0; i < adjacent_blocks.size(); ++i) {
                 BaseNode::Ptr node2 = adjacent_nodes[i].lock();
@@ -605,13 +830,13 @@ void Block::link_vertices() {
                 int j = (i + adjacent_blocks.size() - 1) % adjacent_blocks.size();
                 auto prev_block = adjacent_blocks[j].lock();
                 if (!block || !prev_block) { throw std::runtime_error("Block::link_vertices: invalid block"); }
-                Side2D side = block->get_side(node, node2);
-                Side2D prev_side = prev_block->get_side(node, node2);
-                edges.push_back({
-                    .neib   = block->boundary_vertex(side, 1).get(),
-                    .ratio1 = block->ratio_ptr(side),
-                    .ratio2 = prev_block->ratio_ptr(prev_side),
-                });
+                Side side = block->get_side(node, node2);
+                Side prev_side = prev_block->get_side(node, node2);
+                edges.push_back(BsEdge::Inside(
+                    block->boundary_vertex(side, 1),
+                    block->lambda_ptr(side),
+                    prev_block->lambda_ptr(prev_side)
+                ));
                 if (block->boundary(side)) {
                     throw std::runtime_error("Block::link_vertices: invalid block (why boundary)");
                 }
@@ -621,7 +846,108 @@ void Block::link_vertices() {
     }
 }
 
-double Block::calc_modulus() const {
+void Block::check_consistency() const {
+    if (size1() < 1 || size2() < 1) {
+        throw std::runtime_error("Zero size of some block");
+    }
+    for (Side side: sides_2D) {
+        if (boundary(side)) { continue; }
+
+        auto neib = adjacent_block(side);
+        if (neib) {
+            Side twin = twin_face(side);
+
+            int size1 = size(side);
+            int size2 = neib->size(twin);
+
+            if (size1 != size2) {
+                std::string message = std::format("Block::check_consistency error: size mismatch (blocks {}, {})", m_index, neib->index());
+                std::cerr << message << "\n";
+                throw std::runtime_error(message);
+            }
+        }
+        else {
+            std::string message = "Block::check_consistency error: Boundary or neighbor should be defined";
+            std::cerr << message << "\n";
+            throw std::runtime_error(message);
+        }
+    }
+}
+
+void Block::smooth() {
+    for (int i = 0; i <= size1(); ++i) {
+        for (int j = 0; j <= size2(); ++j) {
+            auto vc = vertex(i, j);
+            auto &adjacent = vc->adjacent();
+
+            // Фиксированная вершина
+            if (adjacent.empty()) {
+                vc->next =vc->pos;
+                continue;
+            }
+
+            // Угловая вершина
+            if (!vc->inner() && vc->corner()) {
+                vc->next = vc->pos;
+                continue;
+            }
+
+            // Вершина на границе
+            if (!vc->inner()) {
+                Curve* boundary = vc->boundary();
+                Vector3d next = Vector3d::Zero();
+                double sum = 0.0;
+                for (auto edge: vertex(i, j)->adjacent()) {
+                    if (edge.boundary()) {
+                        next += edge.lambda() * edge.pos();
+                        sum += edge.lambda();
+                    }
+                    else {
+                        next += 2.0 * edge.lambda() * boundary->projection(edge.pos());
+                        sum += 2.0 * edge.lambda();
+                    }
+                }
+                next /= sum;
+                vc->next = boundary->projection(next);
+                continue;
+            }
+
+            // Внутренняя вершина
+            Vector3d next = Vector3d::Zero();
+            double sum = 0.0;
+            for (auto edge: vertex(i, j)->adjacent()) {
+                next += edge.lambda() * edge.pos();
+                sum += edge.lambda();
+            }
+            next /= sum;
+            vc->next = next;
+        }
+    }
+}
+
+double Block::move_vertices() {
+    z_assert(m_vertices.size1() == size1() + 1, "Bad size1");
+    z_assert(m_vertices.size2() == size2() + 1, "Bad size2");
+
+    double err = 0.0;
+
+    for (int i = 0; i <= size1(); ++i) {
+        for (int j = 0; j <= size2(); ++j) {
+            BsVertex::Ref vc = vertex(i, j);
+
+            double L = 0.0;
+            for (const auto edge: vertex(i, j)->adjacent()) {
+                L = std::max(L, (vc->pos - edge.pos()).norm());
+            }
+            err = std::max(err, (vc->pos - vc->next).norm() / L);
+
+            vc->pos = vc->next;
+        }
+    }
+    return err;
+}
+
+void Block::update_modulus() {
     int Nx = size1();
     int Ny = size2();
 
@@ -629,10 +955,10 @@ double Block::calc_modulus() const {
     double sum_y = 0.0;
     for (int i = 0; i < Nx; ++i) {
         for (int j = 0; j < Ny; ++j) {
-            Vector3d v1 = vertex(i, j)->v1;
-            Vector3d v2 = vertex(i+1, j)->v1;
-            Vector3d v3 = vertex(i+1, j+1)->v1;
-            Vector3d v4 = vertex(i, j+1)->v1;
+            Vector3d v1 = vertex(i, j)->pos;
+            Vector3d v2 = vertex(i+1, j)->pos;
+            Vector3d v3 = vertex(i+1, j+1)->pos;
+            Vector3d v4 = vertex(i, j+1)->pos;
 
             // Triangle Method
             Triangle T1 = {v4, v1, v2};
@@ -658,231 +984,9 @@ double Block::calc_modulus() const {
     //std::cout << "M: " << sum_y << "; 1/M: " << sum_x << "; 1: " << sum_x * sum_y << std::endl;
     //std::cout << "M avg: " << std::sqrt(sum_y / sum_x) << std::endl;
     //std::cout << "M avg: " << 0.5 * (sum_y + 1.0 / sum_x) << std::endl;
-    return std::sqrt(sum_y / sum_x);
-}
 
-void Block::update_modulus() {
-    double K = calc_modulus();
-    m_modulus = K;
-    m_ratio[0] = m_modulus * size2() / size1();
-    m_ratio[1] = 1.0 / m_ratio[0];
-
-    std::cout << std::format("Block {}.\tK: {:.2f}; ratio1: {:.2f}; ratio2: {:.2f}\n", index, m_modulus, m_ratio[0], m_ratio[1]);
-}
-
-double Block::smooth() {
-    double err = 0.0;
-
-    for (int i = 0; i <= size1(); ++i) {
-        for (int j = 0; j <= size2(); ++j) {
-            auto vc = vertex(i, j);
-            auto &adjacent = vc->adjacent();
-
-            // Фиксированная вершина
-            if (adjacent.empty()) {
-                vc->v2 =vc->v1;
-                continue;
-            }
-
-            // Угловая вершина
-            if (!vc->inner() && vc->corner()) {
-                vc->v2 = vc->v1;
-                continue;
-            }
-
-            // Вершина на границе
-            if (!vc->inner()) {
-                Curve *boundary = vc->boundary();
-
-                Vector3d next = Vector3d::Zero();
-                double sum = 0.0;
-                for (auto edge: vertex(i, j)->adjacent()) {
-                    next += 1/edge.ratio() * edge.neib->v1;
-                    sum += 1/edge.ratio();
-                }
-                next /= sum;
-                vc->v2 = vc->boundary()->projection(next);
-                continue;
-            }
-
-            // Внутренняя вершина
-            // А может по отдельности все зафигачить???
-            // Есть 4 случая:
-            //   Регулярная внутренняя
-            //   Регулярная на границе двух блоков
-            //   Регулярная на границе 4ех блоков
-            //   Сингулярная на границе нескольких блоков
-
-
-            Vector3d next = Vector3d::Zero();
-            double sum = 0.0;
-            for (auto edge: vertex(i, j)->adjacent()) {
-                next += 1/edge.ratio() * edge.neib->v1;
-                sum += 1/edge.ratio();
-            }
-            next /= sum;
-            vc->v2 = next;
-            double L = 0.0;
-            for (const auto adj: adjacent) {
-                L = std::max(L, (vc->v1 - adj.neib->v1).norm());
-            }
-
-            err = std::max(err, (vc->v1 - vc->v2).norm() / L);
-
-#if 0
-            // Проигнорируем сингулярные (пока)
-            if (adjacent.size() != 4) {
-                vc->v2 = vc->v1;
-                throw std::runtime_error("NO WAY #0");
-                continue;
-            }
-
-            double ML, MR, MB, MT;
-            double NL, NR, NB, NT;
-
-            // Классический вариант внутри блоков
-            MB = MT = modulus();
-            ML = MR = 1.0 / modulus();
-            NB = NT = ratio();
-            NL = NR = 1.0 / ratio();
-
-            BsVertex* vR = adjacent[0].neib;
-            BsVertex* vT = adjacent[1].neib;
-            BsVertex* vL = adjacent[2].neib;
-            BsVertex* vB = adjacent[3].neib;
-
-            // Регулярная внутри блока
-            if (0 < i && i < size1() && 0 < j && j < size2()) {
-                vL = m_vertices(i - 1, j).get();
-                vR = m_vertices(i + 1, j).get();
-                vB = m_vertices(i, j - 1).get();
-                vT = m_vertices(i, j + 1).get();
-            }
-            // На нижней границе блока
-            else if (0 < i && i < size1() && j == 0) {
-                vL = m_vertices(i - 1, j).get();
-                vR = m_vertices(i + 1, j).get();
-                vT = m_vertices(i, j + 1).get();
-
-                auto neib = m_adjacent_blocks[Side2D::B].lock();
-                vB = neib->vertex(i, -2).get();
-                MB = neib->modulus();
-                NB = neib->ratio();
-
-                ML = MR = 1.0 / std::sqrt(modulus() * neib->modulus());
-                NL = NR = 1.0 / std::sqrt(ratio() * neib->ratio());
-            }
-            // На верхней границе блока
-            else if (0 < i && i < size1() && j == size2()) {
-                vL = m_vertices(i - 1, j).get();
-                vR = m_vertices(i + 1, j).get();
-                vB = m_vertices(i, j - 1).get();
-
-                auto neib = m_adjacent_blocks[Side2D::T].lock();
-                vT = neib->vertex(i, 1).get();
-                MT = neib->modulus();
-                NT = neib->ratio();
-
-                ML = MR = 1.0 / std::sqrt(modulus() * neib->modulus());
-                NL = NR = 1.0 / std::sqrt(ratio() * neib->ratio());
-            }
-            // На левой границе блока
-            else if (0 < j && j < size2() && i == 0) {
-                vR = m_vertices(i + 1, j).get();
-                vB = m_vertices(i, j - 1).get();
-                vT = m_vertices(i, j + 1).get();
-
-                auto neib = m_adjacent_blocks[Side2D::L].lock();
-                vL = neib->vertex(-2, j).get();
-                ML = 1.0 / neib->modulus();
-                NL = 1.0 / neib->ratio();
-
-                MB = MT = std::sqrt(modulus() * neib->modulus());
-                NB = NT = std::sqrt(ratio() * neib->ratio());
-            }
-            // На правой границе блока
-            else if (0 < j && j < size2() && i == size1()) {
-                vL = m_vertices(i - 1, j).get();
-                vB = m_vertices(i, j - 1).get();
-                vT = m_vertices(i, j + 1).get();
-
-                auto neib = m_adjacent_blocks[Side2D::R].lock();
-                vR = neib->vertex(1, j).get();
-                MR = 1.0 / neib->modulus();
-                NR = 1.0 / neib->ratio();
-
-                MB = MT = std::sqrt(modulus() * neib->modulus());
-                NB = NT = std::sqrt(ratio() * neib->ratio());
-            }
-            else {
-                // Регулярная угловая точка
-                // У меня сейчас одна точка, рассмотрим её в лоб, для конкретного блока
-                if (i != 0 || j != 0) { continue; }
-
-                auto rt = shared_from_this();
-                auto lt = m_adjacent_blocks[Side2D::L].lock();
-                auto rb = m_adjacent_blocks[Side2D::B].lock();
-                auto lb = lt->m_adjacent_blocks[Side2D::B].lock();
-
-                vR = m_vertices(1, 0).get();
-                vT = m_vertices(0, 1).get();
-                vL = lt->vertex(-2, 0).get();
-                vB = rb->vertex(0, -2).get();
-
-                MB = std::sqrt(lb->modulus() * rb->modulus());
-                MT = std::sqrt(lt->modulus() * rt->modulus());
-                ML = 1.0 / std::sqrt(lb->modulus() * lt->modulus());
-                MR = 1.0 / std::sqrt(rb->modulus() * rt->modulus());
-                
-                NB = std::sqrt(lb->ratio() * rb->ratio());
-                NT = std::sqrt(lt->ratio() * rt->ratio());
-                NL = 1.0 / std::sqrt(lb->ratio() * lt->ratio());
-                NR = 1.0 / std::sqrt(rb->ratio() * rt->ratio());
-            }
-
-            double KL = ML * NL;
-            double KR = MR * NR;
-            double KB = MB * NB;
-            double KT = MT * NT;
-
-            Vector3d next = Vector3d::Zero();
-            double sum = 0.0;
-            for (auto edge: vertex(i, j)->adjacent()) {
-                next += 1/edge.ratio() * edge.neib->v1;
-                sum += 1/edge.ratio();
-            }
-            next /= sum;
-            //next = KL * vL->v1 + KR * vR->v1 + KB * vB->v1 + KT * vT->v1;
-           // next /= (KL + KR + KB + KT);
-
-            // for (auto neib: adjacent) {
-            //     next += neib->v1;
-            // }
-            // next /= vertex->n_adjacent();
-
-            vc->v2 = next;
-
-            double L = 0.0;
-            for (const auto adj: adjacent) {
-                L = std::max(L, (vc->v1 - adj.neib->v1).norm());
-            }
-
-            err = std::max(err, (vc->v1 - vc->v2).norm() / L);
-#endif
-        }
-    }
-
-    return err;
-}
-
-void Block::update() {
-    z_assert(m_vertices.size1() == size1() + 1, "Bad size1");
-    z_assert(m_vertices.size2() == size2() + 1, "Bad size2");
-    for (int i = 0; i <= size1(); ++i) {
-        for (int j = 0; j <= size2(); ++j) {
-            vertex(i, j)->v1 = vertex(i, j)->v2;
-        }
-    }
+    double K = std::sqrt(sum_y / sum_x);
+    set_modulus(K);
 }
 
 } // namespace zephyr::geom::generator

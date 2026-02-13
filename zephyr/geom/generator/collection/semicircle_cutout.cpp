@@ -16,7 +16,6 @@ SemicircleCutout::SemicircleCutout(
         double xmin, double xmax,
         double ymin, double ymax,
         double xc, double r, Boundaries bounds) :
-        BlockStructured(5),
         m_xmin(xmin), m_xmax(xmax),
         m_ymin(ymin), m_ymax(ymax),
         m_xc(xc), m_r(r),
@@ -105,34 +104,33 @@ void SemicircleCutout::init_blocks() {
     top->set_boundary(m_bounds.top);
     circle->set_boundary(m_bounds.bottom);
 
+    throw std::runtime_error("Not implemented");
+
     // Генератор сетки
-    *m_blocks[0] = {v1, v2, v9, v10};
+    //*m_blocks[0] = {v1, v2, v9, v10};
     m_blocks[0]->set_boundary(v1, v9, left);
     m_blocks[0]->set_boundary(v1, v2, bottom);
     m_blocks[0]->set_boundary(v9, v10, top);
 
-    *m_blocks[1] = {v2, v3, v4, v10};
+    //*m_blocks[1] = {v2, v3, v4, v10};
     m_blocks[1]->set_boundary(v2, v3, bottom);
     m_blocks[1]->set_boundary(v3, v4, circle);
 
-    *m_blocks[2] = {v4, v5, v10, v11};
+    //*m_blocks[2] = {v4, v5, v10, v11};
     m_blocks[2]->set_boundary(v4, v5, circle);
     m_blocks[2]->set_boundary(v10, v11, top);
 
-    *m_blocks[3] = {v6, v7, v5, v11};
+    //*m_blocks[3] = {v6, v7, v5, v11};
     m_blocks[3]->set_boundary(v6, v7, bottom);
     m_blocks[3]->set_boundary(v5, v6, circle);
 
-    *m_blocks[4] = {v7, v8, v11, v12};
+    //*m_blocks[4] = {v7, v8, v11, v12};
     m_blocks[4]->set_boundary(v7, v8, bottom);
     m_blocks[4]->set_boundary(v11, v12, top);
     m_blocks[4]->set_boundary(v8, v12, right);
 
     // Необходимо связать блоки
-    link();
-
-    // Точность сглаживания (необязательно)
-    set_accuracy(1.0e-5);
+    link_blocks();
 }
 
 

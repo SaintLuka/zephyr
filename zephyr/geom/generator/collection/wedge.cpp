@@ -16,7 +16,7 @@ Wedge::Wedge(
         double ymin, double ymax,
         double xw, double phi, 
         Boundaries bounds) :
-        BlockStructured(2),
+        BlockStructured(),
         m_xmin(xmin), m_xmax(xmax),
         m_ymin(ymin), m_ymax(ymax),
         m_xw(xw), m_phi(phi),
@@ -76,7 +76,7 @@ void Wedge::init_blocks() {
 
     double m_yw = m_ymin + (m_xmax - m_xw) * std::tan(m_phi);
 
-    // Задаем базисные вершины для струтурированных блоков
+    // Задаем базисные вершины для структурированных блоков
     v1 = BaseNode::create(m_xmin, m_ymin, true);
     v2 = BaseNode::create(m_xw,   m_ymin, true);
     v3 = BaseNode::create(m_xmax, m_yw,   true);
@@ -98,22 +98,21 @@ void Wedge::init_blocks() {
     // wedge->set_boundary(m_bounds.bottom);
     wedge->set_boundary(Boundary::WALL);
 
+    throw std::runtime_error("Not implemented");
+
     // Генератор сетки
-    *m_blocks[0] = {v1, v2, v4, v5};
+    //*m_blocks[0] = {v1, v2, v4, v5};
     m_blocks[0]->set_boundary(v1, v4, left);
     m_blocks[0]->set_boundary(v1, v2, bottom);
     m_blocks[0]->set_boundary(v4, v5, top);
 
-    *m_blocks[1] = {v2, v3, v5, v6};
+    //*m_blocks[1] = {v2, v3, v5, v6};
     m_blocks[1]->set_boundary(v2, v3, wedge);
     m_blocks[1]->set_boundary(v5, v6, top);
     m_blocks[1]->set_boundary(v3, v6, right);
 
     // Необходимо связать блоки
-    link();
-
-    // Точность сглаживания (необязательно)
-    set_accuracy(1.0e-5);
+    link_blocks();
 }
 
 

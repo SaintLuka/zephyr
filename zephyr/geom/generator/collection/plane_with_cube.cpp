@@ -18,7 +18,7 @@ PlaneWithCube::PlaneWithCube(
         double ymin, double ymax,
         double xc, double yc,
         double r) :
-        BlockStructured(8),
+        BlockStructured(),
         m_xmin(xmin), m_xmax(xmax),
         m_ymin(ymin), m_ymax(ymax),
         m_xc(xc), m_yc(yc),
@@ -104,44 +104,43 @@ void PlaneWithCube::init_blocks() {
     bottom->set_boundary(m_bounds.bottom);
     top->set_boundary(m_bounds.top);
 
+    throw std::runtime_error("Not implemented");
+
     // Генератор сетки
-    *m_blocks[0] = {v1, v5, v7, v8};
+    //*m_blocks[0] = {v1, v5, v7, v8};
     m_blocks[0]->set_boundary(v1, v7, left);
     m_blocks[0]->set_boundary(v5, v8, cube_side1);
 
-    *m_blocks[1] = {v1, v2, v4, v5};
+    //*m_blocks[1] = {v1, v2, v4, v5};
     m_blocks[1]->set_boundary(v1, v2, bottom);
     m_blocks[1]->set_boundary(v4, v5, cube_side1);
 
-    *m_blocks[2] = {v2, v3, v4, v6};
+    //*m_blocks[2] = {v2, v3, v4, v6};
     m_blocks[2]->set_boundary(v2, v3, bottom);
     m_blocks[2]->set_boundary(v4, v6, cube_side2);
 
-    *m_blocks[3] = {v3, v6, v9, v10};
+    //*m_blocks[3] = {v3, v6, v9, v10};
     m_blocks[3]->set_boundary(v6, v9, cube_side2);
     m_blocks[3]->set_boundary(v3, v10, right);
 
-    *m_blocks[4] = {v9, v10, v12, v16};
+    //*m_blocks[4] = {v9, v10, v12, v16};
     m_blocks[4]->set_boundary(v9, v12, cube_side3);
     m_blocks[4]->set_boundary(v10, v16, right);
 
-    *m_blocks[5] = {v12, v13, v15, v16};
+    //*m_blocks[5] = {v12, v13, v15, v16};
     m_blocks[5]->set_boundary(v12, v13, cube_side3);
     m_blocks[5]->set_boundary(v15, v16, top);
 
-    *m_blocks[6] = {v11, v13, v14, v15};
+    //*m_blocks[6] = {v11, v13, v14, v15};
     m_blocks[6]->set_boundary(v11, v13, cube_side4);
     m_blocks[6]->set_boundary(v14, v15, top);
 
-    *m_blocks[7] = {v7, v8, v11, v14};
+    //*m_blocks[7] = {v7, v8, v11, v14};
     m_blocks[7]->set_boundary(v8, v11, cube_side4);
     m_blocks[7]->set_boundary(v7, v14, left);
 
     // Необходимо связать блоки
-    link();
-
-    // Точность сглаживания (необязательно)
-    set_accuracy(1.0e-5);
+    link_blocks();
 }
 
 Box PlaneWithCube::bbox() const {

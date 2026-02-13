@@ -1,22 +1,37 @@
-#include "bs_vertex.h"
-
 #include <algorithm>
 #include <ranges>
 
 #include <zephyr/geom/generator/curve/curve.h>
 #include <zephyr/geom/generator/bs_vertex.h>
-#include <zephyr/geom/generator/block.h>
-
 
 namespace zephyr::geom::generator {
 
-BsVertex::BsVertex(const Vector3d &v)
-    : index(-1), v1(v), v2(v) {
+BsEdge::BsEdge(BsVertex* v, double* lambda_1, double* lambda_2)
+    : neib(v), lambda1(lambda_1), lambda2(lambda_2) { }
+
+BsEdge BsEdge::Border(BsVertex_Ref v, double* lambda) {
+    return BsEdge{v.get(), lambda, nullptr};
 }
 
-BsVertex::BsVertex(double x, double y)
-    : index(-1), v1(x, y, 0.0), v2(x, y, 0.0) {
+BsEdge BsEdge::Inside(BsVertex_Ref v, double* lambda) {
+    return BsEdge{v.get(), lambda, lambda};
 }
+
+BsEdge BsEdge::Inside(BsVertex::Ref v, double* lambda1, double* lambda2) {
+    return BsEdge{v.get(), lambda1, lambda2};
+}
+
+double BsEdge::lambda() const {
+    z_assert(lambda1 != nullptr, "lambda1 is null");
+    if (boundary()) { return (*lambda1); }
+    return std::sqrt((*lambda1) * (*lambda2));
+}
+
+BsVertex::BsVertex(const Vector3d &v)
+    : index(-1), pos(v), next(v) { }
+
+BsVertex::BsVertex(double x, double y)
+    : index(-1), pos(x, y, 0.0), next(x, y, 0.0) { }
 
 BsVertex::Ptr BsVertex::create(const Vector3d &v) {
     return std::make_shared<BsVertex>(v);
@@ -26,28 +41,11 @@ BsVertex::Ptr BsVertex::create(double x, double y) {
     return std::make_shared<BsVertex>(x, y);
 }
 
-int BsVertex::degree() const {
-    return m_edges.size();
-}
-
-void BsVertex::fix() {
-    m_edges.clear();
-}
-
-void BsVertex::clear() {
-    m_boundaries.clear();
-    m_edges.clear();
-}
-
-const std::vector<BsVertex::Edge> &BsVertex::adjacent() const {
-    return m_edges;
-}
-
-void BsVertex::set_edges(const std::vector<Edge> &edges) {
-    std::vector<std::pair<double, Edge>> sorted;
+void BsVertex::set_edges(const std::vector<BsEdge> &edges) {
+    std::vector<std::pair<double, BsEdge>> sorted;
     sorted.reserve(edges.size());
     for (auto &edge: edges) {
-        sorted.emplace_back(std::atan2(edge.neib->y() - v1.y(), edge.neib->x() - v1.x()), edge);
+        sorted.emplace_back(std::atan2(edge.y() - pos.y(), edge.x() - pos.x()), edge);
     }
 
     for (size_t i = 1; i < sorted.size(); ++i) {
@@ -57,8 +55,8 @@ void BsVertex::set_edges(const std::vector<Edge> &edges) {
     }
 
     std::ranges::sort(sorted,
-                      [](const std::pair<double, Edge> &p1,
-                         const std::pair<double, Edge> &p2) {
+                      [](const std::pair<double, BsEdge> &p1,
+                         const std::pair<double, BsEdge> &p2) {
                           return p1.first < p2.first;
                       });
 
@@ -69,21 +67,17 @@ void BsVertex::set_edges(const std::vector<Edge> &edges) {
     }
 }
 
-bool BsVertex::inner() const {
-    return m_boundaries.empty();
+void BsVertex::add_boundary(Curve* boundary) {
+    if (boundary) {
+        m_boundaries.insert(boundary);
+    }
 }
 
-bool BsVertex::corner() const {
-    return m_boundaries.size() > 1;
-}
-
-Curve *BsVertex::boundary() const {
+Curve* BsVertex::boundary() const {
     if (m_boundaries.size() == 1) {
         return *m_boundaries.begin();
     }
-    else {
-        throw std::runtime_error("BsVertex error: #1464");
-    }
+    throw std::runtime_error("BsVertex error: more than one boundary");
 }
 
 std::set<Boundary> BsVertex::boundaries() const {
@@ -92,12 +86,6 @@ std::set<Boundary> BsVertex::boundaries() const {
         res.insert(curve->boundary());
     }
     return res;
-}
-
-void BsVertex::add_boundary(Curve *boundary) {
-    if (boundary) {
-        m_boundaries.insert(boundary);
-    }
 }
 
 } // namespace zephyr::geom::generator

@@ -40,7 +40,7 @@ public:
 
     /// @brief Конструктор
     /// @param xs, ys, zs Узлы сплайна
-    /// @param left, right Тип экстрапляции на границах
+    /// @param left, right Тип экстраполяции на границах
     PCubicSpline(const std::vector<double> &xs,
                  const std::vector<double> &ys,
                  const std::vector<double> &zs,

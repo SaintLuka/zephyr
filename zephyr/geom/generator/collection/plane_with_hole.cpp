@@ -14,7 +14,6 @@
 namespace zephyr::geom::generator::collection {
 
 PlaneWithHole::PlaneWithHole(const Json& config) :
-        BlockStructured(12),
         m_xmin(0.0), m_xmax(0.0),
         m_ymin(0.0), m_ymax(0.0),
         m_xc(0.0), m_yc(0.0),
@@ -76,7 +75,6 @@ PlaneWithHole::PlaneWithHole(
         double ymin, double ymax,
         double xc, double yc,
         double r) :
-        BlockStructured(4), //12
         m_xmin(xmin), m_xmax(xmax),
         m_ymin(ymin), m_ymax(ymax),
         m_xc(xc), m_yc(yc),
@@ -333,28 +331,27 @@ void PlaneWithHole::init_blocks() {
     top->set_boundary(m_bounds.top);
     circle->set_boundary(m_bounds.hole);
 
+    throw std::runtime_error("Not implemented");
+
     // Генератор сетки
-    *m_blocks[0] = {v1, v2, v7, v8};
+    //*m_blocks[0] = {v1, v2, v7, v8};
     m_blocks[0]->set_boundary(v1, v7, left);
     m_blocks[0]->set_boundary(v2, v8, circle);
 
-    *m_blocks[1] = {v1, v3, v2, v4};
+    //*m_blocks[1] = {v1, v3, v2, v4};
     m_blocks[1]->set_boundary(v1, v3, bottom);
     m_blocks[1]->set_boundary(v2, v4, circle);
 
-    *m_blocks[2] = {v3, v4, v6, v5};
+    //*m_blocks[2] = {v3, v4, v6, v5};
     m_blocks[2]->set_boundary(v3, v5, right);
     m_blocks[2]->set_boundary(v4, v6, circle);
 
-    *m_blocks[3] = {v5, v6, v7, v8};
+    //*m_blocks[3] = {v5, v6, v7, v8};
     m_blocks[3]->set_boundary(v5, v7, top);
     m_blocks[3]->set_boundary(v6, v8, circle);
 
     // Необходимо связать блоки
-    link();
-
-    // Точность сглаживания (необязательно)
-    set_accuracy(1.0e-5);
+    link_blocks();
 }
 
 Box PlaneWithHole::bbox() const {

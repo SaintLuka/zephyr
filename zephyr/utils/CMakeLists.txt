@@ -8,6 +8,7 @@ set(ZEPHYR_UTILS_SRC
     PARENT_SCOPE)
 
 install(FILES
+        ${CMAKE_CURRENT_SOURCE_DIR}/array2d.h
         ${CMAKE_CURRENT_SOURCE_DIR}/buffer.h
         ${CMAKE_CURRENT_SOURCE_DIR}/csr.h
         ${CMAKE_CURRENT_SOURCE_DIR}/error_list.h
