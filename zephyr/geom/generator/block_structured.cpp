@@ -5,7 +5,6 @@
 #include <iomanip>
 #include <list>
 #include <ranges>
-#include <bits/fs_fwd.h>
 
 #include <zephyr/geom/box.h>
 #include <zephyr/geom/grid.h>
@@ -17,6 +16,14 @@
 
 namespace zephyr::geom::generator {
 
+inline bool good_number(double num) {
+    return !std::isinf(num) && !std::isnan(num) && num > 0.0;
+}
+
+inline bool bad_number(double num) {
+    return std::isinf(num) || std::isnan(num) || num <= 0.0;
+}
+
 constexpr int node_idx(Side side, int idx) {
     switch (side) {
         case Side::L: return std::array{0, 2}[idx];
@@ -27,17 +34,25 @@ constexpr int node_idx(Side side, int idx) {
     }
 }
 
-inline bool bad_number(double num) {
-    return std::isinf(num) || std::isnan(num) || num <= 0.0;
-}
-
-inline bool good_number(double num) {
-    return !std::isinf(num) && !std::isnan(num) && num > 0.0;
-}
-
 // Перпендикулярная ось
-constexpr Axis opposite(Axis axis) {
+constexpr Axis orthogonal(Axis axis) {
     return axis == Axis::X ? Axis::Y : Axis::X;
+}
+
+// Противоположная сторона
+constexpr Side opposite(Side side) {
+    switch (side) {
+        case Side::L: return Side::R;
+        case Side::R: return Side::L;
+        case Side::B: return Side::T;
+        case Side::T: return Side::B;
+        default: throw std::runtime_error("Invalid side");
+    }
+}
+
+// Стороны, которые лежат вдоль выбранной оси
+constexpr std::array<Side, 2> sides_by_axis(Axis axis) {
+    return axis == Axis::X? std::array{Side::B, Side::T} : std::array{Side::L, Side::R};
 }
 
 // Пара сторон, связанных с вершиной (обход против часовой внутри блока)
@@ -80,8 +95,9 @@ void BlockStructured::operator+=(const std::array<BaseNode::Ptr, 4>& base_nodes)
 
     // Добавить рёбра
     for (Side side: sides_2D) {
-        auto[v1, v2] = block->base_nodes(side);
-        node_pair_t edge{v1, v2};
+        auto v1 = block->base_node(side, 0);
+        auto v2 = block->base_node(side, 1);
+        BaseEdge edge{v1, v2};
 
         if (m_edges.contains(edge)) {
             if (m_edges[edge].b1.expired()) {
@@ -115,7 +131,7 @@ void BlockStructured::operator+=(const std::array<BaseNode::Ptr, 4>& base_nodes)
 }
 
 void BlockStructured::set_boundary(BaseNode::Ref v1, BaseNode::Ref v2, Curve::Ref curve) {
-    node_pair_t edge{v1, v2};
+    BaseEdge edge{v1, v2};
     if (m_edges.contains(edge)) {
         if (m_edges[edge].boundary()) {
             if (m_edges[edge].b1.expired()) {
@@ -200,6 +216,9 @@ void BlockStructured::link_blocks() {
             Block::link(adj[i].lock(), adj[j].lock());
         }
     }
+
+    // TODO: Проверить связность области!
+
     m_stage = LINKED;
 }
 
@@ -231,7 +250,7 @@ void BlockStructured::plot() const {
     // bounding box
     Box bbox = Box::Empty(2);
     for (const auto& block: m_blocks) {
-        auto& vertices = block->m_mapping;
+        auto& vertices = block->mapping();
         for (int i = 0; i < vertices.size1(); ++i) {
             for (int j = 0; j < vertices.size2(); ++j) {
                 bbox.capture(vertices(i, j));
@@ -249,7 +268,7 @@ void BlockStructured::plot() const {
     // Сетка внутри блоков
     std::vector<double> xs, ys;
     for (const auto& block: m_blocks) {
-        auto& vertices = block->m_mapping;
+        auto& vertices = block->mapping();
         if (vertices.empty()) { continue; }
 
         xs.resize(vertices.size1());
@@ -275,7 +294,7 @@ void BlockStructured::plot() const {
 
     // Границы блоков
     for (const auto& block: m_blocks) {
-        auto& vertices = block->m_mapping;
+        auto& vertices = block->mapping();
         if (vertices.empty()) { continue; }
 
         xs.resize(vertices.size1());
@@ -463,8 +482,8 @@ void BlockStructured::plot_debug() const {
         Vector3d bc = m_blocks[ib]->center();
         //plt.text(bc.x(), bc.y(), std::format("B{}", ib));
 
-        auto ptr1 = reinterpret_cast<uintptr_t>(m_blocks[ib]->lambda_ptr(Axis::X));
-        auto ptr2 = reinterpret_cast<uintptr_t>(m_blocks[ib]->lambda_ptr(Axis::Y));
+        //auto ptr1 = reinterpret_cast<uintptr_t>(m_blocks[ib]->lambda_ptr(Axis::X));
+        //auto ptr2 = reinterpret_cast<uintptr_t>(m_blocks[ib]->lambda_ptr(Axis::Y));
         //std::cout << std::format("  Block {}: {}, {}\n", ib, ptr1 % 97, ptr2 % 97);
     }
 
@@ -475,8 +494,8 @@ void BlockStructured::plot_debug() const {
             auto adj = block->adjacent_block(side);
             if (!adj) continue;
 
-            Vector3d v1 = block->base_node(node_idx(side, 0))->pos();
-            Vector3d v2 = block->base_node(node_idx(side, 1))->pos();
+            Vector3d v1 = block->base_node(side, 0)->pos();
+            Vector3d v2 = block->base_node(side, 1)->pos();
             Vector3d c2 = adj->center();
 
             Vector3d vc = 0.5 * (v1 + v2);
@@ -488,39 +507,39 @@ void BlockStructured::plot_debug() const {
 
     // Сетка для оптимизации
     for (const auto& block: m_blocks) {
-        auto& verts = block->m_mapping;
+        auto& verts = block->mapping();
 
         if (verts.empty()) { continue; }
-        std::vector<double> xs1(block->size1() + 1);
-        std::vector<double> ys1(block->size1() + 1);
-        for (int j = 0; j <= block->size2(); ++j) {
-            for (int i = 0; i <= block->size1(); ++i) {
+        std::vector<double> xs1(verts.size1());
+        std::vector<double> ys1(verts.size1());
+        for (int j = 0; j < verts.size2(); ++j) {
+            for (int i = 0; i < verts.size1(); ++i) {
                 xs1[i] = verts(i, j).x();
                 ys1[i] = verts(i, j).y();
             }
             plt.plot(xs1, ys1, {.linewidth=1.0, .color="black"});
         }
 
-        std::vector<double> xs2(block->size2() + 1);
-        std::vector<double> ys2(block->size2() + 1);
-        for (int i = 0; i <= block->size1(); ++i) {
-            for (int j = 0; j <= block->size2(); ++j) {
+        std::vector<double> xs2(verts.size2());
+        std::vector<double> ys2(verts.size2());
+        for (int i = 0; i < verts.size1(); ++i) {
+            for (int j = 0; j < verts.size2(); ++j) {
                 xs2[j] = verts(i, j).x();
                 ys2[j] = verts(i, j).y();
             }
             plt.plot(xs2, ys2, {.linewidth=1.0, .color="black"});
         }
 
-        for (int i = 0; i <= block->size1(); ++i) {
-            for (int j = 0; j <= block->size2(); ++j) {
+        //for (int i = 0; i <= size(block, Axis::X); ++i) {
+        //    for (int j = 0; j <= size(block, Axis::Y); ++j) {
                 // plt.text(verts(i, j).x(), verts(i, j).y(), std::to_string(verts(i,j)->degree()));
-            }
-        }
+        //    }
+        //}
 
         /*
         // Связи с соседями
-        for (int i = 0; i <= block->size1(); ++i) {
-            for (int j = 0; j <= block->size2(); ++j) {
+        for (int i = 0; i <= size(block, Axis::X); ++i) {
+            for (int j = 0; j <= size(block, Axis::Y); ++j) {
                 Vector3d v1 = verts(i, j)->pos;
                 for (auto edge: verts(i, j)->adjacent()) {
                     Vector3d v2 = edge.pos();
@@ -543,23 +562,23 @@ void BlockStructured::plot_debug() const {
     plt.show();
 }
 
-int BlockStructured::calc_cells() const {
+int BlockStructured::calc_cells(const Pairs<int>& sizes) const {
     int count = 0;
-    for (auto& block: m_blocks) {
-        count += block->size1() * block->size2();
+    for (int b1 = 0; b1 < size(); ++b1) {
+        count += sizes[b1][Axis::X] * sizes[b1][Axis::Y];
     }
     return count;
 }
 
-int BlockStructured::calc_nodes() const {
+int BlockStructured::calc_nodes(const Pairs<int>& sizes) const {
     int count = 0;
-    for (auto& block: m_blocks) {
-        count += (block->size1() + 1) * (block->size2() + 1);
+    for (int b1 = 0; b1 < size(); ++b1) {
+        count += (sizes[b1][Axis::X] + 1) * (sizes[b1][Axis::Y] + 1);
     }
     return count;
 }
 
-void BlockStructured::setup_block_sizes(int N) {
+Pairs<int> BlockStructured::auto_block_sizes(int N) {
     for (const auto& block: m_blocks) {
         if (bad_number(block->modulus())) {
             throw std::runtime_error("Need to define modulus before");
@@ -567,12 +586,14 @@ void BlockStructured::setup_block_sizes(int N) {
     }
 
     // Сбросить относительные размеры
-    for (const auto& block: m_blocks) {
-        block->reset_rel_sizes();
+    Pairs<double> rel_sizes(m_blocks.size());
+    for (int b1 = 0; b1 < size(); ++b1) {
+        rel_sizes[b1][Axis::X] = NAN;
+        rel_sizes[b1][Axis::Y] = NAN;
     }
 
     // Задаем у первого блока
-    m_blocks.front()->init_rel_sizes();
+    init_rel_sizes(rel_sizes, 0);
 
     // Алгоритм не сработает для несвязных областей
     // TODO: Проверка связности области
@@ -587,7 +608,7 @@ void BlockStructured::setup_block_sizes(int N) {
         list.pop_front();
 
         // Размеры блока не определены полностью, переместить в начало
-        bool defined = block->update_rel_sizes();
+        bool defined = update_rel_sizes(rel_sizes, block);
         if (!defined) {
             list.push_back(block);
         }
@@ -599,23 +620,25 @@ void BlockStructured::setup_block_sizes(int N) {
 
     // Находим минимальный относительный размер
     double min_size = std::numeric_limits<double>::max();
-    for (const auto &block: m_blocks) {
-        min_size = std::min(min_size, block->rel_size(Axis::X));
-        min_size = std::min(min_size, block->rel_size(Axis::Y));
+    for (int b1 = 0; b1 < size(); ++b1) {
+        min_size = std::min(min_size, rel_sizes[b1][Axis::X]);
+        min_size = std::min(min_size, rel_sizes[b1][Axis::Y]);
     }
 
     // Проставить реальные размеры (N ячеек на min_size)
-    for (const auto &block: m_blocks) {
-        block->set_size(Axis::X, static_cast<int>(std::round(N * block->rel_size(Axis::X) / min_size)));
-        block->set_size(Axis::Y, static_cast<int>(std::round(N * block->rel_size(Axis::Y) / min_size)));
+    Pairs<int> sizes(m_blocks.size());
+    for (int b1 = 0; b1 < size(); ++b1) {
+        sizes[b1][Axis::X] = static_cast<int>(std::round(N * rel_sizes[b1][Axis::X] / min_size));
+        sizes[b1][Axis::Y] = static_cast<int>(std::round(N * rel_sizes[b1][Axis::Y] / min_size));
     }
+    return sizes;
+}
 
-    /*
-    for (const auto& block: m_blocks) {
-        std::cout << std::format("Block {}; modulus: {:.2f};\trel_sizes: ({:.2f}, {:.2f})",
-            block->index(), block->modulus(), block->rel_size(Axis::X), block->rel_size(Axis::Y));
+void BlockStructured::conformal_info(const Pairs<double>& lambda) const {
+    for (int b1 = 0; b1 <= m_blocks.size(); ++b1) {
+        std::cout << std::format("      Block {:3}.  K: {:.2f};  λ_1: {:.2f}; λ_2: {:.2f}",
+            b1, m_blocks[b1]->modulus(), lambda[b1][Axis::X], lambda[b1][Axis::Y]);
     }
-    */
 }
 
 void BlockStructured::optimize(const optimize_options& opts) {
@@ -666,34 +689,58 @@ void BlockStructured::optimize(int N, double eps, int verbose) {
     }
 }
 
+inline AxisPair<double> calc_lambda_zero(double K, AxisPair<int> sizes) {
+    AxisPair<double> lambda{0.0, 0.0};
+    if (sizes[Axis::X] >= 1 && sizes[Axis::Y] >= 1) {
+        lambda[Axis::Y] = K * sizes[Axis::Y] / sizes[Axis::X];
+        lambda[Axis::X] = 1.0 / lambda[Axis::Y];
+    }
+    return lambda;
+}
+
+inline AxisPair<double> calc_lambda_nan(double K, AxisPair<int> sizes) {
+    AxisPair<double> lambda{NAN, NAN};
+    if (good_number(K) && sizes[Axis::X] >= 1 && sizes[Axis::Y] >= 1) {
+        lambda[Axis::Y] = K * sizes[Axis::Y] / sizes[Axis::X];
+        lambda[Axis::X] = 1.0 / lambda[Axis::Y];
+    }
+    return lambda;
+}
+
+Pairs<double> BlockStructured::get_lambda_nan(const Pairs<int>& sizes) const {
+    if (m_blocks.size() != sizes.size()) {
+        throw std::runtime_error("get_lambda_nan: block size mismatch");
+    }
+    Pairs<double> lambda(m_blocks.size());
+    for (int b1 = 0; b1 < size(); ++b1) {
+        lambda[b1] = calc_lambda_nan(m_blocks[b1]->modulus(), sizes[b1]);
+    }
+    return lambda;
+}
+
 void BlockStructured::optimize_init(int N, double eps, int verbose) {
     // Оценить конформный модуль по геометрии
-    for (const auto &block: m_blocks) {
-        block->estimate_modulus();
+    for (int b1 = 0; b1 < size(); ++b1) {
+        double K = m_blocks[b1]->estimate_modulus();
+        m_blocks[b1]->set_modulus(K);
     }
 
     // Проставить размеры блоков
-    setup_block_sizes(N);
+    const auto sizes = auto_block_sizes(N);
+    auto lambda = get_lambda_nan(sizes);
 
     if (verbose > 2) {
-        for (const auto& block: m_blocks) {
-            std::cout << "    " << block->sizes_info() << "\n";
-        }
+        sizes_info(sizes);
     }
     if (verbose > 1) {
-        std::cout << "    Cells count: " << calc_cells() << "\n";
+        std::cout << "    Cells count: " << calc_cells(sizes) << "\n";
     }
 
     // Первое создание вершин
-    check_consistency();
-    std::vector<axis_pair<int>> all_sizes(m_blocks.size());
-    for (int k = 0; k < size(); ++k) {
-        all_sizes[k][Axis::X] = m_blocks[k]->size(Axis::X);
-        all_sizes[k][Axis::Y] = m_blocks[k]->size(Axis::Y);
-    }
-    auto vertices = create_vertices(all_sizes);
-    merge_vertices(vertices);
-    link_vertices(vertices);
+    check_consistency(sizes);
+    auto vertices = create_vertices(sizes);
+    merge_vertices(vertices, sizes);
+    link_vertices(vertices, sizes, lambda);
     if (verbose > 4) {
         plot(vertices);
     }
@@ -705,24 +752,21 @@ void BlockStructured::optimize_init(int N, double eps, int verbose) {
         if (verbose > 2 && counter % 50 == 0) {
             std::cout << std::format("    step {:6}, eps: {:.2e}\n", counter, error);
             if (verbose > 3 && counter % 50 == 0) {
-                for (const auto &block: m_blocks) {
-                    std::cout << "      " << block->conformal_info() << "\n";
-                }
+                conformal_info(lambda);
             }
         }
         smooth_vertices(vertices);
         error = update_vertices(vertices);
         for (int b1 = 0; b1 < size(); ++b1) {
             m_blocks[b1]->update_modulus(vertices[b1]);
+            lambda[b1] = calc_lambda_zero(m_blocks[b1]->modulus(), sizes[b1]);
         }
         ++counter;
     }
     if (verbose > 2) {
         std::cout << std::format("    step {:6}, eps: {:.2e}\n", counter, error);
         if (verbose > 3) {
-            for (const auto &block: m_blocks) {
-                std::cout << "      " << block->conformal_info() << "\n";
-            }
+            conformal_info(lambda);
         }
     }
     if (verbose > 4) {
@@ -736,28 +780,22 @@ void BlockStructured::optimize_init(int N, double eps, int verbose) {
 
 void BlockStructured::optimize_again(int N, double eps, int verbose) {
     // Проставить размеры блоков
-    setup_block_sizes(N);
+    const auto sizes = auto_block_sizes(N);
+    auto lambda = get_lambda_nan(sizes);
 
     if (verbose > 2) {
-        for (const auto& block: m_blocks) {
-            std::cout << "    " << block->sizes_info() << "\n";
-        }
+        sizes_info(sizes);
     }
     if (verbose > 1) {
-        std::cout << "    Cells count: " << calc_cells() << "\n";
+        std::cout << "    Cells count: " << calc_cells(sizes) << "\n";
     }
 
     // Повторное создание вершин
-    check_consistency();
-    std::vector<axis_pair<int>> all_sizes(m_blocks.size());
-    for (int k = 0; k < size(); ++k) {
-        all_sizes[k][Axis::X] = m_blocks[k]->size(Axis::X);
-        all_sizes[k][Axis::Y] = m_blocks[k]->size(Axis::Y);
-    }
+    check_consistency(sizes);
 
-    auto vertices = create_vertices_again(all_sizes);
-    merge_vertices(vertices);
-    link_vertices(vertices);
+    auto vertices = create_vertices_again(sizes);
+    merge_vertices(vertices, sizes);
+    link_vertices(vertices, sizes, lambda);
 
     int counter = 0;
     double error = 1.0;
@@ -766,24 +804,21 @@ void BlockStructured::optimize_again(int N, double eps, int verbose) {
         if (verbose > 2 && counter % 50 == 0) {
             std::cout << std::format("    step {:6}, eps: {:.2e}\n", counter, error);
             if (verbose > 3) {
-                for (const auto &block: m_blocks) {
-                    std::cout << "      " << block->conformal_info() << "\n";
-                }
+                conformal_info(lambda);
             }
         }
         smooth_vertices(vertices);
         error = update_vertices(vertices);
         for (int b1 = 0; b1 < size(); ++b1) {
             m_blocks[b1]->update_modulus(vertices[b1]);
+            lambda[b1] = calc_lambda_zero(m_blocks[b1]->modulus(), sizes[b1]);
         }
         ++counter;
     }
     if (verbose > 2) {
         std::cout << std::format("    step {:6}, eps: {:.2e}\n", counter, error);
         if (verbose > 3) {
-            for (const auto &block: m_blocks) {
-                std::cout << "      " << block->conformal_info() << "\n";
-            }
+            conformal_info(lambda);
         }
     }
     if (verbose > 4) {
@@ -798,8 +833,8 @@ void BlockStructured::optimize_again(int N, double eps, int verbose) {
 Grid BlockStructured::make() {
     throw std::runtime_error("Not implemented");
     Grid grid;
-    grid.reserve_cells(calc_cells());
-    grid.reserve_nodes(calc_nodes());
+    //grid.reserve_cells(calc_cells());
+    //grid.reserve_nodes(calc_nodes());
 
     /*
 
@@ -854,11 +889,11 @@ Grid BlockStructured::make() {
     return grid;
 }
 
-void BlockStructured::check_consistency() const {
+void BlockStructured::check_consistency(const Pairs<int>& sizes) const {
     for (int b1 = 0; b1 < size(); ++b1) {
         auto block = m_blocks[b1];
 
-        if (block->size1() < 1 || block->size2() < 1) {
+        if (sizes[b1][Axis::X] < 1 || sizes[b1][Axis::Y] < 1) {
             throw std::runtime_error("Zero size of some block");
         }
         for (Side side: sides_2D) {
@@ -866,13 +901,14 @@ void BlockStructured::check_consistency() const {
 
             auto neib = block->adjacent_block(side);
             if (neib) {
+                int b2 = neib->index();
                 Side twin = block->twin_face(side);
 
-                int size1 = block->size(side);
-                int size2 = neib->size(twin);
+                int size1 = sizes[b1][side];
+                int size2 = sizes[b2][twin];
 
                 if (size1 != size2) {
-                    std::string message = std::format("Block::check_consistency error: size mismatch (blocks {}, {})", b1, neib->index());
+                    std::string message = std::format("Block::check_consistency error: size mismatch (blocks {}, {})", b1, b2);
                     std::cerr << message << "\n";
                     throw std::runtime_error(message);
                 }
@@ -886,7 +922,7 @@ void BlockStructured::check_consistency() const {
     }
 }
 
-Tables2D BlockStructured::create_vertices(const std::vector<axis_pair<int>>& sizes) const {
+Tables2D BlockStructured::create_vertices(const Pairs<int>& sizes) const {
     if (m_blocks.size() != sizes.size()) {
         throw std::runtime_error("BlockStructured::create_vertices: block size mismatch");
     }
@@ -897,7 +933,7 @@ Tables2D BlockStructured::create_vertices(const std::vector<axis_pair<int>>& siz
     return vertices;
 }
 
-Tables2D BlockStructured::create_vertices_again(const std::vector<axis_pair<int>>& sizes) const {
+Tables2D BlockStructured::create_vertices_again(const Pairs<int>& sizes) const {
     if (m_blocks.size() != sizes.size()) {
         throw std::runtime_error("BlockStructured::create_vertices: block size mismatch");
     }
@@ -908,7 +944,7 @@ Tables2D BlockStructured::create_vertices_again(const std::vector<axis_pair<int>
     return vertices;
 }
 
-void BlockStructured::merge_vertices(Tables2D& all_vertices) const {
+void BlockStructured::merge_vertices(Tables2D& all_vertices, const Pairs<int>& sizes) const {
     for (int b1 = 0; b1 < size(); ++b1) {
         auto block = m_blocks[b1];
 
@@ -918,16 +954,16 @@ void BlockStructured::merge_vertices(Tables2D& all_vertices) const {
 
             if (!neib) { continue; }
 
+            int b2 = neib->index();
+
             // Сосед есть, но без вершин
-            if (all_vertices[neib->index()].empty()) {
+            if (all_vertices[b2].empty()) {
                 continue;
             }
 
             Side twin = block->twin_face(side);
 
-            int b2 = neib->index();
-
-            int N = block->size(side);
+            int N = sizes[b1][side];
             for (int idx = 0; idx <= N; ++idx) {
                 all_vertices[b1].boundary(side, idx) = all_vertices[b2].boundary(twin, N - idx);
             }
@@ -935,28 +971,29 @@ void BlockStructured::merge_vertices(Tables2D& all_vertices) const {
     }
 }
 
-void BlockStructured::link_vertices(Tables2D& all_vertices) const {
+void BlockStructured::link_vertices(Tables2D& all_vertices, const Pairs<int>& sizes, Pairs<double>& lambda) const {
     for (int b1 = 0; b1 < size(); ++b1) {
         auto self = m_blocks[b1];
+        auto& vertices = all_vertices[b1];
 
         // Очистить все списки
-        for (int i = 0; i <= self->size1(); ++i) {
-            for (int j = 0; j <= self->size2(); ++j) {
-                all_vertices[self->index()](i, j)->clear();
+        for (int i = 0; i <= sizes[b1][Axis::X]; ++i) {
+            for (int j = 0; j <= sizes[b1][Axis::Y]; ++j) {
+                vertices(i, j)->clear();
             }
         }
 
         // Внутренние вершины блоков
-        for (int i = 1; i < self->size1(); ++i) {
-            for (int j = 1; j < self->size2(); ++j) {
+        for (int i = 1; i < sizes[b1][Axis::X]; ++i) {
+            for (int j = 1; j < sizes[b1][Axis::Y]; ++j) {
                 // Справа, сверху, слева, снизу
                 std::vector edges {
-                    BsEdge::Inside(all_vertices[self->index()](i + 1, j), self->lambda_ptr(Axis::X)),
-                    BsEdge::Inside(all_vertices[self->index()](i, j + 1), self->lambda_ptr(Axis::Y)),
-                    BsEdge::Inside(all_vertices[self->index()](i - 1, j), self->lambda_ptr(Axis::X)),
-                    BsEdge::Inside(all_vertices[self->index()](i, j - 1), self->lambda_ptr(Axis::Y))
+                    BsEdge::Inside(vertices(i + 1, j), &lambda[b1][Axis::X]),
+                    BsEdge::Inside(vertices(i, j + 1), &lambda[b1][Axis::Y]),
+                    BsEdge::Inside(vertices(i - 1, j), &lambda[b1][Axis::X]),
+                    BsEdge::Inside(vertices(i, j - 1), &lambda[b1][Axis::Y])
                 };
-                all_vertices[self->index()](i, j)->set_edges(edges);
+                vertices(i, j)->set_edges(edges);
             }
         }
 
@@ -967,39 +1004,40 @@ void BlockStructured::link_vertices(Tables2D& all_vertices) const {
             }
 
             Axis axis = to_axis(side);
-            Axis perp_axis = opposite(axis);
+            Axis perp_axis = orthogonal(axis);
 
             if (self->boundary(side)) {
-                for (int idx = 1; idx < self->size(side); ++idx) {
+                for (int idx = 1; idx < sizes[b1][side]; ++idx) {
                     // Добавить границу
-                    all_vertices[self->index()].boundary(side, idx)->add_boundary(self->boundary(side).get());
+                    vertices.boundary(side, idx)->add_boundary(self->boundary(side).get());
                     // Добавить связи (три штуки)
                     std::vector edges {
-                        BsEdge::Border(all_vertices[self->index()].boundary(side, idx + 1), self->lambda_ptr(axis)),
-                        BsEdge::Inside(all_vertices[self->index()].near_boundary(side, idx),  self->lambda_ptr(perp_axis)),
-                        BsEdge::Border(all_vertices[self->index()].boundary(side, idx - 1), self->lambda_ptr(axis))
+                        BsEdge::Border(vertices.boundary(side, idx + 1),  &lambda[b1][axis]),
+                        BsEdge::Inside(vertices.near_boundary(side, idx), &lambda[b1][perp_axis]),
+                        BsEdge::Border(vertices.boundary(side, idx - 1),  &lambda[b1][axis])
                     };
-                    all_vertices[self->index()].boundary(side, idx)->set_edges(edges);
+                    vertices.boundary(side, idx)->set_edges(edges);
                 }
             } else {
                 auto neib = self->adjacent_block(side);
                 if (!neib) {
                     throw std::runtime_error("Face is not boundary and has no neighbor");
                 }
+                int b2 = neib->index();
 
-                int N = self->size(side);
+                int N = sizes[b1][side];
                 Side twin = self->twin_face(side);
 
                 Axis neib_axis = to_axis(twin);
-                Axis prep_neib_axis = opposite(neib_axis);
+                Axis perp_neib_axis = orthogonal(neib_axis);
                 for (int idx = 1; idx < N; ++idx) {
                     std::vector edges {
-                        BsEdge::Inside(all_vertices[self->index()].boundary(side, idx + 1), self->lambda_ptr(axis), neib->lambda_ptr(neib_axis)),
-                        BsEdge::Inside(all_vertices[self->index()].near_boundary(side, idx), self->lambda_ptr(perp_axis)),
-                        BsEdge::Inside(all_vertices[self->index()].boundary(side, idx - 1), self->lambda_ptr(axis), neib->lambda_ptr(neib_axis)),
-                        BsEdge::Inside(all_vertices[neib->index()].near_boundary(twin, N - idx), neib->lambda_ptr(prep_neib_axis))
+                        BsEdge::Inside(vertices.boundary(side, idx + 1),  &lambda[b1][axis], &lambda[b2][neib_axis]),
+                        BsEdge::Inside(vertices.near_boundary(side, idx), &lambda[b1][perp_axis]),
+                        BsEdge::Inside(vertices.boundary(side, idx - 1),  &lambda[b1][axis], &lambda[b2][neib_axis]),
+                        BsEdge::Inside(all_vertices[b2].near_boundary(twin, N - idx), &lambda[b2][perp_neib_axis])
                     };
-                    all_vertices[self->index()].boundary(side, idx)->set_edges(edges);
+                    vertices.boundary(side, idx)->set_edges(edges);
                 }
             }
         }
@@ -1007,7 +1045,7 @@ void BlockStructured::link_vertices(Tables2D& all_vertices) const {
         // Угловые вершины блока (здесь могут быть сингулярности)
         for (int v_idx = 0; v_idx < 4; ++v_idx) {
             auto node = self->base_node(v_idx);
-            all_vertices[self->index()].corner(v_idx)->clear();
+            vertices.corner(v_idx)->clear();
 
             /// Фиксированная точка
             if (node->is_fixed()) { continue; }
@@ -1019,7 +1057,7 @@ void BlockStructured::link_vertices(Tables2D& all_vertices) const {
             if (auto [side1, side2] = node_adjacent_sides(v_idx);
                 self->boundary(side1) && self->boundary(side2)) {
                 continue;
-                }
+            }
 
             // Вершина на границе
             if (node->is_boundary()) {
@@ -1031,7 +1069,7 @@ void BlockStructured::link_vertices(Tables2D& all_vertices) const {
                     throw std::runtime_error("Block::link_vertices: n_blocks + 1 != n_nodes for boundary node");
                 }
 
-                auto corner = all_vertices[self->index()].corner(v_idx);
+                auto corner = vertices.corner(v_idx);
                 std::vector<BsEdge> edges;
 
                 // Первая граничная вершина
@@ -1046,7 +1084,7 @@ void BlockStructured::link_vertices(Tables2D& all_vertices) const {
                     corner->add_boundary(block->boundary(side).get());
                     edges.push_back(BsEdge::Border(
                         all_vertices[block->index()].boundary(side, 1),
-                        block->lambda_ptr(side)
+                        &lambda[block->index()][side]
                     ));
                 }
                 // Внутренние вершины
@@ -1056,12 +1094,13 @@ void BlockStructured::link_vertices(Tables2D& all_vertices) const {
                     Block::Ptr block = adjacent_blocks[i].lock();
                     auto prev_block = adjacent_blocks[i - 1].lock();
                     if (!block || !prev_block) { throw std::runtime_error("Block::link_vertices: invalid block"); }
+                    int b3 = block->index();
                     Side side = block->get_side(node, node2);
                     Side prev_side = prev_block->get_side(node, node2);
                     edges.push_back(BsEdge::Inside(
-                        all_vertices[block->index()].boundary(side, 1),
-                        block->lambda_ptr(side),
-                        prev_block->lambda_ptr(prev_side)
+                        all_vertices[b3].boundary(side, 1),
+                        &lambda[b3][side],
+                        &lambda[prev_block->index()][prev_side]
                     ));
                     if (block->boundary(side)) {
                         throw std::runtime_error("Block::link_vertices: invalid block (why boundary)");
@@ -1074,8 +1113,8 @@ void BlockStructured::link_vertices(Tables2D& all_vertices) const {
                     if (!node2 || !block) { throw std::runtime_error("Block::link_vertices: invalid block"); }
                     Side side = block->get_side(node, node2);
                     edges.push_back(BsEdge::Border(
-                        all_vertices[block->index()].boundary(side, block->size(side) - 1),
-                        block->lambda_ptr(side)
+                        all_vertices[block->index()].boundary(side, sizes[block->index()][side] - 1),
+                        &lambda[block->index()][side]
                     ));
                     if (!block->boundary(side)) {
                         throw std::runtime_error("Block::link_vertices: invalid block (not boundary)");
@@ -1094,7 +1133,7 @@ void BlockStructured::link_vertices(Tables2D& all_vertices) const {
                     throw std::runtime_error("Block::link_vertices: n_blocks != n_nodes for inner node");
                 }
 
-                auto corner = all_vertices[self->index()].corner(v_idx);
+                auto corner = vertices.corner(v_idx);
                 std::vector<BsEdge> edges;
 
                 for (int i = 0; i < adjacent_blocks.size(); ++i) {
@@ -1108,8 +1147,8 @@ void BlockStructured::link_vertices(Tables2D& all_vertices) const {
                     Side prev_side = prev_block->get_side(node, node2);
                     edges.push_back(BsEdge::Inside(
                         all_vertices[block->index()].boundary(side, 1),
-                        block->lambda_ptr(side),
-                        prev_block->lambda_ptr(prev_side)
+                        &lambda[block->index()][side],
+                        &lambda[prev_block->index()][prev_side]
                     ));
                     if (block->boundary(side)) {
                         throw std::runtime_error("Block::link_vertices: invalid block (why boundary)");
@@ -1194,6 +1233,65 @@ double BlockStructured::update_vertices(const Tables2D& all_vertices) {
         }
     }
     return err;
+}
+
+// ---------- Размеры блока ----------------------------------------- --------------------------------------------------
+
+// Проставить размеры, в том числе у связанных блоков
+template <typename Type>
+void SET_SIZE(const std::vector<Block::Ptr>& blocks, Pairs<Type>& sizes, int b1, Axis axis, Type N) {
+    if (blocks.size() != sizes.size()) {
+        throw std::runtime_error("SET SIZE: SIZE MISMATCH");
+    }
+    if (sizes[b1][axis] == N) { return; }
+    sizes[b1][axis] = N;
+    for (Side side: sides_by_axis(axis)) {
+        auto neib = blocks[b1]->adjacent_block(side);
+        if (neib) {
+            int b2 = neib->index();
+            auto twin = blocks[b1]->twin_face(side);
+            if (sizes[b2][twin] != N) {
+                SET_SIZE(blocks, sizes, b2, to_axis(twin), N);
+            }
+        }
+    }
+}
+
+void BlockStructured::set_size(Pairs<int>& sizes, int b1, Axis axis, int N) const {
+    SET_SIZE(m_blocks, sizes, b1, axis, N);
+}
+
+void BlockStructured::set_rel_size(Pairs<double>& sizes, int b1, Axis axis, double N) const {
+    SET_SIZE(m_blocks, sizes, b1, axis, N);
+}
+
+void BlockStructured::init_rel_sizes(Pairs<double>& sizes, int b1) const {
+    if (std::isnan(m_blocks[b1]->modulus())) {
+        throw std::runtime_error("Invalid Modulus");
+    }
+    set_rel_size(sizes, b1, Axis::X, m_blocks[b1]->modulus());
+    set_rel_size(sizes, b1, Axis::Y, 1.0);
+}
+
+bool BlockStructured::update_rel_sizes(Pairs<double>& sizes, Block::Ref b) const {
+    int b1 = b->index();
+    if (std::isnan(b->modulus())) {
+        throw std::runtime_error("update_rel_sizes error: Invalid Modulus");
+    }
+    if (bad_number(sizes[b1][Axis::X]) && good_number(sizes[b1][Axis::Y])) {
+        set_rel_size(sizes, b1, Axis::X, sizes[b1][Axis::Y] * b->modulus());
+    }
+    if (bad_number(sizes[b1][Axis::Y]) && good_number(sizes[b1][Axis::X])) {
+        set_rel_size(sizes, b1, Axis::Y, sizes[b1][Axis::X] / b->modulus());
+    }
+    return good_number(sizes[b1][Axis::X]) && good_number(sizes[b1][Axis::Y]);
+}
+
+void BlockStructured::sizes_info(const Pairs<int>& sizes) const {
+    for (int b1 = 0; b1 < size(); ++b1) {
+        std::cout << std::format("    Block {:3}.  K: {:.2f};  sizes: ({:3}, {:3})", b1,
+            m_blocks[b1]->modulus(), sizes[b1][Axis::X], sizes[b1][Axis::Y]);
+    }
 }
 
 } // namespace zephyr::geom::generator

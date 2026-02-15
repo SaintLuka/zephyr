@@ -1,6 +1,5 @@
 #pragma once
 
-#include <vector>
 #include <memory>
 
 #include <zephyr/geom/generator/array2d.h>
@@ -10,30 +9,52 @@
 
 namespace zephyr::geom::generator {
 
-template <typename T>
-struct axis_pair {
-    axis_pair() = default;
-
-    axis_pair(const std::array<T, 2>& arr) : vals(arr) { }
-
-    operator const std::array<T, 2>&() const { return vals; }
-
-    T& operator[](int axis) { return vals[axis]; }
-
-    const T& operator[](int axis) const { return vals[axis]; }
-
-    T& operator[](Axis axis) { return vals[static_cast<int>(axis)]; }
-
-    const T& operator[](Axis axis) const { return vals[static_cast<int>(axis)]; }
-
-    T& operator[](Side side) { return vals[static_cast<int>(to_axis(side))]; }
-
-    const T& operator[](Side side) const { return vals[static_cast<int>(to_axis(side))]; }
-
-    std::array<T, 2> vals{};
-};
-
 class BlockStructured;
+
+/// @brief Пара величин, присвоенная осям блока
+template <typename T>
+class AxisPair {
+public:
+    /// @brief Конструктор по умолчанию
+    AxisPair() = default;
+
+    /// @brief Конструктор от initializer_list
+    constexpr AxisPair(std::initializer_list<T> list) {
+        if (list.size() != 2)
+            throw std::invalid_argument("Pair requires exactly 2 elements");
+        std::copy_n(list.begin(), 2, values.begin());
+    }
+
+    /// @brief Конструктор от std::array
+    constexpr AxisPair(const std::array<T, 2>& arr) : values(arr) {}
+
+    /// @brief Неявное приведение к std::array
+    operator const std::array<T, 2>&() const { return values; }
+
+    /// @brief Доступ по оси
+    T& operator[](Axis axis) {
+        return values[static_cast<int>(axis)];
+    }
+
+    /// @brief Доступ по оси
+    const T& operator[](Axis axis) const {
+        return values[static_cast<int>(axis)];
+    }
+
+    /// @brief Доступ по стороне
+    T& operator[](Side side) {
+        return values[static_cast<int>(to_axis(side))];
+    }
+
+    /// @brief Доступ по стороне
+    const T& operator[](Side side) const {
+        return values[static_cast<int>(to_axis(side))];
+    }
+
+private:
+    /// @brief Пара значений
+    std::array<T, 2> values{};
+};
 
 /// @brief Представление четырехугольного блока.
 class Block {
@@ -69,7 +90,6 @@ public:
     /// @brief Длина стороны блока
     double length(Side side) const;
 
-
     // --------------------------- Базисные вершины ---------------------------
 
     /// @brief Индекс базисной вершины внутри блока
@@ -96,66 +116,8 @@ public:
     /// @param v_idx Индекс вершины
     BaseNode::Ptr base_node(int v_idx) const { return m_base_nodes[v_idx]; }
 
-    /// @brief Получить базисные вершины некоторой стороны (порядка нет)
-    std::tuple<BaseNode::Ptr, BaseNode::Ptr> base_nodes(Side side) const;
-
-
-    // ---------------------------- Размеры блока -----------------------------
-
-    /// @brief Число ячеек вдоль сторон (v1, v2) и (v3, v4)
-    int size1() const { return m_sizes[0]; }
-
-    /// @brief Число ячеек вдоль сторон (v1, v3) и (v2, v4)
-    int size2() const { return m_sizes[1]; }
-
-    /// @brief Число ячеек вдоль оси блока
-    int size(Axis axis) const;
-
-    /// @brief Число ячеек вдоль стороны блока
-    int size(Side side) const;
-
-    /// @brief Число ячеек вдоль стороны (v1, v2)
-    int size(BaseNode::Ref v1, BaseNode::Ref v2) const;
-
-    /// @brief Установить число ячеек вдоль оси блока
-    void set_size(Axis axis, int N);
-
-    /// @brief Установить число ячеек вдоль стороны блока
-    void set_size(Side side, int N);
-
-    /// @brief Установить число ячеек вдоль стороны (v1, v2)
-    void set_size(BaseNode::Ref v1, BaseNode::Ref v2, int N);
-
-    /// @brief Строка информации о разбиении блока на ячейки
-    std::string sizes_info() const;
-
-    /// @brief Относительный размер вдоль оси блока
-    double rel_size(Axis axis) const;
-
-    /// @brief Относительный размер вдоль стороны (v1, v2)
-    double rel_size(BaseNode::Ref v1, BaseNode::Ref v2) const;
-
-    /// @brief Сбросить относительные размеры
-    void reset_rel_sizes();
-
-    /// @brief Выставить начальные относительные размеры
-    void init_rel_sizes();
-
-    /// @brief Обновить размеры (из конформного модуля)
-    /// @return true, если оба размера теперь заданы
-    bool update_rel_sizes();
-
-    /// @brief Установить относительный размер вдоль оси блока
-    void set_rel_size(Axis axis, double N);
-
-    /// @brief Установить относительный размер вдоль стороны блока
-    void set_rel_size(Side side, double N);
-
-    /// @brief Установить относительный размер вдоль стороны (v1, v2)
-    void set_rel_size(BaseNode::Ref v1, BaseNode::Ref v2, double N);
-
-    /// @brief Установить относительные размеры блока
-    void set_rel_sizes(double Nx, double Ny);
+    /// @brief Базисная вершина по стороне (против часовой стрелки)
+    BaseNode::Ptr base_node(Side side, int idx) const;
 
 
     // ---------------------------- Границы блока -----------------------------
@@ -194,48 +156,39 @@ public:
     Side twin_face(Side side) const;
 
 
-    // -------------------------- Конформные приколы --------------------------
-
-    /// @brief Конформный модуль криволинейного четырехугольника
-    double modulus() const;
-
-    /// @brief Установить конформный модуль (пересчитать lambda)
-    void set_modulus(double K);
-
-    /// @brief Оценить и установить конформный модуль четырехугольника
-    void estimate_modulus();
-
-    /// @brief Указатель на коэффициент анизотропного сглаживания
-    double* lambda_ptr(Axis axis);
-
-    /// @brief Указатель на коэффициент анизотропного сглаживания
-    double* lambda_ptr(Side side);
-
-    /// @brief Обновить коэффициенты сглаживания (по модулю и размерам)
-    void update_lambda();
-
-    /// @brief Строка информации о параметрах
-    std::string conformal_info() const;
-
-
     // ----------------------- Функции "верхнего уровня" ------------------------
 
     /// @brief Связать два блока
     static void link(Block::Ref B1, Block::Ref B2);
 
     /// @brief Сгенерировать узлы сетки с нуля
-    Array2D<BsVertex::Ptr> create_vertices(axis_pair<int> sizes) const;
+    Array2D<BsVertex::Ptr> create_vertices(AxisPair<int> sizes) const;
 
     /// @brief Сгенерировать узлы сетки на основе сохраненного отображения
-    Array2D<BsVertex::Ptr> create_vertices_again(axis_pair<int> sizes) const;
+    Array2D<BsVertex::Ptr> create_vertices_again(AxisPair<int> sizes) const;
+
+
+    // -------------------------- Конформные приколы --------------------------
+
+    /// @brief Конформный модуль криволинейного четырехугольника
+    double modulus() const { return m_modulus; }
+
+    /// @brief Установить конформный модуль (пересчитать lambda)
+    void set_modulus(double K);
+
+    /// @brief Оценить и установить конформный модуль четырехугольника
+    double estimate_modulus() const;
 
     /// @brief Пересчитывает модуль и коэффициенты сглаживания
     void update_modulus(const Array2D<BsVertex::Ptr>& vertices);
 
+    /// @brief Получить конформное отображение блока
+    const Array2D<Vector3d>& mapping() const { return m_mapping; }
+
     /// @brief Сохранить текущее отображение
     void set_mapping(const Array2D<BsVertex::Ptr>& vertices);
 
-public:
+private:
     // Основные топологические параметры, задаются пользователем
 
     /// @brief Индекс блока в общем списке блоков
@@ -247,35 +200,19 @@ public:
     /// @brief Границы области (nullptr для внутренних границ)
     std::array<Curve::Ptr, 4> m_boundaries{};
 
-
     // Связи блоков, находятся при вызове link()
 
     /// @brief Ссылки на соседние блоки (nullptr для границ области)
-    std::array<Block::WPtr, 4> m_adjacent_blocks{}; // ~nullptr
+    std::array<Block::WPtr, 4> m_adjacent_blocks{};
 
     /// @brief Поворот соседнего блока [0..3]
     std::array<int, 4> m_rotations{};
 
-
-    // Размеры будущей сетки, влияют на создание таблицы m_vertices
-
-    // Число ячеек вдоль граней (v1, v2) и (v3, v4)
-    // Число ячеек вдоль граней (v1, v3) и (v2, v4)
-    axis_pair<int> m_sizes{std::array<int, 2>{0, 0}};
-
-    /// @brief Конформное отображение блока в виде таблицы вершин
-    Array2D<Vector3d> m_mapping{};
-
-    // Геометрические параметры, находятся и используются при оптимизации
-
     /// @brief Конформный модуль блока (геометрическая характеристика)
     double m_modulus{NAN};
 
-    /// @brief Коэффициенты для анизотропного сглаживания Лапласа
-    axis_pair<double> m_lambda{std::array<double, 2>{NAN, NAN}};
-
-    /// @brief Относительные размеры блока
-    axis_pair<double> m_rel_sizes{std::array<double, 2>{NAN, NAN}};
+    /// @brief Конформное отображение блока в виде таблицы вершин
+    Array2D<Vector3d> m_mapping{};
 };
 
 } // namespace zephyr::mesh::generator

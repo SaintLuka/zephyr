@@ -18,12 +18,8 @@ inline bool bad_number(double num) {
     return std::isinf(num) || std::isnan(num) || num <= 0.0;
 }
 
-inline bool good_number(double num) {
-    return !std::isinf(num) && !std::isnan(num) && num > 0.0;
-}
-
 // Перпендикулярная ось
-constexpr Axis opposite(Axis axis) {
+constexpr Axis orthogonal(Axis axis) {
     return axis == Axis::X ? Axis::Y : Axis::X;
 }
 
@@ -134,8 +130,8 @@ Vector3d Block::center() const {
 }
 
 Vector3d Block::center(Side side) const {
-    Vector3d v1 = base_node(node_idx(side, 0))->pos();
-    Vector3d v2 = base_node(node_idx(side, 1))->pos();
+    Vector3d v1 = base_node(side, 0)->pos();
+    Vector3d v2 = base_node(side, 1)->pos();
     Vector3d vc = 0.5 * (v1 + v2);
     if (boundary(side)) {
         vc = boundary(side)->projection(vc);
@@ -144,8 +140,8 @@ Vector3d Block::center(Side side) const {
 }
 
 double Block::length(Side side) const {
-    Vector3d v1 = base_node(node_idx(side, 0))->pos();
-    Vector3d v2 = base_node(node_idx(side, 1))->pos();
+    Vector3d v1 = base_node(side, 0)->pos();
+    Vector3d v2 = base_node(side, 1)->pos();
     return (v2 - v1).norm();
 }
 
@@ -184,112 +180,8 @@ std::tuple<BaseNode::Ptr, BaseNode::Ptr> Block::adjacent_nodes(const BaseNode* v
     }
 }
 
-std::tuple<BaseNode::Ptr, BaseNode::Ptr> Block::base_nodes(Side side) const {
-    return {base_node(node_idx(side, 0)), base_node(node_idx(side, 1))};
-}
-
-// ---------- Размеры блока ----------------------------------------- --------------------------------------------------
-
-int Block::size(Axis axis) const {
-    return m_sizes[axis];
-}
-
-int Block::size(Side side) const {
-    return m_sizes[side];
-}
-
-int Block::size(BaseNode::Ref v1, BaseNode::Ref v2) const {
-    return m_sizes[get_side(v1, v2)];
-}
-
-void Block::set_size(Axis axis, int N) {
-    if (m_sizes[axis] == N) return;
-    m_sizes[axis] = N;
-    update_lambda();
-    for (Side side: sides_by_axis(axis)) {
-        auto block = adjacent_block(side);
-        if (block) {
-            BaseNode::Ref v1 = m_base_nodes[node_idx(side, 0)];
-            BaseNode::Ref v2 = m_base_nodes[node_idx(side, 1)];
-            if (block->size(v1, v2) != N) {
-                block->set_size(v1, v2, N);
-            }
-        }
-    }
-}
-
-void Block::set_size(Side side, int N) {
-    set_size(to_axis(side), N);
-}
-
-void Block::set_size(BaseNode::Ref v1, BaseNode::Ref v2, int N) {
-    set_size(get_axis(v1, v2), N);
-}
-
-std::string Block::sizes_info() const {
-    return std::format("Block {:3}.  K: {:.2f};  sizes: ({:3}, {:3})", m_index, m_modulus, m_sizes[0], m_sizes[1]);
-}
-
-double Block::rel_size(Axis axis) const {
-    return m_rel_sizes[axis];
-}
-
-double Block::rel_size(BaseNode::Ref v1, BaseNode::Ref v2) const {
-    return m_rel_sizes[get_side(v1, v2)];
-}
-
-void Block::reset_rel_sizes() {
-    m_rel_sizes[0] = NAN;
-    m_rel_sizes[1] = NAN;
-}
-
-void Block::init_rel_sizes() {
-    if (std::isnan(m_modulus)) {
-        throw std::runtime_error("Invalid Modulus");
-    }
-    set_rel_size(Axis::X, m_modulus);
-    set_rel_size(Axis::Y, 1.0);
-}
-
-bool Block::update_rel_sizes() {
-    if (std::isnan(m_modulus)) {
-        throw std::runtime_error("update_rel_sizes error: Invalid Modulus");
-    }
-    if (bad_number(rel_size(Axis::X)) && good_number(rel_size(Axis::Y))) {
-        set_rel_size(Axis::X, rel_size(Axis::Y) * modulus());
-    }
-    if (bad_number(rel_size(Axis::Y)) && good_number(rel_size(Axis::X))) {
-        set_rel_size(Axis::Y, rel_size(Axis::X) / modulus());
-    }
-    return good_number(rel_size(Axis::X)) && good_number(rel_size(Axis::Y));
-}
-
-void Block::set_rel_size(Axis axis, double N) {
-    if (m_rel_sizes[axis] == N) return;
-    m_rel_sizes[axis] = N;
-    for (Side side: sides_by_axis(axis)) {
-        auto block = adjacent_block(side);
-        if (block) {
-            BaseNode::Ref v1 = m_base_nodes[node_idx(side, 0)];
-            BaseNode::Ref v2 = m_base_nodes[node_idx(side, 1)];
-            if (block->rel_size(v1, v2) != N) {
-                block->set_rel_size(v1, v2, N);
-            }
-        }
-    }
-}
-
-void Block::set_rel_size(Side side, double N) {
-    set_rel_size(to_axis(side), N);
-}
-
-void Block::set_rel_size(BaseNode::Ref v1, BaseNode::Ref v2, double N) {
-    set_rel_size(get_axis(v1, v2), N);
-}
-
-void Block::set_rel_sizes(double Nx, double Ny) {
-    set_rel_size(Axis::X, Nx);
-    set_rel_size(Axis::Y, Ny);
+BaseNode::Ptr Block::base_node(Side side, int idx) const {
+    return m_base_nodes[node_idx(side, idx)];
 }
 
 // ---------- Границы блока ------------------ -------------------------------------------------------------------------
@@ -368,64 +260,7 @@ Side Block::twin_face(Side side) const {
     return idx_to_side((f_idx - m_rotations[static_cast<int>(side)] + 4) % 4);
 }
 
-// ---------- Конформные приколы ---------------------------------------------------------------------------------------
-
-double Block::modulus() const { return m_modulus; }
-
-void Block::estimate_modulus() {
-    double len1 = length(Side::B) + length(Side::T);
-    double len2 = length(Side::L) + length(Side::R);
-    set_modulus(len1 / len2);
-}
-
-inline double restricted_modulus(double K) {
-    static constexpr double max_modulus = 100.0;
-    static constexpr double min_modulus = 1.0 / max_modulus;
-    if (K > max_modulus) {
-        std::cerr << "Modulus exceeded max\n";
-        K = max_modulus;
-    }
-    if (K < min_modulus) {
-        std::cerr << "Modulus exceeded min\n";
-        K = min_modulus;
-    }
-    return K;
-}
-
-void Block::set_modulus(double K) {
-    if (bad_number(K)) {
-        throw std::runtime_error("Block::update_ratio: bad modulus");
-    }
-    m_modulus = restricted_modulus(K);
-    if (size1() >= 1 && size2() >= 1) {
-        m_lambda[1] = m_modulus * size2() / size1();
-        m_lambda[0] = 1.0 / m_lambda[1];
-    }
-    else {
-        m_lambda[0] = m_lambda[1] = 0.0;
-    }
-}
-
-double* Block::lambda_ptr(Axis axis) { return &m_lambda[axis]; }
-
-double* Block::lambda_ptr(Side side) { return &m_lambda[side]; }
-
-void Block::update_lambda() {
-    if (good_number(m_modulus) && size1() >= 1 && size2() >= 1) {
-        m_lambda[1] = m_modulus * size2() / size1();
-        m_lambda[0] = 1.0 / m_lambda[1];
-    }
-    else {
-        m_lambda[0] = m_lambda[1] = NAN;
-    }
-}
-
-std::string Block::conformal_info() const {
-    return std::format("Block {:3}.  K: {:.2f};  λ_1: {:.2f}; λ_2: {:.2f}", m_index, m_modulus, m_lambda[0], m_lambda[1]);
-}
-
 // ---------- Функции "верхнего уровня" --------------------------------------------------------------------------------
-
 
 void Block::link(Block::Ref B1, Block::Ref B2) {
     if (!B1 || !B2) {
@@ -437,13 +272,13 @@ void Block::link(Block::Ref B1, Block::Ref B2) {
 
     // Ищем просто полным перебором
     for (Side side1: sides_2D) {
-        BaseNode::Ptr a1 = B1->base_node(node_idx(side1, 0));
-        BaseNode::Ptr b1 = B1->base_node(node_idx(side1, 1));
+        BaseNode::Ptr a1 = B1->base_node(side1, 0);
+        BaseNode::Ptr b1 = B1->base_node(side1, 1);
         if (a1.get() > b1.get()) std::swap(a1, b1);
 
         for (Side side2: sides_2D) {
-            BaseNode::Ptr a2 = B2->base_node(node_idx(side2, 0));
-            BaseNode::Ptr b2 = B2->base_node(node_idx(side2, 1));
+            BaseNode::Ptr a2 = B2->base_node(side2, 0);
+            BaseNode::Ptr b2 = B2->base_node(side2, 1);
             if (a2.get() > b2.get()) std::swap(a2, b2);
 
             if (a1 == a2 && b1 == b2) {
@@ -463,16 +298,16 @@ void Block::link(Block::Ref B1, Block::Ref B2) {
     }
 }
 
-Array2D<BsVertex::Ptr> Block::create_vertices(axis_pair<int> sizes) const {
-    if (sizes[0] * sizes[1] > 1000000) {
+Array2D<BsVertex::Ptr> Block::create_vertices(AxisPair<int> sizes) const {
+    if (sizes[Axis::X] * sizes[Axis::Y] > 10000000) {
         throw std::runtime_error("Too much vertices");
     }
 
     Array2D<BsVertex::Ptr> vertices({sizes[Axis::X] + 1, sizes[Axis::Y] + 1}, nullptr);
 
     for (Side side: sides_2D) {
-        Vector3d p1 = base_node(node_idx(side, 0))->pos();
-        Vector3d p2 = base_node(node_idx(side, 1))->pos();
+        Vector3d p1 = base_node(side, 0)->pos();
+        Vector3d p2 = base_node(side, 1)->pos();
 
         for (int i = 0; i <= sizes[side]; ++i) {
             double x = static_cast<double>(i) / sizes[side];
@@ -518,7 +353,7 @@ Array2D<BsVertex::Ptr> Block::create_vertices(axis_pair<int> sizes) const {
     return vertices;
 }
 
-Array2D<BsVertex::Ptr> Block::create_vertices_again(axis_pair<int> sizes) const {
+Array2D<BsVertex::Ptr> Block::create_vertices_again(AxisPair<int> sizes) const {
     if (sizes[Axis::X] * sizes[Axis::Y] > 1000000) {
         throw std::runtime_error("Too much vertices");
     }
@@ -563,6 +398,35 @@ Array2D<BsVertex::Ptr> Block::create_vertices_again(axis_pair<int> sizes) const 
         }
     }
     return vertices;
+}
+
+// ---------- Конформные приколы ---------------------------------------------------------------------------------------
+
+inline double restricted_modulus(double K) {
+    static constexpr double max_modulus = 100.0;
+    static constexpr double min_modulus = 1.0 / max_modulus;
+    if (K > max_modulus) {
+        std::cerr << "Modulus exceeded max\n";
+        K = max_modulus;
+    }
+    if (K < min_modulus) {
+        std::cerr << "Modulus exceeded min\n";
+        K = min_modulus;
+    }
+    return K;
+}
+
+double Block::estimate_modulus() const {
+    double len1 = length(Side::B) + length(Side::T);
+    double len2 = length(Side::L) + length(Side::R);
+    return restricted_modulus(len1 / len2);
+}
+
+void Block::set_modulus(double K) {
+    if (bad_number(K)) {
+        throw std::runtime_error("Block::update_ratio: bad modulus");
+    }
+    m_modulus = restricted_modulus(K);
 }
 
 void Block::update_modulus(const Array2D<BsVertex::Ptr>& vertices) {

@@ -42,6 +42,9 @@ void SemicircleCutout::set_ny(int Ny) {
     int Nxl = std::max(1, int(((m_xc - H) - m_xmin) / h));
     int Nxr = std::max(1, int((m_xmax - (m_xc + H)) / h));
 
+    throw std::runtime_error("Not implemented");
+
+    /*
     // Нет необходимости устанавливать все размеры
     // у каждого блока, поскольку они связаны
     m_blocks[0]->set_size(v1, v9, Ny);
@@ -52,6 +55,7 @@ void SemicircleCutout::set_ny(int Ny) {
 
     m_blocks[4]->set_size(v7, v8, Nxr);
     m_blocks[4]->set_size(v8, v12, Ny);
+    */
 }
 
 

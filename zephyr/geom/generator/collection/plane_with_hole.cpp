@@ -178,7 +178,9 @@ void PlaneWithHole::set_nx(int Nx) {
 
     double xi2 = L2 / m_r;
     int Nr3 = (int)(std::log(xi2) / std::log(1.0 + a3 / N2));
-    int Nr4 = (int)(std::log(xi2) / std::log(1.0 + a4 / N2)); 
+    int Nr4 = (int)(std::log(xi2) / std::log(1.0 + a4 / N2));
+    throw std::runtime_error("Not implemented");
+    /*
 
     m_blocks[0]->set_size(v2, v1, Nr1);
     m_blocks[0]->set_size(v2, v8, Ny);
@@ -191,6 +193,7 @@ void PlaneWithHole::set_nx(int Nx) {
 
     m_blocks[3]->set_size(v7, v8, Nr2);
     m_blocks[3]->set_size(v5, v7, Ny);
+    */
 }
 
 void PlaneWithHole::set_boundaries(Boundaries bounds) {

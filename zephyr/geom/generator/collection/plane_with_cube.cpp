@@ -32,7 +32,9 @@ PlaneWithCube::PlaneWithCube(
 /// @brief 8 x 20 
 void PlaneWithCube::set_nx(int Nx) {
 
+    throw std::runtime_error("Not implemented");
     // TODO
+    /*
     m_blocks[0]->set_size(v1, v7, 8);
     m_blocks[0]->set_size(v1, v5, 20);
 
@@ -49,6 +51,7 @@ void PlaneWithCube::set_nx(int Nx) {
     m_blocks[6]->set_size(v14, v15, 8);
 
     m_blocks[7]->set_size(v7, v14, 8);
+    */
 }
 
 

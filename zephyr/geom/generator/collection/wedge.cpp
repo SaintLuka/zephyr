@@ -61,9 +61,12 @@ void Wedge::set_nx(int Nx) {
 
     // Нет необходимости устанавливать все размеры
     // у каждого блока, поскольку они связаны
+    throw std::runtime_error("Not implemented");
+    /*
     m_blocks[0]->set_size(v1, v4, Ny);
     m_blocks[0]->set_size(v1, v2, Nx1);
     m_blocks[1]->set_size(v2, v3, Nx2);
+    */
 }
 
 
