@@ -49,8 +49,14 @@ public:
     /// @brief Шаг интегрирования на предыдущем вызове update()
     double dt() const;
 
+    /// @brief Текущий момент времени
+    double current_time() const;
+
     /// @brief Установить шаг интегрирования по времени
     void set_max_dt(double dt);
+
+    /// @brief Установить текущий момент времени
+    void set_curr_time(double t);
 
     /// @brief Выполнить шаг интегрирования по времени
     void update(EuMesh &mesh);
@@ -61,6 +67,14 @@ public:
 
     /// @brief Расчёт потоков
     void fluxes(EuMesh &mesh) const;
+
+    static std::tuple<double, double, Flux> flux(const PState &zL, const PState &zR, const Eos &eos,
+        double alphaL, double alphaR, double u, double dt, double cellx);
+
+    static Flux crp_flux_classic(const PState& zL, const PState& zR,
+        const Eos& eos, double delta, double u, double dt);
+    static Flux crp_flux_inverse(const PState& zL, const PState& zR,
+        const Eos& eos, double delta, double u, double dt);
 
     /// @brief Обновление ячеек
     void swap(EuMesh &mesh) const;
@@ -77,6 +91,7 @@ protected:
     double m_CFL = 0.5;      ///< Число Куранта
     double m_dt;             ///< Шаг интегрирования
     double m_max_dt=1.e300;  ///< Максимальный шаг интегрирования
+    double curr_time;        ///< Текущий момент времени
 };
 
 } // namespace zephyr::math

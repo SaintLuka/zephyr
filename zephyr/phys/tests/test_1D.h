@@ -228,6 +228,39 @@ public:
     double pressure(const Vector3d& r) const final;
 };
 
+/// @brief Простой перенос
+class SimpleAdvectionTest : public Test1D {
+public:
+    double x_jump = 0.0;
+    double finish = 1.8;
+    double rL, rR;
+    double uL, uR;
+    double pL, pR;
+
+    /// @brief Конструктор
+    SimpleAdvectionTest();
+
+    /// @brief Получить название теста
+    std::string name() const final { return "Simple Advection Test"; };
+
+    /// @brief Левая граница области
+    double xmin() const final { return -5.0; }
+
+    /// @brief Правая граница области
+    double xmax() const final { return +5.0; }
+
+    /// @brief Конечный момент времени
+    double max_time() const final { return finish; }
+
+    // Начальные данные
+
+    double density(const Vector3d& r) const final;
+
+    Vector3d velocity(const Vector3d& r) const final;
+
+    double pressure(const Vector3d& r) const final;
+};
+
 /// @brief Тест с разреженной водой.
 /// Отрицательное начальное давление воды, контакт с газом.
 class RarefiedWater : public Test1D {

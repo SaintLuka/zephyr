@@ -28,6 +28,9 @@ struct PState {
     /// @brief Инициализация нулями
     PState();
 
+    /// @brief Инициализация NaN
+    PState(bool isNaN);
+
     /// @brief Инициализация с полным заданием параметров
     PState(const double &density, const Vector3d &velocity,
            const double &pressure, const double &energy);
@@ -146,6 +149,8 @@ struct Flux {
 
     /// @brief Возвращает вектор потока в глобальной системе координат
     Flux in_global(const Vector3d &normal) const;
+
+    void inverse();
 
     /// @brief В поток вывода
     friend std::ostream &operator<<(std::ostream &os, const Flux &flux);

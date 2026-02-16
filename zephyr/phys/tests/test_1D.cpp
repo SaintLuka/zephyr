@@ -283,6 +283,34 @@ double ShockWave::pressure_t(const Vector3d& r, double t) const {
 }
 
 // ============================================================================
+//                               Простой перенос
+// ============================================================================
+
+SimpleAdvectionTest::SimpleAdvectionTest() {
+    m_materials += IdealGas::create(1.4);
+
+    rL = NAN;
+    uL = 1.0;
+    pL = NAN;
+
+    rR = 1.0;
+    uR = 1.0;
+    pR = 1.0;
+}
+
+double SimpleAdvectionTest::density(const Vector3d& r) const {
+    return r.x() < x_jump ? rL : rR;
+}
+
+Vector3d SimpleAdvectionTest::velocity(const Vector3d& r) const {
+    return {r.x() < x_jump ? uL : uR, 0.0, 0.0};
+}
+
+double SimpleAdvectionTest::pressure(const Vector3d& r) const {
+    return r.x() < x_jump ? pL : pR;
+}
+
+// ============================================================================
 //                               Shu-Osher Test
 // ============================================================================
 

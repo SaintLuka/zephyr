@@ -30,12 +30,13 @@ using zephyr::utils::mpi;
 
 int main() {
     mpi::handler init;
-    threads::on();
+    // threads::on();
 
     // Тестовая задача
     //SodTest test;
-    //ToroTest test(1);
-    ShuOsherTest test;
+    // ToroTest test(7);
+    // ShuOsherTest test;
+    SimpleAdvectionTest test;
     //ShockWave test(3.0, 0.1, 1.0);
 
     // Уравнение состояния
@@ -119,6 +120,8 @@ int main() {
     double next_write = 0.0;
 
     while (curr_time < test.max_time()) {
+        pvd.save(mesh, curr_time);
+
         if (curr_time >= next_write) {
             std::cout << "\tStep: " << std::setw(6) << n_step << ";"
                       << "\tTime: " << std::setw(6) << std::setprecision(3) << curr_time << "\n";
@@ -128,6 +131,7 @@ int main() {
 
         // Точное завершение в end_time
         solver.set_max_dt(test.max_time() - curr_time);
+        solver.set_curr_time(curr_time);
 
         // Обновляем слои
         solver.update(mesh);

@@ -16,6 +16,19 @@ PState::PState()
       energy(0.0)
 {}
 
+PState::PState(bool isNaN) : PState{} {
+    if (isNaN) {
+        density = std::numeric_limits<double>::quiet_NaN();
+
+        velocity.x() = std::numeric_limits<double>::quiet_NaN();
+        velocity.y() = std::numeric_limits<double>::quiet_NaN();
+        velocity.z() = std::numeric_limits<double>::quiet_NaN();
+
+        pressure = std::numeric_limits<double>::quiet_NaN();
+        energy = std::numeric_limits<double>::quiet_NaN();
+    }
+}
+
 PState::PState(const double &density, const Vector3d &velocity,
                const double &pressure, const double &energy)
         : density(density), velocity(velocity),
@@ -176,6 +189,14 @@ Flux Flux::in_global(const Vector3d &normal) const {
     Flux f(*this);
     f.to_global(normal);
     return f;
+}
+
+void Flux::inverse() {
+    density = -density;
+    //momentum.x() = -momentum.x();
+    momentum.y() = -momentum.y();
+    momentum.z() = -momentum.z();
+    energy = -energy;
 }
 
 std::ostream &operator<<(std::ostream &os, const Flux &flux) {

@@ -74,11 +74,6 @@ public:
         double u_R,
         const phys::Eos &eosL, const smf::PState &zL);
 
-    static smf::WaveConfig3 wave_config_u_R(
-            double u_L,
-            const phys::Eos &eosR, const smf::QState &Q_R, const smf::Flux &F_R);
-
-
     // ========================================================================
     //                    Многоматериальные версии функций
     // ========================================================================
