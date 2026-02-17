@@ -61,7 +61,7 @@ int main() {
     auto a = part.alpha;
 
     // Файл для записи
-    PvdFile pvd("test1D", "D:\\main_project");
+    PvdFile pvd("test1D", "output");
 
     double curr_time = 0.0;
 
@@ -74,6 +74,7 @@ int main() {
     pvd.variables += {"energy",   [z](EuCell& cell) -> double { return cell[z].energy; }};
     pvd.variables += {"alpha",    [a](EuCell& cell) -> double { return cell[a]; }};
 
+    /*
     pvd.variables += {"exact.dens",
                       [&test, &curr_time](const EuCell &cell) -> double {
                           return test.density_t(cell.center(), curr_time);
@@ -100,6 +101,9 @@ int main() {
                           double P = test.pressure_t(cell.center(), curr_time);
                           return eos->sound_speed_rP(rho, P);
                       }};
+                      */
+
+    test.inverse();
 
     // Начальные данные
     auto init_cells = [&test, &solver, z, a](EuMesh& mesh) {
@@ -110,7 +114,7 @@ int main() {
             cell[z].energy   = test.energy  (cell.center());
 
             // Установить объемные доли поршня
-            cell[a] = cell.x() < solver.bound_pos(0.0) ? 1.0 : 0.0;
+            cell[a] = cell.x() < solver.bound_pos(0.0) ? 0.0 : 1.0;
         }
     };
 

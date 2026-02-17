@@ -68,7 +68,7 @@ public:
     /// @brief Расчёт потоков
     void fluxes(EuMesh &mesh) const;
 
-    static std::tuple<double, double, Flux> flux(const PState &zL, const PState &zR, const Eos &eos,
+    static std::tuple<double, Flux, double, Flux> calc_flux(PState zL, PState zR, const Eos &eos,
         double alphaL, double alphaR, double u, double dt, double cellx);
 
     static Flux crp_flux_classic(const PState& zL, const PState& zR,

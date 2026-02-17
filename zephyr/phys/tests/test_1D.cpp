@@ -290,12 +290,18 @@ SimpleAdvectionTest::SimpleAdvectionTest() {
     m_materials += IdealGas::create(1.4);
 
     rL = NAN;
-    uL = 1.0;
+    uL = 2.0;
     pL = NAN;
 
     rR = 1.0;
-    uR = 1.0;
+    uR = 2.0;
     pR = 1.0;
+}
+
+void SimpleAdvectionTest::inverse() {
+    std::swap(rL, rR);
+    std::swap(uL, uR);
+    std::swap(pL, pR);
 }
 
 double SimpleAdvectionTest::density(const Vector3d& r) const {

@@ -4,6 +4,7 @@
 #include <zephyr/math/cfd/models.h>
 
 #include "zephyr/geom/curves/interpolant.h"
+#include "zephyr/math/funcs.h"
 
 namespace zephyr::math {
 
@@ -13,8 +14,10 @@ using namespace smf;
 using utils::threads;
 using utils::mpi;
 
+constexpr double eps = 1.0e-15;
+
 double FreeBoundary::bound_pos(double t) const {
-    return t;
+    return 0.5 *t;
     // return std::sin(t);
 }
 
@@ -104,12 +107,11 @@ void FreeBoundary::fluxes(EuMesh &mesh) const {
         // Примитивный вектор в ячейке
         PState z_c = cell[part.init];
 
-        // Консервативный вектор в ячейке
-        QState q_c(z_c);
+        bool interesting = cell.index() == 250;
 
         // Переменная для потока
-        Flux flux, F{};
-        double Falpha = 0;
+        Flux flux = Flux::Zero();
+        double F_a = 0;
         for (auto &face: cell.faces(mesh::Direction::X)) {
             // Внешняя нормаль
             auto normal = face.normal();
@@ -128,104 +130,195 @@ void FreeBoundary::fluxes(EuMesh &mesh) const {
             // Значение на грани со стороны соседа
             PState zp = z_n.in_local(normal);
 
-            // Численный поток на грани
-            // Flux loc_flux = HLLC::calc_flux(zm, zp, *m_eos);
-            // loc_flux.to_global(normal);
+            // Вектор скорости
+            //Vector3d vel = {bound_vel(current_time()), 0.0, 0.0};
+            Vector3d vel = {2.0, 0.0, 0.0};
 
-            double FalphaL, FalphaR;
-            Flux Fi{};
+            // Нормальная составляющая
+            double ui = vel.dot(normal);
 
-            // a.dot(b); a.norm(); a.normalize(); b = a.normalized();
-
-            double u = bound_vel(current_time());
-            Vector3d normal_normalized = normal.normalized();
-            Vector3d u_vector = Vector3d(1, 0, 0);
-            u_vector = u_vector.normalized();
-            double dot_vectors = u_vector.x() * normal_normalized.x() + u_vector.y() * normal_normalized.y() + u_vector.z() * normal_normalized.z();
-            double ui = u * dot_vectors;
-
-            double alphaL = cell(part.alpha);
-            double alphaR = face.neib(part.alpha);
-
-            std::tuple<double, double, Flux> alpha_fluxes;
-            if (alphaL == alphaR) {
-                alpha_fluxes = FreeBoundary::flux(zm, zp, *m_eos, alphaL, alphaR, ui, dt(), cell.hx());
-            } else {
-                alpha_fluxes = FreeBoundary::flux(zm, zp, *m_eos, alphaL, alphaR, ui, dt(), cell.hx());
+            double aL = cell[part.alpha];
+            double aR = face.neib(part.alpha);
+            if (interesting) {
             }
-            std::tie(FalphaL, FalphaR, Fi) = alpha_fluxes;
-            Falpha += FalphaL * face.area();
-            Falpha += FalphaR * face.area();
 
-            Fi.to_global(normal);
-            F.arr() += Fi.arr() * face.area();
+            // Численный поток на грани
+            auto [FaL, FL, FaR, FR] = calc_flux(zm, zp, *m_eos, aL, aR, ui, dt(), cell.hx());
+            FL.to_global(normal);
 
-            // flux.arr() += loc_flux.arr() * face.area();
+            F_a += FaL * face.area();
+            flux.arr() += FL.arr() * face.area();
+
+            if (interesting) {
+                std::cout << "qc: " << z_c << "\n";
+                std::cout << "zm: " << zm << "\n";
+                std::cout << "zp: " << zp << "\n";
+                std::cout << "Fal, Far, FL: " << FaL << " " << FaR << " " << FL << "\n";
+            }
         }
 
-        // Обновляем значение в ячейке (консервативные переменные)
-        // q_c.arr() -= (m_dt / cell.volume()) * flux.arr();
+        cell[part.a_next] = cell[part.alpha] - (dt() / cell.volume()) * F_a;
 
-        cell[part.a_next] = cell[part.alpha] - (Falpha / cell.volume());
-        if (std::abs(cell[part.a_next] - 1.0) < std::numeric_limits<double>::epsilon()) {
+        // Ячейка без газа
+        if (cell[part.a_next] > 1.0 - eps) {
             cell[part.a_next] = 1.0;
-        } else if (std::abs(cell[part.a_next]) < std::numeric_limits<double>::epsilon()) {
+            cell[part.next] = PState::NaN();
+            return;
+        }
+
+        if (cell[part.a_next] < eps) {
             cell[part.a_next] = 0.0;
         }
 
+        // Консервативный вектор в ячейке
+        QState q_c = QState::Zero();
+
         // Новое значение примитивных переменных
-        q_c.arr() *= (1 - cell[part.alpha]);
-        q_c.arr() -= (dt() / cell.volume()) * F.arr();
-        if (std::abs(cell[part.a_next] - 1.0) < std::numeric_limits<double>::epsilon()) {
-            QState nan_q_c(true);
-            q_c.arr() = nan_q_c.arr();
-        } else {
-            q_c.arr() /= (1 - cell[part.a_next]);
+        if (cell[part.alpha] < 1.0) {
+            q_c = QState(z_c);
+            q_c.arr() *= (1.0 - cell[part.alpha]);
         }
+
+        if (interesting) {
+            std::cout << "alpha: " << cell[part.alpha] << " " << cell[part.a_next] << "\n";
+            std::cout << "q_c: " << q_c << "\n";
+        }
+
+        q_c.arr() -= (dt() / cell.volume()) * flux.arr();
+        q_c.arr() /= (1.0 - cell[part.a_next]);
+
         cell[part.next] = PState(q_c, *m_eos);
     });
 }
 
-std::tuple<double, double, Flux> FreeBoundary::flux(const PState &zL, const PState &zR, const Eos &eos,
-        double alphaL, double alphaR, double u, double dt, double cellx){
-    double FalphaL = 0;
-    double FalphaR = 0;
-    Flux F{};
-    if(std::fabs(alphaL) < std::numeric_limits<double>::epsilon() &&
-        std::fabs(alphaR) < std::numeric_limits<double>::epsilon()){
-        F = HLLC::calc_flux(zL, zR, eos);
-        return {FalphaL, FalphaR, F};
+std::tuple<double, Flux, double, Flux> FreeBoundary::calc_flux(
+    PState zL, PState zR, const Eos &eos,
+    double alphaL, double alphaR, double u, double dt, double cellx) {
+    // Грань между двумя газовыми ячейками
+    if(alphaL == 0.0 && alphaR == 0.0) {
+        Flux F = HLLC::calc_flux(zL, zR, eos);
+        return {0.0, F, 0.0, F};
     }
 
-    if(std::fabs(alphaL - 1.0) < std::numeric_limits<double>::epsilon() &&
-        std::fabs(alphaR - 1.0) < std::numeric_limits<double>::epsilon()){
-        return {FalphaL, FalphaR, F};
+    // Грань между двумя пустыми ячейками
+    if (alphaL == 1.0 && alphaR == 1.0) {
+        Flux F = Flux::Zero();
+        return {0.0, F, 0.0, F};
     }
 
     // Для положительной скорости
-    const double &P_L = zL.pressure;
-    if (std::fabs(alphaL) < std::numeric_limits<double>::epsilon() &&
-        std::fabs(alphaR - 1.0) < std::numeric_limits<double>::epsilon() && u < 0) {
-        FalphaL = u * dt;
-        Flux F_add{0.0, {P_L, 0.0, 0.0}, P_L * u};
-        F.arr() += F_add.arr();
-    } else if ((alphaL > 0 && alphaL < 1) &&
-        std::fabs(alphaR - 1.0) < std::numeric_limits<double>::epsilon() && u < 0) {
+    double P_L = zL.pressure;
+
+    // "компенсационный поток"
+    // u - скорость поршня, P - давление на поршне
+    auto G = [](double u, double P) -> Flux {
+        return Flux(0.0, {P, 0.0, 0.0}, u * P);
+    };
+
+    double u_m = std::min(u, 0.0);  // u_минус
+    double u_p = std::max(u, 0.0);  // u_плюс
+
+    // Всё забыли. Сводим к задаче, где слева поршень, а справа газ.
+    bool inversed = false;
+    if (alphaL < alphaR) {
+        inversed = true;
+        u *= -1.0;
+        std::swap(alphaL, alphaR);
+        std::swap(zL, zR);
+        zL.inverse();
+        zR.inverse();
+    }
+
+    // теперь alphaL > alphaR
+
+    double Fa_L{NAN};
+    double Fa_R{NAN};
+    Flux F_L = Flux::NaN();
+    Flux F_R = Flux::NaN();
+
+    // Слева только поршень, справа есть газ
+    if (alphaL == 1.0) {
+        auto wc = HLLC::wave_config_u_R(u, eos, zR);
+        PState z(wc.QsR, eos); // состояние на поршне
+
+        // Сжатие газа
+        if (u >= 0.0) {
+            Fa_L = 0.0;
+            Fa_R = u;
+            F_L = Flux::Zero();
+            F_R = G(u, z.P());
+        }
+        else {
+            // Разрежение газа
+            // Справа газ и поршень (0 < alphaR < 1)
+            double delta = alphaR * cellx;
+
+            double tau1 = std::min(-delta/ (u * dt), 1.0);
+            double tau2 = 1.0 - tau1;
+
+            Fa_L = -tau2 * u;
+            Fa_R = -tau1 * u;
+
+            F_L = tau2 * wc.FsR.arr();
+            F_L.momentum.x() -= tau2 * z.P();
+            F_L.energy       -= tau2 * z.P() * u;
+
+            F_R = tau2 * wc.FsR.arr();
+            F_R.momentum.x() -= tau1 * z.P();
+            F_R.energy       -= tau1 * z.P() * u;
+        }
+    }
+    else {
+        throw std::runtime_error("Enough");
+    }
+
+    if (!inversed) {
+        return {Fa_L, F_L, Fa_R, F_R};
+    }
+    else {
+        Fa_L *= -1.0;
+        Fa_R *= -1.0;
+        F_L.inverse();
+        F_R.inverse();
+        return {Fa_R, F_R, Fa_L, F_L};
+    }
+
+    throw std::runtime_error("Enough");
+
+        Flux F{};
+        double FalphaL = 0;
+        double FalphaR = 0;
+
+    if (std::min(alphaL, alphaR) == 0.0 && std::max(alphaL, alphaR) == 1.0) {
+        if (u < 0.0) {
+            FalphaL = u * dt;
+            Flux F_add{0.0, {P_L, 0.0, 0.0}, P_L * u};
+            F.arr() += F_add.arr();
+        }
+        else {
+
+        }
+    }
+
+
+
+    else if ((0.0 < alphaL && alphaL < 1.0) && alphaR == 1.0 && u < 0.0) {
         if (-u * dt <= cellx - cellx * alphaL) {
             FalphaL = u * dt;
         } else {
             FalphaL = -(cellx - cellx * alphaL);
         }
         // F = 0 - потока газа через границу нет
-    } else if (std::fabs(alphaL) < std::numeric_limits<double>::epsilon() &&
-        (alphaR > 0 && alphaR < 1) && u < 0) {
+    }
+    else if (alphaL == 0.0 && (0.0 < alphaR && alphaR < 1.0) && u < 0.0) {
         if (-u * dt > cellx - cellx * alphaR) {
             FalphaL = -(-u * dt - (cellx - cellx * alphaR));
         }
         F = crp_flux_inverse(zL, zR, eos, cellx * alphaR, u, dt);
         Flux F_add{0.0, {-P_L, 0.0, 0.0}, P_L * u};
         F.arr() += F_add.arr();
-    } else if ((alphaL > 0 && alphaL < 1) &&
+    }
+    else if ((0.0 < alphaL && alphaL < 1.0) &&
         std::fabs(alphaR) < std::numeric_limits<double>::epsilon() && u > 0) {
         F = crp_flux_classic(zL, zR, eos, cellx * alphaL, u, dt);
         Flux F_add{0.0, {P_L, 0.0, 0.0}, P_L * u};
@@ -233,16 +326,15 @@ std::tuple<double, double, Flux> FreeBoundary::flux(const PState &zL, const PSta
     }
 
     // Для отрицательной скорости
-    if (std::fabs(alphaL - 1.0) < std::numeric_limits<double>::epsilon() &&
-        std::fabs(alphaR) < std::numeric_limits<double>::epsilon() && u < 0) {
+    if (alphaL == 1.0 && alphaR == 0.0 && u < 0) {
         FalphaL = -u * dt;
-    } else if (std::fabs(alphaL - 1.0) < std::numeric_limits<double>::epsilon() &&
-        (alphaR > 0 && alphaR < 1) && u < 0) {
+    }
+    else if (alphaL == 1.0 && (0.0 < alphaR && alphaR < 1.0) && u < 0) {
         if (-u * dt > cellx * alphaR) {
             FalphaL = -u * dt - (cellx * alphaR);
         }
-    } else if ((alphaL > 0 && alphaL < 1) &&
-        std::fabs(alphaR) < std::numeric_limits<double>::epsilon() && u < 0) {
+    }
+    else if ((0.0 < alphaL && alphaL < 1.0) && alphaR == 0.0 && u < 0) {
         if (-u * dt <= cellx * alphaL) {
             FalphaL = -u * dt;
         } else {
@@ -250,8 +342,7 @@ std::tuple<double, double, Flux> FreeBoundary::flux(const PState &zL, const PSta
         }
     }
 
-
-    return {FalphaL, FalphaR, F};
+    return {FalphaL, F, FalphaR, F};
 }
 
 // Точка в плоскости (x, t)

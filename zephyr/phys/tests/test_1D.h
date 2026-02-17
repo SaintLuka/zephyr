@@ -240,6 +240,8 @@ public:
     /// @brief Конструктор
     SimpleAdvectionTest();
 
+    void inverse();
+
     /// @brief Получить название теста
     std::string name() const final { return "Simple Advection Test"; };
 
