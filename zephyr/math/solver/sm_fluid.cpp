@@ -275,7 +275,7 @@ void SmFluid::fluxes_weno(EuMesh &mesh) const {
         QState q_iplus12_plus;
 
         // Расчет u_{i+1/2} и u_{i-1/2}
-        for (int i = 0; i <= q_c.arr().size(); i++) {
+        for (int i = 0; i < q_c.arr().size(); i++) {
             // WENO5 для u_{i+1/2}^{-} и u_{i-1/2}^{+}
             WENO5 stencil_i{neib_one_left_c.arr()[i], neib_left_c.arr()[i],
                                 q_c.arr()[i], neib_right_c.arr()[i], neib_one_right_c.arr()[i]};
