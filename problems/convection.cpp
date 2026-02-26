@@ -50,7 +50,7 @@ void setup_initial_1(EuMesh& mesh, double D, Storable<double> u) {
     double R = 0.1;
     Vector3d vc = {0.15, 0.15, 0.0};
     for (auto cell: mesh) {
-        cell(u) = (cell.center() - vc).norm() < R ? 1.0 : 0.0;
+        cell[u] = (cell.center() - vc).norm() < R ? 1.0 : 0.0;
     }
 }
 
@@ -65,11 +65,11 @@ void setup_initial_2(EuMesh& mesh, double D, Storable<double> u) {
         Vector3d vc = cell.center();
         if (x_min <= vc.x() && vc.x() <= x_max &&
             y_min <= vc.y() && vc.y() <= y_max) {
-            cell(u) = 1.0;
+            cell[u] = 1.0;
         } else {
-            cell(u) = 0.0;
+            cell[u] = 0.0;
         }
-        cell(u) = 0.0;
+        cell[u] = 0.0;
     }
 }
 
@@ -136,13 +136,13 @@ int main() {
 
     // Переменные для сохранения
     pvd.variables = {"level"};
-    pvd.variables += {"u", [&solver](EuCell& cell) { return cell(solver.u_curr); } };
-    pvd.variables += {"u2", [&solver](EuCell& cell) { return cell(solver.u_next); } };
-    pvd.variables += {"uh", [&solver](EuCell& cell) { return cell(solver.u_half); } };
-    pvd.variables += {"dx", [&solver](EuCell& cell) { return cell(solver.du_dx); } };
-    pvd.variables += {"dy", [&solver](EuCell& cell) { return cell(solver.du_dy); } };
-    pvd.variables += {"vx", [&solver](EuCell& cell) { return solver.velocity(cell.center()).x(); } };
-    pvd.variables += {"vy", [&solver](EuCell& cell) { return solver.velocity(cell.center()).y(); } };
+    pvd.variables.append("u", solver.u_curr);
+    pvd.variables.append("u2", solver.u_next);
+    pvd.variables.append("uh", solver.u_half);
+    pvd.variables.append("dx", solver.du_dx);
+    pvd.variables.append("dy", solver.du_dy);
+    pvd.variables += {"v.x", [&solver](EuCell& cell) { return solver.velocity(cell.center()).x(); } };
+    pvd.variables += {"v.y", [&solver](EuCell& cell) { return solver.velocity(cell.center()).y(); } };
 
     // Заполняем начальные данные
     Box box = mesh.bbox();

@@ -6,10 +6,6 @@
 
 namespace zephyr::phys {
 
-int MixturePT::size() const {
-    return m_materials.size();
-}
-
 void MixturePT::clear() {
     m_materials.clear();
 }
@@ -124,7 +120,7 @@ dPdT MixturePT::volume_PT(double P, double T,
     for (int i = 0; i < size(); ++i) {
         if (beta.has(i)) {
             // есть начальное приближение
-            double rho_i0 = options.rhos ? (*options.rhos)[i] : NAN;
+            double rho_i0 = options.rhos.empty() ? NAN : options.rhos[i];
 
             auto v_i = m_materials[i]->volume_PT(P, T, {.deriv=true, .rho0=rho_i0});
             v.val += beta[i] * v_i.val;
@@ -142,7 +138,7 @@ dPdT MixturePT::energy_PT(double P, double T,
     for (int i = 0; i < size(); ++i) {
         if (beta.has(i)) {
             // есть начальное приближение
-            double rho_i0 = options.rhos ? (*options.rhos)[i] : NAN;
+            double rho_i0 = options.rhos.empty() ? NAN : options.rhos[i];
 
             auto e_i = m_materials[i]->energy_PT(P, T, {.deriv=true, .rho0=rho_i0});
             e.val += beta[i] * e_i.val;
@@ -182,15 +178,21 @@ double MixturePT::min_pressure(const Fractions &beta) const {
     return P_min;
 }
 
-void MixturePT::adjust_cv(double rho_ref, double P_ref, double T_ref) {
-    for (auto& mat: m_materials) {
-        mat->adjust_cv(rho_ref, P_ref, T_ref);
+void MixturePT::adjust_cv(const std::vector<double>& rho_ref, double P_ref, double T_ref) const {
+    if (rho_ref.size() != size()) {
+        throw std::invalid_argument("MixturePT::adjust_cv() rho_ref.size() != materials.size()");
+    }
+    for (int i = 0; i < size(); ++i) {
+        m_materials[i]->adjust_cv(rho_ref[i], P_ref, T_ref);
     }
 }
 
-void MixturePT::adjust_T0(double rho_ref, double P_ref, double T_ref) {
-    for (auto& mat: m_materials) {
-        mat->adjust_T0(rho_ref, P_ref, T_ref);
+void MixturePT::adjust_T0(const std::vector<double>& rho_ref, double P_ref, double T_ref) const {
+    if (rho_ref.size() != size()) {
+        throw std::invalid_argument("MixturePT::adjust_T0() rho_ref.size() != materials.size()");
+    }
+    for (int i = 0; i < size(); ++i) {
+        m_materials[i]->adjust_T0(rho_ref[i], P_ref, T_ref);
     }
 }
 
@@ -200,7 +202,7 @@ MixturePT::triplet_re MixturePT::get_rPT(double rho, double e,
     // Случай одного материала
     int idx = beta.index();
     if (idx >= 0) {
-        ScalarSet rhos = ScalarSet::Pure(idx, rho);
+        ScalarSet rhos = ScalarSet::PureNaN(idx, rho);
         double P = m_materials[idx]->pressure_re(rho, e);
         double T = m_materials[idx]->temperature_rP(rho, P);
         return {rhos, P, T};
@@ -215,7 +217,7 @@ MixturePT::triplet_rP MixturePT::get_reT(double rho, double P,
     // Случай одного материала
     int idx = beta.index();
     if (idx >= 0) {
-        ScalarSet rhos = ScalarSet::Pure(idx, rho);
+        ScalarSet rhos = ScalarSet::PureNaN(idx, rho);
         double e = m_materials[idx]->energy_rP(rho, P);
         double T = m_materials[idx]->temperature_rP(rho, P);
         return {rhos, e, T};
@@ -237,16 +239,16 @@ double MixturePT::sound_speed_PT(double P, double T,
 
 ScalarSet MixturePT::init_densities(const Fractions &beta, const MixOptions &options) const {
     ScalarSet rhos = ScalarSet::NaN();
-    if (options.rhos != nullptr) {
+    if (options.rhos.empty()) {
         for (int i = 0; i < size(); ++i) {
             if (beta.has(i)) {
-                rhos[i] = (*options.rhos)[i];
+                rhos[i] = m_materials[i]->density();
             }
         }
     } else {
         for (int i = 0; i < size(); ++i) {
             if (beta.has(i)) {
-                rhos[i] = m_materials[i]->density();
+                rhos[i] = options.rhos[i];
             }
         }
     }
@@ -368,7 +370,7 @@ MixturePT::triplet_rT MixturePT::find_reP_rT_old(double rho, double T,
         const Fractions& beta, const MixOptions& options) const {
     auto[rhos, P] = find_rP_rT_old(rho, T, beta, options);
 
-    dPdT e1 = energy_PT(P, T, beta, {.deriv=options.deriv, .rho0=rho, .rhos=&rhos});
+    dPdT e1 = energy_PT(P, T, beta, {.deriv=options.deriv, .rho0=rho, .rhos=rhos.span()});
     dRdT e2 = e1.val;
     if (options.deriv) {
         e2.dR = e1.dP * P.dR;
@@ -433,7 +435,7 @@ MixturePT::triplet_rP MixturePT::find_reT_rP_old(double rho, double P,
         const Fractions& beta, const MixOptions& options) const {
     auto[rhos, T] = find_rT_rP_old(rho, P, beta, options);
 
-    dPdT e1 = energy_PT(P, T, beta, {.deriv=options.deriv, .rho0=rho, .rhos=&rhos});
+    dPdT e1 = energy_PT(P, T, beta, {.deriv=options.deriv, .rho0=rho, .rhos=rhos.span()});
     dRdP e2 = e1.val;
     if (options.deriv) {
         e2.dR = e1.dT * T.dR;
@@ -568,7 +570,7 @@ MixturePT::doublet_rT MixturePT::find_rP_rT_new(double rho, double T,
     //   P_i (v_i, T) = P_j (v_j, T)
 
     // Число материалов в задаче
-    int n_fractions = beta.count();
+    int n_fractions = std::min(beta.count(), size());
 
     double v = 1.0 / rho;
 
@@ -627,7 +629,9 @@ MixturePT::doublet_rT MixturePT::find_rP_rT_new(double rho, double T,
         }
 
         // Поправляем приращения
-        dv.arr() *= chi;
+        for (int i = 0; i < n_fractions; ++i) {
+            dv[i] *= chi;
+        }
 
         // Вычисляем ошибку
         double err = 0.0;
@@ -691,7 +695,7 @@ MixturePT::doublet_rP MixturePT::find_rT_rP_new(double rho, double P,
     //   P_i (v_i, T) = P
 
     // Число материалов в задаче
-    int n_fractions = beta.count();
+    int n_fractions = std::min(beta.count(), size());
 
     double v = 1.0 / rho;
 
@@ -749,7 +753,9 @@ MixturePT::doublet_rP MixturePT::find_rT_rP_new(double rho, double P,
         chi = std::min(chi, 0.95 * T / std::abs(dT));
 
         // Поправляем приращения
-        dv *= chi;
+        for (int i = 0; i < n_fractions; ++i) {
+            dv[i] *= chi;
+        }
         dT *= chi;
 
         // Вычисляем ошибку
@@ -821,7 +827,7 @@ MixturePT::triplet_re MixturePT::find_rPT_new(double rho, double e,
     double v = 1.0 / rho;
 
     // Число материалов в задаче
-    int n_fractions = beta.count();
+    int n_fractions = std::min(beta.count(), size());
 
     // Начальное приближение объемных долей
     ScalarSet rhos = init_densities(beta, options);
@@ -883,7 +889,9 @@ MixturePT::triplet_re MixturePT::find_rPT_new(double rho, double e,
             }
         }
 
-        dv *= chi;
+        for (int i = 0; i < n_fractions; ++i) {
+            dv[i] *= chi;
+        }
         dT *= chi;
 
         // Вычисляем ошибку

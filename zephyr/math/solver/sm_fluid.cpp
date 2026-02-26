@@ -122,9 +122,9 @@ void SmFluid::compute_grad(EuMesh &mesh) const {
         auto grad = gradient::LSM<PState>(cell, part.init, boundary_value);
         grad = gradient::limiting<PState>(cell, m_limiter, grad, part.init, boundary_value);
 
-        cell(part.d_dx) = grad.x;
-        cell(part.d_dy) = grad.y;
-        cell(part.d_dz) = grad.z;
+        cell[part.d_dx] = grad.x;
+        cell[part.d_dy] = grad.y;
+        cell[part.d_dz] = grad.z;
     });
 }
 
@@ -173,7 +173,7 @@ void SmFluid::fluxes(EuMesh &mesh) const {
         }
 
         // Новое значение примитивных переменных
-        cell(part.next) = PState(q_c, *m_eos);
+        cell[part.next] = PState(q_c, *m_eos);
     });
 }
 
@@ -343,19 +343,18 @@ void SmFluid::fluxes_stage1(EuMesh &mesh) const {
 
             // Примитивный вектор соседа
             PState z_n;
-            Vector3d neib_c;
             if (!face.is_boundary()) {
-                neib_c = neib.center();
                 z_n = neib[part.init];
             }
             else {
-                neib_c = face.symm_point(cell_c);
                 z_n = boundary_value(z_c, normal, face.flag());
             }
+            Vector3d neib_c = (face.flag() == Boundary::ORDINARY ?
+                face.neib_center() : face.symm_point(cell_c));
 
             auto face_extra = FaceExtra::Direct(
-                    z_c, cell(part.d_dx), cell(part.d_dy), cell(part.d_dz),
-                    z_n, neib(part.d_dx), neib(part.d_dy), neib(part.d_dz),
+                    z_c, cell[part.d_dx], cell[part.d_dy], cell[part.d_dz],
+                    z_n, neib[part.d_dx], neib[part.d_dy], neib[part.d_dz],
                     cell_c, neib_c, face_c);
 
             // Интерполяция на грань со стороны ячейки
@@ -387,7 +386,7 @@ void SmFluid::fluxes_stage1(EuMesh &mesh) const {
         }
 
         // Значение примитивных переменных на полушаге
-        cell(part.half) = PState(q_c, *m_eos);
+        cell[part.half] = PState(q_c, *m_eos);
     });
 }
 
@@ -400,7 +399,7 @@ void SmFluid::fluxes_stage2(EuMesh &mesh) const {
         PState z_c = cell[part.init];
 
         // Примитивный вектор на полуслое
-        PState z_ch = cell(part.half);
+        PState z_ch = cell[part.half];
 
         // Консервативный вектор в ячейке на прошлом шаге
         QState q_c(z_c);
@@ -417,22 +416,21 @@ void SmFluid::fluxes_stage2(EuMesh &mesh) const {
 
             // Примитивный вектор соседа (на предыдущем и на полушаге)
             PState z_n, z_nh;
-            Vector3d neib_c;
             if (!face.is_boundary()) {
-                neib_c = neib.center();
                 z_n  = neib[part.init];
-                z_nh = neib(part.half);
+                z_nh = neib[part.half];
             }
             else {
-                neib_c = face.symm_point(cell_c);
                 z_n  = boundary_value(z_c,  normal, face.flag());
                 z_nh = boundary_value(z_ch, normal, face.flag());
             }
+            Vector3d neib_c = (face.flag() == Boundary::ORDINARY ?
+                face.neib_center() : face.symm_point(cell_c));
 
             // Параметры интерполяции с предыдущего (!) слоя
             auto face_extra = FaceExtra::Direct(
-                    z_c, cell(part.d_dx), cell(part.d_dy), cell(part.d_dz),
-                    z_n, neib(part.d_dx), neib(part.d_dy), neib(part.d_dz),
+                    z_c, cell[part.d_dx], cell[part.d_dy], cell[part.d_dz],
+                    z_n, neib[part.d_dx], neib[part.d_dy], neib[part.d_dz],
                     cell_c, neib_c, face_c);
 
             // Интерполяция на грань со стороны ячейки
@@ -480,13 +478,13 @@ void SmFluid::fluxes_stage2(EuMesh &mesh) const {
         }
 
         // Значение примитивных переменных на новом слое
-        cell(part.next) = PState(q_c, *m_eos);
+        cell[part.next] = PState(q_c, *m_eos);
     });
 }
 
 void SmFluid::swap(EuMesh &mesh) const {
     mesh.for_each([this](EuCell &cell) {
-        cell[part.init] = cell(part.next);
+        cell[part.init] = cell[part.next];
     });
 }
 
@@ -522,9 +520,9 @@ Distributor SmFluid::distributor(const std::string& type) const {
     // Снос по градиентам
     auto split_slope = [this](const EuCell &parent, Children &children) {
         const PState& z_p  = parent[part.init];
-        const PState& d_dx = parent(part.d_dx);
-        const PState& d_dy = parent(part.d_dy);
-        const PState& d_dz = parent(part.d_dz);
+        const PState& d_dx = parent[part.d_dx];
+        const PState& d_dy = parent[part.d_dy];
+        const PState& d_dz = parent[part.d_dz];
 
         auto P = m_eos->pressure_re(z_p.density, z_p.energy, {.deriv = true});
 
@@ -586,10 +584,9 @@ Distributor SmFluid::distributor(const std::string& type) const {
     return distr;
 }
 
+#if 0
 void SmFluid::set_flags(EuMesh &mesh) const {
-    if (!mesh.adaptive()) {
-        return;
-    }
+    if (!mesh.adaptive()) { return; }
 
     compute_grad(mesh);
 
@@ -627,6 +624,133 @@ void SmFluid::set_flags(EuMesh &mesh) const {
                 std::abs(pres_n - pres) > 0.4 * pres_split) {
                 cell.set_flag(0);
             }
+        }
+    }
+}
+#endif
+
+void SmFluid::set_flags(EuMesh &mesh) const {
+    if (!mesh.adaptive()) { return; }
+
+    compute_grad(mesh);
+
+
+    // Пороги (относительные) на разбиение
+    const double xi_dens = 0.05;
+    const double xi_pres = 0.05;
+
+    for (auto cell: mesh) {
+        cell.set_flag(-1);
+
+        // ---------------------- SLOPE CRITERION ---------------------------
+
+        double dens = cell[part.init].density;
+        double pres = cell[part.init].pressure;
+
+        double dens_split = xi_dens * std::abs(dens);
+        double pres_split = xi_pres * std::abs(pres);
+
+        for (auto face: cell.faces()) {
+            if (face.is_boundary()) {
+                continue;
+            }
+
+            double dens_n = face.neib(part.init).density;
+            double pres_n = face.neib(part.init).pressure;
+
+            // Большой перепад плотностей или давлений
+            if (std::abs(dens_n - dens) > dens_split ||
+                std::abs(pres_n - pres) > pres_split) {
+                cell.set_flag(1);
+                break;
+            }
+
+            // Пороги минимум в два раза меньше
+            if (std::abs(dens_n - dens) > 0.4 * dens_split ||
+                std::abs(pres_n - pres) > 0.4 * pres_split) {
+                cell.set_flag(0);
+            }
+        }
+
+        // ---------------------- CHI CRITERION ---------------------------
+        const auto& zc = cell[part.init];
+        const auto& dzcx = cell[part.d_dx];
+        const auto& dzcy = cell[part.d_dy];
+        const auto& dzcz = cell[part.d_dz];
+
+        Matrix3d dens_A = Matrix3d::Zero();
+        Matrix3d dens_B = Matrix3d::Zero();
+        Matrix3d pres_A = Matrix3d::Zero();
+        Matrix3d pres_B = Matrix3d::Zero();
+
+        double full_area = 0.0;
+        for(auto& face: cell.faces()) {
+            full_area += face.area();
+        }
+
+        const double eps = 0.001;
+        Vector3d cell_c = cell.center();
+
+        for(auto& face: cell.faces()) {
+            auto neib = face.neib();
+            Vector3d normal = face.normal();
+            Vector3d neig_c = neib.center();
+            Vector3d face_c = face.center();
+
+            const auto& zn = neib[part.init];
+            const auto& dznx = neib[part.d_dx];
+            const auto& dzny = neib[part.d_dy];
+            const auto& dznz = neib[part.d_dz];
+
+            double S  = face.area();
+            auto   Sn = normal * S;
+
+            // Значения на гранях
+            Vector3d drc = face_c - cell_c;
+            PState zf = zc.arr() + dzcx.arr() * drc.x() + dzcy.arr() * drc.y() + dzcz.arr() * drc.z();
+
+            //linear interpolation for derivatives at edge
+            double t = (face_c - cell_c).dot(normal);
+            t       /= (neig_c - cell_c).dot(normal);
+
+            std::array<PState, 3> dzf = {
+                dzcx.arr() + t * (dznx.arr() - dzcx.arr()),
+                dzcy.arr() + t * (dzny.arr() - dzcy.arr()),
+                dzcz.arr() + t * (dznz.arr() - dzcz.arr())
+            };
+
+            for(int i = 0; i < 3; ++i) {
+                for(int j = 0; j < 3; ++j) {
+                    dens_A(i, j) += 0.5 * (dzf[i].density * Sn[j] + dzf[j].density * Sn[i]);
+                    dens_B(i, j) += 0.5 * (fabs(dzf[i].density) + fabs(dzf[j].density)) * S;
+                    dens_B(i, j) += eps * fabs(zf.density) * S / full_area;
+
+                    pres_A(i, j) += 0.5 * (dzf[i].pressure * Sn[j] + dzf[j].pressure * Sn[i]);
+                    pres_B(i, j) += 0.5 * (fabs(dzf[i].pressure) + fabs(dzf[j].pressure)) * S;
+                    pres_B(i, j) += eps * fabs(zf.pressure) * S / full_area;
+                }
+            }
+        }
+
+        double dens_norm_a = dens_A.squaredNorm();
+        double dens_norm_b = dens_B.squaredNorm() + 1.e-10;
+        double pres_norm_a = pres_A.squaredNorm();
+        double pres_norm_b = pres_B.squaredNorm() + 1.e-10;
+
+        double dens_chi = std::sqrt( dens_norm_a / dens_norm_b );
+        double pres_chi = std::sqrt( pres_norm_a / pres_norm_b );
+
+        const double chi_p = 0.15; // Верхний порог
+        const double chi_m = 0.10; // Нижний порог
+
+        if (dens_chi > chi_p || pres_chi > chi_p) {
+            cell.set_flag(1);
+        }
+        else if (dens_chi < chi_m && pres_chi < chi_m) {
+            cell.set_flag(-1);
+        }
+        else {
+            cell.set_flag(0);
         }
     }
 }

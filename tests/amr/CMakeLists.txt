@@ -4,13 +4,13 @@
 #list(APPEND TESTS random)
 #list(APPEND TESTS templates)
 
-# Assume all files in direcory are tests
+# Assume all files in directory are tests
 if (ZEPHYR_TESTS_ALL)
     file(GLOB TEST_SOURCES *.cpp)
 
     set(TESTS "")
     foreach(filename IN LISTS TEST_SOURCES)
-        # short name without path and extentsion
+        # short name without path and extension
         get_filename_component(test ${filename} NAME_WE)
         list(APPEND TESTS ${test})
     endforeach()

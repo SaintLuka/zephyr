@@ -1,10 +1,8 @@
 /// @file smf_flow_around.cpp
 /// @brief Двумерные газодинамические задачи с обтеканием сложных геометрий.
 /// Или с взаимодействием со сложной геометрией.
-
 #include <iostream>
 #include <iomanip>
-
 
 #include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/geom/generator/collection/wedge.h>
@@ -14,14 +12,12 @@
 #include <zephyr/geom/generator/cuboid.h>
 
 #include <zephyr/mesh/euler/eu_mesh.h>
-#include <zephyr/mesh/euler/eu_mesh.h>
-
-#include <zephyr/phys/tests/test_1D.h>
-
 #include <zephyr/math/solver/sm_fluid.h>
 
 #include <zephyr/io/pvd_file.h>
 #include <zephyr/io/csv_file.h>
+
+#include <zephyr/phys/tests/test_1D.h>
 
 using zephyr::geom::generator::collection::Wedge;
 using zephyr::geom::generator::collection::SemicircleCutout;
@@ -39,57 +35,17 @@ using zephyr::mesh::EuMesh;
 using zephyr::math::SmFluid;
 using zephyr::utils::threads;
 
-#if 0
-
-// Для быстрого доступа по типу
-SmFluid::State U;
-
-/// Переменные для сохранения
-double get_rho(AmrStorage::Item& cell) { return cell(U).density; }
-double get_u(AmrStorage::Item& cell) { return cell(U).velocity.x(); }
-double get_v(AmrStorage::Item& cell) { return cell(U).velocity.y(); }
-double get_p(AmrStorage::Item& cell) { return cell(U).pressure; }
-double get_e(AmrStorage::Item& cell) { return cell(U).energy; }
-
-
 int main() {
     threads::on();
 
-    // Тестовая задача
-    ShockWave test(3.0, 0.8, 0.5);
+    // Test problems
+    ShockWave test(3.0, 0.1, 1.0);
 
-    // Уравнение состояния
-    auto eos = test.get_eos();
-
-    // Начальные данные
-    auto init_cells = [&test, &eos](Mesh& mesh) {
-        for (auto cell: mesh) {
-            auto cell_c = cell.center();
-            cell(U).density  = test.density(cell_c);
-            cell(U).velocity = test.velocity(cell_c);
-            cell(U).pressure = test.pressure(cell_c);
-            cell(U).energy   = test.energy(cell_c);
-        }
-    };
-
-    // Файл для записи
-    PvdFile pvd("flow", "output");
-
-    // Переменные для сохранения
-    pvd.variables = {"level"};
-    pvd.variables += {"rho", get_rho};
-    pvd.variables += {"u", get_u};
-    pvd.variables += {"v", get_v};
-    pvd.variables += {"p", get_p};
-    pvd.variables += {"e", get_e};
-
-    /*
-    Rectangle gen(0.0, 30.0, 0.0, 0.5);
-    gen.set_nx(600);
+    // Сеточные генераторы на выбор
+    Rectangle gen(0.0, 1.0, 0.0, 0.2);
+    gen.set_nx(200);
     gen.set_boundaries({.left=Boundary::ZOE, .right=Boundary::ZOE,
                         .bottom=Boundary::WALL, .top=Boundary::WALL});
-
-     */
 
     /*
     Wedge gen(0.0, 3.0, 0.0, 1.8, 1.5, M_PI / 6.0,
@@ -104,8 +60,10 @@ int main() {
     };
      */
 
+    /*
     PlaneWithCube gen(0, 3.2, 0, 3.2, 1.6, 1.6, 0.3);
     gen.set_nx(-1);
+    */
 
     /*
     PlaneWithHole gen(test.xmin(), test.xmax(), test.ymin(), test.ymax(),
@@ -116,8 +74,8 @@ int main() {
     gen.set_nx(20);
     */
 
-    // Cuboid gen(test.xmin(), test.xmax(), 
-    //            test.ymin(), test.ymax(), 
+    // Cuboid gen(test.xmin(), test.xmax(),
+    //            test.ymin(), test.ymax(),
     //            test.zmin(), test.zmax());
     // gen.set_boundaries({.left   = Boundary::ZOE, .right  = Boundary::ZOE,
     //                     .bottom = Boundary::ZOE, .top    = Boundary::ZOE,
@@ -126,25 +84,54 @@ int main() {
     // gen.set_ny(30);
     // gen.set_nz(30);
 
-    // Создать сетку
-    EuMesh mesh(gen, U);
+    // Create mesh
+    EuMesh mesh(gen);
 
-    // Создать решатель
+    // Test class provides EoS
+    auto eos = test.get_eos();
+
+    // Create and configure solver
     SmFluid solver(eos);
     solver.set_accuracy(2);
     solver.set_CFL(0.5);
     solver.set_limiter("MC");
-    solver.set_method(Fluxes::HLLC);
+    solver.set_method(Fluxes::HLLC_M);
 
+    // Add data fields, choose main data layer
+    auto data = solver.add_types(mesh);
+    auto z = data.init;
+
+    // Configure mesh
     mesh.set_max_level(3);
     mesh.set_distributor(solver.distributor());
 
+    // Files for output
+    PvdFile pvd("flow", "output");
+
+    // Variables to save
+    pvd.variables = {"level"};
+    pvd.variables += {"density",  [z](EuCell& cell) -> double { return cell[z].density; }};
+    pvd.variables += {"vel.x",    [z](EuCell& cell) -> double { return cell[z].velocity.x(); }};
+    pvd.variables += {"vel.y",    [z](EuCell& cell) -> double { return cell[z].velocity.y(); }};
+    pvd.variables += {"pressure", [z](EuCell& cell) -> double { return cell[z].pressure; }};
+    pvd.variables += {"energy",   [z](EuCell& cell) -> double { return cell[z].energy; }};
+
+    // Setup initial conditions
+    auto init_cell = [&test, z](EuCell& cell) {
+        auto cell_c = cell.center();
+        cell[z].density  = test.density(cell_c);
+        cell[z].velocity = test.velocity(cell_c);
+        cell[z].pressure = test.pressure(cell_c);
+        cell[z].energy   = test.energy(cell_c);
+    };
+
+    // Initial conditions (adaptive to initial data)
     for (int k = 0; k < mesh.max_level() + 3; ++k) {
-        init_cells(mesh);
+        mesh.for_each(init_cell);
         solver.set_flags(mesh);
         mesh.refine();
     }
-    init_cells(mesh);
+    mesh.for_each(init_cell);
 
     size_t n_step = 0;
     double curr_time = 0.0;
@@ -158,10 +145,10 @@ int main() {
             next_write += test.max_time() / 100;
         }
 
-        // Точное завершение в end_time
+        // Finish exactly at max_time
         solver.set_max_dt(test.max_time() - curr_time);
 
-        // Обновляем слои
+        // Integration step
         solver.update(mesh);
         solver.set_flags(mesh);
         mesh.refine();
@@ -173,6 +160,3 @@ int main() {
 
     return 0;
 }
-#else
-int main() { }
-#endif

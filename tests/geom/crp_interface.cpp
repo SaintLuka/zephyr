@@ -35,7 +35,7 @@ Inter face_fraction_direct(Polygon &cell, Polygon& neib, double a1, double a2) {
     double f_min = func(a1, a2, cos_min);
     double f_max = func(a1, a2, cos_max);
 
-    assert(f_min * f_max <= 0.0);
+    z_assert(f_min * f_max <= 0.0, "Dichotomy error");
 
     if (std::abs(f_min) < 1.0e-8) {
         cos_max = cos_min;

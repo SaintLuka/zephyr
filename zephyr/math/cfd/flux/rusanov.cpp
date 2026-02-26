@@ -46,15 +46,9 @@ mmf::Flux Rusanov::flux(const mmf::PState &zL, const mmf::PState &zR, const phys
 mmf::Flux Rusanov::calc_flux(const mmf::PState &zL, const mmf::PState &zR, const phys::MixturePT &mixture) {
     using namespace mmf;
 
-    // Нормальные скорости слева и справа
-    const double &u_L = zL.velocity.x();
-    const double &u_R = zR.velocity.x();
-
     // Скорость звука слева и справа
-    double c_L = mixture.sound_speed_rP(zL.density, zL.pressure, zL.mass_frac,
-                                        {.T0 = zL.T(), .rhos = &zL.densities});
-    double c_R = mixture.sound_speed_rP(zR.density, zR.pressure, zR.mass_frac,
-                                        {.T0 = zR.T(), .rhos = &zR.densities});
+    double c_L = mixture.sound_speed_rP(zL.rho(), zL.P(), zL.beta(), {.T0 = zL.T(), .rhos = zL.rhos()});
+    double c_R = mixture.sound_speed_rP(zR.rho(), zR.P(), zR.beta(), {.T0 = zR.T(), .rhos = zR.rhos()});
 
     if (std::isnan(c_L) || std::isnan(c_R)) {
         std::cerr << "Rusanov::calc_mm_flux error #1\n";
@@ -64,8 +58,8 @@ mmf::Flux Rusanov::calc_flux(const mmf::PState &zL, const mmf::PState &zR, const
     }
 
     // Оценки скоростей расходящихся волн
-    double S_L = std::min({u_L - c_L, u_R - c_R, 0.0});
-    double S_R = std::max({u_L + c_L, u_R + c_R, 0.0});
+    double S_L = std::min({zL.vx() - c_L, zR.vx() - c_R, 0.0});
+    double S_R = std::max({zL.vx() + c_L, zR.vx() + c_R, 0.0});
 
     // Максимальное собственное значение
     double S = std::max(std::abs(S_L), S_R);

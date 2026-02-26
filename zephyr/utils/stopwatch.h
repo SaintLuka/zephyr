@@ -3,6 +3,7 @@
 #include <string>
 #include <chrono>
 #include <vector>
+#include <iostream>
 
 #include <zephyr/utils/mpi.h>
 #include <zephyr/utils/numpy.h>
@@ -42,14 +43,14 @@ public:
 	/// @param f Целевая функция
 	/// @param args Аргументы функции
 	template<class F, class... Args>
-	std::enable_if_t<std::is_void_v<std::result_of_t<F(Args...)>>, void>
+	std::enable_if_t<std::is_void_v<std::invoke_result_t<F, Args...>>, void>
 	measure(F&& f, Args&&... args);
 
     /// @brief Измерить время выполнения функции, возвращающей не void
     /// @param f Целевая функция
     /// @param args Аргументы функции
 	template<class F, class... Args>
-	std::enable_if_t<!std::is_void_v<std::result_of_t<F(Args...)>>, std::result_of_t<F(Args...)>>
+	std::enable_if_t<!std::is_void_v<std::invoke_result_t<F, Args...>>, std::invoke_result_t<F, Args...>>
 	measure(F&& f, Args&&... args);
 
 	/// @brief Включить секундомер (со сбросом времени)
@@ -106,7 +107,7 @@ private:
 };
 
 template<class F, class... Args>
-std::enable_if_t<std::is_void_v<std::result_of_t<F(Args...)>>, void>
+std::enable_if_t<std::is_void_v<std::invoke_result_t<F, Args...>>, void>
 Stopwatch::measure(F&& f, Args&&... args) {
     start();
     std::forward<F>(f)(std::forward<Args>(args)...);
@@ -114,7 +115,7 @@ Stopwatch::measure(F&& f, Args&&... args) {
 }
 
 template<class F, class... Args>
-std::enable_if_t<!std::is_void_v<std::result_of_t<F(Args...)>>, std::result_of_t<F(Args...)>>
+std::enable_if_t<!std::is_void_v<std::invoke_result_t<F, Args...>>, std::invoke_result_t<F, Args...>>
 Stopwatch::measure(F&& f, Args&&... args) {
     start();
     auto res = std::forward<F>(f)(std::forward<Args>(args)...);

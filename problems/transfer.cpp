@@ -1,6 +1,5 @@
 /// @file transfer.cpp
 /// @brief Решение задачи переноса со сложными решателями.
-
 #include <iostream>
 #include <iomanip>
 
@@ -17,7 +16,7 @@ using generator::Rectangle;
 
 class Solver;
 
-/// @brief Некоторая геметрия
+/// @brief Некоторая геометрия
 class Body {
 public:
     /// @brief Выставить на сетке начальные условия
@@ -104,7 +103,7 @@ double volume(EuMesh& cells, Storable<double> u1) {
     double sum = 0.0;
     for (auto cell: cells) {
         if (cell.volume() >= 0)
-            sum += cell.volume() * cell(u1);
+            sum += cell.volume() * cell[u1];
     }
     return sum;
 }
@@ -155,12 +154,12 @@ int main() {
     //pvd.variables.append("p", data.p);
     //pvd.variables += {"du/dx", grad_x};
     //pvd.variables += {"du/dy", grad_y};
-    pvd.variables += {"over", [data](EuCell& cell) -> double {
-        double u = cell(data.u1);
-        return u < 0.0 ? u : (u <= 1.0 ? 0.0 / 0.0 : u - 1.0);
+    pvd.variables += {"over", [u1=data.u1](EuCell& cell) -> double {
+        double u = cell[u1];
+        return u < 0.0 ? u : (u <= 1.0 ? NAN : u - 1.0);
     }};
-    pvd.variables += {"close", [data](EuCell& cell) -> double {
-        double u = cell(data.u1);
+    pvd.variables += {"close", [u1=data.u1](EuCell& cell) -> double {
+        double u = cell[u1];
         return std::abs(u < 0.5 ? u : 1.0 - u);
     }};
 
@@ -258,16 +257,16 @@ BodyLine::BodyLine() {
 void BodyLine::initial(Solver& solver, EuMesh& mesh, bool exact) const {
     for (auto cell: mesh) {
         if (!exact) {
-            cell(data.u1) = inside(cell.center());
+            cell[data.u1] = inside(cell.center());
         }
         else {
             double vol_frac = cell.approx_vol_fraction(inside);
             if (0.0 < vol_frac && vol_frac < 1.0) {
                 vol_frac = cell.volume_fraction(inside, 10000);
             }
-            cell(data.u1) = vol_frac;
+            cell[data.u1] = vol_frac;
         }
-        cell(data.u2) = 0.0;
+        cell[data.u2] = 0.0;
     }
 }
 
@@ -305,16 +304,16 @@ BodySquare::BodySquare() {
 void BodySquare::initial(Solver& solver, EuMesh& mesh, bool exact) const {
     for (auto cell: mesh) {
         if (!exact) {
-            cell(data.u1) = inside(cell.center());
+            cell[data.u1] = inside(cell.center());
         }
         else {
             double vol_frac = cell.approx_vol_fraction(inside);
             if (0.0 < vol_frac && vol_frac < 1.0) {
                 vol_frac = cell.volume_fraction(inside, 10000);
             }
-            cell(data.u1) = vol_frac;
+            cell[data.u1] = vol_frac;
         }
-        cell(data.u2) = 0.0;
+        cell[data.u2] = 0.0;
     }
 }
 
@@ -325,7 +324,7 @@ double BodySquare::volume_inside(EuMesh &body) const {
         if (0.0 < vol && vol < 1.0) {
             vol = cell.volume_fraction(inside, 1000);
         }
-        cell(data.u1) = vol;
+        cell[data.u1] = vol;
         vol *= cell.volume();
         res += vol;
     }
@@ -349,8 +348,8 @@ BodyDisk::BodyDisk() {
 void BodyDisk::initial(Solver& solver, EuMesh& mesh, bool exact) const {
     for (auto cell: mesh) {
         auto poly = cell.polygon();
-        cell(data.u1) = poly.disk_clip_area(C, R) / cell.volume();
-        cell(data.u2) = 0.0;
+        cell[data.u1] = poly.disk_clip_area(C, R) / cell.volume();
+        cell[data.u2] = 0.0;
     }
 }
 
@@ -359,7 +358,7 @@ double BodyDisk::volume_inside(EuMesh &body) const {
     for (auto& cell: body) {
         auto poly = cell.polygon();
         double vol = poly.disk_clip_area(C, R);
-        cell(data.u1) = vol / cell.volume();
+        cell[data.u1] = vol / cell.volume();
         res += vol;
     }
     return res;

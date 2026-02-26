@@ -38,8 +38,8 @@ void set_initials(EuMesh& mesh, const Box& domain,
     Vector3d vc = domain.vmin + 0.2 * domain.size();
     double D = 0.1 * domain.diameter();
     for (auto cell: mesh) {
-        cell(u1) = (cell.center() - vc).norm() < D ? 1.0 : 0.0;
-        cell(u2) = 0.0;
+        cell[u1] = (cell.center() - vc).norm() < D ? 1.0 : 0.0;
+        cell[u2] = 0.0;
     }
 }
 
@@ -48,7 +48,7 @@ void set_flags(EuMesh& mesh, Storable<double> var) {
     for (auto cell: mesh) {
         cell.set_flag(-1);
 
-        double uc = cell(var);
+        double uc = cell[var];
         for (auto face: cell.faces()) {
             double un = face.neib(var);
 
@@ -66,9 +66,9 @@ Distributor get_distributor(Storable<double> var) {
     distr.merge = [var](const Children &children, EuCell &parent) {
         double sum = 0.0;
         for (auto child: children) {
-            sum += child(var) * child.volume();
+            sum += child[var] * child.volume();
         }
-        parent(var) = sum / parent.volume();
+        parent[var] = sum / parent.volume();
     };
     return distr;
 }
@@ -85,7 +85,7 @@ int main() {
     EuMesh mesh(gen);
 
     // Добавить данные на сетку
-    auto [u1, u2] = mesh.add<double>("u1", "u2");
+    auto [u1, u2] = mesh.add_multi<double>("u1", "u2");
 
     mesh.set_max_level(3);
     mesh.set_distributor(get_distributor(u1));
@@ -154,16 +154,16 @@ int main() {
                 double a_p = std::max(af, 0.0);
                 double a_m = std::min(af, 0.0);
 
-                fluxes += (a_p * cell(u1) + a_m * neib(u1)) * face.area();
+                fluxes += (a_p * cell[u1] + a_m * neib[u1]) * face.area();
             }
 
-            cell(u2) = cell(u1) - dt * fluxes / cell.volume();
+            cell[u2] = cell[u1] - dt * fluxes / cell.volume();
         }
 
         // Обновляем слои
         for (auto& cell: mesh) {
-            cell(u1) = cell(u2);
-            cell(u2) = 0.0;
+            cell[u1] = cell[u2];
+            cell[u2] = 0.0;
         }
 
         // Отправить/получить основной слой

@@ -21,6 +21,19 @@ class Generator;
 
 namespace zephyr::mesh {
 
+/// @brief Список уникальных узлов, дополняет класс AmrCells
+class AmrNodes {
+public:
+    std::vector<index_t> nodes;
+    std::vector<geom::Vector3d> unique_verts;
+
+    bool empty() const;
+
+    void clear();
+
+    void setup_for(const AmrCells& cells);
+};
+
 /// @brief Эйлерова сетка.
 /// @ingroup euler-mesh
 ///
@@ -87,20 +100,28 @@ public:
 
     /// @{ @name Массивы данных
 
-    /// @brief Добавить несколько массивов данных в хранилище
-    /// @param names Имена массивов данных
-    /// @return Если передан один аргумент, то возвращает единственный Storable<T>,
-    /// при наличии нескольких аргументов возвращает кортеж Storable<T>.
+    /// @brief Добавить тип данных на сетку
+    /// @param name Имя массива данных
+    template <typename T>
+    Storable<T> add(const std::string& name);
+
+    /// @brief Добавить векторный тип данных на сетку
+    /// @param name Имя поля данных должно быть уникальным
+    /// @param count Число компонент
+    template<typename T>
+    Storable<T> add(const std::string &name, int count);
+
+    /// @brief Добавить несколько одинаковых **скалярных** полей
+    /// @param names Имена полей данных, должны быть уникальными
+    /// @tparam Names Произвольное число аргументов (> 1), которые можно
+    /// конвертировать в `std::string`, для всех выполнится `add<T>`.
+    /// @return Кортеж из `Storable<T>` для нескольких аргументов (для structure binding).
     template<typename T, typename... Names, typename = std::enable_if_t<
-            (sizeof...(Names) > 0) && (std::is_convertible_v<Names, std::string> && ...)>>
-    auto add(Names&&... names) {
-        if constexpr (sizeof...(Names) == 1) {
-            return add_one<T>(std::string(std::forward<Names>(names))...);
-        } else {
-            // Короче жесть, тут сложно было добиться соблюдения порядка
-            // с круглыми скобками std::tuple() или std::make_tuple() не работают.
-            return std::tuple{add_one<T>(std::string(std::forward<Names>(names)))...};
-        }
+            (sizeof...(Names) > 1) && (std::is_convertible_v<Names, std::string> && ...)>>
+    auto add_multi(Names&&... names) {
+        // Короче жесть, тут сложно было добиться соблюдения порядка
+        // с круглыми скобками std::tuple() или std::make_tuple() не работают.
+        return std::tuple{add<T>(std::string(std::forward<Names>(names)))...};
     }
 
     /// @brief Поменять местами два массива данных
@@ -212,11 +233,13 @@ public:
     /// @brief Локальные ячейки (принадлежат данному процессу)
     const AmrCells& locals() const { return m_locals; }
 
+#ifdef ZEPHYR_MPI
     /// @brief Слой обменных ячеек (с других процессов)
-    AmrCells& aliens() { return m_aliens; }
+    AmrCells& aliens() { return m_tourists.aliens(); }
 
     /// @brief Слой обменных ячеек (с других процессов)
-    const AmrCells& aliens() const { return m_aliens; }
+    const AmrCells& aliens() const { return m_tourists.aliens(); }
+#endif
 
     /// @}
 
@@ -301,6 +324,19 @@ public:
 
     /// @}
 
+    /// @{ @name Работа с уникальными узлами
+    ///
+    /// @brief Заполнен ли массив с уникальными узлами?
+    bool has_nodes() const { return !m_nodes.empty(); }
+
+    /// @brief Ссылка на массив уникальных узлов
+    const AmrNodes& nodes() const { return m_nodes; }
+
+    /// @brief Собрать массивы уникальных узлов
+    void collect_nodes();
+
+    /// @}
+
     /// @{ @name debug functions
 
     /// @brief Проверить базовую сетку
@@ -309,16 +345,16 @@ public:
     /// @brief Проверить сетку после адаптации
     int check_refined() const;
 
+    /// @brief Полностью сохранить сетку
+    /// @param sroot Корневая директория для сохранения
+    /// @param variables Переменные для сохранения
+    void backup(const std::string& sroot, const std::vector<std::string>& variables) const;
+
     /// @}
 
 private:
     /// @brief Реальный конструктор сетки
     void build(geom::Generator& gen);
-
-    /// @brief Добавить массив данных в хранилище
-    /// @param name Имя массива данных
-    template <typename T>
-    Storable<T> add_one(const std::string& name);
 
     /// @brief Инициализация параметров AMR-ячеек
     void init_amr();
@@ -332,11 +368,6 @@ private:
     /// @brief Выставить новые ранги ячеек по декомпозиции
     void setup_ranks();
 
-    /// @brief Собрать обменные слои (aliens и сопутствующие члены),
-    /// принимаются актуальные данные с border слоя.
-    void build_aliens();
-
-
     /// @brief Максимальный уровень адаптации для адаптивной сетки
     int m_max_level = 0;
 
@@ -344,7 +375,7 @@ private:
     Distributor m_distributor;
 
     AmrCells m_locals;  ///< Ячейки, которые принадлежат данному процессу
-    AmrCells m_aliens;  ///< Ячейки, получаемые с других процессов
+    //AmrCells m_aliens;  ///< Ячейки, получаемые с других процессов
 
     /// @brief Метод декомпозиции
     Decomposition::Ptr m_decomp = nullptr;
@@ -353,6 +384,9 @@ private:
     Tourism   m_tourists;  ///< Построение обменных слоев и обмены
     Migration m_migrants;  ///< Пересылка ячеек при изменении декомпозиции
 #endif
+
+    /// @brief Уникальные узлы
+    AmrNodes m_nodes;
 
     /// @brief Структурированная сетка? (только для однопроцессорных)
     bool m_structured = false;
@@ -365,15 +399,23 @@ private:
 // ============================================================================
 
 template <typename T>
-Storable<T> EuMesh::add_one(const std::string& name) {
+Storable<T> EuMesh::add(const std::string& name) {
     auto res1 = m_locals.data.add<T>(name);
-    auto res2 = m_aliens.data.add<T>(name);
-    if (res1 != res2) {
-        throw std::runtime_error("EuMesh error: bad add<T> #1");
-    }
 #ifdef ZEPHYR_MPI
-    auto res3 = m_tourists.add<T>(name);
-    if (res1 != res3) {
+    auto res2 = m_tourists.add<T>(name);
+    if (res1 != res2) {
+        throw std::runtime_error("EuMesh error: bad add<T> #2");
+    }
+#endif
+    return res1;
+}
+
+template <typename T>
+Storable<T> EuMesh::add(const std::string& name, int count) {
+    auto res1 = m_locals.data.add<T>(name, count);
+#ifdef ZEPHYR_MPI
+    auto res2 = m_tourists.add<T>(name, count);
+    if (res1 != res2) {
         throw std::runtime_error("EuMesh error: bad add<T> #2");
     }
 #endif
@@ -383,7 +425,6 @@ Storable<T> EuMesh::add_one(const std::string& name) {
 template <typename T>
 void EuMesh::swap(Storable<T> var1, Storable<T> var2) {
     m_locals.data.swap<T>(var1, var2);
-    m_aliens.data.swap<T>(var1, var2);
 #ifdef ZEPHYR_MPI
     m_tourists.swap<T>(var1, var2);
 #endif
@@ -393,7 +434,7 @@ template <typename... Args, typename >
 void EuMesh::sync(Args&&... vars) {
 #ifdef ZEPHYR_MPI
     if (mpi::single()) return;
-    m_tourists.sync(m_locals, m_aliens, std::forward<Args>(vars)...);
+    m_tourists.sync(m_locals, std::forward<Args>(vars)...);
 #endif
 }
 
@@ -401,11 +442,11 @@ template <typename... Args>
 void EuMesh::redistribute(Args&&... vars) {
 #ifdef ZEPHYR_MPI
     if (mpi::single()) return;
+
     setup_ranks();
     m_migrants.migrate(
-            m_tourists, m_locals, m_aliens,
-            std::forward<Args>(vars)...);
-    build_aliens();
+        m_tourists, m_locals,
+        std::forward<Args>(vars)...);
 #endif
 }
 

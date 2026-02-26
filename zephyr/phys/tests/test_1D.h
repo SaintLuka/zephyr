@@ -1,4 +1,4 @@
-/// @file Набор одномерных газодинамических тестов.
+/// @brief Набор одномерных газодинамических тестов.
 /// Что есть сейчас:
 ///   SodTest       -- Классический тест Сода
 ///   ToroTest      -- Тесты Торо из монографии
@@ -10,12 +10,11 @@
 #pragma once
 
 #include <zephyr/phys/tests/ivp.h>
-#include <zephyr/phys/matter/eos/ideal_gas.h>
 #include <zephyr/math/solver/riemann.h>
 
 namespace zephyr::phys {
 
-using zephyr::math::RiemannSolver;
+using math::RiemannSolver;
 
 /// @brief Абстрактный класс одномерного теста
 class Test1D : public IVP {

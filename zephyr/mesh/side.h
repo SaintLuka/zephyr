@@ -17,6 +17,184 @@ constexpr int FpC(int dim) { return dim < 3 ? 4 : 6; }
 /// @brief Количество дочерних ячеек.
 constexpr int CpC(int dim) { return dim < 3 ? 4 : 8; }
 
+// К примеру, child_by_face[Side2D::LEFT[1]]
+static constexpr short child_by_subface_2D[8] = {
+    0, 1, 0, 2, // L[0], R[0], B[0], T[0]
+    2, 3, 1, 3, // L[1], R[1], B[1], T[1]
+};
+
+// К примеру, children_by_face[Side2D::LEFT]
+static constexpr std::array<short, 2> children_by_face_2D[4] = {
+    {0, 2},
+    {1, 3},
+    {0, 1},
+    {2, 3},
+};
+
+// К примеру, child_by_face[Side3D::LEFT[3]]
+static constexpr short child_by_subface_3D[24] = {
+    0, 1, 0, 2, 0, 4, // L[0], R[0], B[0], T[0], Z[0], F[0]
+    2, 3, 1, 3, 1, 5, // L[1], R[1], B[1], T[1], Z[1], F[1]
+    4, 5, 4, 6, 2, 6,
+    6, 7, 5, 7, 3, 7,
+};
+
+// К примеру, children_by_face[Side3D::LEFT]
+static constexpr std::array<short, 4> children_by_face_3D[6] = {
+    {0, 2, 4, 6},
+    {1, 3, 5, 7},
+    {0, 1, 4, 5},
+    {2, 3, 6, 7},
+    {0, 1, 2, 3},
+    {4, 5, 6, 7},
+};
+
+/// @brief Индексация вершин в кубической AMR-ячейке. Повторяет индексацию функции SqCube::iss
+template<short i, short j, short k = -1>
+static constexpr short iss() {
+    static_assert(i * i <= 1 && j * j <= 1 && k * k <= 1, "Available indices: {-1, 0, 1}");
+    return 9 * (k + 1) + 3 * (j + 1) + i + 1;
+}
+
+static constexpr std::array<short, 8> simple_face_indices_2D[4] = {
+    {iss<-1, -1>(), iss<-1, +1>(), -1, -1, -1, -1, -1, -1},
+    {iss<+1, -1>(), iss<+1, +1>(), -1, -1, -1, -1, -1, -1},
+    {iss<-1, -1>(), iss<+1, -1>(), -1, -1, -1, -1, -1, -1},
+    {iss<-1, +1>(), iss<+1, +1>(), -1, -1, -1, -1, -1, -1},
+};
+
+static constexpr std::array<short, 8> simple_face_indices_3D[6] = {
+    {iss<-1, -1, -1>(), iss<-1, +1, -1>(), iss<-1, -1, +1>(), iss<-1, +1, +1>(), -1, -1, -1, -1},
+    {iss<+1, -1, -1>(), iss<+1, +1, -1>(), iss<+1, -1, +1>(), iss<+1, +1, +1>(), -1, -1, -1, -1},
+    {iss<-1, -1, -1>(), iss<+1, -1, -1>(), iss<-1, -1, +1>(), iss<+1, -1, +1>(), -1, -1, -1, -1},
+    {iss<-1, +1, -1>(), iss<+1, +1, -1>(), iss<-1, +1, +1>(), iss<+1, +1, +1>(), -1, -1, -1, -1},
+    {iss<-1, -1, -1>(), iss<+1, -1, -1>(), iss<-1, +1, -1>(), iss<+1, +1, -1>(), -1, -1, -1, -1},
+    {iss<-1, -1, +1>(), iss<+1, -1, +1>(), iss<-1, +1, +1>(), iss<+1, +1, +1>(), -1, -1, -1, -1},
+};
+
+static constexpr std::array<short, 8> complex_face_indices_2D[8] = {
+    {iss<-1,-1>(), iss<-1, 0>(), -1, -1, -1, -1, -1, -1}, // L[0]
+    {iss<+1,-1>(), iss<+1, 0>(), -1, -1, -1, -1, -1, -1}, // R[0]
+    {iss<-1,-1>(), iss< 0,-1>(), -1, -1, -1, -1, -1, -1}, // B[0]
+    {iss<-1,+1>(), iss< 0,+1>(), -1, -1, -1, -1, -1, -1}, // T[0]
+                    
+    {iss<-1, 0>(), iss<-1,+1>(), -1, -1, -1, -1, -1, -1}, // L[1]
+    {iss<+1, 0>(), iss<+1,+1>(), -1, -1, -1, -1, -1, -1}, // R[1]
+    {iss< 0,-1>(), iss<+1,-1>(), -1, -1, -1, -1, -1, -1}, // B[1]
+    {iss< 0,+1>(), iss<+1,+1>(), -1, -1, -1, -1, -1, -1}, // T[1]
+};
+
+static constexpr std::array<short, 8> complex_face_indices_3D[24] = {
+    {iss<-1,-1,-1>(), iss<-1, 0,-1>(), iss<-1,-1, 0>(), iss<-1, 0, 0>(), -1, -1, -1, -1}, // L[0]
+    {iss<+1,-1,-1>(), iss<+1, 0,-1>(), iss<+1,-1, 0>(), iss<+1, 0, 0>(), -1, -1, -1, -1}, // R[0]
+    {iss<-1,-1,-1>(), iss< 0,-1,-1>(), iss<-1,-1, 0>(), iss< 0,-1, 0>(), -1, -1, -1, -1}, // B[0]
+    {iss<-1,+1,-1>(), iss< 0,+1,-1>(), iss<-1,+1, 0>(), iss< 0,+1, 0>(), -1, -1, -1, -1}, // T[0]
+    {iss<-1,-1,-1>(), iss<0, -1,-1>(), iss<-1, 0,-1>(), iss< 0, 0,-1>(), -1, -1, -1, -1}, // Z[0]
+    {iss<-1,-1,+1>(), iss< 0,-1,+1>(), iss<-1, 0,+1>(), iss< 0, 0,+1>(), -1, -1, -1, -1}, // F[0]
+                    
+    {iss<-1, 0,-1>(), iss<-1,+1,-1>(), iss<-1, 0, 0>(), iss<-1,+1, 0>(), -1, -1, -1, -1}, // L[1]
+    {iss<+1, 0,-1>(), iss<+1,+1,-1>(), iss<+1, 0, 0>(), iss<+1,+1, 0>(), -1, -1, -1, -1}, // R[1]
+    {iss< 0,-1,-1>(), iss<+1,-1,-1>(), iss< 0,-1, 0>(), iss<+1,-1, 0>(), -1, -1, -1, -1}, // B[1]
+    {iss< 0,+1,-1>(), iss<+1,+1,-1>(), iss< 0,+1, 0>(), iss<+1,+1, 0>(), -1, -1, -1, -1}, // T[1]
+    {iss< 0,-1,-1>(), iss<+1,-1,-1>(), iss< 0, 0,-1>(), iss<+1, 0,-1>(), -1, -1, -1, -1}, // Z[1]
+    {iss< 0,-1,+1>(), iss<+1,-1,+1>(), iss< 0, 0,+1>(), iss<+1, 0,+1>(), -1, -1, -1, -1}, // F[1]
+                    
+    {iss<-1,-1, 0>(), iss<-1, 0, 0>(), iss<-1,-1,+1>(), iss<-1, 0,+1>(), -1, -1, -1, -1}, // L[2]
+    {iss<+1,-1, 0>(), iss<+1, 0, 0>(), iss<+1,-1,+1>(), iss<+1, 0,+1>(), -1, -1, -1, -1}, // R[2]
+    {iss<-1,-1, 0>(), iss< 0,-1, 0>(), iss<-1,-1,+1>(), iss< 0,-1,+1>(), -1, -1, -1, -1}, // B[2]
+    {iss<-1,+1, 0>(), iss< 0,+1, 0>(), iss<-1,+1,+1>(), iss< 0,+1,+1>(), -1, -1, -1, -1}, // T[2]
+    {iss<-1, 0,-1>(), iss< 0, 0,-1>(), iss<-1,+1,-1>(), iss< 0,+1,-1>(), -1, -1, -1, -1}, // Z[2]
+    {iss<-1, 0,+1>(), iss< 0, 0,+1>(), iss<-1,+1,+1>(), iss< 0,+1,+1>(), -1, -1, -1, -1}, // F[2]
+                    
+    {iss<-1, 0, 0>(), iss<-1,+1, 0>(), iss<-1, 0,+1>(), iss<-1,+1,+1>(), -1, -1, -1, -1}, // L[3]
+    {iss<+1, 0, 0>(), iss<+1,+1, 0>(), iss<+1, 0,+1>(), iss<+1,+1,+1>(), -1, -1, -1, -1}, // R[3]
+    {iss< 0,-1, 0>(), iss<+1,-1, 0>(), iss< 0,-1,+1>(), iss<+1,-1,+1>(), -1, -1, -1, -1}, // B[3]
+    {iss< 0,+1, 0>(), iss<+1,+1, 0>(), iss< 0,+1,+1>(), iss<+1,+1,+1>(), -1, -1, -1, -1}, // T[3]
+    {iss< 0, 0,-1>(), iss<+1, 0,-1>(), iss< 0,+1,-1>(), iss<+1,+1,-1>(), -1, -1, -1, -1}, // Z[3]
+    {iss< 0, 0,+1>(), iss<+1, 0,+1>(), iss< 0,+1,+1>(), iss<+1,+1,+1>(), -1, -1, -1, -1}, // F[3]
+};
+
+/// @brief Получить subface по стороне и индексу дочерней ячейки (частичная генерация)
+static constexpr int subface_by_side_child_2D[4][4] = {
+    {0, -1, 4, -1},
+    {-1, 1, -1, 5},
+    {2, 6, -1, -1},
+    {-1, -1, 3, 7},
+};
+
+/// @brief Получить subface по стороне и индексу дочерней ячейки (частичная генерация)
+static constexpr int subface_by_side_child_3D[6][8] = {
+    {0, -1, 6, -1, 12, -1, 18, -1},
+    {-1, 1, -1, 7, -1, 13, -1, 19},
+    {2, 8, -1, -1, 14, 20, -1, -1},
+    {-1, -1, 3, 9, -1, -1, 15, 21},
+    {4, 10, 16, 22, -1, -1, -1, -1},
+    {-1, -1, -1, -1, 5, 11, 17, 23},
+};
+
+// [symmetry][subface]
+static constexpr int neib_child_by_symm_subface_2D[8][8] = {
+    {1, 0, 2, 0, 3, 2, 3, 1},
+    {0, 3, 1, 3, 2, 1, 2, 0},
+    {3, 2, 0, 2, 1, 0, 1, 3},
+    {2, 1, 3, 1, 0, 3, 0, 2},
+    {1, 2, 0, 2, 3, 0, 3, 1},
+    {2, 3, 1, 3, 0, 1, 0, 2},
+    {3, 0, 2, 0, 1, 2, 1, 3},
+    {0, 1, 3, 1, 2, 3, 2, 0},
+};
+
+// [symmetry][subface]
+static constexpr int neib_child_by_symm_subface_3D[48][24] = {
+    {1, 0, 2, 0, 4, 0, 3, 2, 3, 1, 5, 1, 5, 4, 6, 4, 6, 2, 7, 6, 7, 5, 7, 3},
+    {1, 0, 4, 0, 2, 0, 5, 4, 5, 1, 3, 1, 3, 2, 6, 2, 6, 4, 7, 6, 7, 3, 7, 5},
+    {2, 0, 1, 0, 4, 0, 3, 1, 3, 2, 6, 2, 6, 4, 5, 4, 5, 1, 7, 5, 7, 6, 7, 3},
+    {4, 0, 1, 0, 2, 0, 5, 1, 5, 4, 6, 4, 6, 2, 3, 2, 3, 1, 7, 3, 7, 6, 7, 5},
+    {2, 0, 4, 0, 1, 0, 6, 4, 6, 2, 3, 2, 3, 1, 5, 1, 5, 4, 7, 5, 7, 3, 7, 6},
+    {4, 0, 2, 0, 1, 0, 6, 2, 6, 4, 5, 4, 5, 1, 3, 1, 3, 2, 7, 3, 7, 5, 7, 6},
+    {0, 1, 3, 1, 5, 1, 2, 3, 2, 0, 4, 0, 4, 5, 7, 5, 7, 3, 6, 7, 6, 4, 6, 2},
+    {0, 1, 5, 1, 3, 1, 4, 5, 4, 0, 2, 0, 2, 3, 7, 3, 7, 5, 6, 7, 6, 2, 6, 4},
+    {0, 2, 3, 2, 6, 2, 1, 3, 1, 0, 4, 0, 4, 6, 7, 6, 7, 3, 5, 7, 5, 4, 5, 1},
+    {0, 4, 5, 4, 6, 4, 1, 5, 1, 0, 2, 0, 2, 6, 7, 6, 7, 5, 3, 7, 3, 2, 3, 1},
+    {0, 2, 6, 2, 3, 2, 4, 6, 4, 0, 1, 0, 1, 3, 7, 3, 7, 6, 5, 7, 5, 1, 5, 4},
+    {0, 4, 6, 4, 5, 4, 2, 6, 2, 0, 1, 0, 1, 5, 7, 5, 7, 6, 3, 7, 3, 1, 3, 2},
+    {3, 1, 0, 1, 5, 1, 2, 0, 2, 3, 7, 3, 7, 5, 4, 5, 4, 0, 6, 4, 6, 7, 6, 2},
+    {5, 1, 0, 1, 3, 1, 4, 0, 4, 5, 7, 5, 7, 3, 2, 3, 2, 0, 6, 2, 6, 7, 6, 4},
+    {3, 2, 0, 2, 6, 2, 1, 0, 1, 3, 7, 3, 7, 6, 4, 6, 4, 0, 5, 4, 5, 7, 5, 1},
+    {5, 4, 0, 4, 6, 4, 1, 0, 1, 5, 7, 5, 7, 6, 2, 6, 2, 0, 3, 2, 3, 7, 3, 1},
+    {6, 2, 0, 2, 3, 2, 4, 0, 4, 6, 7, 6, 7, 3, 1, 3, 1, 0, 5, 1, 5, 7, 5, 4},
+    {6, 4, 0, 4, 5, 4, 2, 0, 2, 6, 7, 6, 7, 5, 1, 5, 1, 0, 3, 1, 3, 7, 3, 2},
+    {1, 3, 2, 3, 7, 3, 0, 2, 0, 1, 5, 1, 5, 7, 6, 7, 6, 2, 4, 6, 4, 5, 4, 0},
+    {1, 5, 4, 5, 7, 5, 0, 4, 0, 1, 3, 1, 3, 7, 6, 7, 6, 4, 2, 6, 2, 3, 2, 0},
+    {2, 3, 1, 3, 7, 3, 0, 1, 0, 2, 6, 2, 6, 7, 5, 7, 5, 1, 4, 5, 4, 6, 4, 0},
+    {4, 5, 1, 5, 7, 5, 0, 1, 0, 4, 6, 4, 6, 7, 3, 7, 3, 1, 2, 3, 2, 6, 2, 0},
+    {2, 6, 4, 6, 7, 6, 0, 4, 0, 2, 3, 2, 3, 7, 5, 7, 5, 4, 1, 5, 1, 3, 1, 0},
+    {4, 6, 2, 6, 7, 6, 0, 2, 0, 4, 5, 4, 5, 7, 3, 7, 3, 2, 1, 3, 1, 5, 1, 0},
+    {3, 1, 5, 1, 0, 1, 7, 5, 7, 3, 2, 3, 2, 0, 4, 0, 4, 5, 6, 4, 6, 2, 6, 7},
+    {5, 1, 3, 1, 0, 1, 7, 3, 7, 5, 4, 5, 4, 0, 2, 0, 2, 3, 6, 2, 6, 4, 6, 7},
+    {3, 2, 6, 2, 0, 2, 7, 6, 7, 3, 1, 3, 1, 0, 4, 0, 4, 6, 5, 4, 5, 1, 5, 7},
+    {5, 4, 6, 4, 0, 4, 7, 6, 7, 5, 1, 5, 1, 0, 2, 0, 2, 6, 3, 2, 3, 1, 3, 7},
+    {6, 2, 3, 2, 0, 2, 7, 3, 7, 6, 4, 6, 4, 0, 1, 0, 1, 3, 5, 1, 5, 4, 5, 7},
+    {6, 4, 5, 4, 0, 4, 7, 5, 7, 6, 2, 6, 2, 0, 1, 0, 1, 5, 3, 1, 3, 2, 3, 7},
+    {1, 3, 7, 3, 2, 3, 5, 7, 5, 1, 0, 1, 0, 2, 6, 2, 6, 7, 4, 6, 4, 0, 4, 5},
+    {1, 5, 7, 5, 4, 5, 3, 7, 3, 1, 0, 1, 0, 4, 6, 4, 6, 7, 2, 6, 2, 0, 2, 3},
+    {2, 3, 7, 3, 1, 3, 6, 7, 6, 2, 0, 2, 0, 1, 5, 1, 5, 7, 4, 5, 4, 0, 4, 6},
+    {4, 5, 7, 5, 1, 5, 6, 7, 6, 4, 0, 4, 0, 1, 3, 1, 3, 7, 2, 3, 2, 0, 2, 6},
+    {2, 6, 7, 6, 4, 6, 3, 7, 3, 2, 0, 2, 0, 4, 5, 4, 5, 7, 1, 5, 1, 0, 1, 3},
+    {4, 6, 7, 6, 2, 6, 5, 7, 5, 4, 0, 4, 0, 2, 3, 2, 3, 7, 1, 3, 1, 0, 1, 5},
+    {7, 3, 1, 3, 2, 3, 5, 1, 5, 7, 6, 7, 6, 2, 0, 2, 0, 1, 4, 0, 4, 6, 4, 5},
+    {7, 5, 1, 5, 4, 5, 3, 1, 3, 7, 6, 7, 6, 4, 0, 4, 0, 1, 2, 0, 2, 6, 2, 3},
+    {7, 3, 2, 3, 1, 3, 6, 2, 6, 7, 5, 7, 5, 1, 0, 1, 0, 2, 4, 0, 4, 5, 4, 6},
+    {7, 5, 4, 5, 1, 5, 6, 4, 6, 7, 3, 7, 3, 1, 0, 1, 0, 4, 2, 0, 2, 3, 2, 6},
+    {7, 6, 2, 6, 4, 6, 3, 2, 3, 7, 5, 7, 5, 4, 0, 4, 0, 2, 1, 0, 1, 5, 1, 3},
+    {7, 6, 4, 6, 2, 6, 5, 4, 5, 7, 3, 7, 3, 2, 0, 2, 0, 4, 1, 0, 1, 3, 1, 5},
+    {3, 7, 5, 7, 6, 7, 1, 5, 1, 3, 2, 3, 2, 6, 4, 6, 4, 5, 0, 4, 0, 2, 0, 1},
+    {5, 7, 3, 7, 6, 7, 1, 3, 1, 5, 4, 5, 4, 6, 2, 6, 2, 3, 0, 2, 0, 4, 0, 1},
+    {3, 7, 6, 7, 5, 7, 2, 6, 2, 3, 1, 3, 1, 5, 4, 5, 4, 6, 0, 4, 0, 1, 0, 2},
+    {5, 7, 6, 7, 3, 7, 4, 6, 4, 5, 1, 5, 1, 3, 2, 3, 2, 6, 0, 2, 0, 1, 0, 4},
+    {6, 7, 3, 7, 5, 7, 2, 3, 2, 6, 4, 6, 4, 5, 1, 5, 1, 3, 0, 1, 0, 4, 0, 2},
+    {6, 7, 5, 7, 3, 7, 4, 5, 4, 6, 2, 6, 2, 3, 1, 3, 1, 5, 0, 1, 0, 2, 0, 4},
+};
 
 /// @brief Структура позволяет хранить индексы граней AMR-ячейки.
 /// В большинстве контекстов работает как простой `enum Side : int`,
@@ -52,11 +230,11 @@ struct Side final {
     /// @brief Число простых граней ячейки
     static constexpr int count() { return 2 * dim; }
 
-    /// @brief Число подграней сложной грани
-    static constexpr int n_subfaces() { return dim == 2 ? 2 : 4; }
+    /// @brief Полное число подграней ячейки
+    static constexpr int n_subfaces() { return count() * FpF(dim); }
 
     /// @brief Индексы подграней на стороне в списке faces.
-    std::array<Side, n_subfaces()> subfaces() const {
+    std::array<Side, FpF(dim)> subfaces() const {
         if constexpr (dim == 2) {
             return {Side{val}, Side{val}[1]};
         } else {
@@ -78,6 +256,9 @@ struct Side final {
         }
     }
 
+    /// @brief Простая сторона из возможной подграни
+    constexpr Side simple() const { return val % count(); }
+
     /// @brief Получить сторону по нормальному вектору направления
     /// Side3D::LEFT == Side3D::by_dir<-1, 0, 0>().
     template <int i, int j, int k = 0>
@@ -94,7 +275,7 @@ struct Side final {
     /// @brief Преобразование в строку
     std::string to_string() const {
         std::string num = "[" + std::to_string(val / count()) + "]";
-        switch (val % count()) {
+        switch (simple()) {
             case 0: return "LEFT" + num;
             case 1: return "RIGHT" + num;
             case 2: return "BOTTOM" + num;
@@ -111,83 +292,59 @@ struct Side final {
     /// @brief Индексы вершин простой грани в AMR-ячейке
     /// sf -- Simple Face
     constexpr std::array<short, 8> sf() const {
-        if constexpr (dim == 2) {
-            switch (val) {
-                case L: return {iss<-1, -1>(), iss<-1, +1>(), undef(), undef(), undef(), undef(), undef(), undef()};
-                case R: return {iss<+1, -1>(), iss<+1, +1>(), undef(), undef(), undef(), undef(), undef(), undef()};
-                case B: return {iss<-1, -1>(), iss<+1, -1>(), undef(), undef(), undef(), undef(), undef(), undef()};
-                case T: return {iss<-1, +1>(), iss<+1, +1>(), undef(), undef(), undef(), undef(), undef(), undef()};
-                default: return {undef(), undef(), undef(), undef()};
-            }
-        } else {
-            switch (val) {
-                case L: return {iss<-1, -1, -1>(), iss<-1, +1, -1>(), iss<-1, -1, +1>(), iss<-1, +1, +1>(), undef(), undef(), undef(), undef()};
-                case R: return {iss<+1, -1, -1>(), iss<+1, +1, -1>(), iss<+1, -1, +1>(), iss<+1, +1, +1>(), undef(), undef(), undef(), undef()};
-                case B: return {iss<-1, -1, -1>(), iss<+1, -1, -1>(), iss<-1, -1, +1>(), iss<+1, -1, +1>(), undef(), undef(), undef(), undef()};
-                case T: return {iss<-1, +1, -1>(), iss<+1, +1, -1>(), iss<-1, +1, +1>(), iss<+1, +1, +1>(), undef(), undef(), undef(), undef()};
-                case Z: return {iss<-1, -1, -1>(), iss<+1, -1, -1>(), iss<-1, +1, -1>(), iss<+1, +1, -1>(), undef(), undef(), undef(), undef()};
-                case F: return {iss<-1, -1, +1>(), iss<+1, -1, +1>(), iss<-1, +1, +1>(), iss<+1, +1, +1>(), undef(), undef(), undef(), undef()};
-                default: return {undef(), undef(), undef(), undef(), undef(), undef(), undef(), undef()};
-            }
-        }
+        if constexpr (dim == 2) { return simple_face_indices_2D[val]; }
+        else                    { return simple_face_indices_3D[val]; }
     }
 
     /// @brief Индексы вершин части составной грани AMR-ячейки
     /// cf -- Complex Face
     constexpr std::array<short, 8> cf() const {
-        if constexpr (dim == 2) {
-            switch (val) {
-                case L[0]: return {iss<-1,-1>(), iss<-1, 0>(), undef(), undef(), undef(), undef(), undef(), undef()};
-                case L[1]: return {iss<-1, 0>(), iss<-1,+1>(), undef(), undef(), undef(), undef(), undef(), undef()};
-                case R[0]: return {iss<+1,-1>(), iss<+1, 0>(), undef(), undef(), undef(), undef(), undef(), undef()};
-                case R[1]: return {iss<+1, 0>(), iss<+1,+1>(), undef(), undef(), undef(), undef(), undef(), undef()};
-                case B[0]: return {iss<-1,-1>(), iss< 0,-1>(), undef(), undef(), undef(), undef(), undef(), undef()};
-                case B[1]: return {iss< 0,-1>(), iss<+1,-1>(), undef(), undef(), undef(), undef(), undef(), undef()};
-                case T[0]: return {iss<-1,+1>(), iss< 0,+1>(), undef(), undef(), undef(), undef(), undef(), undef()};
-                case T[1]: return {iss< 0,+1>(), iss<+1,+1>(), undef(), undef(), undef(), undef(), undef(), undef()};
-                default:   return {undef(), undef(), undef(), undef(), undef(), undef(), undef(), undef()};
-            }
-        }
-        else {
-            switch (val) {
-                case L[0]: return {iss<-1,-1,-1>(), iss<-1, 0,-1>(), iss<-1,-1, 0>(), iss<-1, 0, 0>(), undef(), undef(), undef(), undef()};
-                case L[1]: return {iss<-1, 0,-1>(), iss<-1,+1,-1>(), iss<-1, 0, 0>(), iss<-1,+1, 0>(), undef(), undef(), undef(), undef()};
-                case L[2]: return {iss<-1,-1, 0>(), iss<-1, 0, 0>(), iss<-1,-1,+1>(), iss<-1, 0,+1>(), undef(), undef(), undef(), undef()};
-                case L[3]: return {iss<-1, 0, 0>(), iss<-1,+1, 0>(), iss<-1, 0,+1>(), iss<-1,+1,+1>(), undef(), undef(), undef(), undef()};
-                case R[0]: return {iss<+1,-1,-1>(), iss<+1, 0,-1>(), iss<+1,-1, 0>(), iss<+1, 0, 0>(), undef(), undef(), undef(), undef()};
-                case R[1]: return {iss<+1, 0,-1>(), iss<+1,+1,-1>(), iss<+1, 0, 0>(), iss<+1,+1, 0>(), undef(), undef(), undef(), undef()};
-                case R[2]: return {iss<+1,-1, 0>(), iss<+1, 0, 0>(), iss<+1,-1,+1>(), iss<+1, 0,+1>(), undef(), undef(), undef(), undef()};
-                case R[3]: return {iss<+1, 0, 0>(), iss<+1,+1, 0>(), iss<+1, 0,+1>(), iss<+1,+1,+1>(), undef(), undef(), undef(), undef()};
-                case B[0]: return {iss<-1,-1,-1>(), iss< 0,-1,-1>(), iss<-1,-1, 0>(), iss< 0,-1, 0>(), undef(), undef(), undef(), undef()};
-                case B[1]: return {iss< 0,-1,-1>(), iss<+1,-1,-1>(), iss< 0,-1, 0>(), iss<+1,-1, 0>(), undef(), undef(), undef(), undef()};
-                case B[2]: return {iss<-1,-1, 0>(), iss< 0,-1, 0>(), iss<-1,-1,+1>(), iss< 0,-1,+1>(), undef(), undef(), undef(), undef()};
-                case B[3]: return {iss< 0,-1, 0>(), iss<+1,-1, 0>(), iss< 0,-1,+1>(), iss<+1,-1,+1>(), undef(), undef(), undef(), undef()};
-                case T[0]: return {iss<-1,+1,-1>(), iss< 0,+1,-1>(), iss<-1,+1, 0>(), iss< 0,+1, 0>(), undef(), undef(), undef(), undef()};
-                case T[1]: return {iss< 0,+1,-1>(), iss<+1,+1,-1>(), iss< 0,+1, 0>(), iss<+1,+1, 0>(), undef(), undef(), undef(), undef()};
-                case T[2]: return {iss<-1,+1, 0>(), iss< 0,+1, 0>(), iss<-1,+1,+1>(), iss< 0,+1,+1>(), undef(), undef(), undef(), undef()};
-                case T[3]: return {iss< 0,+1, 0>(), iss<+1,+1, 0>(), iss< 0,+1,+1>(), iss<+1,+1,+1>(), undef(), undef(), undef(), undef()};
-                case Z[0]: return {iss<-1,-1,-1>(), iss<0, -1,-1>(), iss<-1, 0,-1>(), iss< 0, 0,-1>(), undef(), undef(), undef(), undef()};
-                case Z[1]: return {iss< 0,-1,-1>(), iss<+1,-1,-1>(), iss< 0, 0,-1>(), iss<+1, 0,-1>(), undef(), undef(), undef(), undef()};
-                case Z[2]: return {iss<-1, 0,-1>(), iss< 0, 0,-1>(), iss<-1,+1,-1>(), iss< 0,+1,-1>(), undef(), undef(), undef(), undef()};
-                case Z[3]: return {iss< 0, 0,-1>(), iss<+1, 0,-1>(), iss< 0,+1,-1>(), iss<+1,+1,-1>(), undef(), undef(), undef(), undef()};
-                case F[0]: return {iss<-1,-1,+1>(), iss< 0,-1,+1>(), iss<-1, 0,+1>(), iss< 0, 0,+1>(), undef(), undef(), undef(), undef()};
-                case F[1]: return {iss< 0,-1,+1>(), iss<+1,-1,+1>(), iss< 0, 0,+1>(), iss<+1, 0,+1>(), undef(), undef(), undef(), undef()};
-                case F[2]: return {iss<-1, 0,+1>(), iss< 0, 0,+1>(), iss<-1,+1,+1>(), iss< 0,+1,+1>(), undef(), undef(), undef(), undef()};
-                case F[3]: return {iss< 0, 0,+1>(), iss<+1, 0,+1>(), iss< 0,+1,+1>(), iss<+1,+1,+1>(), undef(), undef(), undef(), undef()};
-                default:   return {undef(), undef(), undef(), undef(), undef(), undef(), undef(), undef()};
-            }
-        }
+        if constexpr (dim == 2) { return complex_face_indices_2D[val]; }
+        else                    { return complex_face_indices_3D[val]; }
     }
 
-private:
-    /// @brief Неопределенный индекс вершины
-    static constexpr short undef() { return -1; }
+    /// @brief Получить индекс прилегающей дочерней ячейки для subface
+    constexpr short child() const {
+        if constexpr (dim == 2) { return child_by_subface_2D[val]; }
+        else {                    return child_by_subface_3D[val]; }
+    }
 
-    /// @brief Индексация вершин в кубической AMR-ячейке. Повторяет индексацию функции SqCube::iss
-    template<short i, short j, short k = -1>
-    static constexpr short iss() {
-        static_assert(i * i <= 1 && j * j <= 1 && k * k <= 1, "Available indices: {-1, 0, 1}");
-        return 9 * (k + 1) + 3 * (j + 1) + i + 1;
+    /// @brief Локальные индексы дочерних ячеек, прилегающих к стороне.
+    constexpr std::array<short, FpF(dim)> children() {
+        if constexpr (dim == 2) { return children_by_face_2D[val]; }
+        else {                    return children_by_face_3D[val]; }
+    }
+
+    /// @brief Для простой грани и прилегающей дочерней ячейки получить subface
+    constexpr Side subface_by_child(int child_idx) const {
+        if constexpr (dim == 2) { return subface_by_side_child_2D[val][child_idx]; }
+        else                    { return subface_by_side_child_3D[val][child_idx]; }
+    }
+
+    /// @brief По subface и повороту получить индекс дочерней соседа
+    constexpr int neib_child(int symm) const {
+        if constexpr (dim == 2) { return neib_child_by_symm_subface_2D[symm][val]; }
+        else                    { return neib_child_by_symm_subface_3D[symm][val]; }
+    }
+
+    /// @brief По subface и повороту получить индекс дочерней соседа
+    /// assuming zero rotation
+    constexpr int neib_child() const {
+        if constexpr (dim == 2) { return neib_child_by_symm_subface_2D[0][val]; }
+        else                    { return neib_child_by_symm_subface_3D[0][val]; }
+    }
+
+    /// @brief По повороту и индексу дочерней (child) определить индекс
+    /// смежной соседней ячейки через простую сторону
+    constexpr int adjacent_child(int symm, int child) const {
+        return subface_by_child(child).neib_child(symm);
+    }
+
+    /// @brief По повороту и индексу дочерней (child) определить индекс
+    /// смежной соседней ячейки через простую сторону
+    /// assuming zero rotation
+    constexpr int adjacent_child(int child) const {
+        return subface_by_child(child).neib_child();
     }
 };
 

@@ -35,7 +35,7 @@ void set_flags(EuMesh &mesh, Storable<PState> z) {
     mesh.for_each([z](EuCell cell) {
         const double threshold = 1.5;
 
-        if (cell(z).density > threshold) {
+        if (cell[z].density > threshold) {
             cell.set_flag(1);
             return;
         }
@@ -86,7 +86,6 @@ int main(int argc, char** argv) {
 
     // Настройка сетки
     mesh.set_decomposition("XYZ");
-    //mesh.block_sorting(4, 4, 8);
     mesh.set_max_level(4);
     mesh.set_distributor(solver.distributor());
 
@@ -94,10 +93,10 @@ int main(int argc, char** argv) {
     auto init_cells = [&](EuMesh& mesh) {
         mesh.for_each([&](EuCell& cell) {
             Vector3d r = cell.center();
-            cell(z).density  = test.density (r);
-            cell(z).velocity = test.velocity(r);
-            cell(z).pressure = std::max(test.pressure(r), 1.0e-3);
-            cell(z).energy   = eos->energy_rP(cell(z).density, cell(z).pressure);
+            cell[z].density  = test.density(r);
+            cell[z].velocity = test.velocity(r);
+            cell[z].pressure = std::max(test.pressure(r), 1.0e-3);
+            cell[z].energy   = eos->energy_rP(cell[z].density, cell[z].pressure);
         });
     };
 
@@ -110,10 +109,10 @@ int main(int argc, char** argv) {
 
     // Переменные для сохранения
     pvd.variables = {"level"};
-    pvd.variables += {"rho", [z](EuCell& cell) -> double { return cell(z).density; }};
-    pvd.variables += {"vr",  [z](EuCell& cell) -> double { return cell(z).velocity.norm(); }};
-    pvd.variables += {"p",   [z](EuCell& cell) -> double { return cell(z).pressure; }};
-    pvd.variables += {"e",   [z](EuCell& cell) -> double { return cell(z).energy; }};
+    pvd.variables += {"rho", [z](EuCell& cell) -> double { return cell[z].density; }};
+    pvd.variables += {"vr",  [z](EuCell& cell) -> double { return cell[z].velocity.norm(); }};
+    pvd.variables += {"p",   [z](EuCell& cell) -> double { return cell[z].pressure; }};
+    pvd.variables += {"e",   [z](EuCell& cell) -> double { return cell[z].energy; }};
     pvd.variables += {"rho_exact",
                       [&test, &curr_time](const EuCell &cell) -> double {
                           return test.density_t(cell.center(), curr_time);

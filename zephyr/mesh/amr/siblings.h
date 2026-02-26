@@ -3,6 +3,9 @@
 #pragma once
 
 #include <zephyr/mesh/amr/common.h>
+#if SCRUTINY
+#include <set>
+#endif
 
 namespace zephyr::mesh::amr {
 
@@ -32,7 +35,7 @@ constexpr std::array<Side3D, CpC(dim)> side_to_next_sibling() {
 //  - Все сиблинги хотят огрубиться.
 template <int dim>
 bool can_coarse(AmrCells& cells, int ic) {
-    const auto sides = side_to_next_sibling<dim>();
+    static constexpr auto sides = side_to_next_sibling<dim>();
 
     const auto& adj = cells.faces.adjacent;
 
@@ -89,7 +92,7 @@ bool can_coarse(AmrCells& cells, int ic) {
 /// @param ic Целевая ячейка (от которой запрос)
 template<int dim>
 std::array<int, CpC(dim) - 1> get_siblings(AmrCells &cells, index_t ic) {
-    const std::array<Side3D, CpC(dim)> sides = side_to_next_sibling<dim>();
+    static constexpr std::array<Side3D, CpC(dim)> sides = side_to_next_sibling<dim>();
 
     std::array<int, CpC(dim) - 1> siblings;
 
@@ -175,6 +178,36 @@ std::array<int, CpC(dim) - 1> get_siblings(AmrCells &cells, index_t ic) {
 #endif
 
     return siblings;
+}
+
+// Ячейка по индексу ic является главной среди сиблингов,
+// прилегающих к грани с рангом rank?
+template<int dim>
+bool main_border_child(AmrCells& locals, index_t ic, int rank) {
+    index_t min_idx = ic;
+    int min_z_idx = locals.z_idx[ic] % CpC(dim);
+
+    // Точно главный
+    if (min_z_idx == 0) { return true; }
+
+    for (auto is: get_siblings<dim>(locals, ic)) {
+        int z_idx = locals.z_idx[is] % CpC(dim);
+        if (z_idx < min_z_idx) {
+            // Проверяем, что сиблинг у границы
+            bool on_border = false;
+            for (auto iface: locals.faces_range(is)) {
+                if (locals.faces.adjacent.rank[iface] == rank) {
+                    on_border = true;
+                    break;
+                }
+            }
+            if (on_border) {
+                min_idx = is;
+                min_z_idx = z_idx;
+            }
+        }
+    }
+    return min_idx == ic;
 }
 
 } // namespace zephyr::mesh::amr

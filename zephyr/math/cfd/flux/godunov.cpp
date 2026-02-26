@@ -46,20 +46,20 @@ mmf::Flux Godunov::calc_flux(const mmf::PState &zL, const mmf::PState &zR, const
     }
 
     auto sol = RiemannSolver::solve(zL.to_smf(), zR.to_smf(),
-            mixture.stiffened_gas(zL.density, zL.pressure, zL.mass_frac, {.T0 = zL.temperature, .rhos=&zL.densities}),
-            mixture.stiffened_gas(zR.density, zR.pressure, zR.mass_frac, {.T0 = zR.temperature, .rhos=&zR.densities}));
+            mixture.stiffened_gas(zL.rho(), zL.P(), zL.beta(), {.T0 = zL.T(), .rhos=zL.rhos()}),
+            mixture.stiffened_gas(zR.rho(), zR.P(), zR.beta(), {.T0 = zR.T(), .rhos=zR.rhos()}));
 
     mmf::Flux flux;
     if (sol.U >= 0) {
-        Vector3d v(sol.Uf, zL.velocity.y(), zL.velocity.z());
-        auto [rhos, energy, temperature] = mixture.get_reT(sol.rho, sol.Pf, zL.mass_frac, {.T0=zL.temperature});
-        mmf::PState z(sol.rho, v, sol.Pf, energy, temperature, zL.mass_frac, mmf::Fractions::NaN());
+        Vector3d v(sol.Uf, zL.vy(), zL.vz());
+        auto [rhos, energy, temperature] = mixture.get_reT(sol.rho, sol.Pf, zL.beta(), {.T0=zL.T()});
+        mmf::PState z(sol.rho, v, sol.Pf, energy, temperature, zL.beta(), mmf::ScalarSet::NaN());
 
         flux = mmf::Flux(z);
     } else {
-        Vector3d v(sol.Uf, zR.velocity.y(), zR.velocity.z());
-        auto [rhos, energy, temperature] = mixture.get_reT(sol.rho, sol.Pf, zR.mass_frac, {.T0=zR.temperature});
-        mmf::PState z(sol.rho, v, sol.Pf, energy, temperature, zR.mass_frac, mmf::Fractions::NaN());
+        Vector3d v(sol.Uf, zR.vy(), zR.vz());
+        auto [rhos, energy, temperature] = mixture.get_reT(sol.rho, sol.Pf, zR.beta(), {.T0=zR.T()});
+        mmf::PState z(sol.rho, v, sol.Pf, energy, temperature, zR.beta(), mmf::ScalarSet::NaN());
 
         flux = mmf::Flux(z);
     }
@@ -69,12 +69,8 @@ mmf::Flux Godunov::calc_flux(const mmf::PState &zL, const mmf::PState &zR, const
 //        std::cerr << "zL: " << zL << "\nzR: " << zR << "\n";
         std::cerr << "Flux: " << flux << "\n";
         std::cerr << "Code for debug:\n";
-        std::cerr << boost::format("PState zL(%1%, {%2%, %3%, %4%}, %5%, %6%, %7%, %8%);\n") %
-                     zL.density % zL.velocity.x() % zL.velocity.y() % zL.velocity.z() % zL.pressure %
-                     zL.energy % zL.temperature % zL.mass_frac;
-        std::cerr << boost::format("PState zR(%1%, {%2%, %3%, %4%}, %5%, %6%, %7%, %8%);\n") %
-                     zR.density % zR.velocity.x() % zR.velocity.y() % zR.velocity.z() % zR.pressure %
-                     zR.energy % zR.temperature % zR.mass_frac;
+        std::cerr << zL << "\n";
+        std::cerr << zR << "\n";
 //        std::cerr << "Godunov flux RIP\n";
 //        flux = Rusanov2::calc_mm_flux(zL, zR, mixture);
         exit(1);

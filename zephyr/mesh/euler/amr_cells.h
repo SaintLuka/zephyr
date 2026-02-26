@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <zephyr/utils/range.h>
 
 #include <zephyr/mesh/side.h>
@@ -205,8 +206,8 @@ public:
     }
 
     /// @brief Полный диапазон граней ячейки (могут встречаться неактуальные)
-    range<index_t> faces_range(index_t ic) const {
-        return {face_begin[ic], face_begin[ic + 1]};
+    range_t<index_t> faces_range(index_t ic) const {
+        return std::views::iota(face_begin[ic], face_begin[ic + 1]);
     }
 
     /// @brief Число вершин, оно же максимальное, хранение неактуальных вершин
@@ -222,8 +223,8 @@ public:
     }
 
     /// @brief Полный диапазон вершин ячейки
-    range<index_t> nodes_range(index_t ic) const {
-        return {node_begin[ic], node_begin[ic + 1]};
+    range_t<index_t> nodes_range(index_t ic) const {
+        return std::views::iota(node_begin[ic], node_begin[ic + 1]);
     }
 
     /// @brief Простая грань на стороне?
@@ -285,6 +286,11 @@ public:
         return verts.data() + node_begin[ic];
     }
 
+    /// @brief Получить вершину по индексу внутри ячейки
+    const Vector3d& vertex(index_t ic, int iv) const {
+        return verts[node_begin[ic] + iv];
+    }
+
     /// @brief Ссылка на вешены в форме набора узлов квадратичного отображения
     template <int dim>
     SqMap<dim>& mapping(index_t ic) {
@@ -341,7 +347,7 @@ public:
 
     /// @{ @name Работа с данными
 
-    void move_item(index_t ic);
+    void move_item(index_t from, index_t to);
 
     /// @brief Скопировать все данные с индекса from на индекс to.
     void copy_data(index_t from, index_t to);
@@ -426,6 +432,14 @@ public:
 
     /// @brief Проверка связности ячеек в MPI версии
     int check_connectivity(index_t ic, const AmrCells& aliens) const;
+
+    /// @brief Полное сохранение сетки
+    /// @param root Корневая директория для бэкапа (существует и пустая)
+    /// @param file Открытый файл для записи (backup.json)
+    /// @param tab Отступ секции в json файле
+    /// @param variables Список имен переменных для сохранения
+    void backup(const std::filesystem::path& root, std::ofstream& file,
+        const std::string& tab, const std::vector<std::string>& variables) const;
 
     /// @}
 

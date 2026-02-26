@@ -95,7 +95,7 @@ private:
     /// @brief Использовать метод Ньютона
     bool m_newton;
 
-    /// @brief Скорость сдивга (0, 0.5)
+    /// @brief Скорость сдвига (0, 0.5)
     double m_mobility;
 
     /// @brief Блочная структура

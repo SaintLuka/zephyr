@@ -36,7 +36,7 @@ void set_flags(EuMesh &mesh, Storable<PState> z) {
     mesh.for_each([z](EuCell cell) {
         const double threshold = 1.5;
 
-        if (cell(z).density > threshold) {
+        if (cell[z].density > threshold) {
             cell.set_flag(1);
             return;
         }
@@ -50,9 +50,10 @@ void set_flags(EuMesh &mesh, Storable<PState> z) {
     });
 }
 
-int main() {
-    mpi::handler mpi_handler;
-    threads::on();
+int main(int argc, char** argv) {
+    mpi::handler handler(argc, argv);
+    threads::init(argc, argv);
+    threads::info();
 
     // Тестовая задача
     SedovBlast3D test({.gamma=1.4, .rho0=1.0, .E=1.0});
@@ -65,7 +66,7 @@ int main() {
     Rectangle gen(test.xmin(), test.xmax(), test.ymin(), test.ymax());
     gen.set_boundaries({.left=Boundary::WALL, .right=Boundary::ZOE,
                         .bottom=Boundary::WALL, .top=Boundary::ZOE});
-    gen.set_nx(40);
+    gen.set_nx(100);
     gen.set_axial(true);
 
     // Создать сетку
@@ -84,7 +85,7 @@ int main() {
     auto z = data.init;
 
     // Настройка сетки
-    //mesh.set_decomposition("XY")
+    mesh.set_decomposition("XY");
     mesh.set_max_level(3);
     mesh.set_distributor(solver.distributor());
 
@@ -92,10 +93,10 @@ int main() {
     auto init_cells = [&](EuMesh& mesh) {
         mesh.for_each([&](EuCell& cell) {
             Vector3d r = cell.center();
-            cell(z).density  = test.density (r);
-            cell(z).velocity = test.velocity(r);
-            cell(z).pressure = std::max(test.pressure(r), 1.0e-3);
-            cell(z).energy   = eos->energy_rP(cell(z).density, cell(z).pressure);
+            cell[z].density  = test.density (r);
+            cell[z].velocity = test.velocity(r);
+            cell[z].pressure = std::max(test.pressure(r), 1.0e-3);
+            cell[z].energy   = eos->energy_rP(cell[z].density, cell[z].pressure);
         });
     };
 
@@ -108,10 +109,10 @@ int main() {
 
     // Переменные для сохранения
     pvd.variables = {"level"};
-    pvd.variables += {"rho", [z](EuCell& cell) -> double { return cell(z).density; }};
-    pvd.variables += {"vr",  [z](EuCell& cell) -> double { return cell(z).velocity.norm(); }};
-    pvd.variables += {"p",   [z](EuCell& cell) -> double { return cell(z).pressure; }};
-    pvd.variables += {"e",   [z](EuCell& cell) -> double { return cell(z).energy; }};
+    pvd.variables += {"rho", [z](EuCell& cell) -> double { return cell[z].density; }};
+    pvd.variables += {"vr",  [z](EuCell& cell) -> double { return cell[z].velocity.norm(); }};
+    pvd.variables += {"p",   [z](EuCell& cell) -> double { return cell[z].pressure; }};
+    pvd.variables += {"e",   [z](EuCell& cell) -> double { return cell[z].energy; }};
     pvd.variables += {"rho_exact",
                       [&test, &curr_time](const EuCell &cell) -> double {
                           return test.density_t(cell.center(), curr_time);
@@ -135,6 +136,7 @@ int main() {
         set_flags(mesh, z);
         mesh.refine();
     }
+    mesh.prebalancing(15);
     init_cells(mesh);
 
     Stopwatch elapsed(true);
@@ -146,6 +148,13 @@ int main() {
             pvd.save(mesh, curr_time);
             next_write += test.max_time() / 200;
         }
+
+        // Балансировка сетки
+        if (n_step % 20 == 0) {
+            mesh.balancing();
+            mesh.redistribute(z);
+        }
+
         // Точное завершение в end_time
         solver.set_max_dt(test.max_time() - curr_time);
 

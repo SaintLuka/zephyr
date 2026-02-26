@@ -3,9 +3,6 @@
 #include <vector>
 
 #include <zephyr/mesh/euler/tourism.h>
-#include <zephyr/io/pvd_file.h>
-
-using zephyr::io::PvdFile;
 
 namespace zephyr::mesh {
 
@@ -22,19 +19,14 @@ public:
     /// @brief Основная функция перераспределения ячеек
     /// @param tourists Актуальные слои для пересылок
     /// @param locals Локальные ячейки
-    /// @param aliens Слой удаленных ячеек
     /// @param vars Список переменных типа Storable<T>, которые переносятся
     /// при перераспределении ячеек.
-    /// @details Входной параметр tourists требуется для связывании соседних
+    /// @details Входной параметр tourists требуется для связывания соседних
     /// ячеек при построении глобальной индексации примитивов.
     /// На данный момент не занимается построением обменного слоя, после
     /// миграции следует вызвать build_aliens().
     template <typename... Args>
-    void migrate(
-            Tourism & tourists,
-            AmrCells& locals,
-            AmrCells& aliens,
-            Args&&... vars);
+    void migrate(Tourism& tourists, AmrCells& locals, Args&&... vars);
 
 protected:
     /// @brief Составить матрицу пересылок перед миграцей.
@@ -59,9 +51,9 @@ protected:
     /// @brief Вспомогательный буфер
     AmrCells migrants;
 
-    Router cell_route;
-    Router face_route;
-    Router node_route;
+    Router m_cell_router;
+    Router m_face_router;
+    Router m_node_router;
 };
 
 template <typename... Vars>
@@ -88,9 +80,9 @@ void Migration::fill_migrants(AmrCells& locals,
 
     // Сортировка migrants по rank, получается нормальный AmrCells
     // стартовые индексы (?)
-    auto cell_index = cell_route.send_offset();
-    auto face_index = face_route.send_offset();
-    auto node_index = node_route.send_offset();
+    auto cell_index = m_cell_router.send_offset();
+    auto face_index = m_face_router.send_offset();
+    auto node_index = m_node_router.send_offset();
 
     // Кортеж указателей на буферы данных
     std::array<Buffer*, n_vars> data_src = locals  .data[loc_vars];
@@ -133,8 +125,9 @@ void Migration::fill_migrants(AmrCells& locals,
 }
 
 template <typename... Vars>
-void Migration::migrate(Tourism& tourists, AmrCells& locals, AmrCells& aliens, Vars&&... vars) {
+void Migration::migrate(Tourism& tourists, AmrCells& locals, Vars&&... vars) {
     using utils::Buffer;
+    AmrCells& aliens = tourists.aliens();
 
     // Все дополнительные переменные имеют тип Storable<T>
     soa::assert_storable<Vars...>();
@@ -159,15 +152,15 @@ void Migration::migrate(Tourism& tourists, AmrCells& locals, AmrCells& aliens, V
     fill_migrants(locals, loc_vars, mig_vars);
 
     // Меняем размеры locals
-    locals.resize(cell_route.recv_buffer_size(),
-                  face_route.recv_buffer_size(),
-                  node_route.recv_buffer_size());
+    locals.resize(m_cell_router.recv_buffer_size(),
+                  m_face_router.recv_buffer_size(),
+                  m_node_router.recv_buffer_size());
 
     // ========================== Пересылка ячеек =============================
 
     // Указатели на буферы данных
     std::array<Buffer*, n_vars> data_src = migrants.data[mig_vars];
-    std::array<Buffer*, n_vars> data_dst = locals  .data[loc_vars];
+    std::array<Buffer*, n_vars> data_dst = locals.data[loc_vars];
 
     // Оптимизируем использование памяти, используем повторно массивы.
     // Запишем в face_begin и node_begin количество элементов на ячейку
@@ -178,148 +171,99 @@ void Migration::migrate(Tourism& tourists, AmrCells& locals, AmrCells& aliens, V
 
     // ============================= ISEND ====================================
 
-    // Отправить данные ячеек
-    auto send_rank     = cell_route.isend(migrants.rank,  MpiTag::RANK);
-    auto send_next     = cell_route.isend(migrants.next,  MpiTag::NEXT);
-    auto send_index    = cell_route.isend(migrants.index, MpiTag::INDEX);
-    auto send_flag     = cell_route.isend(migrants.flag,  MpiTag::FLAG);
-    auto send_level    = cell_route.isend(migrants.level, MpiTag::LEVEL);
-    auto send_b_idx    = cell_route.isend(migrants.b_idx, MpiTag::B_IDX);
-    auto send_z_idx    = cell_route.isend(migrants.z_idx, MpiTag::Z_IDX);
-    auto send_center   = cell_route.isend(migrants.center, MpiTag::CENTER);
-    auto send_volume   = cell_route.isend(migrants.volume, MpiTag::VOLUME);
-    auto send_volume_a = cell_route.isend(migrants.volume_alt, MpiTag::VOLUME_ALT);
-    auto send_face_beg = cell_route.isend(migrants.face_begin, MpiTag::FACE_BEG);
-    auto send_node_beg = cell_route.isend(migrants.node_begin, MpiTag::NODE_BEG);
+    // Отправить геометрию ячеек
+    RequestsList cells_send; cells_send.reserve(16);
+    cells_send += m_cell_router.isend(migrants.rank,  MpiTag::RANK);
+    cells_send += m_cell_router.isend(migrants.next,  MpiTag::NEXT);
+    cells_send += m_cell_router.isend(migrants.index, MpiTag::INDEX);
+    cells_send += m_cell_router.isend(migrants.flag,  MpiTag::FLAG);
+    cells_send += m_cell_router.isend(migrants.level, MpiTag::LEVEL);
+    cells_send += m_cell_router.isend(migrants.b_idx, MpiTag::B_IDX);
+    cells_send += m_cell_router.isend(migrants.z_idx, MpiTag::Z_IDX);
+    cells_send += m_cell_router.isend(migrants.center, MpiTag::CENTER);
+    cells_send += m_cell_router.isend(migrants.volume, MpiTag::VOLUME);
+    cells_send += m_cell_router.isend(migrants.volume_alt, MpiTag::VOLUME_ALT);
+    cells_send += m_cell_router.isend(migrants.face_begin, MpiTag::FACE_BEG);
+    cells_send += m_cell_router.isend(migrants.node_begin, MpiTag::NODE_BEG);
 
     // Отправить данные ячеек
-    std::array<Requests, n_vars> send_data;
+    RequestsList data_send; data_send.reserve(n_vars);
     for (int v = 0; v < n_vars; ++v) {
-        send_data[v] = cell_route.isend(*data_src[v], static_cast<MpiTag>(12345 + v));
+        data_send += m_cell_router.isend(*data_src[v], static_cast<MpiTag>(12345 + v));
     }
 
     // Отправить данные граней
-    auto send_adj_rank  = face_route.isend(migrants.faces.adjacent.rank,  MpiTag::ADJ_RANK);
-    auto send_adj_index = face_route.isend(migrants.faces.adjacent.index, MpiTag::ADJ_INDEX);
-    auto send_adj_alien = face_route.isend(migrants.faces.adjacent.alien, MpiTag::ADJ_ALIEN);
-    auto send_adj_basic = face_route.isend(migrants.faces.adjacent.basic, MpiTag::ADJ_BASIC);
-    auto send_boundary  = face_route.isend(migrants.faces.boundary, MpiTag::BOUNDARY);
-    auto send_normal    = face_route.isend(migrants.faces.normal,   MpiTag::NORMAL);
-    auto send_f_center  = face_route.isend(migrants.faces.center,   MpiTag::FACE_CENTER);
-    auto send_area      = face_route.isend(migrants.faces.area,     MpiTag::AREA);
-    auto send_area_alt  = face_route.isend(migrants.faces.area_alt, MpiTag::AREA_ALT);
-    auto send_face_vs   = face_route.isend(migrants.faces.vertices, MpiTag::FACE_VERTS);
+    RequestsList faces_send; faces_send.reserve(16);
+    faces_send += m_face_router.isend(migrants.faces.adjacent.rank,  MpiTag::ADJ_RANK);
+    faces_send += m_face_router.isend(migrants.faces.adjacent.index, MpiTag::ADJ_INDEX);
+    faces_send += m_face_router.isend(migrants.faces.adjacent.alien, MpiTag::ADJ_ALIEN);
+    faces_send += m_face_router.isend(migrants.faces.adjacent.basic, MpiTag::ADJ_BASIC);
+    faces_send += m_face_router.isend(migrants.faces.boundary, MpiTag::BOUNDARY);
+    faces_send += m_face_router.isend(migrants.faces.normal,   MpiTag::NORMAL);
+    faces_send += m_face_router.isend(migrants.faces.center,   MpiTag::FACE_CENTER);
+    faces_send += m_face_router.isend(migrants.faces.area,     MpiTag::AREA);
+    faces_send += m_face_router.isend(migrants.faces.area_alt, MpiTag::AREA_ALT);
+    faces_send += m_face_router.isend(migrants.faces.vertices, MpiTag::FACE_VERTS);
 
     // Отправить вершины
-    auto send_vertices  = node_route.isend(migrants.verts, MpiTag::VERTICES);
+    auto nodes_send = m_node_router.isend(migrants.verts, MpiTag::VERTICES);
 
     // ============================= IRECV ====================================
 
-    // Получить данные ячеек
-    auto recv_rank     = cell_route.irecv(locals.rank, MpiTag::RANK);
-    auto recv_next     = cell_route.irecv(locals.next, MpiTag::NEXT);
-    auto recv_index    = cell_route.irecv(locals.index, MpiTag::INDEX);
-    auto recv_flag     = cell_route.irecv(locals.flag, MpiTag::FLAG);
-    auto recv_level    = cell_route.irecv(locals.level, MpiTag::LEVEL);
-    auto recv_b_idx    = cell_route.irecv(locals.b_idx, MpiTag::B_IDX);
-    auto recv_z_idx    = cell_route.irecv(locals.z_idx, MpiTag::Z_IDX);
-    auto recv_center   = cell_route.irecv(locals.center, MpiTag::CENTER);
-    auto recv_volume   = cell_route.irecv(locals.volume, MpiTag::VOLUME);
-    auto recv_volume_a = cell_route.irecv(locals.volume_alt, MpiTag::VOLUME_ALT);
+    // Получить геометрию ячеек
+    RequestsList cells_recv; cells_recv.reserve(16);
+    cells_recv += m_cell_router.irecv(locals.rank, MpiTag::RANK);
+    cells_recv += m_cell_router.irecv(locals.next, MpiTag::NEXT);
+    cells_recv += m_cell_router.irecv(locals.index, MpiTag::INDEX);
+    cells_recv += m_cell_router.irecv(locals.flag, MpiTag::FLAG);
+    cells_recv += m_cell_router.irecv(locals.level, MpiTag::LEVEL);
+    cells_recv += m_cell_router.irecv(locals.b_idx, MpiTag::B_IDX);
+    cells_recv += m_cell_router.irecv(locals.z_idx, MpiTag::Z_IDX);
+    cells_recv += m_cell_router.irecv(locals.center, MpiTag::CENTER);
+    cells_recv += m_cell_router.irecv(locals.volume, MpiTag::VOLUME);
+    cells_recv += m_cell_router.irecv(locals.volume_alt, MpiTag::VOLUME_ALT);
 
     // Получить данные ячеек
-    std::array<Requests, n_vars> recv_data;
+    RequestsList data_recv; data_recv.reserve(n_vars);
     for (int v = 0; v < n_vars; ++v) {
-        cell_route.irecv(*data_dst[v], static_cast<MpiTag>(12345 + v));
+        data_recv += m_cell_router.irecv(*data_dst[v], static_cast<MpiTag>(12345 + v));
     };
 
     // При получении используем сдвиг на единицу, чтобы записать нулевой первый элемент
-    auto recv_face_beg = cell_route.irecv(locals.face_begin.data() + 1, MpiTag::FACE_BEG);
-    auto recv_node_beg = cell_route.irecv(locals.node_begin.data() + 1, MpiTag::NODE_BEG);
+    RequestsList faces_recv; faces_recv.reserve(16);
+    faces_recv += m_cell_router.irecv(locals.face_begin.data() + 1, MpiTag::FACE_BEG);
+    faces_recv += m_cell_router.irecv(locals.node_begin.data() + 1, MpiTag::NODE_BEG);
 
     // Получить данные граней
-    auto recv_adj_rank  = face_route.irecv(locals.faces.adjacent.rank, MpiTag::ADJ_RANK);
-    auto recv_adj_index = face_route.irecv(locals.faces.adjacent.index, MpiTag::ADJ_INDEX);
-    auto recv_adj_alien = face_route.irecv(locals.faces.adjacent.alien, MpiTag::ADJ_ALIEN);
-    auto recv_adj_basic = face_route.irecv(locals.faces.adjacent.basic, MpiTag::ADJ_BASIC);
-    auto recv_boundary  = face_route.irecv(locals.faces.boundary, MpiTag::BOUNDARY);
-    auto recv_normal    = face_route.irecv(locals.faces.normal, MpiTag::NORMAL);
-    auto recv_f_center  = face_route.irecv(locals.faces.center, MpiTag::FACE_CENTER);
-    auto recv_area      = face_route.irecv(locals.faces.area, MpiTag::AREA);
-    auto recv_area_alt  = face_route.irecv(locals.faces.area_alt, MpiTag::AREA_ALT);
-    auto recv_face_vs   = face_route.irecv(locals.faces.vertices, MpiTag::FACE_VERTS);
+    faces_recv += m_face_router.irecv(locals.faces.adjacent.rank, MpiTag::ADJ_RANK);
+    faces_recv += m_face_router.irecv(locals.faces.adjacent.index, MpiTag::ADJ_INDEX);
+    faces_recv += m_face_router.irecv(locals.faces.adjacent.alien, MpiTag::ADJ_ALIEN);
+    faces_recv += m_face_router.irecv(locals.faces.adjacent.basic, MpiTag::ADJ_BASIC);
+    faces_recv += m_face_router.irecv(locals.faces.boundary, MpiTag::BOUNDARY);
+    faces_recv += m_face_router.irecv(locals.faces.normal, MpiTag::NORMAL);
+    faces_recv += m_face_router.irecv(locals.faces.center, MpiTag::FACE_CENTER);
+    faces_recv += m_face_router.irecv(locals.faces.area, MpiTag::AREA);
+    faces_recv += m_face_router.irecv(locals.faces.area_alt, MpiTag::AREA_ALT);
+    faces_recv += m_face_router.irecv(locals.faces.vertices, MpiTag::FACE_VERTS);
 
     // Получить вершины
-    auto recv_vertices  = node_route.irecv(locals.verts, MpiTag::VERTICES);
+    auto nodes_recv = m_node_router.irecv(locals.verts, MpiTag::VERTICES);
 
     // =========================== WAIT ISEND =================================
 
-    // Завершить отправку данных ячеек
-    send_rank.wait();
-    send_next.wait();
-    send_index.wait();
-    send_flag.wait();
-    send_level.wait();
-    send_b_idx.wait();
-    send_z_idx.wait();
-    send_center.wait();
-    send_volume.wait();
-    send_volume_a.wait();
-    send_face_beg.wait();
-    send_node_beg.wait();
-
-    // Завершить отправку данных ячеек
-    for (auto& req: send_data) { req.wait(); }
-
-    // Завершить отправку данных граней
-    send_adj_rank.wait();
-    send_adj_index.wait();
-    send_adj_alien.wait();
-    send_adj_basic.wait();
-    send_boundary.wait();
-    send_normal.wait();
-    send_f_center.wait();
-    send_area.wait();
-    send_area_alt.wait();
-    send_face_vs.wait();
-
-    // Завершить отправку вершин
-    send_vertices.wait();
+    cells_send.wait();  // Завершить отправку ячеек
+    data_send.wait();   // Завершить отправку данных ячеек
+    faces_send.wait();  // Завершить отправку граней
+    nodes_send.wait();  // Завершить отправку вершин
 
     // =========================== WAIT IRECV =================================
 
-    // Завершить получение данных ячеек
-    recv_rank.wait();
-    recv_next.wait();
-    recv_index.wait();
-    recv_flag.wait();
-    recv_level.wait();
-    recv_b_idx.wait();
-    recv_z_idx.wait();
-    recv_center.wait();
-    recv_volume.wait();
-    recv_volume_a.wait();
-    recv_face_beg.wait();
-    recv_node_beg.wait();
+    cells_recv.wait();  // Завершить получение ячеек
+    data_recv.wait();   // Завершить получение данных ячеек
+    faces_recv.wait();  // Завершить получение граней
+    nodes_recv.wait();  // Завершить получение вершин
 
-    // Завершить получение данных ячеек
-    for (auto& req: recv_data) { req.wait(); }
-
-    // Завершить получение данных граней
-    recv_adj_rank.wait();
-    recv_adj_index.wait();
-    recv_adj_alien.wait();
-    recv_adj_basic.wait();
-    recv_boundary.wait();
-    recv_normal.wait();
-    recv_f_center.wait();
-    recv_area.wait();
-    recv_area_alt.wait();
-    recv_face_vs.wait();
-
-    // Завершить получение вершин
-    recv_vertices.wait();
-
+    // Восстановить индексацию граней
     locals.face_begin[0] = 0;
     locals.node_begin[0] = 0;
     for (index_t ic = 0; ic < locals.n_cells(); ++ic) {
@@ -348,6 +292,9 @@ void Migration::migrate(Tourism& tourists, AmrCells& locals, AmrCells& aliens, V
         std::cout << "SUCCESS MIGRATION " << mpi::rank() << "\n";
     });
      */
+
+    // Построить обменные слои
+    tourists.update(locals);
 }
 
 #endif // ZEPHYR_MPI

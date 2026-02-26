@@ -1,7 +1,6 @@
 /// @file smf_test_1D.cpp
 /// @brief Одномерные задачи газодинамики. Если раскомментировать #define ADAPTIVE,
 /// то задача решается на двумерной адаптивной сетке.
-
 #include <iostream>
 #include <iomanip>
 
@@ -30,9 +29,10 @@ using zephyr::utils::mpi;
 
 #define ADAPTIVE
 
-int main() {
+int main(int argc, char** argv) {
     mpi::handler init;
-    threads::on();
+    threads::init(argc, argv);
+    threads::info();
 
     // Тестовая задача
     //SodTest test;
@@ -79,11 +79,11 @@ int main() {
 
     // Переменные для сохранения
     pvd.variables = {"level"};
-    pvd.variables += {"density",  [z](EuCell& cell) -> double { return cell(z).density; }};
-    pvd.variables += {"vel.x",    [z](EuCell& cell) -> double { return cell(z).velocity.x(); }};
-    pvd.variables += {"vel.y",    [z](EuCell& cell) -> double { return cell(z).velocity.y(); }};
-    pvd.variables += {"pressure", [z](EuCell& cell) -> double { return cell(z).pressure; }};
-    pvd.variables += {"energy",   [z](EuCell& cell) -> double { return cell(z).energy; }};
+    pvd.variables += {"density",  [z](EuCell& cell) -> double { return cell[z].density; }};
+    pvd.variables += {"vel.x",    [z](EuCell& cell) -> double { return cell[z].velocity.x(); }};
+    pvd.variables += {"vel.y",    [z](EuCell& cell) -> double { return cell[z].velocity.y(); }};
+    pvd.variables += {"pressure", [z](EuCell& cell) -> double { return cell[z].pressure; }};
+    pvd.variables += {"energy",   [z](EuCell& cell) -> double { return cell[z].energy; }};
 
     pvd.variables += {"exact.dens",
                       [&test, &curr_time](const EuCell &cell) -> double {
@@ -103,7 +103,7 @@ int main() {
                       }};
     pvd.variables += {"sound_speed",
                       [&eos, z](const EuCell & cell) -> double {
-                          return eos->sound_speed_rP(cell(z).density, cell(z).pressure);
+                          return eos->sound_speed_rP(cell[z].density, cell[z].pressure);
                       }};
     pvd.variables += {"exact.sound",
                       [&eos, &test, &curr_time](const EuCell &cell) -> double {
@@ -115,10 +115,10 @@ int main() {
     // Начальные данные
     auto init_cells = [&test, z](EuMesh& mesh) {
         for (auto cell: mesh) {
-            cell(z).density  = test.density (cell.center());
-            cell(z).velocity = test.velocity(cell.center());
-            cell(z).pressure = test.pressure(cell.center());
-            cell(z).energy   = test.energy  (cell.center());
+            cell[z].density  = test.density (cell.center());
+            cell[z].velocity = test.velocity(cell.center());
+            cell[z].pressure = test.pressure(cell.center());
+            cell[z].energy   = test.energy  (cell.center());
         }
     };
 
@@ -173,15 +173,15 @@ int main() {
         Vector3d r = cell.center();
         double V = cell.volume();
 
-        r_err += V * std::abs(cell(z).density      - test.density_t(r, curr_time));
-        u_err += V * std::abs(cell(z).velocity.x() - test.velocity_t(r, curr_time).x());
-        p_err += V * std::abs(cell(z).pressure     - test.pressure_t(r, curr_time));
-        e_err += V * std::abs(cell(z).energy       - test.energy_t(r, curr_time));
+        r_err += V * std::abs(cell[z].density      - test.density_t(r, curr_time));
+        u_err += V * std::abs(cell[z].velocity.x() - test.velocity_t(r, curr_time).x());
+        p_err += V * std::abs(cell[z].pressure     - test.pressure_t(r, curr_time));
+        e_err += V * std::abs(cell[z].energy       - test.energy_t(r, curr_time));
 
-        r_avg += V * std::abs(cell(z).density     );
-        u_avg += V * std::abs(cell(z).velocity.x());
-        p_avg += V * std::abs(cell(z).pressure    );
-        e_avg += V * std::abs(cell(z).energy      );
+        r_avg += V * std::abs(cell[z].density     );
+        u_avg += V * std::abs(cell[z].velocity.x());
+        p_avg += V * std::abs(cell[z].pressure    );
+        e_avg += V * std::abs(cell[z].energy      );
     }
     r_err /= r_avg;
     u_err /= u_avg;

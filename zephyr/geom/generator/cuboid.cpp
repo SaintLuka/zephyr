@@ -398,15 +398,15 @@ void Cuboid::initialize(mesh::AmrCells& cells)  {
     double hy = (m_ymax - m_ymin) / m_ny;
     double hz = (m_zmax - m_zmin) / m_nz;
 
-    auto get_index = [=](index_t i, index_t j, index_t k) -> index_t {
+    auto get_index = [=, this](index_t i, index_t j, index_t k) -> index_t {
         return m_nz * (m_ny * i + j) + k;
     };
 
-    auto get_index_pair = [=](index_t n) -> std::array<index_t, 3> {
+    auto get_index_pair = [=, this](index_t n) -> std::array<index_t, 3> {
         return {(n / m_nz) / m_ny, (n / m_nz) % m_ny, n % m_nz};
     };
 
-    auto get_vertex = [=](index_t i, index_t j, index_t k) -> Vector3d {
+    auto get_vertex = [=, this](index_t i, index_t j, index_t k) -> Vector3d {
         return {
                 m_xmin + ((m_xmax - m_xmin) * i) / m_nx,
                 m_ymin + ((m_ymax - m_ymin) * j) / m_ny,
@@ -414,7 +414,7 @@ void Cuboid::initialize(mesh::AmrCells& cells)  {
         };
     };
 
-    auto neib_index = [=](index_t i, index_t j, index_t k, Side3D side) -> index_t {
+    auto neib_index = [=, this](index_t i, index_t j, index_t k, Side3D side) -> index_t {
         if (side == Side3D::LEFT) {
             return i == 0 && !x_period ?  get_index(i, j, k) : get_index((i - 1 + m_nx) % m_nx, j, k);
         }
@@ -518,8 +518,8 @@ void Cuboid::initialize(mesh::AmrCells& cells)  {
         cells.faces.area[iface + Side3D::R] = hy * hz;
         cells.faces.area[iface + Side3D::B] = hx * hz;
         cells.faces.area[iface + Side3D::T] = hx * hz;
-        cells.faces.area[iface + Side3D::Z] = hy * hz;
-        cells.faces.area[iface + Side3D::F] = hy * hz;
+        cells.faces.area[iface + Side3D::Z] = hx * hy;
+        cells.faces.area[iface + Side3D::F] = hx * hy;
 
         cells.faces.vertices[iface + Side3D::L] = Side3D::L.sf();
         cells.faces.vertices[iface + Side3D::R] = Side3D::R.sf();

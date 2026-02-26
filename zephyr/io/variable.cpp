@@ -1,4 +1,5 @@
 #include <cstring>
+#include <cassert>
 
 #include <zephyr/io/variable.h>
 #include <zephyr/mesh/euler/eu_prim.h>

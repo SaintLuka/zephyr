@@ -104,7 +104,7 @@ double IdealGas::min_pressure() const {
 }
 
 void IdealGas::adjust_cv(double rho, double P, double T) {
-    Cv = P / ((gamma - 1.0) * Cv * rho);
+    Cv = P / ((gamma - 1.0) * T * rho);
 }
 
 } // namespace zephyr::phys

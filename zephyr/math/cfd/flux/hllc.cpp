@@ -24,43 +24,36 @@ smf::Flux HLLC::flux(const smf::PState &zL, const smf::PState &zR, const Eos &eo
 smf::Flux HLLC::calc_flux(const smf::PState &zL, const smf::PState &zR, const Eos &eos) {
     using namespace smf;
 
-    const double &rho_L = zL.density;
-    const double &rho_R = zR.density;
-    const double &u_L = zL.velocity.x();
-    const double &u_R = zR.velocity.x();
-    const double &P_L = zL.pressure;
-    const double &P_R = zR.pressure;
-
     // Скорость звука слева и справа
-    double c_L = eos.sound_speed_rP(rho_L, P_L);
-    double c_R = eos.sound_speed_rP(rho_R, P_R);
+    double c_L = eos.sound_speed_rP(zL.rho(), zL.P());
+    double c_R = eos.sound_speed_rP(zR.rho(), zR.P());
 
     // Оценки скоростей расходящихся волн
-    double S_L = std::min(u_L - c_L, u_R - c_R);
-    double S_R = std::max(u_L + c_L, u_R + c_R);
+    double S_L = std::min(zL.vx() - c_L, zR.vx() - c_R);
+    double S_R = std::max(zL.vx() + c_L, zR.vx() + c_R);
 
     // Сверхзвуковое течение
     if (S_L >= 0.0) { return Flux(zL); }
     if (S_R <= 0.0) { return Flux(zR); }
 
     // Перенос массы через левую/правую волну
-    double a_L = rho_L * (S_L - u_L);
-    double a_R = rho_R * (S_R - u_R);
+    double a_L = zL.rho() * (S_L - zL.vx());
+    double a_R = zR.rho() * (S_R - zR.vx());
 
     // Скорость контактного разрыва
-    double S_C = (P_L - P_R + a_R * u_R - a_L * u_L) / (a_R - a_L);
+    double S_C = (zL.P() - zR.P() + a_R * zR.vx() - a_L * zL.vx()) / (a_R - a_L);
 
     // Плотность слева/справа от контактного разрыва
     double rho_sL = a_L / (S_L - S_C);
     double rho_sR = a_R / (S_R - S_C);
 
     // Удельная полная энергия слева/справа от контактного разрыва
-    double E_sL = zL.E() + (S_C - u_L) * (S_C + P_L / a_L);
-    double E_sR = zR.E() + (S_C - u_R) * (S_C + P_R / a_R);
+    double E_sL = zL.E() + (S_C - zL.vx()) * (S_C + zL.P() / a_L);
+    double E_sR = zR.E() + (S_C - zR.vx()) * (S_C + zR.P() / a_R);
 
     // Консервативный вектор слева/справа от контактного разрыва
-    QState Q_sL(rho_sL, {rho_sL * S_C, rho_sL * zL.v(), rho_sL * zL.w()}, rho_sL * E_sL);
-    QState Q_sR(rho_sR, {rho_sR * S_C, rho_sR * zR.v(), rho_sR * zR.w()}, rho_sR * E_sR);
+    QState Q_sL(rho_sL, {rho_sL * S_C, rho_sL * zL.vy(), rho_sL * zL.vz()}, rho_sL * E_sL);
+    QState Q_sR(rho_sR, {rho_sR * S_C, rho_sR * zR.vy(), rho_sR * zR.vz()}, rho_sR * E_sR);
 
     // Консервативный вектор слева/справа
     QState Q_L(zL);
@@ -93,39 +86,33 @@ smf::Flux HLLC::calc_flux(const smf::PState &zL, const smf::PState &zR, const Eo
 smf::WaveConfig3 HLLC::wave_config(
         const Eos& eosL, const smf::PState& zL,
         const Eos& eosR, const smf::PState& zR) {
-    const double &rho_L = zL.density;
-    const double &rho_R = zR.density;
-    const double &u_L = zL.velocity.x();
-    const double &u_R = zR.velocity.x();
-    const double &P_L = zL.pressure;
-    const double &P_R = zR.pressure;
 
     // Скорость звука слева и справа
-    double c_L = eosL.sound_speed_rP(rho_L, P_L);
-    double c_R = eosR.sound_speed_rP(rho_R, P_R);
+    double c_L = eosL.sound_speed_rP(zL.rho(), zL.P());
+    double c_R = eosR.sound_speed_rP(zR.rho(), zR.P());
 
     // Оценки скоростей расходящихся волн
-    double S_L = std::min(u_L - c_L, u_R - c_R);
-    double S_R = std::max(u_L + c_L, u_R + c_R);
+    double S_L = std::min(zL.vx() - c_L, zR.vx() - c_R);
+    double S_R = std::max(zL.vx() + c_L, zR.vx() + c_R);
 
     // Перенос массы через левую/правую волну
-    double a_L = rho_L * (S_L - u_L);
-    double a_R = rho_R * (S_R - u_R);
+    double a_L = zL.rho() * (S_L - zL.vx());
+    double a_R = zR.rho() * (S_R - zR.vx());
 
     // Скорость контактного разрыва
-    double S_C = (P_L - P_R + a_R * u_R - a_L * u_L) / (a_R - a_L);
+    double S_C = (zL.P() - zR.P() + a_R * zR.vx() - a_L * zL.vx()) / (a_R - a_L);
 
     // Плотность слева/справа от контактного разрыва
     double rho_sL = a_L / (S_L - S_C);
     double rho_sR = a_R / (S_R - S_C);
 
     // Удельная полная энергия слева/справа от контактного разрыва
-    double E_sL = zL.E() + (S_C - u_L) * (S_C + P_L / a_L);
-    double E_sR = zR.E() + (S_C - u_R) * (S_C + P_R / a_R);
+    double E_sL = zL.E() + (S_C - zL.vx()) * (S_C + zL.P() / a_L);
+    double E_sR = zR.E() + (S_C - zR.vx()) * (S_C + zR.P() / a_R);
 
     // Консервативный вектор слева/справа от контактного разрыва
-    smf::QState Q_sL(rho_sL, {rho_sL * S_C, rho_sL * zL.v(), rho_sL * zL.w()}, rho_sL * E_sL);
-    smf::QState Q_sR(rho_sR, {rho_sR * S_C, rho_sR * zR.v(), rho_sR * zR.w()}, rho_sR * E_sR);
+    smf::QState Q_sL(rho_sL, {rho_sL * S_C, rho_sL * zL.vy(), rho_sL * zL.vz()}, rho_sL * E_sL);
+    smf::QState Q_sR(rho_sR, {rho_sR * S_C, rho_sR * zR.vy(), rho_sR * zR.vz()}, rho_sR * E_sR);
 
     // Консервативный вектор слева/справа
     smf::QState Q_L(zL);
@@ -261,41 +248,44 @@ mmf::WaveConfig3 HLLC::wave_config(
         const MixturePT& mix,
         const mmf::PState& zL,
         const mmf::PState& zR) {
-    const double &rho_L = zL.density;
-    const double &rho_R = zR.density;
-    const double &u_L = zL.velocity.x();
-    const double &u_R = zR.velocity.x();
-    const double &P_L = zL.pressure;
-    const double &P_R = zR.pressure;
-
+    
     // Скорость звука слева и справа
-    double c_L = mix.sound_speed_rP(rho_L, P_L, zL.mass_frac, {.T0=zL.T(), .rhos=&zL.rhos()});
-    double c_R = mix.sound_speed_rP(rho_R, P_R, zR.mass_frac, {.T0=zR.T(), .rhos=&zR.rhos()});
+    double c_L = mix.sound_speed_rP(zL.rho(), zL.P(), zL.beta(), {.T0 = zL.T(), .rhos = zL.rhos()});
+    double c_R = mix.sound_speed_rP(zR.rho(), zR.P(), zR.beta(), {.T0 = zR.T(), .rhos = zR.rhos()});
 
     // Оценки скоростей расходящихся волн
-    double S_L = std::min(u_L - c_L, u_R - c_R);
-    double S_R = std::max(u_L + c_L, u_R + c_R);
+    double S_L = std::min(zL.vx() - c_L, zR.vx() - c_R);
+    double S_R = std::max(zL.vx() + c_L, zR.vx() + c_R);
 
     // Перенос массы через левую/правую волну
-    double a_L = rho_L * (S_L - u_L);
-    double a_R = rho_R * (S_R - u_R);
+    double a_L = zL.rho() * (S_L - zL.vx());
+    double a_R = zR.rho() * (S_R - zR.vx());
 
     // Скорость контактного разрыва
-    double S_C = (P_L - P_R + a_R * u_R - a_L * u_L) / (a_R - a_L);
+    double S_C = (zL.P() - zR.P() + a_R * zR.vx() - a_L * zL.vx()) / (a_R - a_L);
 
     // Плотность слева/справа от контактного разрыва
     double rho_sL = a_L / (S_L - S_C);
     double rho_sR = a_R / (S_R - S_C);
 
     // Удельная полная энергия слева/справа от контактного разрыва
-    double E_sL = zL.E() + (S_C - u_L) * (S_C + P_L / a_L);
-    double E_sR = zR.E() + (S_C - u_R) * (S_C + P_R / a_R);
+    double E_sL = zL.E() + (S_C - zL.vx()) * (S_C + zL.P() / a_L);
+    double E_sR = zR.E() + (S_C - zR.vx()) * (S_C + zR.P() / a_R);
 
     // Консервативный вектор слева/справа от контактного разрыва
-    mmf::QState Q_sL(rho_sL, {rho_sL * S_C, rho_sL * zL.v(), rho_sL * zL.w()},
-                     rho_sL * E_sL, rho_sL * zL.mass_frac.arr());
-    mmf::QState Q_sR(rho_sR, {rho_sR * S_C, rho_sR * zR.v(), rho_sR * zR.w()},
-                     rho_sR * E_sR, rho_sR * zR.mass_frac.arr());
+    mmf::QState Q_sL, Q_sR;
+    Q_sL.density  = rho_sL;
+    Q_sR.density  = rho_sR;
+    Q_sL.momentum = {rho_sL * S_C, rho_sL * zL.vy(), rho_sL * zL.vz()};
+    Q_sR.momentum = {rho_sR * S_C, rho_sR * zR.vy(), rho_sR * zR.vz()};
+    Q_sL.energy   = rho_sL * E_sL;
+    Q_sR.energy   = rho_sR * E_sR;
+    for (int i = 0; i < Q_sL.mass_frac.size(); ++i) {
+        Q_sL.mass_frac[i] = rho_sL * zL.beta(i);
+    }
+    for (int i = 0; i < Q_sR.mass_frac.size(); ++i) {
+        Q_sR.mass_frac[i] = rho_sR * zR.beta(i);
+    }
 
     // Консервативный вектор слева/справа
     mmf::QState Q_L(zL);
@@ -322,8 +312,11 @@ mmf::WaveConfig3 HLLC::wave_config(const MixturePT& mix,
     double e_L = Q_L.energy / Q_L.density - 0.5 * v_L.squaredNorm();
     double e_R = Q_R.energy / Q_R.density - 0.5 * v_R.squaredNorm();
 
-    Fractions beta_L = Q_L.mass_frac.arr() / Q_L.density;
-    Fractions beta_R = Q_R.mass_frac.arr() / Q_R.density;
+    Fractions beta_L, beta_R;
+    for (int i = 0; i < mix.size(); ++i) {
+        beta_L[i] = Q_L.mass_frac[i] / Q_L.density;
+        beta_R[i] = Q_R.mass_frac[i] / Q_R.density;
+    }
 
     // Скорость звука слева и справа
     double c_L = mix.sound_speed_re(Q_L.density, e_L, beta_L);
@@ -349,10 +342,17 @@ mmf::WaveConfig3 HLLC::wave_config(const MixturePT& mix,
     double E_sR = std::pow(S_C, 2) + (a_R.energy - S_C * a_R.momentum.x()) / a_R.density;
 
     // Консервативный вектор слева/справа от контактного разрыва
-    mmf::QState Q_sL(rho_sL, {rho_sL * S_C, rho_sL * v_L.y(), rho_sL * v_L.z()},
-                     rho_sL * E_sL, rho_sL * beta_L.arr());
-    mmf::QState Q_sR(rho_sR, {rho_sR * S_C, rho_sR * v_R.y(), rho_sR * v_R.z()},
-                     rho_sR * E_sR, rho_sR * beta_R.arr());
+    mmf::QState Q_sL, Q_sR;
+    Q_sL.density  = rho_sL;
+    Q_sR.density  = rho_sR;
+    Q_sL.momentum = {rho_sL * S_C, rho_sL * v_L.y(), rho_sL * v_L.z()};
+    Q_sR.momentum = {rho_sR * S_C, rho_sR * v_R.y(), rho_sR * v_R.z()};
+    Q_sL.energy   = rho_sL * E_sL;
+    Q_sR.energy   = rho_sR * E_sR;
+    for (int i = 0; i < mix.size(); ++i) {
+        Q_sL.mass_frac[i] = rho_sL * beta_L[i];
+        Q_sR.mass_frac[i] = rho_sR * beta_R[i];
+    }
 
     mmf::Flux F_sL = a_L.arr() + S_L * Q_sL.arr();
     mmf::Flux F_sR = a_R.arr() + S_R * Q_sR.arr();
@@ -381,48 +381,44 @@ mmf::Flux HLLC::flux(const mmf::PState &zL, const mmf::PState &zR, const Mixture
 mmf::Flux HLLC::calc_flux(const mmf::PState &zL, const mmf::PState &zR, const MixturePT &mix) {
     using namespace mmf;
 
-    const double &rho_L = zL.density;
-    const double &rho_R = zR.density;
-    const double &u_L = zL.velocity.x();
-    const double &u_R = zR.velocity.x();
-    const double &P_L = zL.pressure;
-    const double &P_R = zR.pressure;
-
     // Скорость звука слева и справа
-    double c_L = mix.sound_speed_rP(zL.density, zL.pressure, zL.mass_frac,
-                                    {.T0 = zL.T(), .rhos = &zL.densities});
-    double c_R = mix.sound_speed_rP(zR.density, zR.pressure, zR.mass_frac,
-                                    {.T0 = zR.T(), .rhos = &zR.densities});
+    double c_L = mix.sound_speed_rP(zL.rho(), zL.P(), zL.beta(), {.T0 = zL.T(), .rhos = zL.rhos()});
+    double c_R = mix.sound_speed_rP(zR.rho(), zR.P(), zR.beta(), {.T0 = zR.T(), .rhos = zR.rhos()});
 
     // Оценки скоростей расходящихся волн
-    double S_L = std::min(u_L - c_L, u_R - c_R);
-    double S_R = std::max(u_L + c_L, u_R + c_R);
+    double S_L = std::min(zL.vx() - c_L, zR.vx() - c_R);
+    double S_R = std::max(zL.vx() + c_L, zR.vx() + c_R);
 
     // Сверхзвуковое течение
     if (S_L >= 0.0) { return Flux(zL); }
     if (S_R <= 0.0) { return Flux(zR); }
 
-    double a_L = rho_L * (S_L - u_L);
-    double a_R = rho_R * (S_R - u_R);
+    double a_L = zL.rho() * (S_L - zL.vx());
+    double a_R = zR.rho() * (S_R - zR.vx());
 
     // Скорость контактного разрыва
-    double S_C = (P_L - P_R + a_R * u_R - a_L * u_L) / (a_R - a_L);
+    double S_C = (zL.P() - zR.P() + a_R * zR.vx() - a_L * zL.vx()) / (a_R - a_L);
 
     // Плотность слева/справа от контактного разрыва
     double rho_sL = a_L / (S_L - S_C);
     double rho_sR = a_R / (S_R - S_C);
 
     // Удельная полная энергия слева/справа от контактного разрыва
-    double E_sL = zL.E() + (S_C - u_L) * (S_C + P_L / a_L);
-    double E_sR = zR.E() + (S_C - u_R) * (S_C + P_R / a_R);
+    double E_sL = zL.E() + (S_C - zL.vx()) * (S_C + zL.P() / a_L);
+    double E_sR = zR.E() + (S_C - zR.vx()) * (S_C + zR.P() / a_R);
 
     // Потоки масс слева/справа от контактного разрыва
-    ScalarSet rhos_sL = rho_sL * zL.beta().arr();
-    ScalarSet rhos_sR = rho_sR * zR.beta().arr();
-
-    // Консервативный вектор слева/справа от контактного разрыва
-    QState Q_sL(rho_sL, {rho_sL * S_C, rho_sL * zL.v(), rho_sL * zL.w()}, rho_sL * E_sL, rhos_sL);
-    QState Q_sR(rho_sR, {rho_sR * S_C, rho_sR * zR.v(), rho_sR * zR.w()}, rho_sR * E_sR, rhos_sR);
+    mmf::QState Q_sL, Q_sR;
+    Q_sL.density  = rho_sL;
+    Q_sR.density  = rho_sR;
+    Q_sL.momentum = {rho_sL * S_C, rho_sL * zL.vy(), rho_sL * zL.vz()};
+    Q_sR.momentum = {rho_sR * S_C, rho_sR * zR.vy(), rho_sR * zR.vz()};
+    Q_sL.energy   = rho_sL * E_sL;
+    Q_sR.energy   = rho_sR * E_sR;
+    for (int i = 0; i < mix.size(); ++i) {
+        Q_sL.mass_frac[i] = rho_sL * zL.beta(i);
+        Q_sR.mass_frac[i] = rho_sR * zR.beta(i);
+    }
 
     QState Q_L(zL);  // Консервативный вектор слева
     QState Q_R(zR);  // Консервативный вектор слева
@@ -457,43 +453,36 @@ smf::Flux HLLC_LM::flux(const smf::PState &zL, const smf::PState &zR, const Eos 
 smf::Flux HLLC_LM::calc_flux(const smf::PState &zL, const smf::PState &zR, const Eos &eos) {
     using namespace smf;
 
-    const double &rho_L = zL.density;
-    const double &rho_R = zR.density;
-    const double &u_L = zL.velocity.x();
-    const double &u_R = zR.velocity.x();
-    const double &P_L = zL.pressure;
-    const double &P_R = zR.pressure;
-
     // Скорость звука слева и справа
-    double c_L = eos.sound_speed_rP(rho_L, P_L);
-    double c_R = eos.sound_speed_rP(rho_R, P_R);
+    double c_L = eos.sound_speed_rP(zL.rho(), zL.P());
+    double c_R = eos.sound_speed_rP(zR.rho(), zR.P());
 
     // Оценки скоростей расходящихся волн
-    double S_L = std::min(u_L - c_L, u_R - c_R);
-    double S_R = std::max(u_L + c_L, u_R + c_R);
+    double S_L = std::min(zL.vx() - c_L, zR.vx() - c_R);
+    double S_R = std::max(zL.vx() + c_L, zR.vx() + c_R);
 
     // Сверхзвуковое течение
     if (S_L >= 0.0) { return Flux(zL); }
     if (S_R <= 0.0) { return Flux(zR); }
 
     // Перенос массы через левую/правую волну
-    double a_L = rho_L * (S_L - u_L);
-    double a_R = rho_R * (S_R - u_R);
+    double a_L = zL.rho() * (S_L - zL.vx());
+    double a_R = zR.rho() * (S_R - zR.vx());
 
     // Скорость контактного разрыва
-    double S_C = (P_L - P_R + a_R * u_R - a_L * u_L) / (a_R - a_L);
+    double S_C = (zL.P() - zR.P() + a_R * zR.vx() - a_L * zL.vx()) / (a_R - a_L);
 
     // Плотность слева/справа от контактного разрыва
     double rho_sL = a_L / (S_L - S_C);
     double rho_sR = a_R / (S_R - S_C);
 
     // Удельная полная энергия слева/справа от контактного разрыва
-    double E_sL = zL.E() + (S_C - u_L) * (S_C + P_L / a_L);
-    double E_sR = zR.E() + (S_C - u_R) * (S_C + P_R / a_R);
+    double E_sL = zL.E() + (S_C - zL.vx()) * (S_C + zL.P() / a_L);
+    double E_sR = zR.E() + (S_C - zR.vx()) * (S_C + zR.P() / a_R);
 
     // Консервативный вектор слева/справа от контактного разрыва
-    QState Q_sL(rho_sL, {rho_sL * S_C, rho_sL * zL.v(), rho_sL * zL.w()}, rho_sL * E_sL);
-    QState Q_sR(rho_sR, {rho_sR * S_C, rho_sR * zR.v(), rho_sR * zR.w()}, rho_sR * E_sR);
+    QState Q_sL(rho_sL, {rho_sL * S_C, rho_sL * zL.vy(), rho_sL * zL.vz()}, rho_sL * E_sL);
+    QState Q_sR(rho_sR, {rho_sR * S_C, rho_sR * zR.vy(), rho_sR * zR.vz()}, rho_sR * E_sR);
 
     // Консервативный вектор слева/справа
     QState Q_L(zL);
@@ -505,7 +494,7 @@ smf::Flux HLLC_LM::calc_flux(const smf::PState &zL, const smf::PState &zR, const
 
     // Индикатор, phi -> 0 при низком числе Маха (< 0.1)
     double Ma_limit = 0.1;
-    double Ma_local = std::max(std::abs(u_L / c_L), std::abs(u_R / c_R));
+    double Ma_local = std::max(std::abs(zL.vx() / c_L), std::abs(zR.vx() / c_R));
     double xi = Ma_local / Ma_limit;
     double phi = xi > 1.0 ? 1.0 : std::sin(M_PI_2 * xi);
     //double phi = xi > 1.0 ? 1.0 : xi * (2.0 - xi);
@@ -536,47 +525,40 @@ smf::Flux HLLC_M::flux(const smf::PState &zL, const smf::PState &zR, const Eos &
 smf::Flux HLLC_M::calc_flux(const smf::PState &zL, const smf::PState &zR, const Eos &eos) {
     using namespace smf;
 
-    const double &rho_L = zL.density;
-    const double &rho_R = zR.density;
-    const double &u_L = zL.velocity.x();
-    const double &u_R = zR.velocity.x();
-    const double &P_L = zL.pressure;
-    const double &P_R = zR.pressure;
-
     // Скорость звука слева и справа
-    double c_L = eos.sound_speed_rP(rho_L, P_L);
-    double c_R = eos.sound_speed_rP(rho_R, P_R);
+    double c_L = eos.sound_speed_rP(zL.rho(), zL.P());
+    double c_R = eos.sound_speed_rP(zR.rho(), zR.P());
 
     // Оценки скоростей расходящихся волн
-    double S_L = std::min(u_L - c_L, u_R - c_R);
-    double S_R = std::max(u_L + c_L, u_R + c_R);
+    double S_L = std::min(zL.vx() - c_L, zR.vx() - c_R);
+    double S_R = std::max(zL.vx() + c_L, zR.vx() + c_R);
 
     // Сверхзвуковое течение
     if (S_L >= 0.0) { return Flux(zL); }
     if (S_R <= 0.0) { return Flux(zR); }
 
     // Перенос массы через левую/правую волну
-    double a_L = rho_L * (S_L - u_L);
-    double a_R = rho_R * (S_R - u_R);
+    double a_L = zL.rho() * (S_L - zL.vx());
+    double a_R = zR.rho() * (S_R - zR.vx());
 
     // Скорость контактного разрыва
-    double S_C = (P_L - P_R + a_R * u_R - a_L * u_L) / (a_R - a_L);
+    double S_C = (zL.P() - zR.P() + a_R * zR.vx() - a_L * zL.vx()) / (a_R - a_L);
 
     // Касательные скорости также усредняются
-    double V_C = (a_R * zR.v() - a_L * zL.v()) / (a_R - a_L);
-    double W_C = (a_R * zR.w() - a_L * zL.w()) / (a_R - a_L);
+    double V_C = (a_R * zR.vy() - a_L * zL.vy()) / (a_R - a_L);
+    double W_C = (a_R * zR.vz() - a_L * zL.vz()) / (a_R - a_L);
 
     // Плотность слева/справа от контактного разрыва
     double rho_sL = a_L / (S_L - S_C);
     double rho_sR = a_R / (S_R - S_C);
 
     // Удельная полная энергия слева/справа от контактного разрыва
-    double E_sL = zL.E() + (S_C - u_L) * (S_C + P_L / a_L);
-    double E_sR = zR.E() + (S_C - u_R) * (S_C + P_R / a_R);
+    double E_sL = zL.E() + (S_C - zL.vx()) * (S_C + zL.P() / a_L);
+    double E_sR = zR.E() + (S_C - zR.vx()) * (S_C + zR.P() / a_R);
 
     // Квадраты тангенциальной составляющей скорости
-    double v_L2 = std::pow(zL.v(), 2) + std::pow(zL.w(), 2);
-    double v_R2 = std::pow(zR.v(), 2) + std::pow(zR.w(), 2);
+    double v_L2 = std::pow(zL.vy(), 2) + std::pow(zL.vz(), 2);
+    double v_R2 = std::pow(zR.vy(), 2) + std::pow(zR.vz(), 2);
 
     // Добавка для HLLC-M
     E_sL += 0.5 * ((a_R * v_R2 - a_L * v_L2) / (a_R - a_L) - v_L2);

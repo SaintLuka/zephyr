@@ -84,7 +84,7 @@ public:
     ///     IdealGas& gas = eos->cast<IdealGas>();
     /// @endcode
     template <class T>
-    typename std::enable_if<std::is_base_of<Eos, T>::value, T&>::type
+    std::enable_if_t<std::is_base_of_v<Eos, T>, T&>
     cast() { return *(dynamic_cast<T*>(this)); };
 
     /// @brief Основная формула, производные требуются для некоторых численных

@@ -31,7 +31,7 @@ public:
 
     /// @brief Проверить, что можно преобразовать к наследнику
     template <class T>
-    typename std::enable_if<std::is_base_of<Generator, T>::value, bool>::type
+    std::enable_if_t<std::is_base_of_v<Generator, T>, bool>
     can_cast() { return dynamic_cast<T*>(this) != nullptr; };
 
     /// @brief Приведение к конкретному типу

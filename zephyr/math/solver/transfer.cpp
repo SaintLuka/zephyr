@@ -146,8 +146,8 @@ double face_fraction_n2(EuCell& cell, EuCell& neib, EuFace& face, double vn, con
 
     // Реконструкция в ячейке
     obj::plane plane{
-            .p = vn > 0.0 ? cell(data.p) : neib(data.p),
-            .n = vn > 0.0 ? cell(data.n) : neib(data.n)
+            .p = vn > 0.0 ? cell[data.p] : neib[data.p],
+            .n = vn > 0.0 ? cell[data.n] : neib[data.n]
     };
 
     bool in1 = plane.under(seg.v1);
@@ -171,7 +171,7 @@ double face_fraction_n2(EuCell& cell, EuCell& neib, EuFace& face, double vn, con
         }
     }
 
-    auto [a_min, a_max] = sorted(cell(data.u1), neib(data.u1));
+    auto [a_min, a_max] = sorted(cell[data.u1], neib[data.u1]);
 
     return between(a_sig, a_min, a_max);
 }
@@ -186,14 +186,14 @@ double best_face_fraction(double a1, double a2, double S, double vn, double dt, 
     auto[a_min, a_max] = sorted(a1, a2);
 
     // Flux и vn имеют один знак
-    assert(Flux * vn >= 0.0);
+    z_assert(Flux * vn >= 0.0, "Strange flux");
 
     return between(Flux / (dt * vn * S), a_min, a_max);
 }
 
 double flux_CRP(EuCell& cell, EuCell& neib, EuFace& face, double vn, double dt, double Flux, const Transfer::State& data) {
-    double a1 = cell(data.u1);
-    double a2 = neib(data.u1);
+    double a1 = cell[data.u1];
+    double a2 = neib[data.u1];
 
     double S = face.area();
     double vol1 = cell.volume();
@@ -206,8 +206,8 @@ double flux_CRP(EuCell& cell, EuCell& neib, EuFace& face, double vn, double dt, 
 }
 
 void Transfer::fluxes_CRP(EuCell &cell, Direction dir) {
-    double a1 = cell(data.u1);
-    Vector3d n1 = cell(data.n);
+    double a1 = cell[data.u1];
+    Vector3d n1 = cell[data.n];
 
     double fluxes = 0.0;
     for (auto &face: cell.faces(dir)) {
@@ -216,8 +216,8 @@ void Transfer::fluxes_CRP(EuCell &cell, Direction dir) {
         }
 
         auto neib = face.neib();
-        double a2 = neib(data.u1);
-        Vector3d n2 = neib(data.n);
+        double a2 = neib[data.u1];
+        Vector3d n2 = neib[data.n];
 
         Vector3d fn = face.normal();
         double vn = velocity(face.center()).dot(fn);
@@ -248,7 +248,7 @@ void Transfer::fluxes_CRP(EuCell &cell, Direction dir) {
         fluxes += flux_2D(a1, a2, S, V1, V2, a_sig, vn, m_dt);
     }
 
-    cell(data.u2) = cell(data.u1) - fluxes / cell.volume();
+    cell[data.u2] = cell[data.u1] - fluxes / cell.volume();
 }
 
 // V1, V2 -- скорость в узлах грани
@@ -278,19 +278,19 @@ double flux_VOF(EuCell &cell, EuFace &face,
 
     auto& poly = poly4;
 
-    if (cell(data.u1) < 1.0e-8) {
+    if (cell[data.u1] < 1.0e-8) {
         // Маленькую часть отправляем по нормали
         if (Vn.squaredNorm() > Vt.squaredNorm())
-            return cell(data.u1) * poly.area();
+            return cell[data.u1] * poly.area();
         else {
             return 0.0;
         }
-    } else if (cell(data.u1) > 1.0 - 1.0e-8) {
+    } else if (cell[data.u1] > 1.0 - 1.0e-8) {
         // От полной ячейки отрезаем весь кусок
         return poly.area();
     }
     else {
-        return poly.clip_area(cell(data.p), cell(data.n));
+        return poly.clip_area(cell[data.p], cell[data.n]);
     }
 }
 
@@ -339,7 +339,7 @@ void Transfer::fluxes_VOF(EuCell &cell, Direction dir) {
         fluxes += Flux;
     }
 
-    cell(data.u2) = cell(data.u1) - fluxes / cell.volume();
+    cell[data.u2] = cell[data.u1] - fluxes / cell.volume();
 }
 
 void Transfer::fluxes_MUSCL(EuCell &cell, Direction dir) {
@@ -354,35 +354,35 @@ void Transfer::fluxes_MUSCL(EuCell &cell, Direction dir) {
         auto fn = face.normal();
         double vn = velocity(face.center()).dot(fn);
 
-        bool interesting = (cell(data.u1) > 0.01 && cell(data.u1) < 0.99) || (neib(data.u1) > 0.01 && neib(data.u1) < 0.99);
+        bool interesting = (cell[data.u1] > 0.01 && cell[data.u1] < 0.99) || (neib[data.u1] > 0.01 && neib[data.u1] < 0.99);
 
         double a_sig = NAN;
         if (m_method == Method::MUSCL_MC || m_method == Method::MUSCL_MC_CRP)
         {
             if (interesting) {
-                //std::cout << cell(data.u1) << " " <<  cell(data.du_dx) << " " << cell(data.du_dy) << "\n";
-                //std::cout << neib(data.u1) << " " <<  neib(data.du_dx) << " " << neib(data.du_dy) << "\n";
+                //std::cout << cell[data.u1] << " " <<  cell[data.du_dx] << " " << cell[data.du_dy] << "\n";
+                //std::cout << neib[data.u1] << " " <<  neib[data.du_dx] << " " << neib[data.du_dy] << "\n";
             }
             auto fe = FaceExtra::Direct(
-                    cell(data.u1), cell(data.du_dx), cell(data.du_dy), 0.0,
-                    neib(data.u1), neib(data.du_dx), neib(data.du_dy), 0.0,
+                    cell[data.u1], cell[data.du_dx], cell[data.du_dy], 0.0,
+                    neib[data.u1], neib[data.du_dx], neib[data.du_dy], 0.0,
                     cell.center(), neib.center(), face.center());
 
-            a_sig = vn > 0.0 ? fe.m(cell(data.u1)) : fe.p(neib(data.u1));
-            a_sig = between(a_sig, cell(data.u1), neib(data.u1));
+            a_sig = vn > 0.0 ? fe.m(cell[data.u1]) : fe.p(neib[data.u1]);
+            a_sig = between(a_sig, cell[data.u1], neib[data.u1]);
         }
         else {
             auto fe = FaceExtra::ATvL(
-                    cell(data.u1), cell(data.du_dx), cell(data.du_dy), 0.0,
-                    neib(data.u1), neib(data.du_dx), neib(data.du_dy), 0.0,
+                    cell[data.u1], cell[data.du_dx], cell[data.du_dy], 0.0,
+                    neib[data.u1], neib[data.du_dx], neib[data.du_dy], 0.0,
                     cell.center(), neib.center(), face.center());
 
-            a_sig = vn > 0.0 ? fe.m(cell(data.u1)) : fe.p(neib(data.u1));
+            a_sig = vn > 0.0 ? fe.m(cell[data.u1]) : fe.p(neib[data.u1]);
         }
 
         if (interesting) {
             //std::cout << "asig: " << a_sig << "\n";
-            //a_sig = vn > 0.0 ? cell(data.u1) : neib(data.u1);
+            //a_sig = vn > 0.0 ? cell[data.u1] : neib[data.u1];
             //std::cout << "asig: " <<a_sig << "\n\n";
         }
 
@@ -398,7 +398,7 @@ void Transfer::fluxes_MUSCL(EuCell &cell, Direction dir) {
         fluxes += Flux;
     }
 
-    cell(data.u2) = cell(data.u1) - fluxes / cell.volume();
+    cell[data.u2] = cell[data.u1] - fluxes / cell.volume();
 }
 
 void Transfer::compute_slopes(EuMesh& mesh) const {
@@ -410,8 +410,8 @@ void Transfer::compute_slopes(EuMesh& mesh) const {
 
             // Реконструкция в ячейке
             obj::plane plane{
-                    .p = cell(data.p),
-                    .n = cell(data.n)
+                    .p = cell[data.p],
+                    .n = cell[data.n]
             };
 
             for (auto face: cell.faces()) {
@@ -442,8 +442,8 @@ void Transfer::compute_slopes(EuMesh& mesh) const {
                 grad_x += a_sig * face.area() * face.normal().x();
                 grad_y += a_sig * face.area() * face.normal().y();
             }
-            cell(data.du_dx) = grad_x / cell.volume();
-            cell(data.du_dy) = grad_y / cell.volume();
+            cell[data.du_dx] = grad_x / cell.volume();
+            cell[data.du_dy] = grad_y / cell.volume();
         }
 
         return;
@@ -451,7 +451,7 @@ void Transfer::compute_slopes(EuMesh& mesh) const {
 
     auto u1 = data.u1;
     auto get_state = [u1](EuCell& cell) -> double {
-        return cell(u1);
+        return cell[u1];
     };
     auto boundary_value = [](double u, const Vector3d& n, Boundary b) -> double {
         return u;
@@ -459,15 +459,15 @@ void Transfer::compute_slopes(EuMesh& mesh) const {
 
     for (auto cell: mesh) {
         auto grad = gradient::LSM<double>(cell, get_state, boundary_value);
-        cell(data.du_dx) = grad.x;
-        cell(data.du_dy) = grad.y;
+        cell[data.du_dx] = grad.x;
+        cell[data.du_dy] = grad.y;
 
         if (m_method == Method::MUSCL_MC || m_method == Method::MUSCL_MC_CRP) {
             auto lim_grad = gradient::limiting<double>(cell, m_limiter,
                     grad, get_state, boundary_value);
 
-            cell(data.du_dx) = lim_grad.x;
-            cell(data.du_dy) = lim_grad.y;
+            cell[data.du_dx] = lim_grad.x;
+            cell[data.du_dy] = lim_grad.y;
         }
     }
 }
@@ -498,8 +498,8 @@ void Transfer::update_CRP(EuMesh& mesh, Direction dir) {
 
     // Обновляем слои
     for (auto cell: mesh) {
-        cell(data.u1) =  between(cell(data.u2), 0.0, 1.0);
-        cell(data.u2) = 0.0;
+        cell[data.u1] =  between(cell[data.u2], 0.0, 1.0);
+        cell[data.u2] = 0.0;
     }
 
     // Без сглаживаний, чисто для реконструкции
@@ -514,8 +514,8 @@ void Transfer::update_VOF(EuMesh& mesh, Direction dir) {
 
     // Обновляем слои
     for (auto& cell: mesh) {
-        cell(data.u1) =  between(cell(data.u2), 0.0, 1.0);
-        cell(data.u2) = 0.0;
+        cell[data.u1] =  between(cell[data.u2], 0.0, 1.0);
+        cell[data.u2] = 0.0;
     }
 
     update_interface(mesh);
@@ -531,8 +531,8 @@ void Transfer::update_MUSCL(EuMesh& mesh, Direction dir) {
 
     // Обновляем слои
     for (auto& cell: mesh) {
-        cell(data.u1) = between(cell(data.u2), 0.0, 1.0);
-        cell(data.u2) = 0.0;
+        cell[data.u1] = between(cell[data.u2], 0.0, 1.0);
+        cell[data.u2] = 0.0;
     }
 
     update_interface(mesh);
@@ -555,11 +555,11 @@ void Transfer::update_WENO(EuMesh& mesh, Direction dir) {
                 int I = vn > 0.0 ? i : i - 1;
 
                 WENO5 weno {
-                    mesh(I - 2, j)(data.u1),
-                    mesh(I - 1, j)(data.u1),
-                    mesh(I + 0, j)(data.u1),
-                    mesh(I + 1, j)(data.u1),
-                    mesh(I + 2, j)(data.u1),
+                    mesh(I - 2, j)[data.u1],
+                    mesh(I - 1, j)[data.u1],
+                    mesh(I + 0, j)[data.u1],
+                    mesh(I + 1, j)[data.u1],
+                    mesh(I + 2, j)[data.u1],
                 };
                 double a_sig = vn > 0.0 ? weno.m() : weno.p();
                 a_sig =  between(a_sig, 0.0, 1.0);
@@ -581,11 +581,11 @@ void Transfer::update_WENO(EuMesh& mesh, Direction dir) {
                 int I = vn > 0.0 ? i : i + 1;
 
                 WENO5 weno {
-                        mesh(I - 2, j)(data.u1),
-                        mesh(I - 1, j)(data.u1),
-                        mesh(I + 0, j)(data.u1),
-                        mesh(I + 1, j)(data.u1),
-                        mesh(I + 2, j)(data.u1),
+                        mesh(I - 2, j)[data.u1],
+                        mesh(I - 1, j)[data.u1],
+                        mesh(I + 0, j)[data.u1],
+                        mesh(I + 1, j)[data.u1],
+                        mesh(I + 2, j)[data.u1],
                 };
 
                 double a_sig = vn > 0.0 ? weno.p() : weno.m();
@@ -608,11 +608,11 @@ void Transfer::update_WENO(EuMesh& mesh, Direction dir) {
                 int J = vn > 0.0 ? j : j - 1;
 
                 WENO5 weno {
-                        mesh(i, J - 2)(data.u1),
-                        mesh(i, J - 1)(data.u1),
-                        mesh(i, J + 0)(data.u1),
-                        mesh(i, J + 1)(data.u1),
-                        mesh(i, J + 2)(data.u1),
+                        mesh(i, J - 2)[data.u1],
+                        mesh(i, J - 1)[data.u1],
+                        mesh(i, J + 0)[data.u1],
+                        mesh(i, J + 1)[data.u1],
+                        mesh(i, J + 2)[data.u1],
                 };
 
                 double a_sig = vn > 0.0 ? weno.m() : weno.p();
@@ -635,11 +635,11 @@ void Transfer::update_WENO(EuMesh& mesh, Direction dir) {
                 int J = vn > 0.0 ? j : j + 1;
 
                 WENO5 weno {
-                        mesh(i, J - 2)(data.u1),
-                        mesh(i, J - 1)(data.u1),
-                        mesh(i, J + 0)(data.u1),
-                        mesh(i, J + 1)(data.u1),
-                        mesh(i, J + 2)(data.u1),
+                        mesh(i, J - 2)[data.u1],
+                        mesh(i, J - 1)[data.u1],
+                        mesh(i, J + 0)[data.u1],
+                        mesh(i, J + 1)[data.u1],
+                        mesh(i, J + 2)[data.u1],
                 };
                 double a_sig = vn > 0.0 ? weno.p() : weno.m();
                 a_sig =  between(a_sig, 0.0, 1.0);
@@ -652,14 +652,14 @@ void Transfer::update_WENO(EuMesh& mesh, Direction dir) {
                 fluxes += Flux;
             }
 
-            cell(data.u2) = cell(data.u1) - fluxes / cell.volume();
+            cell[data.u2] = cell[data.u1] - fluxes / cell.volume();
         }
     }
 
     // Обновляем слои
     for (auto cell: mesh) {
-        cell(data.u1) = between(cell(data.u2), 0.0, 1.0);
-        cell(data.u2) = 0.0;
+        cell[data.u1] = between(cell[data.u2], 0.0, 1.0);
+        cell[data.u2] = 0.0;
     }
 
     update_interface(mesh);
@@ -671,8 +671,8 @@ void Transfer::update_interface(EuMesh& mesh, int smoothing) {
 
 void Transfer::set_flags(EuMesh& mesh) {
     for (auto cell: mesh) {
-        double min_val = cell(data.u1);
-        double max_val = cell(data.u1);
+        double min_val = cell[data.u1];
+        double max_val = cell[data.u1];
 
         for (auto face: cell.faces()) {
             if (face.is_boundary()) {
@@ -698,16 +698,16 @@ Distributor Transfer::distributor() const {
 
     distr.split = [u1](const EuCell& parent, Children &children) {
         for (auto child: children) {
-            child(u1) = parent(u1);
+            child[u1] = parent[u1];
         }
     };
 
     distr.merge = [u1](const Children &children, EuCell& parent) {
         double sum = 0.0;
         for (auto child: children) {
-            sum += child(u1) * child.volume();
+            sum += child[u1] * child.volume();
         }
-        parent(u1) = sum / parent.volume();
+        parent[u1] = sum / parent.volume();
     };
 
     return distr;

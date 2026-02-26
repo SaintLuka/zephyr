@@ -141,7 +141,7 @@ struct Node {
 // N -- число ячеек, точность определения объемной доли ~ 1/N
 template <typename Map2D>
 double volume_fraction(const Map2D& quad, const std::function<bool(const Vector3d&)>& inside, int N) {
-    int n = std::round(std::sqrt(N));
+    int n = static_cast<int>(std::round(std::sqrt(N)));
     double h = 1.0 / n;
     double res = 0.0;
     for (int i = 0; i < n; ++i) {

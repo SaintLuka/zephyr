@@ -124,8 +124,21 @@ public:
     pyport() {
         try {
             if (!Py_IsInitialized()) {
+                #ifdef _WIN32
+                Py_SetPythonHome(const_cast<wchar_t*>(PYTHONHOME));
+                #endif
                 py::initialize_interpreter();
             }
+
+            #ifdef _WIN32
+            // У меня нормальные интерактивные графики не запустились,
+            // matplotlib работает только с Web Backend.
+            py::exec(R"(
+                import matplotlib
+                matplotlib.use('WebAgg')
+            )");
+            #endif
+
             plt = py::module::import("matplotlib.pyplot");
             mpl_toolkits  = py::module::import("mpl_toolkits.mplot3d");
             pylab_helpers = py::module::import("matplotlib._pylab_helpers");

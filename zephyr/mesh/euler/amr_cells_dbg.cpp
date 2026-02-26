@@ -533,7 +533,7 @@ int AmrCells::check_connectivity(index_t ic, const AmrCells& aliens) const {
         if (adj.rank[iface] == mpi::rank()) {
             // Локальный сосед
             if (adj.index[iface] >= m_size) {
-                std::cout << "\tadjacent.index out of range #1\n";
+                std::cout << "\tadjacent.index out of range #2\n";
                 print_info(ic);
                 return -1;
             }
@@ -604,7 +604,8 @@ int AmrCells::check_connectivity(index_t ic, const AmrCells& aliens) const {
                 return -1;
             }
             // Указывает на исходную ячейку
-            if (neibs.faces.adjacent.index[jface] != ic) {
+            if (neibs.faces.adjacent.alien[jface] < 0 &&
+                neibs.faces.adjacent.index[jface] != ic) {
                 std::cout << "\tWrong connection (index != ic). " << f_name << " face\n";
                 std::cout << "\tCurrent cell:\n";
                 print_info(ic);

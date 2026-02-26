@@ -428,7 +428,7 @@ public:
     static void for_each(F&& f) { f(); }
 
     /// @brief Просто пиши mpi::cout <<
-    static std::ostream& cout;
+    static inline std::ostream& cout = std::cout;
 
     /// @}
 
