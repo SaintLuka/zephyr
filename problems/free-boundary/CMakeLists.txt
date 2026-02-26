@@ -1,4 +1,4 @@
-list(APPEND PROBLEMS fb_test_1D)
+#list(APPEND PROBLEMS fb_test_1D)
 
 # Assuming all files in the directory are tests
 if (ZEPHYR_PROBLEMS_ALL)

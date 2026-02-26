@@ -50,6 +50,7 @@ if(POLICY CMP0167)
     cmake_policy(SET CMP0167 NEW)
 endif()
 
+set(Boost_DIR "D:\\main_project\\Boost\\lib\\cmake\\Boost-1.89.0")
 find_package(Boost   COMPONENTS program_options REQUIRED)
 if (ZEPHYR_PYTHON)
     find_package(Python3 COMPONENTS Interpreter Development NumPy REQUIRED)

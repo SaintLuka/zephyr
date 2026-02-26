@@ -42,7 +42,7 @@ int main() {
     //RichtmyerMeshkov test;
     //SodTest test_1D;
     ToroTest test_1D(1);
-    RotatedTest test(test_1D, M_PI / 3.0);
+    RotatedTest test(test_1D, 0);
 
     auto eos = test.get_eos();
 
@@ -50,14 +50,14 @@ int main() {
     // число ячеек можно задать
     Rectangle gen(test.xmin(), test.xmax(), test.ymin(), test.ymax());
     gen.set_boundaries(test.boundaries());
-    gen.set_nx(mpi::single() ? 100 : 500);
+    gen.set_nx(mpi::single() ? 250 : 500);
 
     // Создать сетку
     EuMesh mesh(gen);
 
     // Создать и настроить решатель
     SmFluid solver(eos);
-    solver.set_accuracy(2);
+    solver.set_accuracy(5);
     solver.set_CFL(0.5);
     solver.set_limiter("MC");
     solver.set_method(Fluxes::HLLC);
@@ -68,7 +68,7 @@ int main() {
 
     // Настройка сетки
     //mesh.set_decomposition("XY")
-    mesh.set_max_level(mpi::single() ? 3 : 0);
+    mesh.set_max_level(0);
     mesh.set_distributor(solver.distributor());
 
     // Использовать подсеточную реконструкцию начальных данных?
@@ -87,7 +87,7 @@ int main() {
     };
 
     // Файл для записи
-    PvdFile pvd("test2D", "output");
+    PvdFile pvd("test2D", "D:\\main_project");
 
     // Переменные для сохранения
     pvd.variables = {"level"};

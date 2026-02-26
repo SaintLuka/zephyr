@@ -3,6 +3,7 @@
 #include <zephyr/math/cfd/gradient.h>
 #include <zephyr/math/cfd/models.h>
 #include <zephyr/math/cfd/limiter.h>
+#include <zephyr/math/calc/weno.h>
 
 namespace zephyr::math {
 
@@ -37,7 +38,8 @@ void SmFluid::set_CFL(double CFL) {
 }
 
 void SmFluid::set_accuracy(int acc) {
-    m_acc = std::min(std::max(1, acc), 2);  // 1 или 2
+    // m_acc = std::min(std::max(1, acc), 2);  // 1 или 2
+    m_acc = acc;
 }
 
 void SmFluid::set_axial(bool axial) {
@@ -83,6 +85,10 @@ void SmFluid::update(EuMesh &mesh) {
     if (m_acc == 1) {
         mesh.sync(part.init);
         fluxes(mesh);
+    }
+    else if (m_acc == 5) {
+        mesh.sync(part.init);
+        fluxes_weno(mesh);
     }
     else {
         mesh.sync(part.init);
@@ -157,6 +163,149 @@ void SmFluid::fluxes(EuMesh &mesh) const {
             // Суммируем поток
             flux.arr() += loc_flux.arr() * face.area(m_axial);
         }
+
+        // Обновляем значение в ячейке (консервативные переменные)
+        q_c.arr() -= (m_dt / cell.volume(m_axial)) * flux.arr();
+
+        if (m_axial) {
+            double coeff = cell.volume() / cell.volume(m_axial);
+            q_c.momentum.y() += coeff * z_c.pressure * m_dt;
+        }
+
+        // Новое значение примитивных переменных
+        cell(part.next) = PState(q_c, *m_eos);
+    });
+}
+
+void SmFluid::fluxes_weno(EuMesh &mesh) const {
+    mesh.for_each([this](EuCell &cell) {
+        // Примитивный вектор в ячейке
+        PState z_c = cell[part.init];
+
+        // Консервативный вектор в ячейке
+        QState q_c(z_c);
+
+        // Переменная для потока
+        Flux flux;
+
+        // Cосед слева от рассматриваемой ячейки (I_{i-1})
+        auto face_left = cell.face(mesh::Side2D::L);
+        auto normal_left = face_left.normal();
+        auto cell_left = face_left.neib();
+
+        // Примитивные вектора соседей слева (включая I_{i-2} и I_{i-3})
+        PState neib_left;
+        PState neib_one_left;
+        PState neib_two_left;
+
+        // Расчет примитивных векторов слева от рассматриваемой ячейки
+        if (!face_left.is_boundary()) {
+            neib_left = cell_left[part.init];
+
+            // Сосед через одного слева от рассматриваемой ячейки (I_{i-2})
+            auto face_one_left = cell_left.face(mesh::Side2D::L);
+            auto normal_one_left = face_one_left.normal();
+            auto cell_one_left = face_one_left.neib();
+
+            if (!face_one_left.is_boundary()) {
+                neib_one_left = cell_one_left[part.init];
+
+                // Сосед через два слева от рассматриваемой ячейки (I_{i-3})
+                auto face_two_left = cell_one_left.face(mesh::Side2D::L);
+                auto normal_two_left = face_two_left.normal();
+                auto cell_two_left = face_two_left.neib();
+
+                if (!face_two_left.is_boundary()) {
+                    neib_two_left = cell_two_left[part.init];
+                } else {
+                    neib_two_left = boundary_value(cell_one_left[part.init], normal_two_left, face_two_left.flag());
+                }
+            } else {
+                neib_one_left = boundary_value(cell_left[part.init], normal_one_left, face_one_left.flag());
+            }
+        } else {
+            neib_left = boundary_value(z_c, normal_left, face_left.flag());
+            neib_one_left = boundary_value(z_c, normal_left, face_left.flag());
+        }
+
+        // Cосед справа от рассматриваемой ячейки (I_{i+1})
+        auto face_right = cell.face(mesh::Side2D::R);
+        auto normal_right = face_right.normal();
+        auto cell_right = face_right.neib();
+
+        // Примитивные вектора соседей справа (включая I_{i+2} и I_{i+3})
+        PState neib_right;
+        PState neib_one_right;
+        PState neib_two_right;
+
+        // Расчет примитивных векторов справа от рассматриваемой ячейки
+        if (!face_right.is_boundary()) {
+            neib_right = cell_right[part.init];
+
+            // Сосед через одного справа от рассматриваемой ячейки (I_{i+2})
+            auto face_one_right = cell_right.face(mesh::Side2D::R);
+            auto normal_one_right = face_one_right.normal();
+            auto cell_one_right = face_one_right.neib();
+
+            if (!face_one_right.is_boundary()) {
+                neib_one_right = cell_one_right[part.init];
+            } else {
+                neib_one_right = boundary_value(cell_right[part.init], normal_one_right, face_one_right.flag());
+            }
+        } else {
+            neib_right = boundary_value(z_c, normal_right, face_right.flag());
+            neib_one_right = boundary_value(z_c, normal_right, face_right.flag());
+            neib_two_right = boundary_value(z_c, normal_right, face_right.flag());
+        }
+
+        // Преобразование примитивных векторов в консервативные
+        QState neib_left_c(neib_left);
+        QState neib_one_left_c(neib_one_left);
+        QState neib_two_left_c(neib_two_left);
+
+        QState neib_right_c(neib_right);
+        QState neib_one_right_c(neib_one_right);
+        QState neib_two_right_c(neib_two_right);
+
+        // Консервативные векторы u_{i+1/2}^{-} и u_{i+1/2}^{+}
+        QState q_iplus12_minus;
+        QState q_iminus12_plus;
+
+        QState q_iminus12_minus;
+        QState q_iplus12_plus;
+
+        // Расчет u_{i+1/2} и u_{i-1/2}
+        for (int i = 0; i <= q_c.arr().size(); i++) {
+            // WENO5 для u_{i+1/2}^{-} и u_{i-1/2}^{+}
+            WENO5 stencil_i{neib_one_left_c.arr()[i], neib_left_c.arr()[i],
+                                q_c.arr()[i], neib_right_c.arr()[i], neib_one_right_c.arr()[i]};
+            q_iplus12_minus.arr()[i] += stencil_i.p();
+            q_iminus12_plus.arr()[i] += stencil_i.m();
+
+            // WENO5 для u_{i-1/2}^{-} и u_{i+1/2}^{+}
+            WENO5 stencil_i_minus1{neib_two_left_c.arr()[i], neib_one_left_c.arr()[i],
+                                neib_left_c.arr()[i], q_c.arr()[i], neib_right_c.arr()[i]};
+            q_iminus12_minus.arr()[i] += stencil_i_minus1.p();
+            q_iplus12_plus.arr()[i] += stencil_i_minus1.m();
+        }
+
+        // Преобразование консервативных векторов в примитивные
+        PState z_iplus12_minus{q_iplus12_minus, *m_eos};
+        PState z_iminus12_plus{q_iminus12_plus, *m_eos};
+
+        PState z_iminus12_minus{q_iminus12_minus, *m_eos};
+        PState z_iplus12_plus{q_iplus12_plus, *m_eos};
+
+        // Численные потоки f_{i+1/2} и f_{i-1/2}
+        Flux f_iplus12 = m_nf->flux(z_iplus12_minus.in_local(normal_right), z_iplus12_plus.in_local(normal_right), *m_eos);
+        Flux f_iminus12 = m_nf->flux(z_iminus12_minus.in_local(normal_left), z_iminus12_plus.in_local(normal_left), *m_eos);
+
+        f_iplus12.to_global(normal_right);
+        f_iminus12.to_global(normal_left);
+
+        // Суммируем потоки
+        flux.arr() += f_iplus12.arr() * face_right.area(m_axial);
+        flux.arr() += f_iminus12.arr() * face_left.area(m_axial);
 
         // Обновляем значение в ячейке (консервативные переменные)
         q_c.arr() -= (m_dt / cell.volume(m_axial)) * flux.arr();

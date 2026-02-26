@@ -85,6 +85,9 @@ public:
     /// @brief Расчёт потоков
     void fluxes(EuMesh &mesh) const;
 
+    /// @brief Расчёт потоков с помощью WENO схемы
+    void fluxes_weno(EuMesh &mesh) const;
+
     /// @brief Обновление ячеек
     void swap(EuMesh &mesh) const;
 

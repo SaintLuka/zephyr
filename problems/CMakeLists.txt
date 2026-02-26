@@ -1,6 +1,6 @@
-# add_subdirectory(single-fluid)
+add_subdirectory(single-fluid)
 #add_subdirectory(multi-fluid)
-add_subdirectory(free-boundary)
+#add_subdirectory(free-boundary)
 
 #list(APPEND PROBLEMS advection)
 #list(APPEND PROBLEMS convection)
