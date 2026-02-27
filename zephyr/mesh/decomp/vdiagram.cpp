@@ -539,7 +539,7 @@ double VDiagram::distance_gen(int i, int j) {
     return (m_coords[i] - m_coords[j]).norm();
 }
 
-double imb_func(double Imax) {
+inline double imb_func(double Imax) {
     // Значение дисбаланса, при котором возвращается 1/2
     // Приемлимое значение дисбаланса
     const double I0 = 1.0e-2;

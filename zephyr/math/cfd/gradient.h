@@ -125,15 +125,14 @@ Grad<State> LSM_orig(EuCell &cell,
         const Vector3d &normal = face.normal();
 
         State zn;
-        Vector3d dr;
         if (!face.is_boundary()) {
             auto neib = face.neib();
             zn = get_state(neib);
-            dr = neib.center() - cell_c;
         } else {
             zn = boundary_value(zc, normal, face.flag());
-            dr = face.symm_point(cell_c) - cell_c;
         }
+        Vector3d dr = (face.flag() == Boundary::INNER ?
+            face.neib_center() : face.symm_point(cell_c)) - cell_c;
 
         double w = 1.0 / dr.squaredNorm();
 
@@ -185,15 +184,14 @@ Grad<State> LSM(EuCell &cell,
         auto &normal = face.normal();
 
         State zn;
-        Vector3d dr;
         if (!face.is_boundary()) {
             auto neib = face.neib();
             zn = get_state(neib);
-            dr = neib.center() - cell_c;
         } else {
             zn = boundary_value(zc, normal, face.flag());
-            dr = face.symm_point(cell_c) - cell_c;
         }
+        Vector3d dr = (face.flag() == Boundary::INNER ?
+            face.neib_center() : face.symm_point(cell_c)) - cell_c;
 
         Vector3d drn = dr.dot(normal) * normal;
 
@@ -245,14 +243,13 @@ Grad<State> LSM(EuCell &cell, Storable<State> state,
         auto &normal = face.normal();
 
         State zn;
-        Vector3d dr;
         if (!face.is_boundary()) {
             zn = face.neib(state);
-            dr = face.neib_center() - cell_c;
         } else {
             zn = boundary_value(zc, normal, face.flag());
-            dr = face.symm_point(cell_c) - cell_c;
         }
+        Vector3d dr = (face.flag() == Boundary::INNER ?
+            face.neib_center() : face.symm_point(cell_c)) - cell_c;
 
         Vector3d drn = dr.dot(normal) * normal;
 
@@ -304,15 +301,15 @@ Grad<State> limiting_orig(EuCell &cell, const Limiter& limiter,
         const Vector3d &normal = face.normal();
 
         State zn;
-        Vector3d dr;
         if (!face.is_boundary()) {
             auto neib = face.neib();
             zn = get_state(neib);
-            dr = neib.center() - cell_c;
+            //dr = neib.center() - cell_c;
         } else {
             zn = boundary_value(zc, normal, face.flag());
-            dr = face.symm_point(cell_c) - cell_c;
         }
+        Vector3d dr = (face.flag() == Boundary::INNER ?
+            face.neib_center() : face.symm_point(cell_c)) - cell_c;
 
         double w = 1.0 / dr.squaredNorm();
 
@@ -369,15 +366,14 @@ Grad<State> limiting(EuCell &cell, const Limiter& limiter,
         const Vector3d &normal = face.normal();
 
         State zn;
-        Vector3d dr;
         if (!face.is_boundary()) {
             auto neib = face.neib();
             zn = get_state(neib);
-            dr = neib.center() - cell_c;
         } else {
             zn = boundary_value(zc, normal, face.flag());
-            dr = face.symm_point(cell_c) - cell_c;
         }
+        Vector3d dr = (face.flag() == Boundary::INNER ?
+            face.neib_center() : face.symm_point(cell_c)) - cell_c;
 
         Vector3d drn = dr.dot(normal) * normal;
 
@@ -435,14 +431,13 @@ Grad<State> limiting(EuCell &cell, const Limiter& limiter,
         const Vector3d &normal = face.normal();
 
         State zn;
-        Vector3d dr;
         if (!face.is_boundary()) {
             zn = face.neib(state);
-            dr = face.neib_center() - cell_c;
         } else {
             zn = boundary_value(zc, normal, face.flag());
-            dr = face.symm_point(cell_c) - cell_c;
         }
+        Vector3d dr = (face.flag() == Boundary::INNER ?
+            face.neib_center() : face.symm_point(cell_c)) - cell_c;
 
         Vector3d drn = dr.dot(normal) * normal;
 

@@ -105,20 +105,28 @@ public:
 
     /// @{ @name Массивы данных
 
-    /// @brief Добавить несколько массивов данных в хранилище
-    /// @param names Имена массивов данных
-    /// @return Если передан один аргумент, то возвращает единственный Storable<T>,
-    /// при наличии нескольких аргументов возвращает кортеж Storable<T>.
+    /// @brief Добавить тип данных на сетку
+    /// @param name Имя массива данных
+    template <typename T>
+    Storable<T> add(const std::string& name);
+
+    /// @brief Добавить векторный тип данных на сетку
+    /// @param name Имя поля данных должно быть уникальным
+    /// @param count Число компонент
+    template<typename T>
+    Storable<T> add(const std::string &name, int count);
+
+    /// @brief Добавить несколько одинаковых **скалярных** полей
+    /// @param names Имена полей данных, должны быть уникальными
+    /// @tparam Names Произвольное число аргументов (> 1), которые можно
+    /// конвертировать в `std::string`, для всех выполнится `add<T>`.
+    /// @return Кортеж из `Storable<T>` для нескольких аргументов (для structure binding).
     template<typename T, typename... Names, typename = std::enable_if_t<
-            (sizeof...(Names) > 0) && (std::is_convertible_v<Names, std::string> && ...)>>
-    auto add(Names&&... names) {
-        if constexpr (sizeof...(Names) == 1) {
-            return add_one<T>(std::string(std::forward<Names>(names))...);
-        } else {
-            // Короче жесть, тут сложно было добиться соблюдения порядка
-            // с круглыми скобками std::tuple() или std::make_tuple() не работают.
-            return std::tuple{add_one<T>(std::string(std::forward<Names>(names)))...};
-        }
+            (sizeof...(Names) > 1) && (std::is_convertible_v<Names, std::string> && ...)>>
+    auto add_multi(Names&&... names) {
+        // Короче жесть, тут сложно было добиться соблюдения порядка
+        // с круглыми скобками std::tuple() или std::make_tuple() не работают.
+        return std::tuple{add<T>(std::string(std::forward<Names>(names)))...};
     }
 
     /// @brief Поменять местами два массива данных
@@ -342,6 +350,11 @@ public:
     /// @brief Проверить сетку после адаптации
     int check_refined() const;
 
+    /// @brief Полностью сохранить сетку
+    /// @param sroot Корневая директория для сохранения
+    /// @param variables Переменные для сохранения
+    void backup(const std::string& sroot, const std::vector<std::string>& variables) const;
+
     /// @}
 
 private:
@@ -350,11 +363,6 @@ private:
 
     /// @brief Синхронизовать общие параметры сетки
     void sync_params_();
-
-    /// @brief Добавить массив данных в хранилище
-    /// @param name Имя массива данных
-    template <typename T>
-    Storable<T> add_one(const std::string& name);
 
     /// @brief Инициализация параметров AMR-ячеек
     void init_amr();
@@ -398,10 +406,22 @@ private:
 // ============================================================================
 
 template <typename T>
-Storable<T> EuMesh::add_one(const std::string& name) {
+Storable<T> EuMesh::add(const std::string& name) {
     auto res1 = m_locals.data.add<T>(name);
 #ifdef ZEPHYR_MPI
     auto res2 = m_tourists.add<T>(name);
+    if (res1 != res2) {
+        throw std::runtime_error("EuMesh error: bad add<T> #2");
+    }
+#endif
+    return res1;
+}
+
+template <typename T>
+Storable<T> EuMesh::add(const std::string& name, int count) {
+    auto res1 = m_locals.data.add<T>(name, count);
+#ifdef ZEPHYR_MPI
+    auto res2 = m_tourists.add<T>(name, count);
     if (res1 != res2) {
         throw std::runtime_error("EuMesh error: bad add<T> #2");
     }

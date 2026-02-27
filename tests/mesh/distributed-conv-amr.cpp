@@ -85,7 +85,7 @@ int main() {
     EuMesh mesh(gen);
 
     // Добавить данные на сетку
-    auto [u1, u2] = mesh.add<double>("u1", "u2");
+    auto [u1, u2] = mesh.add_multi<double>("u1", "u2");
 
     mesh.set_max_level(3);
     mesh.set_distributor(get_distributor(u1));

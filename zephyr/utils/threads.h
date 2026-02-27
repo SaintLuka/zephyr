@@ -181,14 +181,14 @@ public:
 
 private:
     /// @brief Число потоков
-    static int n_threads;
+    static inline int n_threads = 0;
 
 #ifdef ZEPHYR_TBB
     /// @brief Ограничитель числа потоков для TBB
-    static std::unique_ptr<tbb::global_control> m_control;
+    static inline std::unique_ptr<tbb::global_control> m_control = nullptr;
 #else
     /// @brief Указатель на пул тредов
-    static std::unique_ptr<ThreadPool> pool;
+    static inline std::unique_ptr<ThreadPool> pool = nullptr;
 #endif
 };
 

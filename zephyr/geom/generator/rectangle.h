@@ -77,6 +77,12 @@ public:
     /// @brief Создать сетку общего вида
     Grid make() const override;
 
+    /// @brief Может инициализировать хранилище (для декартовой сетки)
+    bool can_initialize() const override { return !m_voronoi; }
+
+    /// @brief Инициализация SoA-хранилища сетки
+    void initialize(mesh::AmrCells& cells) const override;
+
     // Далее не самые полезные get-функции
 
     /// @brief Левая граница
@@ -121,6 +127,12 @@ private:
 
     /// @brief Создать сетку из шестиугольников
     Grid create_voronoi() const;
+
+    /// @brief Создать классическую декартову сетку
+    void initialize_classic(mesh::AmrCells& cells) const;
+
+    /// @brief Создать сетку из шестиугольников
+    void initialize_voronoi(mesh::AmrCells& cells);
 
     int m_nx{0}, m_ny{0};   ///< Число ячеек по осям
     int m_size{0};          ///< Суммарное число ячеек

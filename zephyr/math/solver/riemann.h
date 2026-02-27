@@ -29,7 +29,7 @@ public:
         bool conv;  ///< Хорошая сходимость
 
         /// @brief Конструктор по умолчанию
-        Solution() : rho(0.0 / 0.0), Uf(0.0 / 0.0), Pf(0.0 / 0.0), conv(false) {}
+        Solution() : rho(NAN), Uf(NAN), Pf(NAN), conv(false) {}
 
         /// @brief Простейший конструктор
         Solution(cref rho, cref Uf, cref Pf, cref U, cref  P, bool conv)

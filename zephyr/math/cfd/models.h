@@ -1,5 +1,7 @@
 #pragma once
 
+#include <span>
+
 #include <zephyr/geom/vector.h>
 #include <zephyr/math/vectorization.h>
 #include <zephyr/math/cfd/rotate.h>
@@ -52,12 +54,12 @@ struct PState {
     void inverse();
 
     // Короткий доступ к полям
-    const double& rho() const { return density; }
-    const double& u() const { return velocity.x(); }
-    const double& v() const { return velocity.y(); }
-    const double& w() const { return velocity.z(); }
-    const double& P() const { return pressure; }
-    const double& e() const { return energy; }
+    double rho() const { return density; }
+    double vx() const { return velocity.x(); }
+    double vy() const { return velocity.y(); }
+    double vz() const { return velocity.z(); }
+    double P() const { return pressure; }
+    double e() const { return energy; }
 
     // Квадрат модуля скорости
     double v2() const { return velocity.squaredNorm(); }
@@ -159,20 +161,23 @@ using zephyr::phys::MixturePT;
 
 struct QState;
 
-/// @brief Примитивный многоматериальный вектор состояния
+/// @brief Примитивный многоматериальный вектор состояния.
 /// Используется в модели равновесной по скорости, давлению
 /// и температуре (P-V-T модель).
 struct PState {
-    double    density;      ///< Плотность смеси
-    Vector3d  velocity;     ///< Равновесная корость
-    double    pressure;     ///< Равновесное давление
-    double    energy;       ///< Внутренняя энергия смеси (доп)
-    double    temperature;  ///< Равновесная температура (доп)
-    Fractions mass_frac;    ///< Массовые доли компонент
-    ScalarSet densities;    ///< Истинные плотности (доп)
+public:
+    double    density{};      ///< Плотность смеси
+    Vector3d  velocity{};     ///< Равновесная скорость
+    double    pressure{};     ///< Равновесное давление
+    double    energy{};       ///< Внутренняя энергия смеси (доп)
+    double    temperature{};  ///< Равновесная температура (доп)
+    Fractions mass_frac{};    ///< Массовые доли компонент
+    ScalarSet densities{};    ///< Истинные плотности (доп)
+
+    // ----------------------------- Конструкторы -----------------------------
 
     /// @brief Инициализация нулями
-    PState();
+    PState() = default;
 
     /// @brief Инициализация с полным заданием параметров
     PState(double density, const Vector3d &velocity, double pressure, double energy,
@@ -180,17 +185,67 @@ struct PState {
 
     /// @brief Инициализация с частичным заданием параметров и УрС
     PState(double density, const Vector3d &velocity, double pressure,
-            const Fractions &mass_frac,  const MixturePT &mixture);
+            const Fractions &mass_frac, const MixturePT &mixture);
 
     /// @brief Инициализация из консервативного вектора состояния,
     /// давление, температура и объемные доли определяются из уравнения
     /// состояния смеси (PT - замыкание).
-    /// В качестве начальных приближений в следует передавать начальные
+    /// В качестве начальных приближений следует передавать начальные
     /// приближения для давления (P0), температуры (T0) и
     /// плотностей компонент (densities).
     PState(const QState &q, const MixturePT &mixture,
-           double P0, double T0, const ScalarSet& densities);
+           double P0, double T0, std::span<const double> rhos = {});
 
+
+    // ----------------------- Прямой доступ к данным -------------------------
+
+    double  rho() const { return density; }
+    double& rho()       { return density; }
+    double  vx() const { return velocity.x(); }
+    double& vx()       { return velocity.x(); }
+    double  vy() const { return velocity.y(); }
+    double& vy()       { return velocity.y(); }
+    double  vz() const { return velocity.z(); }
+    double& vz()       { return velocity.z(); }
+    double  P() const { return pressure; }
+    double& P()       { return pressure; }
+    double  e() const { return energy; }
+    double& e()       { return energy; }
+    double  T() const { return temperature; }
+    double& T()       { return temperature; }
+
+    double  beta(int i) const { return mass_frac[i]; }
+    double& beta(int i)       { return mass_frac[i]; }
+
+    const Vector3d& vel() const { return velocity; }
+          Vector3d& vel()       { return velocity; }
+
+    const Fractions& beta() const { return mass_frac; }
+          Fractions& beta()       { return mass_frac; }
+
+    std::span<const double> rhos() const { return densities.span(); }
+
+    // ------------------------ Вычисляемые величины --------------------------
+
+    /// @brief Квадрат модуля скорости
+    double v2() const { return velocity.squaredNorm(); }
+
+    /// @brief Полная удельная энергия
+    double E() const { return energy + 0.5 * v2(); }
+
+    /// @brief Объемная доля i-ой компоненты
+    double alpha(int i) const;
+
+    /// @brief Объемные доли всех компонент
+    Fractions volume_fractions() const;
+
+    /// @brief Энергия компоненты energy(P, T)
+    double true_energy(const MixturePT& mixture, int i) const;
+
+    // ---------------------------- Преобразования ----------------------------
+
+    /// @brief Отражает систему координат
+    void inverse();
 
     /// @brief Переводит вектор состояния в локальную систему координат
     void to_local(const Vector3d &normal);
@@ -203,46 +258,6 @@ struct PState {
 
     /// @brief Возвращает вектор состояния в глобальной системе координат
     PState in_global(const Vector3d &normal) const;
-
-    /// @brief Отражает систему координат
-    void inverse();
-
-    // Короткий доступ к полям
-    inline const double& rho() const { return density; }
-    inline const double& u() const { return velocity.x(); }
-    inline const double& v() const { return velocity.y(); }
-    inline const double& w() const { return velocity.z(); }
-    inline const double& P() const { return pressure; }
-    inline const double& T() const { return temperature; }
-    inline const double& e() const { return energy; }
-    inline const Fractions& beta() const { return mass_frac; }
-    inline const ScalarSet& rhos() const { return densities; }
-
-    inline double alpha(int idx) const {
-        return std::isnan(densities[idx]) ? 0.0 :
-               std::max(0.0, std::min(mass_frac[idx] * density / densities[idx], 1.0));
-    }
-
-    Fractions vol_fracs() const {
-        Fractions alpha;
-        for (int i = 0; i < Fractions::size(); ++i) {
-            if (mass_frac.has(i)) {
-                // Если есть массовая концентрация beta_i, значит
-                // должна быть определена плотность rho_i !
-                alpha[i] = mass_frac[i] * density / densities[i];
-            }
-        }
-        return alpha;
-    }
-
-    // Квадрат модуля скорости
-    inline double v2() const { return velocity.squaredNorm(); }
-
-    // Полная удельная энергия
-    inline double E() const { return energy + 0.5 * v2(); }
-
-    /// @brief Энергия компоненты energy(P, T)
-    double true_energy(const MixturePT& mixture, int idx) const;
 
     /// @brief Преобразование в одноматериальный вектор состояния
     smf::PState to_smf() const;
@@ -261,6 +276,9 @@ struct PState {
     /// для энергии и температуры (вычисляются по плотности и давлению)
     void interpolation_update(const phys::MixturePT& mixture);
 
+    // ---------------------------- Output / Debug ----------------------------
+
+    /// @brief Проверить на NaN и Infinity
     bool is_bad() const;
 
     /// @brief В поток вывода

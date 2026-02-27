@@ -10,14 +10,6 @@ namespace po = boost::program_options;
 
 namespace zephyr::utils {
 
-int threads::n_threads = 1;
-
-#ifdef ZEPHYR_TBB
-std::unique_ptr<tbb::global_control> threads::m_control = nullptr;
-#else
-std::unique_ptr<ThreadPool> threads::pool = nullptr;
-#endif
-
 int threads::recommended() {
     int HC = int(std::thread::hardware_concurrency());
     int n_tasks = zephyr::utils::mpi::n_tasks();

@@ -1,5 +1,5 @@
 add_subdirectory(single-fluid)
-#add_subdirectory(multi-fluid)
+add_subdirectory(multi-fluid)
 
 #list(APPEND PROBLEMS advection)
 #list(APPEND PROBLEMS burgers)

@@ -1,5 +1,5 @@
 /// @file wave.cpp
-/// @brief Решение волнового уравнения в квадрате
+/// @brief Numerical solution of a wave equation.
 
 #include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/mesh/euler/eu_mesh.h>
@@ -11,50 +11,50 @@ using namespace zephyr::io;
 using generator::Rectangle;
 
 int main() {
-    // Геометрия области
+    // Generator of a Cartesian grid
     Rectangle gen(-2.0, 1.0, -2.0, 1.0);
     gen.set_nx(400);
     gen.set_boundaries({.left=Boundary::WALL, .right=Boundary::WALL,
                         .bottom=Boundary::WALL, .top=Boundary::WALL});
 
-    // Создать сетку
+    // Create mesh
     EuMesh mesh(gen);
 
-    // Добавить на сетку расчетные поля
+    // Add data fields
     Storable<double> u_prev = mesh.add<double>("u_prev");
     Storable<double> u_curr = mesh.add<double>("u_curr");
     Storable<double> u_next = mesh.add<double>("u_next");
 
-    // Создадим файлы для записи
+    // Files for output
     PvdFile pvd("wave", "output");
     pvd.variables.append("u", u_curr);
 
-    // Начальные условия, скорость считаем нулевой
+    // Initial conditions, assuming zero velocity
     for (auto cell: mesh) {
         double r = cell.center().norm();
         cell[u_prev] = 0.5 + 0.5 * std::tanh(50*(0.5 - r));
         cell[u_curr] = cell[u_prev];
     }
 
-    // Зададим скорость и вычислим расчетный шаг
+    // Estimate timestep
     double speed = 1.0;
     double dt = std::numeric_limits<double>::max();
     for (auto cell: mesh) {
         dt = std::min(dt, 0.5 * cell.incircle_diameter() / speed);
     }
-    dt *= 0.95; // Условие Куранта
+    dt *= 0.95; // CFL condition
 
-    // Основной цикл программы
+    // Main loop
     size_t n_step = 0;
     double curr_time = dt;
     while (curr_time < 5.0 && n_step < 5000) {
-        // Сохранение в файл
+        // Save data to file
         if (n_step % 10 == 0) {
             std::cout << "Step: " << n_step << ";\tTime: " << curr_time << "\n";
             pvd.save(mesh, curr_time);
         }
 
-        // Цикл по сетке и расчет нового слоя
+        // Loop over the cells, compute new time layer
         for (auto cell: mesh) {
             double uc = cell[u_curr];
 
@@ -73,13 +73,13 @@ int main() {
                 std::pow(speed * dt, 2) * fluxes / cell.volume();
         }
 
-        // Обмен временных слоёв
+        // Swap time layers
         for (auto cell: mesh) {
             cell[u_prev] = cell[u_curr];
             cell[u_curr] = cell[u_next];
         }
 
-        // Обновление времени
+        // Update time and step
         curr_time += dt;
         ++n_step;
     }

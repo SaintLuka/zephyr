@@ -1,7 +1,7 @@
 /// @file advection.cpp
-/// @brief Решение задачи переноса с неоднородной скоростью.
-/// Используется простейшая схема первого порядка (upwind).
-#include <iostream>
+/// @brief Numerical solution of a scalar advection problem.
+/// A simple upwind scheme of the first order accuracy is used.
+
 #include <iomanip>
 
 #include <zephyr/geom/generator/rectangle.h>
@@ -17,34 +17,35 @@ using zephyr::mesh::EuMesh;
 using zephyr::mesh::EuCell;
 using zephyr::io::PvdFile;
 
-// Векторное поле скорости
+// Velocity vector field
 Vector3d velocity(const Vector3d& c) {
     return { 1.0, 0.3 + 0.3*std::sin(4 * M_PI * c.x()), 0.0 };
 }
 
 int main() {
-    // Геометрия области
+    // Generator of a Cartesian grid
     Rectangle rect(0.0, 1.0, 0.0, 0.6, true);
     rect.set_nx(200);
     rect.set_boundaries({
         .left   = Boundary::PERIODIC, .right = Boundary::PERIODIC,
         .bottom = Boundary::PERIODIC, .top   = Boundary::PERIODIC});
 
-    // Создать сетку
+    // Create mesh
     EuMesh mesh(rect);
 
-    // Переменные для хранения на сетке
-    auto [u1, u2] = mesh.add<double>("u1", "u2");
+    // Add data fields
+    auto u1 = mesh.add<double>("u1");
+    auto u2 = mesh.add<double>("u2");
 
-    // Файл для записи
+    // Files for output
     PvdFile pvd("mesh", "output");
 
-    // Переменные для сохранения
+    // Variables to save
     pvd.variables.append("u", u1);
     pvd.variables += {"vx", [](EuCell cell) -> double { return velocity(cell.center()).x(); } };
     pvd.variables += {"vy", [](EuCell cell) -> double { return velocity(cell.center()).y(); } };
 
-    // Заполняем начальные данные
+    // Initial conditions
     Box box = mesh.bbox();
     Vector3d vc = box.center();
     double D = 0.1 * box.diameter();
@@ -53,7 +54,7 @@ int main() {
         cell[u2] = 0.0;
     }
 
-    // Число Куранта
+    // Courant number (< 1.0)
     double CFL = 0.5;
 
     int n_step = 0;
@@ -62,13 +63,13 @@ int main() {
 
     while(curr_time <= 1.0) {
         if (curr_time >= next_write) {
-            std::cout << "\tШаг: " << std::setw(6) << n_step << ";"
-                      << "\tВремя: " << std::setw(6) << std::setprecision(3) << curr_time << "\n";
+            std::cout << "\tStep: " << std::setw(6) << n_step << ";"
+                      << "\tTime: " << std::setw(6) << std::setprecision(3) << curr_time << "\n";
             pvd.save(mesh, curr_time);
             next_write += 0.02;
         }
 
-        // Определяем dt
+        // Estimate timestep
         double dt = std::numeric_limits<double>::max();
         for (auto cell: mesh) {
             double max_area = 0.0;
@@ -80,7 +81,7 @@ int main() {
         }
         dt *= CFL;
 
-        // Расчет по схеме upwind
+        // Integrate using upwind scheme
         for (auto cell: mesh) {
             double zc = cell[u1];
 
@@ -98,7 +99,7 @@ int main() {
             cell[u2] = zc - dt * fluxes / cell.volume();
         }
 
-        // Обновляем слои
+        // Update time layers
         for (auto cell: mesh) {
             cell[u1] = cell[u2];
             cell[u2] = 0.0;

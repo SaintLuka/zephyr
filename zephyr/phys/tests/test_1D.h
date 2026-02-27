@@ -10,7 +10,6 @@
 #pragma once
 
 #include <zephyr/phys/tests/ivp.h>
-#include <zephyr/phys/matter/eos/ideal_gas.h>
 #include <zephyr/math/solver/riemann.h>
 
 namespace zephyr::phys {

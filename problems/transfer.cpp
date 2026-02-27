@@ -156,7 +156,7 @@ int main() {
     //pvd.variables += {"du/dy", grad_y};
     pvd.variables += {"over", [u1=data.u1](EuCell& cell) -> double {
         double u = cell[u1];
-        return u < 0.0 ? u : (u <= 1.0 ? 0.0 / 0.0 : u - 1.0);
+        return u < 0.0 ? u : (u <= 1.0 ? NAN : u - 1.0);
     }};
     pvd.variables += {"close", [u1=data.u1](EuCell& cell) -> double {
         double u = cell[u1];

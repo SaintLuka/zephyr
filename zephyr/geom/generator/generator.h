@@ -4,6 +4,7 @@
 #include <memory>
 
 namespace zephyr::utils { class Json; }
+namespace zephyr::mesh { class AmrCells; }
 
 namespace zephyr::geom {
 
@@ -11,7 +12,7 @@ struct Box;  ///< Ограничивающий объем
 class Grid;  ///< Сетка общего вида, создается генератором
 
 /// @brief Максимальное число ячеек сетки
-constexpr int max_grid_size = 100'000'000;
+constexpr int max_grid_size = 200'000'000;
 
 /// @brief Базовый класс для сеточных генераторов.
 /// Виртуальная функция make() -> Grid создает сетку.
@@ -76,6 +77,14 @@ public:
 
     /// @brief Создать сетку общего вида
     virtual Grid make() const = 0;
+
+    /// @brief Некоторые генераторы могут напрямую инициализировать хранилище
+    virtual bool can_initialize() const { return false; }
+
+    /// @brief Инициализация SoA-хранилища сетки
+    virtual void initialize(mesh::AmrCells& cells) const {
+        throw std::runtime_error("Generator::initialize: not implemented");
+    }
 
 protected:
     /// @brief Проверить размеры сетки перед созданием

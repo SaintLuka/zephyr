@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include <zephyr/phys/matter/eos/eos.h>
 
 namespace zephyr::phys {

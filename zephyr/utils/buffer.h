@@ -1,14 +1,40 @@
 #pragma once
 
+#include <iostream>
 #include <string>
+#include <span>
 #include <zephyr/geom/vector.h>
-#include <zephyr/utils/span.h>
 
 #ifdef ZEPHYR_MPI
 #include <zephyr/utils/mpi.h>
 #endif
 
 namespace zephyr::utils {
+
+// Вывод span
+template<typename T>
+std::ostream& operator<<(std::ostream& os, std::span<T> sp) {
+    os << "[";
+    for (size_t i = 0; i < sp.size(); ++i) {
+        os << sp[i];
+        if (i != sp.size() - 1) os << ", ";
+    }
+    os << "]";
+    return os;
+}
+
+// Вспомогательная структура для извлечения информации
+template<typename T>
+struct array_traits {
+    using value = std::remove_extent_t<T>;
+    static constexpr bool is_array = std::is_array_v<T>;
+    static constexpr bool is_complete = is_array && (std::extent_v<T> > 0);
+    static constexpr size_t size = std::extent_v<T>;
+    static constexpr size_t span_extent = std::extent_v<T> > 0 ? std::extent_v<T> : std::dynamic_extent;
+
+    using span_type = std::span<value, span_extent>;             //< Подходящий span
+    using const_span_type = std::span<const value, span_extent>; //< Подходящий span
+};
 
 /// @brief Достаточно простой тип, который допускается хранить в буфере
 template<typename T>
@@ -168,18 +194,20 @@ public:
 
     /// @brief Доступ к элементу векторного типа
     template<typename T>
-    std::enable_if_t<std::is_array_v<T>, span<std::remove_extent_t<T>>>
+    std::enable_if_t<std::is_array_v<T>, typename array_traits<T>::span_type>
     get_val(size_t index) {
-        using V = std::remove_extent_t<T>;
-        return span<V>{reinterpret_cast<V*>(get_ptr(index)), m_count};
+        using V = array_traits<T>::value;
+        auto constexpr N = array_traits<T>::span_extent;
+        return std::span<V, N>{reinterpret_cast<V*>(get_ptr(index)), m_count};
     }
 
     /// @brief Доступ к элементу векторного типа
     template<typename T>
-    std::enable_if_t<std::is_array_v<T>, span<const std::remove_extent_t<T>>>
+    std::enable_if_t<std::is_array_v<T>, typename array_traits<T>::const_span_type>
     get_val(size_t index) const {
-        using V = std::remove_extent_t<T>;
-        return span<const V>{reinterpret_cast<const V*>(get_ptr(index)), m_count}; }
+        using V = array_traits<T>::value;
+        auto constexpr N = array_traits<T>::span_extent;
+        return std::span<const V, N>{reinterpret_cast<const V*>(get_ptr(index)), m_count}; }
 
     /// @brief Скопировать данные с индекса from на индекс to
     void copy_data(size_t from, size_t to) {

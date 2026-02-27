@@ -52,7 +52,7 @@ int main(int argc, char** argv) {
     EuMesh mesh(gen);
 
     // Добавить переменные на сетку
-    auto [u1, u2, load] = mesh.add<double>("u1", "u2", "load");
+    auto [u1, u2, load] = mesh.add_multi<double>("u1", "u2", "load");
 
     // Bounding Box для сетки
     Box domain = gen.bbox();

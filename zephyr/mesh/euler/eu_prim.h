@@ -130,6 +130,12 @@ public:
     template <typename T>
     const T& neib(Storable<T> type) const;
 
+    template <typename T>
+    std::span<const T> neib(Storable<T[]> type) const;
+
+    template <typename T, size_t N>
+    std::span<const T, N> neib(Storable<T[N]> type) const;
+
     /// @brief Флаг адаптации соседней ячейки
     int neib_flag() const;
 
@@ -207,14 +213,17 @@ class EuCell final {
     using SpFunction = std::function<double(const Vector3d &)>;
 
 private:
-    AmrCells* m_cells;  //< Указатель на сетку (обычно locals)
-    index_t   m_index;  //< Индекс ячейки
+    AmrCells* m_cells{nullptr};  //< Указатель на сетку (обычно locals)
+    index_t   m_index{-1};       //< Индекс ячейки
 
     /// @brief Нулевое значение допускается, но не проверяется в целях
     /// оптимизации, поэтому ловите segfaults.
-    AmrCells* m_aliens = nullptr;
+    AmrCells* m_aliens{nullptr};
 
 public:
+    /// @brief Конструктор по умолчанию (иногда требует TBB)
+    EuCell() = default;    
+
     EuCell(AmrCells* cells, index_t index, AmrCells* aliens = nullptr)
         : m_cells(cells), m_index(index), m_aliens(aliens) { }
 
@@ -307,9 +316,25 @@ public:
     template <typename T>
     T& operator[](Storable<T> var);
 
+    /// @brief Ссылка на данные ячейки
+    template <typename T>
+    std::span<T> operator[](Storable<T[]> var);
+
+    /// @brief Ссылка на данные ячейки
+    template <typename T, size_t N>
+    std::span<T, N> operator[](Storable<T[N]> var);
+
     /// @brief Константная ссылка на данные ячейки
     template <typename T>
     const T& operator[](Storable<T> var) const;
+
+    /// @brief Константная ссылка на данные ячейки
+    template <typename T>
+    std::span<const T> operator[](Storable<T[]> var) const;
+
+    /// @brief Константная ссылка на данные ячейки
+    template <typename T, size_t N>
+    std::span<const T, N> operator[](Storable<T[N]> var) const;
 
     /// @brief Скопировать данные в другую ячейку
     void copy_data_to(EuCell& dst_cell) const;
@@ -428,7 +453,7 @@ public:
 /// @brief Итератор по ячейкам из EuMesh или AmrCells
 class EuCell_Iter final {
 private:
-    EuCell m_eu_cell;  ///< Реальная ячейка
+    EuCell m_eu_cell{};  ///< Реальная ячейка
 
 public:
     using iterator_category = std::random_access_iterator_tag;
@@ -436,6 +461,9 @@ public:
     using value_type = EuCell;
     using pointer    = EuCell *;
     using reference  = EuCell &;
+
+    /// @brief Конструктор по умолчанию (иногда требует TBB)
+    EuCell_Iter() = default;
 
     /// @brief Конструктор как у ячейки
     EuCell_Iter(AmrCells *cells, index_t index, AmrCells *aliens = nullptr)
@@ -649,6 +677,22 @@ const T& EuFace::neib(Storable<T> type) const {
     return m_aliens->data.get_val(type, adj_alien());
 }
 
+template <typename T>
+std::span<const T> EuFace::neib(Storable<T[]> type) const {
+    if (utils::mpi::single() || local_neib()) {
+        return m_cells->data.get_val(type, adj_index());
+    }
+    return m_aliens->data.get_val(type, adj_alien());
+}
+
+template <typename T, size_t N>
+std::span<const T, N> EuFace::neib(Storable<T[N]> type) const {
+    if (utils::mpi::single() || local_neib()) {
+        return m_cells->data.get_val(type, adj_index());
+    }
+    return m_aliens->data.get_val(type, adj_alien());
+}
+
 inline int EuFace::neib_flag() const {
     if (utils::mpi::single() || local_neib()) {
         return m_cells->flag[adj_index()];
@@ -725,10 +769,22 @@ inline double EuCell::linear_size() const { return m_cells->linear_size(m_index)
 inline double EuCell::incircle_diameter() const { return m_cells->incircle_diameter(m_index); }
 
 template <typename T>
-T& EuCell::operator[](Storable<T> var) { return m_cells->data.get_val(var, m_index); }
+T& EuCell::operator[](Storable<T> var) { return m_cells->data.get_val<T>(var, m_index); }
 
 template <typename T>
- const T& EuCell::operator[](Storable<T> var) const { return m_cells->data.get_val(var, m_index); }
+std::span<T> EuCell::operator[](Storable<T[]> var) { return m_cells->data.get_val<T>(var, m_index); }
+
+template <typename T, size_t N>
+std::span<T, N> EuCell::operator[](Storable<T[N]> var) { return m_cells->data.get_val<T>(var, m_index); }
+
+template <typename T>
+const T& EuCell::operator[](Storable<T> var) const { return m_cells->data.get_val<T>(var, m_index); }
+
+template <typename T>
+std::span<const T> EuCell::operator[](Storable<T[]> var) const { return m_cells->data.get_val<T>(var, m_index); }
+
+template <typename T, size_t N>
+std::span<const T, N> EuCell::operator[](Storable<T[N]> var) const { return m_cells->data.get_val<T>(var, m_index); }
 
 inline void EuCell::copy_data_to(EuCell &dst_cell) const {
     m_cells->copy_data(m_index, dst_cell.m_cells, dst_cell.m_index);

@@ -5,9 +5,19 @@ project(zephyr
 
 set(CMAKE_LIB_NAME zephyr)
 
+# Флаги компиляции
 set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_FLAGS_DEBUG   "-Wno-attributes -Wno-unused-result -O0 -g")
-set(CMAKE_CXX_FLAGS_RELEASE "-Wno-attributes -Wno-unused-result -O3")
+if (MSVC)
+    set(BASIC_FLAGS "/W1")
+    set(CMAKE_CXX_FLAGS         "${CMAKE_CXX_FLAGS} ${BASIC_FLAGS}")
+    set(CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS_DEBUG} ${BASIC_FLAGS} /Od")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${BASIC_FLAGS} /O2")
+else()
+    set(BASIC_FLAGS "-Wno-attributes -Wno-unused-result")
+    set(CMAKE_CXX_FLAGS         "${CMAKE_CXX_FLAGS} ${BASIC_FLAGS}")
+    set(CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS_DEBUG} ${BASIC_FLAGS} -O0 -g")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${BASIC_FLAGS} -O3")
+endif()
 
 set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type: Release / Debug")
 set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS Release Debug)
@@ -35,17 +45,11 @@ if (CMAKE_BUILD_TYPE STREQUAL Debug)
     set(ZEPHYR_ASSERTS ON)
 endif ()
 
-configure_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/configuration.h.in
-    ${CMAKE_CURRENT_BINARY_DIR}/zephyr/configuration.h
-)
-
 if (ZEPHYR_TBB)
     find_package(TBB REQUIRED)
 else ()
     find_package(Threads REQUIRED)
 endif ()
-find_package(OpenMP REQUIRED)
 find_package(Eigen3  REQUIRED)
 if(POLICY CMP0167)
     cmake_policy(SET CMP0167 NEW)
@@ -54,7 +58,25 @@ find_package(Boost   COMPONENTS program_options REQUIRED)
 if (ZEPHYR_PYTHON)
     find_package(Python3 COMPONENTS Interpreter Development NumPy REQUIRED)
     find_package(pybind11 REQUIRED)
+
+    get_filename_component(PYTHON_EXE_DIR "${Python3_EXECUTABLE}" DIRECTORY)
+    get_filename_component(PYTHONHOME "${PYTHON_EXE_DIR}" ABSOLUTE)
+
+    if(WIN32)
+        file(TO_CMAKE_PATH "${PYTHONHOME}" PYTHONHOME_CMAKE)
+        string(REPLACE "/" "\\" PYTHONHOME_NATIVE "${PYTHONHOME_CMAKE}")
+        string(REPLACE "\\" "\\\\" PYTHONHOME_CPP "${PYTHONHOME_NATIVE}")
+        set(PYTHONHOME "${PYTHONHOME_CPP}")
+    endif()
+
+    message(STATUS "PYTHONHOME: ${PYTHONHOME}")
 endif()
+
+add_definitions(-D_USE_MATH_DEFINES)
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/configuration.h.in
+    ${CMAKE_CURRENT_BINARY_DIR}/zephyr/configuration.h
+)
 
 add_subdirectory(zephyr)
 
@@ -74,7 +96,6 @@ if (ZEPHYR_PYTHON)
     target_link_libraries(zephyr PUBLIC pybind11::embed)
 endif()
 target_link_libraries(zephyr PUBLIC Eigen3::Eigen)
-target_link_libraries(zephyr PUBLIC OpenMP::OpenMP_CXX)
 
 target_include_directories(zephyr PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>
@@ -91,6 +112,23 @@ if (ZEPHYR_MPI)
     target_include_directories(zephyr PUBLIC ${MPI_INCLUDE_PATH})
     target_link_libraries(zephyr PUBLIC ${MPI_LIBRARIES})
 endif()
+
+if(MSVC)
+    set_target_properties(zephyr PROPERTIES
+            WINDOWS_EXPORT_ALL_SYMBOLS TRUE
+            CXX_VISIBILITY_PRESET hidden)
+
+    #set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
+
+    target_compile_definitions(zephyr PRIVATE ZEPHYR_EXPORTS)
+
+    set_target_properties(zephyr PROPERTIES
+            ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+            LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+            RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+            )
+endif()
+
 install(TARGETS zephyr DESTINATION lib EXPORT zephyr-targets)
 
 install(EXPORT zephyr-targets DESTINATION share/cmake/zephyr)

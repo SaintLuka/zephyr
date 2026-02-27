@@ -75,6 +75,7 @@ void EuMesh::prebalancing(int n_iters) {
     if (mpi::single()) return;
 
     if (mpi::master()) {
+        // Что я имел в виду? Неидеальный алгоритм сейчас?
         std::cerr << "Warning: prebalancing is not optimal\n";
     }
 
@@ -87,8 +88,8 @@ void EuMesh::prebalancing(int n_iters) {
 
 void EuMesh::setup_ranks() {
     // Определим новый rank для всех ячеек из locals
-    for_each([this](EuCell cell) {
-        cell.set_rank(m_decomp->rank(cell));
+    for_each([decomp=m_decomp](EuCell cell) {
+        cell.set_rank(decomp->rank(cell));
     });
 }
 

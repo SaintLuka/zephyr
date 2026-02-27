@@ -529,16 +529,16 @@ int main(int argc, char *argv[]) {
 
     constexpr int nx = 10;
     constexpr int ny = 10;
-    std::array<std::array<NodeInput, ny + 1>, nx + 1> ps{};
+    std::array<std::array<NodeInput::Ptr, ny + 1>, nx + 1> ps{};
     for (int i = 0; i <= nx; ++i) {
         for (int j = 0; j <= ny; ++j) {
-            ps[i][j].pos = Vector3d{0.1 * i, 0.2 * j, 0.0};
+            ps[i][j] = NodeInput::create(Vector3d{0.1 * i, 0.2 * j, 0.0});
         }
     }
 
     for (int i = 0; i <= nx; ++i) {
         for (int j = 0; j <= ny; ++j) {
-            grid.add_node(&ps[i][j]);
+            grid.add_node(ps[i][j]);
         }
     }
 
@@ -546,11 +546,11 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < nx; ++i) {
         for (int j = 0; j < ny; ++j) {
             if (rand() % 2 == 0) {
-                grid.add_cell(CellType::QUAD, {&ps[i][j], &ps[i+1][j], &ps[i+1][j+1], &ps[i][j+1]});
+                grid.add_cell(CellType::QUAD, {ps[i][j], ps[i+1][j], ps[i+1][j+1], ps[i][j+1]});
             }
             else {
-                grid.add_cell(CellType::TRIANGLE, {&ps[i][j], &ps[i+1][j], &ps[i+1][j+1]});
-                grid.add_cell(CellType::TRIANGLE, {&ps[i][j], &ps[i+1][j+1], &ps[i][j+1]});
+                grid.add_cell(CellType::TRIANGLE, {ps[i][j], ps[i+1][j], ps[i+1][j+1]});
+                grid.add_cell(CellType::TRIANGLE, {ps[i][j], ps[i+1][j+1], ps[i][j+1]});
             }
         }
     }

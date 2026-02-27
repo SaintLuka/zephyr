@@ -1,5 +1,6 @@
 #pragma once
 
+#include <zephyr/configuration.h>
 #include <zephyr/geom/boundary.h>
 #include <zephyr/geom/generator/generator.h>
 
@@ -28,7 +29,6 @@ public:
 
     /// @brief Конструктор класса
     /// @param xmin, xmax Границы прямоугольника по оси x
-    /// @param nodes Тип распределения узлов
     Strip(double xmin, double xmax, Type nodes = Type::UNIFORM);
 
     /// @brief Создать указатель на класс
@@ -57,6 +57,12 @@ public:
 
     /// @brief Создать сетку общего вида
     Grid make() const override;
+
+    /// @brief Может инициализировать хранилище
+    bool can_initialize() const override { return true; }
+
+    /// @brief Инициализация SoA-хранилища сетки
+    void initialize(mesh::AmrCells& cells) const override;
 
     // Далее не самые полезные get-функции
 
