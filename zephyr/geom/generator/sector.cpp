@@ -135,7 +135,7 @@ void Sector::set_n_phi(int N) {
         m_Nx = 2 * m_parts * m_nx;
         if (N % (2 * m_parts) != 0) {
             std::cerr << "Sector::set_n_phi warning.\n"
-                      << "\tN_phi should be a multiple of " << 2 * m_parts << "\n"
+                      << "\tn_phi should be a multiple of " << 2 * m_parts << "\n"
                       << "\tThe number has been rounded to " << m_Nx << "\n";
         }
     }
@@ -168,21 +168,13 @@ void Sector::set_boundaries(Boundaries bounds) {
     m_bounds = bounds;
 }
 
-void Sector::set_axial(bool axial) {
-    m_axial = axial;
-}
-
 void Sector::check_params() const {
     if (m_r2 <= 0.0 || m_r1 <= 0.0) {
-        std::string message = "Sector generator error #1. r_max < 0.0 or r_min <= 0.0";
-        std::cerr << message << "\n";
-        throw std::runtime_error(message);
+        throw std::runtime_error("Sector::check_params: r_max < 0.0 or r_min <= 0.0");
     }
 
     if (m_r1 >= m_r2) {
-        std::string message = "Sector generator error #2. r_max < r_min";
-        std::cerr << message << "\n";
-        throw std::runtime_error(message);
+        throw std::runtime_error("Sector::check_params: r_max < r_min");
     }
 }
 
@@ -224,7 +216,7 @@ Vector3d Sector::rotate(const Vector3d &v, int r) const {
     };
 }
 
-Grid Sector::make() {
+Grid Sector::make() const {
     using Array1D = std::vector<NodeInput::Ptr>;
     using Array2D = std::vector<std::vector<NodeInput::Ptr>>;
     
@@ -583,7 +575,7 @@ Grid Sector::make() {
     grid.reserve_cells(m_size);
     grid.reserve_nodes(max_nodes);
 
-    std::vector<NodeInput*> vlist(4, nullptr);
+    std::vector<NodeInput::Ptr> vlist(4, nullptr);
 
     // Создаем вершины центральной части
     for (size_t r = 0; r < m_parts; ++r) {
@@ -592,12 +584,12 @@ Grid Sector::make() {
                 auto l_face = get_center_vface(x, y, r);
                 auto r_face = get_center_vface(x + 1, y, r);
 
-                vlist[0] = l_face[0].get();
-                vlist[1] = r_face[0].get();
-                vlist[2] = r_face[1].get();
-                vlist[3] = l_face[1].get();
+                vlist[0] = l_face[0];
+                vlist[1] = r_face[0];
+                vlist[2] = r_face[1];
+                vlist[3] = l_face[1];
 
-                for (auto v: vlist) { grid.add_node(v); }
+                for (const auto& v: vlist) { grid.add_node(v); }
                 grid.add_cell(CellType::QUAD, vlist);
             }
         }
@@ -609,12 +601,12 @@ Grid Sector::make() {
             auto l_face = get_sector_vface(x, y);
             auto r_face = get_sector_vface(x + 1, y);
 
-            vlist[0] = r_face[0].get();
-            vlist[1] = l_face[0].get();
-            vlist[2] = l_face[1].get();
-            vlist[3] = r_face[1].get();
+            vlist[0] = r_face[0];
+            vlist[1] = l_face[0];
+            vlist[2] = l_face[1];
+            vlist[3] = r_face[1];
 
-            for (auto v: vlist) { grid.add_node(v); }
+            for (const auto& v: vlist) { grid.add_node(v); }
             grid.add_cell(CellType::QUAD, vlist);
         }
     }

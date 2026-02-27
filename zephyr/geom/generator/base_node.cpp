@@ -19,7 +19,7 @@ BaseNode::Ptr BaseNode::create(double x, double y, bool fixed) {
 
 void BaseNode::set_fixed(bool fixed) {
     if (m_editable) { m_fixed = fixed; }
-    std::cerr << "BaseNode::set_fixed(): BaseNode is not editable;\n";
+    std::cerr << "BaseNode::set_fixed warning: BaseNode is not editable;\n";
 }
 
 void BaseNode::set_pos(double x, double y) {
@@ -28,7 +28,7 @@ void BaseNode::set_pos(double x, double y) {
 
 void BaseNode::set_pos(const Vector3d& v) {
     if (m_editable) { m_pos = v; }
-    std::cerr << "BaseNode::set_pos(): BaseNode is not editable;\n";
+    std::cerr << "BaseNode::set_pos warning: BaseNode is not editable;\n";
 }
 
 void BaseNode::clear() {
@@ -70,19 +70,19 @@ public:
 
 void BaseNode::finalize(const std::set<Block::Ptr>& blocks) {
     if (!m_editable) {
-        throw std::runtime_error("BaseNode::finalize(): BaseNode is not editable");
+        throw std::runtime_error("BaseNode::finalize: BaseNode is not editable");
     }
     if (blocks.empty()) {
-        throw std::runtime_error("BaseNode::finalize(): No blocks were given");
+        throw std::runtime_error("BaseNode::finalize: no blocks were given");
     }
     if (blocks.size() == 1) {
         Block::Ptr block = *blocks.begin();
         auto[v1, v2] = block->adjacent_nodes(this);
         m_adjacent_nodes = {v1, v2};
         m_adjacent_blocks = {block};
-        if (auto[side1, side2] = block->adjacent_sides(this);
-            !block->is_boundary(side1) || !block->is_boundary(side2)) {
-            throw std::runtime_error("BaseNode::finalize(): Invalid corner BaseNode");
+        if (auto[side1, side2] = block->incident_sides(this);
+            !block->boundary(side1) || !block->boundary(side2)) {
+            throw std::runtime_error("BaseNode::finalize: invalid corner BaseNode");
         }
         m_boundary = true;
         m_editable = false;
@@ -113,8 +113,10 @@ void BaseNode::finalize(const std::set<Block::Ptr>& blocks) {
         for (const auto& a: corners) {
             m_adjacent_nodes.emplace_back(a.v1);
             m_adjacent_blocks.emplace_back(a.block);
-            if (a.block->is_boundary(this)) {
-                throw std::runtime_error("Strange Blocks: boundary condition for inner nodes");
+
+            auto [side1, side2] = a.block->incident_sides(this);
+            if (a.block->boundary(side1) || a.block->boundary(side2)) {
+                throw std::runtime_error("BaseNode::finalize: strange blocks, boundary condition for inner nodes");
             }
         }
         m_boundary = false;
@@ -139,19 +141,19 @@ void BaseNode::finalize(const std::set<Block::Ptr>& blocks) {
     // stops.size() > 1. Такой случай возможен, но мне лень рассматривать
     // Пример: у вершины два смежных блока, которые друг для друга смежными
     // не являются. Получается нетрадиционная граница.
-    throw std::runtime_error("BaseNode::finalize(): Strange Blocks #2");
+    throw std::runtime_error("BaseNode::finalize: strange blocks, blocks is adjacent only through BaseNode");
 }
 
-bool BaseNode::is_boundary() const {
+bool BaseNode::boundary() const {
     if (m_editable) {
-        throw std::runtime_error("BaseNode::is_boundary() called on not finalized node");
+        throw std::runtime_error("BaseNode::is_boundary: called for not finalized BaseNode");
     }
     return m_boundary;
 }
 
 bool BaseNode::regular() const {
     if (m_editable) {
-        throw std::runtime_error("BaseNode::regular() called on not finalized node");
+        throw std::runtime_error("BaseNode::regular: called for not finalized BaseNode");
     }
     auto n_nodes  = n_adjacent_nodes();
     auto n_blocks = n_adjacent_blocks();
@@ -167,28 +169,28 @@ int BaseNode::degree() const {
 
 int BaseNode::n_adjacent_nodes() const {
     if (m_editable) {
-        throw std::runtime_error("BaseNode::n_adjacent_nodes() called on not finalized node");
+        throw std::runtime_error("BaseNode::n_adjacent_nodes: called for not finalized BaseNode");
     }
     return static_cast<int>(adjacent_nodes().size());
 }
 
 int BaseNode::n_adjacent_blocks() const {
     if (m_editable) {
-        throw std::runtime_error("BaseNode::n_adjacent_blocks() called on not finalized node");
+        throw std::runtime_error("BaseNode::n_adjacent_blocks: called for not finalized BaseNode");
     }
     return static_cast<int>(adjacent_blocks().size());
 }
 
 const std::vector<BaseNode::WPtr>& BaseNode::adjacent_nodes() const {
     if (m_editable) {
-        throw std::runtime_error("BaseNode::adjacent_nodes() called on not finalized node");
+        throw std::runtime_error("BaseNode::adjacent_nodes: called for not finalized BaseNode");
     }
     return m_adjacent_nodes;
 }
 
 const std::vector<Block::WPtr> &BaseNode::adjacent_blocks() const {
     if (m_editable) {
-        throw std::runtime_error("BaseNode::adjacent_blocks() called on not finalized node");
+        throw std::runtime_error("BaseNode::adjacent_blocks: called for not finalized BaseNode");
     }
     return m_adjacent_blocks;
 }

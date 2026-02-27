@@ -80,7 +80,7 @@ CellArity arity_of(CellType t) {
 
         case CellType::AMR2D:      return {9, 9, 4, 4, false};  // 3x3 nodes, faces like QUAD
 
-            // 3D (VTK-like counts)
+        // 3D (VTK-like counts)
         case CellType::TETRA:      return {4, 4, 4, 4, false};
         case CellType::PYRAMID:    return {5, 5, 5, 5, false};
         case CellType::WEDGE:      return {6, 6, 5, 5, false};  // triangular prism: 5 faces
@@ -93,7 +93,7 @@ CellArity arity_of(CellType t) {
     }
 }
 
-void require_ptrs_non_null(const std::vector<NodeInput*>& nodes) {
+void require_ptrs_non_null(std::span<const NodeInput::Ptr> nodes) {
     for (std::size_t i = 0; i < nodes.size(); ++i) {
         if (!nodes[i]) {
             throw std::invalid_argument("add_cell: nodes contains null pointer at index " + std::to_string(i));
@@ -177,7 +177,6 @@ void Grid::remove_options_() {
 void Grid::DraftData::clear() {
     nodes.clear();
     cells.clear();
-    node_buffer.clear();
     stamp = 1;
     next_node_id = 0;
 }
@@ -254,7 +253,7 @@ void Grid::reserve_nodes(id_t n_nodes) {
     m_draft->nodes.reserve(n_nodes);
 }
 
-id_t Grid::add_node(NodeInput* v) {
+id_t Grid::add_node(NodeInput::Ref v) {
     require_editable_();
 
     if (!v) {
@@ -287,7 +286,7 @@ void Grid::reserve_cells(id_t n_cells) {
 }
 
 id_t Grid::add_cell(CellType type,
-                    const std::vector<NodeInput*>& nodes,
+                    const std::vector<NodeInput::Ptr>& nodes,
                     const std::vector<Boundary>& face_bc) {
     require_editable_();
 
@@ -335,7 +334,7 @@ id_t Grid::add_cell(CellType type,
     DraftCell dc{.type = type};
     dc.node_ids.reserve(n_nodes);
 
-    for (NodeInput* p : nodes) {
+    for (NodeInput::Ref p : nodes) {
         dc.node_ids.push_back(add_node(p)); // pointer-identity dedup
     }
 
@@ -352,8 +351,46 @@ id_t Grid::add_cell(CellType type,
     return cell_id;
 }
 
-id_t Grid::add_polyhedron(const std::vector<NodeInput*>& nodes,
-                          const std::vector<std::vector<NodeInput*>>& faces,
+id_t Grid::add_quad(const std::array<NodeInput::Ptr, 4>& nodes,
+                    const std::array<Boundary, 4>& face_bc) {
+    require_editable_();
+
+    // Ensure draft exists and set/check dimension.
+    if (!m_draft.has_value()) {
+        begin_build(); // must create m_draft
+        m_dim = 2;
+        m_type = Type::QUAD;
+    } else {
+        if (m_dim == 0) {
+            m_dim = 2;
+        } else if (m_dim != 2) {
+            throw std::runtime_error("add_quad: wrong dimension (cell dim mismatch with grid dim).");
+        }
+        m_type = promotion(m_type, CellType::QUAD);
+    }
+
+    require_ptrs_non_null(nodes);
+
+    // Build DraftCell
+    DraftCell dc{.type = CellType::QUAD};
+    dc.node_ids.reserve(4);
+
+    for (NodeInput::Ref p: nodes) {
+        dc.node_ids.push_back(add_node(p));
+    }
+
+    dc.face_bc.resize(4);
+    for (int i = 0; i < 4; ++i) {
+        dc.face_bc[i] = face_bc[i];
+    }
+
+    const id_t cell_id = static_cast<id_t>(m_draft->cells.size());
+    m_draft->cells.push_back(std::move(dc));
+    return cell_id;
+}
+
+id_t Grid::add_polyhedron(const std::vector<NodeInput::Ptr>& nodes,
+                          const std::vector<std::vector<NodeInput::Ptr>>& faces,
                           const std::vector<Boundary>& faces_bc) {
     require_editable_();
 
@@ -387,7 +424,7 @@ id_t Grid::add_polyhedron(const std::vector<NodeInput*>& nodes,
     // Convert cell nodes to global ids
     dc.node_ids.reserve(nodes.size());
     for (std::size_t i = 0; i < nodes.size(); ++i) {
-        NodeInput* p = nodes[i];
+        NodeInput::Ref p = nodes[i];
         if (!p) {
             throw std::invalid_argument("add_polyhedron: nodes contains null pointer at index " + std::to_string(i));
         }
@@ -438,7 +475,7 @@ id_t Grid::add_polyhedron(const std::vector<NodeInput*>& nodes,
         face_ids.reserve(fnodes.size());
 
         for (std::size_t k = 0; k < fnodes.size(); ++k) {
-            NodeInput* p = fnodes[k];
+            NodeInput::Ref p = fnodes[k];
             if (!p) {
                 throw std::invalid_argument("add_polyhedron: face has null node pointer at face " +
                                             std::to_string(fi) + ", k=" + std::to_string(k));
@@ -562,7 +599,7 @@ std::size_t Grid::n_faces() const noexcept {
 
 std::size_t Grid::total_nodes_per_cell() const noexcept {
     size_t count = 0;
-    for (auto cell: m_cells) {
+    for (const auto& cell: m_cells) {
         count += cell.nodes.size();
     }
     return count;

@@ -131,7 +131,7 @@ bool Grid::validate_draft(std::string* report) const {
 
     // unique_nodes pointers + builder state sanity
     for (std::size_t i = 0; i < d.nodes.size(); ++i) {
-        const NodeInput* p = d.nodes[i];
+        NodeInput::Ref p = d.nodes[i];
         if (!p) {
             ok = false;
             append_line(report, "validate_draft: unique_nodes contains null pointer at index " + std::to_string(i) + ".");
@@ -186,8 +186,8 @@ bool Grid::validate_draft(std::string* report) const {
         // duplicate nodes inside a cell (debug-ish, но полезно ловит ошибки на входе)
         {
             std::vector<id_t> tmp = c.node_ids;
-            std::sort(tmp.begin(), tmp.end());
-            if (std::adjacent_find(tmp.begin(), tmp.end()) != tmp.end()) {
+            std::ranges::sort(tmp);
+            if (std::ranges::adjacent_find(tmp) != tmp.end()) {
                 ok = false;
                 append_line(report, "validate_draft: cell " + std::to_string(ci) + " contains duplicate node ids.");
             }

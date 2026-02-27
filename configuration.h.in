@@ -7,6 +7,8 @@
 #cmakedefine ZEPHYR_TBB
 #cmakedefine ZEPHYR_ASSERTS
 
+#include <iostream>
+
 #ifdef ZEPHYR_MPI
     #define if_mpi(...) __VA_ARGS__
     #define mpi_cond(expr1, expr2) expr1

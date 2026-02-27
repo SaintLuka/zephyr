@@ -629,6 +629,10 @@ void AmrCells::shrink_to_fit_cells() {
 }
 
 void AmrCells::resize(index_t n_cells, index_t n_faces, index_t n_nodes) {
+    if_debug(m_adaptive) {
+        z_assert(n_faces == (m_dim < 3 ? 8 : 24) * n_cells, "bad sizes");
+        z_assert(n_nodes == (m_dim < 3 ? 9 : 27) * n_cells, "bad sizes");
+    }
     resize_cells(n_cells);
     faces.resize(n_faces);
     verts.resize(n_nodes);

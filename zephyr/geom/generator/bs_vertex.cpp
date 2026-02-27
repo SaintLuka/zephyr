@@ -1,8 +1,8 @@
 #include <algorithm>
 #include <ranges>
 
-#include <zephyr/geom/generator/curve/curve.h>
 #include <zephyr/geom/generator/bs_vertex.h>
+#include <zephyr/geom/generator/curve/curve.h>
 
 namespace zephyr::geom::generator {
 
@@ -22,7 +22,7 @@ BsEdge BsEdge::Inside(BsVertex::Ref v, double* lambda1, double* lambda2) {
 }
 
 double BsEdge::lambda() const {
-    z_assert(lambda1 != nullptr, "lambda1 is null");
+    z_assert(lambda1 != nullptr, "BsEdge::lambda: lambda1 is null");
     if (boundary()) { return (*lambda1); }
     return std::sqrt((*lambda1) * (*lambda2));
 }
@@ -77,7 +77,7 @@ Curve* BsVertex::boundary() const {
     if (m_boundaries.size() == 1) {
         return *m_boundaries.begin();
     }
-    throw std::runtime_error("BsVertex error: more than one boundary");
+    throw std::runtime_error("BsVertex::boundary: more than one boundary");
 }
 
 std::set<Boundary> BsVertex::boundaries() const {

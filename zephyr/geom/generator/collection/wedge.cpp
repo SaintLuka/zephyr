@@ -14,78 +14,23 @@ namespace zephyr::geom::generator::collection {
 Wedge::Wedge(
         double xmin, double xmax,
         double ymin, double ymax,
-        double xw, double phi, 
-        Boundaries bounds) :
-        BlockStructured(),
+        double xw, double phi) :
+        Generator("collection.wedge"),
         m_xmin(xmin), m_xmax(xmax),
         m_ymin(ymin), m_ymax(ymax),
-        m_xw(xw), m_phi(phi),
-        m_bounds(bounds) {
+        m_xw(xw), m_phi(phi) {
 
-    m_name = "collection.wedge";
-    init_blocks();
-}
-
-inline double sqr(double x) {
-    return x * x;
-}
-
-void Wedge::set_nx(int Nx) {
-    // Характерный размер ячейки
-    double DX = (m_xmax - m_xmin) / Nx;
-
-    // Положение клина на правой границе
-    double m_yw = m_ymin + (m_xmax - m_xw) * std::tan(m_phi);
-
-    double L1 = std::abs(m_xw - m_xmin);
-    double L2 = std::sqrt(sqr(m_xmax - m_xw) + sqr(m_yw));
-    double L = L1 + L2;
-
-    // Какой-то подгон
-    int Nx2 = std::max(int(std::round(1.2 * L2 * Nx / L)), 1);
-    int Nx1 = std::max(Nx - Nx2, 1);
-    int Ny = std::max(int(std::round(0.9 * (m_ymax - m_ymin) *(Nx1 + Nx2)/ L)), 1);
-
-    /*
-    // Площади блоков
-    double S1 = (m_xw - m_xmin) * (m_ymax - m_ymin);
-    double S2 = 0.5 * (m_xmax - m_xw) * (m_ymax - m_ymin + m_ymax - m_yw);
-
-    // Характерное число ячеек области
-    int N = std::max(2, int(std::ceil((S1 + S2) / sqr(DX))));
-    int Ny = std::max(1, N / Nx);
-
-    int Nx1 = std::max(1, int(std::round(Ny * (m_xw - m_xmin) / (m_ymax - m_ymin))));
-    int Nx2 = std::max(1, Nx - Nx1);
-     */
-
-    // Нет необходимости устанавливать все размеры
-    // у каждого блока, поскольку они связаны
-    throw std::runtime_error("Not implemented");
-    /*
-    m_blocks[0]->set_size(v1, v4, Ny);
-    m_blocks[0]->set_size(v1, v2, Nx1);
-    m_blocks[1]->set_size(v2, v3, Nx2);
-    */
-}
-
-
-void Wedge::set_boundaries(Boundaries bounds) {
-    m_bounds = bounds;
-}
-
-void Wedge::init_blocks() {
     check_params();
 
     double m_yw = m_ymin + (m_xmax - m_xw) * std::tan(m_phi);
 
     // Задаем базисные вершины для структурированных блоков
-    v1 = BaseNode::create(m_xmin, m_ymin, true);
-    v2 = BaseNode::create(m_xw,   m_ymin, true);
-    v3 = BaseNode::create(m_xmax, m_yw,   true);
-    v4 = BaseNode::create(m_xmin, m_ymax, true);
-    v5 = BaseNode::create(m_xw,   m_ymax, false);
-    v6 = BaseNode::create(m_xmax, m_ymax, true);
+    v1 = BaseNode::create(m_xmin, m_ymin);
+    v2 = BaseNode::create(m_xw,   m_ymin);
+    v3 = BaseNode::create(m_xmax, m_yw);
+    v4 = BaseNode::create(m_xmin, m_ymax);
+    v5 = BaseNode::create(m_xw,   m_ymax);
+    v6 = BaseNode::create(m_xmax, m_ymax);
 
     // Ограничивающие прямые области
     left   = Plane::create(v1, v4);
@@ -94,68 +39,62 @@ void Wedge::init_blocks() {
     top    = Plane::create(v4, v6);
     wedge  = Plane::create(v2, v3);
 
-    left->set_boundary(m_bounds.left);
-    right->set_boundary(m_bounds.right);
-    bottom->set_boundary(m_bounds.bottom);
-    top->set_boundary(m_bounds.top);
-    // wedge->set_boundary(m_bounds.bottom);
-    wedge->set_boundary(Boundary::WALL);
-
-    throw std::runtime_error("Not implemented");
-
     // Генератор сетки
-    //*m_blocks[0] = {v1, v2, v4, v5};
-    m_blocks[0]->set_boundary(v1, v4, left);
-    m_blocks[0]->set_boundary(v1, v2, bottom);
-    m_blocks[0]->set_boundary(v4, v5, top);
+    m_blocks += {v1, v2, v4, v5};
+    m_blocks += {v2, v3, v5, v6};
 
-    //*m_blocks[1] = {v2, v3, v5, v6};
-    m_blocks[1]->set_boundary(v2, v3, wedge);
-    m_blocks[1]->set_boundary(v5, v6, top);
-    m_blocks[1]->set_boundary(v3, v6, right);
+    m_blocks.set_boundary(v1, v4, left);
+    m_blocks.set_boundary(v3, v6, right);
+    m_blocks.set_boundary(v1, v2, bottom);
+    m_blocks.set_boundary(v2, v3, wedge);
+    m_blocks.set_boundary({v4, v5, v6}, top);
 
-    // Необходимо связать блоки
-    link_blocks();
+    m_blocks.set_verbosity(0);
+    m_blocks.optimize({.steps=2});
 }
 
+void Wedge::check_params() const {
+    if (m_xmin >= m_xmax) {
+        throw std::runtime_error("Wedge::check_params: x_min >= x_max");
+    }
+    if (m_ymin >= m_ymax) {
+        throw std::runtime_error("Wedge::check_params: y_min >= y_max");
+    }
+    if (m_xw >= m_xmax || m_xw <= m_xmin) {
+        throw std::runtime_error("Wedge::check_params: x_w not in [x_min, x_max]");
+    }
+    if (m_phi < 0.0 || m_phi > 0.75 * M_PI) {
+        throw std::runtime_error("Wedge::check_params: phi not in [0.0, pi/2]");
+    }
+
+    // высота клина
+    double H = (m_xmax - m_xw) * std::tan(m_phi);
+    if (H > 0.9 * (m_ymax - m_ymin)) {
+        throw std::runtime_error("Wedge::check_params: big wedge, increase (y_max - y_min) or decrease angle");
+    }
+}
+
+void Wedge::set_nx(int Nx) {
+    m_blocks.set_size({v4, v5, v6}, Nx);
+}
+
+void Wedge::set_ny(int Ny) {
+    m_blocks.set_size(v1, v4, Ny);
+}
+
+void Wedge::set_boundaries(Boundaries bounds) const {
+    left->set_boundary(bounds.left);
+    right->set_boundary(bounds.right);
+    bottom->set_boundary(bounds.bottom);
+    top->set_boundary(bounds.top);
+    wedge->set_boundary(bounds.bottom);
+}
 
 Box Wedge::bbox() const {   
     Vector3d vmin(m_xmin, m_ymin, 0.0);
     Vector3d vmax(m_xmax, m_ymax, 0.0);
 
     return {vmin, vmax};
-}
-
-void Wedge::check_params() const {
-    if (m_xmin >= m_xmax) {
-        std::string message = "Wedge Error: x_min >= x_max";
-        std::cerr << message << "\n";
-        throw std::runtime_error(message);
-    }
-    if (m_ymin >= m_ymax) {
-        std::string message = "Wedge Error: y_min >= y_max";
-        std::cerr << message << "\n";
-        throw std::runtime_error(message);
-    }
-    if (m_xw >= m_xmax || m_xw <= m_xmin) {
-        std::string message = "Wedge Error: x_w not in [x_min, x_max]";
-        std::cerr << message << "\n";
-        throw std::runtime_error(message);
-    }
-    if (m_phi < 0.0 || m_phi > 0.75 * M_PI) {
-        std::string message = "Wedge Error: phi not in [0.0, pi/2]";
-        std::cerr << message << "\n";
-        throw std::runtime_error(message);
-    }
-
-    // высота клина
-    double H = (m_xmax - m_xw) * std::tan(m_phi);
-    if (H > 0.5 * (m_ymax - m_ymin)) {
-        std::string message = "Wedge Error: big wedge, increase (y_max - y_min)";
-        std::cerr << message << "\n";
-        throw std::runtime_error(message);
-
-    }
 }
 
 } // namespace zephyr::geom::generator::collection

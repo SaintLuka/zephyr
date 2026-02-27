@@ -448,7 +448,12 @@ AmrCells::AmrCells(const Grid& grid) {
     const auto& grid_nodes = grid.nodes();
     const auto& grid_faces = grid.faces();
 
-    resize(grid.n_cells(), grid.n_faces(), grid.total_nodes_per_cell());
+    if (!m_adaptive) {
+        resize(grid.n_cells(), grid.n_faces(), grid.total_nodes_per_cell());
+    }
+    else {
+        resize_amr(grid.n_cells());
+    }
 
     face_begin[0] = 0;
     node_begin[0] = 0;
@@ -471,34 +476,50 @@ AmrCells::AmrCells(const Grid& grid) {
         // Число узлов и граней ячейки
         int n_nodes = grid_cells[ic].nodes.size();
         int n_faces = grid_faces.cell_faces[ic].size();
+        int max_faces = n_faces;
+        if (m_adaptive) {
+            max_faces = m_dim < 3 ? Side2D::n_subfaces() : Side3D::n_subfaces();
+        }
 
         // Выставить индексы грани
-        face_begin[ic + 1] = face_begin[ic] + n_faces;
-        faces.insert(face_begin[ic], grid_cells[ic].type, n_faces);
+        face_begin[ic + 1] = face_begin[ic] + max_faces;
+        faces.insert(face_begin[ic], grid_cells[ic].type, max_faces);
 
         node_begin[ic + 1] = node_begin[ic] + n_nodes;
         for (int i = 0; i < n_nodes; ++i) {
             verts[node_begin[ic] + i] = grid_nodes[grid_cells[ic].nodes[i]].pos;
         }
 
-        for (index_t iface: faces_range(ic)) {
-            faces.area[iface]     = grid_geom.face_areas[iface];
-            faces.center[iface]   = grid_geom.face_centroids[iface];
-            faces.normal[iface]   = grid_geom.face_normals[iface];
-            faces.boundary[iface] = grid_faces.face_bc[iface];
+        // Геометрия
+        for (int i = 0; i < n_faces; ++i) {
+            int iface = face_begin[ic] + i;
+            auto jface = grid_faces.cell_faces[ic][i];
+            faces.boundary[iface] = grid_faces.face_bc[jface];
+            faces.area[iface]     = grid_geom.face_areas[jface];
+            faces.center[iface]   = grid_geom.face_centroids[jface];
+            faces.normal[iface]   = grid_geom.face_normals[jface];
 
             if (m_axial) {
-                //faces.area_alt[iface] = grid_geom.face_areas_alt[iface];
+                //faces.area_alt[iface] = grid_geom.face_areas_alt[jface];
             }
         }
 
         // Смежность
-        for (index_t iface: faces_range(ic)) {
-            faces.boundary[iface] = grid_faces.face_bc[iface];
+        for (int i = 0; i < n_faces; ++i) {
+            auto iface = face_begin[ic] + i;
+            auto jface = grid_faces.cell_faces[ic][i];
             faces.adjacent.rank[iface]  = 0;
-            faces.adjacent.index[iface] = grid_faces.neighbor_cell[iface];
+            faces.adjacent.index[iface] = grid_faces.neighbor_cell[jface];
             faces.adjacent.alien[iface] = -1;
             faces.adjacent.basic[iface] = ic;
+
+            if (faces.is_boundary(iface)) {
+                faces.adjacent.index[iface] = ic; // Реально нужно?
+            }
+        }
+
+        if (grid_cells[ic].type == CellType::QUAD) {
+            faces.reorder_quad_faces(face_begin[ic]);
         }
     }
 }

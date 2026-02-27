@@ -134,6 +134,9 @@ public:
 
     /// @brief Симметричная точка относительно грани
     Vector3d symm_point(index_t iface, const Vector3d& p) const;
+
+    /// @brief Сделать грани полигональной ячейки в AMR порядке
+    void reorder_quad_faces(index_t iface);
 };
 
 

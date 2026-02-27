@@ -14,6 +14,10 @@
 
 namespace zephyr::geom::generator {
 
+inline bool good_number(double num) {
+    return !std::isinf(num) && !std::isnan(num) && num > 0.0;
+}
+
 inline bool bad_number(double num) {
     return std::isinf(num) || std::isnan(num) || num <= 0.0;
 }
@@ -30,34 +34,39 @@ constexpr std::array<Side, 2> sides_by_axis(Axis axis) {
 
 // Переход к индексации сторон против часовой стрелки
 constexpr int side_to_idx(Side side) {
+    z_assert(0 <= static_cast<int>(side) && static_cast<int>(side) < 4,
+        "side_to_idx: Invalid side");
     switch (side) {
         case Side::BOTTOM: return 0;
         case Side::RIGHT:  return 1;
         case Side::TOP:    return 2;
-        case Side::LEFT:   return 3;
-        default: throw std::invalid_argument("Invalid side");
+        case Side::LEFT:
+        default:           return 3;
     }
 }
 
 // Переход от индексации сторон против часовой стрелки
 constexpr Side idx_to_side(int idx) {
+    z_assert(0 <= idx && idx < 4, "idx_to_side: Invalid side");
     switch (idx) {
         case 0: return Side::BOTTOM;
         case 1: return Side::RIGHT;
         case 2: return Side::TOP;
-        case 3: return Side::LEFT;
-        default: throw std::invalid_argument("Invalid side");
+        case 3:
+        default: return Side::LEFT;
     }
 }
 
 // Индекс базисной вершины на стороне
 constexpr int node_idx(Side side, int idx) {
+    z_assert(0 <= static_cast<int>(side) && static_cast<int>(side) < 4,
+        "node_idx: Invalid side");
     switch (side) {
         case Side::LEFT:   return std::array{2, 0}[idx];
         case Side::RIGHT:  return std::array{1, 3}[idx];
         case Side::BOTTOM: return std::array{0, 1}[idx];
-        case Side::TOP:    return std::array{3, 2}[idx];
-        default: throw std::runtime_error("Invalid side");
+        case Side::TOP:
+        default:           return std::array{3, 2}[idx];
     }
 }
 
@@ -69,28 +78,34 @@ constexpr int rotation(Side side1, Side side2) {
 }
 
 // Пара сторон, связанных с вершиной (обход против часовой внутри блока)
-constexpr std::tuple<Side, Side> node_adjacent_sides(int v_idx) {
+constexpr std::tuple<Side, Side> node_incident_sides(int v_idx) {
+    z_assert(0 <= v_idx && v_idx < 4, "node_incident_sides: Invalid index");
     switch (v_idx) {
         case 0: return {Side::B, Side::L};
         case 1: return {Side::R, Side::B};
         case 2: return {Side::L, Side::T};
-        case 3: return {Side::T, Side::R};
-        default: throw std::runtime_error("Invalid base node index");
+        case 3:
+        default: return {Side::T, Side::R};
     }
 }
 
-Block::Block(const std::array<BaseNode::Ptr, 4>& vertices) {
+Block::Block(const std::array<BaseNode::Ptr, 4>& nodes) {
+    for (const auto& node: nodes) {
+        if (!node) {
+            throw std::runtime_error("Block::creat: node does not exist (nullptr)");
+        }
+    }
     // Центр блока
     Vector3d vc = Vector3d::Zero();
-    for (const auto& v: vertices) {
+    for (const auto& v: nodes) {
         vc += v->pos();
     }
     vc *= 0.25;
 
     // Пары (угол, вершина)
-    std::vector<std::pair<double, BaseNode::Ptr>> sorted(4);
+    std::array<std::pair<double, BaseNode::Ptr>, 4> sorted;
     for (int i = 0; i < 4; ++i) {
-        sorted[i].second = vertices[i];
+        sorted[i].second = nodes[i];
         sorted[i].first = std::atan2(sorted[i].second->y() - vc.y(),
                                      sorted[i].second->x() - vc.x());
         if (sorted[i].first < sorted[0].first) {
@@ -112,13 +127,13 @@ Block::Block(const std::array<BaseNode::Ptr, 4>& vertices) {
     m_base_nodes[3] = sorted[2].second;
 }
 
-Block::Ptr Block::create(const std::array<BaseNode::Ptr, 4>& vertices) {
-    return std::make_shared<Block>(vertices);
+Block::Ptr Block::create(const std::array<BaseNode::Ptr, 4>& nodes) {
+    return std::make_shared<Block>(nodes);
 }
 
 void Block::set_index(int i) {
     if (i < 0) {
-        throw std::invalid_argument("Block::set_index error: Invalid index");
+        throw std::out_of_range("Block::set_index error: invalid index");
     }
     m_index = i;
 }
@@ -126,7 +141,8 @@ void Block::set_index(int i) {
 // ---------- Геометрия ------------------------------------------------------------------------------------------------
 
 Vector3d Block::center() const {
-    return 0.25 * (m_base_nodes[0]->pos() + m_base_nodes[1]->pos() + m_base_nodes[2]->pos() + m_base_nodes[3]->pos());
+    return 0.25 * (m_base_nodes[0]->pos() + m_base_nodes[1]->pos() +
+                   m_base_nodes[2]->pos() + m_base_nodes[3]->pos());
 }
 
 Vector3d Block::center(Side side) const {
@@ -148,55 +164,43 @@ double Block::length(Side side) const {
 // ---------- Базисные вершины -----------------------------------------------------------------------------------------
 
 int Block::base_node_index(const BaseNode* v) const {
+    if (!v) { throw std::logic_error("Block::base_node_index: BaseNode is nullptr"); }
     for (int idx = 0; idx < 4; ++idx) {
         if (m_base_nodes[idx].get() == v) {
             return idx;
         }
     }
-    throw std::runtime_error("Can't find base node");
-}
-
-std::tuple<Side, Side> Block::adjacent_sides(const BaseNode* v) const {
-    if (!v) {
-        throw std::runtime_error("Block::adjacent_sides() error: Invalid BaseNode");
-    }
-    return node_adjacent_sides(base_node_index(v));
-}
-
-std::tuple<Side, Side> Block::adjacent_sides(BaseNode::Ref v) const {
-    return adjacent_sides(v.get());
-}
-
-std::tuple<BaseNode::Ptr, BaseNode::Ptr> Block::adjacent_nodes(const BaseNode* v) const {
-    if (!v) {
-        throw std::runtime_error("Block::adjacent_nodes() error: Invalid BaseNode");
-    }
-    switch (base_node_index(v)) {
-        case 0: return {base_node(1), base_node(2)};
-        case 1: return {base_node(3), base_node(0)};
-        case 2: return {base_node(0), base_node(3)};
-        case 3: return {base_node(2), base_node(1)};
-        default: throw std::runtime_error("Invalid base node index");
-    }
+    throw std::runtime_error("Block::base_node_index: can't find base node");
 }
 
 BaseNode::Ptr Block::base_node(Side side, int idx) const {
     return m_base_nodes[node_idx(side, idx)];
 }
 
+std::tuple<Side, Side> Block::incident_sides(const BaseNode* v) const {
+    if (!v) { throw std::runtime_error("Block::incident_sides: BaseNode is nullptr"); }
+    return node_incident_sides(base_node_index(v));
+}
+
+std::tuple<Side, Side> Block::incident_sides(BaseNode::Ref v) const {
+    return incident_sides(v.get());
+}
+
+std::tuple<BaseNode::Ptr, BaseNode::Ptr> Block::adjacent_nodes(const BaseNode* v) const {
+    if (!v) { throw std::runtime_error("Block::adjacent_nodes: BaseNode is nullptr"); }
+    switch (base_node_index(v)) {
+        case 0: return {base_node(1), base_node(2)};
+        case 1: return {base_node(3), base_node(0)};
+        case 2: return {base_node(0), base_node(3)};
+        case 3: return {base_node(2), base_node(1)};
+        default: throw std::runtime_error("Block::adjacent_nodes: invalid BaseNode index");
+    }
+}
+
 // ---------- Границы блока ------------------ -------------------------------------------------------------------------
 
 Curve::Ref Block::boundary(Side side) const {
     return m_boundaries[static_cast<int>(side)];
-}
-
-bool Block::is_boundary(const BaseNode* v) const {
-    auto [side1, side2] = adjacent_sides(v);
-    return is_boundary(side1) || is_boundary(side2);
-}
-
-bool Block::is_boundary(Side side) const {
-    return boundary(side) != nullptr;
 }
 
 void Block::set_boundary(Side side, Curve::Ref curve) {
@@ -214,9 +218,7 @@ Side Block::get_side(BaseNode::Ref v1, BaseNode::Ref v2) const {
     // Глупый полный перебор, хотя тут всего по 4 узла/грани
     int idx_v1 = base_node_index(v1);
     int idx_v2 = base_node_index(v2);
-    if (idx_v1 == idx_v2) {
-        throw std::runtime_error("Invalid side, same nodes");
-    }
+    z_assert(idx_v1 != idx_v2, "Block::get_side: invalid side, two same nodes");
     if (idx_v2 < idx_v1) {
         std::swap(idx_v1, idx_v2);
     }
@@ -244,7 +246,7 @@ Side Block::get_side(BaseNode::Ref v1, BaseNode::Ref v2) const {
             return side;
         }
     }
-    throw std::runtime_error("Can't find face between two vertices");
+    throw std::runtime_error("Block::get_side: can't find face between two vertices");
 }
 
 Axis Block::get_axis(BaseNode::Ref v1, BaseNode::Ref v2) const {
@@ -264,10 +266,10 @@ Side Block::twin_face(Side side) const {
 
 void Block::link(Block::Ref B1, Block::Ref B2) {
     if (!B1 || !B2) {
-        throw std::runtime_error("Invalid block");
+        throw std::runtime_error("Block::link: Block is nullptr");
     }
     if (B1 == B2) {
-        throw std::runtime_error("Can't link same blocks");
+        throw std::logic_error("Block::link: can't link same blocks");
     }
 
     // Ищем просто полным перебором
@@ -283,13 +285,13 @@ void Block::link(Block::Ref B1, Block::Ref B2) {
 
             if (a1 == a2 && b1 == b2) {
                 if (B1->boundary(side1)) {
-                    throw std::runtime_error("Try link through boundary #1");
+                    throw std::runtime_error("Block::link: attempt to link through boundary #1");
                 }
                 B1->m_adjacent_blocks[static_cast<int>(side1)] = B2;
                 B1->m_rotations[static_cast<int>(side1)] = rotation(side1, side2);
 
                 if (B2->boundary(side2)) {
-                    throw std::runtime_error("Try link through boundary #2");
+                    throw std::runtime_error("Block::link: attempt to link through boundary #1");
                 }
                 B2->m_adjacent_blocks[static_cast<int>(side2)] = B1;
                 B2->m_rotations[static_cast<int>(side2)] = rotation(side2, side1);
@@ -298,12 +300,21 @@ void Block::link(Block::Ref B1, Block::Ref B2) {
     }
 }
 
-Array2D<BsVertex::Ptr> Block::create_vertices(AxisPair<int> sizes) const {
-    if (sizes[Axis::X] * sizes[Axis::Y] > 10000000) {
-        throw std::runtime_error("Too much vertices");
+Table2D Block::create_vertices(AxisPair<int> sizes) const {
+    if (m_mapping.empty()) {
+        return create_vertices_init(sizes);
+    }
+    else {
+        return create_vertices_again(sizes);
+    }
+}
+
+Table2D Block::create_vertices_init(AxisPair<int> sizes) const {
+    if (sizes[Axis::X] * sizes[Axis::Y] > 10'000'000) {
+        throw std::runtime_error("Block::create_vertices_init: too much vertices");
     }
 
-    Array2D<BsVertex::Ptr> vertices({sizes[Axis::X] + 1, sizes[Axis::Y] + 1}, nullptr);
+    Table2D vertices({sizes[Axis::X] + 1, sizes[Axis::Y] + 1}, nullptr);
 
     for (Side side: sides_2D) {
         Vector3d p1 = base_node(side, 0)->pos();
@@ -314,7 +325,7 @@ Array2D<BsVertex::Ptr> Block::create_vertices(AxisPair<int> sizes) const {
             vertices.boundary(side, i) = BsVertex::create((1.0 - x) * p1 + x * p2);
         }
 
-        if (is_boundary(side)) {
+        if (boundary(side)) {
             auto curve = boundary(side);
             for (int idx = 1; idx < sizes[side]; ++idx) {
                 Vector3d p = vertices.boundary(side, idx)->pos;
@@ -353,17 +364,15 @@ Array2D<BsVertex::Ptr> Block::create_vertices(AxisPair<int> sizes) const {
     return vertices;
 }
 
-Array2D<BsVertex::Ptr> Block::create_vertices_again(AxisPair<int> sizes) const {
-    if (sizes[Axis::X] * sizes[Axis::Y] > 1000000) {
-        throw std::runtime_error("Too much vertices");
+Table2D Block::create_vertices_again(AxisPair<int> sizes) const {
+    if (sizes[Axis::X] * sizes[Axis::Y] > 10'000'000) {
+        throw std::runtime_error("Block::create_vertices_again: too much vertices");
     }
-
     if (m_mapping.empty()) {
-        throw std::runtime_error("Empty previous vertices array");
+        throw std::runtime_error("Block::create_vertices_again: empty mapping array #1");
     }
-
     if (m_mapping.size1() < 2 || m_mapping.size2() < 2) {
-        throw std::runtime_error("Empty previous vertices array");
+        throw std::runtime_error("Block::create_vertices_again: empty mapping array #2");
     }
 
     // Берем прошлые вершины за основу
@@ -416,23 +425,22 @@ inline double restricted_modulus(double K) {
     return K;
 }
 
-double Block::estimate_modulus() const {
-    double len1 = length(Side::B) + length(Side::T);
-    double len2 = length(Side::L) + length(Side::R);
-    return restricted_modulus(len1 / len2);
+void Block::set_modulus(double K) {
+    z_assert(good_number(K), "Block::update_ratio: bad modulus");
+    m_modulus = restricted_modulus(K);
 }
 
-void Block::set_modulus(double K) {
-    if (bad_number(K)) {
-        throw std::runtime_error("Block::update_ratio: bad modulus");
-    }
-    m_modulus = restricted_modulus(K);
+void Block::estimate_modulus() {
+    double len1 = length(Side::B) + length(Side::T);
+    double len2 = length(Side::L) + length(Side::R);
+    set_modulus(len1 / len2);
 }
 
 void Block::update_modulus(const Array2D<BsVertex::Ptr>& vertices) {
     const int Nx = vertices.size(Axis::X) - 1;
     const int Ny = vertices.size(Axis::Y) - 1;
 
+    // TODO: Посчитать лучше?
     double sum_x = 0.0;
     double sum_y = 0.0;
     for (int i = 0; i < Nx; ++i) {
@@ -476,6 +484,33 @@ void Block::set_mapping(const Array2D<BsVertex::Ptr>& vertices) {
     for (int i = 0; i < vertices.size1(); ++i) {
         for (int j = 0; j < vertices.size2(); ++j) {
             m_mapping(i, j) = vertices(i, j)->pos;
+        }
+    }
+}
+
+void BlockPair::add(Block::Ref block, Side side) {
+    if (b1.expired()) {
+        b1 = block;
+        b2.reset();
+        side1 = side;
+    }
+    else {
+        if (b1.lock() == block) {
+            std::cerr << "Attempt to add block second time\n";
+        }
+        else {
+            if (b2.expired()) {
+                b2 = block;
+                side2 = side;
+            }
+            else {
+                if (b2.lock() == block) {
+                    std::cerr << "Attempt to add block second time\n";
+                }
+                else {
+                    std::cerr << "Edge with more than two blocks\n";
+                }
+            }
         }
     }
 }

@@ -15,183 +15,120 @@ namespace zephyr::geom::generator::collection {
 SemicircleCutout::SemicircleCutout(
         double xmin, double xmax,
         double ymin, double ymax,
-        double xc, double r, Boundaries bounds) :
+        double xc, double r) :
+        Generator("collection.semicircle-cutout"),
         m_xmin(xmin), m_xmax(xmax),
         m_ymin(ymin), m_ymax(ymax),
-        m_xc(xc), m_r(r),
-        m_bounds(bounds) {
+        m_xc(xc), m_r(r) {
+    check_params();
 
-    m_name = "collection.semicircle-cutout";
+    double r_max = std::min({m_xmax - m_xc, m_xc - m_xmin, m_ymax - m_ymin});
+    double R = std::min(1.2 * m_r, r_max);
+    double phi1 = 0.75 * M_PI;
+    double phi2 = 0.25 * M_PI;
 
-    init_blocks();
+    //double R = 1.1 * m_r;
+
+    double x1 = m_xc - R;// * std::cos(phi1);
+    double x2 = m_xc + m_r * std::cos(phi1);
+    double x3 = m_xc + m_r * std::cos(phi2);
+    double x4 = m_xc + R;// * std::cos(phi2);
+    double y1 = m_ymin + m_r * std::sin(phi1);
+    double y2 = m_ymin + R; //R * std::sin(phi1);
+
+    // Задаем базисные вершины для структурированных блоков
+    v1 = BaseNode::create(m_xmin,   m_ymin);
+    v2 = BaseNode::create(m_xc-R,   m_ymin);
+    v3 = BaseNode::create(m_xc-m_r, m_ymin);
+    v4 = BaseNode::create(m_xc+m_r, m_ymin);
+    v5 = BaseNode::create(m_xc+R,   m_ymin);
+    v6 = BaseNode::create(m_xmax,   m_ymin);
+
+    v7  = BaseNode::create(m_xmin, y2);
+    v8  = BaseNode::create(x1, y2);
+    v9  = BaseNode::create(x2, y1);
+    v10 = BaseNode::create(x3, y1);
+    v11 = BaseNode::create(x4, y2);
+    v12 = BaseNode::create(m_xmax, y2);
+
+    v13 = BaseNode::create(m_xmin, m_ymax);
+    v14 = BaseNode::create(x1, m_ymax);
+    v15 = BaseNode::create(x4, m_ymax);
+    v16 = BaseNode::create(m_xmax, m_ymax);
+
+    // Кривые на границе
+    left   = Plane::create(v1, v13);
+    right  = Plane::create(v6, v16);
+    bottom = Plane::create(v1, v6);
+    top    = Plane::create(v13, v16);
+    circle = Circle::create(v3, v9, v4);
+
+    // Генератор сетки
+    m_blocks += {v1, v2, v7, v8};
+    m_blocks += {v2, v3, v8, v9};
+    m_blocks += {v9, v10, v8, v11};
+    m_blocks += {v4, v5, v10, v11};
+    m_blocks += {v5, v6, v11, v12};
+    m_blocks += {v7, v8, v13, v14};
+    m_blocks += {v8, v11, v14, v15};
+    m_blocks += {v11, v12, v15, v16};
+
+    m_blocks.set_boundary({v1, v7, v13}, left);
+    m_blocks.set_boundary({v6, v12, v16}, right);
+    m_blocks.set_boundary({v1, v2, v3}, bottom);
+    m_blocks.set_boundary({v4, v5, v6}, bottom);
+    m_blocks.set_boundary({v3, v9, v10, v4}, circle);
+    m_blocks.set_boundary({v13, v14, v15, v16}, top);
+
+    m_blocks.set_verbosity(0);
+    m_blocks.optimize({.steps=2});
 }
 
-inline double sqr(double x) {
-    return x * x;
+void SemicircleCutout::check_params() const {
+    if (m_xmin >= m_xmax) {
+        throw std::runtime_error("SemicircleCutout::check_params: x_min >= x_max");
+    }
+    if (m_ymin >= m_ymax) {
+        throw std::runtime_error("SemicircleCutout::check_params: y_min >= y_max");
+    }
+    if (m_xc >= m_xmax || m_xc <= m_xmin) {
+        throw std::runtime_error("SemicircleCutout::check_params: x_c not in [x_min, x_max]");
+    }
+    if (1.5 * m_r > (m_ymax - m_ymin)) {
+        // По оси y умещается 1.5 радиуса
+        throw std::runtime_error("SemicircleCutout::check_params: big radius, increase (y_max - y_min)");
+    }
+    if (1.5 * m_r > (m_xmax - m_xc)) {
+        // По оси x умещается 1.5 радиуса вправо
+        throw std::runtime_error("SemicircleCutout::check_params: big radius, increase (x_max - x_c)");
+    }
+    if (1.5 * m_r > (m_xc - m_xmin)) {
+        // По оси x умещается 1.5 радиуса влево
+        throw std::runtime_error("SemicircleCutout::check_params: big radius, increase (x_c - x_min)");
+    }
+}
+
+void SemicircleCutout::set_nx(int Nx) {
+    m_blocks.set_size({v13, v14, v15, v16}, Nx);
 }
 
 void SemicircleCutout::set_ny(int Ny) {
-    // Характерный размер ячейки
-    double H = (m_ymax - m_ymin);
-    double h = H / Ny;
-
-    double xi = H / m_r; // Соотношение "окружностей"
-    int Nr = static_cast<int>(std::log(xi) / std::log(1.0 + M_PI_4 / Ny));
-
-    int Nxc = 2 * Ny;
-    int Nxl = std::max(1, int(((m_xc - H) - m_xmin) / h));
-    int Nxr = std::max(1, int((m_xmax - (m_xc + H)) / h));
-
-    throw std::runtime_error("Not implemented");
-
-    /*
-    // Нет необходимости устанавливать все размеры
-    // у каждого блока, поскольку они связаны
-    m_blocks[0]->set_size(v1, v9, Ny);
-    m_blocks[0]->set_size(v1, v2, Nxl);
-
-    m_blocks[2]->set_size(v4, v10, Nr);
-    m_blocks[2]->set_size(v4, v5, Nxc);
-
-    m_blocks[4]->set_size(v7, v8, Nxr);
-    m_blocks[4]->set_size(v8, v12, Ny);
-    */
+    m_blocks.set_size({v1, v7, v13}, Ny);
 }
 
-
-void SemicircleCutout::set_boundaries(Boundaries bounds) {
-    m_bounds = bounds;
+void SemicircleCutout::set_boundaries(Boundaries bounds) const {
+    left->set_boundary(bounds.left);
+    right->set_boundary(bounds.right);
+    bottom->set_boundary(bounds.bottom);
+    top->set_boundary(bounds.top);
+    circle->set_boundary(bounds.bottom);
 }
-
-void SemicircleCutout::init_blocks() {
-    check_params();
-
-    double H = m_ymax - m_ymin;
-
-    double x1 = m_xc - H;
-    double x6 = m_xc + H;
-    assert(m_xmin < x1 && x6 < m_xmax);
-
-    double x2 = m_xc - m_r;
-    double x5 = m_xc + m_r;
-
-    double x3 = m_xc - m_r * std::cos(M_PI / 3.0);
-    double x4 = m_xc + m_r * std::cos(M_PI / 3.0);
-    double yc = m_ymin + m_r * std::sin(M_PI / 3.0);
-    assert(yc < m_ymax);
-
-
-    // Задаем базисные вершины для структурированных блоков
-    v1 = BaseNode::create(m_xmin, m_ymin, true);
-    v2 = BaseNode::create(x1,     m_ymin, false);
-    v3 = BaseNode::create(x2,     m_ymin, true);
-    v4 = BaseNode::create(x3,     yc,     false);
-    v5 = BaseNode::create(x4,     yc,     false);
-    v6 = BaseNode::create(x5,     m_ymin, true);
-    v7 = BaseNode::create(x6,     m_ymin, false);
-    v8 = BaseNode::create(m_xmax, m_ymin, true);
-    v9 = BaseNode::create(m_xmin,  m_ymax, true);
-    v10 = BaseNode::create(x1,     m_ymax, false);
-    v11 = BaseNode::create(x6,     m_ymax, false);
-    v12 = BaseNode::create(m_xmax, m_ymax, true);
-
-    // Ограничивающие прямые области
-    left   = Plane::create(v1, v9);
-    right  = Plane::create(v8, v12);
-    bottom = Plane::create(v1, v8);
-    top    = Plane::create(v9, v12);
-    circle = Circle::create(v3, v4, v6);
-
-    left->set_boundary(m_bounds.left);
-    right->set_boundary(m_bounds.right);
-    bottom->set_boundary(m_bounds.bottom);
-    top->set_boundary(m_bounds.top);
-    circle->set_boundary(m_bounds.bottom);
-
-    throw std::runtime_error("Not implemented");
-
-    // Генератор сетки
-    //*m_blocks[0] = {v1, v2, v9, v10};
-    m_blocks[0]->set_boundary(v1, v9, left);
-    m_blocks[0]->set_boundary(v1, v2, bottom);
-    m_blocks[0]->set_boundary(v9, v10, top);
-
-    //*m_blocks[1] = {v2, v3, v4, v10};
-    m_blocks[1]->set_boundary(v2, v3, bottom);
-    m_blocks[1]->set_boundary(v3, v4, circle);
-
-    //*m_blocks[2] = {v4, v5, v10, v11};
-    m_blocks[2]->set_boundary(v4, v5, circle);
-    m_blocks[2]->set_boundary(v10, v11, top);
-
-    //*m_blocks[3] = {v6, v7, v5, v11};
-    m_blocks[3]->set_boundary(v6, v7, bottom);
-    m_blocks[3]->set_boundary(v5, v6, circle);
-
-    //*m_blocks[4] = {v7, v8, v11, v12};
-    m_blocks[4]->set_boundary(v7, v8, bottom);
-    m_blocks[4]->set_boundary(v11, v12, top);
-    m_blocks[4]->set_boundary(v8, v12, right);
-
-    // Необходимо связать блоки
-    link_blocks();
-}
-
 
 Box SemicircleCutout::bbox() const {
     Vector3d vmin(m_xmin, m_ymin, 0.0);
     Vector3d vmax(m_xmax, m_ymax, 0.0);
 
     return {vmin, vmax};
-}
-
-void SemicircleCutout::check_params() const {
-    if (m_xmin >= m_xmax) {
-        std::string message = "SemicircleCutout Error: x_min >= x_max";
-        std::cerr << message << "\n";
-        throw std::runtime_error(message);
-    }
-    if (m_ymin >= m_ymax) {
-        std::string message = "SemicircleCutout Error: y_min >= y_max";
-        std::cerr << message << "\n";
-        throw std::runtime_error(message);
-    }
-    if (m_xc >= m_xmax || m_xc <= m_xmin) {
-        std::string message = "SemicircleCutout Error: x_w not in [x_min, x_max]";
-        std::cerr << message << "\n";
-        throw std::runtime_error(message);
-    }
-    if (2.99 * m_r > (m_ymax - m_ymin)) {
-        // По оси y умещается 3 радиуса
-        std::string message = "SemicircleCutout Error: big radius, increase (y_max - y_min)";
-        std::cerr << message << "\n";
-        throw std::runtime_error(message);
-    }
-    if (2.99 * m_r > (m_xmax - m_xc)) {
-        // По оси x умещается 3 радиуса вправо
-        std::string message = "SemicircleCutout Error: big radius, increase (x_max - x_c)";
-        std::cerr << message << "\n";
-        throw std::runtime_error(message);
-    }
-    if (2.99 * m_r > (m_xc - m_xmin)) {
-        // По оси x умещается 3 радиуса влево
-        std::string message = "SemicircleCutout Error: big radius, increase (x_c - x_min)";
-        std::cerr << message << "\n";
-        throw std::runtime_error(message);
-    }
-
-    if (m_ymax - m_ymin > (m_xmax - m_xc)) {
-        // По оси x умещается толщина пластины вправо
-        std::string message = "SemicircleCutout Error: small rectangle, increase (x_max - x_c)";
-        std::cerr << message << "\n";
-        throw std::runtime_error(message);
-    }
-    if (m_ymax - m_ymin > (m_xc - m_xmin)) {
-        // По оси x умещается толщина пластины влево
-        std::string message = "SemicircleCutout Error: small rectangle, increase (x_c - x_min)";
-        std::cerr << message << "\n";
-        throw std::runtime_error(message);
-    }
 }
 
 } // namespace zephyr::geom::generator::collection

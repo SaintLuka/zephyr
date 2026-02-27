@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <type_traits>
 #include <numeric>
+#include <span>
 
 namespace zephyr {
 
@@ -25,51 +26,6 @@ public:
     using index_type = Index;
     using size_type  = std::size_t;
 
-    /// @brief Non-const view of one CSR row.
-    class Row {
-    public:
-        Row() = default;
-        Row(T* ptr, Index n) : m_ptr(ptr), m_n(n) {}
-
-        T* begin() { return m_ptr; }
-        T* end()   { return m_ptr + m_n; }
-
-        T& operator[](Index k) {
-            if (k >= m_n) throw std::out_of_range("Csr::Row: index out of range");
-            return m_ptr[k];
-        }
-
-        Index size() const { return m_n; }
-        bool empty() const { return m_n == 0; }
-
-    private:
-        T* m_ptr{nullptr};
-        Index m_n{0};
-    };
-
-    /// @brief Const view of one CSR row.
-    class ConstRow {
-    public:
-        ConstRow() = default;
-        ConstRow(const T* ptr, Index n) : m_ptr(ptr), m_n(n) {}
-
-        const T* begin() const { return m_ptr; }
-        const T* end()   const { return m_ptr + m_n; }
-
-        const T& operator[](Index k) const {
-            if (k >= m_n) throw std::out_of_range("Csr::ConstRow: index out of range");
-            return m_ptr[k];
-        }
-
-        Index size() const { return m_n; }
-        bool empty() const { return m_n == 0; }
-
-    private:
-        const T* m_ptr{nullptr};
-        Index m_n{0};
-    };
-
-public:
     std::vector<Index> offsets;  ///< size = n_rows()+1, offsets[0]=0, offsets.back()=values.size()
     std::vector<T>     values;   ///< packed row data
 
@@ -86,6 +42,11 @@ public:
     void clear() {
         offsets.clear();
         values.clear();
+    }
+
+    void shrink_to_fit() {
+        offsets.shrink_to_fit();
+        values.shrink_to_fit();
     }
 
     size_type n_rows() const noexcept {
@@ -113,6 +74,24 @@ public:
         values.clear();
     }
 
+    /// @brief Row access (non-const), like vector<vector<T>>::operator[].
+    std::span<T> operator[](size_type row) {
+        if (row + 1 >= offsets.size()) throw std::out_of_range("Csr::operator[]: row out of range");
+        return {values.data() + offsets[row], static_cast<size_t>(offsets[row + 1] - offsets[row])};
+    }
+
+    /// @brief Row access (const).
+    std::span<const T> operator[](size_type row) const {
+        if (row + 1 >= offsets.size()) throw std::out_of_range("Csr::operator[] const: row out of range");
+        return {values.data() + offsets[row], static_cast<size_t>(offsets[row + 1] - offsets[row])};
+    }
+
+    /// @brief Number of items in row.
+    Index row_size(size_type row) const {
+        if (row + 1 >= offsets.size()) throw std::out_of_range("Csr::row_size: row out of range");
+        return offsets[row + 1] - offsets[row];
+    }
+
     /// @brief Validate CSR invariants (throws on error).
     void validate_or_throw() const {
         if (offsets.empty()) return;
@@ -124,28 +103,6 @@ public:
         if (static_cast<size_type>(offsets.back()) != values.size()) {
             throw std::logic_error("Csr: offsets.back() must equal values.size()");
         }
-    }
-
-    /// @brief Row access (non-const), like vector<vector<T>>::operator[].
-    Row operator[](size_type row) {
-        if (row + 1 >= offsets.size()) throw std::out_of_range("Csr::operator[]: row out of range");
-        const Index b = offsets[row];
-        const Index e = offsets[row + 1];
-        return Row(values.data() + static_cast<size_type>(b), e - b);
-    }
-
-    /// @brief Row access (const).
-    ConstRow operator[](size_type row) const {
-        if (row + 1 >= offsets.size()) throw std::out_of_range("Csr::operator[] const: row out of range");
-        const Index b = offsets[row];
-        const Index e = offsets[row + 1];
-        return ConstRow(values.data() + static_cast<size_type>(b), e - b);
-    }
-
-    /// @brief Number of items in row.
-    Index row_size(size_type row) const {
-        if (row + 1 >= offsets.size()) throw std::out_of_range("Csr::row_size: row out of range");
-        return offsets[row + 1] - offsets[row];
     }
 };
 

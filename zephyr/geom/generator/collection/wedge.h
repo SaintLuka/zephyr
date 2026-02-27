@@ -1,16 +1,12 @@
 #pragma once
 
-#include <array>
-#include <vector>
-
-#include <zephyr/configuration.h>
 #include <zephyr/geom/generator/block_structured.h>
 
 namespace zephyr::geom::generator::collection {
 
 /// @brief Генератор для создания сетки внутри прямоугольной области
-/// с отрезаным углом.
-class Wedge : public BlockStructured {
+/// с отрезанным углом.
+class Wedge final : public Generator {
 public:
     using Ptr = std::shared_ptr<Wedge>;
 
@@ -26,8 +22,7 @@ public:
     /// @param xmin, xmax, ymin, ymax Границы прямоугольника
     /// @param xw -- Положение клина
     /// @param phi -- Угол наклона
-    Wedge(double xmin, double xmax, double ymin, double ymax,
-                  double xw, double phi, Boundaries bounds);
+    Wedge(double xmin, double xmax, double ymin, double ymax, double xw, double phi);
 
     /// @brief Создать указатель на класс
     template <class... Args>
@@ -35,32 +30,30 @@ public:
         return std::make_shared<Wedge>(std::forward<Args>(args)...);
     }
 
-    /// @brief Установить желаемое число ячеек сетки по оси Ox
-    /// @details Число ячеек по оси Oy подбирается так, чтобы aspect ячеек
-    /// был около единицы
+    /// @brief Число ячеек вдоль верхней границы
     void set_nx(int nx);
 
+    /// @brief Число ячеек вдоль левой границы
+    void set_ny(int ny);
+
     /// @brief Установить флаги граничных условий
-    void set_boundaries(Boundaries bounds);
+    void set_boundaries(Boundaries bounds) const;
 
     /// @brief Ограничивающий объем
-    Box bbox() const final;
+    Box bbox() const override;
+
+    /// @brief Создать сетку
+    Grid make() const override { return m_blocks.make(); }
 
 private:
-    void check_params() const override;
-
-    void init_blocks();
+    void check_params() const;
 
     // Геометрия
     double m_xmin, m_xmax;
     double m_ymin, m_ymax;
     double m_xw, m_phi;
 
-    // Флаги граничных условий
-    Boundaries m_bounds;
-
-    // Куча параметров
-    // Базисные вершины для струтурированных блоков
+    // Базисные вершины для структурированных блоков
     BaseNode::Ptr v1, v2, v3;
     BaseNode::Ptr v4, v5, v6;
 
@@ -70,6 +63,9 @@ private:
     Curve::Ptr bottom;
     Curve::Ptr top;
     Curve::Ptr wedge;
+
+    // Блочная структура
+    BlockStructured m_blocks;
 };
 
 } // namespace zephyr::geom::generator::collection

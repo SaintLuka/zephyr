@@ -10,7 +10,7 @@ list(APPEND TESTS blocks)
 #list(APPEND TESTS poly_integrate)
 #list(APPEND TESTS polygon_clip)
 #list(APPEND TESTS polyhedra)
-#list(APPEND TESTS rotations)
+list(APPEND TESTS rotations)
 #list(APPEND TESTS splines)
 
 # Assume all files in directory are tests

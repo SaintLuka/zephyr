@@ -4,7 +4,6 @@
 #include <vector>
 #include <set>
 
-#include <zephyr/configuration.h>
 #include <zephyr/geom/vector.h>
 #include <zephyr/geom/boundary.h>
 
@@ -50,6 +49,9 @@ public:
 
     /// @brief Среднегеометрический коэффициент для сглаживания
     double lambda() const;
+
+    /// @brief Индекс соседней вершины
+    int neib_idx() const;
 };
 
 
@@ -92,6 +94,9 @@ public:
     /// остается в начале.
     void set_edges(const std::vector<BsEdge> &edges);
 
+    /// @brief Число смежных вершин
+    int degree() const { return static_cast<int>(m_edges.size()); }
+
     /// @brief Смежные вершины
     /// @details Для вершины на границе области нормальным является наличие
     /// трех смежных вершин, для вершины внутри области нормальное число
@@ -102,6 +107,9 @@ public:
 
     /// @brief Вершина считается внутренней, если она не лежит на границе
     bool inner() const { return m_boundaries.empty(); }
+
+    /// @brief Граничная вершина, если ровно одна граница
+    bool is_boundary() const { return m_boundaries.size() == 1; }
 
     /// @brief Вершина считается угловой, если она лежит на пересечении
     /// нескольких линий границ.
@@ -137,5 +145,7 @@ inline double BsEdge::x() const { return neib->pos.x(); }
 inline double BsEdge::y() const { return neib->pos.y(); }
 
 inline const Vector3d& BsEdge::pos() const { return neib->pos; }
+
+inline int BsEdge::neib_idx() const { return neib->index; }
 
 } // namespace zephyr::geom::generator

@@ -4,6 +4,7 @@
 #include <iostream>
 #include <iomanip>
 
+#include <zephyr/geom/grid.h>
 #include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/geom/generator/collection/wedge.h>
 #include <zephyr/geom/generator/collection/semicircle_cutout.h>
@@ -44,17 +45,22 @@ int main() {
     // Уравнение состояния
     auto eos = test.get_eos();
 
+    /*
     // Сеточные генераторы на выбор
     Rectangle gen(0.0, 1.0, 0.0, 0.2);
     gen.set_nx(200);
     gen.set_boundaries({.left=Boundary::ZOE, .right=Boundary::ZOE,
                         .bottom=Boundary::WALL, .top=Boundary::WALL});
+    */
 
     /*
-    Wedge gen(0.0, 3.0, 0.0, 1.8, 1.5, M_PI / 6.0,
-                 {.left=Boundary::ZOE, .right=Boundary::ZOE,
-                 .bottom=Boundary::WALL, .top=Boundary::WALL});
+    Wedge gen(0.0, 3.0, 0.0, 1.8, 1.5, M_PI / 6.0);
+    gen.set_boundaries({.left=Boundary::ZOE, .right=Boundary::ZOE,
+                        .bottom=Boundary::WALL, .top=Boundary::WALL});
     gen.set_nx(100);
+    */
+
+    /*
     gen.set_fixed(fix_condition);
 
     // Часть области с регулярной сеткой
@@ -63,32 +69,45 @@ int main() {
     };
      */
 
-    /*
-    PlaneWithCube gen(0, 3.2, 0, 3.2, 1.6, 1.6, 0.3);
-    gen.set_nx(-1);
-    */
+
+    // PlaneWithCube gen(0.0, 2.0, 0.0, 1.0, 0.6, 0.5, 0.1);
+    // gen.set_boundaries({.left   = Boundary::ZOE, .right  = Boundary::ZOE,
+    //                     .bottom = Boundary::ZOE, .top    = Boundary::ZOE,
+    //                     .hole   = Boundary::WALL});
+    // gen.set_nx(500);
 
     /*
-    PlaneWithHole gen(test.xmin(), test.xmax(), test.ymin(), test.ymax(),
-                       0.3, 0.5 * (test.ymin() + test.ymax()), 0.1);
+    PlaneWithHole gen(0.0, 2.0, 0.0, 1.0, 0.6, 0.5, 0.1);
     gen.set_boundaries({.left   = Boundary::ZOE, .right  = Boundary::ZOE,
                         .bottom = Boundary::ZOE, .top    = Boundary::ZOE,
                         .hole   = Boundary::WALL});
-    gen.set_nx(20);
+    gen.set_nx(320);
     */
 
-    // Cuboid gen(test.xmin(), test.xmax(),
-    //            test.ymin(), test.ymax(),
-    //            test.zmin(), test.zmax());
-    // gen.set_boundaries({.left   = Boundary::ZOE, .right  = Boundary::ZOE,
-    //                     .bottom = Boundary::ZOE, .top    = Boundary::ZOE,
-    //                     .back   = Boundary::ZOE, .front  = Boundary::ZOE});
-    // gen.set_nx(30);
-    // gen.set_ny(30);
-    // gen.set_nz(30);
+    Cuboid gen(0.0, 1.0,
+               0.0, 1.0,
+               0.0, 0.2);
+    gen.set_boundaries({.left   = Boundary::ZOE, .right  = Boundary::ZOE,
+                        .bottom = Boundary::ZOE, .top    = Boundary::ZOE,
+                        .back   = Boundary::ZOE, .front  = Boundary::ZOE});
+    gen.set_nx(20);
+    gen.set_ny(20);
+    gen.set_nz(20);
+
+
+    //Wedge gen(0.0, 2.0, 0.0, 1.0, 1.0, 0.3);
+    //gen.set_boundaries({.left=Boundary::WALL, .right=Boundary::WALL, .bottom=Boundary::WALL, .top=Boundary::WALL});
+    //gen.set_ny(50);
+
+    Grid grid = gen.make();
+    //grid.mirror_x();
+    //grid.move(-Vector3d::UnitY());
+    //grid.mirror_y();
+    //grid.triangulation(2);
+
 
     // Создать сетку
-    EuMesh mesh(gen);
+    EuMesh mesh(std::move(grid));
 
     // Создать решатель
     SmFluid solver(eos);
@@ -102,23 +121,34 @@ int main() {
     auto z = data.init;
 
     // Настройка сетки
-    mesh.set_max_level(3);
+    mesh.set_max_level(0);
     mesh.set_distributor(solver.distributor());
 
     // Начальные данные
-    auto init_cell = [&test, z](EuCell& cell) {
+    auto init_cell = [&test, z, eos](EuCell& cell) {
         auto cell_c = cell.center();
-        cell[z].density  = test.density(cell_c);
-        cell[z].velocity = test.velocity(cell_c);
-        cell[z].pressure = test.pressure(cell_c);
-        cell[z].energy   = test.energy(cell_c);
+        if (cell_c.norm() < 0.2) {
+            cell[z].density = 2.0;
+            cell[z].pressure =3.0;
+            cell[z].velocity = Vector3d::Zero();
+        }
+        else {
+            cell[z].density = 1.0;
+            cell[z].pressure =1.0;
+            cell[z].velocity = Vector3d::Zero();
+        }
+        cell[z].energy = eos->energy_rP(cell[z].density, cell[z].pressure);
+        //cell[z].density  = test.density(cell_c);
+        //cell[z].velocity = test.velocity(cell_c);
+        //cell[z].pressure = test.pressure(cell_c);
+        //cell[z].energy   = test.energy(cell_c);
     };
 
     // Файл для записи
     PvdFile pvd("flow", "output");
 
     // Переменные для сохранения
-    pvd.variables = {"level"};
+    pvd.variables = {"level", "faces2D"};
     pvd.variables += {"density",  [z](EuCell& cell) -> double { return cell[z].density; }};
     pvd.variables += {"vel.x",    [z](EuCell& cell) -> double { return cell[z].velocity.x(); }};
     pvd.variables += {"vel.y",    [z](EuCell& cell) -> double { return cell[z].velocity.y(); }};
@@ -126,16 +156,20 @@ int main() {
     pvd.variables += {"energy",   [z](EuCell& cell) -> double { return cell[z].energy; }};
 
     // Инициализация начальными данными
-    for (int k = 0; k < mesh.max_level() + 3; ++k) {
-        mesh.for_each(init_cell);
-        solver.set_flags(mesh);
-        mesh.refine();
+    if (mesh.adaptive()) {
+        for (int k = 0; k < mesh.max_level() + 3; ++k) {
+            mesh.for_each(init_cell);
+            solver.set_flags(mesh);
+            mesh.refine();
+        }
     }
     mesh.for_each(init_cell);
 
     size_t n_step = 0;
     double curr_time = 0.0;
     double next_write = 0.0;
+
+    test.finish *= 15.0;
 
     while (curr_time < test.max_time()) {
         if (curr_time >= next_write) {

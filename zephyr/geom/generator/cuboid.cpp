@@ -1,4 +1,5 @@
 #include <iostream>
+#include <format>
 #include <algorithm>
 
 #include <zephyr/geom/box.h>
@@ -15,8 +16,7 @@ Cuboid::Cuboid(const Json& config)
     : Generator("cuboid"),
       m_xmin(0.0), m_xmax(1.0),
       m_ymin(0.0), m_ymax(1.0),
-      m_zmin(0.0), m_zmax(1.0),
-      m_nx(0), m_ny(0), m_nz(0) {
+      m_zmin(0.0), m_zmax(1.0) {
 
     if (!config["geometry"]) {
         throw std::runtime_error("Cuboid config doesn't contain key 'geometry'");
@@ -55,7 +55,7 @@ Cuboid::Cuboid(const Json& config)
             ny = config["size"]["ny"].as<int>();
         }
         if (config["size"]["nz"]) {
-            ny = config["size"]["nz"].as<int>();
+            nz = config["size"]["nz"].as<int>();
         }
         if (nx > 0 && ny > 0 && nz > 0) {
             set_sizes(nx, ny, nz);
@@ -68,13 +68,8 @@ Cuboid::Cuboid(const Json& config)
             } else if (nz > 0) {
                 set_nz(nz);
             } else {
-                std::string message = "Cuboid(json) error: Strange mesh sizes: " +
-                                      std::to_string(nx) + " x " +
-                                      std::to_string(ny) + " x " +
-                                      std::to_string(nz) + "." +
-                                      "Setup size.nx, size.ny, size.nz or each value";
-                std::cerr << message << "\n";
-                throw std::runtime_error(message);
+                throw std::runtime_error(std::format("Cuboid config strange sizes: {}, {}, {}, "
+                                                     "setup key size.nx, size.ny, size.nz or all of them", nx, ny, nz));
             }
         }
     }
@@ -84,9 +79,7 @@ Cuboid::Cuboid(double xmin, double xmax, double ymin, double ymax, double zmin, 
         Generator("cuboid"),
         m_xmin(xmin), m_xmax(xmax),
         m_ymin(ymin), m_ymax(ymax),
-        m_zmin(zmin), m_zmax(zmax),
-        m_nx(0), m_ny(0), m_nz(0), m_size(0),
-        m_bounds() {
+        m_zmin(zmin), m_zmax(zmax) {
     check_params();
 }
 
@@ -99,7 +92,7 @@ Box Cuboid::bbox() const {
 
 void Cuboid::set_nx(int nx) {
     if (nx < 1) {
-        throw std::runtime_error("Cuboid: Nx < 1");
+        throw std::runtime_error("Cuboid::set_nx: Nx < 1");
     }
     m_nx = nx;
     m_ny = int(round(nx * (m_ymax - m_ymin) / (m_xmax - m_xmin)));
@@ -109,7 +102,7 @@ void Cuboid::set_nx(int nx) {
 
 void Cuboid::set_ny(int ny) {
     if (ny < 1) {
-        throw std::runtime_error("Cuboid: Ny < 1");
+        throw std::runtime_error("Cuboid::set_ny: Ny < 1");
     }
     m_ny = ny;
     m_nx = int(round(ny * (m_xmax - m_xmin) / (m_ymax - m_ymin)));
@@ -119,7 +112,7 @@ void Cuboid::set_ny(int ny) {
 
 void Cuboid::set_nz(int nz) {
     if (nz < 1) {
-        throw std::runtime_error("Cuboid: Nz < 1");
+        throw std::runtime_error("Cuboid::set_nz: Nz < 1");
     }
     m_nz = nz;
     m_nx = int(round(nz * (m_xmax - m_xmin) / (m_zmax - m_zmin)));
@@ -129,7 +122,7 @@ void Cuboid::set_nz(int nz) {
 
 void Cuboid::set_sizes(int nx, int ny, int nz) {
     if (nx < 1 || ny < 1 || nz < 1) {
-        throw std::runtime_error("Cuboid: Nx < 1 or Ny < 1 or Nz < 1");
+        throw std::runtime_error("Cuboid::set_sizes: Nx < 1 or Ny < 1 or Nz < 1");
     }
     m_nx = nx;
     m_ny = ny;
@@ -226,19 +219,13 @@ bool Cuboid::periodic_along_z() const {
 
 void Cuboid::check_params() const {
     if (m_xmin >= m_xmax) {
-        std::string message = "Cuboid Error: x_min >= x_max";
-        std::cerr << message << "\n";
-        throw std::runtime_error(message);
+        throw std::runtime_error("Cuboid::check_params: x_min >= x_max");
     }
     if (m_ymin >= m_ymax) {
-        std::string message = "Cuboid Error: y_min >= y_max";
-        std::cerr << message << "\n";
-        throw std::runtime_error(message);
+        throw std::runtime_error("Cuboid::check_params: y_min >= y_max");
     }
     if (m_zmin >= m_zmax) {
-        std::string message = "Cuboid Error: zmin >= zmax";
-        std::cerr << message << "\n";
-        throw std::runtime_error(message);
+        throw std::runtime_error("Cuboid::check_params: z_min >= z_max");
     }
     double dx = (m_xmax - m_xmin) / m_nx;
     double dy = (m_ymax - m_ymin) / m_ny;
@@ -247,7 +234,7 @@ void Cuboid::check_params() const {
     double dmax = std::max(dx, std::max(dy, dz));
     double dmin = std::min(dx, std::min(dy, dz));
     if (dmax / dmin > 1.0e3) {
-        std::cerr << "Cuboid Warning: Huge aspect ratio (> 1000)\n";
+        std::cerr << "Cuboid::check_params warning: Huge aspect ratio (> 1000)\n";
     }
 }
 
@@ -255,7 +242,7 @@ void Cuboid::compute_size() {
     m_size = m_nx * m_ny * m_nz;
 }
 
-Grid Cuboid::make() {
+Grid Cuboid::make() const {
     check_size(m_size);
 
     double dx = (m_xmax - m_xmin) / m_nx;
@@ -266,16 +253,16 @@ Grid Cuboid::make() {
     grid.reserve_nodes((m_nx + 1) * (m_ny + 1) * (m_nz + 1));
     grid.reserve_cells(m_nx * m_ny * m_nz);
 
-    std::vector nodes(m_nx + 1, std::vector(m_ny + 1, std::vector<NodeInput>(m_nz + 1)));
+    std::vector nodes(m_nx + 1, std::vector(m_ny + 1, std::vector<NodeInput::Ptr>(m_nz + 1)));
     for (int i = 0; i <= m_nx; ++i) {
         for (int j = 0; j <= m_ny; ++j) {
-            for (int k = 0; k <= m_ny; ++k) {
+            for (int k = 0; k <= m_nz; ++k) {
                 double x = m_xmin + i * dx;
                 double y = m_ymin + j * dy;
                 double z = m_zmin + k * dz;
-                nodes[i][j][k] = Vector3d{x, y, z};
+                nodes[i][j][k] = NodeInput::create({x, y, z});
 
-                grid.add_node(&nodes[i][j][k]);
+                grid.add_node(nodes[i][j][k]);
             }
         }
     }
@@ -293,14 +280,14 @@ Grid Cuboid::make() {
 
                 grid.add_cell(
                     CellType::HEXAHEDRON, {
-                        &nodes[i][j][k],
-                        &nodes[i + 1][j][k],
-                        &nodes[i + 1][j + 1][k],
-                        &nodes[i][j + 1][k],
-                        &nodes[i][j][k+1],
-                        &nodes[i + 1][j][k+1],
-                        &nodes[i + 1][j + 1][k+1],
-                        &nodes[i][j + 1][k+1]
+                        nodes[i][j][k],
+                        nodes[i + 1][j][k],
+                        nodes[i + 1][j + 1][k],
+                        nodes[i][j + 1][k],
+                        nodes[i][j][k+1],
+                        nodes[i + 1][j][k+1],
+                        nodes[i + 1][j + 1][k+1],
+                        nodes[i][j + 1][k+1]
                     }, bc);
             }
         }

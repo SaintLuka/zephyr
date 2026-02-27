@@ -1,6 +1,8 @@
 #include <zephyr/geom/cell_type.h>
 #include <zephyr/mesh/euler/amr_cells.h>
 
+#include "zephyr/geom/generator/array2d.h"
+
 namespace zephyr::mesh {
 
 using geom::CellType;
@@ -60,6 +62,7 @@ void AmrFaces::insert(index_t iface, CellType ctype, int count) {
     int n_faces = -1;
     switch (ctype) {
         case CellType::AMR2D:
+            z_assert(count == 8 || count < 0, "AmrFaces::insert: bad size 2D");
             vertices[iface + Side2D::L] = Side2D::L.sf();
             vertices[iface + Side2D::R] = Side2D::R.sf();
             vertices[iface + Side2D::B] = Side2D::B.sf();
@@ -68,6 +71,7 @@ void AmrFaces::insert(index_t iface, CellType ctype, int count) {
             break;
 
         case CellType::AMR3D:
+            z_assert(count == 24 || count < 0, "AmrFaces::insert: bad size 3D");
             vertices[iface + Side3D::L] = Side3D::L.sf();
             vertices[iface + Side3D::R] = Side3D::R.sf();
             vertices[iface + Side3D::B] = Side3D::B.sf();
@@ -78,31 +82,49 @@ void AmrFaces::insert(index_t iface, CellType ctype, int count) {
             break;
 
         case CellType::TRIANGLE:
+            z_assert(count == 3 || count < 0, "AmrFaces::insert: bad size TRIANGLE");
+            vertices[iface+0] = {0, 1, -1, -1, -1, -1, -1, -1};
+            vertices[iface+1] = {1, 2, -1, -1, -1, -1, -1, -1};
+            vertices[iface+2] = {2, 0, -1, -1, -1, -1, -1, -1};       
+            n_faces = 3;
+            break;
+            
         case CellType::QUAD:
-            // определяем count и идем на CellType::POLYGON
-            count = ctype == CellType::TRIANGLE ? 3 : 4;
+            // Необычный порядок граней
+            z_assert(count == 4 || count < 0, "AmrFaces::insert: bad size QUAD");
+            vertices[iface+0] = {0, 3, -1, -1, -1, -1, -1, -1};
+            vertices[iface+1] = {1, 2, -1, -1, -1, -1, -1, -1};
+            vertices[iface+2] = {0, 1, -1, -1, -1, -1, -1, -1};
+            vertices[iface+3] = {3, 2, -1, -1, -1, -1, -1, -1};
+            n_faces = 4;
+            break;
 
         case CellType::POLYGON:
             if (count < 0) {
-                std::string message = "AmrFaces::insert error(): set argument 'count' with CellType::POLYGON";
-                std::cerr << message << "\n";
-                throw std::runtime_error(message);
+                throw std::runtime_error("AmrFaces::insert error: set argument 'count' with CellType::POLYGON");
             }
             for (int i = 0; i < count; ++i) {
                 vertices[iface + i].fill(-1);
-                vertices[iface + i][0] = i;
-                vertices[iface + i][1] = (i + 1) % count;
+                vertices[iface + i][0] = static_cast<short>(i);
+                vertices[iface + i][1] = static_cast<short>((i + 1) % count);
             }
             n_faces = count;
             break;
 
-        case CellType::POLYHEDRON:
+        case CellType::HEXAHEDRON:
+            z_assert(count == 6 || count < 0, "AmrFaces::insert: bad size HEXAHEDRON");
+            vertices[iface + Side3D::L] = {7, 3, 0, 4, -1, -1, -1, -1};
+            vertices[iface + Side3D::R] = {1, 2, 6, 5, -1, -1, -1, -1};
+            vertices[iface + Side3D::B] = {0, 1, 5, 4, -1, -1, -1, -1};
+            vertices[iface + Side3D::T] = {2, 3, 7, 6, -1, -1, -1, -1};
+            vertices[iface + Side3D::B] = {3, 2, 1, 0, -1, -1, -1, -1};
+            vertices[iface + Side3D::F] = {4, 5, 6, 7, -1, -1, -1, -1};
+            n_faces = 6;
             break;
 
+        case CellType::POLYHEDRON:
         default:
-            std::string message = "BFaces::BFaces error(): not implemented for current CellType";
-            std::cerr << message << "\n";
-            throw std::runtime_error(message);
+            throw std::runtime_error("AmrFaces::insert: not implemented for current CellType");
     }
 
     for (int i = 0; i < n_faces; ++i) {
@@ -120,6 +142,31 @@ bool AmrFaces::to_skip(index_t iface, Direction dir) const {
         case Direction::Y: return std::abs(normal[iface].y()) < 0.7;
         case Direction::Z: return std::abs(normal[iface].z()) < 0.7;
         default: return false;
+    }
+}
+
+template <class T>
+void reorder(std::vector<T>& field, index_t iface) {
+    // 0 -> 2, 2 -> 3, 3 -> 0
+    T f0 = field[iface];
+    field[iface] = field[iface + 3];
+    field[iface + 3] = field[iface + 2];
+    field[iface + 2] = f0;
+}
+
+void AmrFaces::reorder_quad_faces(index_t iface) {
+    reorder(adjacent.rank, iface);
+    reorder(adjacent.index, iface);
+    reorder(adjacent.alien, iface);
+
+    reorder(boundary, iface);
+    reorder(normal, iface);
+    reorder(center, iface);
+    reorder(area, iface);
+    reorder(vertices, iface);
+
+    if (!area_alt.empty()) {
+        reorder(area_alt, iface);
     }
 }
 

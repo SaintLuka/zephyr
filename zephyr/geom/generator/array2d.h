@@ -27,8 +27,53 @@ constexpr Axis to_axis(Side side) {
     return (side == Side::B || side == Side::T) ? Axis::X : Axis::Y;
 }
 
+/// @brief Пара величин, присвоенная осям блока
+template <typename T>
+class AxisPair {
+public:
+    /// @brief Конструктор по умолчанию
+    AxisPair() = default;
+
+    /// @brief Конструктор от initializer_list
+    constexpr AxisPair(std::initializer_list<T> list) {
+        if (list.size() != 2)
+            throw std::invalid_argument("Pair requires exactly 2 elements");
+        std::copy_n(list.begin(), 2, values.begin());
+    }
+
+    /// @brief Конструктор от std::array
+    constexpr AxisPair(const std::array<T, 2>& arr) : values(arr) {}
+
+    /// @brief Неявное приведение к std::array
+    operator const std::array<T, 2>&() const { return values; }
+
+    /// @brief Доступ по оси
+    T& operator[](Axis axis) {
+        return values[static_cast<int>(axis)];
+    }
+
+    /// @brief Доступ по оси
+    const T& operator[](Axis axis) const {
+        return values[static_cast<int>(axis)];
+    }
+
+    /// @brief Доступ по стороне
+    T& operator[](Side side) {
+        return values[static_cast<int>(to_axis(side))];
+    }
+
+    /// @brief Доступ по стороне
+    const T& operator[](Side side) const {
+        return values[static_cast<int>(to_axis(side))];
+    }
+
+private:
+    /// @brief Пара значений
+    std::array<T, 2> values{};
+};
+
 /// @brief Двумерный массив с возможностью индексации отрицательными
-/// числами как в python. Удобно для таблиц узлов.
+/// индексами как в python. Используется для таблиц узлов.
 template <typename T>
 class Array2D {
 public:
@@ -51,7 +96,7 @@ public:
         m_data.clear();
     }
 
-    /// @brief
+    /// @brief Изменение размеров массива (выполняется с полной очисткой)
     void resize(const std::array<int, 2> sizes) {
         z_assert(sizes[0] > 0 && sizes[1] > 0, "Bad sizes resize");
         m_sizes = sizes;
@@ -59,7 +104,7 @@ public:
         m_data.resize(m_sizes[0] * m_sizes[1]);
     }
 
-    /// @brief
+    /// @brief Изменение размеров массива (выполняется с полной очисткой)
     void resize(const std::array<int, 2> sizes, const T& value) {
         z_assert(sizes[0] > 0 && sizes[1] > 0, "Bad sizes resize");
         m_sizes = sizes;

@@ -4,74 +4,32 @@
 
 #include <zephyr/geom/generator/array2d.h>
 #include <zephyr/geom/generator/base_node.h>
-#include <zephyr/geom/generator/bs_vertex.h>
 #include <zephyr/geom/generator/curve/curve.h>
 
 namespace zephyr::geom::generator {
 
-class BlockStructured;
+class BsVertex;
 
-/// @brief Пара величин, присвоенная осям блока
-template <typename T>
-class AxisPair {
-public:
-    /// @brief Конструктор по умолчанию
-    AxisPair() = default;
+/// @brief Таблица указателей на внутренние узлы
+using Table2D = Array2D<std::shared_ptr<BsVertex>>;
 
-    /// @brief Конструктор от initializer_list
-    constexpr AxisPair(std::initializer_list<T> list) {
-        if (list.size() != 2)
-            throw std::invalid_argument("Pair requires exactly 2 elements");
-        std::copy_n(list.begin(), 2, values.begin());
-    }
-
-    /// @brief Конструктор от std::array
-    constexpr AxisPair(const std::array<T, 2>& arr) : values(arr) {}
-
-    /// @brief Неявное приведение к std::array
-    operator const std::array<T, 2>&() const { return values; }
-
-    /// @brief Доступ по оси
-    T& operator[](Axis axis) {
-        return values[static_cast<int>(axis)];
-    }
-
-    /// @brief Доступ по оси
-    const T& operator[](Axis axis) const {
-        return values[static_cast<int>(axis)];
-    }
-
-    /// @brief Доступ по стороне
-    T& operator[](Side side) {
-        return values[static_cast<int>(to_axis(side))];
-    }
-
-    /// @brief Доступ по стороне
-    const T& operator[](Side side) const {
-        return values[static_cast<int>(to_axis(side))];
-    }
-
-private:
-    /// @brief Пара значений
-    std::array<T, 2> values{};
-};
-
-/// @brief Представление четырехугольного блока.
+/// @brief Четырёхугольный блок на базисных вершинах
 class Block {
+    using BsVertex_Ptr = std::shared_ptr<BsVertex>;
 public:
     using Ptr = std::shared_ptr<Block>;
     using Ref = const std::shared_ptr<Block>&;
     using WPtr = std::weak_ptr<Block>;
 
     /// @brief Конструктор структурированного блока.
-    /// @details Вершины сортируются, чтобы получить обход против часовой
-    /// стрелки, первая вершина остается на месте.
-    explicit Block(const std::array<BaseNode::Ptr, 4>& vertices);
+    /// @param nodes Базисные вершины блока в произвольном порядке. Внутри
+    /// конструктора упорядочиваются, первая вершина остается на месте.
+    explicit Block(const std::array<BaseNode::Ptr, 4>& nodes);
 
-    /// @brief Инициализация структурированного блока.
-    /// @details Вершины сортируются, чтобы получить обход против часовой
-    /// стрелки, первая вершина остается на месте.
-    static Block::Ptr create(const std::array<BaseNode::Ptr, 4>& vertices);
+    /// @brief Конструктор структурированного блока.
+    /// @param nodes Базисные вершины блока в произвольном порядке. Внутри
+    /// конструктора упорядочиваются, первая вершина остается на месте.
+    static Block::Ptr create(const std::array<BaseNode::Ptr, 4>& nodes);
 
     /// @brief Индекс блока
     int index() const { return m_index; }
@@ -92,23 +50,6 @@ public:
 
     // --------------------------- Базисные вершины ---------------------------
 
-    /// @brief Индекс базисной вершины внутри блока
-    int base_node_index(const BaseNode* v) const;
-
-    /// @brief Индекс базисной вершины внутри блока
-    int base_node_index(BaseNode::Ref v) const { return base_node_index(v.get()); }
-
-    /// @brief Стороны блока, которые прилегают к заданной вершине.
-    /// Гарантируется перечисление против часовой стрелки (внутри блока)
-    std::tuple<Side, Side> adjacent_sides(const BaseNode* v) const;
-
-    /// @brief Стороны блока, которые прилегают к заданной вершине.
-    std::tuple<Side, Side> adjacent_sides(BaseNode::Ref v) const;
-
-    /// @brief Пара прилегающих вершин. Гарантируется перечисление вершин против
-    /// часовой стрелки (внутри блока).
-    std::tuple<BaseNode::Ptr, BaseNode::Ptr> adjacent_nodes(const BaseNode* v) const;
-
     /// @brief Базовые вершины
     const auto& base_nodes() const { return m_base_nodes; }
 
@@ -116,27 +57,44 @@ public:
     /// @param v_idx Индекс вершины
     BaseNode::Ptr base_node(int v_idx) const { return m_base_nodes[v_idx]; }
 
-    /// @brief Базисная вершина по стороне (против часовой стрелки)
+    /// @brief Базисная вершина по стороне (индексация против часовой стрелки)
     BaseNode::Ptr base_node(Side side, int idx) const;
 
+    /// @brief Индекс базисной вершины внутри блока
+    int base_node_index(const BaseNode* v) const;
+
+    /// @brief Индекс базисной вершины внутри блока
+    int base_node_index(BaseNode::Ref v) const { return base_node_index(v.get()); }
+
+    /// @brief Стороны блока, которые прилегают к заданной вершине.
+    /// Гарантируется перечисление против часовой стрелки (внутри блока).
+    std::tuple<Side, Side> incident_sides(const BaseNode* v) const;
+
+    /// @brief Стороны блока, которые прилегают к заданной вершине.
+    /// Гарантируется перечисление против часовой стрелки (внутри блока).
+    std::tuple<Side, Side> incident_sides(BaseNode::Ref v) const;
+
+    /// @brief Пара прилегающих вершин. Гарантируется перечисление вершин против
+    /// часовой стрелки (внутри блока).
+    std::tuple<BaseNode::Ptr, BaseNode::Ptr> adjacent_nodes(const BaseNode* v) const;
+
+    /// @brief Пара прилегающих вершин. Гарантируется перечисление вершин против
+    /// часовой стрелки (внутри блока).
+    std::tuple<BaseNode::Ptr, BaseNode::Ptr> adjacent_nodes(BaseNode::Ref v) const {
+        return adjacent_nodes(v.get());
+    }
 
     // ---------------------------- Границы блока -----------------------------
 
-    /// @brief Кривая границы области (допускается nullptr)
+    /// @brief Кривая границы области. Возвращает nullptr при отсутствии
+    /// границы, поэтому может использоваться в условиях.
     Curve::Ref boundary(Side side) const;
-
-    /// @brief Сторона принадлежит границе области?
-    bool is_boundary(Side side) const;
-
-    /// @brief Угол принадлежит границе области?
-    bool is_boundary(const BaseNode* v) const;
 
     /// @brief Установить границу на сторону
     void set_boundary(Side side, Curve::Ref curve);
 
     /// @brief Установить границу на сторону (v1, v2)
     void set_boundary(BaseNode::Ref v1, BaseNode::Ref v2, Curve::Ref curve);
-
 
     // --------------------- Выбор сторон и смежные блоки ---------------------
 
@@ -155,41 +113,41 @@ public:
     /// @brief Сторона этой же грани у соседнего блока
     Side twin_face(Side side) const;
 
-
-    // ----------------------- Функции "верхнего уровня" ------------------------
+    // ---------------------- Функции "верхнего уровня" -----------------------
 
     /// @brief Связать два блока
     static void link(Block::Ref B1, Block::Ref B2);
 
-    /// @brief Сгенерировать узлы сетки с нуля
-    Array2D<BsVertex::Ptr> create_vertices(AxisPair<int> sizes) const;
-
-    /// @brief Сгенерировать узлы сетки на основе сохраненного отображения
-    Array2D<BsVertex::Ptr> create_vertices_again(AxisPair<int> sizes) const;
-
+    /// @brief Сгенерировать таблицу узлов сетки, если в блоке определено
+    /// конформное отображение, то оно будет использовано для генерации.
+    Table2D create_vertices(AxisPair<int> sizes) const;
 
     // -------------------------- Конформные приколы --------------------------
 
     /// @brief Конформный модуль криволинейного четырехугольника
     double modulus() const { return m_modulus; }
 
-    /// @brief Установить конформный модуль (пересчитать lambda)
-    void set_modulus(double K);
-
     /// @brief Оценить и установить конформный модуль четырехугольника
-    double estimate_modulus() const;
+    void estimate_modulus();
 
     /// @brief Пересчитывает модуль и коэффициенты сглаживания
-    void update_modulus(const Array2D<BsVertex::Ptr>& vertices);
+    void update_modulus(const Table2D& vertices);
+
+    /// @brief Сохранить текущее отображение
+    void set_mapping(const Table2D& vertices);
 
     /// @brief Получить конформное отображение блока
     const Array2D<Vector3d>& mapping() const { return m_mapping; }
 
-    /// @brief Сохранить текущее отображение
-    void set_mapping(const Array2D<BsVertex::Ptr>& vertices);
-
 private:
-    // Основные топологические параметры, задаются пользователем
+    /// @brief Установить конформный модуль
+    void set_modulus(double K);
+
+    /// @brief Сгенерировать узлы сетки с нуля
+    Table2D create_vertices_init(AxisPair<int> sizes) const;
+
+    /// @brief Сгенерировать узлы сетки на основе сохраненного отображения
+    Table2D create_vertices_again(AxisPair<int> sizes) const;
 
     /// @brief Индекс блока в общем списке блоков
     int m_index{-1};
@@ -213,6 +171,27 @@ private:
 
     /// @brief Конформное отображение блока в виде таблицы вершин
     Array2D<Vector3d> m_mapping{};
+};
+
+/// @brief Пара смежных блоков
+struct BlockPair {
+    /// @brief Пара смежных блоков
+    Block::WPtr b1{}, b2{};
+
+    /// @brief Стороны у смежных блоков
+    Side side1{}, side2{};
+
+    /// @brief Смежные блоки не заданы
+    bool empty() const { return b1.expired(); }
+
+    /// @brief У ребра только один блок (граница)
+    bool boundary() const { return b2.expired(); }
+
+    /// @brief У ребра два блока (внутреннее ребро)
+    bool inner() const { return b2.expired(); }
+
+    /// @brief Добавить блок (не кидает ошибок)
+    void add(Block::Ref block, Side side);
 };
 
 } // namespace zephyr::mesh::generator

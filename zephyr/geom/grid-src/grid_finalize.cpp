@@ -4,7 +4,11 @@
 #include <stdexcept>
 #include <cstdint>
 
+#include <zephyr/mesh/side.h>
 #include <zephyr/geom/grid.h>
+
+using zephyr::mesh::Side2D;
+using zephyr::mesh::Side3D;
 
 namespace zephyr::geom {
 
@@ -178,8 +182,8 @@ void Grid::finalize(const BuildOptions& opt) {
     };
     auto make_face_key = [&](const std::vector<id_t>& fnodes) -> FaceKey {
         FaceKey k{fnodes};
-        std::sort(k.ids.begin(), k.ids.end());
-        k.ids.erase(std::unique(k.ids.begin(), k.ids.end()), k.ids.end());
+        std::ranges::sort(k.ids);
+        k.ids.erase(std::ranges::unique(k.ids).begin(), k.ids.end());
         return k;
     };
 
@@ -208,7 +212,7 @@ void Grid::finalize(const BuildOptions& opt) {
     m_cells.resize(n_cells);
 
     for (id_t i = 0; i < n_nodes; ++i) {
-        const NodeInput* in = d.nodes[i];
+        NodeInput::Ref in = d.nodes[i];
         m_nodes[i].pos = in->pos;
         m_nodes[i].bc  = in->bc;
     }
@@ -251,7 +255,7 @@ void Grid::finalize(const BuildOptions& opt) {
             const DraftCell& dc = d.cells[cid];
             const Cell& c = m_cells[cid];
 
-            auto get_bc = [&](size_t lf) -> Boundary {
+            auto get_bc = [&](int lf) -> Boundary {
                 if (dc.face_bc.empty()) return Boundary::UNDEFINED;
                 if (lf < dc.face_bc.size()) return dc.face_bc[lf];
                 return Boundary::UNDEFINED;
@@ -300,7 +304,7 @@ void Grid::finalize(const BuildOptions& opt) {
                 case CellType::POLYGON: {
                     const size_t nn = c.nodes.size();
                     throw_if(nn < 3, "Grid::finalize: POLYGON needs >=3 nodes");
-                    for (size_t i = 0; i < nn; ++i) {
+                    for (int i = 0; i < nn; ++i) {
                         const id_t a = c.nodes[i];
                         const id_t b = c.nodes[(i+1) % nn];
                         push_face({a, b}, get_bc(i));
@@ -310,14 +314,14 @@ void Grid::finalize(const BuildOptions& opt) {
                 case CellType::AMR2D: {
                     // 9 nodes: 3x3 row-major
                     throw_if(c.nodes.size() != 9, "Grid::finalize: AMR2D expects exactly 9 nodes");
-                    // bottom: [0,1,2]
-                    push_face({c.nodes[0], c.nodes[1], c.nodes[2]}, get_bc(0));
-                    // right: [2,5,8]
-                    push_face({c.nodes[2], c.nodes[5], c.nodes[8]}, get_bc(1));
-                    // top: [8,7,6]
-                    push_face({c.nodes[8], c.nodes[7], c.nodes[6]}, get_bc(2));
                     // left: [6,3,0]
-                    push_face({c.nodes[6], c.nodes[3], c.nodes[0]}, get_bc(3));
+                    push_face({c.nodes[6], c.nodes[3], c.nodes[0]}, get_bc(Side2D::LEFT));
+                    // right: [2,5,8]
+                    push_face({c.nodes[2], c.nodes[5], c.nodes[8]}, get_bc(Side2D::RIGHT));
+                    // bottom: [0,1,2]
+                    push_face({c.nodes[0], c.nodes[1], c.nodes[2]}, get_bc(Side2D::BOTTOM));
+                    // top: [8,7,6]
+                    push_face({c.nodes[8], c.nodes[7], c.nodes[6]}, get_bc(Side2D::TOP));
                 } break;
 
                     // 3D classic
@@ -353,12 +357,12 @@ void Grid::finalize(const BuildOptions& opt) {
                 case CellType::HEXAHEDRON: {
                     throw_if(c.nodes.size() < 8, "Grid::finalize: HEXAHEDRON needs 8 nodes");
                     // 6 quad faces (orientation fixed by geom check)
-                    push_face({c.nodes[0], c.nodes[1], c.nodes[2], c.nodes[3]}, get_bc(0));
-                    push_face({c.nodes[4], c.nodes[7], c.nodes[6], c.nodes[5]}, get_bc(1));
-                    push_face({c.nodes[0], c.nodes[4], c.nodes[5], c.nodes[1]}, get_bc(2));
-                    push_face({c.nodes[1], c.nodes[5], c.nodes[6], c.nodes[2]}, get_bc(3));
-                    push_face({c.nodes[2], c.nodes[6], c.nodes[7], c.nodes[3]}, get_bc(4));
-                    push_face({c.nodes[3], c.nodes[7], c.nodes[4], c.nodes[0]}, get_bc(5));
+                    push_face({c.nodes[7], c.nodes[3], c.nodes[0], c.nodes[4]}, get_bc(5)); // LEFT
+                    push_face({c.nodes[1], c.nodes[2], c.nodes[6], c.nodes[5]}, get_bc(3)); // RIGHT
+                    push_face({c.nodes[0], c.nodes[1], c.nodes[5], c.nodes[4]}, get_bc(2)); // BOTTOM
+                    push_face({c.nodes[2], c.nodes[3], c.nodes[7], c.nodes[6]}, get_bc(4)); // TOP
+                    push_face({c.nodes[3], c.nodes[2], c.nodes[1], c.nodes[0]}, get_bc(0)); // BACK
+                    push_face({c.nodes[4], c.nodes[5], c.nodes[6], c.nodes[7]}, get_bc(1)); // FRONT
                 } break;
 
                 case CellType::AMR3D: {
@@ -378,47 +382,25 @@ void Grid::finalize(const BuildOptions& opt) {
                     // We generate each face as a 3x3 table (row-major),
                     // then push_face() will flip if needed based on geometry.
 
-                    // z- (k=0): use (u=i, v=j) but with j descending to prefer outward -z
-                    face9([&](int u, int v)->id_t {
-                        const int i = u;
-                        const int j = 2 - v;
-                        return idx(i,j,0);
-                    }, get_bc(0));
-
-                    // z+ (k=2): (u=i, v=j) j ascending
-                    face9([&](int u, int v)->id_t {
-                        const int i = u;
-                        const int j = v;
-                        return idx(i,j,2);
-                    }, get_bc(1));
+                    using mesh::Side3D;
 
                     // x- (i=0): (u=j, v=k)
-                    face9([&](int u, int v)->id_t {
-                        const int j = u;
-                        const int k = v;
-                        return idx(0,j,k);
-                    }, get_bc(2));
+                    face9([&](int u, int v) -> id_t { return idx(0, u, v); }, get_bc(Side3D::LEFT));
 
                     // x+ (i=2): (u=j, v=k)
-                    face9([&](int u, int v)->id_t {
-                        const int j = u;
-                        const int k = v;
-                        return idx(2,j,k);
-                    }, get_bc(3));
+                    face9([&](int u, int v) -> id_t { return idx(2, u, v); }, get_bc(Side3D::RIGHT));
 
                     // y- (j=0): (u=i, v=k)
-                    face9([&](int u, int v)->id_t {
-                        const int i = u;
-                        const int k = v;
-                        return idx(i,0,k);
-                    }, get_bc(4));
+                    face9([&](int u, int v) -> id_t { return idx(u, 0, v); }, get_bc(Side3D::BOTTOM));
 
                     // y+ (j=2): (u=i, v=k)
-                    face9([&](int u, int v)->id_t {
-                        const int i = u;
-                        const int k = v;
-                        return idx(i,2,k);
-                    }, get_bc(5));
+                    face9([&](int u, int v) -> id_t { return idx(u, 2, v); }, get_bc(Side3D::TOP));
+
+                    // z- (k=0): use (u=i, v=j) but with j descending to prefer outward -z
+                    face9([&](int u, int v)->id_t { return idx(u, 2-v, 0); }, get_bc(Side3D::BACK));
+
+                    // z+ (k=2): (u=i, v=j) j ascending
+                    face9([&](int u, int v) -> id_t { return idx(u, v, 2); }, get_bc(Side3D::FRONT));
 
                 } break;
 
@@ -519,9 +501,9 @@ void Grid::finalize(const BuildOptions& opt) {
                     fc.neighbor_cell[g] = fc.owner_cell[f];
                     fc.neighbor_cell[f] = fc.owner_cell[g];
 
-                    // Interior => bc undefined (for both records)
-                    fc.face_bc[f] = Boundary::UNDEFINED;
-                    fc.face_bc[g] = Boundary::UNDEFINED;
+                    // Interior => bc inner (for both records)
+                    fc.face_bc[f] = Boundary::INNER;
+                    fc.face_bc[g] = Boundary::INNER;
 
                     if (opt.build_twin_face) {
                         fc.twin_face[f] = g;
@@ -559,7 +541,7 @@ void Grid::finalize(const BuildOptions& opt) {
                                  "Grid::finalize: non-manifold face (more than 2 adjacent cells)");
 
                         fc.neighbor_cell[fid] = cid;
-                        fc.face_bc[fid] = Boundary::UNDEFINED; // interior
+                        fc.face_bc[fid] = Boundary::INNER; // interior
                         cell_face_rows[cid].push_back(fid);
                     }
                 }

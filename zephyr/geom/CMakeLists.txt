@@ -22,6 +22,7 @@ install(FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/sections.h
         ${CMAKE_CURRENT_SOURCE_DIR}/geom.h
         ${CMAKE_CURRENT_SOURCE_DIR}/grid.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/indexing.h
         ${CMAKE_CURRENT_SOURCE_DIR}/intersection.h
         ${CMAKE_CURRENT_SOURCE_DIR}/interface_recovery.h
         ${CMAKE_CURRENT_SOURCE_DIR}/vector.h
