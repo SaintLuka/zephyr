@@ -82,10 +82,10 @@ void retain_cell(AmrCells &locals, AmrCells& aliens, index_t ic) {
                     index_t sface = face_beg + subface;
                     adj.basic[sface] = locals.next[ic];
                     if (adj.alien[iface] < 0) {
-                        adj.index[sface] = locals.next[neib_next + subface.neib_child()];
+                        adj.index[sface] = locals.next[neib_next + indexing::neib_child(subface)];
                     }
                     else {
-                        int zch = subface.neib_child();
+                        int zch = indexing::neib_child(subface);
                         adj.alien[sface] = child_next(aliens.next[jc], zch);
                     }
                 }
@@ -200,7 +200,7 @@ void retain_cell(AmrCells &locals, AmrCells& aliens, index_t ic) {
                 // Сосед адаптируется (neib_flag > 0)
                 adj.basic[iface] = locals.next[ic];
 
-                int zch = side.adjacent_child(locals.z_idx[ic] % CpC(dim));
+                int zch = indexing::adjacent_child(side, locals.z_idx[ic] % CpC(dim));
                 if (adj.alien[iface] < 0) {
                     index_t neib_next = neibs.next[jc] + zch;
                     adj.index[iface] = locals.next[neib_next];

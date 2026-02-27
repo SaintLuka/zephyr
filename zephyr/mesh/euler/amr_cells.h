@@ -3,7 +3,7 @@
 #include <filesystem>
 #include <zephyr/utils/range.h>
 
-#include <zephyr/mesh/side.h>
+#include <zephyr/geom/side.h>
 #include <zephyr/mesh/storage.h>
 #include <zephyr/mesh/euler/amr_faces.h>
 
@@ -260,7 +260,7 @@ public:
 
     /// @brief Название грани AMR-ячейки
     std::string face_name(index_t ic, index_t iface) const {
-        return side_to_string(iface - face_begin[ic], m_dim);
+        return geom::side_to_string(iface - face_begin[ic], m_dim);
     }
 
     /// @}

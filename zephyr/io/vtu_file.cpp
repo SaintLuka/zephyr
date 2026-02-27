@@ -1,10 +1,10 @@
 #include <fstream>
 #include <filesystem>
 
+#include <zephyr/geom/side.h>
 #include <zephyr/geom/primitives/quad.h>
 #include <zephyr/geom/primitives/cube.h>
 
-#include <zephyr/mesh/side.h>
 #include <zephyr/mesh/euler/eu_prim.h>
 #include <zephyr/mesh/euler/eu_mesh.h>
 

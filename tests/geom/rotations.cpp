@@ -1,10 +1,11 @@
+#include <pybind11/pytypes.h>
 #include <zephyr/geom/vector.h>
 #include <zephyr/geom/geom.h>
-#include <zephyr/mesh/side.h>
+#include <zephyr/geom//side.h>
+#include <zephyr/geom/indexing.h>
 
 using namespace zephyr;
 using namespace zephyr::geom;
-using namespace zephyr::mesh;
 
 // Полная группа перестановок квадрата, элементы записаны в форме перестановок
 // индексов вершин квадрата.
@@ -68,9 +69,9 @@ void subface_by_side_child_gen() {
     };
     // Проходим по subfaces
     for (Side2D s = 0; s < Side2D::n_subfaces(); ++s.val) {
-        if (gen_subface_by_side_child_2D[s.simple()][s.child()] != s) {
+        if (gen_subface_by_side_child_2D[s.simple()][indexing::child(s)] != s) {
 
-            std::cout << s.simple() << " " << s.child() << " " << s << "\n";
+            std::cout << s.simple() << " " << indexing::child(s) << " " << s << "\n";
 
             throw std::runtime_error("No way 2D");
         }
@@ -95,7 +96,7 @@ void subface_by_side_child_gen() {
     };
     // Проходим по subfaces
     for (Side3D s = 0; s < Side3D::n_subfaces(); ++s.val) {
-        if (gen_subface_by_side_child_3D[s.simple()][s.child()] != s) {
+        if (gen_subface_by_side_child_3D[s.simple()][indexing::child(s)] != s) {
             throw std::runtime_error("No way 3D");
         }
     }
@@ -137,7 +138,7 @@ void neib_child_gen_2D() {
             neibs[Side2D::T][i].y() += 1.0;
         }
 
-        std::array<std::array<Vector3d, CpC(2)>, Side2D::count()> child_c;
+        std::array<std::array<Vector3d, indexing::CpC(2)>, Side2D::count()> child_c;
         for (Side2D side: Side2D::items()) {
             child_c[side] = {
                 neibs[side](-0.5, -0.5),
@@ -148,11 +149,11 @@ void neib_child_gen_2D() {
         }
 
         for (Side2D side = 0; side < Side2D::n_subfaces(); ++side.val) {
-            Vector3d fc = 0.5 * (quad[side.cf()[0]] + quad[side.cf()[1]]);
+            Vector3d fc = 0.5 * (quad[indexing::cf(side)[0]] + quad[indexing::cf(side)[1]]);
 
             double min_dist = 100.0;
             int child_idx = -1;
-            for (int i = 0; i < CpC(2); ++i) {
+            for (int i = 0; i < indexing::CpC(2); ++i) {
                 double dist = (child_c[side.simple()][i] - fc).norm();
                 if (dist < min_dist) {
                     min_dist = dist;
@@ -208,7 +209,7 @@ void neib_child_gen_3D() {
             neibs[Side3D::F][i].z() += 1.0;
         }
 
-        std::array<std::array<Vector3d, CpC(3)>, Side3D::count()> child_c;
+        std::array<std::array<Vector3d, indexing::CpC(3)>, Side3D::count()> child_c;
         for (Side3D side: Side3D::items()) {
             child_c[side] = {
                 neibs[side](-0.5, -0.5, -0.5),
@@ -224,12 +225,12 @@ void neib_child_gen_3D() {
 
         for (Side3D side = 0; side < Side3D::n_subfaces(); ++side.val) {
             Vector3d fc = 0.25 * (
-                quad[side.cf()[0]] + quad[side.cf()[1]] +
-                quad[side.cf()[2]] + quad[side.cf()[3]]);
+                quad[indexing::cf(side)[0]] + quad[indexing::cf(side)[1]] +
+                quad[indexing::cf(side)[2]] + quad[indexing::cf(side)[3]]);
 
             double min_dist = 100.0;
             int child_idx = -1;
-            for (int i = 0; i < CpC(3); ++i) {
+            for (int i = 0; i < indexing::CpC(3); ++i) {
                 double dist = (child_c[side.simple()][i] - fc).norm();
                 if (dist < min_dist) {
                     min_dist = dist;

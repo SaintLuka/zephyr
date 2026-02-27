@@ -5,10 +5,11 @@
 #include <zephyr/geom/boundary.h>
 #include <zephyr/geom/box.h>
 #include <zephyr/geom/grid.h>
+#include <zephyr/geom/side.h>
+#include <zephyr/geom/indexing.h>
 #include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/geom/primitives/quad.h>
 #include <zephyr/utils/json.h>
-#include <zephyr/mesh/side.h>
 #include <zephyr/mesh/euler/amr_cells.h>
 
 namespace zephyr::geom::generator {
@@ -572,10 +573,10 @@ void Rectangle::initialize(AmrCells& cells) const {
         cells.faces.area[iface + Side2D::B] = hx;
         cells.faces.area[iface + Side2D::T] = hx;
 
-        cells.faces.vertices[iface + Side2D::L] = Side2D::L.sf();
-        cells.faces.vertices[iface + Side2D::R] = Side2D::R.sf();
-        cells.faces.vertices[iface + Side2D::B] = Side2D::B.sf();
-        cells.faces.vertices[iface + Side2D::T] = Side2D::T.sf();
+        cells.faces.vertices[iface + Side2D::L] = indexing::sf(Side2D::L);
+        cells.faces.vertices[iface + Side2D::R] = indexing::sf(Side2D::R);
+        cells.faces.vertices[iface + Side2D::B] = indexing::sf(Side2D::B);
+        cells.faces.vertices[iface + Side2D::T] = indexing::sf(Side2D::T);
 
         for (index_t jn = 0; jn < n_nodes; ++jn) {
             cells.verts[ic * n_nodes + jn] = quad[jn];

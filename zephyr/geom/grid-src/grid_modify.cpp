@@ -7,7 +7,7 @@
 
 #include <zephyr/utils/threads.h>
 #include <zephyr/geom/grid.h>
-#include <zephyr/mesh/side.h>
+#include <zephyr/geom/side.h>
 
 namespace zephyr::geom {
 
@@ -428,10 +428,10 @@ void Grid::make_amr_2D_() {
 
         // Переставить гран условия
         std::vector bc = draft.cells[i].face_bc;
-        draft.cells[i].face_bc[mesh::Side2D::L] = bc[3];
-        draft.cells[i].face_bc[mesh::Side2D::R] = bc[1];
-        draft.cells[i].face_bc[mesh::Side2D::B] = bc[0];
-        draft.cells[i].face_bc[mesh::Side2D::T] = bc[2];
+        draft.cells[i].face_bc[Side2D::L] = bc[3];
+        draft.cells[i].face_bc[Side2D::R] = bc[1];
+        draft.cells[i].face_bc[Side2D::B] = bc[0];
+        draft.cells[i].face_bc[Side2D::T] = bc[2];
     }
     m_type = Type::AMR;
 }

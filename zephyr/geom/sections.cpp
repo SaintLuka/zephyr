@@ -1,10 +1,10 @@
 #include <iostream>
 
+#include <zephyr/geom/side.h>
 #include <zephyr/geom/sections.h>
 #include <zephyr/math/funcs.h>
 #include <zephyr/math/calc/roots.h>
 #include <zephyr/math/calc/derivatives.h>
-#include <zephyr/mesh/side.h>
 
 namespace zephyr::geom {
 
@@ -503,8 +503,6 @@ inline double e2f(double ax1, double ax2, double ay1, double ay2) {
     auto [min_y, max_y] = sorted(ay1, ay2);
     return 0.5 * (min_x * max_y + max_x * min_y + max_x * max_y - min_x * min_y);
 }
-
-using mesh::Side3D;
 
 std::array<double, Side3D::count()> face_fractions(double a_cell, const std::array<double, Side3D::count()>& a_neib) {
     // Ребра вдоль Ox

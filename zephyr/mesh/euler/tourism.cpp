@@ -2,6 +2,7 @@
 #include <numeric>
 #include <map>
 #include <zephyr/io/pvd_file.h>
+#include <zephyr/geom/indexing.h>
 #include <zephyr/mesh/amr/common.h>
 #include <zephyr/mesh/euler/router.h>
 #include <zephyr/mesh/euler/tourism.h>
@@ -13,6 +14,7 @@ namespace zephyr::mesh {
 
 using utils::mpi;
 using utils::threads;
+namespace indexing = geom::indexing;
 
 void Tourism::shrink_to_fit() {
     //m_unique_border_indices.shrink_to_fit();
@@ -237,7 +239,7 @@ std::bitset<8> border_children(const AmrFaces& faces, index_t ic, int rank) {
             // Simple Face
             index_t iface = face_beg + side;
             if (faces.adjacent.rank[iface] == rank) {
-                for (int i: side.children()) {
+                for (int i: indexing::children(side)) {
                     children[i] = true;
                 }
             }
@@ -246,7 +248,7 @@ std::bitset<8> border_children(const AmrFaces& faces, index_t ic, int rank) {
             for (auto subface: side.subfaces()) {
                 index_t iface = face_beg + subface;
                 if (faces.adjacent.rank[iface] == rank) {
-                    children[subface.child()] = true;
+                    children[indexing::child(subface)] = true;
                 }
             }
         }
@@ -289,7 +291,7 @@ std::vector<index_t> Tourism::setup_border_next() {
                 std::tuple<index_t, index_t, index_t> parent = {
                     m_border.b_idx[i],
                     m_border.level[i],
-                    m_border.z_idx[i] / CpC(dim),
+                    m_border.z_idx[i] / indexing::CpC(dim),
                 };
 
                 auto parent_it = coarse_cells.find(parent);
@@ -347,7 +349,7 @@ void Tourism::update_border_indices(const std::vector<index_t>& locals_next) {
         else {
             auto [border_next, children] = amr::unpack_children(m_border.next[i]);
             index_t main_child = locals_next[prev_border_indices[i]];
-            for (int c = 0; c < CpC(dim); ++c) {
+            for (int c = 0; c < indexing::CpC(dim); ++c) {
                 if (children[c]) {
                     if (border_next >= m_border_indices.size()) {
                         std::cout << m_border.next[i] << "; " << border_next << "; " << children << "; " << m_border_indices.size() << "\n";

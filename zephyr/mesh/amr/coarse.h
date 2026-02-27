@@ -117,7 +117,7 @@ void make_parent(AmrCells& locals, AmrCells& aliens, Children& children, index_t
     auto& adj = locals.faces.adjacent;
     for (Side<dim> side: Side<dim>::items()) {
         // Некоторая дочерняя у грани и её грань
-        index_t some_ch = children.index[side.child()];
+        index_t some_ch = children.index[indexing::child(side)];
         index_t some_ch_face = locals.face_begin[some_ch] + side;
 #if SCRUTINY
         if (locals.faces.is_undefined(some_ch_face)) {
@@ -232,7 +232,7 @@ void make_parent(AmrCells& locals, AmrCells& aliens, Children& children, index_t
         // lvl_ch = lvl_n & flag_n == 0, то есть сосед выше новой родительской ничего не делает
         // lvl_ch < lvl_n & flan_n < 0 хотя бы у одного, то есть сосед, который делает coarse
         for (auto subface: side.subfaces()) {
-            index_t ich = children.index[subface.child()];
+            index_t ich = children.index[indexing::child(subface)];
             index_t ch_face = locals.face_begin[ich] + side;
             auto[neibs, jc] = adj.get_neib(ch_face, locals, aliens);
             scrutiny_check(0 <= jc && jc < neibs.size(), "Out-of-bounds #3");
@@ -245,7 +245,7 @@ void make_parent(AmrCells& locals, AmrCells& aliens, Children& children, index_t
             if (locals.level[ich] > neibs.level[jc]) {
                 // Сосед нашего уровня с родительской, но бьется
                 scrutiny_check(neibs.flag[jc] > 0, "Wrong assumption #4");
-                int zch = subface.neib_child();
+                int zch = indexing::neib_child(subface);
                 if (adj.alien[ch_face] < 0) {
                     index_t adj_next = neibs.next[jc] + zch;
                     adj.index[sface] = locals.next[adj_next];

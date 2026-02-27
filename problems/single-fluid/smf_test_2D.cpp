@@ -91,7 +91,7 @@ int main(int argc, char** argv) {
     PvdFile pvd("test2D", "output");
 
     // Переменные для сохранения
-    pvd.variables = {"level"};
+    pvd.variables = {"level", "faces2D"};
     pvd.variables += {"density",  [z](EuCell& cell) -> double { return cell[z].density; }};
     pvd.variables += {"vel.x",    [z](EuCell& cell) -> double { return cell[z].velocity.x(); }};
     pvd.variables += {"vel.y",    [z](EuCell& cell) -> double { return cell[z].velocity.y(); }};

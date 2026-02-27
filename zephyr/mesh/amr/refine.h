@@ -218,7 +218,7 @@ index_t make_children(AmrCells &locals, AmrCells& aliens, index_t ip) {
     // Далее необходимо связать дочерние ячейки с соседями
     index_t face_beg = locals.face_begin[ip];
     for (Side<dim> side: Side<dim>::items()) {
-        auto children_by_side = side.children();
+        auto children_by_side = indexing::children(side);
 
         // Тип родительской грани
         auto flag = locals.faces.boundary[face_beg + side];
@@ -265,7 +265,7 @@ index_t make_children(AmrCells &locals, AmrCells& aliens, index_t ip) {
 
                 if (locals.level[ip] > neibs.level[jc]) {
                     // case: lvl_c > lvl_n & flag_n == 1
-                    int zch = side.adjacent_child(locals.z_idx[ip] % CpC(dim));
+                    int zch = indexing::adjacent_child(side, locals.z_idx[ip] % CpC(dim));
                     if (adj.alien[p_face] < 0) {
                         adj.index[ch_face] = locals.next[neibs.next[jc] + zch];
                     }
@@ -285,7 +285,7 @@ index_t make_children(AmrCells &locals, AmrCells& aliens, index_t ip) {
                     }
                     else {
                         // case: lvl_c == lvl_n & flag_n == 1
-                        int zch = side.adjacent_child(i);
+                        int zch = indexing::adjacent_child(side, i);
                         if (adj.alien[p_face] < 0) {
                             adj.index[ch_face] = locals.next[neibs.next[jc] + zch];
                         }
@@ -301,7 +301,7 @@ index_t make_children(AmrCells &locals, AmrCells& aliens, index_t ip) {
                 index_t ich = main_child + i;
                 index_t ch_face = locals.face_begin[ich] + side;
 
-                Side<dim> subface = side.subface_by_child(i);
+                Side<dim> subface = indexing::subface_by_child(side, i);
                 index_t p_face = face_beg + subface;
                 auto [neibs, jc] = adj.get_neib(p_face, locals, aliens);
                 scrutiny_check(0 <= jc && jc < neibs.size(), "Out fo bounds make children #2");
@@ -368,7 +368,7 @@ void refine_cell(AmrCells &locals, AmrCells& aliens, index_t ip, const Distribut
             continue;
         }
 
-        for (int i: side.children()) {
+        for (int i: indexing::children(side)) {
             index_t ich = main_child + i;
 #if SCRUTINY
             if (ich < 0 || ich >= locals.size()) {
@@ -397,7 +397,7 @@ void refine_cell(AmrCells &locals, AmrCells& aliens, index_t ip, const Distribut
             }
 #endif
             // Ссылка на соседнюю ячейку
-            index_t p_face = locals.face_begin[ip] + side.subface_by_child(i);
+            index_t p_face = locals.face_begin[ip] + indexing::subface_by_child(side, i);
             auto [neibs, jc] = adj.get_neib(p_face, locals, aliens);
 
             // Желаемый уровень соседней ячейки
@@ -413,7 +413,7 @@ void refine_cell(AmrCells &locals, AmrCells& aliens, index_t ip, const Distribut
                     index_t ch_face = locals.face_begin[ich] + subface;
                     adj.rank[ch_face] = adj.rank[p_face];
 
-                    int zch = subface.neib_child();
+                    int zch = indexing::neib_child(subface);
                     if (adj.alien[p_face] < 0) {
                         adj.index[ch_face] = locals.next[neib_next + zch];
                         adj.alien[ch_face] = -1;

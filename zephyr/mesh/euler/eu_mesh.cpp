@@ -6,6 +6,7 @@
 #include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/mesh/euler/eu_prim.h>
 
+#include <zephyr/geom/indexing.h>
 #include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/geom/generator/cuboid.h>
 #include <zephyr/geom/primitives/polygon.h>
@@ -25,6 +26,7 @@ using generator::Rectangle;
 using generator::Cuboid;
 using utils::Stopwatch;
 using namespace io;
+using namespace geom::indexing;
 
 namespace {
 

@@ -2,10 +2,11 @@
 
 #include <zephyr/geom/geom.h>
 #include <zephyr/math/funcs.h>
-#include <zephyr/mesh/euler/amr_cells.h>
 #include <zephyr/geom/grid.h>
+#include <zephyr/geom/indexing.h>
 #include <zephyr/geom/generator/cuboid.h>
 #include <zephyr/geom/generator/rectangle.h>
+#include <zephyr/mesh/euler/amr_cells.h>
 
 using namespace zephyr::geom;
 
@@ -254,10 +255,10 @@ AmrCells::AmrCells(const generator::Rectangle& rect) {
         faces.area[iface + Side2D::B] = hx;
         faces.area[iface + Side2D::T] = hx;
 
-        faces.vertices[iface + Side2D::L] = Side2D::L.sf();
-        faces.vertices[iface + Side2D::R] = Side2D::R.sf();
-        faces.vertices[iface + Side2D::B] = Side2D::B.sf();
-        faces.vertices[iface + Side2D::T] = Side2D::T.sf();
+        faces.vertices[iface + Side2D::L] = indexing::sf(Side2D::L);
+        faces.vertices[iface + Side2D::R] = indexing::sf(Side2D::R);
+        faces.vertices[iface + Side2D::B] = indexing::sf(Side2D::B);
+        faces.vertices[iface + Side2D::T] = indexing::sf(Side2D::T);
 
         for (index_t jn = 0; jn < n_nodes; ++jn) {
             verts[ic * n_nodes + jn] = quad[jn];
@@ -417,12 +418,12 @@ AmrCells::AmrCells(const generator::Cuboid& c) {
         faces.area[iface + Side3D::Z] = hx * hy;
         faces.area[iface + Side3D::F] = hx * hy;
 
-        faces.vertices[iface + Side3D::L] = Side3D::L.sf();
-        faces.vertices[iface + Side3D::R] = Side3D::R.sf();
-        faces.vertices[iface + Side3D::B] = Side3D::B.sf();
-        faces.vertices[iface + Side3D::T] = Side3D::T.sf();
-        faces.vertices[iface + Side3D::Z] = Side3D::Z.sf();
-        faces.vertices[iface + Side3D::F] = Side3D::F.sf();
+        faces.vertices[iface + Side3D::L] = indexing::sf(Side3D::L);
+        faces.vertices[iface + Side3D::R] = indexing::sf(Side3D::R);
+        faces.vertices[iface + Side3D::B] = indexing::sf(Side3D::B);
+        faces.vertices[iface + Side3D::T] = indexing::sf(Side3D::T);
+        faces.vertices[iface + Side3D::Z] = indexing::sf(Side3D::Z);
+        faces.vertices[iface + Side3D::F] = indexing::sf(Side3D::F);
 
         for (index_t jn = 0; jn < n_nodes; ++jn) {
             verts[ic * n_nodes + jn] = cube[jn];

@@ -9,6 +9,10 @@
 
 namespace zephyr::mesh {
 
+using geom::Side;
+using geom::Side2D;
+using geom::Side3D;
+
 /// @brief Индексы смежности граней
 /// @details Короткое объяснение. Если сосед через грань
 ///             с этого процесса  |  с другого процесса

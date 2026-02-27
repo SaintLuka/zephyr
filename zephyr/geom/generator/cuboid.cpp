@@ -2,13 +2,14 @@
 #include <format>
 #include <algorithm>
 
+#include <zephyr/geom/side.h>
+#include <zephyr/geom/indexing.h>
 #include <zephyr/geom/boundary.h>
 #include <zephyr/geom/box.h>
 #include <zephyr/geom/grid.h>
 #include <zephyr/geom/primitives/cube.h>
 #include <zephyr/geom/generator/cuboid.h>
 #include <zephyr/utils/json.h>
-#include <zephyr/mesh/side.h>
 #include <zephyr/mesh/euler/amr_cells.h>
 
 namespace zephyr::geom::generator {
@@ -428,12 +429,12 @@ void Cuboid::initialize(AmrCells& cells) const {
         cells.faces.area[iface + Side3D::Z] = hx * hy;
         cells.faces.area[iface + Side3D::F] = hx * hy;
 
-        cells.faces.vertices[iface + Side3D::L] = Side3D::L.sf();
-        cells.faces.vertices[iface + Side3D::R] = Side3D::R.sf();
-        cells.faces.vertices[iface + Side3D::B] = Side3D::B.sf();
-        cells.faces.vertices[iface + Side3D::T] = Side3D::T.sf();
-        cells.faces.vertices[iface + Side3D::Z] = Side3D::Z.sf();
-        cells.faces.vertices[iface + Side3D::F] = Side3D::F.sf();
+        cells.faces.vertices[iface + Side3D::L] = indexing::sf(Side3D::L);
+        cells.faces.vertices[iface + Side3D::R] = indexing::sf(Side3D::R);
+        cells.faces.vertices[iface + Side3D::B] = indexing::sf(Side3D::B);
+        cells.faces.vertices[iface + Side3D::T] = indexing::sf(Side3D::T);
+        cells.faces.vertices[iface + Side3D::Z] = indexing::sf(Side3D::Z);
+        cells.faces.vertices[iface + Side3D::F] = indexing::sf(Side3D::F);
 
         for (index_t jn = 0; jn < n_nodes; ++jn) {
             cells.verts[ic * n_nodes + jn] = cube[jn];

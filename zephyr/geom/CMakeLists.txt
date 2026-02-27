@@ -20,6 +20,7 @@ install(FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/box.h
         ${CMAKE_CURRENT_SOURCE_DIR}/cell_type.h
         ${CMAKE_CURRENT_SOURCE_DIR}/sections.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/side.h
         ${CMAKE_CURRENT_SOURCE_DIR}/geom.h
         ${CMAKE_CURRENT_SOURCE_DIR}/grid.h
         ${CMAKE_CURRENT_SOURCE_DIR}/indexing.h

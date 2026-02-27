@@ -2,13 +2,9 @@
 #include <algorithm>
 #include <numeric>
 #include <stdexcept>
-#include <cstdint>
 
-#include <zephyr/mesh/side.h>
+#include <zephyr/geom/side.h>
 #include <zephyr/geom/grid.h>
-
-using zephyr::mesh::Side2D;
-using zephyr::mesh::Side3D;
 
 namespace zephyr::geom {
 
@@ -381,8 +377,6 @@ void Grid::finalize(const BuildOptions& opt) {
 
                     // We generate each face as a 3x3 table (row-major),
                     // then push_face() will flip if needed based on geometry.
-
-                    using mesh::Side3D;
 
                     // x- (i=0): (u=j, v=k)
                     face9([&](int u, int v) -> id_t { return idx(0, u, v); }, get_bc(Side3D::LEFT));

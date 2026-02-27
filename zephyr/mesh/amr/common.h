@@ -22,11 +22,12 @@
 
 #include <zephyr/configuration.h>
 
+#include <zephyr/geom/side.h>
+#include <zephyr/geom/indexing.h>
 #include <zephyr/geom/primitives/line.h>
 #include <zephyr/geom/primitives/quad.h>
 #include <zephyr/geom/primitives/cube.h>
 
-#include <zephyr/mesh/side.h>
 #include <zephyr/mesh/euler/eu_prim.h>
 #include <zephyr/mesh/euler/tourism.h>
 
@@ -39,6 +40,7 @@
 
 namespace zephyr::mesh::amr {
 
+namespace indexing = geom::indexing;
 using geom::Vector3d;
 using geom::Line;
 using geom::Quad;
@@ -46,6 +48,12 @@ using geom::SqQuad;
 using geom::Cube;
 using geom::SqCube;
 using geom::Boundary;
+
+using geom::indexing::FpF;
+using geom::indexing::FpC;
+using geom::indexing::FpC;
+using geom::indexing::CpC;
+
 using mesh::AmrCells;
 using mesh::Children;
 

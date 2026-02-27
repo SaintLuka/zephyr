@@ -4,6 +4,7 @@
 
 #include <zephyr/utils/mpi.h>
 #include <zephyr/geom/geom.h>
+#include <zephyr/geom/indexing.h>
 #include <zephyr/mesh/euler/amr_cells.h>
 
 using zephyr::utils::mpi;
@@ -158,10 +159,10 @@ int AmrCells::check_geometry(index_t ic) const {
         if (faces.is_undefined(iface)) continue;
 
         Vector3d fc(0.0, 0.0, 0.0);
-        for (int iv = 0; iv < VpF(m_dim); ++iv) {
+        for (int iv = 0; iv < indexing::VpF(m_dim); ++iv) {
             fc += verts[node_begin[ic] + faces.vertices[iface][iv]];
         }
-        fc /= VpF(m_dim);
+        fc /= indexing::VpF(m_dim);
 
         // Нормаль внешняя
         if (faces.normal[iface].dot(fc - center[ic]) < 0.0) {

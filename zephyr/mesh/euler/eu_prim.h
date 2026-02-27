@@ -74,7 +74,7 @@ public:
 
     /// @brief Сторона, по которой расположена грань
     template <int dim = 3>
-    Side<dim> side() const;
+    geom::Side<dim> side() const;
 
     /// @brief Площадь/длина обычной грани
     double area() const;

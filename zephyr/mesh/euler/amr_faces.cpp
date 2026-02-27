@@ -1,11 +1,11 @@
 #include <zephyr/geom/cell_type.h>
+#include <zephyr/geom/indexing.h>
 #include <zephyr/mesh/euler/amr_cells.h>
-
-#include "zephyr/geom/generator/array2d.h"
 
 namespace zephyr::mesh {
 
 using geom::CellType;
+namespace indexing = geom::indexing;
 
 void AmrAdjacent::resize(index_t n_faces) {
     rank.resize(n_faces, -1);
@@ -63,21 +63,21 @@ void AmrFaces::insert(index_t iface, CellType ctype, int count) {
     switch (ctype) {
         case CellType::AMR2D:
             z_assert(count == 8 || count < 0, "AmrFaces::insert: bad size 2D");
-            vertices[iface + Side2D::L] = Side2D::L.sf();
-            vertices[iface + Side2D::R] = Side2D::R.sf();
-            vertices[iface + Side2D::B] = Side2D::B.sf();
-            vertices[iface + Side2D::T] = Side2D::T.sf();
+            vertices[iface + Side2D::L] = indexing::sf(Side2D::L);
+            vertices[iface + Side2D::R] = indexing::sf(Side2D::R);
+            vertices[iface + Side2D::B] = indexing::sf(Side2D::B);
+            vertices[iface + Side2D::T] = indexing::sf(Side2D::T);
             n_faces = 8;
             break;
 
         case CellType::AMR3D:
             z_assert(count == 24 || count < 0, "AmrFaces::insert: bad size 3D");
-            vertices[iface + Side3D::L] = Side3D::L.sf();
-            vertices[iface + Side3D::R] = Side3D::R.sf();
-            vertices[iface + Side3D::B] = Side3D::B.sf();
-            vertices[iface + Side3D::T] = Side3D::T.sf();
-            vertices[iface + Side3D::Z] = Side3D::Z.sf();
-            vertices[iface + Side3D::F] = Side3D::F.sf();
+            vertices[iface + Side3D::L] = indexing::sf(Side3D::L);
+            vertices[iface + Side3D::R] = indexing::sf(Side3D::R);
+            vertices[iface + Side3D::B] = indexing::sf(Side3D::B);
+            vertices[iface + Side3D::T] = indexing::sf(Side3D::T);
+            vertices[iface + Side3D::Z] = indexing::sf(Side3D::Z);
+            vertices[iface + Side3D::F] = indexing::sf(Side3D::F);
             n_faces = 24;
             break;
 
