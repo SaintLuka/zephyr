@@ -119,11 +119,21 @@ double AmrCells::incircle_diameter(index_t ic) const {
                     (vertices.vs<0, 0, +1>() - vertices.vs<0, 0, -1>()).squaredNorm()));
         }
     } else {
-        assert(m_dim == 2);
-        int n = node_count(ic);
-        // Диаметр вписанной окружности внутрь правильного многоугольника
-        // с площадью volume.
-        return 2.0 * std::sqrt(volume[ic] / (n * std::tan(M_PI / n)));
+        if (m_dim == 2) {
+            int n = node_count(ic);
+            // Диаметр вписанной окружности внутрь правильного многоугольника
+            // с площадью volume.
+            return 2.0 * std::sqrt(volume[ic] / (n * std::tan(M_PI / n)));
+        }
+        else {
+            // Найдем минимальное расстояние до грани, умножим на два
+            double r = std::numeric_limits<double>::infinity();
+            for (auto j: faces_range(ic)) {
+                double dist = std::abs((faces.center[j] - center[ic]).dot(faces.normal[j]));
+                r = std::min(r, dist);
+            }
+            return 2.0 * r;
+        }
     }
 }
 

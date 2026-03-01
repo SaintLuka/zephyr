@@ -21,32 +21,32 @@ static constexpr id_t invalid_id = static_cast<id_t>(-1);
 /// @brief Draft node object used only during grid construction.
 /// User creates/moves/owns these objects and passes pointers to Grid.
 /// Grid uses hidden builder state for pointer-identity deduplication.
-struct NodeInput {
-    using Ptr = std::shared_ptr<NodeInput>;
-    using Ref = const std::shared_ptr<NodeInput>&;
+struct GridNode {
+    using Ptr = std::shared_ptr<GridNode>;
+    using Ref = const std::shared_ptr<GridNode>&;
 
     Vector3d pos{0.0, 0.0, 0.0};
     Boundary bc{Boundary::UNDEFINED};
 
     static Ptr create(const Vector3d& v) {
-        return std::make_shared<NodeInput>(v);
+        return std::make_shared<GridNode>(v);
     }
 
-    NodeInput() = default;
+    static Ptr create(double x, double y) {
+        return std::make_shared<GridNode>(Vector3d{x, y, 0.0});
+    }
 
-    NodeInput(const Vector3d& v) : pos(v) { }
+    GridNode() = default;
 
-    id_t id() const noexcept { return m_builder.id; }
+    GridNode(const Vector3d& v) : pos(v) { }
+
+    id_t id() const noexcept { return m_id; }
 
 private:
     friend class Grid;
 
-    /// @brief Builder-only state (hidden from user).
-    /// Used to deduplicate by pointer identity in O(1).
-    struct BuilderState {
-        id_t id{invalid_id};
-        std::uint32_t stamp{0};
-    } m_builder{};
+    // Builder-only state
+    id_t m_id{invalid_id};
 };
 
 // ============================================================================
@@ -260,18 +260,15 @@ public:
     void reserve_cells(id_t n_cells);
 
     /// @brief Add a node via shared pointer; returns node index.
-    id_t add_node(NodeInput::Ref v);
+    id_t add_node(GridNode::Ref node);
 
     /// @brief Add a cell using a vector of
-    id_t add_cell(CellType type, const std::vector<NodeInput::Ptr>& nodes,
+    id_t add_cell(CellType type, const std::vector<GridNode::Ptr>& nodes,
                   const std::vector<Boundary>& face_bc = {});
 
-    /// @brief Add a quad cell using an array (opposite clockwise nodes and faces_bc)
-    id_t add_quad(const std::array<NodeInput::Ptr, 4>& nodes, const std::array<Boundary, 4>& face_bc);
-
     /// @brief Add a cell of special kind (CellType::POLYHEDRON)
-    id_t add_polyhedron(const std::vector<NodeInput::Ptr>& nodes,
-                        const std::vector<std::vector<NodeInput::Ptr>>& faces,
+    id_t add_polyhedron(const std::vector<GridNode::Ptr>& nodes,
+                        const std::vector<std::vector<GridNode::Ptr>>& faces,
                         const std::vector<Boundary>& faces_bc = {});
 
     // --------------------------
@@ -310,6 +307,9 @@ public:
     ///             2: триангуляция каждого квадрата на 4 части
     ///                (с добавлением центральной точки)
     void triangulation(int mode);
+
+    /// @brief Делает сетку из кубиков сеткой из пирамидок
+    void pyramidize();
 
     /// @brief Convert Type::QUAD grid to Type::AMR grid (add additional unique nodes)
     void make_amr();
@@ -400,13 +400,10 @@ private:
     };
 
     struct DraftData {
-        std::uint32_t stamp{1};
-        id_t next_node_id{0};
+        std::vector<GridNode::Ptr> nodes{};
+        std::vector<DraftCell>     cells{};
 
-        std::vector<NodeInput::Ptr> nodes{};
-        std::vector<DraftCell>      cells{};
-
-        /// @brief Clear all draft buffers.
+        /// @brief Clear all draft buffers
         void clear();
     };
 

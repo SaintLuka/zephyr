@@ -152,16 +152,16 @@ Grid Strip::make() const {
     double y1 = y_min();
     double y2 = y_max();
 
-    std::vector nodes(2, std::vector<NodeInput::Ptr>(m_nx + 1, nullptr));
+    std::vector nodes(2, std::vector<GridNode::Ptr>(m_nx + 1, nullptr));
 
     Grid grid;
 
     grid.reserve_nodes(m_nx + 1);
     for (int i = 0; i <= m_nx; ++i) {
-        nodes[0][i] = NodeInput::create({nodes1D[i], y1, 0.0});
+        nodes[0][i] = GridNode::create({nodes1D[i], y1, 0.0});
         grid.add_node(nodes[0][i]);
 
-        nodes[1][i] = NodeInput::create({nodes1D[i], y2, 0.0});
+        nodes[1][i] = GridNode::create({nodes1D[i], y2, 0.0});
         grid.add_node(nodes[1][i]);
     }
     nodes[0][0]->bc = m_bounds.left;
@@ -278,10 +278,10 @@ void Strip::initialize(AmrCells& cells) const {
         cells.faces.area[iface + Side2D::B] = hx;
         cells.faces.area[iface + Side2D::T] = hx;
 
-        cells.faces.vertices[iface + Side2D::L] = indexing::sf(Side2D::L);
-        cells.faces.vertices[iface + Side2D::R] = indexing::sf(Side2D::R);
-        cells.faces.vertices[iface + Side2D::B] = indexing::sf(Side2D::B);
-        cells.faces.vertices[iface + Side2D::T] = indexing::sf(Side2D::T);
+        cells.faces.vertices[iface + Side2D::L] = indexing::amr::sf(Side2D::L);
+        cells.faces.vertices[iface + Side2D::R] = indexing::amr::sf(Side2D::R);
+        cells.faces.vertices[iface + Side2D::B] = indexing::amr::sf(Side2D::B);
+        cells.faces.vertices[iface + Side2D::T] = indexing::amr::sf(Side2D::T);
 
         for (index_t jn = 0; jn < n_nodes; ++jn) {
             cells.verts[ic * n_nodes + jn] = quad[jn];

@@ -93,7 +93,7 @@ CellArity arity_of(CellType t) {
     }
 }
 
-void require_ptrs_non_null(std::span<const NodeInput::Ptr> nodes) {
+void require_ptrs_non_null(std::span<const GridNode::Ptr> nodes) {
     for (std::size_t i = 0; i < nodes.size(); ++i) {
         if (!nodes[i]) {
             throw std::invalid_argument("add_cell: nodes contains null pointer at index " + std::to_string(i));
@@ -177,16 +177,6 @@ void Grid::remove_options_() {
 void Grid::DraftData::clear() {
     nodes.clear();
     cells.clear();
-    stamp = 1;
-    next_node_id = 0;
-}
-
-inline std::uint32_t next_stamp(std::uint32_t s) noexcept {
-    // 0 оставим "неиспользуемым" (на всякий случай), крутимся в [1..max]
-    if (s == std::numeric_limits<std::uint32_t>::max()) {
-        return 1u;
-    }
-    return s + 1u;
 }
 
 void Grid::require_editable_() const {
@@ -219,18 +209,13 @@ void Grid::clear() {
 }
 
 void Grid::begin_build() {
-    // Старт новой build-сессии: очищаем draft, но stamp инкрементируем,
-    // чтобы старые NodeInput::m_builder.id/stamp считались "невалидными".
+    // Старт build-сессии: очищаем draft
     m_state = State::editable;
 
     if (!m_draft) {
-        m_draft.emplace(DraftData{});
+        m_draft.emplace();
     } else {
-        // Очищаем буферы, сбрасываем id-счётчик
-        m_draft->nodes.clear();
-        m_draft->cells.clear();
-        m_draft->next_node_id = 0;
-        m_draft->stamp += 1;
+        m_draft->clear();
     }
 
     // На всякий случай сбросим "финальную" часть
@@ -253,29 +238,24 @@ void Grid::reserve_nodes(id_t n_nodes) {
     m_draft->nodes.reserve(n_nodes);
 }
 
-id_t Grid::add_node(NodeInput::Ref v) {
+id_t Grid::add_node(GridNode::Ref node) {
     require_editable_();
 
-    if (!v) {
+    if (!node) {
         throw std::invalid_argument("add_node: NodeInput pointer is null.");
     }
     if (!m_draft) {
         begin_build();
     }
 
-    auto& bs = v->m_builder;
-    if (bs.stamp == m_draft->stamp && bs.id != invalid_id) {
-        return bs.id;
+    if (node->id() != invalid_id) {
+        return node->id();
     }
 
-    // Первый раз видим этот указатель в текущей build-сессии
-    bs.id = m_draft->next_node_id++;
-    bs.stamp = m_draft->stamp;
-
-    z_assert(m_draft->nodes.size() == bs.id, "Grid::add_node(): nodes must be unique.");
-
-    m_draft->nodes.push_back(v); // index == id
-    return bs.id;
+    // Первый раз видим этот указатель
+    node->m_id = m_draft->nodes.size();
+    m_draft->nodes.push_back(node);
+    return node->id();
 }
 
 void Grid::reserve_cells(id_t n_cells) {
@@ -286,7 +266,7 @@ void Grid::reserve_cells(id_t n_cells) {
 }
 
 id_t Grid::add_cell(CellType type,
-                    const std::vector<NodeInput::Ptr>& nodes,
+                    const std::vector<GridNode::Ptr>& nodes,
                     const std::vector<Boundary>& face_bc) {
     require_editable_();
 
@@ -317,13 +297,12 @@ id_t Grid::add_cell(CellType type,
         throw std::invalid_argument("add_cell: unsupported CellType.");
     }
 
-    const std::size_t n_nodes = nodes.size();
+    int n_nodes = nodes.size();
     if (n_nodes < a.n_nodes_min || (a.n_nodes_max != 0 && n_nodes != a.n_nodes_max)) {
         throw std::invalid_argument("add_cell: invalid number of nodes for this CellType.");
     }
 
-    const std::size_t n_faces = a.faces_equal_nodes ? n_nodes : a.n_faces_min;
-
+    int n_faces = a.faces_equal_nodes ? n_nodes : a.n_faces_min;
     if (!face_bc.empty() && face_bc.size() != n_faces) {
         throw std::invalid_argument("add_cell: face_bc must be empty or have correct size for this CellType.");
     }
@@ -331,66 +310,27 @@ id_t Grid::add_cell(CellType type,
     require_ptrs_non_null(nodes);
 
     // Build DraftCell
-    DraftCell dc{.type = type};
-    dc.node_ids.reserve(n_nodes);
+    DraftCell cell{.type = type};
+    cell.node_ids.reserve(n_nodes);
 
-    for (NodeInput::Ref p : nodes) {
-        dc.node_ids.push_back(add_node(p)); // pointer-identity dedup
+    for (auto node: nodes) {
+        cell.node_ids.push_back(add_node(node)); // pointer-identity dedup
     }
 
     // BCs: if not provided, fill with UNDEFINED
     if (face_bc.empty()) {
-        dc.face_bc.assign(n_faces, Boundary::UNDEFINED);
+        cell.face_bc.assign(n_faces, Boundary::UNDEFINED);
     } else {
-        dc.face_bc = face_bc;
-    }
-
-    auto& d = *m_draft;
-    const id_t cell_id = static_cast<id_t>(d.cells.size());
-    d.cells.push_back(std::move(dc));
-    return cell_id;
-}
-
-id_t Grid::add_quad(const std::array<NodeInput::Ptr, 4>& nodes,
-                    const std::array<Boundary, 4>& face_bc) {
-    require_editable_();
-
-    // Ensure draft exists and set/check dimension.
-    if (!m_draft.has_value()) {
-        begin_build(); // must create m_draft
-        m_dim = 2;
-        m_type = Type::QUAD;
-    } else {
-        if (m_dim == 0) {
-            m_dim = 2;
-        } else if (m_dim != 2) {
-            throw std::runtime_error("add_quad: wrong dimension (cell dim mismatch with grid dim).");
-        }
-        m_type = promotion(m_type, CellType::QUAD);
-    }
-
-    require_ptrs_non_null(nodes);
-
-    // Build DraftCell
-    DraftCell dc{.type = CellType::QUAD};
-    dc.node_ids.reserve(4);
-
-    for (NodeInput::Ref p: nodes) {
-        dc.node_ids.push_back(add_node(p));
-    }
-
-    dc.face_bc.resize(4);
-    for (int i = 0; i < 4; ++i) {
-        dc.face_bc[i] = face_bc[i];
+        cell.face_bc = face_bc;
     }
 
     const id_t cell_id = static_cast<id_t>(m_draft->cells.size());
-    m_draft->cells.push_back(std::move(dc));
+    m_draft->cells.push_back(std::move(cell));
     return cell_id;
 }
 
-id_t Grid::add_polyhedron(const std::vector<NodeInput::Ptr>& nodes,
-                          const std::vector<std::vector<NodeInput::Ptr>>& faces,
+id_t Grid::add_polyhedron(const std::vector<GridNode::Ptr>& nodes,
+                          const std::vector<std::vector<GridNode::Ptr>>& faces,
                           const std::vector<Boundary>& faces_bc) {
     require_editable_();
 
@@ -419,52 +359,54 @@ id_t Grid::add_polyhedron(const std::vector<NodeInput::Ptr>& nodes,
     }
 
     // Build DraftCell
-    DraftCell dc{.type=CellType::POLYHEDRON};
+    DraftCell cell{.type=CellType::POLYHEDRON};
 
     // Convert cell nodes to global ids
-    dc.node_ids.reserve(nodes.size());
-    for (std::size_t i = 0; i < nodes.size(); ++i) {
-        NodeInput::Ref p = nodes[i];
-        if (!p) {
+    cell.node_ids.reserve(nodes.size());
+    for (int i = 0; i < nodes.size(); ++i) {
+        auto node = nodes[i];
+        if (!node) {
             throw std::invalid_argument("add_polyhedron: nodes contains null pointer at index " + std::to_string(i));
         }
-        dc.node_ids.push_back(add_node(p));
+        cell.node_ids.push_back(add_node(node));
     }
 
     // Validate duplicates inside polyhedron node list (almost always a bug)
     {
-        auto tmp = dc.node_ids;
-        std::sort(tmp.begin(), tmp.end());
-        if (std::adjacent_find(tmp.begin(), tmp.end()) != tmp.end()) {
+        auto tmp = cell.node_ids;
+        std::ranges::sort(tmp);
+        if (std::ranges::adjacent_find(tmp) != tmp.end()) {
             throw std::invalid_argument("add_polyhedron: nodes contain duplicates (by pointer/global id).");
         }
     }
 
     // Fill face BCs
     if (faces_bc.empty()) {
-        dc.face_bc.assign(faces.size(), Boundary::UNDEFINED);
+        cell.face_bc.assign(faces.size(), Boundary::UNDEFINED);
     } else {
-        dc.face_bc = faces_bc;
+        cell.face_bc = faces_bc;
     }
 
     // Build polyhedron face CSR: offsets + flattened face nodes (global ids)
-    dc.poly_face_offsets.resize(faces.size() + 1);
-    dc.poly_face_offsets[0] = 0;
+    cell.poly_face_offsets.resize(faces.size() + 1);
+    cell.poly_face_offsets[0] = 0;
 
     // For membership check: cell node ids sorted
-    std::vector<id_t> cell_nodes_sorted = dc.node_ids;
-    std::sort(cell_nodes_sorted.begin(), cell_nodes_sorted.end());
+    std::vector<id_t> cell_nodes_sorted = cell.node_ids;
+    std::ranges::sort(cell_nodes_sorted);
 
-    auto cell_contains = [&](id_t nid) -> bool {
-        return std::binary_search(cell_nodes_sorted.begin(), cell_nodes_sorted.end(), nid);
+    auto cell_contains = [&cell_nodes_sorted](id_t nid) -> bool {
+        return std::ranges::binary_search(cell_nodes_sorted, nid);
     };
 
-    std::size_t total_face_nodes = 0;
-    for (const auto& f : faces) total_face_nodes += f.size();
-    dc.poly_face_nodes.reserve(total_face_nodes);
+    int total_face_nodes = 0;
+    for (const auto& f: faces) {
+        total_face_nodes += f.size();
+    }
+    cell.poly_face_nodes.reserve(total_face_nodes);
 
     id_t cursor = 0;
-    for (std::size_t fi = 0; fi < faces.size(); ++fi) {
+    for (int fi = 0; fi < faces.size(); ++fi) {
         const auto& fnodes = faces[fi];
         if (fnodes.size() < 3) {
             throw std::invalid_argument("add_polyhedron: face " + std::to_string(fi) + " has < 3 nodes.");
@@ -475,12 +417,12 @@ id_t Grid::add_polyhedron(const std::vector<NodeInput::Ptr>& nodes,
         face_ids.reserve(fnodes.size());
 
         for (std::size_t k = 0; k < fnodes.size(); ++k) {
-            NodeInput::Ref p = fnodes[k];
-            if (!p) {
+            GridNode::Ref node = fnodes[k];
+            if (!node) {
                 throw std::invalid_argument("add_polyhedron: face has null node pointer at face " +
                                             std::to_string(fi) + ", k=" + std::to_string(k));
             }
-            const id_t gid = add_node(p);
+            const id_t gid = add_node(node);
 
             // Enforce that face nodes belong to the polyhedron node set.
             if (!cell_contains(gid)) {
@@ -494,22 +436,22 @@ id_t Grid::add_polyhedron(const std::vector<NodeInput::Ptr>& nodes,
         // Detect duplicates inside a face (usually invalid)
         {
             auto tmp = face_ids;
-            std::sort(tmp.begin(), tmp.end());
-            if (std::adjacent_find(tmp.begin(), tmp.end()) != tmp.end()) {
+            std::ranges::sort(tmp);
+            if (std::ranges::adjacent_find(tmp) != tmp.end()) {
                 throw std::invalid_argument("add_polyhedron: face " + std::to_string(fi) + " has duplicate nodes.");
             }
         }
 
         // Append to flattened storage
-        for (id_t gid : face_ids) {
-            dc.poly_face_nodes.push_back(gid);
+        for (id_t gid: face_ids) {
+            cell.poly_face_nodes.push_back(gid);
             ++cursor;
         }
-        dc.poly_face_offsets[fi + 1] = cursor;
+        cell.poly_face_offsets[fi + 1] = cursor;
     }
 
     // Optional: basic sanity for polyhedron (not strict, but useful)
-    if (dc.node_ids.size() < 4) {
+    if (cell.node_ids.size() < 4) {
         throw std::invalid_argument("add_polyhedron: polyhedron must have at least 4 unique nodes.");
     }
     if (faces.size() < 4) {
@@ -517,9 +459,8 @@ id_t Grid::add_polyhedron(const std::vector<NodeInput::Ptr>& nodes,
     }
 
     // Store draft cell
-    auto& d = *m_draft;
-    const id_t cell_id = static_cast<id_t>(d.cells.size());
-    d.cells.push_back(std::move(dc));
+    const id_t cell_id = static_cast<id_t>(m_draft->cells.size());
+    m_draft->cells.push_back(std::move(cell));
     return cell_id;
 }
 

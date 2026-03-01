@@ -8,6 +8,7 @@
 #include <zephyr/utils/threads.h>
 #include <zephyr/geom/grid.h>
 #include <zephyr/geom/side.h>
+#include <zephyr/geom/indexing.h>
 
 namespace zephyr::geom {
 
@@ -22,7 +23,7 @@ void Grid::move(const Vector3d& shift) {
     DraftData& draft = *m_draft;
     threads::for_each(
         draft.nodes.begin(), draft.nodes.end(),
-        [shift](NodeInput::Ref node) {
+        [shift](GridNode::Ref node) {
            node->pos += shift;
         });
 }
@@ -36,7 +37,7 @@ void Grid::scale(double q) {
     DraftData& draft = *m_draft;
     threads::for_each(
         draft.nodes.begin(), draft.nodes.end(),
-        [q](NodeInput::Ref node) {
+        [q](GridNode::Ref node) {
            node->pos *= q;
         });
 }
@@ -51,7 +52,7 @@ void Grid::rotate(double phi) {
     double cos = std::cos(phi);
     threads::for_each(
         draft.nodes.begin(), draft.nodes.end(),
-        [sin, cos](NodeInput::Ref node) {
+        [sin, cos](GridNode::Ref node) {
             double x = cos * node->pos.x() - sin * node->pos.y();
             double y = sin * node->pos.x() + cos * node->pos.y();
             node->pos.x() = x;
@@ -67,7 +68,7 @@ void Grid::rotate(const Matrix3d& R) {
     DraftData& draft = *m_draft;
     threads::for_each(
         draft.nodes.begin(), draft.nodes.end(),
-        [R](NodeInput::Ref node) {
+        [R](GridNode::Ref node) {
            node->pos.applyOnTheLeft(R);
         });
 }
@@ -80,7 +81,7 @@ void Grid::transform(std::function<Vector3d(const Vector3d&)>& func) {
     DraftData& draft = *m_draft;
     threads::for_each(
         draft.nodes.begin(), draft.nodes.end(),
-        [&func](NodeInput::Ref node) {
+        [&func](GridNode::Ref node) {
            node->pos = func(node->pos);
         });
 }
@@ -112,7 +113,7 @@ void Grid::mirror_(int axis) {
     std::unordered_set<id_t> border_nodes;
     for (const auto node: draft.nodes) {
         if (std::abs(node->pos[axis]) < eps) {
-            border_nodes.insert(node->m_builder.id);
+            border_nodes.insert(node->id());
         }
         if (sign * node->pos[axis] < -eps) {
             throw std::runtime_error(std::format("Grid::mirror: node[axis] = {:.3e} is out of bound", node->pos[axis]));
@@ -121,13 +122,13 @@ void Grid::mirror_(int axis) {
 
     // Добавить отраженные вершины
     const id_t n_nodes_prev = draft.nodes.size();
-    std::vector<NodeInput::Ptr> mirror_nodes(draft.nodes.size());
+    std::vector<GridNode::Ptr> mirror_nodes(draft.nodes.size());
     for (id_t i = 0; i < draft.nodes.size(); ++i) {
         if (border_nodes.contains(i)) {
             mirror_nodes[i] = draft.nodes[i];
         }
         else {
-            mirror_nodes[i] = NodeInput::create(draft.nodes[i]->pos);
+            mirror_nodes[i] = GridNode::create(draft.nodes[i]->pos);
             mirror_nodes[i]->pos[axis] *= -1.0;
         }
     }
@@ -143,7 +144,7 @@ void Grid::mirror_(int axis) {
     for (id_t i = n_cells_prev; i < draft.cells.size(); ++i) {
         draft.cells[i] = draft.cells[i - n_cells_prev];
         for (id_t& j: draft.cells[i].node_ids) {
-            j = mirror_nodes[j]->m_builder.id;
+            j = mirror_nodes[j]->id();
         }
     }
 
@@ -246,115 +247,173 @@ int choose_delaunay_diagonal(const std::array<Vector3d, 4>& vs) {
 }
 
 void Grid::triangulation_quad_delaunay_() {
-    DraftData& draft = *m_draft;
+    auto&[nodes, cells] = *m_draft;
 
-    int n_cells = draft.cells.size();
-    draft.cells.resize(2 * n_cells);
+    int n_cells = cells.size();
+    cells.resize(2 * n_cells);
+    std::array<id_t, 4> base_ids;
+    std::array<Boundary, 4> base_bc;
     for (id_t i = 0; i < n_cells; ++i) {
-        std::array node_ids{
-            draft.cells[i].node_ids[0], draft.cells[i].node_ids[1],
-            draft.cells[i].node_ids[2], draft.cells[i].node_ids[3]
-        };
-
-        std::array face_bc{
-            draft.cells[i].face_bc[0], draft.cells[i].face_bc[1],
-            draft.cells[i].face_bc[2], draft.cells[i].face_bc[3]
-        };
-
-        std::array vs = {
-            draft.nodes[node_ids[0]]->pos, draft.nodes[node_ids[1]]->pos,
-            draft.nodes[node_ids[2]]->pos, draft.nodes[node_ids[3]]->pos
-        };
-
         id_t j = n_cells + i;
-        draft.cells[i].type = CellType::TRIANGLE;
-        draft.cells[j].type = CellType::TRIANGLE;
+        cells[i].type = CellType::TRIANGLE;
+        cells[j].type = CellType::TRIANGLE;
 
-        if (choose_delaunay_diagonal(vs) == 0) {
-            draft.cells[i].node_ids = {node_ids[0], node_ids[1], node_ids[2]};
-            draft.cells[i].face_bc = {face_bc[0], face_bc[1], Boundary::INNER};
+        std::ranges::copy(cells[i].node_ids, base_ids.begin());
+        std::ranges::copy(cells[i].face_bc,  base_bc.begin());
 
-            draft.cells[j].node_ids = {node_ids[0], node_ids[2], node_ids[3]};
-            draft.cells[j].face_bc = {Boundary::INNER, face_bc[2], face_bc[3]};
+        using indexing::quad::vs;
+        std::array node_pos = {
+            nodes[base_ids[vs<0, 0>()]]->pos,
+            nodes[base_ids[vs<1, 0>()]]->pos,
+            nodes[base_ids[vs<1, 1>()]]->pos,
+            nodes[base_ids[vs<0, 1>()]]->pos
+        };
+
+        if (choose_delaunay_diagonal(node_pos) == 0) {
+            cells[i].node_ids = {base_ids[vs<0, 0>()], base_ids[vs<1, 0>()], base_ids[vs<1, 1>()]};
+            cells[i].face_bc = {base_bc[Side2D::B], base_bc[Side2D::R], Boundary::INNER};
+
+            cells[j].node_ids = {base_ids[vs<0, 0>()], base_ids[vs<1, 1>()], base_ids[vs<0, 1>()]};
+            cells[j].face_bc = {Boundary::INNER, base_bc[Side2D::T], base_bc[Side2D::L]};
         }
         else {
-            draft.cells[i].node_ids = {node_ids[0], node_ids[1], node_ids[3]};
-            draft.cells[i].face_bc = {face_bc[0], Boundary::INNER, face_bc[3]};
+            cells[i].node_ids = {base_ids[vs<0, 0>()], base_ids[vs<1, 0>()], base_ids[vs<0, 1>()]};
+            cells[i].face_bc = {base_bc[Side2D::B], Boundary::INNER, base_bc[Side2D::L]};
 
-            draft.cells[j].node_ids = {node_ids[1], node_ids[2], node_ids[3]};
-            draft.cells[j].face_bc = {face_bc[1], face_bc[2], Boundary::INNER};
+            cells[j].node_ids = {base_ids[vs<1, 0>()], base_ids[vs<1, 1>()], base_ids[vs<0, 1>()]};
+            cells[j].face_bc = {base_bc[Side2D::R], base_bc[Side2D::T], Boundary::INNER};
         }
     }
     m_type = Type::TRI;
 }
 
 void Grid::triangulation_quad_symmetry_() {
-    DraftData& draft = *m_draft;
+    auto&[nodes, cells] = *m_draft;
 
     // Создать центральные вершины
-    std::vector<NodeInput::Ptr> central(draft.cells.size());
-    for (id_t i = 0; i < draft.cells.size(); ++i) {
+    std::vector<GridNode::Ptr> central(cells.size());
+    for (id_t i = 0; i < cells.size(); ++i) {
         Vector3d c = Vector3d::Zero();
-        for (id_t j: draft.cells[i].node_ids) {
-            c += draft.nodes[j]->pos;
+        for (id_t j: cells[i].node_ids) {
+            c += nodes[j]->pos;
         }
-        c /= draft.cells[i].node_ids.size();
-        central[i] = NodeInput::create(c);
+        c /= cells[i].node_ids.size();
+        central[i] = GridNode::create(c);
     }
     for (auto node: central) {
         add_node(node);
     }
 
-    int n_cells = draft.cells.size();
-    draft.cells.resize(4 * n_cells);
+    int n_cells = cells.size();
+    cells.resize(4 * n_cells);
+    std::array<id_t, 4> base_ids;
+    std::array<Boundary, 4> base_bc;
     for (id_t i = 0; i < n_cells; ++i) {
-        std::array node_ids{
-            draft.cells[i].node_ids[0], draft.cells[i].node_ids[1],
-            draft.cells[i].node_ids[2], draft.cells[i].node_ids[3]
-        };
-
-        std::array face_bc{
-            draft.cells[i].face_bc[0], draft.cells[i].face_bc[1],
-            draft.cells[i].face_bc[2], draft.cells[i].face_bc[3]
-        };
-
-        id_t central_id = central[i]->m_builder.id;
+        id_t central_id = central[i]->id();
 
         id_t j1 = n_cells + i;
         id_t j2 = 2*n_cells + i;
         id_t j3 = 3*n_cells + i;
 
-        draft.cells[i].type = CellType::TRIANGLE;
-        draft.cells[i].node_ids = {node_ids[0], node_ids[1], central_id};
-        draft.cells[i].face_bc = {face_bc[0], Boundary::INNER, Boundary::INNER};
+        cells[i].type = CellType::TRIANGLE;
+        cells[j1].type = CellType::TRIANGLE;
+        cells[j2].type = CellType::TRIANGLE;
+        cells[j3].type = CellType::TRIANGLE;
 
-        draft.cells[j1].type = CellType::TRIANGLE;
-        draft.cells[j1].node_ids = {node_ids[1], node_ids[2], central_id};
-        draft.cells[j1].face_bc = {face_bc[1], Boundary::INNER, Boundary::INNER};
+        std::ranges::copy(cells[i].node_ids, base_ids.begin());
+        std::ranges::copy(cells[i].face_bc,  base_bc.begin());
 
-        draft.cells[j2].type = CellType::TRIANGLE;
-        draft.cells[j2].node_ids = {node_ids[2], node_ids[3], central_id};
-        draft.cells[j2].face_bc = {face_bc[2], Boundary::INNER, Boundary::INNER};
+        using indexing::quad::vs;
+        cells[i].node_ids = {base_ids[vs<0, 1>()], base_ids[vs<0, 0>()], central_id};
+        cells[i].face_bc = {base_bc[Side2D::L], Boundary::INNER, Boundary::INNER};
 
-        draft.cells[j3].type = CellType::TRIANGLE;
-        draft.cells[j3].node_ids = {node_ids[3], node_ids[0], central_id};
-        draft.cells[j3].face_bc = {face_bc[3], Boundary::INNER, Boundary::INNER};
+        cells[j1].node_ids = {base_ids[vs<1, 0>()], base_ids[vs<1, 1>()], central_id};
+        cells[j1].face_bc = {base_bc[Side2D::R], Boundary::INNER, Boundary::INNER};
+
+        cells[j2].node_ids = {base_ids[vs<0, 0>()], base_ids[vs<1, 0>()], central_id};
+        cells[j2].face_bc = {base_bc[Side2D::B], Boundary::INNER, Boundary::INNER};
+
+        cells[j3].node_ids = {base_ids[vs<1, 1>()], base_ids[vs<0, 1>()], central_id};
+        cells[j3].face_bc = {base_bc[Side2D::T], Boundary::INNER, Boundary::INNER};
     }
     m_type = Type::TRI;
+}
+
+void Grid::pyramidize() {
+    require_editable_();
+    if (m_type != Type::QUAD) {
+        std::cerr << "Grid::pyramidize: can only pyramidize QUAD grid\n";
+        return;
+    }
+    if (m_dim == 2) {
+        triangulation(2);
+        return;
+    }
+    if (!m_draft) {
+        throw std::runtime_error("Grid::rotate: no draft data");
+    }
+
+    auto&[nodes, cells] = *m_draft;
+
+    // Создать центральные вершины
+    std::vector<GridNode::Ptr> central(cells.size());
+    for (id_t i = 0; i < cells.size(); ++i) {
+        Vector3d c = Vector3d::Zero();
+        for (id_t j: cells[i].node_ids) {
+            c += nodes[j]->pos;
+        }
+        c /= cells[i].node_ids.size();
+        central[i] = GridNode::create(c);
+    }
+    for (auto node: central) {
+        add_node(node);
+    }
+
+    int n_cells = cells.size();
+    cells.resize(6 * n_cells);
+    std::array<id_t, 8> base_ids;
+    std::array<Boundary, 6> base_bc;
+    for (id_t i = 0; i < n_cells; ++i) {
+        id_t central_id = central[i]->id();
+
+        std::ranges::copy(cells[i].node_ids, base_ids.begin());
+        std::ranges::copy(cells[i].face_bc,  base_bc.begin());
+
+        for (int side = 0; side < 6; ++side) {
+            id_t j = side * n_cells + i;
+            cells[j].type = CellType::PYRAMID;
+
+            // У hex грани обходятся нормалью наружу, у пирамиды
+            // узлы основания перечисляются нормалью внутрь
+            using indexing::hex::face_nodes;
+            cells[j].node_ids = {
+                base_ids[face_nodes[side][3]],
+                base_ids[face_nodes[side][2]],
+                base_ids[face_nodes[side][1]],
+                base_ids[face_nodes[side][0]],
+                central_id};
+
+            cells[j].face_bc = {base_bc[side],
+                Boundary::INNER, Boundary::INNER,
+                Boundary::INNER, Boundary::INNER
+            };
+        }
+    }
+    m_type = Type::POLY;
 }
 
 void Grid::make_amr_2D_() {
     DraftData& draft = *m_draft;
 
     // Создать центральные вершины
-    std::vector<NodeInput::Ptr> central(draft.cells.size());
+    std::vector<GridNode::Ptr> central(draft.cells.size());
     for (id_t i = 0; i < draft.cells.size(); ++i) {
         Vector3d c = Vector3d::Zero();
         for (id_t j: draft.cells[i].node_ids) {
             c += draft.nodes[j]->pos;
         }
         c /= draft.cells[i].node_ids.size();
-        central[i] = NodeInput::create(c);
+        central[i] = GridNode::create(c);
     }
 
     // Добавить центральные в массив
@@ -378,14 +437,14 @@ void Grid::make_amr_2D_() {
     };
 
     // Уникальные грани
-    std::unordered_map<const face_t, NodeInput::Ptr, face_hash> faces;
+    std::unordered_map<const face_t, GridNode::Ptr, face_hash> faces;
     for (auto& cell: draft.cells) {
         z_assert(cell.type == CellType::QUAD && cell.node_ids.size() == 4, "Bad cell");
         for (int i = 0; i < 4; ++i) {
             face_t face{cell.node_ids[i], cell.node_ids[(i + 1) % 4]};
             if (!faces.contains(face)) {
                 Vector3d fc = 0.5*(draft.nodes[face.v1]->pos + draft.nodes[face.v2]->pos);
-                faces[face] = NodeInput::create(fc);
+                faces[face] = GridNode::create(fc);
             }
         }
     }

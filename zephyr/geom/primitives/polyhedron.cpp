@@ -3,58 +3,23 @@
 #include <map>
 #include <numeric>
 
+#include <zephyr/geom/indexing.h>
 #include <zephyr/geom/intersection.h>
 #include <zephyr/geom/primitives/polyhedron.h>
 
 namespace zephyr::geom {
 
 namespace {
-// Число вершин для стандартных многогранников
-int default_face_size(CellType ctype) {
-    switch (ctype) {
-        case CellType::TETRA:      return 4;
-        case CellType::PYRAMID:    return 5;
-        case CellType::WEDGE:      return 6;
-        case CellType::HEXAHEDRON: return 8;
-        default:
-            throw std::runtime_error("Has no default face size");
-    }
-}
-
 // Нумерация индексов вершин для стандартных многогранников
 std::vector<std::vector<int>> default_face_indices(CellType ctype) {
-    switch (ctype) {
-        case CellType::TETRA:
-            return {{0, 2, 1},
-                    {0, 1, 3},
-                    {1, 2, 3},
-                    {0, 3, 2}};
-
-        case CellType::PYRAMID:
-            return {{3, 2, 1, 0},
-                    {0, 1, 4},
-                    {1, 2, 4},
-                    {2, 3, 4},
-                    {0, 4, 3}};
-
-        case CellType::WEDGE:
-            return {{0, 3, 4, 1},
-                    {1, 4, 5, 2},
-                    {0, 2, 5, 3},
-                    {0, 1, 2},
-                    {3, 5, 4}};
-
-        case CellType::HEXAHEDRON:
-            return {{0, 3, 2, 1},
-                    {4, 5, 6, 7},
-                    {0, 3, 4, 7},
-                    {1, 2, 6, 5},
-                    {0, 1, 5, 4},
-                    {2, 3, 7, 6}};
-
-        default:
-            throw std::runtime_error("Has no default face indices");
+    std::vector<std::vector<int>> indices(indexing::n_faces(ctype));
+    for (int side = 0; side < indices.size(); ++side) {
+        indices[side].resize(indexing::face_size(ctype, side));
+        for (int i = 0; i < indices[side].size(); ++i) {
+            indices[side][i] = indexing::face_index(ctype, side, i);
+        }
     }
+    return indices;
 }
 }
 
@@ -300,9 +265,6 @@ Polyhedron::Polyhedron(const std::vector<Vector3d>& vertices,
 
 Polyhedron::Polyhedron(CellType ctype, const std::vector<Vector3d>& vertices) {
     auto face_indices = default_face_indices(ctype);
-    if (vertices.size() != default_face_size(ctype)) {
-        throw std::runtime_error("Bad vertices size for cell type");
-    }
     build(vertices, face_indices);
 }
 

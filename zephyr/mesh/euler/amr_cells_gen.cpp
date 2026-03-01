@@ -255,10 +255,10 @@ AmrCells::AmrCells(const generator::Rectangle& rect) {
         faces.area[iface + Side2D::B] = hx;
         faces.area[iface + Side2D::T] = hx;
 
-        faces.vertices[iface + Side2D::L] = indexing::sf(Side2D::L);
-        faces.vertices[iface + Side2D::R] = indexing::sf(Side2D::R);
-        faces.vertices[iface + Side2D::B] = indexing::sf(Side2D::B);
-        faces.vertices[iface + Side2D::T] = indexing::sf(Side2D::T);
+        faces.vertices[iface + Side2D::L] = indexing::amr::sf(Side2D::L);
+        faces.vertices[iface + Side2D::R] = indexing::amr::sf(Side2D::R);
+        faces.vertices[iface + Side2D::B] = indexing::amr::sf(Side2D::B);
+        faces.vertices[iface + Side2D::T] = indexing::amr::sf(Side2D::T);
 
         for (index_t jn = 0; jn < n_nodes; ++jn) {
             verts[ic * n_nodes + jn] = quad[jn];
@@ -418,12 +418,12 @@ AmrCells::AmrCells(const generator::Cuboid& c) {
         faces.area[iface + Side3D::Z] = hx * hy;
         faces.area[iface + Side3D::F] = hx * hy;
 
-        faces.vertices[iface + Side3D::L] = indexing::sf(Side3D::L);
-        faces.vertices[iface + Side3D::R] = indexing::sf(Side3D::R);
-        faces.vertices[iface + Side3D::B] = indexing::sf(Side3D::B);
-        faces.vertices[iface + Side3D::T] = indexing::sf(Side3D::T);
-        faces.vertices[iface + Side3D::Z] = indexing::sf(Side3D::Z);
-        faces.vertices[iface + Side3D::F] = indexing::sf(Side3D::F);
+        faces.vertices[iface + Side3D::L] = indexing::amr::sf(Side3D::L);
+        faces.vertices[iface + Side3D::R] = indexing::amr::sf(Side3D::R);
+        faces.vertices[iface + Side3D::B] = indexing::amr::sf(Side3D::B);
+        faces.vertices[iface + Side3D::T] = indexing::amr::sf(Side3D::T);
+        faces.vertices[iface + Side3D::Z] = indexing::amr::sf(Side3D::Z);
+        faces.vertices[iface + Side3D::F] = indexing::amr::sf(Side3D::F);
 
         for (index_t jn = 0; jn < n_nodes; ++jn) {
             verts[ic * n_nodes + jn] = cube[jn];
@@ -515,12 +515,8 @@ AmrCells::AmrCells(const Grid& grid) {
             faces.adjacent.basic[iface] = ic;
 
             if (faces.is_boundary(iface)) {
-                faces.adjacent.index[iface] = ic; // Реально нужно?
+                faces.adjacent.index[iface] = ic;
             }
-        }
-
-        if (grid_cells[ic].type == CellType::QUAD) {
-            faces.reorder_quad_faces(face_begin[ic]);
         }
     }
 }

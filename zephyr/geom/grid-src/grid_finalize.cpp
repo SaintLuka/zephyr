@@ -5,6 +5,10 @@
 
 #include <zephyr/geom/side.h>
 #include <zephyr/geom/grid.h>
+#include <zephyr/geom/indexing.h>
+#include <zephyr/geom/primitives/triangle.h>
+#include <zephyr/geom/primitives/polygon.h>
+#include <zephyr/geom/primitives/polyhedron.h>
 
 namespace zephyr::geom {
 
@@ -123,7 +127,7 @@ void Grid::finalize(const BuildOptions& opt) {
     // compute cell centroid guess from its nodes (cheap)
     auto cell_centroid_guess = [&](id_t cid) -> Vector3d {
         const Cell& c = m_cells[cid];
-        Vector3d cc(0,0,0);
+        Vector3d cc = Vector3d::Zero();
         for (id_t nid : c.nodes) cc += node_pos(nid);
         if (!c.nodes.empty()) cc /= double(c.nodes.size());
         return cc;
@@ -208,7 +212,7 @@ void Grid::finalize(const BuildOptions& opt) {
     m_cells.resize(n_cells);
 
     for (id_t i = 0; i < n_nodes; ++i) {
-        NodeInput::Ref in = d.nodes[i];
+        GridNode::Ref in = d.nodes[i];
         m_nodes[i].pos = in->pos;
         m_nodes[i].bc  = in->bc;
     }
@@ -284,17 +288,22 @@ void Grid::finalize(const BuildOptions& opt) {
                 // 2D
                 case CellType::TRIANGLE: {
                     throw_if(c.nodes.size() < 3, "Grid::finalize: TRIANGLE needs 3 nodes");
-                    push_face({c.nodes[0], c.nodes[1]}, get_bc(0));
-                    push_face({c.nodes[1], c.nodes[2]}, get_bc(1));
-                    push_face({c.nodes[2], c.nodes[0]}, get_bc(2));
+                    using indexing::tri::face_nodes;
+                    for (int side = 0; side < 3; ++side) {
+                        push_face({c.nodes[face_nodes[side][0]],
+                                   c.nodes[face_nodes[side][1]]},
+                                   get_bc(side));
+                    }
                 } break;
 
                 case CellType::QUAD: {
                     throw_if(c.nodes.size() < 4, "Grid::finalize: QUAD needs 4 nodes");
-                    push_face({c.nodes[0], c.nodes[1]}, get_bc(0));
-                    push_face({c.nodes[1], c.nodes[2]}, get_bc(1));
-                    push_face({c.nodes[2], c.nodes[3]}, get_bc(2));
-                    push_face({c.nodes[3], c.nodes[0]}, get_bc(3));
+                    using indexing::quad::face_nodes;
+                    for (int side = 0; side < 4; ++side) {
+                        push_face({c.nodes[face_nodes[side][0]],
+                                   c.nodes[face_nodes[side][1]]},
+                                   get_bc(side));
+                    }
                 } break;
 
                 case CellType::POLYGON: {
@@ -351,14 +360,15 @@ void Grid::finalize(const BuildOptions& opt) {
                 } break;
 
                 case CellType::HEXAHEDRON: {
-                    throw_if(c.nodes.size() < 8, "Grid::finalize: HEXAHEDRON needs 8 nodes");
-                    // 6 quad faces (orientation fixed by geom check)
-                    push_face({c.nodes[7], c.nodes[3], c.nodes[0], c.nodes[4]}, get_bc(5)); // LEFT
-                    push_face({c.nodes[1], c.nodes[2], c.nodes[6], c.nodes[5]}, get_bc(3)); // RIGHT
-                    push_face({c.nodes[0], c.nodes[1], c.nodes[5], c.nodes[4]}, get_bc(2)); // BOTTOM
-                    push_face({c.nodes[2], c.nodes[3], c.nodes[7], c.nodes[6]}, get_bc(4)); // TOP
-                    push_face({c.nodes[3], c.nodes[2], c.nodes[1], c.nodes[0]}, get_bc(0)); // BACK
-                    push_face({c.nodes[4], c.nodes[5], c.nodes[6], c.nodes[7]}, get_bc(1)); // FRONT
+                    throw_if(c.nodes.size() != 8, "Grid::finalize: HEXAHEDRON needs 8 nodes");
+                    for (int side = 0; side < 6; ++side) {
+                        using indexing::hex::face_nodes;
+                        push_face({c.nodes[face_nodes[side][0]],
+                                   c.nodes[face_nodes[side][1]],
+                                   c.nodes[face_nodes[side][2]],
+                                   c.nodes[face_nodes[side][3]]},
+                                   get_bc(side));
+                    }
                 } break;
 
                 case CellType::AMR3D: {
@@ -714,83 +724,26 @@ void Grid::finalize(const BuildOptions& opt) {
 
         // cell geometry
         if (opt.compute_cell_geometry) {
-            gc.cell_centroids.resize(n_cells, Vector3d(0,0,0));
+            gc.cell_centroids.resize(n_cells, Vector3d::Zero());
             gc.cell_volumes.resize(n_cells, 0.0);
 
             // Compute via per-cell temp faces (robust for unique faces too).
-            for (id_t cid = 0; cid < n_cells; ++cid) {
-                const Vector3d cc_guess = cell_centroid_guess(cid);
+            for (id_t ic = 0; ic < n_cells; ++ic) {
+                // Собрать вершины в массив
+                std::vector<Vector3d> verts(m_cells[ic].nodes.size());
+                for (int i = 0; i < m_cells[ic].nodes.size(); ++i) {
+                    verts[i] = m_nodes[m_cells[ic].nodes[i]].pos;
+                }
 
                 if (m_dim == 2) {
-                    // Use boundary corner polygon depending on type.
-                    const Cell& c = m_cells[cid];
-                    std::vector<id_t> poly;
-
-                    if (c.type == CellType::TRIANGLE && c.nodes.size() >= 3) {
-                        poly = { c.nodes[0], c.nodes[1], c.nodes[2] };
-                    } else if (c.type == CellType::QUAD && c.nodes.size() >= 4) {
-                        poly = { c.nodes[0], c.nodes[1], c.nodes[2], c.nodes[3] };
-                    } else if (c.type == CellType::POLYGON) {
-                        poly.assign(c.nodes.begin(), c.nodes.end());
-                    } else if (c.type == CellType::AMR2D && c.nodes.size() == 9) {
-                        poly = { c.nodes[0], c.nodes[2], c.nodes[8], c.nodes[6] }; // corners
-                    } else {
-                        // fallback: use all nodes (may be wrong for strange ordering)
-                        poly.assign(c.nodes.begin(), c.nodes.end());
-                    }
-
-                    // Triangulate fan around p0
-                    const Vector3d p0 = node_pos(poly[0]);
-                    double area = 0.0;
-                    Vector3d cacc(0,0,0);
-
-                    for (size_t i = 1; i + 1 < poly.size(); ++i) {
-                        const Vector3d p1 = node_pos(poly[i]);
-                        const Vector3d p2 = node_pos(poly[i+1]);
-                        const Vector3d av = 0.5 * (p1 - p0).cross(p2 - p0);
-                        const double a = av.norm(); // unsigned
-                        area += a;
-                        cacc += a * (p0 + p1 + p2) / 3.0;
-                    }
-
-                    if (area > 0.0) {
-                        gc.cell_volumes[cid]   = area;          // "volume" = area in 2D
-                        gc.cell_centroids[cid] = cacc / area;
-                    } else {
-                        gc.cell_volumes[cid]   = 0.0;
-                        gc.cell_centroids[cid] = cc_guess;
-                    }
-                } else {
-                    // 3D: signed volume/centroid from tetra fan to origin (0,0,0)
-                    double V = 0.0;
-                    Vector3d C(0,0,0);
-                    const Vector3d O(0,0,0);
-
-                    for (const TempFace& tf : tmp_cell_faces[cid]) {
-                        std::vector<id_t> cyc = corners_from_face_nodes(tf.nodes);
-                        if (cyc.size() < 3) continue;
-
-                        const Vector3d a0 = node_pos(cyc[0]);
-                        for (size_t i = 1; i + 1 < cyc.size(); ++i) {
-                            const Vector3d a1 = node_pos(cyc[i]);
-                            const Vector3d a2 = node_pos(cyc[i+1]);
-
-                            // signed volume of tetra (O, a0, a1, a2)
-                            const double v = a0.dot((a1).cross(a2)) / 6.0;
-                            V += v;
-                            const Vector3d tet_c = (O + a0 + a1 + a2) / 4.0;
-                            C += v * tet_c;
-                        }
-                    }
-
-                    if (std::abs(V) > 0.0) {
-                        const double Vabs = std::abs(V);
-                        gc.cell_volumes[cid]   = Vabs;
-                        gc.cell_centroids[cid] = C / V; // keep sign consistent then ok
-                    } else {
-                        gc.cell_volumes[cid]   = 0.0;
-                        gc.cell_centroids[cid] = cc_guess;
-                    }
+                    Polygon poly(verts, false);
+                    gc.cell_volumes[ic]   = poly.area();
+                    gc.cell_centroids[ic] = poly.centroid(gc.cell_volumes[ic]);
+                }
+                else {
+                    Polyhedron poly(m_cells[ic].type, verts);
+                    gc.cell_volumes[ic]   = poly.volume();
+                    gc.cell_centroids[ic] = poly.centroid(gc.cell_volumes[ic]);
                 }
             }
         }

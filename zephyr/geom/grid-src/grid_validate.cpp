@@ -124,28 +124,21 @@ bool Grid::validate_draft(std::string* report) const {
 
     bool ok = true;
 
-    if (d.nodes.size() != static_cast<std::size_t>(d.next_node_id)) {
-        ok = false;
-        append_line(report, "validate_draft: unique_nodes.size() != next_node_id.");
-    }
-
     // unique_nodes pointers + builder state sanity
-    for (std::size_t i = 0; i < d.nodes.size(); ++i) {
-        NodeInput::Ref p = d.nodes[i];
-        if (!p) {
+    for (id_t i = 0; i < d.nodes.size(); ++i) {
+        auto node = d.nodes[i];
+        if (!node) {
             ok = false;
             append_line(report, "validate_draft: unique_nodes contains null pointer at index " + std::to_string(i) + ".");
             continue;
         }
 
-        // builder-state should match if the node was added in this session
-        const auto& bs = p->m_builder; // friend class Grid
-        if (bs.stamp != d.stamp || bs.id != static_cast<id_t>(i)) {
+        if (node->id() != i) {
             ok = false;
             append_line(report, "validate_draft: NodeInput builder state mismatch at unique_nodes[" + std::to_string(i) + "].");
         }
 
-        if (!is_finite(p->pos)) {
+        if (!is_finite(node->pos)) {
             ok = false;
             append_line(report, "validate_draft: NodeInput position is not finite at unique_nodes[" + std::to_string(i) + "].");
         }

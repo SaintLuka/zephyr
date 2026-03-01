@@ -279,33 +279,33 @@ Grid Rectangle::create_classic() const {
     grid.reserve_nodes((m_nx + 1) * (m_ny + 1));
     grid.reserve_cells(m_nx * m_ny);
 
-    std::vector nodes(m_nx + 1, std::vector<NodeInput::Ptr>(m_ny + 1));
+    std::vector nodes(m_nx + 1, std::vector<GridNode::Ptr>(m_ny + 1));
     for (int i = 0; i <= m_nx; ++i) {
         for (int j = 0; j <= m_ny; ++j) {
             double x = m_xmin + i * dx;
             double y = m_ymin + j * dy;
-            nodes[i][j] = NodeInput::create({x, y, 0.0});
-
-            grid.add_node(nodes[i][j]);
+            nodes[i][j] = GridNode::create({x, y, 0.0});
         }
     }
 
     // Ячейки как полигоны, обход граней и вершин против часовой
     // стрелки, начиная с нижней левой вершины (нижней грани)
-    std::array<Boundary, 4> bc{};
+    std::vector<Boundary> bc(4);
+    std::vector<GridNode::Ptr> quad_nodes(4);
     for (int i = 0; i < m_nx; ++i) {
-        bc[3] = i == 0      ? m_bounds.left   : Boundary::INNER;
-        bc[1] = i == m_nx-1 ? m_bounds.right  : Boundary::INNER;
+        bc[Side2D::L] = i == 0      ? m_bounds.left   : Boundary::INNER;
+        bc[Side2D::R] = i == m_nx-1 ? m_bounds.right  : Boundary::INNER;
         for (int j = 0; j < m_ny; ++j) {
-            bc[0] = j == 0      ? m_bounds.bottom : Boundary::INNER;
-            bc[2] = j == m_ny-1 ? m_bounds.top    : Boundary::INNER;
+            bc[Side2D::B] = j == 0      ? m_bounds.bottom : Boundary::INNER;
+            bc[Side2D::T] = j == m_ny-1 ? m_bounds.top    : Boundary::INNER;
 
-            grid.add_quad({
-                nodes[i][j],
-                nodes[i + 1][j],
-                nodes[i + 1][j + 1],
-                nodes[i][j + 1]},
-                bc);
+            using indexing::quad::vs;
+            quad_nodes[vs<0, 0>()] = nodes[i][j];
+            quad_nodes[vs<0, 1>()] = nodes[i][j+1];
+            quad_nodes[vs<1, 0>()] = nodes[i+1][j];
+            quad_nodes[vs<1, 1>()] = nodes[i+1][j+1];
+
+            grid.add_cell(CellType::QUAD, quad_nodes, bc);
         }
     }
     return grid;
@@ -321,13 +321,12 @@ Grid Rectangle::create_classic_amr() const {
     grid.reserve_nodes((m_nx + 1) * (m_ny + 1));
     grid.reserve_cells(m_nx * m_ny);
 
-    std::vector nodes(m_nx + 1, std::vector<NodeInput::Ptr>(m_ny + 1));
+    std::vector nodes(m_nx + 1, std::vector<GridNode::Ptr>(m_ny + 1));
     for (int i = 0; i <= m_nx; ++i) {
         for (int j = 0; j <= m_ny; ++j) {
             double x = m_xmin + i * dx;
             double y = m_ymin + j * dy;
-            nodes[i][j] = NodeInput::create({x, y, 0.0});
-            grid.add_node(nodes[i][j]);
+            nodes[i][j] = GridNode::create({x, y, 0.0});
         }
     }
 
@@ -366,20 +365,20 @@ Grid Rectangle::create_voronoi() const {
     double y_shift = m_ymin;
 
     // Вершины в виде таблицы
-    std::vector vertices(Nx + 2, std::vector<NodeInput::Ptr>(2 * Ny + 1, nullptr));
+    std::vector vertices(Nx + 2, std::vector<GridNode::Ptr>(2 * Ny + 1, nullptr));
 
     for (size_t j = 0; j <= 2 * Ny; ++j) {
         double y = y_shift + h * j;
 
         // Часть вершин на левой границе пропускаем
         if (j % 2 == 0) {
-            vertices[0][j] = NodeInput::create({m_xmin, y, 0.0});
+            vertices[0][j] = GridNode::create({m_xmin, y, 0.0});
             vertices[0][j]->bc = m_bounds.left;
         }
 
         for (size_t i = 1; i <= Nx; ++i) {
             double x = x_shift + double(3 * i - (i + j) % 2) * 0.5 * D;
-            vertices[i][j] = NodeInput::create({x, y, 0.0});
+            vertices[i][j] = GridNode::create({x, y, 0.0});
 
             if (j == 0) {
                 vertices[i][j]->bc = m_bounds.bottom;
@@ -390,33 +389,38 @@ Grid Rectangle::create_voronoi() const {
 
         // Часть вершин на правой границе пропускаем
         if (j == 0 || j == 2 * Ny || j % 2 == Nx % 2) {
-            vertices[Nx + 1][j] = NodeInput::create({m_xmax, y, 0.0});
+            vertices[Nx + 1][j] = GridNode::create({m_xmax, y, 0.0});
             vertices[Nx + 1][j]->bc = m_bounds.right;
         }
     }
 
-    Grid grid;
-
-    // Переносим вершины в один массив
-    grid.reserve_nodes((Nx + 2)*(2 * Ny + 1));
-    for (size_t i = 0; i <= Nx + 1; ++i) {
-        for (size_t j = 0; j <= 2 * Ny; ++j) {
-            if (!vertices[i][j]->pos.hasNaN()) {
-                grid.add_node(vertices[i][j]);
-            }
-        }
-    }
-
-    using VList = std::vector<NodeInput::Ptr>;
+    using VList = std::vector<GridNode::Ptr>;
 
     auto erase_nans = [](VList& vlist) {
         const auto to_remove = std::ranges::remove_if(vlist,
-            [](NodeInput::Ref v) -> bool { return !v; }).begin();
+            [](GridNode::Ref v) -> bool { return !v; }).begin();
         vlist.erase(to_remove, vlist.end());
     };
 
-    // Создаем массив ячеек
-    grid.reserve_nodes(m_size);
+    const double eps = 1.0e-9;
+
+    auto get_bounds = [this, eps](VList& vlist) -> std::vector<Boundary> {
+        std::vector bounds(vlist.size(), Boundary::INNER);
+        for (int i = 0; i < vlist.size(); ++i) {
+            int j = (i + 1) % vlist.size();
+            Vector3d v1 = vlist[i]->pos;
+            Vector3d v2 = vlist[j]->pos;
+            if (std::max(v1.x(), v2.x()) <= m_xmin + eps) { bounds[i] = m_bounds.left; }
+            if (std::min(v1.x(), v2.x()) >= m_xmax - eps) { bounds[i] = m_bounds.right; }
+            if (std::max(v1.y(), v2.y()) <= m_ymin + eps) { bounds[i] = m_bounds.bottom; }
+            if (std::min(v1.y(), v2.y()) >= m_ymax - eps) { bounds[i] = m_bounds.top; }
+        }
+        return bounds;
+    };
+
+    Grid grid;
+    grid.reserve_nodes((Nx + 2)*(2 * Ny + 1));
+    grid.reserve_cells(m_size);
     for (size_t i = 0; i <= Nx; ++i) {
         if (i % 2 == 0) {
             for (size_t j = 0; j < 2 * Ny - 1; j += 2) {
@@ -426,31 +430,32 @@ Grid Rectangle::create_voronoi() const {
                     vertices[i][j + 2], vertices[i][j + 1]
                 };
                 erase_nans(vlist);
-
-                grid.add_cell(CellType::POLYGON, vlist);
+                grid.add_cell(CellType::POLYGON, vlist, get_bounds(vlist));
             }
         } else {
             // j == 0
-            grid.add_cell(CellType::QUAD, {
+            VList vlist = {
                 vertices[i][0], vertices[i + 1][0],
                 vertices[i + 1][1], vertices[i][1]
-            });
+            };
+            grid.add_cell(CellType::POLYGON, vlist, get_bounds(vlist));
 
             for (size_t j = 1; j < 2 * Ny - 2; j += 2) {
-                VList vlist = {
+                vlist = {
                     vertices[i][j], vertices[i + 1][j],
                     vertices[i + 1][j + 1], vertices[i + 1][j + 2],
                     vertices[i][j + 2], vertices[i][j + 1]
                 };
                 erase_nans(vlist);
-                grid.add_cell(CellType::POLYGON, vlist);
+                grid.add_cell(CellType::POLYGON, vlist, get_bounds(vlist));
             }
 
             // j == last; i % 2 == 1
-            grid.add_cell(CellType::QUAD, {
+            vlist = {
                 vertices[i][2 * Ny - 1], vertices[i + 1][2 * Ny - 1],
                 vertices[i + 1][2 * Ny], vertices[i][2 * Ny]
-            });
+            };
+            grid.add_cell(CellType::POLYGON, vlist, get_bounds(vlist));
         }
     }
 
@@ -573,10 +578,10 @@ void Rectangle::initialize(AmrCells& cells) const {
         cells.faces.area[iface + Side2D::B] = hx;
         cells.faces.area[iface + Side2D::T] = hx;
 
-        cells.faces.vertices[iface + Side2D::L] = indexing::sf(Side2D::L);
-        cells.faces.vertices[iface + Side2D::R] = indexing::sf(Side2D::R);
-        cells.faces.vertices[iface + Side2D::B] = indexing::sf(Side2D::B);
-        cells.faces.vertices[iface + Side2D::T] = indexing::sf(Side2D::T);
+        cells.faces.vertices[iface + Side2D::L] = indexing::amr::sf(Side2D::L);
+        cells.faces.vertices[iface + Side2D::R] = indexing::amr::sf(Side2D::R);
+        cells.faces.vertices[iface + Side2D::B] = indexing::amr::sf(Side2D::B);
+        cells.faces.vertices[iface + Side2D::T] = indexing::amr::sf(Side2D::T);
 
         for (index_t jn = 0; jn < n_nodes; ++jn) {
             cells.verts[ic * n_nodes + jn] = quad[jn];

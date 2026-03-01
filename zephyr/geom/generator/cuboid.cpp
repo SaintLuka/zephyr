@@ -257,42 +257,40 @@ Grid Cuboid::make() const {
     grid.reserve_nodes((m_nx + 1) * (m_ny + 1) * (m_nz + 1));
     grid.reserve_cells(m_nx * m_ny * m_nz);
 
-    std::vector nodes(m_nx + 1, std::vector(m_ny + 1, std::vector<NodeInput::Ptr>(m_nz + 1)));
+    std::vector nodes(m_nx + 1, std::vector(m_ny + 1, std::vector<GridNode::Ptr>(m_nz + 1)));
     for (int i = 0; i <= m_nx; ++i) {
         for (int j = 0; j <= m_ny; ++j) {
             for (int k = 0; k <= m_nz; ++k) {
                 double x = m_xmin + i * dx;
                 double y = m_ymin + j * dy;
                 double z = m_zmin + k * dz;
-                nodes[i][j][k] = NodeInput::create({x, y, z});
-
-                grid.add_node(nodes[i][j][k]);
+                nodes[i][j][k] = GridNode::create({x, y, z});
             }
         }
     }
 
     std::vector<Boundary> bc(6);
+    std::vector<GridNode::Ptr> cube_nodes(8);
     for (int i = 0; i < m_nx; ++i) {
+        bc[Side3D::L] = i == 0 ?      m_bounds.left :  Boundary::INNER;
+        bc[Side3D::R] = i == m_nx-1 ? m_bounds.right : Boundary::INNER;
         for (int j = 0; j < m_ny; ++j) {
+            bc[Side3D::B] = j == 0 ?      m_bounds.bottom : Boundary::INNER;
+            bc[Side3D::T] = j == m_ny-1 ? m_bounds.top : Boundary::INNER;
             for (int k = 0; k < m_nz; ++k) {
-                bc[Side3D::L] = i == 0 ? m_bounds.left :  Boundary::INNER;
-                bc[Side3D::R] = i == m_nx-1 ? m_bounds.right : Boundary::INNER;
-                bc[Side3D::B] = j == 0 ? m_bounds.bottom : Boundary::INNER;
-                bc[Side3D::T] = j == m_ny-1 ? m_bounds.top : Boundary::INNER;
                 bc[Side3D::Z] = k == 0 ? m_bounds.back : Boundary::INNER;
                 bc[Side3D::F] = k == m_nz-1 ? m_bounds.front : Boundary::INNER;
 
-                grid.add_cell(
-                    CellType::HEXAHEDRON, {
-                        nodes[i][j][k],
-                        nodes[i + 1][j][k],
-                        nodes[i + 1][j + 1][k],
-                        nodes[i][j + 1][k],
-                        nodes[i][j][k+1],
-                        nodes[i + 1][j][k+1],
-                        nodes[i + 1][j + 1][k+1],
-                        nodes[i][j + 1][k+1]
-                    }, bc);
+                using indexing::hex::vs;
+                cube_nodes[vs<0,0,0>()] = nodes[i][j][k];
+                cube_nodes[vs<1,0,0>()] = nodes[i+1][j][k];
+                cube_nodes[vs<1,1,0>()] = nodes[i+1][j+1][k];
+                cube_nodes[vs<0,1,0>()] = nodes[i][j+1][k];
+                cube_nodes[vs<0,0,1>()] = nodes[i][j][k+1];
+                cube_nodes[vs<1,0,1>()] = nodes[i+1][j][k+1];
+                cube_nodes[vs<1,1,1>()] = nodes[i+1][j+1][k+1];
+                cube_nodes[vs<0,1,1>()] = nodes[i][j+1][k+1];
+                grid.add_cell(CellType::HEXAHEDRON, cube_nodes, bc);
             }
         }
     }
@@ -429,12 +427,12 @@ void Cuboid::initialize(AmrCells& cells) const {
         cells.faces.area[iface + Side3D::Z] = hx * hy;
         cells.faces.area[iface + Side3D::F] = hx * hy;
 
-        cells.faces.vertices[iface + Side3D::L] = indexing::sf(Side3D::L);
-        cells.faces.vertices[iface + Side3D::R] = indexing::sf(Side3D::R);
-        cells.faces.vertices[iface + Side3D::B] = indexing::sf(Side3D::B);
-        cells.faces.vertices[iface + Side3D::T] = indexing::sf(Side3D::T);
-        cells.faces.vertices[iface + Side3D::Z] = indexing::sf(Side3D::Z);
-        cells.faces.vertices[iface + Side3D::F] = indexing::sf(Side3D::F);
+        cells.faces.vertices[iface + Side3D::L] = indexing::amr::sf(Side3D::L);
+        cells.faces.vertices[iface + Side3D::R] = indexing::amr::sf(Side3D::R);
+        cells.faces.vertices[iface + Side3D::B] = indexing::amr::sf(Side3D::B);
+        cells.faces.vertices[iface + Side3D::T] = indexing::amr::sf(Side3D::T);
+        cells.faces.vertices[iface + Side3D::Z] = indexing::amr::sf(Side3D::Z);
+        cells.faces.vertices[iface + Side3D::F] = indexing::amr::sf(Side3D::F);
 
         for (index_t jn = 0; jn < n_nodes; ++jn) {
             cells.verts[ic * n_nodes + jn] = cube[jn];

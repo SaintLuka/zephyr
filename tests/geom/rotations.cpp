@@ -149,7 +149,7 @@ void neib_child_gen_2D() {
         }
 
         for (Side2D side = 0; side < Side2D::n_subfaces(); ++side.val) {
-            Vector3d fc = 0.5 * (quad[indexing::cf(side)[0]] + quad[indexing::cf(side)[1]]);
+            Vector3d fc = 0.5 * (quad[indexing::amr::cf(side)[0]] + quad[indexing::amr::cf(side)[1]]);
 
             double min_dist = 100.0;
             int child_idx = -1;
@@ -225,8 +225,8 @@ void neib_child_gen_3D() {
 
         for (Side3D side = 0; side < Side3D::n_subfaces(); ++side.val) {
             Vector3d fc = 0.25 * (
-                quad[indexing::cf(side)[0]] + quad[indexing::cf(side)[1]] +
-                quad[indexing::cf(side)[2]] + quad[indexing::cf(side)[3]]);
+                quad[indexing::amr::cf(side)[0]] + quad[indexing::amr::cf(side)[1]] +
+                quad[indexing::amr::cf(side)[2]] + quad[indexing::amr::cf(side)[3]]);
 
             double min_dist = 100.0;
             int child_idx = -1;

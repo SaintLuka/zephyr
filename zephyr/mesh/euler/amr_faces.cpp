@@ -61,66 +61,93 @@ void AmrFaces::shrink_to_fit() {
 void AmrFaces::insert(index_t iface, CellType ctype, int count) {
     int n_faces = -1;
     switch (ctype) {
-        case CellType::AMR2D:
+        case CellType::AMR2D: {
             z_assert(count == 8 || count < 0, "AmrFaces::insert: bad size 2D");
-            vertices[iface + Side2D::L] = indexing::sf(Side2D::L);
-            vertices[iface + Side2D::R] = indexing::sf(Side2D::R);
-            vertices[iface + Side2D::B] = indexing::sf(Side2D::B);
-            vertices[iface + Side2D::T] = indexing::sf(Side2D::T);
-            n_faces = 8;
-            break;
+            vertices[iface + Side2D::L] = indexing::amr::sf(Side2D::L);
+            vertices[iface + Side2D::R] = indexing::amr::sf(Side2D::R);
+            vertices[iface + Side2D::B] = indexing::amr::sf(Side2D::B);
+            vertices[iface + Side2D::T] = indexing::amr::sf(Side2D::T);
+            n_faces = indexing::amr::n_subfaces2d;
+        } break;
 
-        case CellType::AMR3D:
+        case CellType::AMR3D: {
             z_assert(count == 24 || count < 0, "AmrFaces::insert: bad size 3D");
-            vertices[iface + Side3D::L] = indexing::sf(Side3D::L);
-            vertices[iface + Side3D::R] = indexing::sf(Side3D::R);
-            vertices[iface + Side3D::B] = indexing::sf(Side3D::B);
-            vertices[iface + Side3D::T] = indexing::sf(Side3D::T);
-            vertices[iface + Side3D::Z] = indexing::sf(Side3D::Z);
-            vertices[iface + Side3D::F] = indexing::sf(Side3D::F);
-            n_faces = 24;
-            break;
+            vertices[iface + Side3D::L] = indexing::amr::sf(Side3D::L);
+            vertices[iface + Side3D::R] = indexing::amr::sf(Side3D::R);
+            vertices[iface + Side3D::B] = indexing::amr::sf(Side3D::B);
+            vertices[iface + Side3D::T] = indexing::amr::sf(Side3D::T);
+            vertices[iface + Side3D::Z] = indexing::amr::sf(Side3D::Z);
+            vertices[iface + Side3D::F] = indexing::amr::sf(Side3D::F);
+            n_faces = indexing::amr::n_subfaces3d;
+        } break;
 
-        case CellType::TRIANGLE:
+        case CellType::TRIANGLE: {
             z_assert(count == 3 || count < 0, "AmrFaces::insert: bad size TRIANGLE");
-            vertices[iface+0] = {0, 1, -1, -1, -1, -1, -1, -1};
-            vertices[iface+1] = {1, 2, -1, -1, -1, -1, -1, -1};
-            vertices[iface+2] = {2, 0, -1, -1, -1, -1, -1, -1};       
+            vertices[iface+0] = indexing::tri::sf(0);
+            vertices[iface+1] = indexing::tri::sf(1);
+            vertices[iface+2] = indexing::tri::sf(2);
             n_faces = 3;
-            break;
+        } break;
             
         case CellType::QUAD:
             // Необычный порядок граней
             z_assert(count == 4 || count < 0, "AmrFaces::insert: bad size QUAD");
-            vertices[iface+0] = {0, 3, -1, -1, -1, -1, -1, -1};
-            vertices[iface+1] = {1, 2, -1, -1, -1, -1, -1, -1};
-            vertices[iface+2] = {0, 1, -1, -1, -1, -1, -1, -1};
-            vertices[iface+3] = {3, 2, -1, -1, -1, -1, -1, -1};
+            vertices[iface+0] = indexing::quad::sf(0);
+            vertices[iface+1] = indexing::quad::sf(1);
+            vertices[iface+2] = indexing::quad::sf(2);
+            vertices[iface+3] = indexing::quad::sf(3);
             n_faces = 4;
             break;
 
-        case CellType::POLYGON:
+        case CellType::POLYGON: {
             if (count < 0) {
                 throw std::runtime_error("AmrFaces::insert error: set argument 'count' with CellType::POLYGON");
             }
             for (int i = 0; i < count; ++i) {
-                vertices[iface + i].fill(-1);
-                vertices[iface + i][0] = static_cast<short>(i);
-                vertices[iface + i][1] = static_cast<short>((i + 1) % count);
+                vertices[iface + i] = indexing::poly::sf(count, i);
             }
             n_faces = count;
-            break;
+        } break;
 
-        case CellType::HEXAHEDRON:
+        case CellType::TETRA: {
+            z_assert(count == 4 || count < 0, "AmrFaces::insert: bad size TETRA");
+            vertices[iface + 0] = indexing::tetra::sf(0);
+            vertices[iface + 1] = indexing::tetra::sf(1);
+            vertices[iface + 2] = indexing::tetra::sf(2);
+            vertices[iface + 3] = indexing::tetra::sf(3);
+            n_faces = indexing::tetra::n_faces;
+        } break;
+
+        case CellType::PYRAMID: {
+            z_assert(count == 5 || count < 0, "AmrFaces::insert: bad size PYRAMID");
+            vertices[iface + 0] = indexing::pyramid::sf(0);
+            vertices[iface + 1] = indexing::pyramid::sf(1);
+            vertices[iface + 2] = indexing::pyramid::sf(2);
+            vertices[iface + 3] = indexing::pyramid::sf(3);
+            vertices[iface + 4] = indexing::pyramid::sf(4);
+            n_faces = indexing::pyramid::n_faces;
+        } break;
+
+        case CellType::WEDGE: {
+            z_assert(count == 5 || count < 0, "AmrFaces::insert: bad size PYRAMID");
+            vertices[iface + 0] = indexing::wedge::sf(0);
+            vertices[iface + 1] = indexing::wedge::sf(1);
+            vertices[iface + 2] = indexing::wedge::sf(2);
+            vertices[iface + 3] = indexing::wedge::sf(3);
+            vertices[iface + 4] = indexing::wedge::sf(4);
+            n_faces = indexing::wedge::n_faces;
+        } break;
+
+        case CellType::HEXAHEDRON: {
             z_assert(count == 6 || count < 0, "AmrFaces::insert: bad size HEXAHEDRON");
-            vertices[iface + Side3D::L] = {7, 3, 0, 4, -1, -1, -1, -1};
-            vertices[iface + Side3D::R] = {1, 2, 6, 5, -1, -1, -1, -1};
-            vertices[iface + Side3D::B] = {0, 1, 5, 4, -1, -1, -1, -1};
-            vertices[iface + Side3D::T] = {2, 3, 7, 6, -1, -1, -1, -1};
-            vertices[iface + Side3D::B] = {3, 2, 1, 0, -1, -1, -1, -1};
-            vertices[iface + Side3D::F] = {4, 5, 6, 7, -1, -1, -1, -1};
+            vertices[iface + Side3D::L] = indexing::hex::sf(Side3D::L);
+            vertices[iface + Side3D::R] = indexing::hex::sf(Side3D::R);
+            vertices[iface + Side3D::B] = indexing::hex::sf(Side3D::B);
+            vertices[iface + Side3D::T] = indexing::hex::sf(Side3D::T);
+            vertices[iface + Side3D::Z] = indexing::hex::sf(Side3D::Z);
+            vertices[iface + Side3D::F] = indexing::hex::sf(Side3D::F);
             n_faces = 6;
-            break;
+        } break;
 
         case CellType::POLYHEDRON:
         default:

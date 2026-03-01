@@ -1380,7 +1380,7 @@ Grid BlockStructured::make() const {
         }
     }
 
-    std::vector<NodeInput::Ptr> nodes;
+    std::vector<GridNode::Ptr> nodes;
     {
         if (m_verbosity > 0) {
             std::cout << "  Smooth final grid (" << m_iters_count << " iterations)\n";
@@ -1396,7 +1396,7 @@ Grid BlockStructured::make() const {
 
         nodes.resize(n_nodes);
         for (int i = 0; i < n_nodes; ++i) {
-            nodes[i] = NodeInput::create(s.pos[i]);
+            nodes[i] = GridNode::create(s.pos[i]);
         }
     }
 

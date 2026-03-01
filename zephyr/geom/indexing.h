@@ -20,6 +20,17 @@ constexpr int FpC(int dim) { return dim < 3 ? 4 : 6; }
 /// @brief Количество дочерних ячеек.
 constexpr int CpC(int dim) { return dim < 3 ? 4 : 8; }
 
+// Как хранится в AmrCells
+using node_array = std::array<short, 8>;
+
+template <int size, typename container>
+constexpr node_array convert(const container& arr) {
+    static_assert(size < 8);
+    node_array res = {-1, -1, -1, -1, -1, -1, -1, -1};
+    std::ranges::copy_n(arr, size, res.begin());
+    return res;
+}
+
 // --------------------------------- Элементы ---------------------------------
 
 /// @brief Адаптивный элемент?
@@ -85,39 +96,88 @@ constexpr int n_nodes(CellType type) {
     }
 }
 
-/// @brief Индексация вершин в кубической AMR-ячейке. Повторяет индексацию функции SqCube::iss
-template<short i, short j, short k = -1>
-static constexpr short iss() {
-    static_assert(i * i <= 1 && j * j <= 1 && k * k <= 1, "Available indices: {-1, 0, 1}");
-    return 9 * (k + 1) + 3 * (j + 1) + i + 1;
-}
+// ----------------------------------------------------------------------------
 
-// ---------------------------------- Грани -----------------------------------
+/// @brief Индексация узлов и граней в треугольнике (лол)
+namespace tri {
 
-constexpr int triangle_n_faces = 3;
-constexpr int triangle_face_size[3] = {2, 2, 2};
-constexpr int triangle_face_indices[3][2] = {
+constexpr int n_faces = 3;
+constexpr int face_size[3] = {2, 2, 2};
+constexpr int face_nodes[3][2] = {
     {0, 1}, {1, 2}, {2, 0}
 };
 
-constexpr int quad_n_faces = 4;
-constexpr int quad_face_size[4] = {2, 2, 2, 2};
-constexpr int quad_face_indices[4][2] = {
-    {0, 3}, {1, 2}, {0, 1}, {3, 2}
+/// @brief Индексы вершин грани
+constexpr node_array sf(int side) { return convert<2>(face_nodes[side]); }
+
+} // namespace indexing::tri
+
+// ----------------------------------------------------------------------------
+
+/// @brief Индексация узлов и граней в простой QUAD-ячейке
+namespace quad {
+
+/// @brief Нумерация узлов в простом четырёхугольнике.
+/// Против часовой стрелки от 0 до 3 с левого нижнего угла.
+template <int i, int j>
+constexpr int vs() {
+    static_assert(0 <= std::min(i, j) && std::max(i, j) <= 1, "Available indices: {0, 1}");
+    return i == 0 ? (j == 0 ? 0 : 3) : (j == 0 ? 1 : 2);
+}
+
+constexpr int n_faces = 4;
+constexpr int face_size[4] = {2, 2, 2, 2};
+constexpr int face_nodes[4][2] = {
+    {vs<0,0>(), vs<0,1>()}, // L
+    {vs<1,0>(), vs<1,1>()}, // R
+    {vs<0,0>(), vs<1,0>()}, // B
+    {vs<0,1>(), vs<1,1>()}, // T
 };
 
-constexpr int tetra_n_faces = 4;
-constexpr int tetra_face_size[4] = {3, 3, 3, 3};
-constexpr int tetra_face_indices[4][3] = {
+/// @brief Индексы вершин грани
+constexpr node_array sf(int side) { return convert<2>(face_nodes[side]); }
+
+} // namespace indexing::quad
+
+// ----------------------------------------------------------------------------
+
+namespace poly {
+
+constexpr node_array sf(int count, int side) {
+    node_array vertices;
+    std::ranges::fill(vertices, -1);
+    vertices[0] = static_cast<short>(side);
+    vertices[1] = static_cast<short>((side + 1) % count);
+    return vertices;
+}
+
+} // namespace indexing::poly
+
+// ----------------------------------------------------------------------------
+
+namespace tetra {
+
+constexpr int n_faces = 4;
+constexpr int face_size[4] = {3, 3, 3, 3};
+constexpr int face_nodes[4][3] = {
     {0, 2, 1},
     {0, 1, 3},
     {1, 2, 3},
     {0, 3, 2}
 };
 
-constexpr int pyramid_n_faces = 4;
-constexpr int pyramid_face_size[4] = {4, 3, 3, 3};
-constexpr int pyramid_face_indices[5][4] = {
+/// @brief Индексы вершин грани
+constexpr node_array sf(int side) { return convert<3>(face_nodes[side]); }
+
+} // namespace indexing::tetra
+
+// ----------------------------------------------------------------------------
+
+namespace pyramid {
+
+constexpr int n_faces = 4;
+constexpr int face_size[4] = {4, 3, 3, 3};
+constexpr int face_nodes[5][4] = {
     {3, 2, 1, 0},
     {0, 1, 4},
     {1, 2, 4},
@@ -125,9 +185,25 @@ constexpr int pyramid_face_indices[5][4] = {
     {0, 4, 3}
 };
 
-constexpr int wedge_n_faces = 5;
-constexpr int wedge_face_size[5] = {4, 4, 4, 3, 3};
-constexpr int wedge_face_indices[5][4] ={
+/// @brief Индексы вершин грани
+constexpr node_array sf(int side) {
+    if (face_size[side] == 3) {
+        return convert<3>(face_nodes[side]);
+    }
+    else {
+        return convert<4>(face_nodes[side]);
+    }
+}
+
+} // namespace indexing::pyramid
+
+// ----------------------------------------------------------------------------
+
+namespace wedge {
+
+constexpr int n_faces = 5;
+constexpr int face_size[5] = {4, 4, 4, 3, 3};
+constexpr int face_nodes[5][4] ={
     {0, 3, 4, 1},
     {1, 4, 5, 2},
     {0, 2, 5, 3},
@@ -135,92 +211,150 @@ constexpr int wedge_face_indices[5][4] ={
     {3, 5, 4}
 };
 
-constexpr int hexahedron_n_faces = 6;
-constexpr int hexahedron_face_size[6] = {4, 4, 4, 4, 4, 4};
-constexpr int hexahedron_face_indices[6][4] = {
-    {0, 3, 2, 1},
-    {4, 5, 6, 7},
-    {0, 3, 4, 7},
-    {1, 2, 6, 5},
-    {0, 1, 5, 4},
-    {2, 3, 7, 6}
+/// @brief Индексы вершин грани
+constexpr node_array sf(int side) {
+    if (face_size[side] == 3) {
+        return convert<3>(face_nodes[side]);
+    }
+    else {
+        return convert<4>(face_nodes[side]);
+    }
+}
+
+} // namespace indexing::wedge
+
+// ----------------------------------------------------------------------------
+
+namespace hex {
+
+/// @brief Нумерация узлов в шестиграннике (соглашение VTK).
+template <int i, int j, int k>
+constexpr int vs() {
+    static_assert(0 <= std::min({i, j, k}) && std::max({i, j, k}) <= 1, "Available indices: {0, 1}");
+    return quad::vs<i, j>() + 4 * k;
+}
+
+constexpr int n_faces = 6;
+constexpr int face_size[6] = {4, 4, 4, 4, 4, 4};
+constexpr int face_nodes[6][4] = {
+    {vs<0,0,0>(), vs<0,0,1>(), vs<0,1,1>(), vs<0,1,0>()}, // L
+    {vs<1,0,0>(), vs<1,1,0>(), vs<1,1,1>(), vs<1,0,1>()}, // R
+    {vs<0,0,0>(), vs<1,0,0>(), vs<1,0,1>(), vs<0,0,1>()}, // B
+    {vs<1,1,0>(), vs<0,1,0>(), vs<0,1,1>(), vs<1,1,1>()}, // T
+    {vs<0,0,0>(), vs<0,1,0>(), vs<1,1,0>(), vs<1,0,0>()}, // X
+    {vs<0,0,1>(), vs<1,0,1>(), vs<1,1,1>(), vs<0,1,1>()}, // F
 };
 
-constexpr int amr2d_n_faces = 4;
-constexpr int amr2d_face_size[4] = {2, 2, 2, 2};
-constexpr int amr2d_face_indices[4][2] = {
-    {iss<-1, -1>(), iss<-1, +1>()},
-    {iss<+1, -1>(), iss<+1, +1>()},
-    {iss<-1, -1>(), iss<+1, -1>()},
-    {iss<-1, +1>(), iss<+1, +1>()},
+/// @brief Индексы вершин грани
+constexpr node_array sf(int side) { return convert<4>(face_nodes[side]); }
+
+} // namespace indexing::hex
+
+// ----------------------------------------------------------------------------
+
+/// @brief Индексация узлов и граней в AMR-ячейках
+namespace amr {
+
+/// @brief Индексация вершин в кубической AMR-ячейке. Повторяет индексацию функции SqCube::iss
+template <int i, int j, int k = -1>
+constexpr int vs() {
+    static_assert(i * i <= 1 && j * j <= 1 && k * k <= 1, "Available indices: {-1, 0, 1}");
+    return 9 * (k + 1) + 3 * (j + 1) + i + 1;
+}
+
+constexpr int n_faces2d = 4;
+constexpr int face_size2d[4] = {2, 2, 2, 2};
+constexpr int face_nodes2d[4][2] = {
+    {vs<-1, -1>(), vs<-1, +1>()},
+    {vs<+1, -1>(), vs<+1, +1>()},
+    {vs<-1, -1>(), vs<+1, -1>()},
+    {vs<-1, +1>(), vs<+1, +1>()},
 };
 
-constexpr int amr3d_n_faces = 6;
-constexpr int amr3d_face_size[6] = {4, 4, 4, 4};
-constexpr int amr3d_face_indices[6][4] = {
-    {iss<-1, -1, -1>(), iss<-1, +1, -1>(), iss<-1, -1, +1>(), iss<-1, +1, +1>()},
-    {iss<+1, -1, -1>(), iss<+1, +1, -1>(), iss<+1, -1, +1>(), iss<+1, +1, +1>()},
-    {iss<-1, -1, -1>(), iss<+1, -1, -1>(), iss<-1, -1, +1>(), iss<+1, -1, +1>()},
-    {iss<-1, +1, -1>(), iss<+1, +1, -1>(), iss<-1, +1, +1>(), iss<+1, +1, +1>()},
-    {iss<-1, -1, -1>(), iss<+1, -1, -1>(), iss<-1, +1, -1>(), iss<+1, +1, -1>()},
-    {iss<-1, -1, +1>(), iss<+1, -1, +1>(), iss<-1, +1, +1>(), iss<+1, +1, +1>()},
+constexpr int n_faces3d = 6;
+constexpr int face_size3d[6] = {4, 4, 4, 4};
+constexpr int face_nodes3d[6][4] = {
+    {vs<-1, -1, -1>(), vs<-1, +1, -1>(), vs<-1, -1, +1>(), vs<-1, +1, +1>()},
+    {vs<+1, -1, -1>(), vs<+1, +1, -1>(), vs<+1, -1, +1>(), vs<+1, +1, +1>()},
+    {vs<-1, -1, -1>(), vs<+1, -1, -1>(), vs<-1, -1, +1>(), vs<+1, -1, +1>()},
+    {vs<-1, +1, -1>(), vs<+1, +1, -1>(), vs<-1, +1, +1>(), vs<+1, +1, +1>()},
+    {vs<-1, -1, -1>(), vs<+1, -1, -1>(), vs<-1, +1, -1>(), vs<+1, +1, -1>()},
+    {vs<-1, -1, +1>(), vs<+1, -1, +1>(), vs<-1, +1, +1>(), vs<+1, +1, +1>()},
 };
 
-constexpr int amr2d_n_subfaces = 8;
-constexpr int amr2d_subface_indices[8][2] = {
-    {iss<-1,-1>(), iss<-1, 0>()}, // L[0]
-    {iss<+1,-1>(), iss<+1, 0>()}, // R[0]
-    {iss<-1,-1>(), iss< 0,-1>()}, // B[0]
-    {iss<-1,+1>(), iss< 0,+1>()}, // T[0]
+constexpr int n_subfaces2d = 8;
+constexpr int subface_nodes2d[8][2] = {
+    {vs<-1,-1>(), vs<-1, 0>()}, // L[0]
+    {vs<+1,-1>(), vs<+1, 0>()}, // R[0]
+    {vs<-1,-1>(), vs< 0,-1>()}, // B[0]
+    {vs<-1,+1>(), vs< 0,+1>()}, // T[0]
 
-    {iss<-1, 0>(), iss<-1,+1>()}, // L[1]
-    {iss<+1, 0>(), iss<+1,+1>()}, // R[1]
-    {iss< 0,-1>(), iss<+1,-1>()}, // B[1]
-    {iss< 0,+1>(), iss<+1,+1>()}, // T[1]    
+    {vs<-1, 0>(), vs<-1,+1>()}, // L[1]
+    {vs<+1, 0>(), vs<+1,+1>()}, // R[1]
+    {vs< 0,-1>(), vs<+1,-1>()}, // B[1]
+    {vs< 0,+1>(), vs<+1,+1>()}, // T[1]
 };
 
-constexpr int amr3d_n_subfaces = 24;
-constexpr int amr3d_subface_indices[24][4] = {
-    {iss<-1,-1,-1>(), iss<-1, 0,-1>(), iss<-1,-1, 0>(), iss<-1, 0, 0>()}, // L[0]
-    {iss<+1,-1,-1>(), iss<+1, 0,-1>(), iss<+1,-1, 0>(), iss<+1, 0, 0>()}, // R[0]
-    {iss<-1,-1,-1>(), iss< 0,-1,-1>(), iss<-1,-1, 0>(), iss< 0,-1, 0>()}, // B[0]
-    {iss<-1,+1,-1>(), iss< 0,+1,-1>(), iss<-1,+1, 0>(), iss< 0,+1, 0>()}, // T[0]
-    {iss<-1,-1,-1>(), iss<0, -1,-1>(), iss<-1, 0,-1>(), iss< 0, 0,-1>()}, // Z[0]
-    {iss<-1,-1,+1>(), iss< 0,-1,+1>(), iss<-1, 0,+1>(), iss< 0, 0,+1>()}, // F[0]
+constexpr int n_subfaces3d = 24;
+constexpr int subface_nodes3d[24][4] = {
+    {vs<-1,-1,-1>(), vs<-1, 0,-1>(), vs<-1,-1, 0>(), vs<-1, 0, 0>()}, // L[0]
+    {vs<+1,-1,-1>(), vs<+1, 0,-1>(), vs<+1,-1, 0>(), vs<+1, 0, 0>()}, // R[0]
+    {vs<-1,-1,-1>(), vs< 0,-1,-1>(), vs<-1,-1, 0>(), vs< 0,-1, 0>()}, // B[0]
+    {vs<-1,+1,-1>(), vs< 0,+1,-1>(), vs<-1,+1, 0>(), vs< 0,+1, 0>()}, // T[0]
+    {vs<-1,-1,-1>(), vs<0, -1,-1>(), vs<-1, 0,-1>(), vs< 0, 0,-1>()}, // Z[0]
+    {vs<-1,-1,+1>(), vs< 0,-1,+1>(), vs<-1, 0,+1>(), vs< 0, 0,+1>()}, // F[0]
 
-    {iss<-1, 0,-1>(), iss<-1,+1,-1>(), iss<-1, 0, 0>(), iss<-1,+1, 0>()}, // L[1]
-    {iss<+1, 0,-1>(), iss<+1,+1,-1>(), iss<+1, 0, 0>(), iss<+1,+1, 0>()}, // R[1]
-    {iss< 0,-1,-1>(), iss<+1,-1,-1>(), iss< 0,-1, 0>(), iss<+1,-1, 0>()}, // B[1]
-    {iss< 0,+1,-1>(), iss<+1,+1,-1>(), iss< 0,+1, 0>(), iss<+1,+1, 0>()}, // T[1]
-    {iss< 0,-1,-1>(), iss<+1,-1,-1>(), iss< 0, 0,-1>(), iss<+1, 0,-1>()}, // Z[1]
-    {iss< 0,-1,+1>(), iss<+1,-1,+1>(), iss< 0, 0,+1>(), iss<+1, 0,+1>()}, // F[1]
+    {vs<-1, 0,-1>(), vs<-1,+1,-1>(), vs<-1, 0, 0>(), vs<-1,+1, 0>()}, // L[1]
+    {vs<+1, 0,-1>(), vs<+1,+1,-1>(), vs<+1, 0, 0>(), vs<+1,+1, 0>()}, // R[1]
+    {vs< 0,-1,-1>(), vs<+1,-1,-1>(), vs< 0,-1, 0>(), vs<+1,-1, 0>()}, // B[1]
+    {vs< 0,+1,-1>(), vs<+1,+1,-1>(), vs< 0,+1, 0>(), vs<+1,+1, 0>()}, // T[1]
+    {vs< 0,-1,-1>(), vs<+1,-1,-1>(), vs< 0, 0,-1>(), vs<+1, 0,-1>()}, // Z[1]
+    {vs< 0,-1,+1>(), vs<+1,-1,+1>(), vs< 0, 0,+1>(), vs<+1, 0,+1>()}, // F[1]
 
-    {iss<-1,-1, 0>(), iss<-1, 0, 0>(), iss<-1,-1,+1>(), iss<-1, 0,+1>()}, // L[2]
-    {iss<+1,-1, 0>(), iss<+1, 0, 0>(), iss<+1,-1,+1>(), iss<+1, 0,+1>()}, // R[2]
-    {iss<-1,-1, 0>(), iss< 0,-1, 0>(), iss<-1,-1,+1>(), iss< 0,-1,+1>()}, // B[2]
-    {iss<-1,+1, 0>(), iss< 0,+1, 0>(), iss<-1,+1,+1>(), iss< 0,+1,+1>()}, // T[2]
-    {iss<-1, 0,-1>(), iss< 0, 0,-1>(), iss<-1,+1,-1>(), iss< 0,+1,-1>()}, // Z[2]
-    {iss<-1, 0,+1>(), iss< 0, 0,+1>(), iss<-1,+1,+1>(), iss< 0,+1,+1>()}, // F[2]
+    {vs<-1,-1, 0>(), vs<-1, 0, 0>(), vs<-1,-1,+1>(), vs<-1, 0,+1>()}, // L[2]
+    {vs<+1,-1, 0>(), vs<+1, 0, 0>(), vs<+1,-1,+1>(), vs<+1, 0,+1>()}, // R[2]
+    {vs<-1,-1, 0>(), vs< 0,-1, 0>(), vs<-1,-1,+1>(), vs< 0,-1,+1>()}, // B[2]
+    {vs<-1,+1, 0>(), vs< 0,+1, 0>(), vs<-1,+1,+1>(), vs< 0,+1,+1>()}, // T[2]
+    {vs<-1, 0,-1>(), vs< 0, 0,-1>(), vs<-1,+1,-1>(), vs< 0,+1,-1>()}, // Z[2]
+    {vs<-1, 0,+1>(), vs< 0, 0,+1>(), vs<-1,+1,+1>(), vs< 0,+1,+1>()}, // F[2]
 
-    {iss<-1, 0, 0>(), iss<-1,+1, 0>(), iss<-1, 0,+1>(), iss<-1,+1,+1>()}, // L[3]
-    {iss<+1, 0, 0>(), iss<+1,+1, 0>(), iss<+1, 0,+1>(), iss<+1,+1,+1>()}, // R[3]
-    {iss< 0,-1, 0>(), iss<+1,-1, 0>(), iss< 0,-1,+1>(), iss<+1,-1,+1>()}, // B[3]
-    {iss< 0,+1, 0>(), iss<+1,+1, 0>(), iss< 0,+1,+1>(), iss<+1,+1,+1>()}, // T[3]
-    {iss< 0, 0,-1>(), iss<+1, 0,-1>(), iss< 0,+1,-1>(), iss<+1,+1,-1>()}, // Z[3]
-    {iss< 0, 0,+1>(), iss<+1, 0,+1>(), iss< 0,+1,+1>(), iss<+1,+1,+1>()}, // F[3]    
+    {vs<-1, 0, 0>(), vs<-1,+1, 0>(), vs<-1, 0,+1>(), vs<-1,+1,+1>()}, // L[3]
+    {vs<+1, 0, 0>(), vs<+1,+1, 0>(), vs<+1, 0,+1>(), vs<+1,+1,+1>()}, // R[3]
+    {vs< 0,-1, 0>(), vs<+1,-1, 0>(), vs< 0,-1,+1>(), vs<+1,-1,+1>()}, // B[3]
+    {vs< 0,+1, 0>(), vs<+1,+1, 0>(), vs< 0,+1,+1>(), vs<+1,+1,+1>()}, // T[3]
+    {vs< 0, 0,-1>(), vs<+1, 0,-1>(), vs< 0,+1,-1>(), vs<+1,+1,-1>()}, // Z[3]
+    {vs< 0, 0,+1>(), vs<+1, 0,+1>(), vs< 0,+1,+1>(), vs<+1,+1,+1>()}, // F[3]
 };
+
+/// @brief Индексы вершин простой грани в AMR-ячейке (sf -- simple face)
+constexpr node_array sf(Side2D side) { return convert<2>(face_nodes2d[side]); }
+
+/// @brief Индексы вершин простой грани в AMR-ячейке (sf -- simple face)
+constexpr node_array sf(Side3D side) { return convert<4>(face_nodes3d[side]); }
+
+/// @brief Индексы вершин части составной грани AMR-ячейки (cf -- complex face)
+constexpr node_array cf(Side2D side) { return convert<2>(subface_nodes2d[side]); }
+
+/// @brief Индексы вершин части составной грани AMR-ячейки (cf -- complex face)
+constexpr node_array cf(Side3D side) { return convert<4>(subface_nodes3d[side]); }
+
+} // namespace indexing::amr
+
+// ---------------------------------- Грани -----------------------------------
+
+
 
 /// @brief Число граней элемента
 constexpr int n_faces(CellType type) {
     switch (type) {
-        case CellType::TRIANGLE:   return triangle_n_faces;
-        case CellType::QUAD:       return quad_n_faces;
-        case CellType::AMR2D:      return amr2d_n_faces;
-        case CellType::TETRA:      return tetra_n_faces;
-        case CellType::PYRAMID:    return pyramid_n_faces;
-        case CellType::WEDGE:      return wedge_n_faces;
-        case CellType::HEXAHEDRON: return hexahedron_n_faces;
-        case CellType::AMR3D:      return amr3d_n_faces;
+        case CellType::TRIANGLE:   return tri::n_faces;
+        case CellType::QUAD:       return quad::n_faces;
+        case CellType::AMR2D:      return amr::n_faces2d;
+        case CellType::TETRA:      return tetra::n_faces;
+        case CellType::PYRAMID:    return pyramid::n_faces;
+        case CellType::WEDGE:      return wedge::n_faces;
+        case CellType::HEXAHEDRON: return hex::n_faces;
+        case CellType::AMR3D:      return amr::n_faces3d;
         default: return -1; // dynamic
     }
 }
@@ -231,12 +365,12 @@ constexpr int face_size(CellType type, int side) {
         case CellType::TRIANGLE:
         case CellType::QUAD:
         case CellType::POLYGON:    return 2;
-        case CellType::AMR2D:      return amr2d_face_size[side];
-        case CellType::TETRA:      return tetra_face_size[side];
-        case CellType::PYRAMID:    return pyramid_face_size[side];
-        case CellType::WEDGE:      return wedge_face_size[side];
-        case CellType::HEXAHEDRON: return hexahedron_face_size[side];
-        case CellType::AMR3D:      return amr3d_face_size[side];
+        case CellType::AMR2D:      return amr::face_size2d[side];
+        case CellType::TETRA:      return tetra::face_size[side];
+        case CellType::PYRAMID:    return pyramid::face_size[side];
+        case CellType::WEDGE:      return wedge::face_size[side];
+        case CellType::HEXAHEDRON: return hex::face_size[side];
+        case CellType::AMR3D:      return amr::face_size3d[side];
         default: return -1; // dynamic
     }
 }
@@ -245,47 +379,16 @@ constexpr int face_size(CellType type, int side) {
 constexpr int face_index(CellType type, int side, int idx) {
     z_assert(idx < face_size(type, side), "bad face index");
     switch (type) {
-        case CellType::TRIANGLE:   return triangle_face_indices[side][idx];
-        case CellType::QUAD:       return quad_face_indices[side][idx];
-        case CellType::AMR2D:      return amr2d_face_indices[side][idx];
-        case CellType::TETRA:      return tetra_face_indices[side][idx];
-        case CellType::PYRAMID:    return pyramid_face_indices[side][idx];
-        case CellType::WEDGE:      return wedge_face_indices[side][idx];
-        case CellType::HEXAHEDRON: return hexahedron_face_indices[side][idx];
-        case CellType::AMR3D:      return amr3d_face_indices[side][idx];
+        case CellType::TRIANGLE:   return tri::face_nodes[side][idx];
+        case CellType::QUAD:       return quad::face_nodes[side][idx];
+        case CellType::AMR2D:      return amr::face_nodes2d[side][idx];
+        case CellType::TETRA:      return tetra::face_nodes[side][idx];
+        case CellType::PYRAMID:    return pyramid::face_nodes[side][idx];
+        case CellType::WEDGE:      return wedge::face_nodes[side][idx];
+        case CellType::HEXAHEDRON: return hex::face_nodes[side][idx];
+        case CellType::AMR3D:      return amr::face_nodes3d[side][idx];
         default: return -1; // dynamic
     }
-}
-
-// Как хранится в AmrCells
-using node_array = std::array<short, 8>;
-
-template <int size, typename container>
-constexpr node_array convert(const container& arr) {
-    static_assert(size < 8);
-    node_array res = {-1, -1, -1, -1, -1, -1, -1, -1};
-    std::ranges::copy_n(arr, size, res.begin());
-    return res;
-}
-
-/// @brief Индексы вершин простой грани в AMR-ячейке
-/// sf -- Simple Face
-constexpr node_array sf(Side2D side) {
-    return convert<2>(amr2d_face_indices[side]);
-}
-
-constexpr node_array sf(Side3D side) {
-    return convert<4>(amr3d_face_indices[side]);
-}
-
-/// @brief Индексы вершин части составной грани AMR-ячейки
-/// cf -- Complex Face
-constexpr node_array cf(Side2D side) {
-    return convert<2>(amr2d_subface_indices[side]);
-}
-
-constexpr node_array cf(Side3D side) {
-    return convert<4>(amr3d_subface_indices[side]);
 }
 
 // ----------------------------- Адаптивная жесть -----------------------------

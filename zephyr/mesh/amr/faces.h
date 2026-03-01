@@ -18,10 +18,10 @@ void setup_faces_topo(AmrFaces& faces, index_t face_beg) {
     const index_t orig_face = face_beg + side;
 
     // Исходная грань превращается в первую подгрань
-    faces.vertices[orig_face] = indexing::cf(side[0]);
+    faces.vertices[orig_face] = indexing::amr::cf(side[0]);
 
     const index_t subface_1 = face_beg + side[1];
-    faces.vertices[subface_1] = indexing::cf(side[1]);
+    faces.vertices[subface_1] = indexing::amr::cf(side[1]);
     faces.boundary[subface_1] = faces.boundary[orig_face];
     faces.adjacent.rank [subface_1] = faces.adjacent.rank [orig_face];
     faces.adjacent.index[subface_1] = faces.adjacent.index[orig_face];
@@ -30,7 +30,7 @@ void setup_faces_topo(AmrFaces& faces, index_t face_beg) {
 
     if constexpr (dim > 2) {
         const index_t subface_2 = face_beg + side[2];
-        faces.vertices[subface_2] = indexing::cf(side[2]);
+        faces.vertices[subface_2] = indexing::amr::cf(side[2]);
         faces.boundary[subface_2] = faces.boundary[orig_face];
         faces.adjacent.rank [subface_2] = faces.adjacent.rank [orig_face];
         faces.adjacent.index[subface_2] = faces.adjacent.index[orig_face];
@@ -38,7 +38,7 @@ void setup_faces_topo(AmrFaces& faces, index_t face_beg) {
         faces.adjacent.basic[subface_2] = faces.adjacent.basic[orig_face];
 
         const index_t subface_3 = face_beg + side[3];
-        faces.vertices[subface_3] = indexing::cf(side[3]);
+        faces.vertices[subface_3] = indexing::amr::cf(side[3]);
         faces.boundary[subface_3] = faces.boundary[orig_face];
         faces.adjacent.rank [subface_3] = faces.adjacent.rank [orig_face];
         faces.adjacent.index[subface_3] = faces.adjacent.index[orig_face];
@@ -140,7 +140,7 @@ void merge_faces_impl(AmrFaces& faces, index_t face_beg, const SqMap<dim>& verti
     }
 #endif
 
-    faces.vertices[face_beg + side] = indexing::sf(side);
+    faces.vertices[face_beg + side] = indexing::amr::sf(side);
 
     faces.set_undefined(face_beg + side[1]);
     if constexpr (dim > 2) {
