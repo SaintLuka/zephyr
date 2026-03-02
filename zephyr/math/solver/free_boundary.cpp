@@ -144,7 +144,7 @@ void FreeBoundary::fluxes(EuMesh &mesh) const {
             double dot_vectors = u_vector.x() * normal_normalized.x() + u_vector.y() * normal_normalized.y() + u_vector.z() * normal_normalized.z();
             double ui = u * dot_vectors;
 
-            double alphaL = cell(part.alpha);
+            double alphaL = cell[part.alpha];
             double alphaR = face.neib(part.alpha);
 
             std::tuple<double, double, Flux> alpha_fluxes;
@@ -317,8 +317,8 @@ Flux FreeBoundary::crp_flux_classic(const PState& zL, const PState& zR,
 
         // Характеристики из точки O1
         auto[S_1L, S_1C, S_1R, Q_s1L, F_s1L, Q_s1R, F_s1R] = HLLC::wave_config_u_R(u, eos, z_s0L);
-        Char C_1L = {.x = O1.x, .t = O1.t, S_1L};
-        Char C_1R = {.x = O1.x, .t = O1.t, S_1R};
+        Char C_1L = {.x = O1.x, .t = O1.t, .S = S_1L};
+        Char C_1R = {.x = O1.x, .t = O1.t, .S = S_1R};
 
         double tau1 = C_1R.edge_t() / dt;
         if (tau1 >= 1.0) {
@@ -346,7 +346,7 @@ Flux FreeBoundary::crp_flux_classic(const PState& zL, const PState& zR,
 
         Char C_0C = {.x = 0.0, .t = 0.0, .S = S_0C};
         auto[S_1L, S_1C, S_1R, Q_s1L, F_s1L, Q_s1R, F_s1R] = HLLC::wave_config_u_R(u, eos, z_s0L);
-        Char C_1R = {.x = O1.x, .t = O1.t, S_1R};
+        Char C_1R = {.x = O1.x, .t = O1.t, .S = S_1R};
 
         Point O2 = C_1R.cross(C_0C);
 

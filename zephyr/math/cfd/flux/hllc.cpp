@@ -156,7 +156,7 @@ smf::WaveConfig3 HLLC::wave_config_u_R(
     double E_sR = zR.E() + (S_C - u_R) * (S_C + P_R / a_R);
 
     // Консервативный вектор справа от контактного разрыва
-    smf::QState Q_sR(rho_sR, {rho_sR * S_C, rho_sR * zR.v(), rho_sR * zR.w()}, rho_sR * E_sR);
+    smf::QState Q_sR(rho_sR, {rho_sR * S_C, rho_sR * zR.vy(), rho_sR * zR.vz()}, rho_sR * E_sR);
     smf::QState Q_sL(true);
 
     // Консервативный вектор справа

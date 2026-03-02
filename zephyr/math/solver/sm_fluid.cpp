@@ -178,7 +178,7 @@ void SmFluid::fluxes(EuMesh &mesh) const {
 }
 
 void SmFluid::fluxes_weno(EuMesh &mesh) const {
-    mesh.for_each([this](EuCell &cell) {
+    for(auto cell: mesh) {
         // Примитивный вектор в ячейке
         PState z_c = cell[part.init];
 
@@ -191,7 +191,6 @@ void SmFluid::fluxes_weno(EuMesh &mesh) const {
         // Cосед слева от рассматриваемой ячейки (I_{i-1})
         auto face_left = cell.face(mesh::Side2D::L);
         auto normal_left = face_left.normal();
-        auto cell_left = face_left.neib();
 
         // Примитивные вектора соседей слева (включая I_{i-2} и I_{i-3})
         PState neib_left;
@@ -200,62 +199,63 @@ void SmFluid::fluxes_weno(EuMesh &mesh) const {
 
         // Расчет примитивных векторов слева от рассматриваемой ячейки
         if (!face_left.is_boundary()) {
+            auto cell_left = face_left.neib();
             neib_left = cell_left[part.init];
 
             // Сосед через одного слева от рассматриваемой ячейки (I_{i-2})
             auto face_one_left = cell_left.face(mesh::Side2D::L);
             auto normal_one_left = face_one_left.normal();
-            auto cell_one_left = face_one_left.neib();
 
             if (!face_one_left.is_boundary()) {
+                auto cell_one_left = face_one_left.neib();
                 neib_one_left = cell_one_left[part.init];
 
                 // Сосед через два слева от рассматриваемой ячейки (I_{i-3})
                 auto face_two_left = cell_one_left.face(mesh::Side2D::L);
                 auto normal_two_left = face_two_left.normal();
-                auto cell_two_left = face_two_left.neib();
 
                 if (!face_two_left.is_boundary()) {
+                    auto cell_two_left = face_two_left.neib();
                     neib_two_left = cell_two_left[part.init];
                 } else {
-                    neib_two_left = boundary_value(cell_one_left[part.init], normal_two_left, face_two_left.flag());
+                    neib_two_left = boundary_value(neib_one_left, normal_two_left, face_two_left.flag());
                 }
             } else {
-                neib_one_left = boundary_value(cell_left[part.init], normal_one_left, face_one_left.flag());
+                neib_one_left = boundary_value(neib_left, normal_one_left, face_one_left.flag());
+                neib_two_left = boundary_value(neib_left, normal_one_left, face_one_left.flag());
             }
         } else {
             neib_left = boundary_value(z_c, normal_left, face_left.flag());
             neib_one_left = boundary_value(z_c, normal_left, face_left.flag());
+            neib_two_left = boundary_value(z_c, normal_left, face_left.flag());
         }
 
         // Cосед справа от рассматриваемой ячейки (I_{i+1})
         auto face_right = cell.face(mesh::Side2D::R);
         auto normal_right = face_right.normal();
-        auto cell_right = face_right.neib();
 
         // Примитивные вектора соседей справа (включая I_{i+2} и I_{i+3})
         PState neib_right;
         PState neib_one_right;
-        PState neib_two_right;
 
         // Расчет примитивных векторов справа от рассматриваемой ячейки
         if (!face_right.is_boundary()) {
+            auto cell_right = face_right.neib();
             neib_right = cell_right[part.init];
 
             // Сосед через одного справа от рассматриваемой ячейки (I_{i+2})
             auto face_one_right = cell_right.face(mesh::Side2D::R);
             auto normal_one_right = face_one_right.normal();
-            auto cell_one_right = face_one_right.neib();
 
             if (!face_one_right.is_boundary()) {
+                auto cell_one_right = face_one_right.neib();
                 neib_one_right = cell_one_right[part.init];
             } else {
-                neib_one_right = boundary_value(cell_right[part.init], normal_one_right, face_one_right.flag());
+                neib_one_right = boundary_value(neib_right, normal_one_right, face_one_right.flag());
             }
         } else {
             neib_right = boundary_value(z_c, normal_right, face_right.flag());
             neib_one_right = boundary_value(z_c, normal_right, face_right.flag());
-            neib_two_right = boundary_value(z_c, normal_right, face_right.flag());
         }
 
         // Преобразование примитивных векторов в консервативные
@@ -265,7 +265,6 @@ void SmFluid::fluxes_weno(EuMesh &mesh) const {
 
         QState neib_right_c(neib_right);
         QState neib_one_right_c(neib_one_right);
-        QState neib_two_right_c(neib_two_right);
 
         // Консервативные векторы u_{i+1/2}^{-} и u_{i+1/2}^{+}
         QState q_iplus12_minus;
@@ -316,8 +315,8 @@ void SmFluid::fluxes_weno(EuMesh &mesh) const {
         }
 
         // Новое значение примитивных переменных
-        cell(part.next) = PState(q_c, *m_eos);
-    });
+        cell[part.next] = PState(q_c, *m_eos);
+    }
 }
 
 void SmFluid::fluxes_stage1(EuMesh &mesh) const {

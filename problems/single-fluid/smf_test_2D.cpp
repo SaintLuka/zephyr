@@ -33,7 +33,7 @@ using zephyr::utils::Stopwatch;
 
 int main() {
     mpi::handler mpi_init;
-    threads::on();
+    threads::off();
 
     // Тестовая задача
     //Riemann2D test(6);
@@ -50,14 +50,14 @@ int main() {
     // число ячеек можно задать
     Rectangle gen(test.xmin(), test.xmax(), test.ymin(), test.ymax());
     gen.set_boundaries(test.boundaries());
-    gen.set_nx(mpi::single() ? 250 : 500);
+    gen.set_nx(mpi::single() ? 100 : 500);
 
     // Создать сетку
     EuMesh mesh(gen);
 
     // Создать и настроить решатель
     SmFluid solver(eos);
-    solver.set_accuracy(2);
+    solver.set_accuracy(5);
     solver.set_CFL(0.5);
     solver.set_limiter("MC");
     solver.set_method(Fluxes::HLLC);
@@ -82,7 +82,7 @@ int main() {
                      test.momentum_mean(cell, n),
                      test.energy_mean(cell, n));
 
-            cell(z) = PState(q, *eos);
+            cell[z] = PState(q, *eos);
         });
     };
 
@@ -91,11 +91,11 @@ int main() {
 
     // Переменные для сохранения
     pvd.variables = {"level"};
-    pvd.variables += {"density",  [z](EuCell& cell) -> double { return cell(z).density; }};
-    pvd.variables += {"vel.x",    [z](EuCell& cell) -> double { return cell(z).velocity.x(); }};
-    pvd.variables += {"vel.y",    [z](EuCell& cell) -> double { return cell(z).velocity.y(); }};
-    pvd.variables += {"pressure", [z](EuCell& cell) -> double { return cell(z).pressure; }};
-    pvd.variables += {"energy",   [z](EuCell& cell) -> double { return cell(z).energy; }};
+    pvd.variables += {"density",  [z](EuCell& cell) -> double { return cell[z].density; }};
+    pvd.variables += {"vel.x",    [z](EuCell& cell) -> double { return cell[z].velocity.x(); }};
+    pvd.variables += {"vel.y",    [z](EuCell& cell) -> double { return cell[z].velocity.y(); }};
+    pvd.variables += {"pressure", [z](EuCell& cell) -> double { return cell[z].pressure; }};
+    pvd.variables += {"energy",   [z](EuCell& cell) -> double { return cell[z].energy; }};
 
     double curr_time = 0.0;
     pvd.variables += {"exact.dens",
@@ -130,10 +130,19 @@ int main() {
         // Точное завершение в end_time
         solver.set_max_dt(test.max_time() - curr_time);
 
+        if (n_step >= 35) {
+            solver.update(mesh);
+            solver.set_flags(mesh);
+            mesh.refine();
+        } else {
+            solver.update(mesh);
+            solver.set_flags(mesh);
+            mesh.refine();
+        }
         // Обновляем слои
-        solver.update(mesh);
-        solver.set_flags(mesh);
-        mesh.refine();
+        // solver.update(mesh);
+        // solver.set_flags(mesh);
+        // mesh.refine();
 
         curr_time += solver.dt();
         n_step += 1;
