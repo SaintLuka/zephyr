@@ -50,8 +50,7 @@ int main() {
     // число ячеек можно задать
     Rectangle gen(test.xmin(), test.xmax(), test.ymin(), test.ymax());
     gen.set_boundaries(test.boundaries());
-    gen.set_nx(mpi::single() ? 23 : 500);
-    gen.set_ny(23);
+    gen.set_nx(mpi::single() ? 100 : 500);
 
     // Создать сетку
     EuMesh mesh(gen);

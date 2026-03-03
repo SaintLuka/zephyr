@@ -178,7 +178,6 @@ void SmFluid::fluxes(EuMesh &mesh) const {
 }
 
 void SmFluid::fluxes_weno(EuMesh &mesh) const {
-    int count = 0;
     for(auto cell: mesh) {
         // Примитивный вектор в ячейке
         PState z_c = cell[part.init];
@@ -293,18 +292,18 @@ void SmFluid::fluxes_weno(EuMesh &mesh) const {
             // WENO5 для u_{i+1/2}^{-} и u_{i-1/2}^{+}
             WENO5 stencil_i{neib_one_left_c.arr()[i], neib_left_c.arr()[i],
                                 q_c.arr()[i], neib_right_c.arr()[i], neib_one_right_c.arr()[i]};
-            q_iplus12_minus.arr()[i] += stencil_i.p();
-            q_iminus12_plus.arr()[i] += stencil_i.m();
+            q_iplus12_minus.arr()[i] = stencil_i.p();
+            q_iminus12_plus.arr()[i] = stencil_i.m();
 
             // WENO5 для u_{i-1/2}^{-}
             WENO5 stencil_i_minus1{neib_two_left_c.arr()[i], neib_one_left_c.arr()[i],
                                 neib_left_c.arr()[i], q_c.arr()[i], neib_right_c.arr()[i]};
-            q_iminus12_minus.arr()[i] += stencil_i_minus1.p();
+            q_iminus12_minus.arr()[i] = stencil_i_minus1.p();
 
             // WENO5 для u_{i+1/2}^{+}
             WENO5 stencil_i_plus1{neib_left_c.arr()[i], q_c.arr()[i],
                                 neib_right_c.arr()[i], neib_one_right_c.arr()[i], neib_two_right_c.arr()[i]};
-            q_iplus12_plus.arr()[i] += stencil_i_plus1.m();
+            q_iplus12_plus.arr()[i] = stencil_i_plus1.m();
         }
 
         // Преобразование консервативных векторов в примитивные
@@ -315,36 +314,15 @@ void SmFluid::fluxes_weno(EuMesh &mesh) const {
         PState z_iplus12_plus{q_iplus12_plus, *m_eos};
 
         // Численные потоки f_{i+1/2} и f_{i-1/2}
-        auto zL_plus = z_iplus12_minus.in_local(normal_right);
-        auto zL_minus = z_iminus12_minus.in_local(normal_left);
+        Flux f_iplus12 = m_nf->flux(z_iplus12_minus, z_iplus12_plus, *m_eos);
+        Flux f_iminus12 = m_nf->flux(z_iminus12_minus, z_iminus12_plus, *m_eos);
 
-        auto zR_plus = z_iplus12_plus.in_local(normal_right);
-        auto zR_minus = z_iminus12_plus.in_local(normal_left);
-
-        if (zL_plus.P() < 0 || zL_minus.P() < 0 ||
-            zL_plus.rho() < 0 || zL_minus.rho() < 0 ||
-            zR_plus.e() < 0 || zR_minus.e() < 0) {
-            std::cout << count << std::endl;
-        }
-
-        Flux f_iplus12, f_iminus12;
-        if (count == 207) {
-            f_iplus12 = m_nf->flux(zL_plus, zR_plus, *m_eos);
-            f_iminus12 = m_nf->flux(zL_minus, zR_minus, *m_eos);
-        } else {
-            f_iplus12 = m_nf->flux(zL_plus, zR_plus, *m_eos);
-            f_iminus12 = m_nf->flux(zL_minus, zR_minus, *m_eos);
-        }
-
-        // Flux f_iplus12 = m_nf->flux(zL_plus, zR_plus, *m_eos);
-        // Flux f_iminus12 = m_nf->flux(zL_minus, zR_minus, *m_eos);
-
-        f_iplus12.to_global(normal_right);
-        f_iminus12.to_global(normal_left);
+        /* Flux f_iplus12 = m_nf->flux(z_c.in_local(normal_right), neib_right.in_local(normal_right), *m_eos);
+        Flux f_iminus12 = m_nf->flux(neib_left.in_local(normal_right), z_c.in_local(normal_right), *m_eos); */
 
         // Суммируем потоки
         flux.arr() += f_iplus12.arr() * face_right.area(m_axial);
-        flux.arr() += f_iminus12.arr() * face_left.area(m_axial);
+        flux.arr() -= f_iminus12.arr() * face_left.area(m_axial);
 
         // Обновляем значение в ячейке (консервативные переменные)
         q_c.arr() -= (m_dt / cell.volume(m_axial)) * flux.arr();
@@ -356,8 +334,6 @@ void SmFluid::fluxes_weno(EuMesh &mesh) const {
 
         // Новое значение примитивных переменных
         cell[part.next] = PState(q_c, *m_eos);
-
-        count += 1;
     }
 }
 
