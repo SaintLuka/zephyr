@@ -178,6 +178,7 @@ void SmFluid::fluxes(EuMesh &mesh) const {
 }
 
 void SmFluid::fluxes_weno(EuMesh &mesh) const {
+    int count = 0;
     for(auto cell: mesh) {
         // Примитивный вектор в ячейке
         PState z_c = cell[part.init];
@@ -237,6 +238,7 @@ void SmFluid::fluxes_weno(EuMesh &mesh) const {
         // Примитивные вектора соседей справа (включая I_{i+2} и I_{i+3})
         PState neib_right;
         PState neib_one_right;
+        PState neib_two_right;
 
         // Расчет примитивных векторов справа от рассматриваемой ячейки
         if (!face_right.is_boundary()) {
@@ -250,12 +252,24 @@ void SmFluid::fluxes_weno(EuMesh &mesh) const {
             if (!face_one_right.is_boundary()) {
                 auto cell_one_right = face_one_right.neib();
                 neib_one_right = cell_one_right[part.init];
+
+                // Сосед через два справа от рассматриваемой ячейки (I_{i+3})
+                auto face_two_right = cell_one_right.face(mesh::Side2D::R);
+                auto normal_two_right = face_two_right.normal();
+                if (!face_two_right.is_boundary()) {
+                    auto cell_two_right = face_two_right.neib();
+                    neib_two_right = cell_two_right[part.init];
+                }else {
+                    neib_two_right = boundary_value(neib_one_right, normal_two_right, face_two_right.flag());
+                }
             } else {
                 neib_one_right = boundary_value(neib_right, normal_one_right, face_one_right.flag());
+                neib_two_right = boundary_value(neib_right, normal_one_right, face_one_right.flag());
             }
         } else {
             neib_right = boundary_value(z_c, normal_right, face_right.flag());
             neib_one_right = boundary_value(z_c, normal_right, face_right.flag());
+            neib_two_right = boundary_value(z_c, normal_right, face_right.flag());
         }
 
         // Преобразование примитивных векторов в консервативные
@@ -265,13 +279,14 @@ void SmFluid::fluxes_weno(EuMesh &mesh) const {
 
         QState neib_right_c(neib_right);
         QState neib_one_right_c(neib_one_right);
+        QState neib_two_right_c(neib_two_right);
 
         // Консервативные векторы u_{i+1/2}^{-} и u_{i+1/2}^{+}
-        QState q_iplus12_minus;
-        QState q_iminus12_plus;
+        QState q_iplus12_minus{};
+        QState q_iminus12_plus{};
 
-        QState q_iminus12_minus;
-        QState q_iplus12_plus;
+        QState q_iminus12_minus{};
+        QState q_iplus12_plus{};
 
         // Расчет u_{i+1/2} и u_{i-1/2}
         for (int i = 0; i < q_c.arr().size(); i++) {
@@ -281,11 +296,15 @@ void SmFluid::fluxes_weno(EuMesh &mesh) const {
             q_iplus12_minus.arr()[i] += stencil_i.p();
             q_iminus12_plus.arr()[i] += stencil_i.m();
 
-            // WENO5 для u_{i-1/2}^{-} и u_{i+1/2}^{+}
+            // WENO5 для u_{i-1/2}^{-}
             WENO5 stencil_i_minus1{neib_two_left_c.arr()[i], neib_one_left_c.arr()[i],
                                 neib_left_c.arr()[i], q_c.arr()[i], neib_right_c.arr()[i]};
             q_iminus12_minus.arr()[i] += stencil_i_minus1.p();
-            q_iplus12_plus.arr()[i] += stencil_i_minus1.m();
+
+            // WENO5 для u_{i+1/2}^{+}
+            WENO5 stencil_i_plus1{neib_left_c.arr()[i], q_c.arr()[i],
+                                neib_right_c.arr()[i], neib_one_right_c.arr()[i], neib_two_right_c.arr()[i]};
+            q_iplus12_plus.arr()[i] += stencil_i_plus1.m();
         }
 
         // Преобразование консервативных векторов в примитивные
@@ -296,8 +315,29 @@ void SmFluid::fluxes_weno(EuMesh &mesh) const {
         PState z_iplus12_plus{q_iplus12_plus, *m_eos};
 
         // Численные потоки f_{i+1/2} и f_{i-1/2}
-        Flux f_iplus12 = m_nf->flux(z_iplus12_minus.in_local(normal_right), z_iplus12_plus.in_local(normal_right), *m_eos);
-        Flux f_iminus12 = m_nf->flux(z_iminus12_minus.in_local(normal_left), z_iminus12_plus.in_local(normal_left), *m_eos);
+        auto zL_plus = z_iplus12_minus.in_local(normal_right);
+        auto zL_minus = z_iminus12_minus.in_local(normal_left);
+
+        auto zR_plus = z_iplus12_plus.in_local(normal_right);
+        auto zR_minus = z_iminus12_plus.in_local(normal_left);
+
+        if (zL_plus.P() < 0 || zL_minus.P() < 0 ||
+            zL_plus.rho() < 0 || zL_minus.rho() < 0 ||
+            zR_plus.e() < 0 || zR_minus.e() < 0) {
+            std::cout << count << std::endl;
+        }
+
+        Flux f_iplus12, f_iminus12;
+        if (count == 207) {
+            f_iplus12 = m_nf->flux(zL_plus, zR_plus, *m_eos);
+            f_iminus12 = m_nf->flux(zL_minus, zR_minus, *m_eos);
+        } else {
+            f_iplus12 = m_nf->flux(zL_plus, zR_plus, *m_eos);
+            f_iminus12 = m_nf->flux(zL_minus, zR_minus, *m_eos);
+        }
+
+        // Flux f_iplus12 = m_nf->flux(zL_plus, zR_plus, *m_eos);
+        // Flux f_iminus12 = m_nf->flux(zL_minus, zR_minus, *m_eos);
 
         f_iplus12.to_global(normal_right);
         f_iminus12.to_global(normal_left);
@@ -316,6 +356,8 @@ void SmFluid::fluxes_weno(EuMesh &mesh) const {
 
         // Новое значение примитивных переменных
         cell[part.next] = PState(q_c, *m_eos);
+
+        count += 1;
     }
 }
 
