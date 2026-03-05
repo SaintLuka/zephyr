@@ -57,7 +57,7 @@ int main() {
 
     // Создать и настроить решатель
     SmFluid solver(eos);
-    solver.set_accuracy(2);
+    solver.set_accuracy(5);
     solver.set_CFL(0.5);
     solver.set_limiter("MC");
     solver.set_method(Fluxes::HLLC);
