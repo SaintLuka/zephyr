@@ -68,7 +68,7 @@ int main() {
 
     // Настройка сетки
     //mesh.set_decomposition("XY")
-    mesh.set_max_level(mpi::single() ? 3 : 0);
+    mesh.set_max_level(0);
     mesh.set_distributor(solver.distributor());
 
     // Использовать подсеточную реконструкцию начальных данных?
@@ -130,19 +130,10 @@ int main() {
         // Точное завершение в end_time
         solver.set_max_dt(test.max_time() - curr_time);
 
-        if (n_step >= 35) {
-            solver.update(mesh);
-            solver.set_flags(mesh);
-            mesh.refine();
-        } else {
-            solver.update(mesh);
-            solver.set_flags(mesh);
-            mesh.refine();
-        }
         // Обновляем слои
-        // solver.update(mesh);
-        // solver.set_flags(mesh);
-        // mesh.refine();
+        solver.update(mesh);
+        solver.set_flags(mesh);
+        mesh.refine();
 
         curr_time += solver.dt();
         n_step += 1;

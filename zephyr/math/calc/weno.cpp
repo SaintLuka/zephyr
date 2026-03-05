@@ -56,21 +56,21 @@ template<>
 double WENO<-2, 0>::beta() const {
     double d1 = m_data[0] - 4.0 * m_data[1] + 3.0 * m_data[2];
     double d2 = m_data[0] - 2.0 * m_data[1] + m_data[2];
-    return 13.0 / 12.0 * d2 * d2 + 1.0 / 4.0 * d1 * d1;
+    return +13.0 / 12.0 * d2 * d2 + 1.0 / 4.0 * d1 * d1;
 }
 
 template<>
 double WENO<-1, 1>::beta() const {
     double d1 = m_data[0] - m_data[2];
     double d2 = m_data[0] - 2.0 * m_data[1] + m_data[2];
-    return 13.0 / 12.0 * d2 * d2 + 1.0 / 4.0 * d1 * d1;
+    return +13.0 / 12.0 * d2 * d2 + 1.0 / 4.0 * d1 * d1;
 }
 
 template<>
 double WENO<0, 2>::beta() const {
     double d1 = 3.0 * m_data[0] - 4.0 * m_data[1] + m_data[2];
     double d2 = m_data[0] - 2.0 * m_data[1] + m_data[2];
-    return 13.0 / 12.0 * d2 * d2 + 1.0 / 4.0 * d1 * d1;
+    return +13.0 / 12.0 * d2 * d2 + 1.0 / 4.0 * d1 * d1;
 }
 
 inline double sqr(double x) { return x * x; }
@@ -83,9 +83,9 @@ WENO5::WENO5(double u1, double u2, double u3, double u4, double u5)
 { }
 
 double WENO5::p() const {
-    const double d0_c = 3.0 / 10.0;
-    const double d1_c = 6.0 / 10.0;
-    const double d2_c = 1.0 / 10.0;
+    const double d0_c = +3.0 / 10.0;
+    const double d1_c = +3.0 / 5.0;
+    const double d2_c = +1.0 / 10.0;
 
     double b0 = we0.beta();
     double b1 = we1.beta();
@@ -104,9 +104,9 @@ double WENO5::p() const {
 }
 
 double WENO5::m() const {
-    const double d0_c = 1.0 / 10.0;
-    const double d2_c = 3.0 / 10.0;
-    const double d1_c = 6.0 / 10.0;
+    const double d0_c = +1.0 / 10.0;
+    const double d2_c = +3.0 / 10.0;
+    const double d1_c = +3.0 / 5.0;
 
     double b0 = we0.beta();
     double b1 = we1.beta();
