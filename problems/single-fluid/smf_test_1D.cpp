@@ -27,7 +27,7 @@ using zephyr::math::SmFluid;
 using zephyr::utils::threads;
 using zephyr::utils::mpi;
 
-#define ADAPTIVE
+//#define ADAPTIVE
 
 int main(int argc, char** argv) {
     mpi::handler init;
@@ -35,9 +35,9 @@ int main(int argc, char** argv) {
     threads::info();
 
     // Тестовая задача
-    //SodTest test;
+    SodTest test;
     //ToroTest test(1);
-    ShuOsherTest test;
+    //ShuOsherTest test;
     //ShockWave test(3.0, 0.1, 1.0);
 
     // Уравнение состояния
@@ -63,17 +63,17 @@ int main(int argc, char** argv) {
 
     // Создать решатель
     SmFluid solver(eos);
-    solver.set_CFL(0.5);
-    solver.set_accuracy(2);
+    solver.set_CFL(0.1);
+    solver.set_accuracy(5);
     solver.set_limiter("MC");
-    solver.set_method(Fluxes::HLLC_M);
+    solver.set_method(Fluxes::HLL);
 
     // Добавляем типы на сетку, выбираем основной слой
     auto data = solver.add_types(mesh);
     auto z = data.init;
 
     // Файл для записи
-    PvdFile pvd("test1D", "D:\\main_project");
+    PvdFile pvd("test1D", "output");
 
     double curr_time = 0.0;
 

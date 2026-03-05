@@ -9,6 +9,7 @@ namespace zephyr::math {
 
 using namespace geom;
 using namespace smf;
+using namespace mesh;
 
 using utils::threads;
 using utils::mpi;
@@ -185,126 +186,67 @@ void SmFluid::fluxes_weno(EuMesh &mesh) const {
         // Консервативный вектор в ячейке
         QState q_c(z_c);
 
-        // Переменная для потока
-        Flux flux;
-
-        // Cосед слева от рассматриваемой ячейки (I_{i-1})
-        auto face_left = cell.face(mesh::Side2D::L);
-        auto normal_left = face_left.normal();
-
         // Примитивные вектора соседей слева (включая I_{i-2} и I_{i-3})
-        PState neib_left;
-        PState neib_one_left;
-        PState neib_two_left;
-
-        // Расчет примитивных векторов слева от рассматриваемой ячейки
-        if (!face_left.is_boundary()) {
-            auto cell_left = face_left.neib();
-            neib_left = cell_left[part.init];
-
-            // Сосед через одного слева от рассматриваемой ячейки (I_{i-2})
-            auto face_one_left = cell_left.face(mesh::Side2D::L);
-            auto normal_one_left = face_one_left.normal();
-
-            if (!face_one_left.is_boundary()) {
-                auto cell_one_left = face_one_left.neib();
-                neib_one_left = cell_one_left[part.init];
-
-                // Сосед через два слева от рассматриваемой ячейки (I_{i-3})
-                auto face_two_left = cell_one_left.face(mesh::Side2D::L);
-                auto normal_two_left = face_two_left.normal();
-
-                if (!face_two_left.is_boundary()) {
-                    auto cell_two_left = face_two_left.neib();
-                    neib_two_left = cell_two_left[part.init];
-                } else {
-                    neib_two_left = boundary_value(neib_one_left, normal_two_left, face_two_left.flag());
-                }
-            } else {
-                neib_one_left = boundary_value(neib_left, normal_one_left, face_one_left.flag());
-                neib_two_left = boundary_value(neib_left, normal_one_left, face_one_left.flag());
-            }
-        } else {
-            neib_left = boundary_value(z_c, normal_left, face_left.flag());
-            neib_one_left = boundary_value(z_c, normal_left, face_left.flag());
-            neib_two_left = boundary_value(z_c, normal_left, face_left.flag());
-        }
-
-        // Cосед справа от рассматриваемой ячейки (I_{i+1})
-        auto face_right = cell.face(mesh::Side2D::R);
-        auto normal_right = face_right.normal();
+        PState z_l1 = cell.neib(-1, 0)[part.init];
+        PState z_l2 = cell.neib(-2, 0)[part.init];
+        PState z_l3 = cell.neib(-3, 0)[part.init];
 
         // Примитивные вектора соседей справа (включая I_{i+2} и I_{i+3})
-        PState neib_right;
-        PState neib_one_right;
-
-        // Расчет примитивных векторов справа от рассматриваемой ячейки
-        if (!face_right.is_boundary()) {
-            auto cell_right = face_right.neib();
-            neib_right = cell_right[part.init];
-
-            // Сосед через одного справа от рассматриваемой ячейки (I_{i+2})
-            auto face_one_right = cell_right.face(mesh::Side2D::R);
-            auto normal_one_right = face_one_right.normal();
-
-            if (!face_one_right.is_boundary()) {
-                auto cell_one_right = face_one_right.neib();
-                neib_one_right = cell_one_right[part.init];
-            } else {
-                neib_one_right = boundary_value(neib_right, normal_one_right, face_one_right.flag());
-            }
-        } else {
-            neib_right = boundary_value(z_c, normal_right, face_right.flag());
-            neib_one_right = boundary_value(z_c, normal_right, face_right.flag());
-        }
+        PState z_r1 = cell.neib(+1, 0)[part.init];
+        PState z_r2 = cell.neib(+2, 0)[part.init];
+        PState z_r3 = cell.neib(+3, 0)[part.init];
 
         // Преобразование примитивных векторов в консервативные
-        QState neib_left_c(neib_left);
-        QState neib_one_left_c(neib_one_left);
-        QState neib_two_left_c(neib_two_left);
+        QState q_l1(z_l1);
+        QState q_l2(z_l2);
+        QState q_l3(z_l3);
 
-        QState neib_right_c(neib_right);
-        QState neib_one_right_c(neib_one_right);
+        QState q_r1(z_r1);
+        QState q_r2(z_r2);
+        QState q_r3(z_r3);
 
         // Консервативные векторы u_{i+1/2}^{-} и u_{i+1/2}^{+}
-        QState q_iplus12_minus;
-        QState q_iminus12_plus;
+        QState q_r_minus;
+        QState q_l_plus;
 
-        QState q_iminus12_minus;
-        QState q_iplus12_plus;
+        QState q_l_minus;
+        QState q_r_plus;
 
         // Расчет u_{i+1/2} и u_{i-1/2}
         for (int i = 0; i < q_c.arr().size(); i++) {
             // WENO5 для u_{i+1/2}^{-} и u_{i-1/2}^{+}
-            WENO5 stencil_i{neib_one_left_c.arr()[i], neib_left_c.arr()[i],
-                                q_c.arr()[i], neib_right_c.arr()[i], neib_one_right_c.arr()[i]};
-            q_iplus12_minus.arr()[i] += stencil_i.p();
-            q_iminus12_plus.arr()[i] += stencil_i.m();
+            WENO5 stencil_i{q_l2.arr()[i], q_l1.arr()[i], q_c.arr()[i], q_r1.arr()[i], q_r2.arr()[i]};
+            q_r_minus.arr()[i] += stencil_i.p();
+            q_l_plus.arr()[i] += stencil_i.m();
 
-            // WENO5 для u_{i-1/2}^{-} и u_{i+1/2}^{+}
-            WENO5 stencil_i_minus1{neib_two_left_c.arr()[i], neib_one_left_c.arr()[i],
-                                neib_left_c.arr()[i], q_c.arr()[i], neib_right_c.arr()[i]};
-            q_iminus12_minus.arr()[i] += stencil_i_minus1.p();
-            q_iplus12_plus.arr()[i] += stencil_i_minus1.m();
+            // WENO5 для u_{i-1/2}^{+}
+            WENO5 stencil_il{q_l3.arr()[i], q_l2.arr()[i], q_l1.arr()[i], q_c.arr()[i], q_r1.arr()[i]};
+            q_l_minus.arr()[i] += stencil_il.p();
+
+            // WENO5 для u_{i+1/2}^{-}
+            WENO5 stencil_ir{q_l1.arr()[i], q_c.arr()[i], q_r1.arr()[i], q_r2.arr()[i], q_r3.arr()[i]};
+            q_r_plus.arr()[i] += stencil_ir.m();
         }
 
         // Преобразование консервативных векторов в примитивные
-        PState z_iplus12_minus{q_iplus12_minus, *m_eos};
-        PState z_iminus12_plus{q_iminus12_plus, *m_eos};
+        PState z_r_minus{q_r_minus, *m_eos};
+        PState z_l_plus {q_l_plus,  *m_eos};
 
-        PState z_iminus12_minus{q_iminus12_minus, *m_eos};
-        PState z_iplus12_plus{q_iplus12_plus, *m_eos};
-
-        // Численные потоки f_{i+1/2} и f_{i-1/2}
-        Flux f_iplus12 = m_nf->flux(z_iplus12_minus.in_local(normal_right), z_iplus12_plus.in_local(normal_right), *m_eos);
-        Flux f_iminus12 = m_nf->flux(z_iminus12_minus.in_local(normal_left), z_iminus12_plus.in_local(normal_left), *m_eos);
-
-        f_iplus12.to_global(normal_right);
-        f_iminus12.to_global(normal_left);
+        PState z_l_minus{q_l_minus, *m_eos};
+        PState z_r_plus {q_r_plus,  *m_eos};
 
         // Суммируем потоки
-        flux.arr() += f_iplus12.arr() * face_right.area(m_axial);
-        flux.arr() += f_iminus12.arr() * face_left.area(m_axial);
+        // Численные потоки f_{i-1/2} и f_{i+1/2}
+        Flux flux_L = m_nf->flux(z_l_minus, z_l_plus, *m_eos);
+        Flux flux_R = m_nf->flux(z_r_minus, z_r_plus, *m_eos);
+
+        auto face_L = cell.face(Side2D::L);
+        auto face_R = cell.face(Side2D::R);
+
+        // Переменная для потока
+        Flux flux = Flux::Zero();
+        flux.arr() += flux_R.arr() * face_R.area(m_axial);
+        flux.arr() -= flux_L.arr() * face_L.area(m_axial);
 
         // Обновляем значение в ячейке (консервативные переменные)
         q_c.arr() -= (m_dt / cell.volume(m_axial)) * flux.arr();
