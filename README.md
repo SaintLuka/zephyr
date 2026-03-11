@@ -1,15 +1,15 @@
-# 🚀 ZEPHYR
+# Zephyr
 
-> Современный высокопроизводительный CFD-фреймворк с локально-адаптивными сетками
+>Современный высокопроизводительный CFD-фреймворк с локально-адаптивными сетками
 
-[![CMake](https://img.shields.io/badge/build-CMake-brightgreen.svg)]
-[![C++20](https://img.shields.io/badge/C++-20/23-blue.svg)]
-[![MPI](https://img.shields.io/badge/MPI-enabled-important)]
-[![TBB](https://img.shields.io/badge/TBB-parallel-important)]
+![CMake](https://img.shields.io/badge/build-CMake-brightgreen.svg)
+![C++20](https://img.shields.io/badge/C++-20/23-blue.svg)
+![MPI](https://img.shields.io/badge/MPI-enabled-important)
+![TBB](https://img.shields.io/badge/TBB-parallel-important)
 
 [![GitHub Pages](https://img.shields.io)](https://saintluka.github.io/zephyr/)
 
-Полная документация доступна по ссылке: [https://saintluka.github.io/zephyr/](https://saintluka.github.io/zephyr/)
+Документация доступна по ссылке: [https://saintluka.github.io/zephyr/](https://saintluka.github.io/zephyr/)
 
 # Ключевые особенности
 
