@@ -20,3 +20,26 @@ diplom
 
 doc/code/zephyr-code.pdf
 doc/scientific/scientific.pdf
+
+# ================================
+# Docusaurus
+# ================================
+docs/docusaurus/.docusaurus/
+docs/docusaurus/build/
+docs/docusaurus/node_modules/
+docs/docusaurus/.env
+docs/docusaurus/.env.*.local
+docs/docusaurus/.cache/
+docs/docusaurus/.parcel-cache/
+docs/docusaurus/*.tgz
+docs/docusaurus/*.tar.gz
+
+# ================================
+# Node.js
+# ================================
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.lock-wscript
+.npmrc
+.pnpm-debug.log*
