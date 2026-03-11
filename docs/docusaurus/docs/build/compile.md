@@ -60,9 +60,7 @@ Zephyr/
 
 ## Windows (MSVC)
 
-<details style={{
-  border: "none", boxShadow: "none",
-  background: "none", padding: "0"}}>
+<details style={{border: "none", boxShadow: "none", background: "none", padding: "0"}}>
 <summary>Инструкция</summary>
 
 ### Требования к окружению
@@ -157,10 +155,10 @@ cmake --build . --target wave --config Release
 
 Если не указать Release, то сборка по умолчанию в Debug.
 
-***Запуск в коносли***
+***Запуск в терминале***
 
 Библиотека libzephyr.dll является динамической, поэтому при запуске исполняемый файл должен "знать", где она находится.
-Библиотеку можно скопировать и положить рядом с исполняемым файлом, также можно создать символическую ссылку на библиотеку рядом с исполняемым файлом. А можно добавить путь к библиотке в переменную окружения `PATH`. Выберем последний вариант и запустим задачу `wave`:
+Библиотеку можно скопировать и положить рядом с исполняемым файлом, также можно создать символическую ссылку на библиотеку рядом с исполняемым файлом. А можно добавить путь к библиотеке в переменную окружения `PATH`. Выберем последний вариант и запустим задачу `wave`:
 
 ```bash
 set PATH=C:\...path...\build\bin\Release;%PATH%
@@ -172,9 +170,7 @@ wave
 [ParaView](/docs/additional/paraview).
 
 
-<details style={{
-  border: "none", boxShadow: "none",
-  background: "none", padding: "0"}}>
+<details style={{border: "none", boxShadow: "none", background: "none", padding: "0"}}>
 <summary>
 **Нерешенные проблемы**
 </summary>
@@ -245,11 +241,8 @@ vcpkg install msmpi
 
 ## Windows (UCRT)
 
-<details style={{
-  border: "none", boxShadow: "none",
-  background: "none", padding: "0"}}>
+<details style={{border: "none", boxShadow: "none",background: "none", padding: "0"}}>
 <summary>Инструкция</summary>
-
 
 ### MSYS2
 
@@ -331,10 +324,10 @@ cmake --build . --target wave --config Release
 
 Если не указать Release, то сборка по умолчанию в Debug.
 
-***Запуск в коносли***
+***Запуск в терминале***
 
 Библиотека libzephyr.dll является динамической, поэтому при запуске исполняемый файл должен "знать", где она находится.
-Добавим путь к библиотке в переменную окружения `PATH`:
+Добавим путь к библиотеке в переменную окружения `PATH`:
 ```bash
 export PATH="/C/Users/.../Zephyr/build:$PATH"
 ```
@@ -363,9 +356,7 @@ cd problmes
 Важно поставить ';' в конце! Данным способом переменная устанавливается навсегда, после этого исполняемые файлы будут всегда запускаться. Минус такого подхода в том, что путь будет всегда указывать на библиотеку в Release сборке, поэтому для Debug тестов придется либо менять переменную, либо делать Debug сборку в той же директории.
 </details>
 
-<details style={{
-  border: "none", boxShadow: "none",
-  background: "none", padding: "0"}}>
+<details style={{border: "none", boxShadow: "none", background: "none", padding: "0"}}>
 <summary>
 **Нерешенные вопросы**
 </summary>
@@ -384,10 +375,84 @@ cd problmes
   background: "none", padding: "0"}}>
 <summary>Инструкция</summary>
 
+### Требования к окружению
+
+Для сборки проекта необходим компилятор **GCC** версии **11.0** или выше с поддержкой стандарта C++20.
+В современных дистрибутивах (например, Ubuntu 22.04 LTS и свежее) необходимые инструменты доступны в репозиториях по умолчанию и устанавливаются через стандартный менеджер пакетов apt.
+
 ### Установка зависимостей
 
+Установка необходимых пакетов:
+```bash
+sudo apt update
+sudo apt install libeigen3-dev libboost-all-dev
+```
+
+Установка необязательных пакетов (см. [зависимости](/docs/build/dependencies#используемые-библиотеки)):
+```bash
+sudo apt install libtbb-dev libopenmpi-dev pybind11-dev
+sudo apt install python3-numpy python3-matplotlib
+```
+
 ### Сборка и запуск
+
+***Конфигурация CMake***
+
+Переходим в директорию сборки, выполняем конфигурацию CMake:
+```bash
+mkdir build && cd build
+cmake ../zephyr-src -DCMAKE_BUILD_TYPE=Release
+```
+
+Дополнительные опции CMake (build type, install prefix и другие) можно передать при первом вызове, а можно запустить конфигурацию CMake несколько раз, добавляя или изменяя опции.
+
+К примеру, включим сборку всех задач и используем библиотеку TBB:
+```bash
+cmake ../zephyr-src -DTHREADS_TYPE=TBB
+cmake ../zephyr-src -DZEPHYR_PROBLEMS_ALL=ON
+```
+
+<details>
+<summary>Конфигурация с помощью cmake-curses-gui</summary>
+
+**cmake-curses-gui** это консольная версия CMake с псевдографическим интерфейсом для интерактивной настройки проекта в консоли. Установка:
+```bash
+sudo apt install cmake-curses-gui
+```
+
+Теперь вместо команды cmake вводим:
+```bash
+ccmake ../zephyr-src
+```
+
+Теперь в терминале можно выбрать опции, тип сборки, указать путь для установки.
+После завершения настройки нажать 'c' (configure), затем 'g' (generate).
+Использование cmake-curses-gui очень удобно, особенно при сборке на кластере.
 
 </details>
 
 
+***Сборка проекта***
+
+Сборка всего проекта (*ключ -j указывает число потоков*):
+
+```bash
+make -j 4
+```
+
+Сборка конкретной цели:
+```bash
+cmake -j 4 wave
+```
+
+***Запуск в терминале***
+
+Перейдем в папку с задачами и запустим `wave`:
+```bash
+cd problmes
+./wave
+```
+
+Результаты выполнения появятся рядом с программой в папке output. Для визуализации следует использовать [ParaView](/docs/additional/paraview).
+
+</details>
