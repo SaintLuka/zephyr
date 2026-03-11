@@ -1,7 +1,0 @@
-add_subdirectory(amr)
-add_subdirectory(geom)
-add_subdirectory(math)
-add_subdirectory(matter)
-add_subdirectory(mesh)
-add_subdirectory(phys)
-add_subdirectory(utils)
