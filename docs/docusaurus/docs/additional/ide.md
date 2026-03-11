@@ -1,5 +1,5 @@
 ---
-sidebar_position: 5
+sidebar_position: 2
 description: "Работа в IDE: Visual Studio, CLion, QtCreator, VsCode"
 ---
 
