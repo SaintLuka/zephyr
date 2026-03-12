@@ -36,9 +36,9 @@ int main(int argc, char** argv) {
     // threads::info();
 
     // Тестовая задача
-    SodTest test;
+    // SodTest test;
     //ToroTest test(1);
-    //ShuOsherTest test;
+    ShuOsherTest test;
     //ShockWave test(3.0, 0.1, 1.0);
 
     // Уравнение состояния
@@ -64,7 +64,7 @@ int main(int argc, char** argv) {
 
     // Создать решатель
     SmFluid solver(eos);
-    solver.set_CFL(0.2);
+    solver.set_CFL(0.5);
     solver.set_accuracy(3);
     solver.set_limiter("MC");
     solver.set_method(Fluxes::HLLC);
