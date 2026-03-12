@@ -29,7 +29,8 @@ SmFluid::Parts SmFluid::add_types(EuMesh& mesh) {
     part.d_dx = mesh.add<PState>("d_dx");
     part.d_dy = mesh.add<PState>("d_dy");
     part.d_dz = mesh.add<PState>("d_dz");
-    part.half = mesh.add<PState>("half");
+    part.step1 = mesh.add<PState>("step1");
+    part.step2 = mesh.add<PState>("step2");
     part.next = mesh.add<PState>("next");
     return part;
 }
@@ -91,15 +92,28 @@ void SmFluid::update(EuMesh &mesh) {
         mesh.sync(part.init);
         fluxes_weno(mesh);
     }
-    else {
+    else if (m_acc == 2){
         mesh.sync(part.init);
         compute_grad(mesh);
 
         mesh.sync(part.d_dx, part.d_dy, part.d_dz);
         fluxes_stage1(mesh);
 
-        mesh.sync(part.half);
+        mesh.sync(part.step1);
         fluxes_stage2(mesh);
+    }
+    else {
+        mesh.sync(part.init);
+        compute_grad(mesh);
+
+        mesh.sync(part.d_dx, part.d_dy, part.d_dz);
+        fluxes_weno_stage1(mesh);
+
+        mesh.sync(part.step1);
+        fluxes_weno_stage2(mesh);
+
+        mesh.sync(part.step2);
+        fluxes_weno_stage3(mesh);
     }
 
     // Обновляем слои
@@ -178,6 +192,103 @@ void SmFluid::fluxes(EuMesh &mesh) const {
     });
 }
 
+// void SmFluid::fluxes_weno(EuMesh &mesh) const {
+//     for(auto cell: mesh) {
+//         // Примитивный вектор в ячейке
+//         PState z_c = cell[part.init];
+//
+//         // Консервативный вектор в ячейке
+//         QState q_c(z_c);
+//
+//         // Примитивные вектора соседей слева (включая I_{i-2} и I_{i-3})
+//         PState z_l1 = cell.neib(-1, 0)[part.init];
+//         PState z_l2 = cell.neib(-2, 0)[part.init];
+//         PState z_l3 = cell.neib(-3, 0)[part.init];
+//
+//         // Примитивные вектора соседей справа (включая I_{i+2} и I_{i+3})
+//         PState z_r1 = cell.neib(+1, 0)[part.init];
+//         PState z_r2 = cell.neib(+2, 0)[part.init];
+//         PState z_r3 = cell.neib(+3, 0)[part.init];
+//
+//         // Преобразование примитивных векторов в консервативные
+//         // QState q_l1(z_l1);
+//         // QState q_l2(z_l2);
+//         // QState q_l3(z_l3);
+//         //
+//         // QState q_r1(z_r1);
+//         // QState q_r2(z_r2);
+//         // QState q_r3(z_r3);
+//
+//         // Консервативные векторы u_{i+1/2}^{-} и u_{i+1/2}^{+}
+//         // QState q_r_minus;
+//         // QState q_l_plus;
+//         //
+//         // QState q_l_minus;
+//         // QState q_r_plus;
+//
+//         // Примитивные векторы u_{i+1/2}^{-} и u_{i+1/2}^{+}
+//         PState z_r_minus;
+//         PState z_l_plus;
+//
+//         PState z_l_minus;
+//         PState z_r_plus;
+//
+//         // Расчет u_{i+1/2} и u_{i-1/2}
+//         for (int i = 0; i < z_c.arr().size(); i++) {
+//             // WENO5 для u_{i+1/2}^{-} и u_{i-1/2}^{+}
+//             WENO5 stencil_i{z_l2.arr()[i], z_l1.arr()[i], z_c.arr()[i], z_r1.arr()[i], z_r2.arr()[i]};
+//             z_r_minus.arr()[i] += stencil_i.p();
+//             z_l_plus.arr()[i] += stencil_i.m();
+//
+//             // WENO5 для u_{i-1/2}^{+}
+//             WENO5 stencil_il{z_l3.arr()[i], z_l2.arr()[i], z_l1.arr()[i], z_c.arr()[i], z_r1.arr()[i]};
+//             z_l_minus.arr()[i] += stencil_il.p();
+//
+//             // WENO5 для u_{i+1/2}^{-}
+//             WENO5 stencil_ir{z_l1.arr()[i], z_c.arr()[i], z_r1.arr()[i], z_r2.arr()[i], z_r3.arr()[i]};
+//             z_r_plus.arr()[i] += stencil_ir.m();
+//
+//             if (i == z_c.arr().size() - 1) {
+//                 z_r_minus.arr()[i] = m_eos->energy_rP(z_r_minus.rho(), z_r_minus.P());
+//                 z_l_plus.arr()[i] = m_eos->energy_rP(z_l_plus.rho(), z_l_plus.P());
+//                 z_l_minus.arr()[i] = m_eos->energy_rP(z_l_minus.rho(), z_l_minus.P());
+//                 z_r_plus.arr()[i] = m_eos->energy_rP(z_r_plus.rho(), z_r_plus.P());
+//             }
+//         }
+//
+//         // Преобразование консервативных векторов в примитивные
+//         // PState z_r_minus{q_r_minus, *m_eos};
+//         // PState z_l_plus {q_l_plus,  *m_eos};
+//         //
+//         // PState z_l_minus{q_l_minus, *m_eos};
+//         // PState z_r_plus {q_r_plus,  *m_eos};
+//
+//         // Суммируем потоки
+//         // Численные потоки f_{i-1/2} и f_{i+1/2}
+//         Flux flux_L = m_nf->flux(z_l_minus, z_l_plus, *m_eos);
+//         Flux flux_R = m_nf->flux(z_r_minus, z_r_plus, *m_eos);
+//
+//         auto face_L = cell.face(Side2D::L);
+//         auto face_R = cell.face(Side2D::R);
+//
+//         // Переменная для потока
+//         Flux flux = Flux::Zero();
+//         flux.arr() += flux_R.arr() * face_R.area(m_axial);
+//         flux.arr() -= flux_L.arr() * face_L.area(m_axial);
+//
+//         // Обновляем значение в ячейке (консервативные переменные)
+//         q_c.arr() -= (m_dt / cell.volume(m_axial)) * flux.arr();
+//
+//         if (m_axial) {
+//             double coeff = cell.volume() / cell.volume(m_axial);
+//             q_c.momentum.y() += coeff * z_c.pressure * m_dt;
+//         }
+//
+//         // Новое значение примитивных переменных
+//         cell[part.next] = PState(q_c, *m_eos);
+//     }
+// }
+
 void SmFluid::fluxes_weno(EuMesh &mesh) const {
     for(auto cell: mesh) {
         // Примитивный вектор в ячейке
@@ -186,67 +297,8 @@ void SmFluid::fluxes_weno(EuMesh &mesh) const {
         // Консервативный вектор в ячейке
         QState q_c(z_c);
 
-        // Примитивные вектора соседей слева (включая I_{i-2} и I_{i-3})
-        PState z_l1 = cell.neib(-1, 0)[part.init];
-        PState z_l2 = cell.neib(-2, 0)[part.init];
-        PState z_l3 = cell.neib(-3, 0)[part.init];
-
-        // Примитивные вектора соседей справа (включая I_{i+2} и I_{i+3})
-        PState z_r1 = cell.neib(+1, 0)[part.init];
-        PState z_r2 = cell.neib(+2, 0)[part.init];
-        PState z_r3 = cell.neib(+3, 0)[part.init];
-
-        // Преобразование примитивных векторов в консервативные
-        QState q_l1(z_l1);
-        QState q_l2(z_l2);
-        QState q_l3(z_l3);
-
-        QState q_r1(z_r1);
-        QState q_r2(z_r2);
-        QState q_r3(z_r3);
-
-        // Консервативные векторы u_{i+1/2}^{-} и u_{i+1/2}^{+}
-        QState q_r_minus;
-        QState q_l_plus;
-
-        QState q_l_minus;
-        QState q_r_plus;
-
-        // Расчет u_{i+1/2} и u_{i-1/2}
-        for (int i = 0; i < q_c.arr().size(); i++) {
-            // WENO5 для u_{i+1/2}^{-} и u_{i-1/2}^{+}
-            WENO5 stencil_i{q_l2.arr()[i], q_l1.arr()[i], q_c.arr()[i], q_r1.arr()[i], q_r2.arr()[i]};
-            q_r_minus.arr()[i] += stencil_i.p();
-            q_l_plus.arr()[i] += stencil_i.m();
-
-            // WENO5 для u_{i-1/2}^{+}
-            WENO5 stencil_il{q_l3.arr()[i], q_l2.arr()[i], q_l1.arr()[i], q_c.arr()[i], q_r1.arr()[i]};
-            q_l_minus.arr()[i] += stencil_il.p();
-
-            // WENO5 для u_{i+1/2}^{-}
-            WENO5 stencil_ir{q_l1.arr()[i], q_c.arr()[i], q_r1.arr()[i], q_r2.arr()[i], q_r3.arr()[i]};
-            q_r_plus.arr()[i] += stencil_ir.m();
-        }
-
-        // Преобразование консервативных векторов в примитивные
-        PState z_r_minus{q_r_minus, *m_eos};
-        PState z_l_plus {q_l_plus,  *m_eos};
-
-        PState z_l_minus{q_l_minus, *m_eos};
-        PState z_r_plus {q_r_plus,  *m_eos};
-
-        // Суммируем потоки
-        // Численные потоки f_{i-1/2} и f_{i+1/2}
-        Flux flux_L = m_nf->flux(z_l_minus, z_l_plus, *m_eos);
-        Flux flux_R = m_nf->flux(z_r_minus, z_r_plus, *m_eos);
-
-        auto face_L = cell.face(Side2D::L);
-        auto face_R = cell.face(Side2D::R);
-
         // Переменная для потока
-        Flux flux = Flux::Zero();
-        flux.arr() += flux_R.arr() * face_R.area(m_axial);
-        flux.arr() -= flux_L.arr() * face_L.area(m_axial);
+        Flux flux = flux_weno(cell, part.init);
 
         // Обновляем значение в ячейке (консервативные переменные)
         q_c.arr() -= (m_dt / cell.volume(m_axial)) * flux.arr();
@@ -258,6 +310,161 @@ void SmFluid::fluxes_weno(EuMesh &mesh) const {
 
         // Новое значение примитивных переменных
         cell[part.next] = PState(q_c, *m_eos);
+    }
+}
+
+Flux SmFluid::flux_weno(EuCell cell, Storable<PState> z) const {
+    // Примитивный вектор в ячейке
+    PState z_c = cell[z];
+
+    // Примитивные вектора соседей слева (включая I_{i-2} и I_{i-3})
+    PState z_l1 = cell.neib(-1, 0)[z];
+    PState z_l2 = cell.neib(-2, 0)[z];
+    PState z_l3 = cell.neib(-3, 0)[z];
+
+    // Примитивные вектора соседей справа (включая I_{i+2} и I_{i+3})
+    PState z_r1 = cell.neib(+1, 0)[z];
+    PState z_r2 = cell.neib(+2, 0)[z];
+    PState z_r3 = cell.neib(+3, 0)[z];
+
+    PState z_r_minus;
+    PState z_l_plus;
+
+    PState z_l_minus;
+    PState z_r_plus;
+
+    // Расчет u_{i+1/2} и u_{i-1/2}
+    for (int i = 0; i < z_c.arr().size(); i++) {
+        // WENO5 для u_{i+1/2}^{-} и u_{i-1/2}^{+}
+        WENO5 stencil_i{z_l2.arr()[i], z_l1.arr()[i], z_c.arr()[i], z_r1.arr()[i], z_r2.arr()[i]};
+        z_r_minus.arr()[i] += stencil_i.p();
+        z_l_plus.arr()[i] += stencil_i.m();
+
+        // WENO5 для u_{i-1/2}^{+}
+        WENO5 stencil_il{z_l3.arr()[i], z_l2.arr()[i], z_l1.arr()[i], z_c.arr()[i], z_r1.arr()[i]};
+        z_l_minus.arr()[i] += stencil_il.p();
+
+        // WENO5 для u_{i+1/2}^{-}
+        WENO5 stencil_ir{z_l1.arr()[i], z_c.arr()[i], z_r1.arr()[i], z_r2.arr()[i], z_r3.arr()[i]};
+        z_r_plus.arr()[i] += stencil_ir.m();
+
+        if (i == z_c.arr().size() - 1) {
+            z_r_minus.arr()[i] = m_eos->energy_rP(z_r_minus.rho(), z_r_minus.P());
+            z_l_plus.arr()[i] = m_eos->energy_rP(z_l_plus.rho(), z_l_plus.P());
+            z_l_minus.arr()[i] = m_eos->energy_rP(z_l_minus.rho(), z_l_minus.P());
+            z_r_plus.arr()[i] = m_eos->energy_rP(z_r_plus.rho(), z_r_plus.P());
+        }
+    }
+
+    // Суммируем потоки
+    // Численные потоки f_{i-1/2} и f_{i+1/2}
+    Flux flux_L = m_nf->flux(z_l_minus, z_l_plus, *m_eos);
+    Flux flux_R = m_nf->flux(z_r_minus, z_r_plus, *m_eos);
+
+    auto face_L = cell.face(Side2D::L);
+    auto face_R = cell.face(Side2D::R);
+
+    // Переменная для потока
+    Flux flux = Flux::Zero();
+    flux.arr() += flux_R.arr() * face_R.area(m_axial);
+    flux.arr() -= flux_L.arr() * face_L.area(m_axial);
+
+    return flux;
+}
+
+void SmFluid::fluxes_weno_stage1(EuMesh &mesh) const {
+    for(auto cell: mesh) {
+        // Примитивный вектор в ячейке
+        PState z_c = cell[part.init];
+
+        // Консервативный вектор в ячейке
+        QState q_c(z_c);
+
+        // Переменная для потока
+        Flux flux = flux_weno(cell, part.init);
+
+        // Обновляем значение в ячейке (консервативные переменные)
+        q_c.arr() -= (m_dt / cell.volume(m_axial)) * flux.arr();
+
+        if (m_axial) {
+            double coeff = cell.volume() / cell.volume(m_axial);
+            q_c.momentum.y() += coeff * z_c.pressure * m_dt;
+        }
+
+        // Консервативный вектор на первой стадии
+        QState q_c1{};
+        q_c1.arr() += (q_c.arr() + m_dt * flux.arr());
+
+        // Новое значение примитивных переменных
+        cell[part.step1] = PState(q_c1, *m_eos);
+    }
+}
+
+void SmFluid::fluxes_weno_stage2(EuMesh &mesh) const {
+    for(auto cell: mesh) {
+        // Примитивный вектор в ячейке
+        PState z_c = cell[part.init];
+
+        // Примитивный вектор в ячейке на первой стадий
+        PState z_c1 = cell[part.step1];
+
+        // Консервативный вектор в ячейке
+        QState q_c(z_c);
+
+        // Консервативный вектор в ячейке на первой стадий
+        QState q_c1(z_c1);
+
+        // Переменная для потока
+        Flux flux = flux_weno(cell, part.step1);
+
+        // Обновляем значение в ячейке (консервативные переменные)
+        q_c1.arr() -= (m_dt / cell.volume(m_axial)) * flux.arr();
+
+        if (m_axial) {
+            double coeff = cell.volume() / cell.volume(m_axial);
+            q_c1.momentum.y() += coeff * z_c1.pressure * m_dt;
+        }
+
+        // Консервативный вектор на второй стадии
+        QState q_c2{};
+        q_c2.arr() += (3.0 / 4.0 * q_c.arr() + 1.0 / 4.0 * q_c1.arr() + 1.0 / 4.0 * m_dt * flux.arr());
+
+        // Новое значение примитивных переменных
+        cell[part.step2] = PState(q_c2, *m_eos);
+    }
+}
+
+void SmFluid::fluxes_weno_stage3(EuMesh &mesh) const {
+    for(auto cell: mesh) {
+        // Примитивный вектор в ячейке
+        PState z_c = cell[part.init];
+
+        // Примитивный вектор в ячейке на второй стадий
+        PState z_c2 = cell[part.step2];
+
+        // Консервативный вектор в ячейке
+        QState q_c(z_c);
+
+        // Консервативный вектор в ячейке на второй стадий
+        QState q_c2(z_c2);
+
+        // Переменная для потока
+        Flux flux = flux_weno(cell, part.step2);
+
+        // Обновляем значение в ячейке (консервативные переменные)
+        q_c2.arr() -= (m_dt / cell.volume(m_axial)) * flux.arr();
+
+        if (m_axial) {
+            double coeff = cell.volume() / cell.volume(m_axial);
+            q_c2.momentum.y() += coeff * z_c2.pressure * m_dt;
+        }
+
+        // Консервативный вектор на следующем шаге
+        QState q_cn{};
+        q_cn.arr() += (1.0 / 3.0 * q_c.arr() + 2.0 / 3.0 * q_c2.arr() + 2.0 / 3.0 * m_dt * flux.arr());
+
+        // Новое значение примитивных переменных
+        cell[part.next] = PState(q_cn, *m_eos);
     }
 }
 
@@ -327,7 +534,7 @@ void SmFluid::fluxes_stage1(EuMesh &mesh) const {
         }
 
         // Значение примитивных переменных на полушаге
-        cell[part.half] = PState(q_c, *m_eos);
+        cell[part.step1] = PState(q_c, *m_eos);
     });
 }
 
@@ -340,7 +547,7 @@ void SmFluid::fluxes_stage2(EuMesh &mesh) const {
         PState z_c = cell[part.init];
 
         // Примитивный вектор на полуслое
-        PState z_ch = cell[part.half];
+        PState z_ch = cell[part.step1];
 
         // Консервативный вектор в ячейке на прошлом шаге
         QState q_c(z_c);
@@ -359,7 +566,7 @@ void SmFluid::fluxes_stage2(EuMesh &mesh) const {
             PState z_n, z_nh;
             if (!face.is_boundary()) {
                 z_n  = neib[part.init];
-                z_nh = neib[part.half];
+                z_nh = neib[part.step1];
             }
             else {
                 z_n  = boundary_value(z_c,  normal, face.flag());

@@ -31,8 +31,9 @@ using zephyr::utils::mpi;
 
 int main(int argc, char** argv) {
     mpi::handler init;
-    threads::init(argc, argv);
-    threads::info();
+    threads::off();
+    // threads::init(argc, argv);
+    // threads::info();
 
     // Тестовая задача
     SodTest test;
@@ -63,10 +64,10 @@ int main(int argc, char** argv) {
 
     // Создать решатель
     SmFluid solver(eos);
-    solver.set_CFL(0.1);
-    solver.set_accuracy(5);
+    solver.set_CFL(0.2);
+    solver.set_accuracy(3);
     solver.set_limiter("MC");
-    solver.set_method(Fluxes::HLL);
+    solver.set_method(Fluxes::HLLC);
 
     // Добавляем типы на сетку, выбираем основной слой
     auto data = solver.add_types(mesh);

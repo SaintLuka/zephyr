@@ -25,7 +25,8 @@ public:
     /// @brief Расширенный вектор состояния на котором решается задача
     struct Parts {
         Storable<PState> init;  ///< Состояние на основном слое
-        Storable<PState> half;  ///< Состояние на полушаге
+        Storable<PState> step1;  ///< Состояние на полушаге
+        Storable<PState> step2;  ///< Состояние между полушагом и следующим шагом
         Storable<PState> next;  ///< Состояние на следующем шаге
 
         /// @brief Градиент вектора состояния
@@ -87,6 +88,18 @@ public:
 
     /// @brief Расчёт потоков с помощью WENO схемы
     void fluxes_weno(EuMesh &mesh) const;
+
+    /// @brief Оператор L(U)
+    Flux flux_weno(EuCell cell, Storable<PState> z) const;
+
+    /// @brief Вычисление первой стадии RK3
+    void fluxes_weno_stage1(EuMesh &mesh) const;
+
+    /// @brief Вычисление второй стадии RK3
+    void fluxes_weno_stage2(EuMesh &mesh) const;
+
+    /// @brief Вычисление третьей стадии RK3
+    void fluxes_weno_stage3(EuMesh &mesh) const;
 
     /// @brief Обновление ячеек
     void swap(EuMesh &mesh) const;
