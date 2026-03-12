@@ -384,16 +384,12 @@ void SmFluid::fluxes_weno_stage1(EuMesh &mesh) const {
         Flux flux = flux_weno(cell, part.init);
 
         // Обновляем значение в ячейке (консервативные переменные)
-        q_c.arr() -= (m_dt / cell.volume(m_axial)) * flux.arr();
+        QState q_c1 = q_c.arr() - (m_dt / cell.volume(m_axial)) * flux.arr();
 
-        if (m_axial) {
-            double coeff = cell.volume() / cell.volume(m_axial);
-            q_c.momentum.y() += coeff * z_c.pressure * m_dt;
-        }
-
-        // Консервативный вектор на первой стадии
-        QState q_c1{};
-        q_c1.arr() += (q_c.arr() + m_dt * flux.arr());
+        // if (m_axial) {
+        //     double coeff = cell.volume() / cell.volume(m_axial);
+        //     q_c.momentum.y() += coeff * z_c.pressure * m_dt;
+        // }
 
         // Новое значение примитивных переменных
         cell[part.step1] = PState(q_c1, *m_eos);
@@ -418,16 +414,12 @@ void SmFluid::fluxes_weno_stage2(EuMesh &mesh) const {
         Flux flux = flux_weno(cell, part.step1);
 
         // Обновляем значение в ячейке (консервативные переменные)
-        q_c1.arr() -= (m_dt / cell.volume(m_axial)) * flux.arr();
+        QState q_c2 = 3.0 / 4.0 * q_c.arr() + 1.0 / 4.0 * q_c1.arr() - 1.0 / 4.0 * (m_dt / cell.volume(m_axial)) * flux.arr();
 
-        if (m_axial) {
-            double coeff = cell.volume() / cell.volume(m_axial);
-            q_c1.momentum.y() += coeff * z_c1.pressure * m_dt;
-        }
-
-        // Консервативный вектор на второй стадии
-        QState q_c2{};
-        q_c2.arr() += (3.0 / 4.0 * q_c.arr() + 1.0 / 4.0 * q_c1.arr() + 1.0 / 4.0 * m_dt * flux.arr());
+        // if (m_axial) {
+        //     double coeff = cell.volume() / cell.volume(m_axial);
+        //     q_c.momentum.y() += coeff * z_c.pressure * m_dt;
+        // }
 
         // Новое значение примитивных переменных
         cell[part.step2] = PState(q_c2, *m_eos);
@@ -452,16 +444,13 @@ void SmFluid::fluxes_weno_stage3(EuMesh &mesh) const {
         Flux flux = flux_weno(cell, part.step2);
 
         // Обновляем значение в ячейке (консервативные переменные)
-        q_c2.arr() -= (m_dt / cell.volume(m_axial)) * flux.arr();
+        QState q_cn = 1.0 / 3.0 * q_c.arr() + 2.0 / 3.0 * q_c2.arr() -
+            2.0 / 3.0 * (m_dt / cell.volume(m_axial)) * flux.arr();
 
-        if (m_axial) {
-            double coeff = cell.volume() / cell.volume(m_axial);
-            q_c2.momentum.y() += coeff * z_c2.pressure * m_dt;
-        }
-
-        // Консервативный вектор на следующем шаге
-        QState q_cn{};
-        q_cn.arr() += (1.0 / 3.0 * q_c.arr() + 2.0 / 3.0 * q_c2.arr() + 2.0 / 3.0 * m_dt * flux.arr());
+        // if (m_axial) {
+        //     double coeff = cell.volume() / cell.volume(m_axial);
+        //     q_c.momentum.y() += coeff * z_c.pressure * m_dt;
+        // }
 
         // Новое значение примитивных переменных
         cell[part.next] = PState(q_cn, *m_eos);
