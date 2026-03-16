@@ -5,7 +5,7 @@ import styles from './styles.module.css';
 const FeatureList = [
   {
     title: 'Modern C++',
-    Svg: require('@site/static/img/undraw_docusaurus_mountain.svg').default,
+    Svg: require('@site/static/img/badge-cpp.svg').default,
     description: (
       <>
         Lorem ipsum dolor sit amet, consectetur adipiscing elit. 
@@ -16,7 +16,7 @@ const FeatureList = [
   },
   {
     title: 'AMR',
-    Svg: require('@site/static/img/undraw_docusaurus_tree.svg').default,
+    Svg: require('@site/static/img/badge-amr.svg').default,
     description: (
       <>
         Aenean ante ligula, tincidunt sed elit eu, fermentum convallis enim. 
@@ -26,7 +26,7 @@ const FeatureList = [
   },
   {
     title: 'MPI',
-    Svg: require('@site/static/img/undraw_docusaurus_react.svg').default,
+    Svg: require('@site/static/img/badge-mpi.svg').default,
     description: (
       <>
         Quisque diam lectus, semper ac interdum vitae, hendrerit id metus. 

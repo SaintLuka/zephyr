@@ -26,7 +26,7 @@ $$
 ```
 list(APPEND PROBLEMS wave)
 ```
-Для сборки цели `wave` необходимо убедиться, что включена [опция cmake](/additional/cmake.md#список-опций-проекта) `ZEPHYR_ENABLE_PROBLEMS`.
+Для сборки цели `wave` необходимо убедиться, что включена [опция cmake](/docs/build/dependencies#опции-cmake) `ZEPHYR_ENABLE_PROBLEMS`.
 В этом случае цель `wave` появится в выдаче cmake в списке компилируемых задач.
 Перейдем к написанию файла `wave.cpp`.
 
