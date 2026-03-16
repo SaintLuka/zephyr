@@ -33,7 +33,7 @@ export default function Home() {
   return (
     <Layout
       title={`Start page ${siteConfig.title}`}
-      description="Description will go into a meta tag in <head />">
+      description="Yet another CFD code">
       <HomepageHeader />
       <main>
         <HomepageFeatures />
