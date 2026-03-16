@@ -89,8 +89,10 @@ public:
     /// @brief Расчёт потоков с помощью WENO схемы
     void fluxes_weno(EuMesh &mesh) const;
 
-    /// @brief Оператор L(U)
-    Flux flux_weno(EuCell cell, Storable<PState> z) const;
+    /// @brief Оператор L(U) по x
+    Flux flux_weno_x(EuCell cell, Storable<PState> z) const;
+
+    Flux flux_weno_y(EuCell cell, Storable<PState> z) const;
 
     /// @brief Вычисление первой стадии RK3
     void fluxes_weno_stage1(EuMesh &mesh) const;
