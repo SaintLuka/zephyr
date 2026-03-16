@@ -202,12 +202,7 @@ void SmFluid::fluxes_weno(EuMesh &mesh) const {
 
         // Переменная для потока
         Flux flux_x = flux_weno_x(cell, part.init);
-
-        Flux flux_y = Flux::Zero();
-        if (cell.dim() == 2) {
-            Flux flux = flux_weno_y(cell, part.init);
-            flux_y.arr() += flux.arr();
-        }
+        Flux flux_y = flux_weno_y(cell, part.init);
 
         // Обновляем значение в ячейке (консервативные переменные)
         q_c.arr() -= (m_dt / cell.volume(m_axial)) * flux_x.arr() + (m_dt / cell.volume(m_axial)) * flux_y.arr();
