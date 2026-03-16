@@ -276,6 +276,14 @@ void Strip::initialize(AmrCells& cells) {
             cells.faces.vertices[iface + side].fill(-1);
         }
 
+        for (auto side: {Side2D::BOTTOM, Side2D::TOP}) {
+            cells.faces.adjacent.rank[iface + side] = 0;
+            cells.faces.adjacent.index[iface + side] = ic;
+            cells.faces.adjacent.alien[iface + side] = -1;
+            cells.faces.adjacent.basic[iface + side] = ic;
+            cells.faces.vertices[iface + side].fill(-1);
+        }
+
         cells.faces.normal[iface + Side2D::L] = -Vector3d::UnitX();
         cells.faces.normal[iface + Side2D::R] =  Vector3d::UnitX();
         cells.faces.normal[iface + Side2D::B] = -Vector3d::UnitY();
