@@ -87,6 +87,16 @@ public:
         m_data.resize(m_sizes[0] * m_sizes[1], value);
     }
 
+    /// @brief Создать массив из существующего буфера
+    explicit Array2D(const std::array<int, 2> sizes, std::vector<T>&& data)
+        : m_sizes(sizes) {
+        z_assert(sizes[0] > 0 && sizes[1] > 0, "Bad sizes constructor");
+        if (sizes[0] * sizes[1] != data.size()) {
+            throw std::runtime_error("Array2D: bad sizes for buffer");
+        }
+        m_data = std::move(data);
+    }
+
     /// @brief Пустой массив?
     bool empty() const { return m_data.empty(); }
 
@@ -181,6 +191,9 @@ public:
             default: throw std::runtime_error("Invalid base node index");
         }
     }
+
+    /// @brief Указатель на данные
+    const T* data() const { return m_data.data(); }
 
 private:
     /// @brief Привести индекс к корректному диапазону

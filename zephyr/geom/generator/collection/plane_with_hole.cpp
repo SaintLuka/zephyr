@@ -185,4 +185,8 @@ void PlaneWithHole::check_params() const {
     }
 }
 
+Grid PlaneWithHole::make() const {
+    return m_blocks.make();
+}
+
 } // namespace zephyr::geom::generator::collection

@@ -47,7 +47,7 @@ public:
     Box bbox() const override;
 
     /// @brief Создать сетку
-    Grid make() const override { return m_blocks.make(); }
+    Grid make() const override;
 
 private:
     void check_params() const;

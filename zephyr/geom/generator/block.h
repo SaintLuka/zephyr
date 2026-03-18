@@ -127,6 +127,9 @@ public:
     /// @brief Конформный модуль криволинейного четырехугольника
     double modulus() const { return m_modulus; }
 
+    /// @brief Установить конформный модуль
+    void set_modulus(double K);
+
     /// @brief Оценить и установить конформный модуль четырехугольника
     void estimate_modulus();
 
@@ -136,13 +139,13 @@ public:
     /// @brief Сохранить текущее отображение
     void set_mapping(const Table2D& vertices);
 
+    /// @brief Сохранить текущее отображение
+    void set_mapping(Array2D<Vector3d>&& vertices);
+
     /// @brief Получить конформное отображение блока
     const Array2D<Vector3d>& mapping() const { return m_mapping; }
 
 private:
-    /// @brief Установить конформный модуль
-    void set_modulus(double K);
-
     /// @brief Сгенерировать узлы сетки с нуля
     Table2D create_vertices_init(AxisPair<int> sizes) const;
 

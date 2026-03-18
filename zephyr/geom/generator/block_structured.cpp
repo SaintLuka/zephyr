@@ -1,6 +1,7 @@
 #include <array>
+#include <filesystem>
 #include <algorithm>
-#include <iomanip>
+#include <fstream>
 #include <format>
 #include <map>
 #include <list>
@@ -413,7 +414,10 @@ void BlockStructured::link_blocks() {
 
     // Оценить конформный модуль по геометрии
     for (const auto& block: m_blocks) {
-        block->estimate_modulus();
+        // При загрузке из кэша не меняем
+        if (std::isnan(block->modulus())) {
+            block->estimate_modulus();
+        }
     }
 
     m_stage = LINKED;
@@ -1106,7 +1110,109 @@ inline Pairs<double> get_lambda(const std::vector<Block::Ptr>& blocks, const Pai
     return lambda;
 }
 
+const std::string cachefile = ".bscache";
+
+template <class T>
+inline void hash_combine(std::size_t& seed, const T& v) {
+    seed ^= std::hash<T>{}(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+}
+
+size_t BlockStructured::get_hash(const optimize_options& opts) const {
+    // Считаем, что у нас топология не меняется, все кривые и границы заданы так же.
+    // В контрольную сумму попадают только координаты базовых вершин и статус fix/не fix.
+    size_t hash = m_blocks.size();
+
+    // Хэшируем опции, они влияют на итоговую сетку
+    hash_combine(hash, opts.steps);
+    hash_combine(hash, opts.N);
+    hash_combine(hash, opts.eps);
+
+    for (auto block: m_blocks) {
+        for (auto node: block->base_nodes()) {
+            hash_combine(hash, node->x());
+            hash_combine(hash, node->y());
+            hash_combine(hash, node->fixed());
+        }
+    }
+    return hash;
+}
+
+void BlockStructured::save_cache(const optimize_options& opts) const {
+    size_t hash = get_hash(opts);
+    std::ofstream file(cachefile, std::ios::out | std::ios::binary | std::ios::trunc);
+    file.write((char*)&hash, sizeof(hash));
+
+    for (auto block: m_blocks) {
+        BaseNode::Ptr v1 = block->base_node(0);
+        BaseNode::Ptr v2 = block->base_node(1);
+        BaseNode::Ptr v3 = block->base_node(2);
+        BaseNode::Ptr v4 = block->base_node(3);
+
+        // Положения базисных узлов
+        file.write((char*)v1->pos().data(), 3 * sizeof(double));
+        file.write((char*)v2->pos().data(), 3 * sizeof(double));
+        file.write((char*)v3->pos().data(), 3 * sizeof(double));
+        file.write((char*)v4->pos().data(), 3 * sizeof(double));
+
+        // Конформный модуль
+        double modulus = block->modulus();
+        file.write((char*)&modulus, sizeof(modulus));
+
+        // Буфер вершин mapping
+        std::array<int, 2> sizes = block->mapping().sizes();
+        file.write((char*)sizes.data(), sizeof(sizes));
+        auto buffer = block->mapping().data();
+        file.write((char*)buffer, 3 * sizes[0] * sizes[1] * sizeof(double));
+    }
+    file.close();
+}
+
+void BlockStructured::load_cached() {
+    std::ifstream file(cachefile, std::ios::in | std::ios::binary);
+    size_t hash;
+    file.read((char*)&hash, sizeof(hash));
+
+    for (auto block: m_blocks) {
+        // Положения базисных узлов
+        Vector3d v1, v2, v3, v4;
+        file.read((char*)v1.data(), 3 * sizeof(double));
+        file.read((char*)v2.data(), 3 * sizeof(double));
+        file.read((char*)v3.data(), 3 * sizeof(double));
+        file.read((char*)v4.data(), 3 * sizeof(double));
+
+        block->base_node(0)->set_pos(v1);
+        block->base_node(1)->set_pos(v2);
+        block->base_node(2)->set_pos(v3);
+        block->base_node(3)->set_pos(v4);
+
+        // Конформный модуль
+        double modulus;
+        file.read((char*)&modulus, sizeof(modulus));
+        block->set_modulus(modulus);
+
+        // Буфер вершин mapping
+        std::array<int, 2> sizes;
+        file.read((char*)sizes.data(), sizeof(sizes));
+
+        std::vector<Vector3d> buffer(sizes[0]*sizes[1]);
+        file.read((char*)buffer.data(), 3 * buffer.size() * sizeof(double));
+        Array2D<Vector3d> vertices(sizes, std::move(buffer));
+        block->set_mapping(std::move(vertices));
+    }
+    file.close();
+
+    if (m_stage == EDITABLE) {
+        if (m_verbosity > 1) {
+            std::cout << "  Link blocks\n";
+        }
+        link_blocks();
+    }
+    m_stage = OPTIMIZED;
+}
+
 void BlockStructured::optimize(const optimize_options& opts) {
+    namespace fs = std::filesystem;
+
     int n_steps = std::max(1, std::min(opts.steps, 7));
     int N = std::max(2, opts.N);
 
@@ -1114,6 +1220,25 @@ void BlockStructured::optimize(const optimize_options& opts) {
     N = std::min(N, static_cast<int>(std::floor(std::pow(2, 11 - n_steps))));
 
     double eps = std::max(1.0e-6, std::min(opts.eps, 0.01));
+
+    // Загрузить из кэша, если там что-то есть
+    if (opts.cache) {
+        // Проверить наличие файла кэша
+        if (fs::exists(cachefile) && fs::is_regular_file(cachefile)) {
+            std::ifstream file(cachefile, std::ios::in | std::ios::binary);
+            size_t file_hash;
+            file.read((char*)&file_hash, sizeof(file_hash));
+            file.close();
+            size_t hash = get_hash(opts);
+            if (file_hash == hash) {
+                if (m_verbosity > 0) {
+                    std::cout << "BlockStructured: load cached \"" << cachefile << "\"\n";
+                }
+                load_cached();
+                return;
+            }
+        }
+    }
 
     if (m_verbosity > 0) {
         std::cout << "BlockStructured optimization (" << n_steps << " steps)\n";
@@ -1128,6 +1253,14 @@ void BlockStructured::optimize(const optimize_options& opts) {
         optimize(N, eps);
         N *= 2;
         eps /= 2.0;
+    }
+
+    // Сохранить кэш после оптимизации
+    if (opts.cache) {
+        if (m_verbosity > 0) {
+            std::cout << "BlockStructured: save cache \"" << cachefile << "\"\n";
+        }
+        save_cache(opts);
     }
 }
 
@@ -1184,7 +1317,7 @@ void BlockStructured::optimization_step(int N, double eps) {
         error = smooth_vertices(vertices);
         for (int b1 = 0; b1 < n_blocks(); ++b1) {
             m_blocks[b1]->update_modulus(vertices[b1]);
-            lambda[b1] = calc_lambda( sizes[b1], m_blocks[b1]->modulus());
+            lambda[b1] = calc_lambda(sizes[b1], m_blocks[b1]->modulus());
         }
         ++counter;
     }

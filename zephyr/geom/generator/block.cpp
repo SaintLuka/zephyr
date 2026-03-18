@@ -489,6 +489,10 @@ void Block::set_mapping(const Array2D<BsVertex::Ptr>& vertices) {
     }
 }
 
+void Block::set_mapping(Array2D<Vector3d>&& vertices) {
+    m_mapping = std::move(vertices);
+}
+
 void BlockPair::add(Block::Ref block, Side side) {
     if (b1.expired()) {
         b1 = block;

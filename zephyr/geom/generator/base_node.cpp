@@ -19,7 +19,9 @@ BaseNode::Ptr BaseNode::create(double x, double y, bool fixed) {
 
 void BaseNode::set_fixed(bool fixed) {
     if (m_editable) { m_fixed = fixed; }
-    std::cerr << "BaseNode::set_fixed warning: BaseNode is not editable;\n";
+    else {
+        std::cerr << "BaseNode::set_fixed warning: BaseNode is not editable;\n";
+    }
 }
 
 void BaseNode::set_pos(double x, double y) {
@@ -28,7 +30,9 @@ void BaseNode::set_pos(double x, double y) {
 
 void BaseNode::set_pos(const Vector3d& v) {
     if (m_editable) { m_pos = v; }
-    std::cerr << "BaseNode::set_pos warning: BaseNode is not editable;\n";
+    else {
+        std::cerr << "BaseNode::set_pos warning: BaseNode is not editable;\n";
+    }
 }
 
 void BaseNode::clear() {
