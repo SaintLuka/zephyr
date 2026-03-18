@@ -30,7 +30,7 @@ struct Star {
     Polygon poly;
 
     // @param R Радиус описанной окружности
-    explicit Star(double R) : R(R), poly(10) {
+    explicit Star(double R) : R(R) {
         update(0.0);
     }
 
@@ -53,6 +53,7 @@ struct Star {
         double xc = a * std::sqrt(2.0) * std::cos(xi) / (1.0 + std::pow(std::sin(xi), 2));
         double yc = xc * std::sin(xi);
 
+        std::array<Vector3d, 10> vertices;
         for (int i = 0; i < 10; i += 2) {
             Vector3d v1 = {xc + R * std::cos(M_PI * i / 5.0 + phi),
                            yc + R * std::sin(M_PI * i / 5.0 + phi), 0.0};
@@ -60,9 +61,10 @@ struct Star {
             Vector3d v2 = {xc + r * std::cos(M_PI * (i + 1) / 5.0 + phi),
                            yc + r * std::sin(M_PI * (i + 1) / 5.0 + phi), 0.0};
 
-            poly.set(i, v1);
-            poly.set(i + 1, v2);
+            vertices[i] = v1;
+            vertices[i + 1] = v2;
         }
+        poly = Polygon(vertices);
     }
 };
 

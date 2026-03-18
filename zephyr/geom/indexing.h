@@ -157,6 +157,7 @@ constexpr node_array sf(int count, int side) {
 
 namespace tetra {
 
+constexpr int n_nodes = 4;
 constexpr int n_faces = 4;
 constexpr int face_size[4] = {3, 3, 3, 3};
 constexpr int face_nodes[4][3] = {
@@ -175,8 +176,9 @@ constexpr node_array sf(int side) { return convert<3>(face_nodes[side]); }
 
 namespace pyramid {
 
-constexpr int n_faces = 4;
-constexpr int face_size[4] = {4, 3, 3, 3};
+constexpr int n_nodes = 5;
+constexpr int n_faces = 5;
+constexpr int face_size[5] = {4, 3, 3, 3, 3};
 constexpr int face_nodes[5][4] = {
     {3, 2, 1, 0},
     {0, 1, 4},
@@ -201,6 +203,15 @@ constexpr node_array sf(int side) {
 
 namespace wedge {
 
+/// @brief Нумерация узлов в треугольной призме.
+/// b - индекс основания, i - индекс вершины основания
+template <int b, int i>
+constexpr int vs() {
+    static_assert(0 <= b && b <= 1 && 0 <= i && i <= 2, "Available indices: {0, 1, 2}");
+    return 3 * b + i;
+}
+
+constexpr int n_nodes = 6;
 constexpr int n_faces = 5;
 constexpr int face_size[5] = {4, 4, 4, 3, 3};
 constexpr int face_nodes[5][4] ={
@@ -234,6 +245,7 @@ constexpr int vs() {
     return quad::vs<i, j>() + 4 * k;
 }
 
+constexpr int n_nodes = 8;
 constexpr int n_faces = 6;
 constexpr int face_size[6] = {4, 4, 4, 4, 4, 4};
 constexpr int face_nodes[6][4] = {
@@ -271,6 +283,14 @@ constexpr int face_nodes2d[4][2] = {
     {vs<-1, +1>(), vs<+1, +1>()},
 };
 
+constexpr int sqface_size2d[4] = {3, 3, 3, 3};
+constexpr int sqface_nodes2d[4][3] = {
+    {vs<-1, -1>(), vs<-1, 0>(), vs<-1, +1>()},
+    {vs<+1, -1>(), vs<+1, 0>(), vs<+1, +1>()},
+    {vs<-1, -1>(), vs<0, -1>(), vs<+1, -1>()},
+    {vs<-1, +1>(), vs<0, +1>(), vs<+1, +1>()},
+};
+
 constexpr int n_faces3d = 6;
 constexpr int face_size3d[6] = {4, 4, 4, 4};
 constexpr int face_nodes3d[6][4] = {
@@ -280,6 +300,28 @@ constexpr int face_nodes3d[6][4] = {
     {vs<-1, +1, -1>(), vs<+1, +1, -1>(), vs<-1, +1, +1>(), vs<+1, +1, +1>()},
     {vs<-1, -1, -1>(), vs<+1, -1, -1>(), vs<-1, +1, -1>(), vs<+1, +1, -1>()},
     {vs<-1, -1, +1>(), vs<+1, -1, +1>(), vs<-1, +1, +1>(), vs<+1, +1, +1>()},
+};
+
+constexpr int sqface_size3d[6] = {9, 9, 9, 9};
+constexpr int sqface_nodes3d[6][9] = {
+    {vs<-1, -1, -1>(), vs<-1,  0, -1>(), vs<-1, +1, -1>(),
+     vs<-1, -1,  0>(), vs<-1,  0,  0>(), vs<-1, +1,  0>(),
+     vs<-1, -1, +1>(), vs<-1,  0, +1>(), vs<-1, +1, +1>()}, // LEFT
+    {vs<+1, -1, -1>(), vs<+1,  0, -1>(), vs<+1, +1, -1>(),
+     vs<+1, -1,  0>(), vs<+1,  0,  0>(), vs<+1, +1,  0>(),
+     vs<+1, -1, +1>(), vs<+1,  0, +1>(), vs<+1, +1, +1>()}, // RIGHT
+    {vs<-1, -1, -1>(), vs< 0, -1, -1>(), vs<+1, -1, -1>(),
+     vs<-1, -1,  0>(), vs< 0, -1,  0>(), vs<+1, -1,  0>(),
+     vs<-1, -1, +1>(), vs< 0, -1, +1>(), vs<+1, -1, +1>()}, // BOTTOM
+    {vs<-1, +1, -1>(), vs< 0, +1, -1>(), vs<+1, +1, -1>(),
+     vs<-1, +1,  0>(), vs< 0, +1,  0>(), vs<+1, +1,  0>(),
+     vs<-1, +1, +1>(), vs< 0, +1, +1>(), vs<+1, +1, +1>()}, // TOP
+    {vs<-1, -1, -1>(), vs< 0, -1, -1>(), vs<+1, -1, -1>(),
+     vs<-1,  0, -1>(), vs< 0,  0, -1>(), vs<+1,  0, -1>(),
+     vs<-1, +1, -1>(), vs< 0, +1, -1>(), vs<+1, +1, -1>()}, // BACK
+    {vs<-1, -1, +1>(), vs< 0, -1, +1>(), vs<+1, -1, +1>(),
+     vs<-1,  0, +1>(), vs< 0,  0, +1>(), vs<+1,  0, +1>(),
+     vs<-1, +1, +1>(), vs< 0, +1, +1>(), vs<+1, +1, +1>()}, // FRONT
 };
 
 constexpr int n_subfaces2d = 8;

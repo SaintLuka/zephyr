@@ -56,9 +56,9 @@ public:
     static Vector3d get(const Vector3d &v1, const Vector3d &v2, double x);
 
     /// @brief Нормаль к отрезку, располагается в плоскости с отрезком
-    /// и точкой 'c', направлена от точки 'c'.
+    /// и точкой 'view', направлена от точки 'view'.
     static Vector3d normal(const Vector3d& v1, const Vector3d& v2,
-                           const Vector3d& c);
+                           const Vector3d& view);
 
     /// @brief Якобиан отображения в точке x.
     /// Фактически половина длины отрезка.
@@ -74,8 +74,8 @@ public:
     Vector3d centroid(bool axial) const;
 
     /// @brief Нормаль к отрезку, располагается в плоскости с отрезком
-    /// и точкой 'c', направлена от точки 'c'.
-    Vector3d normal(const Vector3d &c) const;
+    /// и точкой 'view', направлена от точки 'view'.
+    Vector3d normal(const Vector3d &view) const;
 
     /// @brief Длина отрезка
     double length() const;
@@ -84,8 +84,8 @@ public:
     double area_as() const;
 
     /// @brief Нормаль, умноженная на длину отрезка, нормаль располагается
-    /// в плоскости с отрезком и точкой 'c', направлена от точки 'c'.
-    Vector3d area_n(const Vector3d &c) const;
+    /// в плоскости с отрезком и точкой 'view', направлена от точки 'view'.
+    Vector3d area_n(const Vector3d &view) const;
 };
 
 /// @brief Криволинейный отрезок.
@@ -131,16 +131,12 @@ public:
     /// @brief Оператор доступа по индексам отображения
     /// @tparam i in {-1, 0, 1}
     template <int i>
-    Vector3d &vs() {
-        return verts[iss<i>()];
-    }
+    Vector3d &vs() { return verts[iss<i>()]; }
 
     /// @brief Оператор доступа по индексам отображения
     /// @tparam i in {-1, 0, 1}
     template <int i>
-    const Vector3d &vs() const {
-        return verts[iss<i>()];
-    }
+    const Vector3d &vs() const { return verts[iss<i>()]; }
 
     /// @brief Получить точку на кривой
     /// @param x in [-1, 1]
@@ -174,9 +170,9 @@ public:
 
     /// @brief Нормализованный криволинейный интеграл второго рода
     /// int vec(n) dl, где выбирается нормаль, которая лежит в одной
-    /// плоскости  вместе с кривой и вместе с точкой 'c' (если возможно),
-    /// направлена от точки 'c'.
-    Vector3d normal(const Vector3d& c) const;
+    /// плоскости  вместе с кривой и вместе с точкой 'view' (если возможно),
+    /// направлена от точки 'view'.
+    Vector3d normal(const Vector3d& view) const;
 
     /// @brief "Длина" криволинейной одномерной грани. Равна |int vec(n) dl|,
     /// то есть модулю криволинейного интеграла 2-го рода.

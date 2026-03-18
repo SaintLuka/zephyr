@@ -2,10 +2,6 @@
 
 namespace zephyr::geom::intersection2D {
 
-inline double sqr(double x) {
-    return x * x;
-}
-
 // vector product [v1, v2].z
 inline double cross2D(const Vector3d& v1, const Vector3d& v2) {
     return v1.x() * v2.y() - v1.y() * v2.x();
@@ -33,8 +29,9 @@ bool exist(const obj::ray& ray, const obj::segment& seg) {
 }
 
 bool exist(const obj::plane& plane, const obj::segment& seg) {
-    double dot1 = plane.n.dot(seg.v1 - plane.p);
-    double dot2 = plane.n.dot(seg.v2 - plane.p);
+    Vector3d r0 = plane.p * plane.n; // точка плоскости
+    double dot1 = plane.n.dot(seg.v1 - r0);
+    double dot2 = plane.n.dot(seg.v2 - r0);
 
     return dot1 * dot2 <= 0.0;
 }
@@ -64,7 +61,7 @@ Vector3d find_fast(const obj::line& line, const obj::segment& seg) {
 }
 
 Vector3d find_fast(const obj::plane& plane, const obj::line& line) {
-    double t = plane.n.dot(plane.p - line.p) / plane.n.dot(line.tau);
+    double t = (plane.p - plane.n.dot(line.p)) / plane.n.dot(line.tau);
     return line.get(t);
 }
 
@@ -79,7 +76,7 @@ circle_segment_intersection find(
 
     double A = line.tau.squaredNorm();
     double B = line.tau.dot(line.p - circle.c);
-    double C = (line.p - circle.c).squaredNorm() - sqr(circle.r);
+    double C = (line.p - circle.c).squaredNorm() - std::pow(circle.r, 2);
 
     double D = B * B - A * C;
 

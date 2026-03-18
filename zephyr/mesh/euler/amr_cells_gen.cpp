@@ -437,24 +437,19 @@ AmrCells::AmrCells(const Grid& grid) {
     m_linear = true;
     m_axial = false;
 
-    if (!grid.has_faces() || !grid.faces_per_cell()) {
+    if (!grid.has_faces()) {
         throw std::runtime_error("Grid was built with wrong options, need faces per cell");
     }
-    if (!grid.has_cells_geometry() || !grid.has_faces_geometry()) {
-        throw std::runtime_error("Grid was built with wrong options, need 'faces per cell'");
-    }
-
-    const auto& grid_geom = grid.geometry();
-    const auto& grid_cells = grid.cells();
-    const auto& grid_nodes = grid.nodes();
-    const auto& grid_faces = grid.faces();
 
     if (!m_adaptive) {
-        resize(grid.n_cells(), grid.n_faces(), grid.total_nodes_per_cell());
+        resize(grid.n_cells(), grid.total_faces_per_cell(), grid.total_nodes_per_cell());
     }
     else {
         resize_amr(grid.n_cells());
     }
+
+    const auto& nodes = grid.nodes();
+    const auto& cells = grid.cells();
 
     face_begin[0] = 0;
     node_begin[0] = 0;
@@ -467,16 +462,16 @@ AmrCells::AmrCells(const Grid& grid) {
         z_idx[ic] = 0;
         level[ic] = 0;
 
-        volume[ic] = grid_geom.cell_volumes[ic];
-        center[ic] = grid_geom.cell_centroids[ic];
+        volume[ic] = cells[ic].volume();
+        center[ic] = cells[ic].centroid();
 
         if (m_axial) {
             // m_locals.volume_alt[ic] = geom.cell_volumes_alt[ic];
         }
 
         // Число узлов и граней ячейки
-        int n_nodes = grid_cells[ic].nodes.size();
-        int n_faces = grid_faces.cell_faces[ic].size();
+        int n_nodes = cells[ic].n_nodes();
+        int n_faces = cells[ic].n_faces();
         int max_faces = n_faces;
         if (m_adaptive) {
             max_faces = m_dim < 3 ? Side2D::n_subfaces() : Side3D::n_subfaces();
@@ -484,21 +479,36 @@ AmrCells::AmrCells(const Grid& grid) {
 
         // Выставить индексы грани
         face_begin[ic + 1] = face_begin[ic] + max_faces;
-        faces.insert(face_begin[ic], grid_cells[ic].type, max_faces);
+        if (cells[ic].type() != CellType::POLYHEDRON) {
+            faces.insert(face_begin[ic], cells[ic].type(), max_faces);
+        }
+        else {
+            auto iface = face_begin[ic];
+            for (int i = 0; i < n_faces; ++i) {
+                const auto& face = cells[ic].get_face(i);
+                faces.vertices[iface + i].fill(-1);
+                for (int j = 0; j < face.n_nodes(); ++j) {
+                    faces.vertices[iface + i][j] = face.node_idx(j);
+                }
+                faces.set_undefined(iface + i);
+            }
+        }
+        const auto& node_ids = cells[ic].nodes();
 
         node_begin[ic + 1] = node_begin[ic] + n_nodes;
         for (int i = 0; i < n_nodes; ++i) {
-            verts[node_begin[ic] + i] = grid_nodes[grid_cells[ic].nodes[i]].pos;
+            verts[node_begin[ic] + i] = nodes[node_ids[i]].pos;
         }
 
         // Геометрия
         for (int i = 0; i < n_faces; ++i) {
+            const auto& face = cells[ic].get_face(i);
+
             int iface = face_begin[ic] + i;
-            auto jface = grid_faces.cell_faces[ic][i];
-            faces.boundary[iface] = grid_faces.face_bc[jface];
-            faces.area[iface]     = grid_geom.face_areas[jface];
-            faces.center[iface]   = grid_geom.face_centroids[jface];
-            faces.normal[iface]   = grid_geom.face_normals[jface];
+            faces.boundary[iface] = face.bc();
+            faces.area[iface]     = face.area();
+            faces.center[iface]   = face.center();
+            faces.normal[iface]   = face.normal();
 
             if (m_axial) {
                 //faces.area_alt[iface] = grid_geom.face_areas_alt[jface];
@@ -507,10 +517,12 @@ AmrCells::AmrCells(const Grid& grid) {
 
         // Смежность
         for (int i = 0; i < n_faces; ++i) {
+            const auto& face = cells[ic].get_face(i);
+
             auto iface = face_begin[ic] + i;
-            auto jface = grid_faces.cell_faces[ic][i];
+
             faces.adjacent.rank[iface]  = 0;
-            faces.adjacent.index[iface] = grid_faces.neighbor_cell[jface];
+            faces.adjacent.index[iface] = face.neib();
             faces.adjacent.alien[iface] = -1;
             faces.adjacent.basic[iface] = ic;
 

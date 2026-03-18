@@ -17,14 +17,15 @@
 #include <zephyr/geom/grid.h>
 #include <zephyr/geom/generator/cuboid.h>
 #include <zephyr/geom/generator/rectangle.h>
+#include <zephyr/geom/generator/collection/wedge.h>
+#include <zephyr/geom/generator/collection/plane_with_hole.h>
 
 using namespace zephyr::io;
 using namespace zephyr::phys;
 using namespace zephyr::math;
 using namespace zephyr::math::smf;
+using namespace zephyr::geom::generator;
 
-using generator::Cuboid;
-using generator::Rectangle;
 using zephyr::mesh::EuMesh;
 using zephyr::mesh::EuCell;
 using zephyr::math::SmFluid;
@@ -89,15 +90,88 @@ Grid test6() {
     return grid;
 }
 
+// Декартова сетка в кубе, побитая на тетраэдры
+Grid test7() {
+    Cuboid gen(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
+    gen.set_boundaries({.left=WALL, .right=WALL, .bottom=WALL, .top=WALL, .back=WALL, .front=WALL});
+    gen.set_nx(20);
+    Grid grid = gen.make();
+    grid.triangulation();
+    return grid;
+}
+
+// Extrude декартовой сетки
+Grid test8() {
+    Rectangle gen(-1.0, 1.0, -1.0, 1.0);
+    gen.set_boundaries({.left=WALL, .right=WALL, .bottom=WALL, .top=WALL});
+    gen.set_nx(40);
+    Grid grid = gen.make();
+    grid.extrude(Vector3d{0.1, 0.1, 1.0}, 20, WALL, WALL);
+    return grid;
+}
+
+// Extrude сетки из треугольников
+Grid test9() {
+    Rectangle gen(-1.0, 1.0, -1.0, 1.0);
+    gen.set_boundaries({.left=WALL, .right=WALL, .bottom=WALL, .top=WALL});
+    gen.set_nx(30);
+    Grid grid = gen.make();
+    grid.triangulation(2);
+    grid.extrude(Vector3d{0.0, 0.0, 1.0}, 15, WALL, WALL);
+    return grid;
+}
+
+// Extrude сетки из многоугольников
+Grid test10() {
+    Rectangle gen(-1.0, 1.0, -1.0, 1.0, true);
+    gen.set_boundaries({.left=WALL, .right=WALL, .bottom=WALL, .top=WALL});
+    gen.set_nx(30);
+    Grid grid = gen.make();
+    grid.extrude(Vector3d{0.0, 0.0, 1.0}, 15, WALL, WALL);
+    return grid;
+}
+
+// Простая BlockStructured сетка
+Grid test11() {
+    collection::PlaneWithHole gen(0.0, 2.0, 0.0, 1.0, 0.6, 0.2, 0.1);
+    gen.set_boundaries({.left=ZOE, .right=ZOE, .bottom=WALL, .top=WALL});
+    gen.set_ny(80);
+    return gen.make();
+}
+
+// BlockStructured сетка с отражением и триангуляцией
+Grid test12() {
+    collection::Wedge gen(0.0, 1.0, 0.0, 0.5, 0.5, 0.2);
+    gen.set_boundaries({.left=ZOE, .right=ZOE, .bottom=WALL, .top=WALL});
+    gen.set_ny(20);
+
+    Grid grid = gen.make();
+    grid.triangulation(1);
+    grid.mirror_x();
+    grid.move({0.0, -0.5, 0.0});
+    grid.mirror_y();
+    return grid;
+}
+
+// BlockStructured с extrude
+Grid test13() {
+    collection::PlaneWithHole gen = collection::PlaneWithHole(0.0, 2.0, 0.0, 2.0, 1.0, 1.0, 0.3);
+    gen.set_boundaries({.left=ZOE, .right=ZOE, .bottom=WALL, .top=WALL});
+    gen.set_ny(80);
+    Grid grid = gen.make();
+    grid.extrude(Vector3d::UnitZ(), 40, ZOE, ZOE);
+    return grid;
+}
 
 int main(int argc, char** argv) {
     mpi::handler handler(argc, argv);
     threads::init(argc, argv);
     threads::info();
-    threads::off();
+    threads::on();
 
     // Создать сетку
-    Grid grid = test5();
+    Grid grid = test13();
+    bool polyhedral = grid.polyhedral();
     EuMesh mesh(std::move(grid));
 
     // Создать и настроить решатель
@@ -135,6 +209,8 @@ int main(int argc, char** argv) {
 
     // Файл для записи
     PvdFile pvd("mesh", "output");
+    //pvd.unique_nodes = true;
+    pvd.polyhedral = polyhedral;
 
     // Переменные для сохранения
     pvd.variables = {"level", "faces2D"};

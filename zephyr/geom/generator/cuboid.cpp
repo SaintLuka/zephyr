@@ -257,20 +257,20 @@ Grid Cuboid::make() const {
     grid.reserve_nodes((m_nx + 1) * (m_ny + 1) * (m_nz + 1));
     grid.reserve_cells(m_nx * m_ny * m_nz);
 
-    std::vector nodes(m_nx + 1, std::vector(m_ny + 1, std::vector<GridNode::Ptr>(m_nz + 1)));
+    std::vector nodes(m_nx + 1, std::vector(m_ny + 1, std::vector<Node::Ptr>(m_nz + 1)));
     for (int i = 0; i <= m_nx; ++i) {
         for (int j = 0; j <= m_ny; ++j) {
             for (int k = 0; k <= m_nz; ++k) {
                 double x = m_xmin + i * dx;
                 double y = m_ymin + j * dy;
                 double z = m_zmin + k * dz;
-                nodes[i][j][k] = GridNode::create({x, y, z});
+                nodes[i][j][k] = Node::create({x, y, z});
             }
         }
     }
 
     std::vector<Boundary> bc(6);
-    std::vector<GridNode::Ptr> cube_nodes(8);
+    std::vector<Node::Ptr> cube_nodes(8);
     for (int i = 0; i < m_nx; ++i) {
         bc[Side3D::L] = i == 0 ?      m_bounds.left :  Boundary::INNER;
         bc[Side3D::R] = i == m_nx-1 ? m_bounds.right : Boundary::INNER;

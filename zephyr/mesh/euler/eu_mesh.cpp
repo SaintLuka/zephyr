@@ -32,25 +32,11 @@ namespace {
 
 AmrCells make_locals(geom::Grid&& grid) {
     // Опции генерации сетки
-    constexpr Grid::BuildOptions opts{
-        .faces=Grid::BuildOptions::FaceOption::per_cell,
-        .build_face_local_indices=true,
-        .build_twin_face=false,
-        .build_edges=false,
-        .build_node_cells=false,
-        .build_node_faces=false,
-        .compute_face_geometry=true,
-        .compute_cell_geometry=true
+    constexpr Grid::BuildOptions options{
+        .build_faces=true
     };
 
-    grid.finalize(opts);
-
-    if (true) {
-        std::string report;
-        grid.validate_finalized_full(&report);
-        std::cout << report << std::endl;
-    }
-
+    grid.finalize(options);
     return AmrCells(grid);
 }
 

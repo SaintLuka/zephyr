@@ -27,16 +27,18 @@ InFunction smooth_func = [](const Vector3d &v) -> bool {
 // 2. Некоторая угловатая функция
 InFunction angle_func = [](const Vector3d &v) -> bool {
     static bool initialized = false;
-    static Polygon poly(10);
+    static Polygon poly;
     if (!initialized) {
+        std::array<Vector3d, 10> vertices;
         double R = 0.8;
         double r = 0.382 * R;
         for (int i = 0; i < 10; i += 2) {
             Vector3d v1 = to_cartesian(R, M_PI*(i + 0)/5.0);
             Vector3d v2 = to_cartesian(r, M_PI*(i + 1)/5.0);
-            poly.set(i, v1);
-            poly.set(i + 1, v2);
+            vertices[i] = v1;
+            vertices[i + 1] = v2;
         }
+        poly = Polygon(vertices);
         initialized = true;
     }
     return poly.inside(v);

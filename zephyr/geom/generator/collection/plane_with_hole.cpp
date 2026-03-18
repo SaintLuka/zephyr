@@ -141,7 +141,7 @@ PlaneWithHole::PlaneWithHole(
     //m_blocks.plot_layout();
     //m_blocks.set_iters_count(1);
     m_blocks.optimize();
-    m_blocks.plot();
+    //m_blocks.plot();
 }
 
 void PlaneWithHole::set_nx(int Nx) {

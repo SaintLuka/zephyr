@@ -496,9 +496,9 @@ void VDiagram::paint() {
         }
     }
 
-    std::vector<bool> full_set(size(), true);
+    std::vector full_set(size(), true);
 
-    std::reverse(order.begin(), order.end());
+    std::ranges::reverse(order);
     for (auto iGen: order) {
         for (auto& jGen: m_adjacency[iGen]) {
             if (m_colors[jGen] >= 0) {
@@ -541,7 +541,7 @@ double VDiagram::distance_gen(int i, int j) {
 
 inline double imb_func(double Imax) {
     // Значение дисбаланса, при котором возвращается 1/2
-    // Приемлимое значение дисбаланса
+    // Приемлемое значение дисбаланса
     const double I0 = 1.0e-2;
     return Imax / (Imax + I0);
 }
@@ -551,7 +551,8 @@ void VDiagram::balancing() {
 
     std::vector<double> ws(size());
     for (int iGen = 0; iGen < size(); ++iGen) {
-        geom::Polygon poly(m_lines[iGen], true);
+        geom::Polygon poly(m_lines[iGen]);
+        poly.sort();
         ws[iGen] = poly.area();
     }
     balancing(ws);

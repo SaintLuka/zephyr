@@ -217,8 +217,8 @@ Vector3d Sector::rotate(const Vector3d &v, int r) const {
 }
 
 Grid Sector::make() const {
-    using Array1D = std::vector<GridNode::Ptr>;
-    using Array2D = std::vector<std::vector<GridNode::Ptr>>;
+    using Array1D = std::vector<Node::Ptr>;
+    using Array2D = std::vector<std::vector<Node::Ptr>>;
     
     // Вершины центральной части
     Array2D CV, CV2, CV3, CV4;
@@ -259,7 +259,7 @@ Grid Sector::make() const {
             double x = double(i) / m_nx;
             for (size_t j = 0; j <= m_nx; ++j) {
                 double y = double(j) / m_nx;
-                CV[i][j] = GridNode::create(v0 + a * x + b * y + skew * x * y);
+                CV[i][j] = Node::create(v0 + a * x + b * y + skew * x * y);
             }
         }
 
@@ -275,9 +275,9 @@ Grid Sector::make() const {
             double phi = (M_PI_4 * i) / m_nx;
             for (size_t j = 1; j < m_ny; ++j) {
                 double r = m_r0 * pow(1.0 + d_alpha, j);
-                SV[i][j] = GridNode::create(to_cartesian(r, phi));
+                SV[i][j] = Node::create(to_cartesian(r, phi));
             }
-            SV[i][m_ny] = GridNode::create(to_cartesian(m_r1, phi));
+            SV[i][m_ny] = Node::create(to_cartesian(m_r1, phi));
         }
 
 
@@ -372,7 +372,7 @@ Grid Sector::make() const {
 
             double xi = 2.0 * m_part_angle / M_PI;
 
-            auto transform = [this, xi](GridNode::Ref v) {
+            auto transform = [this, xi](Node::Ref v) {
                 if (!v) { return; }
                 double r = std::sqrt(v->pos.x() * v->pos.x() + v->pos.y() * v->pos.y());
                 double phi = std::atan2(v->pos.y(), v->pos.x());
@@ -405,7 +405,7 @@ Grid Sector::make() const {
         //     Симметризация
         // ========================================================================
 
-        auto symmetrization = [this](GridNode::Ref p1, GridNode::Ref p2) {
+        auto symmetrization = [this](Node::Ref p1, Node::Ref p2) {
             Vector3d v1 = p1->pos;
             Vector3d v2 = p2->pos;
 
@@ -439,7 +439,7 @@ Grid Sector::make() const {
         for (size_t r = 1; r < m_parts; ++r) {
             for (size_t j = 0; j <= m_ny; ++j) {
                 for (size_t i = 1; i <= 2 * m_nx; ++i) {
-                    SV[2 * m_nx * r + i][j] = GridNode::create(rotate(SV[i][j]->pos, r));
+                    SV[2 * m_nx * r + i][j] = Node::create(rotate(SV[i][j]->pos, r));
                 }
             }
         }
@@ -449,11 +449,11 @@ Grid Sector::make() const {
             for (size_t j = 0; j <= m_nx; ++j) {
                 Vector3d v = CV[i][j]->pos;
                 if (m_parts > 1) {
-                    CV2[m_nx - j][i] = GridNode::create(rotate(v, 1));
+                    CV2[m_nx - j][i] = Node::create(rotate(v, 1));
                     if (m_parts > 2) {
-                        CV3[m_nx - i][m_nx - j] = GridNode::create(rotate(v, 2));
+                        CV3[m_nx - i][m_nx - j] = Node::create(rotate(v, 2));
                         if (m_parts > 3) {
-                            CV4[j][m_nx - i] = GridNode::create(rotate(v, 3));
+                            CV4[j][m_nx - i] = Node::create(rotate(v, 3));
                         }
                     }
                 }
@@ -517,13 +517,13 @@ Grid Sector::make() const {
         SV[i].resize(m_ny + m_Ny + 1);
 
         double phi = m_angle * double(i) / m_Nx;
-        SV[i][m_ny] = GridNode::create(to_cartesian(m_r1, phi));
+        SV[i][m_ny] = Node::create(to_cartesian(m_r1, phi));
         for (size_t j = 1; j < m_Ny; ++j) {
             double r = m_r1 * std::pow(1.0 + D_alpha, m_zeta * j);
 
-            SV[i][m_ny + j] = GridNode::create(to_cartesian(r, phi));
+            SV[i][m_ny + j] = Node::create(to_cartesian(r, phi));
         }
-        SV[i][m_ny + m_Ny] = GridNode::create(to_cartesian(m_r2, phi));
+        SV[i][m_ny + m_Ny] = Node::create(to_cartesian(m_r2, phi));
     }
     if (m_hole) {
         for (size_t i = 0; i <= m_Nx; ++i) {
@@ -551,7 +551,7 @@ Grid Sector::make() const {
     // ========================================================================
 
     auto get_center_vface = [&](size_t x, size_t y, size_t r)
-            -> std::array<GridNode::Ptr, 2> {
+            -> std::array<Node::Ptr, 2> {
         z_assert(x <= m_nx, "out of range");
         z_assert(y <= m_nx, "out of range");
         switch (r) {
@@ -563,7 +563,7 @@ Grid Sector::make() const {
     };
 
     auto get_sector_vface = [&SV](size_t x, size_t y)
-            -> std::array<GridNode::Ptr, 2> {
+            -> std::array<Node::Ptr, 2> {
 
         return {SV[x][y], SV[x][y + 1]};
     };
@@ -575,7 +575,7 @@ Grid Sector::make() const {
     grid.reserve_cells(m_size);
     grid.reserve_nodes(max_nodes);
 
-    std::vector<GridNode::Ptr> vlist(4, nullptr);
+    std::vector<Node::Ptr> vlist(4, nullptr);
 
     // Создаем вершины центральной части
     for (size_t r = 0; r < m_parts; ++r) {

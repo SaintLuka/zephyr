@@ -34,8 +34,8 @@ Vector3d Line::get(const Vector3d &v1, const Vector3d &v2, double x) {
     return 0.5 * (1.0 - x) * v1 + 0.5 * (1.0 + x) * v2;
 }
 
-Vector3d Line::normal(const Vector3d &v1, const Vector3d &v2, const Vector3d &c) {
-    return perpendicular(v2 - v1, v1 - c);
+Vector3d Line::normal(const Vector3d &v1, const Vector3d &v2, const Vector3d &view) {
+    return perpendicular(v2 - v1, v1 - view);
 }
 
 double Line::Jacobian() const {
@@ -62,8 +62,8 @@ Vector3d Line::centroid(bool axial) const {
     return Vector3d{c.x() + coeff * dx, c.y() + coeff * dy, c.z()};
 }
 
-Vector3d Line::normal(const Vector3d &c) const {
-    return perpendicular(verts[1] - verts[0], verts[0] - c);
+Vector3d Line::normal(const Vector3d &view) const {
+    return perpendicular(verts[1] - verts[0], verts[0] - view);
 }
 
 double Line::length() const {
@@ -74,8 +74,8 @@ double Line::area_as() const {
     return 0.5 * (verts[0].y() + verts[1].y()) * (verts[1] - verts[0]).norm();
 }
 
-Vector3d Line::area_n(const Vector3d& c) const {
-    return length() * normal(c);
+Vector3d Line::area_n(const Vector3d& view) const {
+    return length() * normal(view);
 }
 
 // ============================================================================
@@ -143,13 +143,13 @@ const Vector3d &SqLine::center() const {
     return verts[1];
 }
 
-Vector3d SqLine::normal(const Vector3d &c) const {
+Vector3d SqLine::normal(const Vector3d &view) const {
     // Это не заглушка, было установлено, что в расчете потока через
     // криволинейную грань следует использовать такую же нормаль,
     // как при расчете через обычную грань.
     // Единственное, здесь добавляется проекция на плоскость кривой.
 
-    Vector3d a = projection(verts[1] - c);
+    Vector3d a = projection(verts[1] - view);
     return perpendicular(verts[2] - verts[0], a);
 }
 

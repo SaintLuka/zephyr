@@ -279,19 +279,19 @@ Grid Rectangle::create_classic() const {
     grid.reserve_nodes((m_nx + 1) * (m_ny + 1));
     grid.reserve_cells(m_nx * m_ny);
 
-    std::vector nodes(m_nx + 1, std::vector<GridNode::Ptr>(m_ny + 1));
+    std::vector nodes(m_nx + 1, std::vector<Node::Ptr>(m_ny + 1));
     for (int i = 0; i <= m_nx; ++i) {
         for (int j = 0; j <= m_ny; ++j) {
             double x = m_xmin + i * dx;
             double y = m_ymin + j * dy;
-            nodes[i][j] = GridNode::create({x, y, 0.0});
+            nodes[i][j] = Node::create({x, y, 0.0});
         }
     }
 
     // Ячейки как полигоны, обход граней и вершин против часовой
     // стрелки, начиная с нижней левой вершины (нижней грани)
     std::vector<Boundary> bc(4);
-    std::vector<GridNode::Ptr> quad_nodes(4);
+    std::vector<Node::Ptr> quad_nodes(4);
     for (int i = 0; i < m_nx; ++i) {
         bc[Side2D::L] = i == 0      ? m_bounds.left   : Boundary::INNER;
         bc[Side2D::R] = i == m_nx-1 ? m_bounds.right  : Boundary::INNER;
@@ -321,12 +321,12 @@ Grid Rectangle::create_classic_amr() const {
     grid.reserve_nodes((m_nx + 1) * (m_ny + 1));
     grid.reserve_cells(m_nx * m_ny);
 
-    std::vector nodes(m_nx + 1, std::vector<GridNode::Ptr>(m_ny + 1));
+    std::vector nodes(m_nx + 1, std::vector<Node::Ptr>(m_ny + 1));
     for (int i = 0; i <= m_nx; ++i) {
         for (int j = 0; j <= m_ny; ++j) {
             double x = m_xmin + i * dx;
             double y = m_ymin + j * dy;
-            nodes[i][j] = GridNode::create({x, y, 0.0});
+            nodes[i][j] = Node::create({x, y, 0.0});
         }
     }
 
@@ -365,20 +365,20 @@ Grid Rectangle::create_voronoi() const {
     double y_shift = m_ymin;
 
     // Вершины в виде таблицы
-    std::vector vertices(Nx + 2, std::vector<GridNode::Ptr>(2 * Ny + 1, nullptr));
+    std::vector vertices(Nx + 2, std::vector<Node::Ptr>(2 * Ny + 1, nullptr));
 
     for (size_t j = 0; j <= 2 * Ny; ++j) {
         double y = y_shift + h * j;
 
         // Часть вершин на левой границе пропускаем
         if (j % 2 == 0) {
-            vertices[0][j] = GridNode::create({m_xmin, y, 0.0});
+            vertices[0][j] = Node::create({m_xmin, y, 0.0});
             vertices[0][j]->bc = m_bounds.left;
         }
 
         for (size_t i = 1; i <= Nx; ++i) {
             double x = x_shift + double(3 * i - (i + j) % 2) * 0.5 * D;
-            vertices[i][j] = GridNode::create({x, y, 0.0});
+            vertices[i][j] = Node::create({x, y, 0.0});
 
             if (j == 0) {
                 vertices[i][j]->bc = m_bounds.bottom;
@@ -389,16 +389,16 @@ Grid Rectangle::create_voronoi() const {
 
         // Часть вершин на правой границе пропускаем
         if (j == 0 || j == 2 * Ny || j % 2 == Nx % 2) {
-            vertices[Nx + 1][j] = GridNode::create({m_xmax, y, 0.0});
+            vertices[Nx + 1][j] = Node::create({m_xmax, y, 0.0});
             vertices[Nx + 1][j]->bc = m_bounds.right;
         }
     }
 
-    using VList = std::vector<GridNode::Ptr>;
+    using VList = std::vector<Node::Ptr>;
 
     auto erase_nans = [](VList& vlist) {
         const auto to_remove = std::ranges::remove_if(vlist,
-            [](GridNode::Ref v) -> bool { return !v; }).begin();
+            [](Node::Ref v) -> bool { return !v; }).begin();
         vlist.erase(to_remove, vlist.end());
     };
 

@@ -1,7 +1,7 @@
 add_subdirectory(curves)
 add_subdirectory(generator)
 add_subdirectory(primitives)
-add_subdirectory(grid-src)
+add_subdirectory(grid)
 
 set(ZEPHYR_GEOM_SRC
         ${ZEPHYR_GEOM_CURVES_SRC}

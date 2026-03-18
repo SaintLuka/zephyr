@@ -15,71 +15,37 @@ inline bool bad_normal(const Vector3d& n) {
     return n.hasNaN() || n.squaredNorm() == 0.0;
 }
 
-Polygon::Polygon()
-    : vs({}) , m_center(Vector3d::Zero()) {
+Polygon::Polygon() = default;
+
+Polygon::Polygon(std::initializer_list<Vector3d> vertices)
+    : vs(vertices) {
+    calc_params();
 }
 
-Polygon::Polygon(int size)
-    : vs(size, Vector3d::Zero()), m_center(Vector3d::Zero()) {
-
+Polygon::Polygon(std::span<const Vector3d> vertices)
+    : vs(vertices.begin(), vertices.end()) {
+    calc_params();
 }
 
-Polygon::Polygon(const Vector3d* buff, int size, bool sort) {
-    vs.resize(size);
-    std::memcpy((void *) vs.data(), (void *) buff, size * sizeof(Vector3d));
-    setup_center();
-    if (sort) {
-        Polygon::sort();
-    }
-}
-
-Polygon::Polygon(const std::vector<Vector3d>& vertices, bool sort)
-        : vs(vertices) {
-    setup_center();
-    if (sort) {
-        Polygon::sort();
-    }
-}
-
-Polygon::Polygon(std::vector<Vector3d>&& vertices, bool sort)
+Polygon::Polygon(std::vector<Vector3d>&& vertices)
     :vs(std::move(vertices)) {
-    setup_center();
-    if (sort) {
-        Polygon::sort();
-    }
+    calc_params();
 }
 
-Polygon::Polygon(std::initializer_list<Vector3d>&& list, bool sort)
-    : vs(std::move(list)) {
-    setup_center();
-    if (sort) {
-        Polygon::sort();
-    }
-}
-
-void Polygon::setup_center() {
-    m_center = {0.0, 0.0, 0.0};
-    for (auto &v: vs) {
+void Polygon::calc_params() {
+    m_center = Vector3d::Zero();
+    if (vs.empty()) return;
+    for (const auto &v: vs) {
         m_center += v;
+        if (m_center.z() != 0.0) {
+            plane_oxy = false;
+        }
     }
     m_center /= vs.size();
 }
 
-void Polygon::reserve(int size) {
-    vs.reserve(size);
-}
-
-void Polygon::set(int idx, const Vector3d& p) {
-    m_center += (p - vs[idx]) / vs.size();
-    vs[idx] = p;
-}
-
-void Polygon::operator+=(const Vector3d& p) {
-    m_center = (vs.size() * m_center + p) / (vs.size() + 1);
-    vs.emplace_back(p);
-}
-
 std::vector<double> Polygon::xs() const {
+    z_assert(plane_oxy, "Polygon::xs: not plain polygon");
     if (empty()) {
         return {};
     }
@@ -92,6 +58,7 @@ std::vector<double> Polygon::xs() const {
 }
 
 std::vector<double> Polygon::ys() const {
+    z_assert(plane_oxy, "Polygon::ys: not plain polygon");
     if (empty()) {
         return {};
     }
@@ -102,67 +69,80 @@ std::vector<double> Polygon::ys() const {
     res[size()] = vs[0].y();
     return res;
 }
-/*
-void Polygon::print_numpy() const {
-    std::cout << "x = np.array([";
-    for (int i = 0; i < size(); ++i) {
-        std::cout << vs[i].x() << ", ";
-    }
-    if (!empty()) {
-        std::cout << vs[0].x();
-    }
-    std::cout << "])\n";
 
-    std::cout << "y = np.array([";
-    for (int i = 0; i < size(); ++i) {
-        std::cout << vs[i].y() << ", ";
-    }
-    if (!empty()) {
-        std::cout << vs[0].y();
-    }
-    std::cout << "])\n";
-}
-*/
 Box Polygon::bbox() const {
     if (empty()) {
-        return {Vector3d::Zero(), Vector3d::Zero()};
+        return Box::Zero();
     }
-
-    const double max = +std::numeric_limits<double>::infinity();
-    const double min = -std::numeric_limits<double>::infinity();
-
-    Vector3d vmin = {max, max, min};
-    Vector3d vmax = {min, min, max};
-    for (int i = 0; i < size(); ++i) {
-        if (vs[i].x() < vmin.x()) {
-            vmin.x() = vs[i].x();
-        }
-        else if (vs[i].x() > vmax.x()) {
-            vmax.x() = vs[i].x();
-        }
-
-        if (vs[i].y() < vmin.y()) {
-            vmin.y() = vs[i].y();
-        }
-        else if (vs[i].y() > vmax.y()) {
-            vmax.y() = vs[i].y();
-        }
+    Box bbox = Box::Empty(plane_oxy ? 2 : 3);
+    for (const auto &v: vs) {
+        bbox.capture(v);
     }
-
-    return {vmin, vmax};
+    return bbox;
 }
 
 Vector3d Polygon::center() const {
     return m_center;
 }
 
-void Polygon::sort() {
-    std::sort(vs.begin(), vs.end(),
-              [this](const Vector3d &a, const Vector3d &b) -> bool {
-                  double phi_a = std::atan2(a.y() - m_center.y(), a.x() - m_center.x());
-                  double phi_b = std::atan2(b.y() - m_center.y(), b.x() - m_center.x());
-                  return phi_a < phi_b;
-              });
+// Компаратор для точек полигона на плоскости Oxy, упорядочивает точки
+// на плоскости против часовой стрелки.
+struct Comp2D {
+    Comp2D(const Vector3d& center) : c(center) { }
+
+    // Сравнение пары точек по углу
+    bool operator()(const Vector3d& v1, const Vector3d& v2) const {
+        double phi_a = std::atan2(v1.y() - c.y(), v1.x() - c.x());
+        double phi_b = std::atan2(v2.y() - c.y(), v2.x() - c.x());
+        return phi_a < phi_b;
+    }
+private:
+    Vector3d c;   // Центральная точка
+};
+
+// Компаратор для точек полигона в пространстве, упорядочивает точки полигона
+// в пространстве против часовой стрелки вокруг нормали n.
+struct Comp3D {
+    Comp3D(const Vector3d& c, const Vector3d& n, const Vector3d& v0)
+            : c(c), n(n) {
+        e_x = (v0 - c).normalized();
+        e_y = n.cross(e_x);
+    }
+
+    // Проекция точек на плоскость и сравнение по углу
+    bool operator()(const Vector3d& v1, const Vector3d& v2) const {
+        double x1 = (v1 - c).dot(e_x);
+        double y1 = (v1 - c).dot(e_y);
+        double x2 = (v2 - c).dot(e_x);
+        double y2 = (v2 - c).dot(e_y);
+
+        double phi1 = std::atan2(y1, x1);
+        double phi2 = std::atan2(y2, x2);
+        return phi1 < phi2;
+    }
+
+private:
+    Vector3d c;   // Точка плоскости
+    Vector3d n;   // Нормаль к плоскости
+
+    // Базис в плоскости
+    Vector3d e_x, e_y;
+};
+
+Polygon& Polygon::sort() {
+    z_assert(plane_oxy, "Polygon::sort: not plain polygon");
+    Comp2D comp(m_center);
+    std::ranges::sort(vs, comp);
+    return *this;
+}
+
+Polygon& Polygon::sort(const Vector3d& view) {
+    z_assert(!plane_oxy, "Polygon::sort: plain polygon");
+    Vector3d fc = center();
+    Vector3d normal = (fc - view).normalized();
+    Comp3D comp(fc, normal, vs.front());
+    std::ranges::sort(vs, comp);
+    return *this;
 }
 
 // vector product [v1, v2].z
@@ -177,6 +157,7 @@ double cross(const Vector3d& c, const Vector3d& v1, const Vector3d& v2) {
 }
 
 bool Polygon::inside(const Vector3d& p) const {
+    z_assert(plane_oxy, "Polygon::inside: not plain polygon");
     obj::ray ray = {p, Vector3d{0.123, 0.346433, 0.0}};
 
     // even-odd rule
@@ -190,40 +171,84 @@ bool Polygon::inside(const Vector3d& p) const {
     return counter % 2 > 0;
 }
 
+Vector3d Polygon::normal(const Vector3d& view) const {
+    if (plane_oxy) {
+        return Vector3d{0.0, 0.0, view.z() <= 0.0 ? 1.0 : -1.0};
+    }
+
+    Vector3d S = Vector3d::Zero();
+    for (int i = 0; i < size(); ++i) {
+        const auto &v1 = vs[i];
+        const auto &v2 = vs[(i + 1) % size()];
+        S += (v1 - m_center).cross(v2 - m_center);
+    }
+    if ((m_center - view).dot(S) < 0.0) {
+        S *= -1.0;
+    }
+    return S.normalized();
+}
+
 double Polygon::area() const {
-    double S = 0.0;
+    if (plane_oxy) {
+        double S = 0.0;
+        for (int i = 0; i < size(); ++i) {
+            const auto &v1 = vs[i];
+            const auto &v2 = vs[(i + 1) % size()];
+            S += cross(m_center, v1, v2);
+        }
+        return 0.5 * S;
+    }
+
+    Vector3d S = Vector3d::Zero();
+    for (int i = 0; i < size(); ++i) {
+        const auto &v1 = vs[i];
+        const auto &v2 = vs[(i + 1) % size()];
+        S += (v1 - m_center).cross(v2 - m_center);
+    }
+    return 0.5 * S.norm();
+}
+
+Vector3d Polygon::centroid(double S) const {
+    if (plane_oxy) {
+        if (S == 0.0) {
+            S = area();
+        }
+
+        Vector3d C = {0.0, 0.0, 0.0};
+        for (int i = 0; i < size(); ++i) {
+            auto &v1 = vs[i];
+            auto &v2 = vs[(i + 1) % size()];
+
+            C.x() += (v2.y() - v1.y()) * (v2.x() * v2.x() + v2.x() * v1.x() + v1.x() * v1.x());
+            C.y() -= (v2.x() - v1.x()) * (v2.y() * v2.y() + v2.y() * v1.y() + v1.y() * v1.y());
+        }
+        C /= (6.0 * S);
+
+        return C;
+    }
+
+    Vector3d C = Vector3d::Zero();
+    double area_sum = 0.0;
     for (int i = 0; i < size(); ++i) {
         const auto &v1 = vs[i];
         const auto &v2 = vs[(i + 1) % size()];
 
-        S += cross(m_center, v1, v2);
+        // барицентр и площадь треугольника
+        Vector3d ci = (1.0 / 3.0) * (v1 + v2 + m_center);
+        double area_i = 0.5 * (v1 - m_center).cross(v2 - m_center).norm();
+        C += ci * area_i;
+        area_sum += area_i;
     }
-    return 0.5 * S;
-}
-
-Vector3d Polygon::centroid(double S) const {
-    if (S == 0.0) {
-        S = area();
-    }
-
-    Vector3d C = {0.0, 0.0, 0.0};
-    for (int i = 0; i < size(); ++i) {
-        auto &v1 = vs[i];
-        auto &v2 = vs[(i + 1) % size()];
-
-        C.x() += (v2.y() - v1.y()) * (v2.x() * v2.x() + v2.x() * v1.x() + v1.x() * v1.x());
-        C.y() -= (v2.x() - v1.x()) * (v2.y() * v2.y() + v2.y() * v1.y() + v1.y() * v1.y());
-    }
-    C /= (6.0 * S);
-
-    return C;
+    C /= area_sum;
+    return C / area_sum;
 }
 
 double Polygon::volume_as() const {
-    return NAN;
+    throw std::runtime_error("Polygon::volume_as: not implemented");
 }
 
 double Polygon::clip_area(const std::function<bool(const Vector3d&)>& inside, int N) const {
+    z_assert(plane_oxy, "Polygon::clip_area: not plain polygon");
     int n = std::max(1, N / size());
 
     double area = 0.0;
@@ -239,6 +264,7 @@ double Polygon::clip_area(const std::function<bool(const Vector3d&)>& inside, in
 }
 
 Polygon Polygon::clip(const Vector3d& p, const Vector3d& n) const {
+    z_assert(plane_oxy, "Polygon::clip: not plain polygon");
     if (empty()) {
         return {};
     }
@@ -306,7 +332,7 @@ AnS clip_area_and_slice(const Polygon& poly, const Vector3d& p, const Vector3d& 
     Vector3d sec_out_in;
 
     // Индекс стороны многоугольника, на которой первая точка внутри,
-    // а вторая снуружи, sec_in_out -- пересечение
+    // а вторая снаружи, sec_in_out -- пересечение
     int idx_in_out = -1;
     Vector3d sec_in_out;
 
@@ -456,7 +482,7 @@ Vector3d find_section_bisect(const Polygon& poly, const Vector3d& n, double alph
     return v_avg;
 }
 
-// Сходится дольше, чем метод бисекции, почему?
+// Сходится дольше, чем метод дихотомии, почему?
 // Надо ещё метод Брента попробовать
 Polygon::section find_section_newton(const Polygon& poly, const Vector3d& n, double alpha) {
 #if COUNT_ITERATIONS

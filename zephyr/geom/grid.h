@@ -3,11 +3,13 @@
 #include <memory>
 #include <vector>
 #include <optional>
+#include <boost/container/static_vector.hpp>
 
 #include <zephyr/geom/vector.h>
 #include <zephyr/geom/boundary.h>
 #include <zephyr/geom/cell_type.h>
 #include <zephyr/utils/csr.h>
+
 
 namespace zephyr::geom {
 
@@ -18,141 +20,260 @@ namespace zephyr::geom {
 using id_t = std::uint32_t;
 static constexpr id_t invalid_id = static_cast<id_t>(-1);
 
-/// @brief Draft node object used only during grid construction.
-/// User creates/moves/owns these objects and passes pointers to Grid.
-/// Grid uses hidden builder state for pointer-identity deduplication.
-struct GridNode {
-    using Ptr = std::shared_ptr<GridNode>;
-    using Ref = const std::shared_ptr<GridNode>&;
+/// @brief Вектор неопределенных значений
+inline Vector3d nanvec() { return {NAN, NAN, NAN}; }
 
-    Vector3d pos{0.0, 0.0, 0.0};
-    Boundary bc{Boundary::UNDEFINED};
+/// @brief Тип локального индекса в ячейке
+using node_id_t = std::uint8_t;
 
-    static Ptr create(const Vector3d& v) {
-        return std::make_shared<GridNode>(v);
-    }
+/// @brief Максимальное число узлов в ячейке (до 255)
+constexpr std::uint8_t max_nodes_per_cell = std::numeric_limits<std::uint8_t>::max();
 
-    static Ptr create(double x, double y) {
-        return std::make_shared<GridNode>(Vector3d{x, y, 0.0});
-    }
+/// @brief Максимальное число вершин на грани ячейки
+constexpr std::uint8_t max_nodes_per_face = 16;
 
-    GridNode() = default;
+/// @brief Локальные индексы вершин внутри ячейки (можно использовать std::vector)
+using node_ids_t = boost::container::static_vector<node_id_t, max_nodes_per_face>;
 
-    GridNode(const Vector3d& v) : pos(v) { }
+// ============================================================================
+//                           Сеточные примитивы
+// ============================================================================
 
+/// @brief Узел сетки (положение + индекс). Индекс проставляет Grid,
+/// при этом выполняется дедубликация по указателям.
+class Node {
+public:
+    using Ptr = std::shared_ptr<Node>;
+    using Ref = const std::shared_ptr<Node>&;
+
+    Vector3d pos{nanvec()};           ///< Положение
+    Boundary bc{Boundary::UNDEFINED}; ///< Граничное условие
+
+
+    /// @brief Создать узел из Eigen вектора
+    explicit Node(const Vector3d& v);
+
+    /// @brief Создать узел из Eigen вектора
+    static Ptr create(const Vector3d& v);
+
+    /// @brief Создать узел (x, y) на плоскости
+    static Ptr create(double x, double y);
+
+    /// @brief Индекс узла
     id_t id() const noexcept { return m_id; }
+
+    /// @brief Конечные значения? Нет NAN и infinity.
+    bool is_finite() const;
+
+    /// @brief Точное сравнение координат и индексов
+    bool operator==(const Node& other) const;
+
+    /// @brief Точное сравнение координат и индексов
+    bool operator!=(const Node& other) const;
 
 private:
     friend class Grid;
-
-    // Builder-only state
-    id_t m_id{invalid_id};
+    id_t m_id{invalid_id};  ///< Индекс (для Grid builder)
 };
 
-// ============================================================================
-//               Finalized entities, minimal Grid description
-// ============================================================================
+/// @brief Грань ячейки
+class Face {
+public:
+    /// @brief Пустая грань без узлов и гран условий
+    Face() = default;
 
-/// @brief Finalized unique node stored in Grid after finalize().
-struct Node {
-    Vector3d pos{0.0, 0.0, 0.0};
-    Boundary bc{Boundary::UNDEFINED};
+    // ------------------------------- Индексы --------------------------------
+
+    /// @brief Локальные индексы проставлены?
+    bool has_nodes() const { return !m_nodes.empty(); }
+
+    /// @brief Число узлов грани
+    int n_nodes() const { return static_cast<int>(m_nodes.size()); }
+
+    /// @brief Получить локальный индекс i-ого узла
+    int node_idx(int i) const { return m_nodes[i]; }
+
+    /// @brief Локальные индексы узлов грани
+    const node_ids_t& nodes() const { return m_nodes; }
+
+    /// @brief Установить локальные индексы узлов
+    void set_nodes(std::span<const int> node_ids);
+
+    // ------------------------------ Связность -------------------------------
+
+    /// @brief Граничное условие на грани
+    Boundary bc() const { return m_bc; }
+
+    /// @brief Установить граничное условие
+    void set_bc(Boundary bc);
+
+    /// @brief Индекс соседней ячейки
+    id_t neib() const { return m_neib; }
+
+    /// @brief Установить индекс соседней ячейки (neib_id)
+    /// и индекс смежной грани внутри этой ячейки (face_id).
+    void set_neib(id_t neib_id, int face_id);
+
+    // ------------------------------ Геометрия -------------------------------
+
+    /// @brief Площадь грани
+    double area() const { return m_area_n.norm(); }
+
+    /// @brief Внешняя нормаль (относительно ячейки-владельца)
+    Vector3d normal() const { return m_area_n.normalized(); }
+
+    /// @brief Барицентр грани
+    Vector3d center() const { return m_center; }
+
+    /// @brief Установить площадь и внешнюю нормаль
+    void set_area_n(const Vector3d& S) { m_area_n = S; }
+
+    /// @brief Установить центр ячейки
+    void set_center(const Vector3d& C) { m_center = C; }
+
+    /// @brief Вычислить геометрию грани в виде отрезка
+    void calc_geom_line(const std::vector<Vector3d>& vertices, const Vector3d& view);
+
+    /// @brief Вычислить геометрию многоугольной грани
+    void calc_geom_poly(const std::vector<Vector3d>& vertices, const Vector3d& view);
+
+    /// @brief Вычислить геометрию грани двумерной AMR-ячейки
+    void calc_geom_amr2d(const std::vector<Vector3d>& vertices, const Vector3d& view);
+
+    /// @brief Вычислить геометрию грани трёхмерной AMR-ячейки
+    void calc_geom_amr3d(const std::vector<Vector3d>& vertices, const Vector3d& view);
+
+private:
+    node_ids_t m_nodes{};           ///< Локальные индексы (внутри ячейки)
+    Vector3d   m_area_n{nanvec()};  ///< Площадь на внешнюю нормаль
+    Vector3d   m_center{nanvec()};  ///< Барицентр грани
+
+    Boundary m_bc{Boundary::UNDEFINED};  ///< Граничное условие
+    id_t m_neib{invalid_id};             ///< Индекс соседней ячейки (-1 для boundary)
+    int  m_twin{-1};                     ///< Индекс грани у соседней ячейки
 };
 
-/// @brief Finalized cell stored in Grid after finalize().
-struct Cell {
-    CellType type{CellType::QUAD};
-    std::vector<id_t> nodes{}; ///< node ids (ordering matters, VTK)
+/// @brief Ячейка сетки.
+class Cell {
+public:
+    // ---------------------------- Инициализация -----------------------------
+
+    /// @brief Конструктор базовой ячейки (только необходимое)
+    Cell(CellType type, std::vector<id_t>&& node_ids);
+
+    /// @brief Конструктор базовой ячейки (только необходимое)
+    Cell(CellType type, std::initializer_list<id_t> node_ids);
+
+    /// @brief Установить граничные условия, если граней нет, то они будут созданы
+    void set_face_bc(const std::vector<Boundary>& face_bc);
+
+    /// @brief Инициализировать локальные индексы вершин граней (не работает для POLYHEDRON)
+    void init_faces();
+
+    /// @brief Установить локальные индексы вершин граней (только для POLYHEDRON)
+    void set_faces(const std::vector<std::vector<int>>& face_ids);
+
+
+    /// @brief Тип ячейки
+    CellType type() const { return m_type; }
+
+    /// @brief Число вершин ячейки
+    int n_nodes() const { return static_cast<int>(m_nodes.size()); }
+
+    /// @brief Получить индекс вершины ячейки
+    id_t node_idx(int i) const { return m_nodes[i]; }
+
+    /// @brief Массив индексов вершин ячейки
+    const std::vector<id_t>& nodes() const { return m_nodes; }
+
+    /// @brief Массив граничных условий константного размера
+    template <int N>
+    std::array<Boundary, N> faces_bc() const {
+        std::array<Boundary, N> bc;
+        bc.fill(Boundary::UNDEFINED);
+        for (int i = 0; i < std::min(N, n_faces()); ++i) {
+            bc[i] = m_faces[i].bc();
+        }
+        return bc;
+    }
+
+
+
+    bool has_faces() const { return !m_faces.empty(); }
+
+    int n_faces() const { return static_cast<int>(m_faces.size()); }
+
+    const Face& get_face(int iface) const { return m_faces[iface]; }
+
+    void set_bc(int iface, Boundary bc) { m_faces[iface].set_bc(bc); }
+
+    void set_neib(int iface, id_t neib_id, int face_id);
+
+    const std::vector<Face>& faces() const { return m_faces; }
+
+
+
+    // ----------------------------- Модификации ------------------------------
+
+    /// @brief Заменить индексы узлов (количество должно быть то же)
+    void replace_nodes(std::vector<id_t>&& new_nodes);
+
+    /// @brief Зеркально отразить ячейку
+    void mirror();
+
+    // ------------------------------ Геометрия -------------------------------
+
+    /// @brief Объем ячейки
+    double volume() const { return m_volume; }
+
+    /// @brief Барицентр ячейки
+    Vector3d centroid() const { return m_center; }
+
+    /// @brief Среднее вершин грани
+    Vector3d face_center(const std::vector<Node>& grid_nodes, int iface) const;
+
+    /// @brief Среднее вершин ячейки
+    Vector3d center(const std::vector<Node>& grid_nodes) const;
+
+    /// @brief Вычислить геометрию ячейки и граней
+    void calc_geom(const std::vector<Node>& grid_nodes);
+
+private:
+    CellType m_type{};            ///< Тип ячейки
+    std::vector<id_t> m_nodes{};  ///< Индексы вершин
+    std::vector<Face> m_faces{};  ///< Грани (optional)
+
+    Vector3d m_center{nanvec()};  ///< Барицентр ячейки
+    double   m_volume{NAN};       ///< Объем ячейки
 };
 
-// ============================================================================
-//                  Geometry and topology caches (optional)
-// ============================================================================
+// FaceKey for merging (order-insensitive: sorted node ids)
+struct FaceKey {
+    std::vector<id_t> ids;
 
-/// @brief Optional computed geometry for faces/cells.
-/// Presence depends on finalize options.
-struct GeometryCache {
-    // Cell geometry (size = n_cells)
-    std::vector<Vector3d> cell_centroids{};
-    std::vector<double>   cell_volumes{};
+    explicit FaceKey(const Cell& cell, const Face& face) {
+        const auto& cell_nodes = cell.nodes();
+        ids.reserve(face.n_nodes());
+        for (auto loc_id: face.nodes()) {
+            ids.push_back(cell_nodes[loc_id]);
+        }
+        std::ranges::sort(ids);
+    }
 
-    // Face geometry (size = n_faces)
-    std::vector<Vector3d> face_centroids{};
-    std::vector<Vector3d> face_normals{};   // convention: outward from owner cell
-    std::vector<double>   face_areas{};
-
-    /// @brief Clear all cached geometry.
-    void clear();
+    bool operator==(const FaceKey& o) const noexcept {
+        return ids == o.ids;
+    }
 };
 
-/// @brief Faces-derived data (optional). Built in finalize() depending on BuildOptions.
-/// Invariants (when built):
-///   - n_faces = owner_cell.size() = neighbor_cell.size() = face_bc.size()
-///   - face_nodes.size() == n_faces
-///   - cell_faces.size() == n_cells
-struct FacesCache {
-    /// @brief For each cell: list of face ids (size = n_cells rows).
-    Csr<id_t, id_t> cell_faces{};
-
-    /// @brief For each face: owner cell id (size = n_faces).
-    std::vector<id_t> owner_cell{};
-
-    /// @brief For each face: neighbor cell id (size = n_faces).
-    /// invalid_id for boundary faces.
-    std::vector<id_t> neighbor_cell{};
-
-    /// @brief For each face: boundary tag/type (size = n_faces).
-    /// Meaningful for boundary faces (neighbor_cell == invalid_id).
-    std::vector<Boundary> face_bc{};
-
-    /// @brief For each face: list of global node ids (size = n_faces).
-    Csr<id_t, id_t> face_nodes{};
-
-    // ---- Optional connectivity extras ----
-
-    /// @brief Opposite oriented face id for per-cell storage (size = n_faces).
-    /// invalid_id for boundary faces or if not built / not applicable.
-    std::vector<id_t> twin_face{};
-
-    /// @brief Local node indices in owner cell for each face (size = n_faces).
-    Csr<std::uint16_t, id_t> local_nodes{};
-
-    /// @brief Clear all face caches.
-    void clear();
-
-    /// @brief Number of faces in cache.
-    std::size_t n_faces() const noexcept;
-
-    /// @brief Basic consistency check (throws on mismatch).
-    void validate_or_throw(std::size_t n_cells_expected) const;
-};
-
-/// @brief Edges-derived data (optional). Built in finalize() depending
-/// on BuildOptions, size = n_edges.
-struct EdgesCache {
-    /// @brief Pairs of nodes global indices
-    std::vector<std::array<id_t, 2>> edges{};
-
-    /// @brief Optional computed incidence for edges
-    Csr<id_t, id_t> edge_faces{};
-    Csr<id_t, id_t> edge_cells{};
-
-    /// @brief Clear all face caches.
-    void clear();
-
-    /// @brief Number of faces in cache.
-    std::size_t n_edges() const noexcept;
-
-    /// @brief Basic consistency check (throws on mismatch).
-    void validate_or_throw() const;
-};
-
-/// @brief Optional computed incidence for nodes.
-struct IncidenceCache {
-    Csr<id_t, id_t> node_cells;
-    Csr<id_t, id_t> node_faces;
-
-    void clear();
+struct FaceKeyHash {
+    std::size_t operator()(const FaceKey& k) const noexcept {
+        // FNV-1a-ish combine
+        std::size_t h = 1469598103934665603ull;
+        for (size_t v: k.ids) {
+            h ^= v + 0x9e3779b97f4a7c15ull + (h<<6) + (h>>2);
+        }
+        return h;
+    }
 };
 
 // ============================================================================
@@ -185,7 +306,7 @@ class Grid {
 public:
     /// @brief Grid state: editable (draft) or finalized (extended).
     enum class State {
-        editable, finalized
+        Editable, Finalized
     };
 
     /// @brief Grid type
@@ -200,28 +321,10 @@ public:
 
     /// @brief Options controlling what finalize() computes/builds.
     struct BuildOptions {
-        /// @brief Controls face construction and storage mode.
-        enum class FaceOption {
-            none,     ///< Do not build faces cache at all.
-            unique,   ///< Build one face per topological face (internal faces are shared).
-            per_cell  ///< Build faces per cell (internal faces duplicated, oriented per owner).
-        };
+        bool build_faces{false};       ///< Build faces per cell
+        bool build_node_cells{false};  ///< Build IncidenceCache::node_cells
 
-        FaceOption faces{FaceOption::none};
-
-        bool build_face_local_indices{false}; ///< Build FacesCache::local_nodes (per-face local indices in owner cell).
-        bool build_twin_face{false};          ///< Build FacesCache::twin_face (only meaningful for per_cell).
-
-        bool build_edges{false};              ///< Build EdgesCache
-
-        bool build_node_cells{false};         ///< Build IncidenceCache::node_cells (CSR).
-        bool build_node_faces{false};         ///< Build IncidenceCache::node_faces (CSR). Requires faces != none.
-
-        bool compute_face_geometry{false};    ///< Build GeometryCache face arrays. Requires faces != none.
-        bool compute_cell_geometry{false};    ///< Build GeometryCache cell arrays.
-
-        /// @brief Validate option compatibility.
-        void validate_or_throw(int dim) const;
+        void validate();
     };
 
 public:
@@ -237,10 +340,10 @@ public:
     State state() const noexcept { return m_state; }
 
     /// @brief True if grid is in editable state.
-    bool is_editable() const noexcept { return m_state == State::editable; }
+    bool is_editable() const noexcept { return m_state == State::Editable; }
 
     /// @brief True if grid is finalized.
-    bool is_finalized() const noexcept { return m_state == State::finalized; }
+    bool is_finalized() const noexcept { return m_state == State::Finalized; }
 
     // --------------------------
     // Editable API
@@ -249,10 +352,6 @@ public:
     /// @brief Reset grid to empty editable state (invalidates all data).
     void clear();
 
-    /// @brief Begin a new editable build session (increments internal stamp).
-    ///        Useful when reusing the same Vertex objects across builds.
-    void begin_build();
-
     /// @brief Reserve array for nodes
     void reserve_nodes(id_t n_nodes);
 
@@ -260,15 +359,18 @@ public:
     void reserve_cells(id_t n_cells);
 
     /// @brief Add a node via shared pointer; returns node index.
-    id_t add_node(GridNode::Ref node);
+    id_t add_node(Node::Ref node);
+
+    /// @brief Add a node via shared pointer; returns node indices.
+    std::vector<id_t> add_nodes(const std::vector<Node::Ptr>& nodes);
 
     /// @brief Add a cell using a vector of
-    id_t add_cell(CellType type, const std::vector<GridNode::Ptr>& nodes,
-                  const std::vector<Boundary>& face_bc = {});
+    id_t add_cell(CellType type, const std::vector<Node::Ptr>& nodes,
+                  const std::vector<Boundary>& faces_bc = {});
 
     /// @brief Add a cell of special kind (CellType::POLYHEDRON)
-    id_t add_polyhedron(const std::vector<GridNode::Ptr>& nodes,
-                        const std::vector<std::vector<GridNode::Ptr>>& faces,
+    id_t add_polyhedron(const std::vector<Node::Ptr>& nodes,
+                        const std::vector<std::vector<Node::Ptr>>& faces,
                         const std::vector<Boundary>& faces_bc = {});
 
     // --------------------------
@@ -306,16 +408,18 @@ public:
     /// @param mode 1: триангуляция каждого квадрата на две части,
     ///             2: триангуляция каждого квадрата на 4 части
     ///                (с добавлением центральной точки)
-    void triangulation(int mode);
+    void triangulation(int mode = 2);
 
     /// @brief Делает сетку из кубиков сеткой из пирамидок
     void pyramidize();
 
+    /// @brief Транслировать двумерную сетку вдоль направления
+    /// @param p Полный вектор сдвига
+    /// @param N Число ячеек вдоль ребра
+    void extrude(const Vector3d& p, int N, Boundary side1, Boundary side2);
+
     /// @brief Convert Type::QUAD grid to Type::AMR grid (add additional unique nodes)
     void make_amr();
-
-    /// @brief Convert Type::AMR grid to Type::QUAD grid (remove intermediate nodes)
-    void reduce_amr();
 
     // --------------------------
     // Finalize API
@@ -323,7 +427,7 @@ public:
 
     /// @brief Build requested extended connectivity/geometry and switch to finalized state.
     ///        Releases draft storage unless keep_input_nodes == true.
-    void finalize(const BuildOptions& opt);
+    void finalize(const BuildOptions& options);
 
     // --------------------------
     // Read-only access (finalized)
@@ -336,7 +440,7 @@ public:
     bool adaptive() const noexcept { return m_type == Type::AMR; }
 
     /// @brief 3D polyhedral mesh?
-    bool polyhedral() const { throw std::runtime_error("sdfsdf"); }
+    bool polyhedral() const { return m_type == Type::POLYHEDRON; }
 
     /// @brief Number of unique nodes (finalized).
     std::size_t n_nodes() const noexcept { return m_nodes.size(); }
@@ -350,66 +454,20 @@ public:
     /// @brief Access finalized cells.
     const std::vector<Cell>& cells() const noexcept { return m_cells; }
 
-    /// @brief Faces were built  per cell (internal
-    /// faces duplicated, oriented per owner).
-    bool faces_per_cell() const noexcept;
-
     /// @brief Faces is computed?
     bool has_faces() const noexcept;
 
     /// @brief Number of faces if computed (else 0)
-    std::size_t n_faces() const noexcept;
-
-    const FacesCache& faces() const noexcept { return *m_faces; }
+    std::size_t total_faces_per_cell() const noexcept;
 
     /// @brief Number of nodes for each cell (with duplicates).
     std::size_t total_nodes_per_cell() const noexcept;
 
-    bool has_geometry() const noexcept { return m_geom.has_value(); }
-    bool has_cells_geometry() const noexcept;
-    bool has_faces_geometry() const noexcept;
-
-    const GeometryCache& geometry() const noexcept { return *m_geom; }
-
-
-    // --------------------------
-    // Validation / utilities
-    // --------------------------
-
-    /// @brief Validate basic invariants (ids in range, adjacency consistency, etc.).
-    /// @return true if valid, false otherwise; optionally fills report.
-    bool validate(std::string* report) const;
-
-    bool validate_draft(std::string* report = nullptr) const;
-    bool validate_finalized_basic(std::string* report = nullptr) const;
-    bool validate_finalized_full(std::string* report = nullptr) const;
-
 private:
+
     // ==========================
-    // Draft (editable) storage
-    // ==========================
-
-    struct DraftCell {
-        CellType type{CellType::QUAD};
-        std::vector<id_t> node_ids{};
-        std::vector<Boundary> face_bc{};
-
-        // Optional, only for CellType::POLYHEDRON
-        std::vector<id_t> poly_face_offsets{}; ///< size = n_faces + 1, offsets[0]=0
-        std::vector<id_t> poly_face_nodes{};   ///< flattened global node ids of faces
-    };
-
-    struct DraftData {
-        std::vector<GridNode::Ptr> nodes{};
-        std::vector<DraftCell>     cells{};
-
-        /// @brief Clear all draft buffers
-        void clear();
-    };
-
-    // --------------------------
     // Grid Modification
-    // --------------------------
+    // ==========================
 
     /// @brief Достроить зеркальное отражение сетки. Все узлы сетки должны
     /// лежать в одной полуплоскости.
@@ -422,17 +480,14 @@ private:
     /// @brief Триангуляция с центральным узлом для сетки из четырёхугольников
     void triangulation_quad_symmetry_();
 
+    /// @brief Триангуляция с центральным узлом для сетки из шестигранников
+    void triangulation_hex_symmetry_();
+
     /// @brief Преобразовать сетку из четырёхугольников в AMR сетку
     void make_amr_2D_();
 
     /// @brief Преобразовать сетку из шестигранников в AMR сетку
     void make_amr_3D_();
-
-    /// @brief Преобразовать двумерную AMR сетку в сетку из четырёхугольников
-    void reduce_amr_2D_();
-
-    /// @brief Преобразовать трёхмерную AMR сетку в сетку из шестигранников
-    void reduce_amr_3D_();
 
     // ==========================
     // Internal finalize steps
@@ -444,26 +499,17 @@ private:
     /// @brief Ensure finalized state; throws if editable.
     void require_finalized_() const;
 
-    /// @brief Clear draft and all optional data
-    void remove_options_();
+    void initialize_geom_(const BuildOptions& options);
+
+    void initialize_faces_(const BuildOptions& options);
 
 private:
-    State m_state{State::editable};
+    State m_state{State::Editable};
 
-    std::optional<DraftData> m_draft{std::nullopt};
-
-    // Finalized storage
     int m_dim{0};
     Type m_type{Type::NONE};
-    BuildOptions m_options;
     std::vector<Node> m_nodes{};
     std::vector<Cell> m_cells{};
-
-    // Optional caches
-    std::optional<GeometryCache> m_geom{std::nullopt};
-    std::optional<FacesCache> m_faces{std::nullopt};
-    std::optional<EdgesCache> m_edges{std::nullopt};
-    std::optional<IncidenceCache> m_inc{std::nullopt};
 };
 
 } // namespace zephyr::geom

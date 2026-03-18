@@ -71,8 +71,8 @@ protected:
 // Компаратор.
 // Сортировщик для точек на плоскости, позволяет упорядочить
 // точки в плоскости против часовой стрелки вокруг нормали n.
-struct SortRule {
-    SortRule(const Vector3d& c, const Vector3d& n, const Vector3d& v0)
+struct Comp3D {
+    Comp3D(const Vector3d& c, const Vector3d& n, const Vector3d& v0)
             : c(c), n(n), v0(v0) {
         e_x = (v0 - c).normalized();
         e_y = n.cross(e_x);
@@ -139,7 +139,7 @@ void sort_indices(const std::vector<Vector3d>& vs,
     // Примерная внешняя нормаль
     Vector3d nb = (face_c - cell_c).normalized();
 
-    SortRule comp(face_c, nb, vs[face_inds[0]]);
+    Comp3D comp(face_c, nb, vs[face_inds[0]]);
 
     std::sort(face_inds.begin(), face_inds.end(),
               [&comp, &vs](int i, int j) -> bool {
@@ -529,7 +529,7 @@ double Polyhedron::clip_volume(
 // TODO: Описание алгоритма
 Polyhedron Polyhedron::clip(const Vector3d& p, const Vector3d& n) const {
     // Плоскость
-    obj::plane plane{.p=p, .n=n};
+    obj::plane plane{.p=p.dot(n), .n=n};
 
     // Пересечения рёбер с индексами вершин (i, j).
     // Или сама точка, тогда индекс (i, i).

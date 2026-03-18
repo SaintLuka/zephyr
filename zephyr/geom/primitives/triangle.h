@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <span>
 #include <functional>
 
 #include <zephyr/geom/vector.h>
@@ -10,17 +11,31 @@ namespace zephyr::geom {
 /// @addtogroup geom-primitives
 /// @{
 
-/// @brief Треугольник в плоскости Oxy.
-/// Отображение из барицентрических координат.
+/// @brief Треугольник в плоскости (Oxy) или в пространстве, отображение
+/// из барицентрических координат.
 class Triangle {
 protected:
     /// @brief Набор вершин (против часовой для плоскости (x, y))
     std::array<Vector3d, 3> verts;
 
 public:
-    /// @brief Конструктор по угловым точкам
-    /// @warning Сортировка не осуществляется!
+    /// @brief Конструктор по угловым точкам (нет сортировки)
     Triangle(const Vector3d& v1, const Vector3d& v2, const Vector3d& v3);
+
+    /// @brief Упорядочить вершины (в плоскости Oxy) против часовой стрелки.
+    static void sort(std::span<Vector3d, 3> verts);
+
+    /// @brief Упорядочить вершины таким образом, чтобы нормаль по правилу
+    /// правой руки была внешней для точки view.
+    static void sort(std::span<Vector3d, 3> verts, const Vector3d& view);
+
+    /// @brief Упорядочить вершины против часовой стрелки.
+    /// Для треугольников в плоскости Oxy.
+    Triangle& sort();
+
+    /// @brief Упорядочить вершины таким образом, чтобы нормаль по правилу
+    /// правой руки была внешней для точки view.
+    Triangle& sort(const Vector3d& view);
 
     /// @brief Прямой доступ к данным по индексу
     /// @param idx in [0..2]
@@ -41,8 +56,8 @@ public:
     /// @brief Нормаль к треугольнику (по правилу правой руки)
     Vector3d normal() const;
 
-    /// @brief Нормаль к треугольнику, направлена от точки c
-    Vector3d normal(const Vector3d& c) const;
+    /// @brief Нормаль к треугольнику, направлена от точки view
+    Vector3d normal(const Vector3d& view) const;
 
     /// @brief Центр треугольника
     Vector3d center() const;
@@ -53,18 +68,16 @@ public:
     /// @brief Барицентр = центру
     Vector3d centroid() const;
 
-    /// @brief Посчитать площадь фигуры, которая отсекается от ячейки некоторым
-    /// телом, точки которого определяются характеристической функцией inside
+    /// @brief Площадь фигуры, которая отсекается от ячейки некоторым телом.
     /// @param inside Характеристическая функция: true, если точка находится
-    /// внутри тела, иначе false
+    /// внутри тела, иначе false.
     /// @param n_points Число тестовых точек, относительная погрешность ~ 1/N.
     double clip_area(const std::function<bool(const Vector3d&)>& inside,
                      int n_points = 10000) const;
 
-    /// @brief Посчитать объемную долю, которая отсекается от ячейки некоторым
-    /// телом, точки которого определяются характеристической функцией inside
+    /// @brief Доля площади, которая отсекается от ячейки некоторым телом.
     /// @param inside Характеристическая функция: true, если точка находится
-    /// внутри тела, иначе false
+    /// внутри тела, иначе false.
     /// @param n_points Число тестовых точек, погрешность ~ 1/N.
     double volume_fraction(const std::function<bool(const Vector3d&)>& inside,
                            int n_points = 10000) const;
@@ -91,7 +104,7 @@ public:
 
 private:
     /// @brief Отображение по барицентрическим координатам
-    /// @details Требуется предворительная нормировка sum x_i = 1
+    /// @details Требуется предварительная нормировка sum x_i = 1
     Vector3d pget(double x1, double x2, double x3) const;
 };
 

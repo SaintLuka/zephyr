@@ -8,6 +8,7 @@
 
 #include <zephyr/geom/box.h>
 #include <zephyr/geom/grid.h>
+#include <zephyr/geom/side.h>
 #include <zephyr/geom/generator/bs_vertex.h>
 #include <zephyr/geom/generator/curve/curve.h>
 #include <zephyr/geom/generator/curve/plane.h>
@@ -1380,7 +1381,7 @@ Grid BlockStructured::make() const {
         }
     }
 
-    std::vector<GridNode::Ptr> nodes;
+    std::vector<Node::Ptr> nodes;
     {
         if (m_verbosity > 0) {
             std::cout << "  Smooth final grid (" << m_iters_count << " iterations)\n";
@@ -1396,7 +1397,7 @@ Grid BlockStructured::make() const {
 
         nodes.resize(n_nodes);
         for (int i = 0; i < n_nodes; ++i) {
-            nodes[i] = GridNode::create(s.pos[i]);
+            nodes[i] = Node::create(s.pos[i]);
         }
     }
 
@@ -1435,10 +1436,10 @@ Grid BlockStructured::make() const {
             for (int i = 0; i < Nx; ++i) {
                 for (int j = 0; j < Ny; ++j) {
                     bc[0] = bc[1] = bc[2] = bc[3] = Boundary::INNER;
-                    if (i == 0)      bc[3] = block_bc[static_cast<int>(Side::L)];
-                    if (i == Nx - 1) bc[1] = block_bc[static_cast<int>(Side::R)];
-                    if (j == 0)      bc[0] = block_bc[static_cast<int>(Side::B)];
-                    if (j == Ny - 1) bc[2] = block_bc[static_cast<int>(Side::T)];
+                    if (i == 0)      bc[Side2D::L] = block_bc[static_cast<int>(Side::L)];
+                    if (i == Nx - 1) bc[Side2D::R] = block_bc[static_cast<int>(Side::R)];
+                    if (j == 0)      bc[Side2D::B] = block_bc[static_cast<int>(Side::B)];
+                    if (j == Ny - 1) bc[Side2D::T] = block_bc[static_cast<int>(Side::T)];
 
                     grid.add_cell(
                         CellType::QUAD, {
@@ -1455,10 +1456,10 @@ Grid BlockStructured::make() const {
             for (int i = 0; i < Nx; ++i) {
                 for (int j = 0; j < Ny; ++j) {
                     bc[0] = bc[1] = bc[2] = bc[3] = Boundary::INNER;
-                    if (i == 0)      bc[static_cast<int>(Side::L)] = block_bc[static_cast<int>(Side::L)];
-                    if (i == Nx - 1) bc[static_cast<int>(Side::R)] = block_bc[static_cast<int>(Side::R)];
-                    if (j == 0)      bc[static_cast<int>(Side::B)] = block_bc[static_cast<int>(Side::B)];
-                    if (j == Ny - 1) bc[static_cast<int>(Side::T)] = block_bc[static_cast<int>(Side::T)];
+                    if (i == 0)      bc[Side2D::L] = block_bc[static_cast<int>(Side::L)];
+                    if (i == Nx - 1) bc[Side2D::R] = block_bc[static_cast<int>(Side::R)];
+                    if (j == 0)      bc[Side2D::B] = block_bc[static_cast<int>(Side::B)];
+                    if (j == Ny - 1) bc[Side2D::T] = block_bc[static_cast<int>(Side::T)];
 
                     grid.add_cell(
                         CellType::AMR2D, {

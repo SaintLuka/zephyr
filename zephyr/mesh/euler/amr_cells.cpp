@@ -152,35 +152,34 @@ Polygon AmrCells::polygon(index_t ic) const {
     }
 
     if (m_adaptive) {
-        Polygon poly;
+        std::vector<Vector3d> poly;
         poly.reserve(8);
 
         const SqQuad& vertices = mapping<2>(ic);
 
-        poly += vertices.vs<-1, -1>();
+        poly.push_back(vertices.vs<-1, -1>());
         if (!m_linear && complex_face(ic, Side2D::BOTTOM)) {
-            poly += vertices.vs<0, -1>();
+            poly.push_back(vertices.vs<0, -1>());
         }
 
-        poly += vertices.vs<+1, -1>();
+        poly.push_back(vertices.vs<+1, -1>());
         if (!m_linear && complex_face(ic, Side2D::RIGHT)) {
-            poly += vertices.vs<+1, 0>();
+            poly.push_back(vertices.vs<+1, 0>());
         }
 
-        poly += vertices.vs<+1, +1>();
+        poly.push_back(vertices.vs<+1, +1>());
         if (!m_linear && complex_face(ic, Side2D::TOP)) {
-            poly += vertices.vs<0, +1>();
+            poly.push_back( vertices.vs<0, +1>());
         }
 
-        poly += vertices.vs<-1, +1>();
+        poly .push_back(vertices.vs<-1, +1>());
         if (!m_linear && complex_face(ic, Side2D::LEFT)) {
-            poly += vertices.vs<-1, 0>();
+            poly.push_back(vertices.vs<-1, 0>());
         }
 
-        return poly;
-    } else {
-        return {vertices_data(ic), node_count(ic)};
+        return Polygon(std::move(poly));
     }
+    return Polygon(std::span(vertices_data(ic), node_count(ic)));
 }
 
 Polyhedron AmrCells::polyhedron(index_t ic) const {

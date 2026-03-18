@@ -64,7 +64,7 @@ void InterfaceRecovery::adjust_normal(EuCell &cell) const {
         return;
     }
 
-    obj::plane plane{cell[p], cell[n]};
+    obj::plane plane{cell[p].dot(cell[n]), cell[n]};
 
     std::vector <Vector3d> ints;
     for (auto face: cell.faces()) {
@@ -78,7 +78,7 @@ void InterfaceRecovery::adjust_normal(EuCell &cell) const {
                     ints.emplace_back(seg.get(-0.001));
                 }
             } else {
-                obj::segment seg2{plane.p, face.neib(p)};
+                obj::segment seg2{plane.r0(), face.neib(p)};
                 Vector3d vi = intersection2D::find_fast(seg, seg2);
                 ints.emplace_back(vi);
             }
@@ -87,7 +87,7 @@ void InterfaceRecovery::adjust_normal(EuCell &cell) const {
 
     if (ints.size() > 1) {
         cell[n] = {ints[0].y() - ints[1].y(),
-                       ints[1].x() - ints[0].x(), 0.0};
+                   ints[1].x() - ints[0].x(), 0.0};
 
         if (cell[n].dot(plane.n) < 0.0) {
             cell[n] *= -1.0;

@@ -101,9 +101,9 @@ V simpson(
 int main() {
     // Основной тестовый двумерный набор
     SqQuad test_sqquad = {
-            Vector3d(0.1, 1.0, 0.0), Vector3d(0.7, 1.1, 0.0), Vector3d(1.3, 1.1, 0.0),
-            Vector3d(0.2, 1.5, 0.0), Vector3d(0.8, 1.7, 0.3), Vector3d(1.4, 1.8, 0.0),
-            Vector3d(0.0, 2.0, 0.0), Vector3d(0.5, 2.4, 0.0), Vector3d(1.2, 2.6, 0.0)
+            Vector3d(0.1, 1.0, 0.0), Vector3d(0.7, 1.1, -0.3), Vector3d(1.3, 1.1, -0.7),
+            Vector3d(0.2, 1.5, 0.0), Vector3d(0.8, 1.7, -0.5), Vector3d(1.4, 1.8, -0.9),
+            Vector3d(0.0, 2.0, 0.0), Vector3d(0.5, 2.4, -0.4), Vector3d(1.2, 2.6, -0.8)
     };
 
     // Основной тестовый трехмерный набор
@@ -133,10 +133,9 @@ int main() {
         // int normal(x) * dl(x) = int normal(x) |J(x)| dx = length() * normal()
         Vector3d res1 = line.length() * line.normal(C2);
 
-        std::function<Vector3d(double)> func =
-                [&line, &C2](double x) -> Vector3d {
-                    return line.Jacobian() * line.normal(C2);
-                };
+        std::function func = [&line, &C2](double x) -> Vector3d {
+            return line.Jacobian() * line.normal(C2);
+        };
 
         Vector3d res2 = simpson(
                 np::linspace(-1.0, 1.0, 51),
@@ -151,14 +150,16 @@ int main() {
         std::cout << "Длина и нормаль криволинейного отрезка\n";
 
         SqLine line = {test_sqquad[0], test_sqquad[1], test_sqquad[2]};
+        for (int i = 0; i < 3; ++i) {
+            line[i].z() = 0.0;
+        }
 
         // int normal(x) * dl(x) = int normal(x) |J(x)| dx = length() * normal()
         Vector3d res1 = line.length() * line.normal(C2);
 
-        std::function<Vector3d(double)> func =
-                [&line, &C2](double x) -> Vector3d {
-                    return line.Jacobian(x) * line.normal(x, C2);
-                };
+        std::function func = [&line, &C2](double x) -> Vector3d {
+            return line.Jacobian(x) * line.normal(x, C2);
+        };
 
         Vector3d res2 = simpson(
                 np::linspace(-1.0, 1.0, 51),
@@ -170,40 +171,15 @@ int main() {
     }
 
     {
-        std::cout << "Площадь простой двумерной ячейки\n";
+        std::cout << "Площадь и нормаль простой двумерной ячейки\n";
 
         Quad quad = test_sqquad.reduce();
-
-        double res1 = quad.area();
-
-        std::function<double(double, double)> func =
-                [&quad](double x, double y) -> double {
-                    return quad.Jacobian(x, y);
-                };
-
-        double res2 = simpson(
-                np::linspace(-1.0, 1.0, 51),
-                np::linspace(-1.0, 1.0, 51),
-                func, 0.0);
-
-        std::cout << "    res (formula): " << res1 << "\n";
-        std::cout << "    res (numeric): " << res2 << "\n";
-        std::cout << "    error: " << std::abs(res1 - res2) / L2 << "\n\n";
-    }
-
-    {
-        std::cout << "Площадь и нормаль простой изогнутой двумерной ячейки\n";
-
-        Quad quad = test_sqquad.reduce();
-        quad(+1, -1).z() += 0.1;
-        quad(+1, +1).z() += 0.2;
 
         Vector3d res1 = quad.area() * quad.normal(C3);
 
-        std::function<Vector3d(double, double)> func =
-                [&quad, C3](double x, double y) -> Vector3d {
-                    return quad.Jacobian(x, y) * quad.normal(x, y, C3);
-                };
+        std::function func = [&quad, C3](double x, double y) -> Vector3d {
+            return quad.Jacobian(x, y) * quad.normal(x, y, C3);
+        };
 
         Vector3d res2 = simpson(
                 np::linspace(-1.0, 1.0, 51),
@@ -216,41 +192,39 @@ int main() {
     }
 
     {
-        std::cout << "Площадь криволинейной двумерной ячейки\n";
+        std::cout << "Площадь и нормаль криволинейной двумерной ячейки\n";
 
         SqQuad& quad = test_sqquad;
-        for (int i = 0; i < 9; ++i) {
-            quad[i].z() = 0.0;
-        }
 
-        double res1 = quad.area();
+        Vector3d res1 = quad.area() * quad.normal(C3);
 
-        std::function<double(double, double)> func =
-                [&quad](double x, double y) -> double {
-                    return quad.Jacobian(x, y);
-                };
+        std::function func = [&quad, C3](double x, double y) -> Vector3d {
+            return quad.Jacobian(x, y) * quad.normal(x, y, C3);
+        };
 
-        double res2 = simpson(
+        Vector3d res2 = simpson(
                 np::linspace(-1.0, 1.0, 101),
                 np::linspace(-1.0, 1.0, 101),
-                func, 0.0);
+                func, {0.0, 0.0, 0.0});
 
-        std::cout << "    res (formula): " << res1 << "\n";
-        std::cout << "    res (numeric): " << res2 << "\n";
-        std::cout << "    error: " << std::abs(res1 - res2) / L2 << "\n\n";
+        std::cout << "    res (formula): " << res1.transpose() << "\n";
+        std::cout << "    res (numeric): " << res2.transpose() << "\n";
+        std::cout << "    error: " << (res1 - res2).norm() / L2 << "\n\n";
     }
 
     {
-        std::cout << "Объем обычной двумерной ячейки в осесимметричной постновке\n";
+        std::cout << "Объем обычной двумерной ячейки в осесимметричной постановке\n";
 
         Quad quad = test_sqquad.reduce();
+        for (int i = 0; i < 4; ++i) {
+            quad[i].z() = 0.0;
+        }
 
         double res1 = quad.volume_as();
 
-        std::function<double(double, double)> func =
-                [&quad](double x, double y) -> double {
-                    return quad(x, y).y() * quad.Jacobian(x, y);
-                };
+        std::function func = [&quad](double x, double y) -> double {
+            return quad(x, y).y() * quad.Jacobian(x, y);
+        };
 
         double res2 = simpson(
                 np::linspace(-1.0, 1.0, 51),
@@ -263,19 +237,18 @@ int main() {
     }
 
     {
-        std::cout << "Объем криволинейной ячейки в осесимметричной постновке\n";
+        std::cout << "Объем криволинейной ячейки в осесимметричной постановке\n";
 
-        SqQuad& quad = test_sqquad;
+        SqQuad quad = test_sqquad;
         for (int i = 0; i < 9; ++i) {
             quad[i].z() = 0.0;
         }
 
         double res1 = quad.volume_as();
 
-        std::function<double(double, double)> func =
-                [&quad](double x, double y) -> double {
-                    return quad(x, y).y() * quad.Jacobian(x, y);
-                };
+        std::function func = [&quad](double x, double y) -> double {
+            return quad(x, y).y() * quad.Jacobian(x, y);
+        };
 
         double res2 = simpson(
                 np::linspace(-1.0, 1.0, 501),
@@ -290,14 +263,13 @@ int main() {
     {
         std::cout << "Объем трехмерной ячейки\n";
 
-        Cube& cube = test_cube;
+        Cube cube = test_cube;
 
         double res1 = cube.volume();
 
-        std::function<double(double, double, double)> func =
-                [&cube](double x, double y, double z) -> double {
-                    return cube.Jacobian(x, y, z);
-                };
+        std::function func = [&cube](double x, double y, double z) -> double {
+            return cube.Jacobian(x, y, z);
+        };
 
         double res2 = simpson(
                 np::linspace(-1.0, 1.0, 41),
@@ -319,10 +291,9 @@ int main() {
 
         Vector3d res1 = quad.centroid(S);
 
-        std::function<Vector3d(double, double)> func =
-                [&quad](double x, double y) -> Vector3d {
-                    return quad(x, y) * quad.Jacobian(x, y);
-                };
+        std::function func = [&quad](double x, double y) -> Vector3d {
+            return quad(x, y) * quad.Jacobian(x, y);
+        };
 
         Vector3d res2 = simpson(
                 np::linspace(-1.0, 1.0, 51),
@@ -337,20 +308,19 @@ int main() {
     {
         std::cout << "Барицентр криволинейной двумерной ячейки\n";
 
-        SqQuad& quad = test_sqquad;
+        SqQuad quad = test_sqquad;
 
         double S = quad.area();
 
         Vector3d res1 = quad.centroid(S);
 
-        std::function<Vector3d(double, double)> func =
-                [&quad](double x, double y) -> Vector3d {
-                    return quad(x, y) * quad.Jacobian(x, y);
-                };
+        std::function func = [&quad](double x, double y) -> Vector3d {
+            return quad(x, y) * quad.Jacobian(x, y);
+        };
 
         Vector3d res2 = simpson(
-                np::linspace(-1.0, 1.0, 501),
-                np::linspace(-1.0, 1.0, 501),
+                np::linspace(-1.0, 1.0, 51),
+                np::linspace(-1.0, 1.0, 51),
                 func, {0.0, 0.0, 0.0}) / S;
 
         std::cout << "    res (formula): " << res1.transpose() << "\n";
@@ -366,10 +336,9 @@ int main() {
         double V = cube.volume();
         Vector3d res1 = cube.centroid(V);
 
-        std::function<Vector3d(double, double, double)> func =
-                [&cube](double x, double y, double z) -> Vector3d {
-                    return cube(x, y, z) * cube.Jacobian(x, y, z);
-                };
+        std::function func = [&cube](double x, double y, double z) -> Vector3d {
+            return cube(x, y, z) * cube.Jacobian(x, y, z);
+        };
 
         Vector3d res2 = simpson(
                 np::linspace(-1.0, 1.0, 11),

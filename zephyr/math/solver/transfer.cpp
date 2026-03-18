@@ -146,7 +146,7 @@ double face_fraction_n2(EuCell& cell, EuCell& neib, EuFace& face, double vn, con
 
     // Реконструкция в ячейке
     obj::plane plane{
-            .p = vn > 0.0 ? cell[data.p] : neib[data.p],
+            .p = vn > 0.0 ? cell[data.p].dot(cell[data.n]) : neib[data.p].dot(neib[data.p]),
             .n = vn > 0.0 ? cell[data.n] : neib[data.n]
     };
 
@@ -410,7 +410,7 @@ void Transfer::compute_slopes(EuMesh& mesh) const {
 
             // Реконструкция в ячейке
             obj::plane plane{
-                    .p = cell[data.p],
+                    .p = cell[data.p].dot(cell[data.n]),
                     .n = cell[data.n]
             };
 

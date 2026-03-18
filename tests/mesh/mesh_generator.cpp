@@ -521,18 +521,14 @@ LaMesh Test::gen_la() const {
 #else
 
 int main(int argc, char *argv[]) {
-    using BuildOptions = Grid::BuildOptions;
-    using FaceOption = Grid::BuildOptions::FaceOption;
-
-
     Grid grid;
 
     constexpr int nx = 10;
     constexpr int ny = 10;
-    std::array<std::array<GridNode::Ptr, ny + 1>, nx + 1> ps{};
+    std::array<std::array<Node::Ptr, ny + 1>, nx + 1> ps{};
     for (int i = 0; i <= nx; ++i) {
         for (int j = 0; j <= ny; ++j) {
-            ps[i][j] = GridNode::create(Vector3d{0.1 * i, 0.2 * j, 0.0});
+            ps[i][j] = Node::create(Vector3d{0.1 * i, 0.2 * j, 0.0});
         }
     }
 
@@ -555,22 +551,9 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    BuildOptions opts{
-        .faces=FaceOption::per_cell,
-        .build_face_local_indices=true,
-        .build_twin_face=false,
-        .build_edges=false,
-        .build_node_cells=true,
-        .build_node_faces=true,
-        .compute_face_geometry=true,
-        .compute_cell_geometry=true
-    };
+    Grid::BuildOptions opts{.build_faces=true };
 
     grid.finalize(opts);
-
-    std::string report;
-    grid.validate_finalized_full(&report);
-    std::cout << report << std::endl;
 
     EuMesh mesh(std::move(grid));
 
