@@ -29,7 +29,7 @@ using Vector5d = Eigen::Matrix<double, 5, 1>; ///< 5-и  мерный Eigen ве
 using Vector6d = Eigen::Matrix<double, 6, 1>; ///< 6-и  мерный Eigen вектор-столбец
 using Vector7d = Eigen::Matrix<double, 7, 1>; ///< 7-и  мерный Eigen вектор-столбец
 
-using Matrix2d = Eigen::Matrix<double, 4, 4>; ///< Eigen матрица 2 x 2
+using Matrix2d = Eigen::Matrix<double, 2, 2>; ///< Eigen матрица 2 x 2
 using Matrix4d = Eigen::Matrix<double, 4, 4>; ///< Eigen матрица 4 x 4
 using Matrix5d = Eigen::Matrix<double, 5, 5>; ///< Eigen матрица 5 x 5
 using Matrix6d = Eigen::Matrix<double, 6, 6>; ///< Eigen матрица 6 x 6

@@ -36,6 +36,9 @@ public:
     /// @brief Индекс базовой ячейки, которая содержит грань
     std::vector<index_t> basic;
 
+    /// @brief Относительное вращение ячейки через грань
+    std::vector<std::uint8_t> rotation;
+
     /// @brief Расширить массивы по числу граней
     void resize(index_t n_faces);
 

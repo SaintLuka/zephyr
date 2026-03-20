@@ -53,6 +53,9 @@ public:
     /// @brief Установить флаг граничных условий
     void set_boundary(Boundary flag) const;
 
+    /// @brief Поворот соседней ячейки
+    int rotation() const;
+
     /// @}
 
     /// @{ @name Геометрия грани
@@ -616,6 +619,8 @@ inline void EuFace::set_boundary(Boundary flag) const {
         m_cells->faces.adjacent.alien[m_face_idx] = -1;
     }
 }
+
+inline int EuFace::rotation() const { return m_cells->faces.adjacent.rotation[m_face_idx]; }
 
 inline const geom::Vector3d &EuFace::normal() const { return m_cells->faces.normal[m_face_idx]; }
 

@@ -64,6 +64,68 @@ void Grid::transform(std::function<Vector3d(const Vector3d&)>& func) {
         });
 }
 
+std::vector<Node::Ptr> Grid::create_central_nodes_() {
+    std::vector<Node::Ptr> central(m_cells.size());
+    for (id_t i = 0; i < m_cells.size(); ++i) {
+        Vector3d c = m_cells[i].center(m_nodes);
+        central[i] = Node::create(c);
+    }
+    for (const auto& node: central) {
+        add_node(node);
+    }
+    return central;
+}
+
+std::unordered_map<FaceKey, Node::Ptr> Grid::create_face_nodes_() {
+    std::unordered_map<FaceKey, Node::Ptr> face_nodes;
+    for (auto & cell: m_cells) {
+        if (!cell.has_faces()) {
+            cell.init_faces();
+        }
+        for (int iface = 0; iface < cell.n_faces(); ++iface) {
+            const Face& face = cell.get_face(iface);
+            Vector3d fc = cell.face_center(m_nodes, iface);
+            FaceKey face_key{cell, face};
+            face_nodes[face_key] = Node::create(fc);
+        }
+    }
+    for (const auto& val: face_nodes | std::views::values) {
+        add_node(val);
+    }
+    return face_nodes;
+}
+
+std::unordered_map<EdgeKey, Node::Ptr> Grid::create_edge_nodes_() {
+    if (m_dim != 3 && m_type != Type::QUAD) {
+        throw std::runtime_error("Grid::create_edge_nodes_: Only for HEX cells");
+    }
+
+    std::unordered_map<EdgeKey, Node::Ptr> edge_nodes;
+    edge_nodes.reserve(4 * m_cells.size()); // Для сетки из HEX ячеек
+    for (auto& cell: m_cells) {
+        if (!cell.has_faces()) {
+            cell.init_faces();
+        }
+        for (const auto& face: cell.faces()) {
+            for (int i = 0; i < face.n_nodes(); ++i) {
+                int j = (i + 1) % face.n_nodes();
+                id_t nid1 = cell.node_idx(face.node_idx(i));
+                id_t nid2 = cell.node_idx(face.node_idx(j));
+                EdgeKey edge{nid1, nid2};
+                if (!edge_nodes.contains(edge)) {
+                    Vector3d v1 = m_nodes[nid1].pos;
+                    Vector3d v2 = m_nodes[nid2].pos;
+                    edge_nodes[edge] = Node::create(0.5 * (v1 + v2));
+                }
+            }
+        }
+    }
+    for (const auto& val: edge_nodes | std::views::values) {
+        add_node(val);
+    }
+    return edge_nodes;
+}
+
 void Grid::mirror_(int axis) {
     require_editable_();
     if (m_nodes.empty() || m_cells.empty()) {
@@ -244,15 +306,9 @@ void Grid::triangulation_quad_delaunay_() {
 
 void Grid::triangulation_quad_symmetry_() {
     // Создать центральные вершины
-    std::vector<Node::Ptr> central(m_cells.size());
-    for (id_t i = 0; i < m_cells.size(); ++i) {
-        Vector3d c = m_cells[i].center(m_nodes);
-        central[i] = Node::create(c);
-    }
-    for (const auto& node: central) {
-        add_node(node);
-    }
+    const auto central = create_central_nodes_();
 
+    // Переместить исходные ячейки
     const std::vector<Cell> quads = std::move(m_cells);
 
     id_t n_cells = quads.size();
@@ -300,33 +356,12 @@ void Grid::triangulation_hex_symmetry_() {
     }
 
     // Создать центральные вершины
-    std::vector<Node::Ptr> central(m_cells.size());
-    for (id_t ic = 0; ic < m_cells.size(); ++ic) {
-        Vector3d c = m_cells[ic].center(m_nodes);
-        central[ic] = Node::create(c);
-    }
-    for (const auto& node: central) {
-        add_node(node);
-    }
+    const auto central = create_central_nodes_();
 
     // Создать вершины граней
-    std::unordered_map<FaceKey, Node::Ptr, FaceKeyHash> face_unique_nodes;
-    for (auto & cell : m_cells) {
-        if (!cell.has_faces()) {
-            cell.init_faces();
-        }
-        for (int iface = 0; iface < cell.n_faces(); ++iface) {
-            const Face& face = cell.get_face(iface);
-            Vector3d fc = cell.face_center(m_nodes, iface);
-            FaceKey face_key{cell, face};
-            face_unique_nodes[face_key] = Node::create(fc);
-        }
-    }
-    for (const auto& val: face_unique_nodes | std::views::values) {
-        add_node(val);
-    }
+    auto face_unique_nodes = create_face_nodes_();
 
-    // Генерируем ячейки
+    // Переместить исходные ячейки
     const std::vector<Cell> cubes = std::move(m_cells);
 
     id_t n_cells = cubes.size();
@@ -385,15 +420,9 @@ void Grid::pyramidize() {
     }
 
     // Создать центральные вершины
-    std::vector<Node::Ptr> central(m_cells.size());
-    for (id_t i = 0; i < m_cells.size(); ++i) {
-        Vector3d c = m_cells[i].center(m_nodes);
-        central[i] = Node::create(c);
-    }
-    for (const auto& node: central) {
-        add_node(node);
-    }
+    const auto central = create_central_nodes_();
 
+    // Переместить исходные ячейки
     const std::vector<Cell> cubes = std::move(m_cells);
 
     id_t n_cells = cubes.size();
@@ -440,6 +469,10 @@ void Grid::extrude(const Vector3d& p, int N, Boundary side1, Boundary side2) {
     }
     if (m_type == Type::AMR) {
         std::cerr << "Grid::extrude: can't extrude AMR grid\n";
+        return;
+    }
+    if (p.z() < 0.0) {
+        std::cerr << "Grid::extrude: negative extrude not implemented\n";
         return;
     }
 
@@ -565,102 +598,152 @@ void Grid::extrude(const Vector3d& p, int N, Boundary side1, Boundary side2) {
 }
 
 void Grid::make_amr_2D_() {
-    /*
-    DraftData& draft = *m_draft;
-
     // Создать центральные вершины
-    std::vector<Node::Ptr> central(draft.cells.size());
-    for (id_t i = 0; i < draft.cells.size(); ++i) {
-        Vector3d c = Vector3d::Zero();
-        for (id_t j: draft.cells[i].nodes) {
-            c += draft.nodes[j]->pos;
-        }
-        c /= draft.cells[i].nodes.size();
-        central[i] = Node::create(c);
-    }
+    const auto central = create_central_nodes_();
 
-    // Добавить центральные в массив
-    for (const auto& node: central) {
-        add_node(node);
-    }
+    // Создать вершины граней
+    auto face_nodes = create_face_nodes_();
 
-    struct face_t {
-        id_t v1, v2;
-        bool operator==(const face_t& other) const {
-            return (v1 == other.v1 && v2 == other.v2) ||
-                   (v1 == other.v2 && v2 == other.v1);
-        }
-    };
-    struct face_hash {
-        std::size_t operator()(const face_t& k) const noexcept {
-            auto h1 = std::hash<id_t>()(k.v1);
-            auto h2 = std::hash<id_t>()(k.v2);
-            return (h1 + h2) * (h1 + h2 + 1) / 2 + std::min(h1, h2);
-        }
-    };
-
-    // Уникальные грани
-    std::unordered_map<const face_t, Node::Ptr, face_hash> faces;
-    for (auto& cell: draft.cells) {
-        z_assert(cell.type == CellType::QUAD && cell.nodes.size() == 4, "Bad cell");
-        for (int i = 0; i < 4; ++i) {
-            face_t face{cell.nodes[i], cell.nodes[(i + 1) % 4]};
-            if (!faces.contains(face)) {
-                Vector3d fc = 0.5*(draft.nodes[face.v1]->pos + draft.nodes[face.v2]->pos);
-                faces[face] = Node::create(fc);
-            }
-        }
-    }
-
-    // Добавить вершины граней в массив
-    for (const auto& val: faces | std::views::values) {
-        add_node(val);
-    }
+    // Сохраняем исходные ячейки
+    const std::vector<Cell> quads = std::move(m_cells);
 
     // Преобразовать ячейки в AMR2D (заменяем полигоны на таблицы 3x3)
-    for (id_t i = 0; i < draft.cells.size(); ++i) {
-        auto& cell = draft.cells[i];
-        face_t L{cell.nodes[0], cell.nodes[3]};
-        face_t R{cell.nodes[1], cell.nodes[2]};
-        face_t B{cell.nodes[0], cell.nodes[1]};
-        face_t T{cell.nodes[3], cell.nodes[2]};
+    m_cells.clear();
+    for (id_t i = 0; i < quads.size(); ++i) {
+        const Cell& quad = quads[i];
+        FaceKey L{quad, quad.get_face(Side2D::L)};
+        FaceKey R{quad, quad.get_face(Side2D::R)};
+        FaceKey B{quad, quad.get_face(Side2D::B)};
+        FaceKey T{quad, quad.get_face(Side2D::T)};
 
-        z_assert(faces.contains(L), "Cell face not found");
-        z_assert(faces.contains(R), "Cell face not found");
-        z_assert(faces.contains(B), "Cell face not found");
-        z_assert(faces.contains(T), "Cell face not found");
+        z_assert(face_nodes.contains(L), "Cell face not found");
+        z_assert(face_nodes.contains(R), "Cell face not found");
+        z_assert(face_nodes.contains(B), "Cell face not found");
+        z_assert(face_nodes.contains(T), "Cell face not found");
 
-        cell.type = CellType::AMR2D;
-
-        id_t vLB = cell.nodes[0];
-        id_t vRB = cell.nodes[1];
-        id_t vLT = cell.nodes[3];
-        id_t vRT = cell.nodes[2];
+        id_t vLB = quad.node_idx(0);
+        id_t vRB = quad.node_idx(1);
+        id_t vLT = quad.node_idx(3);
+        id_t vRT = quad.node_idx(2);
         id_t v_C = central[i]->id();
-        id_t v_L = faces[L]->id();
-        id_t v_R = faces[R]->id();
-        id_t v_B = faces[B]->id();
-        id_t v_T = faces[T]->id();
+        id_t v_L = face_nodes[L]->id();
+        id_t v_R = face_nodes[R]->id();
+        id_t v_B = face_nodes[B]->id();
+        id_t v_T = face_nodes[T]->id();
 
-        cell.nodes = {
+        Cell cell(CellType::AMR2D,{
             vLB, v_B, vRB,
             v_L, v_C, v_R,
             vLT, v_T, vRT
-        };
-
-        // Переставить гран условия
-        std::vector bc = draft.cells[i].face_bc;
-        draft.cells[i].face_bc[Side2D::L] = bc[3];
-        draft.cells[i].face_bc[Side2D::R] = bc[1];
-        draft.cells[i].face_bc[Side2D::B] = bc[0];
-        draft.cells[i].face_bc[Side2D::T] = bc[2];
+        });
+        cell.init_faces();
+        for (int k = 0; k < 4; ++k) {
+            cell.set_bc(k, quad.get_face(k).bc());
+        }
+        m_cells.emplace_back(std::move(cell));
     }
     m_type = Type::AMR;
-    */
 }
 
 void Grid::make_amr_3D_() {
-    throw std::runtime_error("Grid::make_amr_3D_ not implemented");
+    // Создать центральные вершины
+    const auto central = create_central_nodes_();
+
+    // Создать вершины граней
+    auto face_nodes = create_face_nodes_();
+
+    // Создать узлы на рёбрах
+    auto edge_nodes = create_edge_nodes_();
+
+    // Сохраняем исходные ячейки
+    const std::vector<Cell> quads = std::move(m_cells);
+
+    // Преобразовать ячейки в AMR2D (заменяем полигоны на таблицы 3x3)
+    m_cells.clear();
+    for (id_t i = 0; i < quads.size(); ++i) {
+        const Cell& quad = quads[i];
+        FaceKey L{quad, quad.get_face(Side3D::L)};
+        FaceKey R{quad, quad.get_face(Side3D::R)};
+        FaceKey B{quad, quad.get_face(Side3D::B)};
+        FaceKey T{quad, quad.get_face(Side3D::T)};
+        FaceKey Z{quad, quad.get_face(Side3D::Z)};
+        FaceKey F{quad, quad.get_face(Side3D::F)};
+
+        z_assert(face_nodes.contains(L), "Cell face not found");
+        z_assert(face_nodes.contains(R), "Cell face not found");
+        z_assert(face_nodes.contains(B), "Cell face not found");
+        z_assert(face_nodes.contains(T), "Cell face not found");
+        z_assert(face_nodes.contains(Z), "Cell face not found");
+        z_assert(face_nodes.contains(F), "Cell face not found");
+
+        using namespace indexing;
+        
+        // Ребра вдоль Ox
+        EdgeKey e_bz{quad.node_idx(hex::vs<0,0,0>()), quad.node_idx(hex::vs<1,0,0>())};
+        EdgeKey e_bf{quad.node_idx(hex::vs<0,0,1>()), quad.node_idx(hex::vs<1,0,1>())};
+        EdgeKey e_tz{quad.node_idx(hex::vs<0,1,0>()), quad.node_idx(hex::vs<1,1,0>())};
+        EdgeKey e_tf{quad.node_idx(hex::vs<0,1,1>()), quad.node_idx(hex::vs<1,1,1>())};
+
+        // Ребра вдоль Oy
+        EdgeKey e_zl{quad.node_idx(hex::vs<0,0,0>()), quad.node_idx(hex::vs<0,1,0>())};
+        EdgeKey e_zr{quad.node_idx(hex::vs<1,0,0>()), quad.node_idx(hex::vs<1,1,0>())};
+        EdgeKey e_fl{quad.node_idx(hex::vs<0,0,1>()), quad.node_idx(hex::vs<0,1,1>())};
+        EdgeKey e_fr{quad.node_idx(hex::vs<1,0,1>()), quad.node_idx(hex::vs<1,1,1>())};
+
+        // Ребра вдоль Oz
+        EdgeKey e_lb{quad.node_idx(hex::vs<0,0,0>()), quad.node_idx(hex::vs<0,0,1>())};
+        EdgeKey e_lt{quad.node_idx(hex::vs<0,1,0>()), quad.node_idx(hex::vs<0,1,1>())};
+        EdgeKey e_rb{quad.node_idx(hex::vs<1,0,0>()), quad.node_idx(hex::vs<1,0,1>())};
+        EdgeKey e_rt{quad.node_idx(hex::vs<1,1,0>()), quad.node_idx(hex::vs<1,1,1>())};
+
+        std::vector<id_t> nodes(27);
+        // Угловые вершины
+        nodes[amr::vs<-1, -1, -1>()] = quad.node_idx(hex::vs<0, 0, 0>());
+        nodes[amr::vs<+1, -1, -1>()] = quad.node_idx(hex::vs<1, 0, 0>());
+        nodes[amr::vs<-1, +1, -1>()] = quad.node_idx(hex::vs<0, 1, 0>());
+        nodes[amr::vs<+1, +1, -1>()] = quad.node_idx(hex::vs<1, 1, 0>());
+        nodes[amr::vs<-1, -1, +1>()] = quad.node_idx(hex::vs<0, 0, 1>());
+        nodes[amr::vs<+1, -1, +1>()] = quad.node_idx(hex::vs<1, 0, 1>());
+        nodes[amr::vs<-1, +1, +1>()] = quad.node_idx(hex::vs<0, 1, 1>());
+        nodes[amr::vs<+1, +1, +1>()] = quad.node_idx(hex::vs<1, 1, 1>());
+
+        // Центральная
+        nodes[amr::vs<0, 0, 0>()] = central[i]->id();
+
+        // Вершины на гранях
+        nodes[amr::vs<-1, 0, 0>()] = face_nodes[L]->id();
+        nodes[amr::vs<+1, 0, 0>()] = face_nodes[R]->id();
+        nodes[amr::vs<0, -1, 0>()] = face_nodes[B]->id();
+        nodes[amr::vs<0, +1, 0>()] = face_nodes[T]->id();
+        nodes[amr::vs<0, 0, -1>()] = face_nodes[Z]->id();
+        nodes[amr::vs<0, 0, +1>()] = face_nodes[F]->id();
+
+        // Вершины на рёбрах
+        nodes[amr::vs<0, -1, -1>()] = edge_nodes[e_bz]->id();
+        nodes[amr::vs<0, -1, +1>()] = edge_nodes[e_bf]->id();
+        nodes[amr::vs<0, +1, -1>()] = edge_nodes[e_tz]->id();
+        nodes[amr::vs<0, +1, +1>()] = edge_nodes[e_tf]->id();
+
+        // Ребра вдоль Oy
+        nodes[amr::vs<-1, 0, -1>()] = edge_nodes[e_zl]->id();
+        nodes[amr::vs<+1, 0, -1>()] = edge_nodes[e_zr]->id();
+        nodes[amr::vs<-1, 0, +1>()] = edge_nodes[e_fl]->id();
+        nodes[amr::vs<+1, 0, +1>()] = edge_nodes[e_fr]->id();
+
+        // Ребра вдоль Oz
+        nodes[amr::vs<-1, -1, 0>()] = edge_nodes[e_lb]->id();
+        nodes[amr::vs<-1, +1, 0>()] = edge_nodes[e_lt]->id();
+        nodes[amr::vs<+1, -1, 0>()] = edge_nodes[e_rb]->id();
+        nodes[amr::vs<+1, +1, 0>()] = edge_nodes[e_rt]->id();
+
+        Cell cell(CellType::AMR3D, std::move(nodes));
+        cell.init_faces();
+        for (int k = 0; k < 6; ++k) {
+            cell.set_bc(k, quad.get_face(k).bc());
+        }
+        m_cells.emplace_back(std::move(cell));
+    }
+    m_type = Type::AMR;
 }
 
 void Grid::Grid::make_amr() {

@@ -124,7 +124,7 @@ void make_parent(AmrCells& locals, AmrCells& aliens, Children& children, index_t
             throw std::runtime_error("Undefined boundary (coarse cell");
         }
         for (auto subface: side.subfaces()) {
-            index_t ich = children.index[subface.child()];
+            index_t ich = children.index[indexing::child(subface)];
             index_t iface = locals.face_begin[ich] + side;
 
             if (locals.faces.boundary[iface] != locals.faces.boundary[some_ch_face]) {
@@ -141,6 +141,7 @@ void make_parent(AmrCells& locals, AmrCells& aliens, Children& children, index_t
             adj.index[face_beg + side] = ip_next;
             adj.alien[face_beg + side] = -1;
             adj.basic[face_beg + side] = ip_next;
+            adj.rotation[face_beg + side] = 0;
             continue;
         }
 
@@ -164,8 +165,8 @@ void make_parent(AmrCells& locals, AmrCells& aliens, Children& children, index_t
         auto [some_neibs, some_neib] = adj.get_neib(some_ch_face, locals, aliens);
         auto some_neib_wanted_lvl = some_neibs.level[some_neib] + some_neibs.flag[some_neib];
 #if SCRUTINY
-        auto children_by_side = side.children();
-        for (int i = 1; i < VpF(dim); ++i) {
+        auto children_by_side = indexing::children(side);
+        for (int i = 1; i < indexing::VpF(dim); ++i) {
             index_t ich = children.index[children_by_side[i]];
             index_t iface = locals.face_begin[ich] + side;
 
@@ -196,6 +197,7 @@ void make_parent(AmrCells& locals, AmrCells& aliens, Children& children, index_t
             index_t p_face = face_beg + side;
             adj.rank [p_face] = some_neib_rank;
             adj.basic[p_face] = ip_next;
+            adj.rotation[p_face] = adj.rotation[some_ch_face];
 
             int some_neib_flag = some_neibs.flag[some_neib];
             if (some_neib_flag == 0) {
@@ -241,11 +243,13 @@ void make_parent(AmrCells& locals, AmrCells& aliens, Children& children, index_t
 
             adj.rank[sface] = adj.rank[ch_face];
             adj.basic[sface] = ip_next;
+            adj.rotation[sface] = adj.rotation[ch_face];
+            int symm = adj.rotation[sface];
 
             if (locals.level[ich] > neibs.level[jc]) {
                 // Сосед нашего уровня с родительской, но бьется
                 scrutiny_check(neibs.flag[jc] > 0, "Wrong assumption #4");
-                int zch = indexing::neib_child(subface);
+                int zch = indexing::neib_child(subface, symm);
                 if (adj.alien[ch_face] < 0) {
                     index_t adj_next = neibs.next[jc] + zch;
                     adj.index[sface] = locals.next[adj_next];

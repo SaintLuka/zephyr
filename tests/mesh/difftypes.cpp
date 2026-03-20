@@ -163,6 +163,27 @@ Grid test13() {
     return grid;
 }
 
+// BlockStructured, затем make_amr
+Grid test14() {
+    collection::PlaneWithHole gen = collection::PlaneWithHole(0.0, 2.0, 0.0, 2.0, 1.0, 1.0, 0.3);
+    gen.set_boundaries({.left=WALL, .right=WALL, .bottom=WALL, .top=WALL});
+    gen.set_ny(80);
+    Grid grid = gen.make();
+    grid.make_amr();
+    return grid;
+}
+
+// BlockStructured, затем extrude и make_amr
+Grid test15() {
+    collection::PlaneWithHole gen = collection::PlaneWithHole(0.0, 2.0, 0.0, 2.0, 1.0, 1.0, 0.3);
+    gen.set_boundaries({.left=WALL, .right=WALL, .bottom=WALL, .top=WALL});
+    gen.set_ny(80);
+    Grid grid = gen.make();
+    grid.extrude(Vector3d::UnitZ()/20, 2, ZOE, ZOE);
+    grid.make_amr();
+    return grid;
+}
+
 int main(int argc, char** argv) {
     mpi::handler handler(argc, argv);
     threads::init(argc, argv);
@@ -170,7 +191,7 @@ int main(int argc, char** argv) {
     threads::on();
 
     // Создать сетку
-    Grid grid = test13();
+    Grid grid = test15();
     bool polyhedral = grid.polyhedral();
     EuMesh mesh(std::move(grid));
 
@@ -188,6 +209,7 @@ int main(int argc, char** argv) {
 
     // Настройка сетки
     mesh.set_decomposition("XY");
+    mesh.set_max_level(2);
     mesh.set_distributor(solver.distributor());
 
     // Задание начальных данных
@@ -213,7 +235,7 @@ int main(int argc, char** argv) {
     pvd.polyhedral = polyhedral;
 
     // Переменные для сохранения
-    pvd.variables = {"level", "faces2D"};
+    pvd.variables = {"level"};
     pvd.variables += {"density",  [z](EuCell& cell) -> double { return cell[z].density; }};
     pvd.variables += {"vel.x",    [z](EuCell& cell) -> double { return cell[z].velocity.x(); }};
     pvd.variables += {"vel.y",    [z](EuCell& cell) -> double { return cell[z].velocity.y(); }};

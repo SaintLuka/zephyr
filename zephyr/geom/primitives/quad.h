@@ -19,6 +19,9 @@ protected:
     std::array<Vector3d, 4> verts;
 
 public:
+    /// @brief Конструктор по умолчанию (мусор)
+    Quad() = default;
+
     /// @brief Конструктор по угловым точкам (Z-порядок)
     Quad(const Vector3d& v00,
          const Vector3d& v01,
@@ -144,7 +147,7 @@ protected:
     std::array<Vector3d, 9> verts;
 
 public:
-    /// @brief Конструктор по умолчанию
+    /// @brief Конструктор по умолчанию (мусор)
     SqQuad() = default;
 
     /// @brief Конструктор по угловым точкам

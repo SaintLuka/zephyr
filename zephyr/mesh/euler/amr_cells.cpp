@@ -455,6 +455,7 @@ void AmrCells::move_item(index_t from, index_t to) {
         faces.adjacent.index[jface] = faces.adjacent.index[iface];
         faces.adjacent.alien[jface] = faces.adjacent.alien[iface];
         faces.adjacent.basic[jface] = to;
+        faces.adjacent.rotation[jface] = faces.adjacent.rotation[iface];
     }
 
     for (index_t i = 0; i < node_begin[from + 1] - node_begin[from]; ++i) {
@@ -509,6 +510,7 @@ void AmrCells::copy_geom(index_t ic, AmrCells& cells,
         cells.faces.adjacent.index[jface] = faces.adjacent.index[iface];
         cells.faces.adjacent.alien[jface] = faces.adjacent.alien[iface];
         cells.faces.adjacent.basic[jface] = index[ic];
+        cells.faces.adjacent.rotation[jface] = faces.adjacent.rotation[iface];
     }
 
     cells.node_begin[jc] = node_beg;
@@ -539,6 +541,7 @@ void AmrCells::copy_geom_basic(index_t ic, AmrCells& cells,
         cells.faces.adjacent.rank [jface] = faces.adjacent.rank [iface];
         cells.faces.adjacent.index[jface] = faces.adjacent.index[iface];
         cells.faces.adjacent.alien[jface] = faces.adjacent.alien[iface];
+        cells.faces.adjacent.rotation[jface] = faces.adjacent.rotation[iface];
     }
 
     cells.node_begin[jc] = node_beg;

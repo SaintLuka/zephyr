@@ -50,6 +50,7 @@ void AmrCells::print_info(index_t ic) const {
         std::cout << "\t\t\t\tadj.index:  " << faces.adjacent.index[iface] << "\n";
         std::cout << "\t\t\t\tadj.alien:  " << faces.adjacent.alien[iface] << "\n";
         std::cout << "\t\t\t\tadj.basic:  " << faces.adjacent.basic[iface] << "\n";
+        std::cout << "\t\t\t\tadj.rotat:  " << int(faces.adjacent.rotation[iface]) << "\n";
     }
 }
 
@@ -515,6 +516,11 @@ int AmrCells::check_connectivity(index_t ic, const AmrCells& aliens) const {
                 print_info(ic);
                 return -1;
             }
+            if (adj.rotation[iface] != 0) {
+                std::cout << "\tBoundary face should point to origin cell (rotation)\n";
+                print_info(ic);
+                return -1;
+            }
             continue;
         }
 
@@ -527,6 +533,13 @@ int AmrCells::check_connectivity(index_t ic, const AmrCells& aliens) const {
 
         if (adj.index[iface] < 0) {
             std::cout << "\tadjacent.index out of range #1\n";
+            print_info(ic);
+            return -1;
+        }
+
+        int n_symmetries = m_dim == 2 ? 8 : 48;
+        if (adj.rotation[iface] > n_symmetries) {
+            std::cout << "\tadjacent.rotation out of range\n";
             print_info(ic);
             return -1;
         }

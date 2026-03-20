@@ -59,31 +59,26 @@ void Face::set_neib(id_t neib_id, int face_id) {
     }
 }
 
-void Face::calc_geom_line(const std::vector<Vector3d>& vertices, const Vector3d& view) {
-    if (m_nodes.size() != 2) {
-        throw std::runtime_error("Face::calc_geom_line: invalid number of nodes");
+FaceKey::FaceKey(const Cell& cell, const Face& face) {
+    const auto& cell_nodes = cell.nodes();
+    ids.reserve(face.n_nodes());
+    for (auto loc_id: face.nodes()) {
+        ids.push_back(cell_nodes[loc_id]);
     }
-    Line line{vertices[m_nodes[0]], vertices[m_nodes[1]]};
-
-    m_center = line.center();
-    m_area_n = line.area_n(view);
+    std::ranges::sort(ids);
 }
 
-void Face::calc_geom_poly(const std::vector<Vector3d>& vertices, const Vector3d& view) {
-
+bool FaceKey::operator==(const FaceKey& o) const noexcept {
+    return ids == o.ids;
 }
 
-void Face::calc_geom_amr2d(const std::vector<Vector3d>& vertices, const Vector3d& view) {
-    if (m_nodes.size() != 3) {
-        throw std::runtime_error("Face::calc_geom_amr2d: invalid number of nodes");
-    }
-    SqLine line{vertices[m_nodes[0]], vertices[m_nodes[1]], vertices[m_nodes[2]]};
-    m_center = line.center();
-    m_area_n = line.length() * line.normal(view);
+EdgeKey::EdgeKey(id_t i, id_t j) {
+    nid1 = std::min(i, j);
+    nid2 = std::max(i, j);
 }
 
-void Face::calc_geom_amr3d(const std::vector<Vector3d>& vertices, const Vector3d& view) {
-
+bool EdgeKey::operator==(const EdgeKey& o) const noexcept {
+    return nid1 == o.nid1 && nid2 == o.nid2;
 }
 
 // ------------------------------------------------------- CELL -------------------------------------------------------
@@ -289,29 +284,50 @@ Vector3d Cell::center(const std::vector<Node>& grid_nodes) const {
 void Cell::calc_geom(const std::vector<Node>& grid_nodes) {
     if (indexing::get_dimension(m_type) == 2) {
         if (m_type != CellType::AMR2D) {
-            std::vector<Vector3d> vertices;
-            vertices.reserve(m_nodes.size());
-            for (const auto& nid: m_nodes) {
-                vertices.push_back(grid_nodes[nid].pos);
+            Polygon poly;
+            {
+                std::vector<Vector3d> vertices;
+                vertices.reserve(m_nodes.size());
+                for (const auto& nid: m_nodes) {
+                    vertices.push_back(grid_nodes[nid].pos);
+                }
+                poly = Polygon(std::move(vertices));
             }
-            Polygon poly(std::move(vertices));
             m_volume = poly.area();
             m_center = poly.centroid(m_volume);
+
             for (auto& face: m_faces) {
-                face.calc_geom_line(poly.vertices(), m_center);
+                if (face.n_nodes() != 2) {
+                    throw std::runtime_error("Face::calc_geom_line: invalid number of nodes");
+                }
+                Line line{
+                    grid_nodes[m_nodes[face.node_idx(0)]].pos,
+                    grid_nodes[m_nodes[face.node_idx(1)]].pos
+                };
+                face.set_center(line.center());
+                face.set_area_n(line.area_n(m_center));
             }
         }
         else {
-            std::vector<Vector3d> vertices;
-            vertices.reserve(m_nodes.size());
-            for (const auto& nid: m_nodes) {
-                vertices.push_back(grid_nodes[nid].pos);
+            SqQuad quad;
+            for (int i = 0; i < 9; ++i) {
+                quad[i] = grid_nodes[m_nodes[i]].pos;
             }
-            SqQuad quad(std::span<const Vector3d, 9>{vertices});
             m_volume = quad.area();
             m_center = quad.centroid(m_volume);
+
+            // Fill faces geometry
             for (auto& face: m_faces) {
-                face.calc_geom_amr2d(vertices, m_center);
+                if (face.n_nodes() != 3) {
+                    throw std::runtime_error("Cell::calc_geom: invalid number of face nodes");
+                }
+                SqLine line{
+                    grid_nodes[m_nodes[face.node_idx(0)]].pos,
+                    grid_nodes[m_nodes[face.node_idx(1)]].pos,
+                    grid_nodes[m_nodes[face.node_idx(2)]].pos
+                };
+                face.set_center(line.center());
+                face.set_area_n(line.length() * line.normal(m_center));
             }
         }
     }
@@ -339,7 +355,32 @@ void Cell::calc_geom(const std::vector<Node>& grid_nodes) {
             }
         }
         else {
-            throw std::runtime_error("not implemented #1654");
+            SqCube cube;
+            for (int i = 0; i < 27; ++i) {
+                cube[i] = grid_nodes[m_nodes[i]].pos;
+            }
+            m_volume = cube.volume();
+            m_center = cube.centroid(m_volume);
+
+            // Fill faces geometry
+            for (auto& face: m_faces) {
+                if (face.n_nodes() != 9) {
+                    throw std::runtime_error("Cell::calc_geom: invalid number of face nodes");
+                }
+                SqQuad quad{
+                    grid_nodes[m_nodes[face.node_idx(0)]].pos,
+                    grid_nodes[m_nodes[face.node_idx(1)]].pos,
+                    grid_nodes[m_nodes[face.node_idx(2)]].pos,
+                    grid_nodes[m_nodes[face.node_idx(3)]].pos,
+                    grid_nodes[m_nodes[face.node_idx(4)]].pos,
+                    grid_nodes[m_nodes[face.node_idx(5)]].pos,
+                    grid_nodes[m_nodes[face.node_idx(6)]].pos,
+                    grid_nodes[m_nodes[face.node_idx(7)]].pos,
+                    grid_nodes[m_nodes[face.node_idx(8)]].pos
+                };
+                face.set_center(quad.center());
+                face.set_area_n(quad.area_n(m_center));
+            }
         }
     }
 }

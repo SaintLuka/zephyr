@@ -15,6 +15,7 @@ void make_link_2D(AmrCells& cells, index_t main_child, int rank) {
     cells.faces.adjacent.rank[iface] = rank;
     cells.faces.adjacent.index[iface] = cells.next[main_child + Quad::iss<i + 2 * x, j + 2 * y>()];
     cells.faces.adjacent.alien[iface] = -1;
+    cells.faces.adjacent.rotation[iface] = 0;
 }
 
 /// @brief Добавить связь, (i, j, k) - координаты дочерней ячейки, (x, y, z) - вектор направления
@@ -25,6 +26,7 @@ void make_link_3D(AmrCells& cells, index_t main_child, int rank) {
     cells.faces.adjacent.rank[iface] = rank;
     cells.faces.adjacent.index[iface] = cells.next[main_child + Cube::iss<i + 2 * x, j + 2 * y, k + 2 * z>()];
     cells.faces.adjacent.alien[iface] = -1;
+    cells.faces.adjacent.rotation[iface] = 0;
 }
 
 /// @brief Связать грани соседних дочерних ячеек (внутри родительской). Помним,
@@ -240,6 +242,7 @@ index_t make_children(AmrCells &locals, AmrCells& aliens, index_t ip) {
                 adj.rank [ch_face] = rank;
                 adj.index[ch_face] = locals.next[ich];
                 adj.alien[ch_face] = -1;
+                adj.rotation[ch_face] = 0;
             }
             continue;
         }
@@ -262,10 +265,12 @@ index_t make_children(AmrCells &locals, AmrCells& aliens, index_t ip) {
                 index_t ch_face = locals.face_begin[ich] + side;
 
                 adj.rank[ch_face] = adj.rank[p_face];
+                adj.rotation[ch_face] = adj.rotation[p_face];
+                int symm = adj.rotation[p_face];
 
                 if (locals.level[ip] > neibs.level[jc]) {
                     // case: lvl_c > lvl_n & flag_n == 1
-                    int zch = indexing::adjacent_child(side, locals.z_idx[ip] % CpC(dim));
+                    int zch = indexing::adjacent_child(side, symm, locals.z_idx[ip] % CpC(dim));
                     if (adj.alien[p_face] < 0) {
                         adj.index[ch_face] = locals.next[neibs.next[jc] + zch];
                     }
@@ -285,7 +290,7 @@ index_t make_children(AmrCells &locals, AmrCells& aliens, index_t ip) {
                     }
                     else {
                         // case: lvl_c == lvl_n & flag_n == 1
-                        int zch = indexing::adjacent_child(side, i);
+                        int zch = indexing::adjacent_child(side, symm, i);
                         if (adj.alien[p_face] < 0) {
                             adj.index[ch_face] = locals.next[neibs.next[jc] + zch];
                         }
@@ -307,6 +312,7 @@ index_t make_children(AmrCells &locals, AmrCells& aliens, index_t ip) {
                 scrutiny_check(0 <= jc && jc < neibs.size(), "Out fo bounds make children #2");
 
                 adj.rank[ch_face] = adj.rank[p_face];
+                adj.rotation[ch_face] = adj.rotation[p_face];
 
                 if (neibs.flag[jc] == 0) {
                     if (adj.alien[p_face] < 0) {
@@ -412,8 +418,9 @@ void refine_cell(AmrCells &locals, AmrCells& aliens, index_t ip, const Distribut
                 for (auto subface: side.subfaces()) {
                     index_t ch_face = locals.face_begin[ich] + subface;
                     adj.rank[ch_face] = adj.rank[p_face];
+                    int symm = adj.rotation[ch_face];
 
-                    int zch = indexing::neib_child(subface);
+                    int zch = indexing::neib_child(subface, symm);
                     if (adj.alien[p_face] < 0) {
                         adj.index[ch_face] = locals.next[neib_next + zch];
                         adj.alien[ch_face] = -1;

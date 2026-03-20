@@ -78,7 +78,7 @@ Variable::Variable(const char* name)
         m_type = VtkType::Int8;
         m_n_components = !std::strcmp(name, "face2D.rank") ? 8 : 24;
         m_write = [max_faces=m_n_components](const EuCell& cell, void *arg) {
-            const int n_faces = std::min(max_faces, cell.face_count());
+            const int n_faces = cell.adaptive() ? max_faces : std::min(max_faces, cell.face_count());
             const auto out = static_cast<int8_t *>(arg);
             for (int i = 0; i < n_faces; ++i) {
                 out[i] = static_cast<int8_t>(cell.face(i).adj_rank());
@@ -92,7 +92,7 @@ Variable::Variable(const char* name)
         m_type = VtkType::Int32;
         m_n_components = !std::strcmp(name, "face2D.index") ? 8 : 24;
         m_write = [max_faces=m_n_components](const EuCell& cell, void *arg) {
-            const int n_faces = std::min(max_faces, cell.face_count());
+            const int n_faces = cell.adaptive() ? max_faces : std::min(max_faces, cell.face_count());
             const auto out = static_cast<int32_t *>(arg);
             for (int i = 0; i < n_faces; ++i) {
                 out[i] = cell.face(i).adj_index();
@@ -106,7 +106,7 @@ Variable::Variable(const char* name)
         m_type = VtkType::Int32;
         m_n_components = !std::strcmp(name, "face2D.alien") ? 8 : 24;
         m_write = [max_faces=m_n_components](const EuCell& cell, void *arg) {
-            const int n_faces = std::min(max_faces, cell.face_count());
+            const int n_faces = cell.adaptive() ? max_faces : std::min(max_faces, cell.face_count());
             const auto out = static_cast<int32_t *>(arg);
             for (int i = 0; i < n_faces; ++i) {
                 out[i] = cell.face(i).adj_alien();
@@ -120,10 +120,24 @@ Variable::Variable(const char* name)
         m_type = VtkType::Int8;
         m_n_components = !std::strcmp(name, "face2D.boundary") ? 8 : 24;
         m_write = [max_faces=m_n_components](const EuCell& cell, void *arg) {
-            const int n_faces = std::min(max_faces, cell.face_count());
+            const int n_faces = cell.adaptive() ? max_faces : std::min(max_faces, cell.face_count());
             const auto out = static_cast<int8_t *>(arg);
             for (int i = 0; i < n_faces; ++i) {
                 out[i] = static_cast<int8_t>(cell.face(i).flag());
+            }
+            for (int i = n_faces; i < max_faces; ++i) {
+                out[i] = int8_t{-13};
+            }
+        };
+    }
+    else if (!std::strcmp(name, "face2D.rotation") || !std::strcmp(name, "face3D.rotation")) {
+        m_type = VtkType::Int8;
+        m_n_components = !std::strcmp(name, "face2D.rotation") ? 8 : 24;
+        m_write = [max_faces=m_n_components](const EuCell& cell, void *arg) {
+            const auto out = static_cast<int8_t*>(arg);
+            const int n_faces = cell.adaptive() ? max_faces : std::min(max_faces, cell.face_count());
+            for (int i = 0; i < n_faces; ++i) {
+                out[i] = static_cast<int8_t>(cell.face(i).rotation());
             }
             for (int i = n_faces; i < max_faces; ++i) {
                 out[i] = int8_t{-13};

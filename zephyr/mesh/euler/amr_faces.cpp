@@ -12,6 +12,7 @@ void AmrAdjacent::resize(index_t n_faces) {
     index.resize(n_faces, -1);
     alien.resize(n_faces, -1);
     basic.resize(n_faces, -1);
+    rotation.resize(n_faces, -1);
 }
 
 void AmrAdjacent::reserve(index_t n_faces) {
@@ -19,6 +20,7 @@ void AmrAdjacent::reserve(index_t n_faces) {
     index.reserve(n_faces);
     alien.reserve(n_faces);
     basic.reserve(n_faces);
+    rotation.reserve(n_faces);
 }
 
 void AmrAdjacent::shrink_to_fit() {
@@ -26,6 +28,7 @@ void AmrAdjacent::shrink_to_fit() {
     index.shrink_to_fit();
     alien.shrink_to_fit();
     basic.shrink_to_fit();
+    rotation.shrink_to_fit();
 }
 
 void AmrFaces::resize(index_t n_faces) {

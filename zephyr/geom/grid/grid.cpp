@@ -338,7 +338,7 @@ void Grid::finalize(const BuildOptions& options) {
     // Найти соседей через грань
     if (options.build_faces) {
         // Сделаем "лениво" через хэш граней (face hash, adjacent (cell, face_id) )
-        std::unordered_map<FaceKey, std::vector<std::pair<id_t, int>>, FaceKeyHash> faces;
+        std::unordered_map<FaceKey, std::vector<std::pair<id_t, int>>> faces;
         for (id_t ic = 0; ic < m_cells.size(); ++ic) {
             const auto& cell = m_cells[ic];
             if (!cell.has_faces()) {

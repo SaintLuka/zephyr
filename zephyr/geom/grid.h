@@ -131,18 +131,6 @@ public:
     /// @brief Установить центр ячейки
     void set_center(const Vector3d& C) { m_center = C; }
 
-    /// @brief Вычислить геометрию грани в виде отрезка
-    void calc_geom_line(const std::vector<Vector3d>& vertices, const Vector3d& view);
-
-    /// @brief Вычислить геометрию многоугольной грани
-    void calc_geom_poly(const std::vector<Vector3d>& vertices, const Vector3d& view);
-
-    /// @brief Вычислить геометрию грани двумерной AMR-ячейки
-    void calc_geom_amr2d(const std::vector<Vector3d>& vertices, const Vector3d& view);
-
-    /// @brief Вычислить геометрию грани трёхмерной AMR-ячейки
-    void calc_geom_amr3d(const std::vector<Vector3d>& vertices, const Vector3d& view);
-
 private:
     node_ids_t m_nodes{};           ///< Локальные индексы (внутри ячейки)
     Vector3d   m_area_n{nanvec()};  ///< Площадь на внешнюю нормаль
@@ -247,33 +235,22 @@ private:
     double   m_volume{NAN};       ///< Объем ячейки
 };
 
-// FaceKey for merging (order-insensitive: sorted node ids)
+// FaceKey for hash-table (order-insensitive: sorted node ids)
 struct FaceKey {
     std::vector<id_t> ids;
 
-    explicit FaceKey(const Cell& cell, const Face& face) {
-        const auto& cell_nodes = cell.nodes();
-        ids.reserve(face.n_nodes());
-        for (auto loc_id: face.nodes()) {
-            ids.push_back(cell_nodes[loc_id]);
-        }
-        std::ranges::sort(ids);
-    }
+    explicit FaceKey(const Cell& cell, const Face& face);
 
-    bool operator==(const FaceKey& o) const noexcept {
-        return ids == o.ids;
-    }
+    bool operator==(const FaceKey& o) const noexcept;
 };
 
-struct FaceKeyHash {
-    std::size_t operator()(const FaceKey& k) const noexcept {
-        // FNV-1a-ish combine
-        std::size_t h = 1469598103934665603ull;
-        for (size_t v: k.ids) {
-            h ^= v + 0x9e3779b97f4a7c15ull + (h<<6) + (h>>2);
-        }
-        return h;
-    }
+// EdgeKey for hash-table (order-insensitive: sorted node ids)
+struct EdgeKey {
+    id_t nid1, nid2;
+
+    explicit EdgeKey(id_t i, id_t j);
+
+    bool operator==(const EdgeKey& o) const noexcept;
 };
 
 // ============================================================================
@@ -469,6 +446,15 @@ private:
     // Grid Modification
     // ==========================
 
+    /// @brief Создать узлы в центрах ячеек и добавить их на сетку
+    std::vector<Node::Ptr> create_central_nodes_();
+
+    /// @brief Создать узлы в центрах граней и добавить их на сетку
+    std::unordered_map<FaceKey, Node::Ptr> create_face_nodes_();
+
+    /// @brief Создать узлы в центрах рёбер и добавить их на сетку
+    std::unordered_map<EdgeKey, Node::Ptr> create_edge_nodes_();
+
     /// @brief Достроить зеркальное отражение сетки. Все узлы сетки должны
     /// лежать в одной полуплоскости.
     /// @param axis = 0, 1, 2 -- нормали X, Y, Z
@@ -513,3 +499,27 @@ private:
 };
 
 } // namespace zephyr::geom
+
+/// @brief Хэш-функция для FaceKey
+template <>
+struct std::hash<zephyr::geom::FaceKey> {
+    size_t operator()(const zephyr::geom::FaceKey& k) const noexcept {
+        size_t h = 1469598103934665603ull;
+        for (size_t v: k.ids) {
+            h ^= v + 0x9e3779b97f4a7c15ull + (h<<6) + (h>>2);
+        }
+        return h;
+    }
+};
+
+/// @brief Хэш-функция для EdgeKey
+template <>
+struct std::hash<zephyr::geom::EdgeKey> {
+    size_t operator()(const zephyr::geom::EdgeKey& k) const noexcept {
+        size_t h = 1469598103934665603ull;
+        for (size_t v: {k.nid1, k.nid2}) {
+            h ^= v + 0x9e3779b97f4a7c15ull + (h<<6) + (h>>2);
+        }
+        return h;
+    }
+};

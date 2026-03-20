@@ -522,7 +522,7 @@ void SmFluid::set_flags(EuMesh &mesh) const {
                 cell.set_flag(0);
             }
         }
-
+        /*
         // ---------------------- CHI CRITERION ---------------------------
         const auto& zc = cell[part.init];
         const auto& dzcx = cell[part.d_dx];
@@ -603,6 +603,7 @@ void SmFluid::set_flags(EuMesh &mesh) const {
         else {
             cell.set_flag(0);
         }
+        */
     }
 }
 

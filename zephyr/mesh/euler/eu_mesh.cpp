@@ -14,6 +14,7 @@
 
 #include <zephyr/mesh/amr/apply.h>
 #include <zephyr/mesh/amr/balancing.h>
+#include <zephyr/mesh/amr/rotations.h>
 
 #include <zephyr/utils/json.h>
 #include <zephyr/io/pvd_file.h>
@@ -75,6 +76,7 @@ void EuMesh::build_(Generator& gen) {
             Grid grid = gen.make();
             m_locals = make_locals(std::move(grid));
         }
+        init_amr();
     }
     sync_params_();
 
@@ -102,6 +104,7 @@ void EuMesh::build_(Generator& gen) {
 EuMesh::EuMesh(Grid&& grid) {
     if (mpi::master()) {
         m_locals = make_locals(std::move(grid));
+        init_amr();
     }
     sync_params_();
 }
@@ -159,28 +162,9 @@ EuMesh::EuMesh(const Json& config) {
 }
 
 void EuMesh::init_amr() {
-    // Эта функция нифига не используется же?
-    m_max_level = 0;
+    if (!m_locals.adaptive()) return;
 
-    if (m_locals.empty()) {
-        return;
-    }
-
-    int rank = mpi::rank();
-    int size = mpi::size();
-
-    auto cells_nums = mpi::all_gather(m_locals.size());
-    std::vector<int> offset(size, 0);
-    for (int r = 0; r < size - 1; ++r) {
-        offset[r + 1] = offset[r] + cells_nums[r];
-    }
-
-    for (int ic = 0; ic < m_locals.size(); ++ic) {
-        m_locals.b_idx[ic] = offset[rank] + ic;
-        m_locals.z_idx[ic] = 0;
-        m_locals.level[ic] = 0;
-        m_locals.flag [ic] = 0;
-    }
+    amr::find_rotations(m_locals);
 }
 
 bool EuMesh::adaptive() const {
@@ -676,7 +660,7 @@ int EuMesh::check_refined() const {
         res = m_locals.check_geometry(ic);
         if (res < 0) return res;
 
-        // Грани правльно ориентированы
+        // Грани правильно ориентированы
         res = m_locals.check_base_face_orientation(ic);
         if (res < 0) return res;
 
