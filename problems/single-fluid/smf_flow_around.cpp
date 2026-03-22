@@ -4,8 +4,8 @@
 #include <iostream>
 #include <iomanip>
 
-#include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/geom/grid.h>
+#include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/geom/generator/collection/wedge.h>
 #include <zephyr/geom/generator/collection/semicircle_cutout.h>
 #include <zephyr/geom/generator/collection/plane_with_hole.h>
@@ -19,6 +19,10 @@
 #include <zephyr/io/csv_file.h>
 
 #include <zephyr/phys/tests/test_1D.h>
+
+#include <zephyr/utils/mpi.h>
+#include <zephyr/utils/threads.h>
+#include <zephyr/utils/stopwatch.h>
 
 using zephyr::geom::generator::collection::Wedge;
 using zephyr::geom::generator::collection::SemicircleCutout;
@@ -34,59 +38,69 @@ using namespace zephyr::math::smf;
 
 using zephyr::mesh::EuMesh;
 using zephyr::math::SmFluid;
+using zephyr::utils::mpi;
 using zephyr::utils::threads;
+using zephyr::utils::Stopwatch;
 
-int main() {
-    threads::on();
-
-    // Test problems
-    ShockWave test(3.0, 0.1, 1.0);
-
-    // Сеточные генераторы на выбор
-    Rectangle gen(0.0, 1.0, 0.0, 0.2);
+EuMesh tube_2D() {
+    Rectangle gen(0.0, 2.0, -0.1, 0.1);
     gen.set_nx(200);
     gen.set_boundaries({.left=Boundary::ZOE, .right=Boundary::ZOE,
                         .bottom=Boundary::WALL, .top=Boundary::WALL});
+    return EuMesh(gen);
+}
 
-    /*
-    Wedge gen(0.0, 3.0, 0.0, 1.8, 1.5, M_PI / 6.0,
-                 {.left=Boundary::ZOE, .right=Boundary::ZOE,
-                 .bottom=Boundary::WALL, .top=Boundary::WALL});
-    gen.set_nx(100);
-    gen.set_fixed(fix_condition);
+EuMesh tube_3D() {
+    Cuboid gen(0.0, 2.0, -0.1, 0.1, -0.1, 0.1);
+    gen.set_boundaries({.left   = Boundary::ZOE, .right  = Boundary::ZOE,
+                        .bottom = Boundary::ZOE, .top    = Boundary::ZOE,
+                        .back   = Boundary::ZOE, .front  = Boundary::ZOE});
+    gen.set_nx(50);
+    return EuMesh(gen);
+}
 
-    // Часть области с регулярной сеткой
-    auto fix_condition = [&test](const Vector3d& v) {
-        return v.x() <= test.x_jump + 0.1 * (test.xmax() - test.xmin());
-    };
-     */
+EuMesh wedge() {
+    Wedge gen(0.0, 2.0, 0.0, 1.0, 0.8, M_PI / 6.0);
+    gen.set_boundaries({.left=Boundary::ZOE, .right=Boundary::ZOE,
+                        .bottom=Boundary::WALL, .top=Boundary::WALL});
+    gen.set_nx(200);
+    gen.set_adaptive(true);
+    return EuMesh(gen);
+}
 
-    /*
-    PlaneWithCube gen(0, 3.2, 0, 3.2, 1.6, 1.6, 0.3);
-    gen.set_nx(-1);
-    */
-
-    /*
-    PlaneWithHole gen(test.xmin(), test.xmax(), test.ymin(), test.ymax(),
-                       0.3, 0.5 * (test.ymin() + test.ymax()), 0.1);
+EuMesh plane_with_hole() {
+    PlaneWithHole gen(0.0, 2.0, -1.0, 1.0, 0.5, 0.0, 0.1);
     gen.set_boundaries({.left   = Boundary::ZOE, .right  = Boundary::ZOE,
                         .bottom = Boundary::ZOE, .top    = Boundary::ZOE,
                         .hole   = Boundary::WALL});
-    gen.set_nx(20);
-    */
+    gen.set_nx(200);
+    gen.set_adaptive(true);
+    return EuMesh(gen);
+}
 
-    // Cuboid gen(test.xmin(), test.xmax(),
-    //            test.ymin(), test.ymax(),
-    //            test.zmin(), test.zmax());
-    // gen.set_boundaries({.left   = Boundary::ZOE, .right  = Boundary::ZOE,
-    //                     .bottom = Boundary::ZOE, .top    = Boundary::ZOE,
-    //                     .back   = Boundary::ZOE, .front  = Boundary::ZOE});
-    // gen.set_nx(30);
-    // gen.set_ny(30);
-    // gen.set_nz(30);
+EuMesh plane_with_cube() {
+    PlaneWithCube gen(0.0, 2.0, -1.0, 1.0, 0.5, 0.0, 0.1);
+    gen.set_boundaries({.left=Boundary::ZOE, .right=Boundary::ZOE,
+                        .bottom=Boundary::WALL, .top=Boundary::WALL});
+    gen.set_nx(200);
+    gen.set_adaptive(true);
+    return EuMesh(gen);
+}
+
+int main(int argc, char** argv) {
+    mpi::handler handler(argc, argv);
+    threads::init(argc, argv);
+    threads::info();
+
+    // Test problems
+    ShockWave test(3.0, 0.1, 2.0);
 
     // Create mesh
-    EuMesh mesh(gen);
+    //EuMesh mesh = tube_2D();
+    //EuMesh mesh = tube_3D();
+    //EuMesh mesh = wedge();
+    //EuMesh mesh = plane_with_hole();
+    EuMesh mesh = plane_with_cube();
 
     // Test class provides EoS
     auto eos = test.get_eos();
@@ -138,6 +152,7 @@ int main() {
     double curr_time = 0.0;
     double next_write = 0.0;
 
+    Stopwatch elapsed(true);
     while (curr_time < test.max_time()) {
         if (curr_time >= next_write) {
             std::cout << "\tStep: " << std::setw(6) << n_step << ";"
@@ -158,6 +173,10 @@ int main() {
         n_step += 1;
     }
     pvd.save(mesh, curr_time);
+    elapsed.stop();
+
+    mpi::cout << "\nElapsed time:   " << elapsed.extended_time()
+              << " ( " << elapsed.milliseconds() << " ms)\n";
 
     return 0;
 }

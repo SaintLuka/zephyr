@@ -43,6 +43,15 @@ public:
     /// @brief Установить флаги граничных условий
     void set_boundaries(Boundaries bounds) const;
 
+    /// @brief Использовать осевую симметрию
+    void set_axial(bool axial) override;
+
+    /// @brief Использовать адаптацию
+    void set_adaptive(bool adaptive) override;
+
+    /// @brief Использовать линейную адаптацию
+    void set_linear(bool linear) override;
+
     /// @brief Ограничивающий объем
     Box bbox() const override;
 

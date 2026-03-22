@@ -20,8 +20,8 @@ public:
 
     /// @brief Конструктор класса
     /// @param xmin, xmax, ymin, ymax Границы прямоугольника
-    /// @param xw -- Положение клина
-    /// @param phi -- Угол наклона
+    /// @param xw Положение клина
+    /// @param phi Угол наклона
     Wedge(double xmin, double xmax, double ymin, double ymax, double xw, double phi);
 
     /// @brief Создать указатель на класс
@@ -39,11 +39,20 @@ public:
     /// @brief Установить флаги граничных условий
     void set_boundaries(Boundaries bounds) const;
 
+    /// @brief Использовать осевую симметрию
+    void set_axial(bool axial) override;
+
+    /// @brief Использовать адаптацию
+    void set_adaptive(bool adaptive) override;
+
+    /// @brief Использовать линейную адаптацию
+    void set_linear(bool linear) override;
+
     /// @brief Ограничивающий объем
     Box bbox() const override;
 
     /// @brief Создать сетку
-    Grid make() const override { return m_blocks.make(); }
+    Grid make() const override;
 
 private:
     void check_params() const;

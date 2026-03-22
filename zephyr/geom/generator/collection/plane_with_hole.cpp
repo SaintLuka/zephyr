@@ -164,10 +164,21 @@ void PlaneWithHole::set_boundaries(Boundaries bounds) const {
     bottom->set_boundary(bounds.bottom);
 }
 
+void PlaneWithHole::set_axial(bool axial) {
+    m_blocks.set_axial(axial);
+}
+
+void PlaneWithHole::set_adaptive(bool adaptive) {
+    m_blocks.set_adaptive(adaptive);
+}
+
+void PlaneWithHole::set_linear(bool linear) {
+    m_blocks.set_linear(linear);
+}
+
 Box PlaneWithHole::bbox() const {
     Vector3d vmin(m_xmin, m_ymin, 0.0);
     Vector3d vmax(m_xmax, m_ymax, 0.0);
-
     return {vmin, vmax};
 }
 

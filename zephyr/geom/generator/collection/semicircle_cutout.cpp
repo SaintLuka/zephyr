@@ -124,11 +124,26 @@ void SemicircleCutout::set_boundaries(Boundaries bounds) const {
     circle->set_boundary(bounds.bottom);
 }
 
+void SemicircleCutout::set_axial(bool axial) {
+    m_blocks.set_axial(axial);
+}
+
+void SemicircleCutout::set_adaptive(bool adaptive) {
+    m_blocks.set_adaptive(adaptive);
+}
+
+void SemicircleCutout::set_linear(bool linear) {
+    m_blocks.set_linear(linear);
+}
+
 Box SemicircleCutout::bbox() const {
     Vector3d vmin(m_xmin, m_ymin, 0.0);
     Vector3d vmax(m_xmax, m_ymax, 0.0);
-
     return {vmin, vmax};
+}
+
+Grid SemicircleCutout::make() const {
+    return m_blocks.make();
 }
 
 } // namespace zephyr::geom::generator::collection

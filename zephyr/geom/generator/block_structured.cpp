@@ -1497,7 +1497,15 @@ Grid BlockStructured::make() const {
     }
 
     // Размеры по пожеланию пользователя
-    const auto sizes = wanted_block_sizes();
+    auto sizes = wanted_block_sizes();
+
+    // Нелинейная адаптивная сетка (в 4 раза больше ячеек)
+    if (m_adaptive && !m_linear) {
+        for (auto& size: sizes) {
+            size[Axis::X] *= 2;
+            size[Axis::Y] *= 2;
+        }
+    }
 
     // Рассчитать коэффициенты
     auto lambda = get_lambda(m_blocks, sizes);
@@ -1562,9 +1570,11 @@ Grid BlockStructured::make() const {
         }
 
         const auto& verts = vertices[b1];
-        int Nx = verts.size(Axis::X) - 1;
-        int Ny = verts.size(Axis::Y) - 1;
-        if (!m_adaptive) {
+        // Не адаптивная или адаптивная линейная
+        if (!m_adaptive || (m_adaptive && m_linear)) {
+            int Nx = verts.size(Axis::X) - 1;
+            int Ny = verts.size(Axis::Y) - 1;
+
             // Обход против часовой стрелки, с нижней левой вершины и нижней грани
             for (int i = 0; i < Nx; ++i) {
                 for (int j = 0; j < Ny; ++j) {
@@ -1584,8 +1594,12 @@ Grid BlockStructured::make() const {
                 }
             }
         }
-        else {
+        else if (m_adaptive && !m_linear) {
+            // Адаптивная и нелинейная
             // AMR-ячейка, Z-порядок вершин
+            int Nx = (verts.size(Axis::X) - 1) / 2;
+            int Ny = (verts.size(Axis::Y) - 1) / 2;
+
             for (int i = 0; i < Nx; ++i) {
                 for (int j = 0; j < Ny; ++j) {
                     bc[0] = bc[1] = bc[2] = bc[3] = Boundary::INNER;
@@ -1596,15 +1610,23 @@ Grid BlockStructured::make() const {
 
                     grid.add_cell(
                         CellType::AMR2D, {
-                            nodes[verts(i, j)->index],
-                            nodes[verts(i + 1, j)->index],
-                            nodes[verts(i, j + 1)->index],
-                            nodes[verts(i + 1, j + 1)->index]
+                            nodes[verts(2*i, 2*j+0)->index], nodes[verts(2*i+1, 2*j+0)->index], nodes[verts(2*i+2, 2*j+0)->index],
+                            nodes[verts(2*i, 2*j+1)->index], nodes[verts(2*i+1, 2*j+1)->index], nodes[verts(2*i+2, 2*j+1)->index],
+                            nodes[verts(2*i, 2*j+2)->index], nodes[verts(2*i+1, 2*j+2)->index], nodes[verts(2*i+2, 2*j+2)->index]
                         }, bc);
                 }
             }
         }
+        else {
+            throw std::runtime_error("BlockStructured::make: bad configuration");
+        }
     }
+
+    // Сделать адаптивную из простой сетки
+    if (m_adaptive && m_linear) {
+        grid.make_amr();
+    }
+
     if (m_verbosity > 0) {
         std::cout << "BlockStructured finish\n";
     }
