@@ -198,6 +198,7 @@ void Migration::migrate(Tourism& tourists, AmrCells& locals, Vars&&... vars) {
     faces_send += m_face_router.isend(migrants.faces.adjacent.index, MpiTag::ADJ_INDEX);
     faces_send += m_face_router.isend(migrants.faces.adjacent.alien, MpiTag::ADJ_ALIEN);
     faces_send += m_face_router.isend(migrants.faces.adjacent.basic, MpiTag::ADJ_BASIC);
+    faces_send += m_face_router.isend(migrants.faces.adjacent.rotation, MpiTag::ADJ_ROTATION);
     faces_send += m_face_router.isend(migrants.faces.boundary, MpiTag::BOUNDARY);
     faces_send += m_face_router.isend(migrants.faces.normal,   MpiTag::NORMAL);
     faces_send += m_face_router.isend(migrants.faces.center,   MpiTag::FACE_CENTER);
@@ -239,6 +240,7 @@ void Migration::migrate(Tourism& tourists, AmrCells& locals, Vars&&... vars) {
     faces_recv += m_face_router.irecv(locals.faces.adjacent.index, MpiTag::ADJ_INDEX);
     faces_recv += m_face_router.irecv(locals.faces.adjacent.alien, MpiTag::ADJ_ALIEN);
     faces_recv += m_face_router.irecv(locals.faces.adjacent.basic, MpiTag::ADJ_BASIC);
+    faces_recv += m_face_router.irecv(locals.faces.adjacent.rotation, MpiTag::ADJ_ROTATION);
     faces_recv += m_face_router.irecv(locals.faces.boundary, MpiTag::BOUNDARY);
     faces_recv += m_face_router.irecv(locals.faces.normal, MpiTag::NORMAL);
     faces_recv += m_face_router.irecv(locals.faces.center, MpiTag::FACE_CENTER);

@@ -92,6 +92,14 @@ void BlockStructured::plot() const {
     std::string line_color = "tab:blue";
     std::string outline_color = "black";
 
+    // Центры блоков
+    /*
+    for (int ib = 0; ib < m_blocks.size(); ++ib) {
+        Vector3d bc = m_blocks[ib]->center();
+        plt.text(bc.x(), bc.y(), std::format("$B_{{{}}}$", ib), {.ha = "center", .va = "center"});
+    }
+    */
+
     // Сетка внутри блоков
     std::vector<double> xs, ys;
     for (const auto& block: m_blocks) {
@@ -324,6 +332,16 @@ void BlockStructured::plot(const Tables2D& all_vertices) {
 
     std::string line_color = "tab:blue";
     std::string outline_color = "black";
+
+    // Центры блоков
+    /*
+    for (int ib = 0; ib < all_vertices.size(); ++ib) {
+        int i = all_vertices[ib].size(Axis::X) / 2;
+        int j = all_vertices[ib].size(Axis::Y) / 2;
+        Vector3d bc = all_vertices[ib](i, j)->pos;
+        plt.text(bc.x(), bc.y(), std::format("$B_{{{}}}$", ib), {.ha = "center", .va = "center"});
+    }
+    */
 
     // Сетка внутри блоков
     std::vector<double> xs, ys;

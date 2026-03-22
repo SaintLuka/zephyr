@@ -117,6 +117,7 @@ int main(int argc, char** argv) {
     auto z = data.init;
 
     // Configure mesh
+    mesh.set_decomposition("XY");
     mesh.set_max_level(3);
     mesh.set_distributor(solver.distributor());
 
@@ -154,8 +155,15 @@ int main(int argc, char** argv) {
 
     Stopwatch elapsed(true);
     while (curr_time < test.max_time()) {
+        // Load balancing
+        if (n_step % 20 == 0) {
+            mesh.balancing(mesh.n_cells());
+            mesh.redistribute(z);
+        }
+
+        // Save mesh
         if (curr_time >= next_write) {
-            std::cout << "\tStep: " << std::setw(6) << n_step << ";"
+            mpi::cout << "\tStep: " << std::setw(6) << n_step << ";"
                       << "\tTime: " << std::setw(6) << std::setprecision(3) << curr_time << "\n";
             pvd.save(mesh, curr_time);
             next_write += test.max_time() / 100;

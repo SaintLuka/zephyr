@@ -23,7 +23,6 @@ PlaneWithCube::PlaneWithCube(
         m_xc(xc), m_yc(yc),
         m_r(r) {
 
-
     double a = r;
     double b = 1.7 * a;
     

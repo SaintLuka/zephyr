@@ -33,6 +33,7 @@ enum class MpiTag : int {
     ADJ_INDEX,
     ADJ_ALIEN,
     ADJ_BASIC,
+    ADJ_ROTATION,
     BOUNDARY,
     NORMAL,
     FACE_CENTER,

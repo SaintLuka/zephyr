@@ -581,6 +581,7 @@ void Tourism::sync_geometry() {
     faces_send += m_face_router.isend(m_border.faces.adjacent.index, MpiTag::ADJ_INDEX);
     faces_send += m_face_router.isend(m_border.faces.adjacent.alien, MpiTag::ADJ_ALIEN);
     faces_send += m_face_router.isend(m_border.faces.adjacent.basic, MpiTag::ADJ_BASIC);
+    faces_send += m_face_router.isend(m_border.faces.adjacent.rotation, MpiTag::ADJ_ROTATION);
     faces_send += m_face_router.isend(m_border.faces.boundary, MpiTag::BOUNDARY);
     faces_send += m_face_router.isend(m_border.faces.normal, MpiTag::NORMAL);
     faces_send += m_face_router.isend(m_border.faces.center, MpiTag::FACE_CENTER);
@@ -622,6 +623,7 @@ void Tourism::sync_geometry() {
     faces_recv += m_face_router.irecv(m_aliens.faces.adjacent.index, MpiTag::ADJ_INDEX);
     faces_recv += m_face_router.irecv(m_aliens.faces.adjacent.alien, MpiTag::ADJ_ALIEN);
     faces_recv += m_face_router.irecv(m_aliens.faces.adjacent.basic, MpiTag::ADJ_BASIC);
+    faces_recv += m_face_router.irecv(m_aliens.faces.adjacent.rotation, MpiTag::ADJ_ROTATION);
     faces_recv += m_face_router.irecv(m_aliens.faces.boundary, MpiTag::BOUNDARY);
     faces_recv += m_face_router.irecv(m_aliens.faces.normal, MpiTag::NORMAL);
     faces_recv += m_face_router.irecv(m_aliens.faces.center, MpiTag::FACE_CENTER);

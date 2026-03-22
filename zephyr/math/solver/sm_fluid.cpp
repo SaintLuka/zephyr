@@ -483,6 +483,7 @@ void SmFluid::set_flags(EuMesh &mesh) const {
 void SmFluid::set_flags(EuMesh &mesh) const {
     if (!mesh.adaptive()) { return; }
 
+    mesh.sync(part.init);
     compute_grad(mesh);
 
 

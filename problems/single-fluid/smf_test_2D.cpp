@@ -121,6 +121,13 @@ int main(int argc, char** argv) {
 
     Stopwatch elapsed(true);
     while (curr_time < test.max_time()) {
+        // Load balancing
+        if (n_step % 20 == 0) {
+            mesh.balancing(mesh.n_cells());
+            mesh.redistribute(z);
+        }
+
+        // Save mesh
         if (curr_time >= next_write) {
             mpi::cout << "\tStep: " << std::setw(6) << n_step << ";"
                       << "\tTime: " << std::setw(8) << std::setprecision(3) << curr_time << "\n";
