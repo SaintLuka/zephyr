@@ -12,7 +12,7 @@ using generator::Rectangle;
 
 int main() {
     // Generator of a Cartesian grid
-    Rectangle gen(-2.0, 1.0, -2.0, 1.0);
+    Rectangle gen(-2.0, 1.0, -2.0, 1.0);  // [x_min, x_max, y_min, y_max]
     gen.set_nx(400);
     gen.set_boundaries({.left=Boundary::WALL, .right=Boundary::WALL,
                         .bottom=Boundary::WALL, .top=Boundary::WALL});

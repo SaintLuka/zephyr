@@ -64,10 +64,10 @@ int main(int argc, char** argv) {
     //Cuboid gen = Cuboid(test.xmin(), test.xmax(),
     //                    test.ymin(), test.ymax(),
     //                    test.zmin(), test.zmax());
-    Cuboid gen = Cuboid(-test.xmax(), test.xmax(),
-                        -test.ymax(), test.ymax(),
-                        -test.zmax(), test.zmax());
-    gen.set_nx(20);
+    Cuboid gen = Cuboid(0.0, test.xmax(),
+                        0.0, test.ymax(),
+                        0.0, test.zmax());
+    gen.set_nx(10);
     gen.set_boundaries(test.boundaries());
 
     // Создать сетку
@@ -75,8 +75,8 @@ int main(int argc, char** argv) {
 
     // Создать решатель
     SmFluid solver(eos);
-    solver.set_accuracy(2);
-    solver.set_CFL(0.5);
+    solver.set_accuracy(1);
+    solver.set_CFL(0.8);
     solver.set_limiter("minmod");
     solver.set_method(Fluxes::HLLC);
 
@@ -86,7 +86,7 @@ int main(int argc, char** argv) {
 
     // Настройка сетки
     mesh.set_decomposition("XYZ");
-    mesh.set_max_level(4);
+    mesh.set_max_level(3);
     mesh.set_distributor(solver.distributor());
 
     // Начальные данные
@@ -102,6 +102,7 @@ int main(int argc, char** argv) {
 
     // Файл для записи
     PvdFile pvd("Sedov", "output");
+    pvd.unique_nodes = true;
 
     size_t n_step = 0;
     double curr_time = test.init_time;
@@ -144,7 +145,7 @@ int main(int argc, char** argv) {
     Stopwatch sw_refine;
     Stopwatch sw_write;
 
-    test.finish = 0.2;
+    test.finish = 0.5;
 
     Stopwatch elapsed(true);
     while (curr_time < test.max_time()) {
@@ -153,7 +154,7 @@ int main(int argc, char** argv) {
                   << "\tTime: " << std::setw(10) << std::setprecision(5) << curr_time << "\n";
         if (curr_time >= next_write) {
             pvd.save(mesh, curr_time);
-            next_write += test.max_time() / 5;
+            next_write += test.max_time() / 50;
         }
         sw_write.stop();
 
