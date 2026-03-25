@@ -116,7 +116,7 @@ PlaneWithCube::PlaneWithCube(
 
     //m_blocks.plot_layout();
     //m_blocks.set_verbosity(5);
-    m_blocks.set_iters_count(10);
+    m_blocks.set_iters_count(100);
     m_blocks.optimize();
 }
 

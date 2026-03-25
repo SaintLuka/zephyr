@@ -193,6 +193,9 @@ protected:
     /// @brief Загрузить оптимизированную сетку из кэша
     void load_cached();
 
+    /// @brief Выставить консистентные конформные модули (после пересчета)
+    void correct_modulus();
+
     // ------------------------ Информационные выводы -------------------------
 
     /// @brief Построить блоки, внутренние узлы и прочее
@@ -233,6 +236,15 @@ protected:
     /// @brief Желаемое число ячеек на рёбрах и цепочках рёбер.
     /// Имеет значение только при создании финальной сетки (вызове make()).
     std::vector<wanted_size_t> m_wanted_sizes{};
+
+    // Внутренний узел + индексы и направления инцидентных блоков
+    struct inner_node_t {
+        BaseNode::Ptr node;
+        std::vector<std::tuple<int, bool>> blocks;
+    };
+
+    /// @brief Внутренние узлы
+    std::vector<inner_node_t> m_inner_nodes;
 };
 
 } // namespace zephyr::geom::generator

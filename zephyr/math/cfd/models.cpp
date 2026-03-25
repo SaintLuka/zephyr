@@ -56,7 +56,7 @@ void PState::inverse() {
 }
 
 bool PState::is_bad(const phys::Eos &eos) {
-    if (std::isnan(density) || std::isnan(pressure) || std::isnan(energy)) {
+    if (!std::isfinite(density) || !std::isfinite(pressure) || !std::isfinite(energy)) {
         return true;
     }
     return density <= 0.0 || pressure < eos.min_pressure();

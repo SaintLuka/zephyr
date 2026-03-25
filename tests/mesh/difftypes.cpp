@@ -191,7 +191,7 @@ int main(int argc, char** argv) {
     threads::on();
 
     // Создать сетку
-    Grid grid = test15();
+    Grid grid = test11();
     bool polyhedral = grid.polyhedral();
     EuMesh mesh(std::move(grid));
 

@@ -5,9 +5,7 @@
 #include <iomanip>
 
 #include <zephyr/geom/grid.h>
-#include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/geom/generator/collection/wedge.h>
-#include <zephyr/geom/generator/collection/semicircle_cutout.h>
 #include <zephyr/geom/generator/collection/plane_with_hole.h>
 #include <zephyr/geom/generator/collection/plane_with_cube.h>
 #include <zephyr/geom/generator/cuboid.h>
@@ -16,7 +14,6 @@
 #include <zephyr/math/solver/sm_fluid.h>
 
 #include <zephyr/io/pvd_file.h>
-#include <zephyr/io/csv_file.h>
 
 #include <zephyr/phys/tests/test_1D.h>
 
@@ -25,7 +22,6 @@
 #include <zephyr/utils/stopwatch.h>
 
 using zephyr::geom::generator::collection::Wedge;
-using zephyr::geom::generator::collection::SemicircleCutout;
 using zephyr::geom::generator::collection::PlaneWithHole;
 using zephyr::geom::generator::collection::PlaneWithCube;
 using zephyr::geom::generator::Rectangle;
@@ -42,23 +38,6 @@ using zephyr::utils::mpi;
 using zephyr::utils::threads;
 using zephyr::utils::Stopwatch;
 
-EuMesh tube_2D() {
-    Rectangle gen(0.0, 2.0, -0.1, 0.1);
-    gen.set_nx(200);
-    gen.set_boundaries({.left=Boundary::ZOE, .right=Boundary::ZOE,
-                        .bottom=Boundary::WALL, .top=Boundary::WALL});
-    return EuMesh(gen);
-}
-
-EuMesh tube_3D() {
-    Cuboid gen(0.0, 2.0, -0.1, 0.1, -0.1, 0.1);
-    gen.set_boundaries({.left   = Boundary::ZOE, .right  = Boundary::ZOE,
-                        .bottom = Boundary::ZOE, .top    = Boundary::ZOE,
-                        .back   = Boundary::ZOE, .front  = Boundary::ZOE});
-    gen.set_nx(50);
-    return EuMesh(gen);
-}
-
 EuMesh wedge() {
     Wedge gen(0.0, 2.0, 0.0, 1.0, 0.8, M_PI / 6.0);
     gen.set_boundaries({.left=Boundary::ZOE, .right=Boundary::ZOE,
@@ -73,7 +52,7 @@ EuMesh plane_with_hole() {
     gen.set_boundaries({.left   = Boundary::ZOE, .right  = Boundary::ZOE,
                         .bottom = Boundary::ZOE, .top    = Boundary::ZOE,
                         .hole   = Boundary::WALL});
-    gen.set_nx(200);
+    gen.set_nx(100);
     gen.set_adaptive(true);
     return EuMesh(gen);
 }
@@ -82,7 +61,7 @@ EuMesh plane_with_cube() {
     PlaneWithCube gen(0.0, 2.0, -1.0, 1.0, 0.5, 0.0, 0.1);
     gen.set_boundaries({.left=Boundary::ZOE, .right=Boundary::ZOE,
                         .bottom=Boundary::WALL, .top=Boundary::WALL});
-    gen.set_nx(200);
+    gen.set_nx(100);
     gen.set_adaptive(true);
     return EuMesh(gen);
 }
@@ -96,8 +75,6 @@ int main(int argc, char** argv) {
     ShockWave test(3.0, 0.1, 2.0);
 
     // Create mesh
-    //EuMesh mesh = tube_2D();
-    //EuMesh mesh = tube_3D();
     //EuMesh mesh = wedge();
     //EuMesh mesh = plane_with_hole();
     EuMesh mesh = plane_with_cube();
@@ -109,7 +86,7 @@ int main(int argc, char** argv) {
     SmFluid solver(eos);
     solver.set_accuracy(2);
     solver.set_CFL(0.5);
-    solver.set_limiter("MC");
+    solver.set_limiter("van Albada");
     solver.set_method(Fluxes::HLLC_M);
 
     // Add data fields, choose main data layer

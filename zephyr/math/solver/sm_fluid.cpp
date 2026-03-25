@@ -238,6 +238,9 @@ void SmFluid::fluxes_stage1(EuMesh &mesh) const {
 
         // Значение примитивных переменных на полушаге
         cell[part.half] = PState(q_c, *m_eos);
+        if (cell[part.half].is_bad(*m_eos)) {
+            cell[part.half] = z_c;
+        }
     });
 }
 
@@ -330,6 +333,9 @@ void SmFluid::fluxes_stage2(EuMesh &mesh) const {
 
         // Значение примитивных переменных на новом слое
         cell[part.next] = PState(q_c, *m_eos);
+        if (cell[part.next].is_bad(*m_eos)) {
+            cell[part.next] = z_ch;
+        }
     });
 }
 
@@ -362,7 +368,7 @@ Distributor SmFluid::distributor(const std::string& type) const {
 
     // Снос копированием
     auto split_const = [this](const EuCell &parent, Children &children) {
-        PState z_p = parent[part.init];
+        const PState& z_p = parent[part.init];
         for (auto child: children) {
             child[part.init] = z_p;
         }

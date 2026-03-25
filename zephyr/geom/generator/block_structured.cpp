@@ -419,6 +419,51 @@ void BlockStructured::link_blocks() {
             block->estimate_modulus();
         }
     }
+    std::set<BaseNode::Ptr> inner_nodes_set;
+    for (const auto& block: m_blocks) {
+        for (const auto& node: block->base_nodes()) {
+            // Пропускаем угловые и граничные базовые узлы
+            if (node->fixed()) { continue; }
+
+            if (node->n_adjacent_blocks() < 2) { continue; }
+
+            if (auto [side1, side2] = block->incident_sides(node);
+                block->boundary(side1) || block->boundary(side2)) {
+                continue;
+                }
+            if (node->boundary()) {
+                continue;
+            }
+
+            // Остались только внутренние базовые узлы
+            inner_nodes_set.insert(node) = {};
+        }
+    }
+
+    // Собрать внутренние узлы
+    m_inner_nodes.clear();
+    m_inner_nodes.reserve(inner_nodes_set.size());
+    for (const auto& node: inner_nodes_set) {
+        m_inner_nodes.emplace_back(node);
+    }
+
+    for (auto& [node, blocks]: m_inner_nodes) {
+        // Предполагаем, что смежные вершины и блоки упорядочены верно,
+        // то есть против часовой стрелки внутри области
+        auto& adjacent_nodes  = node->adjacent_nodes();
+        auto& adjacent_blocks = node->adjacent_blocks();
+
+        if (adjacent_nodes.size() != adjacent_blocks.size()) {
+            throw std::runtime_error("BlockStructured::consistent_modulus: n_blocks != n_nodes for inner node");
+        }
+        blocks.reserve(adjacent_blocks.size());
+        for (int i = 0; i < adjacent_nodes.size(); ++i) {
+            BaseNode::Ptr node2 = adjacent_nodes[i].lock();
+            if (!node2) { throw std::runtime_error("BlockStructured::consistent_modulus: invalid node"); }
+            const Block::Ptr block = adjacent_blocks[i].lock();
+            blocks.emplace_back(block->index(), block->get_axis(node, node2) == Axis::X);
+        }
+    }
 
     m_stage = LINKED;
 }
@@ -795,13 +840,13 @@ Tables2D create_vertices(const std::vector<Block::Ptr>& blocks, const Pairs<int>
 
     // ---------- Склеить угловые вершины блоков---------------------------------------------------
     std::set<BaseNode::Ptr> unique_nodes;
-    for (int b1 = 0; b1 < blocks.size(); ++b1) {
-        unique_nodes.insert(blocks[b1]->base_node(0));
-        unique_nodes.insert(blocks[b1]->base_node(1));
-        unique_nodes.insert(blocks[b1]->base_node(2));
-        unique_nodes.insert(blocks[b1]->base_node(3));
+    for (const auto & block : blocks) {
+        unique_nodes.insert(block->base_node(0));
+        unique_nodes.insert(block->base_node(1));
+        unique_nodes.insert(block->base_node(2));
+        unique_nodes.insert(block->base_node(3));
     }
-    for (auto node: unique_nodes) {
+    for (const auto& node: unique_nodes) {
         auto& adj_blocks = node->adjacent_blocks();
         if (adj_blocks.size() < 2) { continue; }
 
@@ -1127,8 +1172,8 @@ size_t BlockStructured::get_hash(const optimize_options& opts) const {
     hash_combine(hash, opts.N);
     hash_combine(hash, opts.eps);
 
-    for (auto block: m_blocks) {
-        for (auto node: block->base_nodes()) {
+    for (const auto& block: m_blocks) {
+        for (const auto& node: block->base_nodes()) {
             hash_combine(hash, node->x());
             hash_combine(hash, node->y());
             hash_combine(hash, node->fixed());
@@ -1142,7 +1187,7 @@ void BlockStructured::save_cache(const optimize_options& opts) const {
     std::ofstream file(cachefile, std::ios::out | std::ios::binary | std::ios::trunc);
     file.write((char*)&hash, sizeof(hash));
 
-    for (auto block: m_blocks) {
+    for (const auto& block: m_blocks) {
         BaseNode::Ptr v1 = block->base_node(0);
         BaseNode::Ptr v2 = block->base_node(1);
         BaseNode::Ptr v3 = block->base_node(2);
@@ -1172,7 +1217,7 @@ void BlockStructured::load_cached() {
     size_t hash;
     file.read((char*)&hash, sizeof(hash));
 
-    for (auto block: m_blocks) {
+    for (const auto& block: m_blocks) {
         // Положения базисных узлов
         Vector3d v1, v2, v3, v4;
         file.read((char*)v1.data(), 3 * sizeof(double));
@@ -1317,6 +1362,9 @@ void BlockStructured::optimization_step(int N, double eps) {
         error = smooth_vertices(vertices);
         for (int b1 = 0; b1 < n_blocks(); ++b1) {
             m_blocks[b1]->update_modulus(vertices[b1]);
+        }
+        correct_modulus();
+        for (int b1 = 0; b1 < n_blocks(); ++b1) {
             lambda[b1] = calc_lambda(sizes[b1], m_blocks[b1]->modulus());
         }
         ++counter;
@@ -1334,6 +1382,57 @@ void BlockStructured::optimization_step(int N, double eps) {
         m_blocks[k]->set_mapping(vertices[k]);
     }
     m_stage = OPTIMIZED;
+}
+
+void BlockStructured::correct_modulus() {
+    using Eigen::VectorXd;
+    using Eigen::MatrixXd;
+
+    // Решается недоопределенная система уравнений
+    // Число строк - число внутренних узлов, столбцов - число блоков.
+    int n_rows = static_cast<int>(m_inner_nodes.size());
+
+    MatrixXd A = MatrixXd::Zero(n_rows, n_blocks());
+    VectorXd F = VectorXd::Zero(n_rows);
+
+    for (int i = 0; i < n_rows; ++i) {
+        for (auto [b, dir]: m_inner_nodes[i].blocks) {
+            double sign = dir ? 1.0 : -1.0;
+            A(i, b) = sign;
+            F[i] -= sign * std::log(m_blocks[b]->modulus());
+        }
+    }
+
+    // Псевдообратная матрица
+    MatrixXd C = A * A.transpose();
+    VectorXd y = C.ldlt().solve(F);
+    VectorXd x = A.transpose() * y;
+
+    VectorXd xi(n_blocks());
+    for (int b1 = 0; b1 < m_blocks.size(); ++b1) {
+        xi[b1] = std::exp(x[b1]);
+    }
+
+    for (int b1 = 0; b1 < n_blocks(); ++b1) {
+        m_blocks[b1]->set_modulus(xi[b1] * m_blocks[b1]->modulus());
+    }
+
+    /*
+    // Debug info
+    for (auto& [node, info]: m_inner_nodes) {
+        std::cout << "  Node (" << std::boolalpha;
+        for (auto [b1, dir]: info) {
+            std::cout << b1 << ",";
+        }
+        std::cout << ")\t";
+        double prod = 1.0;
+        for (auto [b1, dir]: info) {
+            double sign = dir ? 1.0 : -1.0;
+            prod *= std::pow(m_blocks[b1]->modulus(), sign);
+        }
+        std::cout << "prod: " << prod << "\n";
+    }
+    */
 }
 
 // Пронумеровать вершины в блоках, возвращает число уникальных вершин
