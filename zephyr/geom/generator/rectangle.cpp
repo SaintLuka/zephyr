@@ -318,14 +318,14 @@ Grid Rectangle::create_classic_amr() const {
     double dy = (m_ymax - m_ymin) / m_ny;
 
     Grid grid;
-    grid.reserve_nodes((m_nx + 1) * (m_ny + 1));
+    grid.reserve_nodes((2 * m_nx + 1) * (2 * m_ny + 1));
     grid.reserve_cells(m_nx * m_ny);
 
-    std::vector nodes(m_nx + 1, std::vector<Node::Ptr>(m_ny + 1));
-    for (int i = 0; i <= m_nx; ++i) {
-        for (int j = 0; j <= m_ny; ++j) {
-            double x = m_xmin + i * dx;
-            double y = m_ymin + j * dy;
+    std::vector nodes(2 * m_nx + 1, std::vector<Node::Ptr>(2 * m_ny + 1));
+    for (int i = 0; i <= 2 * m_nx; ++i) {
+        for (int j = 0; j <= 2 * m_ny; ++j) {
+            double x = m_xmin + 0.5 * i * dx;
+            double y = m_ymin + 0.5 * j * dy;
             nodes[i][j] = Node::create({x, y, 0.0});
         }
     }

@@ -29,6 +29,8 @@ SmFluid::Parts SmFluid::add_types(EuMesh& mesh) {
     part.d_dz = mesh.add<PState>("d_dz");
     part.half = mesh.add<PState>("half");
     part.next = mesh.add<PState>("next");
+    part.wait = mesh.add<int>("wait");
+    mesh.for_each([wait=part.wait](EuCell& cell) { cell[wait] = 0; });
     return part;
 }
 
@@ -173,6 +175,12 @@ void SmFluid::fluxes(EuMesh &mesh) const {
 
 void SmFluid::fluxes_stage1(EuMesh &mesh) const {
     mesh.for_each([this](EuCell &cell) {
+        // Ячейка в изоляции
+        if (cell[part.wait] > 0) {
+            cell[part.half] = cell[part.init];
+            return;
+        }
+
         // Центр ячейки
         Vector3d cell_c = cell.center();
 
@@ -278,37 +286,47 @@ void SmFluid::fluxes_stage2(EuMesh &mesh) const {
                 z_n  = boundary_value(z_c,  normal, face.flag());
                 z_nh = boundary_value(z_ch, normal, face.flag());
             }
-            Vector3d neib_c = (face.flag() == Boundary::INNER ?
-                face.neib_center() : face.symm_point(cell_c));
 
-            // Параметры интерполяции с предыдущего (!) слоя
-            auto face_extra = FaceExtra::Direct(
-                    z_c, cell[part.d_dx], cell[part.d_dy], cell[part.d_dz],
-                    z_n, neib[part.d_dx], neib[part.d_dy], neib[part.d_dz],
-                    cell_c, neib_c, face_c);
+            PState zm, zp;
 
-            // Интерполяция на грань со стороны ячейки
-            PState zm = face_extra.m(z_ch);
-
-            // Восстанавливаем после интерполяции
-            zm.energy = m_eos->energy_rP(zm.density, zm.pressure);
-
-            // При некорректной интерполяции
-            if (zm.is_bad(*m_eos)) { zm = z_ch; }
-
-            // Интерполяция на грань со стороны соседа
-            PState zp;
-            if (!face.is_boundary()) {
-                zp = face_extra.p(z_nh);
-
-                // Восстанавливаем после интерполяции
-                zp.energy = m_eos->energy_rP(zp.density, zp.pressure);
-
-                // При некорректной интерполяции
-                if (zp.is_bad(*m_eos)) { zp = z_nh; }
+            // Одна из ячеек в изоляции
+            bool robust = cell[part.wait] > 0 || neib[part.wait] > 0;
+            if (robust) {
+                zm = z_ch;
+                zp = z_nh;
             }
             else {
-                zp = boundary_value(zm, normal, face.flag());
+                Vector3d neib_c = (face.flag() == Boundary::INNER ?
+                    face.neib_center() : face.symm_point(cell_c));
+
+                // Параметры интерполяции с предыдущего (!) слоя
+                auto face_extra = FaceExtra::Direct(
+                        z_c, cell[part.d_dx], cell[part.d_dy], cell[part.d_dz],
+                        z_n, neib[part.d_dx], neib[part.d_dy], neib[part.d_dz],
+                        cell_c, neib_c, face_c);
+
+                // Интерполяция на грань со стороны ячейки
+                zm = face_extra.m(z_ch);
+
+                // Восстанавливаем после интерполяции
+                zm.energy = m_eos->energy_rP(zm.density, zm.pressure);
+
+                // При некорректной интерполяции
+                if (zm.is_bad(*m_eos)) { zm = z_ch; }
+
+                // Интерполяция на грань со стороны соседа
+                if (!face.is_boundary()) {
+                    zp = face_extra.p(z_nh);
+
+                    // Восстанавливаем после интерполяции
+                    zp.energy = m_eos->energy_rP(zp.density, zp.pressure);
+
+                    // При некорректной интерполяции
+                    if (zp.is_bad(*m_eos)) { zp = z_nh; }
+                }
+                else {
+                    zp = boundary_value(zm, normal, face.flag());
+                }
             }
 
             // Переводим в локальную систему координат
@@ -316,7 +334,7 @@ void SmFluid::fluxes_stage2(EuMesh &mesh) const {
             zp.to_local(normal);
 
             // Численный поток на грани
-            auto loc_flux = m_nf->flux(zm, zp, *m_eos);
+            auto loc_flux = robust? HLL::calc_flux(zm, zp, *m_eos) : m_nf->flux(zm, zp, *m_eos);
             loc_flux.to_global(normal);
 
             // Суммируем поток
@@ -334,15 +352,21 @@ void SmFluid::fluxes_stage2(EuMesh &mesh) const {
         // Значение примитивных переменных на новом слое
         cell[part.next] = PState(q_c, *m_eos);
         if (cell[part.next].is_bad(*m_eos)) {
-            cell[part.next] = z_ch;
+            // Сажаем ячейку в изоляцию
+            cell[part.next] = z_c;
+            cell[part.wait] = 3;
+        }
+        else {
+            // Уменьшаем срок изоляции
+            if (cell[part.wait] > 0) {
+                --cell[part.wait];
+            }
         }
     });
 }
 
 void SmFluid::swap(EuMesh &mesh) const {
-    mesh.for_each([this](EuCell &cell) {
-        cell[part.init] = cell[part.next];
-    });
+    mesh.swap(part.init, part.next);
 }
 
 Distributor SmFluid::distributor(const std::string& type) const {
@@ -364,6 +388,7 @@ Distributor SmFluid::distributor(const std::string& type) const {
         q_p.arr() /= parent.volume();
         PState z_p(q_p, *m_eos);
         parent[part.init] = z_p;
+        parent[part.wait] = 0;
     };
 
     // Снос копированием
@@ -371,6 +396,7 @@ Distributor SmFluid::distributor(const std::string& type) const {
         const PState& z_p = parent[part.init];
         for (auto child: children) {
             child[part.init] = z_p;
+            child[part.wait] = 0;
         }
     };
     
@@ -418,6 +444,7 @@ Distributor SmFluid::distributor(const std::string& type) const {
             }
 
             child[part.init] = z_ch;
+            child[part.wait] = 0;
         }
 
         // Не удалось сделать интерполяцию в одну из дочерних ячеек,
@@ -425,6 +452,7 @@ Distributor SmFluid::distributor(const std::string& type) const {
         if (bad_grad) {
             for (auto child: children) {
                 child[part.init] = z_p;
+                child[part.wait] = 0;
             }
         }
     };

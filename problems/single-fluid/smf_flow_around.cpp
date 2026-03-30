@@ -40,8 +40,8 @@ using zephyr::utils::Stopwatch;
 
 EuMesh wedge() {
     Wedge gen(0.0, 2.0, 0.0, 1.0, 0.8, M_PI / 6.0);
-    gen.set_boundaries({.left=Boundary::ZOE, .right=Boundary::ZOE,
-                        .bottom=Boundary::WALL, .top=Boundary::WALL});
+    gen.set_boundaries({.left   = Boundary::ZOE,  .right = Boundary::ZOE,
+                        .bottom = Boundary::WALL, .top   = Boundary::WALL});
     gen.set_nx(200);
     gen.set_adaptive(true);
     return EuMesh(gen);
@@ -49,19 +49,19 @@ EuMesh wedge() {
 
 EuMesh plane_with_hole() {
     PlaneWithHole gen(0.0, 2.0, -1.0, 1.0, 0.5, 0.0, 0.1);
-    gen.set_boundaries({.left   = Boundary::ZOE, .right  = Boundary::ZOE,
-                        .bottom = Boundary::ZOE, .top    = Boundary::ZOE,
+    gen.set_boundaries({.left   = Boundary::ZOE, .right = Boundary::ZOE,
+                        .bottom = Boundary::ZOE, .top   = Boundary::ZOE,
                         .hole   = Boundary::WALL});
-    gen.set_nx(100);
+    gen.set_nx(200);
     gen.set_adaptive(true);
     return EuMesh(gen);
 }
 
 EuMesh plane_with_cube() {
     PlaneWithCube gen(0.0, 2.0, -1.0, 1.0, 0.5, 0.0, 0.1);
-    gen.set_boundaries({.left=Boundary::ZOE, .right=Boundary::ZOE,
-                        .bottom=Boundary::WALL, .top=Boundary::WALL});
-    gen.set_nx(100);
+    gen.set_boundaries({.left   = Boundary::ZOE, .right = Boundary::ZOE,
+                        .bottom = Boundary::ZOE, .top   = Boundary::ZOE});
+    gen.set_nx(200);
     gen.set_adaptive(true);
     return EuMesh(gen);
 }
@@ -86,7 +86,7 @@ int main(int argc, char** argv) {
     SmFluid solver(eos);
     solver.set_accuracy(2);
     solver.set_CFL(0.5);
-    solver.set_limiter("van Albada");
+    solver.set_limiter("MC");
     solver.set_method(Fluxes::HLLC_M);
 
     // Add data fields, choose main data layer

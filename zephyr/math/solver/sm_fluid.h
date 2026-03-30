@@ -30,6 +30,9 @@ public:
 
         /// @brief Градиент вектора состояния
         Storable<PState> d_dx, d_dy, d_dz;
+
+        /// @brief Бит изоляции
+        Storable<int> wait;
     };
 
     Parts part;
