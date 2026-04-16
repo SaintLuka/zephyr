@@ -221,7 +221,7 @@ int AmrCells::check_base_face_orientation(index_t ic) const {
         Vector3d nx2 = faces.normal[face_begin[ic] + Side3D::R];
         Vector3d ny1 = faces.normal[face_begin[ic] + Side3D::B];
         Vector3d ny2 = faces.normal[face_begin[ic] + Side3D::T];
-        Vector3d nz1 = faces.normal[face_begin[ic] + Side3D::X];
+        Vector3d nz1 = faces.normal[face_begin[ic] + Side3D::Z];
         Vector3d nz2 = faces.normal[face_begin[ic] + Side3D::F];
 
         if (nx1.dot(nx2) > -0.8) {

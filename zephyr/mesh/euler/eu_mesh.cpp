@@ -244,6 +244,27 @@ void EuMesh::apply_flags() {
 #endif
 }
 
+void EuMesh::make_shuba(int count) {
+    count = std::max(0, std::min(count, 50));
+
+    for (int i = 1; i <= count; i++) {
+#ifdef ZEPHYR_MPI
+        if (!mpi::single()) {
+            m_tourists.sync<MpiTag::FLAG>(m_locals, m_aliens);
+        }
+#endif
+        for_each([&](EuCell& cell) {
+            if (cell.flag() > 0) return;
+            for (auto face: cell.faces()) {
+                if (face.neib_flag() == i) {
+                    cell.set_flag(i + 1);
+                    return;
+                }
+            }
+        });
+    }
+}
+
 void EuMesh::refine() {
     if (!adaptive()) { return; }
 

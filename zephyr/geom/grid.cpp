@@ -469,28 +469,28 @@ AmrCell Grid::amr_cell(int idx) const {
         cell.faces[Side3D::R].boundary = gcell.boundary({v5, v1, v3, v7});
         cell.faces[Side3D::B].boundary = gcell.boundary({v0, v1, v4, v5});
         cell.faces[Side3D::T].boundary = gcell.boundary({v6, v7, v2, v3});
-        cell.faces[Side3D::X].boundary = gcell.boundary({v0, v1, v2, v3});
+        cell.faces[Side3D::Z].boundary = gcell.boundary({v0, v1, v2, v3});
         cell.faces[Side3D::F].boundary = gcell.boundary({v4, v5, v6, v7});
 
         cell.faces[Side3D::L].adjacent.rank = 0;
         cell.faces[Side3D::R].adjacent.rank = 0;
         cell.faces[Side3D::B].adjacent.rank = 0;
         cell.faces[Side3D::T].adjacent.rank = 0;
-        cell.faces[Side3D::X].adjacent.rank = 0;
+        cell.faces[Side3D::Z].adjacent.rank = 0;
         cell.faces[Side3D::F].adjacent.rank = 0;
 
         cell.faces[Side3D::L].adjacent.alien = -1;
         cell.faces[Side3D::R].adjacent.alien = -1;
         cell.faces[Side3D::B].adjacent.alien = -1;
         cell.faces[Side3D::T].adjacent.alien = -1;
-        cell.faces[Side3D::X].adjacent.alien = -1;
+        cell.faces[Side3D::Z].adjacent.alien = -1;
         cell.faces[Side3D::F].adjacent.alien = -1;
 
         cell.faces[Side3D::L].adjacent.index = gcell.adjacent({v0, v4, v2, v6});
         cell.faces[Side3D::R].adjacent.index = gcell.adjacent({v5, v1, v3, v7});
         cell.faces[Side3D::B].adjacent.index = gcell.adjacent({v0, v1, v4, v5});
         cell.faces[Side3D::T].adjacent.index = gcell.adjacent({v6, v7, v2, v3});
-        cell.faces[Side3D::X].adjacent.index = gcell.adjacent({v0, v1, v2, v3});
+        cell.faces[Side3D::Z].adjacent.index = gcell.adjacent({v0, v1, v2, v3});
         cell.faces[Side3D::F].adjacent.index = gcell.adjacent({v4, v5, v6, v7});
 
         return cell;

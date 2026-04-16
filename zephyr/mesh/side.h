@@ -37,8 +37,8 @@ struct Side final {
     static const Side BACK;    //=4; Только для dim == 3.
     static const Side FRONT;   //=5; Только для dim == 3.
 
-    /// @brief Сокращенные имена граней (X = BACK)
-    static const Side L, R, B, T, X, F;
+    /// @brief Сокращенные имена граней (Z = BACK)
+    static const Side L, R, B, T, Z, F;
 
     /// @brief Индекс грани
     int val;
@@ -125,7 +125,7 @@ struct Side final {
                 case R: return {iss<+1, -1, -1>(), iss<+1, +1, -1>(), iss<+1, -1, +1>(), iss<+1, +1, +1>(), undef(), undef(), undef(), undef()};
                 case B: return {iss<-1, -1, -1>(), iss<+1, -1, -1>(), iss<-1, -1, +1>(), iss<+1, -1, +1>(), undef(), undef(), undef(), undef()};
                 case T: return {iss<-1, +1, -1>(), iss<+1, +1, -1>(), iss<-1, +1, +1>(), iss<+1, +1, +1>(), undef(), undef(), undef(), undef()};
-                case X: return {iss<-1, -1, -1>(), iss<+1, -1, -1>(), iss<-1, +1, -1>(), iss<+1, +1, -1>(), undef(), undef(), undef(), undef()};
+                case Z: return {iss<-1, -1, -1>(), iss<+1, -1, -1>(), iss<-1, +1, -1>(), iss<+1, +1, -1>(), undef(), undef(), undef(), undef()};
                 case F: return {iss<-1, -1, +1>(), iss<+1, -1, +1>(), iss<-1, +1, +1>(), iss<+1, +1, +1>(), undef(), undef(), undef(), undef()};
                 default: return {undef(), undef(), undef(), undef(), undef(), undef(), undef(), undef()};
             }
@@ -166,10 +166,10 @@ struct Side final {
                 case T[1]: return {iss< 0,+1,-1>(), iss<+1,+1,-1>(), iss< 0,+1, 0>(), iss<+1,+1, 0>(), undef(), undef(), undef(), undef()};
                 case T[2]: return {iss<-1,+1, 0>(), iss< 0,+1, 0>(), iss<-1,+1,+1>(), iss< 0,+1,+1>(), undef(), undef(), undef(), undef()};
                 case T[3]: return {iss< 0,+1, 0>(), iss<+1,+1, 0>(), iss< 0,+1,+1>(), iss<+1,+1,+1>(), undef(), undef(), undef(), undef()};
-                case X[0]: return {iss<-1,-1,-1>(), iss<0, -1,-1>(), iss<-1, 0,-1>(), iss< 0, 0,-1>(), undef(), undef(), undef(), undef()};
-                case X[1]: return {iss< 0,-1,-1>(), iss<+1,-1,-1>(), iss< 0, 0,-1>(), iss<+1, 0,-1>(), undef(), undef(), undef(), undef()};
-                case X[2]: return {iss<-1, 0,-1>(), iss< 0, 0,-1>(), iss<-1,+1,-1>(), iss< 0,+1,-1>(), undef(), undef(), undef(), undef()};
-                case X[3]: return {iss< 0, 0,-1>(), iss<+1, 0,-1>(), iss< 0,+1,-1>(), iss<+1,+1,-1>(), undef(), undef(), undef(), undef()};
+                case Z[0]: return {iss<-1,-1,-1>(), iss<0, -1,-1>(), iss<-1, 0,-1>(), iss< 0, 0,-1>(), undef(), undef(), undef(), undef()};
+                case Z[1]: return {iss< 0,-1,-1>(), iss<+1,-1,-1>(), iss< 0, 0,-1>(), iss<+1, 0,-1>(), undef(), undef(), undef(), undef()};
+                case Z[2]: return {iss<-1, 0,-1>(), iss< 0, 0,-1>(), iss<-1,+1,-1>(), iss< 0,+1,-1>(), undef(), undef(), undef(), undef()};
+                case Z[3]: return {iss< 0, 0,-1>(), iss<+1, 0,-1>(), iss< 0,+1,-1>(), iss<+1,+1,-1>(), undef(), undef(), undef(), undef()};
                 case F[0]: return {iss<-1,-1,+1>(), iss< 0,-1,+1>(), iss<-1, 0,+1>(), iss< 0, 0,+1>(), undef(), undef(), undef(), undef()};
                 case F[1]: return {iss< 0,-1,+1>(), iss<+1,-1,+1>(), iss< 0, 0,+1>(), iss<+1, 0,+1>(), undef(), undef(), undef(), undef()};
                 case F[2]: return {iss<-1, 0,+1>(), iss< 0, 0,+1>(), iss<-1,+1,+1>(), iss< 0,+1,+1>(), undef(), undef(), undef(), undef()};
@@ -215,7 +215,7 @@ template <> constexpr Side3D Side3D::L = LEFT;
 template <> constexpr Side3D Side3D::R = RIGHT;
 template <> constexpr Side3D Side3D::B = BOTTOM;
 template <> constexpr Side3D Side3D::T = TOP;
-template <> constexpr Side3D Side3D::X = BACK;
+template <> constexpr Side3D Side3D::Z = BACK;
 template <> constexpr Side3D Side3D::F = FRONT;
 
 /// @brief Вывод названия грани в поток

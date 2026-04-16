@@ -150,7 +150,12 @@ double volume_fraction(const Map3D& cube, const std::function<bool(const Vector3
             }
         }
     }
-    return res * std::pow(2.0 * h, 3) / cube.volume();
+    res *= std::pow(2.0 * h, 3) / cube.volume();
+    // Округлить до единицы
+    if (std::abs(1.0 - res) < 0.1 / N) {
+        return 1.0;
+    }
+    return res;
 }
 
 // type Map3D is Cube or SqCube

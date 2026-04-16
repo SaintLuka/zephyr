@@ -1,33 +1,13 @@
 // PLIC реконструкция границы на двумерных декартовых сетках
+#include "PLIC.h"
 
-#include <boost/type_traits/type_with_alignment.hpp>
-#include <zephyr/mesh/euler/eu_mesh.h>
+// Нормаль для теста с плоскостью
+static Vector3d some_n = (Vector3d{0.24, 0.13, 0.0}).normalized();
 
-#include <zephyr/geom/generator/rectangle.h>
-
-#include <zephyr/io/pvd_file.h>
-#include <zephyr/geom/sections.h>
-
-#include <zephyr/geom/geom.h>
-
-#include "zephyr/math/funcs.h"
-
-using namespace zephyr;
-using namespace zephyr::io;
-using namespace zephyr::geom;
-using namespace zephyr::mesh;
-
-using generator::Rectangle;
-
-Vector3d to_cartesian(double r, double phi) {
-    return {r * std::cos(phi), r * std::sin(phi), 0.0};
-}
-
-/// @brief Характеристическая функция (функция-индикатор)
-using InFunction = std::function<bool(const Vector3d &)>;
-
-/// @brief Пространственная функция
-using SpFunction = std::function<double(const Vector3d &)>;
+// 0. Область под прямой
+auto plain_func = [](const Vector3d& v) -> bool {
+    return v.dot(some_n) < 0.0;
+};
 
 // 1. Гладкая замкнутая кривая
 InFunction smooth_func = [](const Vector3d &v) -> bool {
@@ -74,32 +54,34 @@ SpFunction diffuse_func = [](const Vector3d &v) -> double {
     double r = v.norm();
     double r1 = R1 * (1.0 + e1 * std::sin(k * phi));
     double r2 = R2 * (1.0 + e2 * std::sin(k * phi));
-    double h = 0.12;
+    double h = 0.08;
     return 0.25 * (1 + math::sign_p(r - r1, h)) * (1 + math::sign_p(r2 - r, h));
 };
 
-// 4. Зашумленная функция (случайный шум)
-InFunction noise_func = [](const Vector3d &v) -> bool {
-    return false;
-};
-
-// 5. Функция с мелкими деталями (маленькие круги, тонкие стержни)
-// Соприкасающиеся окружности.
-InFunction detail_func = [](const Vector3d &v) -> bool {
-    return false;
-};
-
+// Объемная доля
 static Storable<double> a;
-static Storable<double> a2;
-// Простые производные
+
+// Центральные разности
 static Storable<Vector3d> n1;
 static Storable<double> p1;
 static Storable<double> e1;
-// Моя формула
+
+// Формула Youngs
 static Storable<Vector3d> n2;
 static Storable<double> p2;
 static Storable<double> e2;
 
+// Схема ELVIRA
+static Storable<Vector3d> n3;
+static Storable<double> p3;
+static Storable<double> e3;
+
+// Моя формула
+static Storable<Vector3d> n4;
+static Storable<double> p4;
+static Storable<double> e4;
+
+// Смешанная ячейка?
 inline bool mixed(EuCell& cell) {
     return 0.0 < cell[a] && cell[a] < 1.0;
 }
@@ -107,30 +89,116 @@ inline bool mixed(EuCell& cell) {
 void make_interface(EuMesh& mesh) {
     mesh.for_each([](EuCell& cell) {
         if (!mixed(cell)) {
-            cell[n1] = Vector3d::Zero();
-            cell[n2] = Vector3d::Zero();
-            cell[p1] = 0.0;
-            cell[p2] = 0.0;
+            for (auto n: {n1, n2, n3, n4}) cell[n] = Vector3d::Zero();
+            for (auto p: {p1, p2, p3, p4}) cell[p] = 0.0;
+            for (auto e: {e1, e2, e3, e4}) cell[e] = 0.0;
             return;
         }
 
-        Vector3d grad1 = Vector3d::Zero();
-        Vector3d grad2 = Vector3d::Zero();
-        for (auto& face: cell.faces()) {
-            double a_f1 = 0.5 * (cell[a] + face.neib(a));
-            Vector3d S = face.area() * face.normal();
-            grad1 -= a_f1 * S;
+        // Размеры ячейки
+        double hx = cell.hx();
+        double hy = cell.hy();
 
-            double a_f2 = face_fraction(cell[a], face.neib(a));
-            grad2 -= a_f2 * S;
+        // Простая производная
+        Vector3d grad = Vector3d::Zero();
+        for (auto face: cell.faces()) {
+            double a_f = 0.5 * (cell[a] + face.neib(a));
+            grad += a_f * face.area_n();
         }
-        cell[n1] = grad1.normalized();
-        cell[n2] = grad2.normalized();
+        cell[n1] = -grad.normalized();
 
-        double h = cell.linear_size();
-        cell[p1] = quad_find_section(cell[a], cell[n1]) * h;
-        cell[p2] = quad_find_section(cell[a], cell[n2]) * h;
+        Stencil2D C(cell, a);
+        cell[n2] = C.Youngs(hx, hy);
+        cell[n3] = C.ELVIRA(hx, hy);
+
+        // Моя формула
+        grad = Vector3d::Zero();
+        for (auto face: cell.faces()) {
+            double a_f = face_fraction(cell[a], face.neib(a));
+            grad += a_f * face.area_n();
+        }
+        cell[n4] = -grad.normalized();
+
+        // Пересчитываем позиции прямых
+        cell[p1] = quad_find_section(cell[a], cell[n1], hx, hy);
+        cell[p2] = quad_find_section(cell[a], cell[n2], hx, hy);
+        cell[p3] = quad_find_section(cell[a], cell[n3], hx, hy);
+        cell[p4] = quad_find_section(cell[a], cell[n4], hx, hy);
     });
+}
+
+void calc_errors(EuMesh& mesh, InFunction func, int nx) {
+    std::atomic err1{0.0};
+    std::atomic err2{0.0};
+    std::atomic err3{0.0};
+    std::atomic err4{0.0};
+
+    mesh.for_each([func, nx, &err1, &err2, &err3, &err4](EuCell& cell) {
+        // Нулевые погрешности
+        cell[e1] = cell[e2] = cell[e3] = cell[e4] = 0.0;
+
+        if (!mixed(cell)) {
+            return;
+        }
+        for (auto face: cell.faces()) {
+            if (face.is_boundary()) {
+                return;
+            }
+        }
+
+        double hx = cell.hx();
+        double hy = cell.hy();
+
+        std::array counter = {0, 0, 0, 0};
+        for (int i = 0; i < nx; ++i) {
+            double x = hx * ((i + 0.5) / nx - 0.5);
+            for (int j = 0; j < nx; ++j) {
+                double y = hy * ((j + 0.5) / nx - 0.5);
+
+                // Точка относительно центра ячейки
+                Vector3d r = {x, y, 0.0};
+
+                bool inside = func(cell.center() + r);
+                if (inside != (r.dot(cell[n1]) < cell[p1])) { ++counter[0]; }
+                if (inside != (r.dot(cell[n2]) < cell[p2])) { ++counter[1]; }
+                if (inside != (r.dot(cell[n3]) < cell[p3])) { ++counter[2]; }
+                if (inside != (r.dot(cell[n4]) < cell[p4])) { ++counter[3]; }
+            }
+        }
+
+        // Интегральная метрика L1, как у Aulisa
+        double xi = cell.volume() / (nx * nx);
+        cell[e1] = xi * counter[0];
+        cell[e2] = xi * counter[1];
+        cell[e3] = xi * counter[2];
+        cell[e4] = xi * counter[3];
+
+        err1 += cell[e1];
+        err2 += cell[e2];
+        err3 += cell[e3];
+        err4 += cell[e4];
+    });
+
+    double hx{NAN}, hy{NAN};
+    for (auto cell: mesh) {
+        if (mixed(cell)) {
+            hx = cell.hx();
+            hy = cell.hy();
+            break;
+        }
+    }
+
+    std::cout << "hx, hy               Central      Youngs      ELVIRA       CSIR\n";
+
+    std::cout << std::setprecision(5) << std::fixed;
+    std::cout << hx << ", " << hy << ":";
+
+    std::cout << std::setprecision(2) << std::scientific;
+
+    std::cout << std::setw(12) << err1;
+    std::cout << std::setw(12) << err2;
+    std::cout << std::setw(12) << err3;
+    std::cout << std::setw(12) << err4 << "\n";
 }
 
 EuMesh body(EuMesh& mesh, Storable<double> p, Storable<Vector3d> n) {
@@ -151,101 +219,105 @@ EuMesh body(EuMesh& mesh, Storable<double> p, Storable<Vector3d> n) {
     return clipped;
 }
 
-std::tuple<double, double> calc_errors(EuMesh& mesh, InFunction func, int nx) {
-    double err1 = 0.0;
-    double err2 = 0.0;
-
-    mesh.for_each([func, nx, &err1, &err2](EuCell& cell) {
-        if (!mixed(cell)) {
-            cell[e1] = 0.0;
-            cell[e2] = 0.0;
-            return;
-        }
-
-        Box box = cell.bbox();
-
-        double pos1 = cell[p1];
-        double pos2 = cell[p2];
-        Vector3d norm1 = cell[n1];
-        Vector3d norm2 = cell[n2];
-
-        int counter1 = 0;
-        int counter2 = 0;
-        for (int i = 0; i < nx; ++i) {
-            double x = box.vmin.x() + (box.vmax.x() - box.vmin.x()) * (i + 0.5) / nx;
-            for (int j = 0; j < nx; ++j) {
-                double y = box.vmin.y() + (box.vmax.y() - box.vmin.y()) * (j + 0.5) / nx;
-                Vector3d r = {x, y, 0.0};
-                bool in0 = func(r);
-                bool in1 = (r - cell.center()).dot(norm1) < pos1;
-                bool in2 = (r - cell.center()).dot(norm2) < pos2;
-                if (in0 != in1) { ++counter1; }
-                if (in0 != in2) { ++counter2; }
-            }
-        }
-        if (counter1 == nx * nx) {
-            // Выяснить, что здесь такое вообще
-            cell[e1] = 0.0;
-            cell[e2] = 0.0;
-        }
-        else {
-            cell[e1] = double(counter1) / (nx * nx);// * cell.volume();
-            cell[e2] = double(counter2) / (nx * nx);// * cell.volume();
-
-            err1 += cell[e1];
-            err2 += cell[e2];
-        }
-    });
-
-    int mix_count = mesh.sum([](EuCell& cell) -> int {
-        return mixed(cell) ? 1 : 0;
-    }, 0);
-    err1 /= mix_count;
-    err2 /= mix_count;
-
-    return {err1, err2};
-}
-
 void save_mesh(EuMesh& mesh) {
-    Variables vars;
+    Variables vars = {"level", "flag"};
     vars.append("a", a);
-    vars.append("a2", a2);
-    vars.append("p1", p1);
-    vars.append("p2", p2);
     vars.append("n1", n1);
     vars.append("n2", n2);
+    vars.append("n3", n3);
+    vars.append("n4", n4);
+    vars.append("p1", p1);
+    vars.append("p2", p2);
+    vars.append("p3", p3);
+    vars.append("p4", p4);
     vars.append("e1", e1);
     vars.append("e2", e2);
+    vars.append("e3", e3);
+    vars.append("e4", e4);
+    vars.append<bool>("mixed", mixed);
+    vars.append<double>("delta", [](EuCell& cell) -> double {
+        return std::min(std::abs(cell[a]), std::abs(1.0 - cell[a]));
+    });
 
     VtuFile::save("output/mesh.vtu", mesh, vars);
 
-    auto body1 = body(mesh, p1, n1);
-    VtuFile::save("output/body1.vtu", body1, {}, false, true);
+    auto body_central = body(mesh, p1, n1);
+    VtuFile::save("output/body(central).vtu", body_central, {}, false, true);
 
-    //auto body2 = body(mesh, p2, n2);
-    //VtuFile::save("output/body2.vtu", body2, {}, false, true);
+    auto body_youngs = body(mesh, p2, n2);
+    VtuFile::save("output/body(youngs).vtu", body_youngs, {}, false, true);
+
+    auto body_elvira = body(mesh, p3, n3);
+    VtuFile::save("output/body(elvira).vtu", body_elvira, {}, false, true);
+
+    auto body_csir = body(mesh, p4, n4);
+    VtuFile::save("output/body(csir).vtu", body_csir, {}, false, true);
 }
 
-// Для обычной характеристической функции
-void show_classic(EuMesh& mesh, InFunction func) {
-    mesh.for_each([func](EuCell& cell) {
-        cell[a] = cell.volume_fraction(func, 10000);
+// Адаптировать, если ячейка или сосед смешанные
+void set_flag(EuCell& cell) {
+    cell.set_flag(-1);
+    if (mixed(cell)) {
+        cell.set_flag(1);
+        return;
+    }
+    for (auto face: cell.faces()) {
+        auto neib = face.neib();
+        if (mixed(neib)) {
+            cell.set_flag(1);
+            return;
+        }
+    }
+}
+
+// Выставить значения объемной доли и провести адаптацию
+void initialize(EuMesh& mesh, std::function<void(EuCell&)> set_alpha) {
+    mesh.set_distributor(Distributor::initializer(set_alpha));
+    mesh.for_each(set_alpha);
+    if (mesh.adaptive()) {
+        for (int i = 0; i <= mesh.max_level(); ++i) {
+            mesh.for_each(set_flag);
+            mesh.make_shuba(1);
+            mesh.refine();
+        }
+    }
+}
+
+// Для плоскости
+void show_plain(EuMesh& mesh) {
+    initialize(mesh, [](EuCell& cell) {
+        double p = -cell.center().dot(some_n);
+        cell[a] = quad_volume_fraction(p, some_n, cell.hx(), cell.hy());
     });
 
     make_interface(mesh);
 
-    auto [error1, error2] = calc_errors(mesh, func, 200);
+    calc_errors(mesh, plain_func, 200);
 
-    std::cout << "Error1: " << error1 << "\n";
-    std::cout << "Error2: " << error2 << "\n";
+    save_mesh(mesh);
+}
+
+// Для обычной характеристической функции
+void show_classic(EuMesh& mesh, InFunction func) {
+    initialize(mesh, [func](EuCell& cell) {
+        cell[a] = cell.volume_fraction(func, 100000);
+    });
+
+    make_interface(mesh);
+
+    calc_errors(mesh, func, 200);
 
     save_mesh(mesh);
 }
 
 void show_diffuse(EuMesh& mesh) {
+    mesh.set_max_level(0);
+
     mesh.for_each([](EuCell& cell) {
-        cell[a] = cell.integrate_low(diffuse_func, 10) / cell.volume();
-        cell[a] = math::between(cell[a], 0.0, 10);
+        double alpha = cell.integrate_low(diffuse_func, 10) / cell.volume();
+        if (alpha < 1.0e-6) alpha = 0.0;
+        if (alpha > 1.0 - 1.0e-6) alpha = 1.0;
+        cell[a] = alpha;
     });
 
     make_interface(mesh);
@@ -254,64 +326,56 @@ void show_diffuse(EuMesh& mesh) {
 }
 
 void show_noise(EuMesh& mesh, InFunction func) {
+    mesh.set_max_level(0);
+
     mesh.for_each([func](EuCell& cell) {
-        cell[a] = cell.volume_fraction(func, 100000);
+        cell[a] = cell.volume_fraction(func, 1000);
     });
 
     // Добавить шум
-    for (int i = 0; i < mesh.nx(); ++i) {
-        for (int j = 0; j < mesh.ny(); ++j) {
-            double avg_a = 0.0;
-            for (int ii = i - 2; ii <= i + 2; ++ii) {
-                for (int jj = j - 2; jj <= j + 2; ++jj) {
-                    avg_a += mesh(ii, jj)[a];
-                }
+    auto ampl = mesh.add<double>("ampl");
+    mesh.for_each([ampl](EuCell& cell) {
+        double avg_a = 0.0;
+        for (int i = - 2; i <= 2; ++i) {
+            for (int j = - 2; j <= 2; ++j) {
+                avg_a += cell.neib(i, j)[a];
             }
-            avg_a /= 25;
-            mesh(i, j)[a2] = 0.5 - std::abs(avg_a - 0.5);
         }
-    }
+        avg_a /= 25;
+        cell[ampl] = 0.5 - std::abs(avg_a - 0.5);
+    });
 
-    mesh.for_each([func](EuCell& cell) {
+    mesh.for_each([ampl](EuCell& cell) {
         double r = 2.0 * rand() / double(RAND_MAX) - 1.0;
-        double alp = cell[a] + 0.05 * r * cell[a2];
-        cell[a] = math::between(alp, 0.0, 1.0);
+        double alpha = cell[a] + 0.08 * r * cell[ampl];
+        cell[a] = math::between(alpha, 0.0, 1.0);
     });
 
     make_interface(mesh);
 
-    auto [error1, error2] = calc_errors(mesh, func, 200);
-
-    std::cout << "Error1: " << error1 << "\n";
-    std::cout << "Error2: " << error2 << "\n";
-
     save_mesh(mesh);
 }
 
-// В норме L_inf: ц.р. не сходятся, мой метод с 1-ым порядком
-// В норме L_1: ц.р. имеют 1-ый порядок, мой метод 2-ой
-// Средняя от L_inf: ц.р. имеют 1-ый порядок, мой метод 2-ой
-// Во всех случаях обычные разности дают погрешности на порядок больше
 int main() {
+    utils::mpi::handler mpi_init;
     utils::threads::on();
 
     Rectangle gen(-1.0, 1.0, -1.0, 1.0);
-    gen.set_nx(100);
+    gen.set_nx(50);
+    //gen.set_sizes(30, 50);
 
     EuMesh mesh(gen);
+    mesh.set_max_level(1);
 
     a = mesh.add<double>("a");
-    a2 = mesh.add<double>("a2");
-    p1 = mesh.add<double>("p1");
-    n1 = mesh.add<Vector3d>("n1");
-    e1 = mesh.add<double>("e1");
-    p2 = mesh.add<double>("p2");
-    n2 = mesh.add<Vector3d>("n2");
-    e2 = mesh.add<double>("e2");
+    std::tie(p1, p2, p3, p4) = mesh.add<double  >("p1", "p2", "p3", "p4");
+    std::tie(n1, n2, n3, n4) = mesh.add<Vector3d>("n1", "n2", "n3", "n4");
+    std::tie(e1, e2, e3, e4) = mesh.add<double  >("e1", "e2", "e3", "e4");
 
-    int test = 4;
+    int test = 1;
 
     switch (test) {
+        case 0: show_plain(mesh); return 0;
         case 1: show_classic(mesh, smooth_func); return 0;
         case 2: show_classic(mesh, angle_func); return 0;
         case 3: show_diffuse(mesh); return 0;
@@ -319,3 +383,15 @@ int main() {
         default: return 0;
     }
 }
+
+/*
+Classic interface
+hx       hy          Central      Youngs      ELVIRA       CSIR
+0.04000, 0.04000:    1.04e-02    3.17e-03    3.38e-03    2.64e-03
+0.02000, 0.02000:    5.31e-03    9.18e-04    7.65e-04    5.88e-04
+0.01000, 0.01000:    2.66e-03    3.45e-04    1.63e-04    1.39e-04
+0.00500, 0.00500:    1.33e-03    1.56e-04    4.02e-05    3.52e-05
+0.00250, 0.00250:    6.67e-04    7.63e-05    1.01e-05    8.88e-06
+0.00125, 0.00125:    3.33e-04    3.71e-05    2.61e-06    2.26e-06
+0.00062, 0.00062:    1.67e-04    1.85e-05    6.74e-07    6.03e-07
+*/

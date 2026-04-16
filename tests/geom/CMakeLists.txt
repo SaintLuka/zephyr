@@ -33,6 +33,10 @@ if (NOT ZEPHYR_PYTHON)
     list(REMOVE_ITEM TESTS splines)
 endif()
 
+# Need C++20 standard (std::atomic<double>)
+list(APPEND CPP20_TESTS PLIC_2D)
+list(APPEND CPP20_TESTS PLIC_3D)
+
 if (TESTS)
     message(STATUS "Build geom tests:\n   ${TESTS}")
 endif()
@@ -47,6 +51,15 @@ foreach(test IN LISTS TESTS)
             $<TARGET_FILE:zephyr>
             $<TARGET_FILE_DIR:${test}>
     )
+
+
+    if(test IN_LIST CPP20_TESTS)
+        set_target_properties(${test} PROPERTIES
+                CXX_STANDARD 20
+                CXX_STANDARD_REQUIRED ON
+                CXX_EXTENSIONS OFF
+        )
+    endif()
 
     install(TARGETS ${test} DESTINATION tests/geom)
 endforeach()

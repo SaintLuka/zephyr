@@ -8,7 +8,7 @@
 
 // forward declaration для классов из geom
 namespace zephyr::geom {
-class Box;
+struct Box;
 class Quad;
 class SqQuad;
 class Cube;
@@ -246,6 +246,15 @@ public:
     /// @}
 
     /// @{ @name Геометрические свойства ячеек
+
+    /// @brief Линейный размер ячейки по оси x (от левой до правой грани)
+    double hx(index_t ic) const;
+
+    /// @brief Линейный размер ячейки по оси y (от нижней до верхней грани)
+    double hy(index_t ic) const;
+
+    /// @brief Линейный размер ячейки по оси z (от задней до передней грани)
+    double hz(index_t ic) const;
 
     /// @brief Линейный размер ячейки
     double linear_size(index_t ic) const {

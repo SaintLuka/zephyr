@@ -153,7 +153,12 @@ double volume_fraction(const Map2D& quad, const std::function<bool(const Vector3
             }
         }
     }
-    return res * sqr(2.0 * h) / quad.area();
+    res *= 4.0 * h * h / quad.area();
+    // Округлить до единицы
+    if (std::abs(1.0 - res) < 0.5 / N) {
+        return 1.0;
+    }
+    return res;
 }
 
 // type Q is Quad or SqQuad
