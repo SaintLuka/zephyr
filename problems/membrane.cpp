@@ -1,7 +1,5 @@
 /// @file membrane.cpp
-/// @brief Решатель газодинамики в одном файле.
-/// В углу прямоугольной области колеблется мембрана.
-
+/// @brief Решатель газодинамики в одном файле. На границе области колеблется мембрана.
 #include <iostream>
 #include <iomanip>
 
@@ -54,30 +52,35 @@ int main() {
     EuMesh mesh(rect);
 
     // Переменные для хранения на сетке
-    auto [rho1, p1, e1] = mesh.add<double>("rho1", "p1", "e1");
-    auto [rho2, p2, e2] = mesh.add<double>("rho2", "p2", "e2");
-    auto [v1, v2]       = mesh.add<Vector3d>("v1", "v2");
+    auto rho1 = mesh.add<double>("rho1");
+    auto v1 = mesh.add<Vector3d>("v1");
+    auto p1 = mesh.add<double>("p1");
+    auto e1 = mesh.add<double>("e1");
+
+    auto rho2 = mesh.add<double>("rho2");
+    auto v2 = mesh.add<Vector3d>("v2");
+    auto p2 = mesh.add<double>("p2");
+    auto e2 = mesh.add<double>("e2");
 
     // Файл для записи
     PvdFile pvd("mesh", "output");
 
     // Переменные для сохранения
-    pvd.variables += {"rho", [rho1](EuCell& cell) -> double { return cell(rho1); }};
-    pvd.variables += {"velocity.x", [v1](EuCell& cell) -> double { return cell(v1).x(); }};
-    pvd.variables += {"velocity.y", [v1](EuCell& cell) -> double { return cell(v1).y(); }};
-    pvd.variables += {"|velocity|", [v1](EuCell& cell) -> double { return cell(v1).norm(); }};
-    pvd.variables += {"pressure",   [p1](EuCell& cell) -> double { return cell(p1); }};
+    pvd.variables.append("rho", rho1);
+    pvd.variables.append("pressure", p1);
+    pvd.variables.append("velocity", v1);
+    pvd.variables += {"|velocity|", [v=v1](EuCell& cell) -> double { return cell[v].norm(); }};
     pvd.variables += {"SPL", [p1](EuCell& cell) -> double {
         // Уровень звукового давления в дБ
-        return 20.0 * std::log(1.0 + std::abs(cell(p1) - 1.0_bar) / 20.0e-6_Pa) / std::log(10.0);
+        return 20.0 * std::log(1.0 + std::abs(cell[p1] - 1.0_bar) / 20.0e-6_Pa) / std::log(10.0);
     }};
 
     // Заполняем начальные данные
     for (auto cell: mesh) {
-        cell(rho1) = R0;
-        cell(v1) = Vector3d::Zero();
-        cell(p1) = P0;
-        cell(e1) = eos.energy_rP(cell(rho1), cell(p1));
+        cell[rho1] = R0;
+        cell[v1] = Vector3d::Zero();
+        cell[p1] = P0;
+        cell[e1] = eos.energy_rP(cell[rho1], cell[p1]);
     }
 
     // Число Куранта
@@ -114,10 +117,10 @@ int main() {
             double dt = 1.0e300;
 
             // скорость звука
-            double c = eos.sound_speed_rP(cell(rho1), cell(p1));
+            double c = eos.sound_speed_rP(cell[rho1], cell[p1]);
             for (auto &face: cell.faces()) {
                 // Нормальная составляющая скорости
-                double vn = cell(v1).dot(face.normal());
+                double vn = cell[v1].dot(face.normal());
 
                 // Максимальное по модулю СЗ
                 double lambda = std::max(std::abs(vn + c), std::abs(vn - c));
@@ -135,7 +138,7 @@ int main() {
         sw_flux.resume();
         mesh.for_each([&](EuCell cell) {
             // Примитивный вектор в ячейке
-            PState zc(cell(rho1), cell(v1), cell(p1), cell(e1));
+            PState zc(cell[rho1], cell[v1], cell[p1], cell[e1]);
 
             // Консервативный вектор в ячейке
             QState qc(zc);
@@ -199,10 +202,10 @@ int main() {
             // Новое значение примитивных переменных
             PState Zc(Qc, eos);
 
-            cell(rho2) = Zc.density;
-            cell(v2)   = Zc.velocity;
-            cell(p2)   = Zc.pressure;
-            cell(e2)   = Zc.energy;
+            cell[rho2] = Zc.density;
+            cell[v2]   = Zc.velocity;
+            cell[p2]   = Zc.pressure;
+            cell[e2]   = Zc.energy;
         });
         sw_flux.stop();
 

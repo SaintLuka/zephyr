@@ -7,8 +7,8 @@
 namespace zephyr::geom::generator {
 
 /// @brief Простой класс для создания AmrStorage для хранения
-/// квазиодномерной сетки (прямоугольная сетка толщиной в одну ячейку).
-class Strip : public Generator {
+/// квазиодномерной сетки (прямоугольная сетка шириной в одну ячейку).
+class Strip final : public Generator {
 public:
     using Ptr = std::shared_ptr<Strip>;
 
@@ -24,7 +24,7 @@ public:
         Boundary right = Boundary::ZOE;
     };
 
-    /// @brief Конструктор класса по кофигу
+    /// @brief Конструктор класса по конфигурации
     explicit Strip(const Json& config);
 
     /// @brief Конструктор класса
@@ -46,18 +46,23 @@ public:
     /// @brief Установить флаги граничных условий
     void set_boundaries(Boundaries bounds);
 
-    /// @brief Количество ячеек сетки
-    int size() const final;
+    /// @brief Осевая симметрия странно
+    void set_axial(bool) override { m_axial = false; }
+
+    /// @brief Нелинейная сетка странно
+    void set_linear(bool) override { m_linear = true; }
 
     /// @brief Ограничивающий объем
-    Box bbox() const final;
+    Box bbox() const override;
 
     /// @brief Создать сетку общего вида
-    Grid make() final;
+    Grid make() const override;
+
+    /// @brief Может инициализировать хранилище
+    bool can_initialize() const override { return true; }
 
     /// @brief Инициализация SoA-хранилища сетки
-    void initialize(mesh::AmrCells& cells) final;
-
+    void initialize(mesh::AmrCells& cells) const override;
 
     // Далее не самые полезные get-функции
 
@@ -84,7 +89,7 @@ public:
 
 private:
     /// @brief Проверить параметры сетки перед созданием
-    void check_params() const final;
+    void check_params() const;
 
     ///@brief Соотношение сторон прямоугольника
     const double aspect = 0.01;
@@ -93,7 +98,7 @@ private:
     Type m_type;
 
     /// @brief Число ячеек сетки
-    int m_nx;
+    int m_nx{0};
 
     /// @brief Левая и правая граница полосы
     double m_xmin, m_xmax;

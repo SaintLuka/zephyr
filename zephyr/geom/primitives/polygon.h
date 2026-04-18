@@ -1,5 +1,6 @@
 #pragma once
 
+#include <span>
 #include <vector>
 #include <functional>
 
@@ -11,64 +12,37 @@ namespace zephyr::geom {
 /// @addtogroup geom-primitives
 /// @{
 
-/// @brief Многоугольник в плоскости Oxy.
+/// @brief Плоский многоугольник в плоскости Oxy или полигон в пространстве.
 /// Для треугольника лучше использовать класс Triangle.
-/// @warning По умолчанию вершины полигона не сортируются, если порядок
-/// вершин в конструкторе неизвестен, то лучше вызвать функцию Polygon::sort()
+/// @details По умолчанию вершины полигона не сортируются, если порядок
+/// вершин в конструкторе неизвестен, то лучше вызвать функцию Polygon::sort().
+/// Полигон можно построить перемещением вершин из std::vector.
 class Polygon {
 public:
-    /// @brief Пустой полигон (заглушка)
+    /// @brief Пустой полигон
     Polygon();
-
-    /// @brief Полигон с заданным числом вершин
-    /// Все вершины устанавливаются равными нулю
-    explicit Polygon(int size);
-
-    /// @brief Создание полигона на основе имеющегося массива вершин
-    /// заданного размера. Вершины копируются в буфер полигона
-    /// @param sort Необходимо сортировать?
-    Polygon(const Vector3d* buff, int size, bool sort = false);
-
-    /// @brief Создание полигона на основе имеющегося массива вершин
-    /// @param sort Необходимо сортировать?
-    explicit Polygon(const std::vector<Vector3d>& vertices, bool sort = false);
-
-    /// @brief Создание полигона на основе имеющегося массива вершин
-    /// @param sort Необходимо сортировать?
-    explicit Polygon(std::vector<Vector3d>&& vertices, bool sort = false);
 
     /// @brief Вершины полигона можно напрямую задавать в фигурных скобках
     /// Vector3d v1, v2, v3, v4;
     /// ...
     /// Polygon poly = {v1, v2, v3, v4};
-    /// @param sort Необходимо сортировать?
-    Polygon(std::initializer_list<Vector3d>&& list, bool sort = false);
+    Polygon(std::initializer_list<Vector3d> list);
 
-    /// @brief Копирование
-    Polygon(const Polygon& ) = default;
+    /// @brief Создание полигона на основе имеющегося массива вершин
+    /// заданного размера. Вершины копируются в буфер полигона
+    explicit Polygon(std::span<const Vector3d> vertices);
 
-    /// @brief Перемещение
-    Polygon(Polygon&& ) = default;
-
-    /// @brief Число вершин в буфере
-    int size() const { return vs.size(); }
+    /// @brief Создание полигона на основе имеющегося массива вершин
+    explicit Polygon(std::vector<Vector3d>&& vertices);
 
     /// @brief Полигон заглушка?
     bool empty() const { return vs.empty(); }
 
+    /// @brief Число вершин в буфере
+    int size() const { return static_cast<int>(vs.size()); }
+
     /// @brief Оператор доступа по индексу
     const Vector3d& operator[](int idx) const { return vs[idx]; }
-
-    /// @brief Установить новое положение вершины полигона
-    /// @details Центр полигона пересчитывается
-    void set(int idx, const Vector3d& p);
-
-    /// @brief Зарезервировать место в массиве для новых вершин
-    void reserve(int size);
-
-    /// @brief Добавить вершину в массив
-    /// @details Центр полигона пересчитывается
-    void operator+=(const Vector3d& p);
 
     /// @brief Координаты x вершин многоугольника (с замыканием)
     std::vector<double> xs() const;
@@ -76,24 +50,31 @@ public:
     /// @brief Координаты y вершин многоугольника (с замыканием)
     std::vector<double> ys() const;
 
+    /// @brief Массив вершин многоугольника
+    const std::vector<Vector3d>& vertices() const { return vs; }
+
     /// @brief Ограничивающий прямоугольник
     Box bbox() const;
 
     /// @brief Центр полигона (среднее вершин)
     Vector3d center() const;
 
-    /// @brief Сортировать вершины по часовой стрелке
-    void sort();
+    /// @brief Сортировать вершины против часовой стрелки (полигон в плоскости Oxy)
+    Polygon& sort();
+
+    /// @brief Сортировать вершины по правилу правой руки: нормалью наружу из точки обзора
+    Polygon& sort(const Vector3d& view);
 
     /// @brief Точка внутри полигона?
     bool inside(const Vector3d& p) const;
 
-    /// @brief Площадь произвольного многоугольника
-    /// Вершины должны располагаться в плоскости (x, y).
+    /// @brief Внешняя нормаль к полигону из точки view
+    Vector3d normal(const Vector3d& view) const;
+
+    /// @brief Площадь многоугольника.
     double area() const;
 
-    /// @brief Барицентр произвольного многоугольника.
-    /// Вершины должны располагаться в плоскости (x, y).
+    /// @brief Барицентр многоугольника.
     /// @param area Площадь многоугольника (если известна)
     Vector3d centroid(double area = 0.0) const;
 
@@ -142,8 +123,7 @@ public:
     /// окружность пересекает многоугольник, нулевая нормаль в остальных случаях.
     Vector3d disk_clip_normal(const Vector3d& c, double R) const;
 
-    /// @brief Посчитать объемную долю, которая отсекается от ячейки некоторым
-    /// телом, точки которого определяются характеристической функцией inside.
+    /// @brief Доля полигона, которая отсекается от ячейки некоторым телом.
     /// @param inside Характеристическая функция: true, если точка находится
     /// внутри тела, иначе false
     /// @param n_points Число тестовых точек, погрешность ~ 1/N.
@@ -167,15 +147,16 @@ public:
 
     /// @brief Интеграл скалярной функции по треугольному элементу
     /// @param n Разбиение по сторонам
-    /// @details Формула 13-го порядка по 37 узлам (extra-high  accuracy order)
+    /// @details Формула 13-го порядка по 37 узлам (extra-high accuracy order)
     double integrate_extra(const std::function<double(const Vector3d&)>& func, int n) const;
 
 protected:
     /// @brief Пересчитывает центр полигона
-    void setup_center();
+    void calc_params();
 
-    std::vector<Vector3d> vs;  ///< Массив вершин
-    Vector3d m_center;         ///< Центр полигона
+    bool plane_oxy{true};                 ///< Плоский полигон в плоскости Oxy
+    std::vector<Vector3d> vs{};           ///< Массив вершин
+    Vector3d m_center{Vector3d::Zero()};  ///< Центр полигона
 };
 
 /// @brief Вывод многоугольника в консоль

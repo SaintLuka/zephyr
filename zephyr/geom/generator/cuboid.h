@@ -1,14 +1,12 @@
 #pragma once
 
-#include <zephyr/configuration.h>
 #include <zephyr/geom/boundary.h>
 #include <zephyr/geom/generator/generator.h>
 
 namespace zephyr::geom::generator {
 
-/// @brief Простой класс для генерации декартовой сетки или сетки
-/// внутри параллелепипеда.
-class Cuboid : public Generator {
+/// @brief Генератор декартовой сетки внутри параллелепипеда.
+class Cuboid final : public Generator {
 public:
     using Ptr = std::shared_ptr<Cuboid>;
     using Ref = const std::shared_ptr<Cuboid>&;
@@ -22,7 +20,7 @@ public:
         Boundary front  = Boundary::WALL;
     };
 
-    /// @brief Конструктор класса по кофигу
+    /// @brief Конструктор класса по конфигу
     explicit Cuboid(const Json& config);
 
     /// @brief Конструктор класса
@@ -36,6 +34,9 @@ public:
     static Cuboid::Ptr create(Args&&... args){
         return std::make_shared<Cuboid>(std::forward<Args>(args)...);
     }
+
+    /// @brief Структурированная сетка?
+    bool structured() const override { return true; }
 
     /// @brief Установить желаемое число ячеек сетки по оси Ox
     /// @details Число ячеек по осям Oy и Oz подбирается так, чтобы aspect
@@ -63,18 +64,23 @@ public:
     /// @brief Установить флаги граничных условий
     void set_boundaries(Boundaries bounds);
 
-    /// @brief Количество ячеек сетки
-    int size() const final;
+    /// @brief Нельзя использовать осевую симметрию
+    void set_axial(bool) override { m_axial = false; }
+
+    /// @brief Всегда использовать линейную адаптацию
+    void set_linear(bool) override { m_linear = true; }
 
     /// @brief Ограничивающий объем
-    Box bbox() const final;
+    Box bbox() const override;
 
     /// @brief Создать сетку общего вида
-    Grid make() final;
+    Grid make() const override;
+
+    /// @brief Может инициализировать хранилище
+    bool can_initialize() const override { return true; }
 
     /// @brief Инициализация SoA-хранилища сетки
-    void initialize(mesh::AmrCells& cells) final;
-
+    void initialize(mesh::AmrCells& cells) const override;
 
     // Далее не самые полезные get-функции
 
@@ -99,6 +105,9 @@ public:
     /// @brief Число ячеек по оси Z
     int nz() const;
 
+    /// @brief Граничные условия
+    Boundaries bounds() const;
+
     /// @brief Есть ли периодичность по оси X?
     bool periodic_along_x() const;
 
@@ -110,13 +119,13 @@ public:
 
 private:
     /// @brief Проверить параметры сетки перед созданием
-    void check_params() const final;
+    void check_params() const;
 
     /// @brief Обновить число ячеек
     void compute_size();
 
-    int m_nx, m_ny, m_nz;
-    int m_size;
+    int m_nx{0}, m_ny{0}, m_nz{0};
+    int m_size{0};
     double m_xmin, m_xmax;
     double m_ymin, m_ymax;
     double m_zmin, m_zmax;

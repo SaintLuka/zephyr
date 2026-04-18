@@ -1,10 +1,15 @@
+#include <filesystem>
 #include <iostream>
+#include <fstream>
+#include <cassert>
 
 #include <zephyr/geom/geom.h>
 #include <zephyr/math/funcs.h>
+#include <zephyr/utils/mpi.h>
 #include <zephyr/mesh/euler/amr_cells.h>
 
 using namespace zephyr::geom;
+using zephyr::utils::mpi;
 
 namespace zephyr::mesh {
 
@@ -114,11 +119,21 @@ double AmrCells::incircle_diameter(index_t ic) const {
                     (vertices.vs<0, 0, +1>() - vertices.vs<0, 0, -1>()).squaredNorm()));
         }
     } else {
-        assert(m_dim == 2);
-        int n = node_count(ic);
-        // Диаметр вписанной окружности внутрь правильного многоугольника
-        // с площадью volume.
-        return 2.0 * std::sqrt(volume[ic] / (n * std::tan(M_PI / n)));
+        if (m_dim == 2) {
+            int n = node_count(ic);
+            // Диаметр вписанной окружности внутрь правильного многоугольника
+            // с площадью volume.
+            return 2.0 * std::sqrt(volume[ic] / (n * std::tan(M_PI / n)));
+        }
+        else {
+            // Найдем минимальное расстояние до грани, умножим на два
+            double r = std::numeric_limits<double>::infinity();
+            for (auto j: faces_range(ic)) {
+                double dist = std::abs((faces.center[j] - center[ic]).dot(faces.normal[j]));
+                r = std::min(r, dist);
+            }
+            return 2.0 * r;
+        }
     }
 }
 
@@ -137,35 +152,34 @@ Polygon AmrCells::polygon(index_t ic) const {
     }
 
     if (m_adaptive) {
-        Polygon poly;
+        std::vector<Vector3d> poly;
         poly.reserve(8);
 
         const SqQuad& vertices = mapping<2>(ic);
 
-        poly += vertices.vs<-1, -1>();
+        poly.push_back(vertices.vs<-1, -1>());
         if (!m_linear && complex_face(ic, Side2D::BOTTOM)) {
-            poly += vertices.vs<0, -1>();
+            poly.push_back(vertices.vs<0, -1>());
         }
 
-        poly += vertices.vs<+1, -1>();
+        poly.push_back(vertices.vs<+1, -1>());
         if (!m_linear && complex_face(ic, Side2D::RIGHT)) {
-            poly += vertices.vs<+1, 0>();
+            poly.push_back(vertices.vs<+1, 0>());
         }
 
-        poly += vertices.vs<+1, +1>();
+        poly.push_back(vertices.vs<+1, +1>());
         if (!m_linear && complex_face(ic, Side2D::TOP)) {
-            poly += vertices.vs<0, +1>();
+            poly.push_back( vertices.vs<0, +1>());
         }
 
-        poly += vertices.vs<-1, +1>();
+        poly .push_back(vertices.vs<-1, +1>());
         if (!m_linear && complex_face(ic, Side2D::LEFT)) {
-            poly += vertices.vs<-1, 0>();
+            poly.push_back(vertices.vs<-1, 0>());
         }
 
-        return poly;
-    } else {
-        return {vertices_data(ic), node_count(ic)};
+        return Polygon(std::move(poly));
     }
+    return Polygon(std::span(vertices_data(ic), node_count(ic)));
 }
 
 Polyhedron AmrCells::polyhedron(index_t ic) const {
@@ -411,26 +425,24 @@ double AmrCells::integrate_low(index_t ic, const SpFunction& func, int n_points)
     }
 }
 
-void AmrCells::move_item(index_t ic) {
-    int jc = next[ic];
+void AmrCells::move_item(index_t from, index_t to) {
+    rank[to] = rank[from];
+    next[to] = to;
+    index[to] = to;
 
-    rank[jc] = rank[ic];
-    next[jc] = jc;
-    index[jc] = jc;
+    flag[to] = flag[from];
+    level[to] = level[from];
+    b_idx[to] = b_idx[from];
+    z_idx[to] = z_idx[from];
 
-    flag[jc] = flag[ic];
-    level[jc] = level[ic];
-    b_idx[jc] = b_idx[ic];
-    z_idx[jc] = z_idx[ic];
+    center[to] = center[from];
+    volume[to] = volume[from];
 
-    center[jc] = center[ic];
-    volume[jc] = volume[ic];
+    volume_alt[to] = volume_alt[from];
 
-    volume_alt[jc] = volume_alt[ic];
-
-    for (index_t i = 0; i < face_begin[ic + 1] - face_begin[ic]; ++i) {
-        index_t iface = face_begin[ic] + i;
-        index_t jface = face_begin[jc] + i;
+    for (index_t i = 0; i < face_begin[from + 1] - face_begin[from]; ++i) {
+        index_t iface = face_begin[from] + i;
+        index_t jface = face_begin[to] + i;
 
         faces.boundary[jface] = faces.boundary[iface];
         faces.normal  [jface] = faces.normal  [iface];
@@ -442,16 +454,17 @@ void AmrCells::move_item(index_t ic) {
         faces.adjacent.rank [jface] = faces.adjacent.rank[iface];
         faces.adjacent.index[jface] = faces.adjacent.index[iface];
         faces.adjacent.alien[jface] = faces.adjacent.alien[iface];
-        faces.adjacent.basic[jface] = jc;
+        faces.adjacent.basic[jface] = to;
+        faces.adjacent.rotation[jface] = faces.adjacent.rotation[iface];
     }
 
-    for (index_t i = 0; i < node_begin[ic + 1] - node_begin[ic]; ++i) {
-        index_t jv = node_begin[jc] + i;
-        index_t iv = node_begin[ic] + i;
+    for (index_t i = 0; i < node_begin[from + 1] - node_begin[from]; ++i) {
+        index_t jv = node_begin[to] + i;
+        index_t iv = node_begin[from] + i;
         verts[jv] = verts[iv];
     }
 
-    set_undefined(ic);
+    set_undefined(from);
 }
 
 void AmrCells::copy_data(index_t from, index_t to) {
@@ -497,6 +510,7 @@ void AmrCells::copy_geom(index_t ic, AmrCells& cells,
         cells.faces.adjacent.index[jface] = faces.adjacent.index[iface];
         cells.faces.adjacent.alien[jface] = faces.adjacent.alien[iface];
         cells.faces.adjacent.basic[jface] = index[ic];
+        cells.faces.adjacent.rotation[jface] = faces.adjacent.rotation[iface];
     }
 
     cells.node_begin[jc] = node_beg;
@@ -527,6 +541,7 @@ void AmrCells::copy_geom_basic(index_t ic, AmrCells& cells,
         cells.faces.adjacent.rank [jface] = faces.adjacent.rank [iface];
         cells.faces.adjacent.index[jface] = faces.adjacent.index[iface];
         cells.faces.adjacent.alien[jface] = faces.adjacent.alien[iface];
+        cells.faces.adjacent.rotation[jface] = faces.adjacent.rotation[iface];
     }
 
     cells.node_begin[jc] = node_beg;
@@ -631,6 +646,10 @@ void AmrCells::shrink_to_fit_cells() {
 }
 
 void AmrCells::resize(index_t n_cells, index_t n_faces, index_t n_nodes) {
+    if_debug(m_adaptive) {
+        z_assert(n_faces == (m_dim < 3 ? 8 : 24) * n_cells, "bad sizes");
+        z_assert(n_nodes == (m_dim < 3 ? 9 : 27) * n_cells, "bad sizes");
+    }
     resize_cells(n_cells);
     faces.resize(n_faces);
     verts.resize(n_nodes);
@@ -682,7 +701,7 @@ void AmrCells::set_cell(index_t ic, const Quad& quad) {
         faces.area[iface]     = vs.length();
         faces.center[iface]   = vs.center();
         faces.normal[iface]   = vs.normal(center[ic]);
-        faces.boundary[iface] = Boundary::ORDINARY;
+        faces.boundary[iface] = Boundary::INNER;
     }
 }
 
@@ -739,7 +758,7 @@ void AmrCells::set_cell(index_t ic, const Quad& quad, bool axial) {
         faces.area[iface]     = vs.length();
         faces.center[iface]   = vs.centroid(axial);
         faces.normal[iface]   = vs.normal(center[ic]);
-        faces.boundary[iface] = Boundary::ORDINARY;
+        faces.boundary[iface] = Boundary::INNER;
 
         if (axial) {
             faces.area_alt[iface] = vs.area_as();
@@ -793,7 +812,7 @@ void AmrCells::set_cell(index_t ic, const Cube& cube) {
         faces.area[iface]     = vs.area();
         faces.center[iface]   = vs.center();
         faces.normal[iface]   = vs.normal(center[ic]);
-        faces.boundary[iface] = Boundary::ORDINARY;
+        faces.boundary[iface] = Boundary::INNER;
     }
 }
 
@@ -852,7 +871,7 @@ void AmrCells::push_back(const Polygon& poly) {
         faces.area[iface]     = vs.length();
         faces.center[iface]   = vs.centroid();
         faces.normal[iface]   = vs.normal(center[ic]);
-        faces.boundary[iface] = Boundary::ORDINARY;
+        faces.boundary[iface] = Boundary::INNER;
 
         if (m_axial) {
             faces.area_alt[iface] = vs.area_as();
@@ -914,7 +933,7 @@ void AmrCells::push_back_impl(const Polyhedron& poly) {
         faces.area[iface] = poly.face_area(i);
         faces.center[iface] = poly.face_center(i);
         faces.normal[iface] = poly.face_normal(i);
-        faces.boundary[iface] = Boundary::ORDINARY;
+        faces.boundary[iface] = Boundary::INNER;
 
         faces.area_alt[iface] = NAN;
 
@@ -933,6 +952,202 @@ void AmrCells::push_back_impl(const Polyhedron& poly) {
         }
 
         faces.adjacent.basic[iface] = ic;
+    }
+}
+
+namespace fs = std::filesystem;
+
+template <typename T>
+void save_vector(
+    const fs::path& root,
+    std::ofstream& file,
+    const fs::path& path,
+    const std::string& tab,
+    const std::string& name,
+    const std::vector<T>& arr,
+    const std::string& end=""
+) {
+    // Сохранить бинарные данные
+    fs::path fullname = root / path / (name + (mpi::single() ? "" : (".pt" + mpi::srank())) + ".bin");
+    std::ofstream binary(fullname, std::ios::binary | std::ios::trunc | std::ios::out);
+    binary.write(reinterpret_cast<const char*>(arr.data()), arr.size() * sizeof(T));
+    binary.close();
+
+    // Собрать размеры со всех процессов
+    std::vector<size_t> sizes;
+    if (!mpi::single()) {
+        mpi::all_gather(arr.size(), sizes);
+    }
+
+    // Все побочные процессы завершают функцию
+    if (!mpi::master()) return;
+
+    file << tab << "\"" << name << "\": {\n";
+    file << tab << "  \"sizeof\": " << sizeof(T) << ",\n";
+
+    // Относительное имя файла
+    std::string filename = path / name;
+    if (mpi::single()) {
+        file << tab << "  \"data\": ";
+        file << "{ \"size\": " << arr.size() << ", \"file\": \"" << filename << ".bin\" }\n";
+    }
+    else {
+        file << tab << "  \"data\": [\n";
+        for (int i = 0; i < sizes.size() - 1; ++i) {
+            file << tab << "    { \"size\": " << sizes[i] << ", \"file\": \"" << filename << ".pt" << i << ".bin\" },\n";
+        }
+        file << tab << "    { \"size\": " << sizes.back() << ", \"file\": \"" << filename << ".pt" << sizes.size() << ".bin\" }\n";
+        file << tab << "  ]\n";
+    }
+    file << tab << "}" << end;
+}
+
+inline void save_buffer(
+    const fs::path& root,
+    std::ofstream& file,
+    const fs::path& path,
+    const std::string& tab,
+    const std::string& var,
+    const Storage& storage,
+    const std::string& end=""
+) {
+    // Получить ссылку на буфер
+    if (!storage.contain(var)) {
+        throw std::runtime_error("No such variable \"" + var + "\" in Storage");
+    }
+    const utils::Buffer& buffer = storage[var];
+
+    // Сохранить бинарные данные
+    fs::path fullname = root / path / (var + (mpi::single() ? "" : (".pt" + mpi::srank())) + ".bin");
+    std::ofstream binary(fullname, std::ios::binary | std::ios::trunc | std::ios::out);
+    binary.write(reinterpret_cast<const char*>(buffer.data()), buffer.byte_size());
+    binary.close();
+
+    // Собрать размеры со всех процессов
+    std::vector<size_t> sizes;
+    if (!mpi::single()) {
+        mpi::all_gather(buffer.size(), sizes);
+    }
+
+    // Все побочные процессы завершают функцию
+    if (!mpi::master()) return;
+
+    file << tab << "\"" << var << "\": {\n";
+    file << tab << "  \"count\": " << buffer.count() << ",\n";
+    file << tab << "  \"sizeof\": " << buffer.element_size() << ",\n";
+
+    // Относительное имя файла
+    std::string filename = path / var;
+    if (mpi::single()) {
+        file << tab << "  \"data\": ";
+        file << "{ \"size\": " << buffer.size() << ", \"file\": \"" << filename << ".bin\" }\n";
+    }
+    else {
+        file << tab << "  \"data\": [\n";
+        for (int i = 0; i < sizes.size() - 1; ++i) {
+            file << tab << "    { \"size\": " << sizes[i] << ", \"file\": \"" << filename << ".pt" << i << ".bin\" },\n";
+        }
+        file << tab << "    { \"size\": " << sizes.back() << ", \"file\": \"" << filename << ".pt" << sizes.size() << ".bin\" }\n";
+        file << tab << "  ]\n";
+    }
+    file << tab << "}" << end;
+}
+
+void AmrCells::backup(const std::filesystem::path& root, std::ofstream& file,
+    const std::string& tab, const std::vector<std::string>& variables) const {
+
+    if (!fs::exists(root) && !fs::is_directory(root)) {
+        throw std::runtime_error("AmrCells::backup(): directory " + root.string() + "\" doesn't exist");
+    }
+
+    if (mpi::master() && !file.is_open()) {
+        throw std::runtime_error("AmrCells::backup(): cannot open output file.");
+    }
+
+    const std::string tab2 = tab + "  ";
+    const std::string tab3 = tab + "    ";
+
+    if (mpi::master()) {
+        file << std::boolalpha;
+        file << tab << "\"dim\":      " << m_dim << ",\n";
+        file << tab << "\"adaptive\": " << m_adaptive << ",\n";
+        file << tab << "\"axial\":    " << m_axial << ",\n";
+        file << tab << "\"linear\":   " << m_linear << ",\n";
+    }
+
+    if (mpi::single()) {
+        file << tab << "\"size\":     " << size() << ",\n";
+    }
+    else {
+        auto sizes = mpi::all_gather(size());
+        if (mpi::master()) {
+            file << tab << "\"sizes\": [";
+            for (int i = 0; i < sizes.size() - 1; ++i) {
+                file << sizes[i] << ", ";
+            }
+            file << sizes.back() << "],\n";
+        }
+    }
+
+    save_vector(root, file, "cells", tab, "rank",  rank, ",\n");
+    save_vector(root, file, "cells", tab, "index", index, ",\n");
+    save_vector(root, file, "cells", tab, "level", level, ",\n");
+    save_vector(root, file, "cells", tab, "b_idx", b_idx, ",\n");
+    save_vector(root, file, "cells", tab, "z_idx", z_idx, ",\n");
+    save_vector(root, file, "cells", tab, "center", center, ",\n");
+    save_vector(root, file, "cells", tab, "volume", volume, ",\n");
+    if (!volume_alt.empty()) {
+        save_vector(root, file, "cells", tab, "volume_alt", volume_alt, ",\n");
+    }
+    save_vector(root, file, "cells", tab, "face_begin", face_begin, ",\n");
+    save_vector(root, file, "cells", tab, "node_begin", node_begin, ",\n");
+
+    if (mpi::master()) {
+        fs::create_directory(root / "cells/faces");
+        file << tab << "\"faces\": {\n";
+    }
+
+    if (mpi::master()) {
+        fs::create_directory(root / "cells/faces/adjacent");
+        file << tab2 << "\"adjacent\": {\n";
+    }
+
+    save_vector(root, file, "cells/faces/adjacent", tab3, "rank", faces.adjacent.rank, ",\n");
+    save_vector(root, file, "cells/faces/adjacent", tab3, "index", faces.adjacent.index, ",\n");
+    save_vector(root, file, "cells/faces/adjacent", tab3, "alien", faces.adjacent.alien, ",\n");
+    save_vector(root, file, "cells/faces/adjacent", tab3, "basic", faces.adjacent.basic, "\n");
+
+    if (mpi::master()) {
+        file << tab2 << "},\n"; // mesh.cells.faces.adjacent
+    }
+
+    save_vector(root, file, "cells/faces", tab2, "boundary", faces.boundary, ",\n");
+    save_vector(root, file, "cells/faces", tab2, "normal", faces.normal, ",\n");
+    save_vector(root, file, "cells/faces", tab2, "center", faces.center, ",\n");
+    save_vector(root, file, "cells/faces", tab2, "area", faces.area, ",\n");
+    if (!faces.area_alt.empty()) {
+        save_vector(root, file, "cells/faces", tab2, "area_alt", faces.area_alt, ",\n");
+    }
+    save_vector(root, file, "cells/faces", tab2, "vertices", faces.vertices, "\n");
+
+    if (mpi::master()) {
+        file << tab << "},\n"; // mesh.cells.faces
+    }
+
+    save_vector(root, file, "cells", tab, "verts", verts, ",\n");
+
+    if (mpi::master()) {
+        fs::create_directory(root / "cells/data");
+        file << tab << "\"data\": {\n";
+    }
+
+    for (int i = 0; i < variables.size() - 1; ++i) {
+        save_buffer(root, file, "cells/data", tab2, variables[i], data, ",\n");
+    }
+    save_buffer(root, file, "cells/data", tab2, variables.back(), data, "\n");
+
+    if (mpi::master()) {
+        file << tab << "}\n"; // mesh.cells.data
     }
 }
 

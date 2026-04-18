@@ -31,18 +31,19 @@ using zephyr::utils::threads;
 using zephyr::utils::Stopwatch;
 
 
-int main() {
-    mpi::handler mpi_init;
-    threads::on();
+int main(int argc, char** argv) {
+    mpi::handler handler(argc, argv);
+    threads::init(argc, argv);
+    threads::info();
 
     // Тестовая задача
-    //Riemann2D test(6);
+    Riemann2D test(6);
     //ToroTest2D test(1, 0.3 * M_PI);
     //SkewShockWave test(5.0, M_PI/6, 0.2);
     //RichtmyerMeshkov test;
     //SodTest test_1D;
-    ToroTest test_1D(1);
-    RotatedTest test(test_1D, M_PI / 3.0);
+    //ToroTest test_1D(1);
+    //RotatedTest test(test_1D, M_PI / 3.0);
 
     auto eos = test.get_eos();
 
@@ -50,7 +51,7 @@ int main() {
     // число ячеек можно задать
     Rectangle gen(test.xmin(), test.xmax(), test.ymin(), test.ymax());
     gen.set_boundaries(test.boundaries());
-    gen.set_nx(mpi::single() ? 100 : 500);
+    gen.set_nx(200);
 
     // Создать сетку
     EuMesh mesh(gen);
@@ -67,8 +68,8 @@ int main() {
     auto z = data.init;
 
     // Настройка сетки
-    //mesh.set_decomposition("XY")
-    mesh.set_max_level(mpi::single() ? 3 : 0);
+    mesh.set_decomposition("XY");
+    mesh.set_max_level(3);
     mesh.set_distributor(solver.distributor());
 
     // Использовать подсеточную реконструкцию начальных данных?
@@ -82,7 +83,7 @@ int main() {
                      test.momentum_mean(cell, n),
                      test.energy_mean(cell, n));
 
-            cell(z) = PState(q, *eos);
+            cell[z] = PState(q, *eos);
         });
     };
 
@@ -90,12 +91,12 @@ int main() {
     PvdFile pvd("test2D", "output");
 
     // Переменные для сохранения
-    pvd.variables = {"level"};
-    pvd.variables += {"density",  [z](EuCell& cell) -> double { return cell(z).density; }};
-    pvd.variables += {"vel.x",    [z](EuCell& cell) -> double { return cell(z).velocity.x(); }};
-    pvd.variables += {"vel.y",    [z](EuCell& cell) -> double { return cell(z).velocity.y(); }};
-    pvd.variables += {"pressure", [z](EuCell& cell) -> double { return cell(z).pressure; }};
-    pvd.variables += {"energy",   [z](EuCell& cell) -> double { return cell(z).energy; }};
+    pvd.variables = {"level", "faces2D"};
+    pvd.variables += {"density",  [z](EuCell& cell) -> double { return cell[z].density; }};
+    pvd.variables += {"vel.x",    [z](EuCell& cell) -> double { return cell[z].velocity.x(); }};
+    pvd.variables += {"vel.y",    [z](EuCell& cell) -> double { return cell[z].velocity.y(); }};
+    pvd.variables += {"pressure", [z](EuCell& cell) -> double { return cell[z].pressure; }};
+    pvd.variables += {"energy",   [z](EuCell& cell) -> double { return cell[z].energy; }};
 
     double curr_time = 0.0;
     pvd.variables += {"exact.dens",
@@ -120,6 +121,13 @@ int main() {
 
     Stopwatch elapsed(true);
     while (curr_time < test.max_time()) {
+        // Load balancing
+        if (n_step % 20 == 0) {
+            mesh.balancing(mesh.n_cells());
+            mesh.redistribute(z);
+        }
+
+        // Save mesh
         if (curr_time >= next_write) {
             mpi::cout << "\tStep: " << std::setw(6) << n_step << ";"
                       << "\tTime: " << std::setw(8) << std::setprecision(3) << curr_time << "\n";

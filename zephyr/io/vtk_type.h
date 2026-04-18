@@ -1,9 +1,51 @@
 #pragma once
 
+#include <cstdint>
+#include <vector>
 #include <string>
-#include <iostream>
+#include <fstream>
 
 namespace zephyr::io {
+
+/// @brief Тип для задания размера массивов в бинарном файле, его нельзя менять (ограничение VTK)
+using datasize_t = std::uint32_t;
+using offset_t   = std::uint32_t;  ///< Тип смещения массивов в байтах
+using index_t    = std::uint32_t;  ///< Тип для нумерации примитивов (ячеек, вершин и т.д.)
+using type_t     = std::uint8_t;   ///< VTK тип примитива/ячейки
+
+/// @brief Определить порядок байт
+/// @return "BigEndian" или "LittleEndian"
+std::string byteorder();
+
+/// @brief Создать директории, если указано сложное имя filename
+void create_directories(const std::string& filename);
+
+/// @brief Размер массива данных в байтах
+template <typename T>
+datasize_t buffer_size(const std::vector<T>& buffer) {
+    return buffer.size() * sizeof(T);
+}
+
+/// @brief Записать массив данных в VTK формате (binary appended)
+template <typename T>
+void write_buffer(std::ofstream& file, const std::vector<T>& buffer) {
+    datasize_t data_size = buffer_size(buffer);
+    file.write((char*) &data_size, sizeof(datasize_t));
+    file.write((char*) buffer.data(), data_size);
+}
+
+/// @brief Встроенные VTK-типы ячеек
+enum VtkCellType : type_t {
+    VTK_TRIANGLE   = 5,
+    VTK_POLYGON    = 7,
+    VTK_QUAD       = 9,
+    VTK_TETRA      = 10,
+    VTK_HEXAHEDRON = 12,
+    VTK_WEDGE      = 13,
+    VTK_PYRAMID    = 14,
+    VTK_POLYHEDRON = 42,
+    VTK_TRIQUADRIC_HEXAHEDRON = 29
+};
 
 /// @brief Тип скаляра при сохранении в VTU, работает как enum class.
 class VtkType {
@@ -95,4 +137,3 @@ private:
 std::ostream& operator<<(std::ostream& os, const VtkType& vtk_type);
 
 } // namespace zephyr::io
-

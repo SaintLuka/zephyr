@@ -3,14 +3,10 @@
 
 namespace zephyr::phys {
 
-Fractions::Fractions() {
-    m_data.fill(0.0);
-}
-
 Fractions::Fractions(std::initializer_list<double> list) {
-    if (list.size() > Fractions::max_size) {
-        throw std::runtime_error("When construct Fractions got list.size() > Fractions::max_size (" +
-                                 std::to_string(list.size()) + " > " + std::to_string(Fractions::max_size));
+    if (list.size() > max_size) {
+        throw std::runtime_error("When construct Fractions got list.size() > max_size (" +
+                                 std::to_string(list.size()) + " > " + std::to_string(max_size));
     }
 
     int counter = 0;
@@ -24,56 +20,8 @@ Fractions::Fractions(std::initializer_list<double> list) {
     normalize();
 }
 
-Fractions::Fractions(const std::vector<double> &vec) {
-    if (vec.size() > Fractions::max_size) {
-        throw std::runtime_error("When construct Fractions got vec.size() > Fractions::max_size (" +
-                                 std::to_string(vec.size()) + " > " + std::to_string(Fractions::max_size));
-    }
-
-    for (size_t i = 0; i < vec.size(); ++i) {
-        m_data[i] = vec[i];
-    }
-    for (int i = vec.size(); i < max_size; ++i) {
-        m_data[i] = 0.0;
-    }
-
-    normalize();
-}
-
 Fractions::Fractions(const std::array<double, max_size> &arr) : m_data(arr) {
     normalize();
-}
-
-Fractions::Fractions(const ScalarSet &scalars) {
-    std::copy(scalars.m_data.begin(), scalars.m_data.end(), m_data.begin());
-
-    normalize();
-}
-
-Fractions Fractions::Pure(int idx) {
-    Fractions res;
-    res[idx] = 1.0;
-    return res;
-}
-
-bool Fractions::has(int idx) const {
-    return m_data[idx] > 0.0;
-}
-
-double &Fractions::operator[](int idx) {
-    return m_data[idx];
-}
-
-const double &Fractions::operator[](int idx) const {
-    return m_data[idx];
-}
-
-double &Fractions::operator[](size_t idx) {
-    return m_data[idx];
-}
-
-const double &Fractions::operator[](size_t idx) const {
-    return m_data[idx];
 }
 
 bool Fractions::is_pure() const {
@@ -95,17 +43,17 @@ bool Fractions::is_pure() const {
 }
 
 void Fractions::set_pure(int idx) {
-    for (int i = 0; i < Fractions::max_size; ++i) {
+    for (int i = 0; i < size(); ++i) {
         m_data[i] = 0.0;
     }
-    if (0 <= idx && idx < Fractions::max_size) {
+    if (0 <= idx && idx < size()) {
         m_data[idx] = 1.0;
     }
 }
 
 int Fractions::index() const {
     int idx = -1;
-    for (int i = 0; i < max_size; ++i) {
+    for (int i = 0; i < size(); ++i) {
         if (has(i)) {
             if (idx < 0) {
                 // Нашли первое вещество
@@ -119,44 +67,6 @@ int Fractions::index() const {
     // Либо не нашли вещество (тогда -1),
     // Либо нашли только одно, тогда i
     return idx;
-}
-
-int Fractions::count() const {
-    int idx = 0;
-    for (int i = 0; i < max_size; ++i) {
-        if (has(i)) {
-            idx = i;
-        }
-    }
-    return idx + 1;
-}
-
-int Fractions::nonzero() const {
-    int counter = 0;
-    for (int i = 0; i < max_size; ++i) {
-        if (has(i)) {
-            ++counter;
-        }
-    }
-    return counter;
-}
-
-std::array<int, 2> Fractions::pair() const {
-    int first = -1;
-    for (int i = 0; i < max_size; ++i) {
-        if (has(i)) {
-            if (first < 0) {
-                // Нашли первое вещество
-                first = i;
-            } else {
-                // Нашли второе вещество
-                return {first, i};
-            }
-        }
-    }
-    // Либо не нашли вещество,
-    // либо нашли только одно
-    return {-1, -1};
 }
 
 void Fractions::normalize() {
@@ -188,101 +98,94 @@ bool Fractions::empty() const {
     return true;
 }
 
-std::ostream &operator<<(std::ostream &os, const Fractions &frac) {
-    os << "{";
-    for (int i = 0; i < Fractions::size() - 1; ++i) {
-        os << frac[i] << ", ";
+int Fractions::count() const {
+    int idx = 0;
+    for (int i = 0; i < max_size; ++i) {
+        if (has(i)) {
+            idx = i;
+        }
     }
-    os << frac[Fractions::size()  - 1] << "}";
-    return os;
+    return idx + 1;
 }
 
-ScalarSet::ScalarSet() {
-    m_data.fill(0.0);
+std::tuple<int, int> Fractions::pair() const {
+    int first = -1;
+    for (int i = 0; i < max_size; ++i) {
+        if (has(i)) {
+            if (first < 0) {
+                // Нашли первое вещество
+                first = i;
+            } else {
+                // Нашли второе вещество
+                return {first, i};
+            }
+        }
+    }
+    // Либо не нашли вещество,
+    // либо нашли только одно
+    return {-1, -1};
+}
+
+std::ostream &operator<<(std::ostream &os, const Fractions &frac) {
+    os << "{";
+    for (int i = 0; i < frac.size() - 1; ++i) {
+        os << frac[i] << ", ";
+    }
+    os << frac[frac.size()  - 1] << "}";
+    return os;
 }
 
 ScalarSet::ScalarSet(std::initializer_list<double> list) {
-    if (list.size() > Fractions::max_size) {
-        throw std::runtime_error("When construct ScalarSet got list.size() > Fractions::max_size (" +
-                                 std::to_string(list.size()) + " > " + std::to_string(Fractions::max_size));
+    if (list.size() > max_size) {
+        throw std::runtime_error("When construct ScalarSet got list.size() > max_size (" +
+                                 std::to_string(list.size()) + " > " + std::to_string(max_size));
     }
 
     int counter = 0;
     for (auto &elem: list) {
         m_data[counter++] = elem;
     }
-    for (int i = counter; i < Fractions::max_size; ++i) {
+    for (int i = counter; i < max_size; ++i) {
         m_data[i] = 0.0;
     }
 }
 
-ScalarSet::ScalarSet(int idx, double val) {
-    m_data.fill(0.0);
-    m_data[idx] = val;
-}
+ScalarSet::ScalarSet(const std::array<double, max_size>& arr)
+    : m_data(arr) { }
 
 ScalarSet::ScalarSet(const Fractions &frac)
-    : m_data(frac.data_ref()) {}
-
-ScalarSet::ScalarSet(const std::vector<double> &vec) {
-    if (vec.size() > Fractions::max_size) {
-        throw std::runtime_error("When construct ScalarSet got vec.size() > Fractions::max_size (" +
-                                 std::to_string(vec.size()) + " > " + std::to_string(Fractions::max_size));
-    }
-
-    for (size_t i = 0; i < vec.size(); ++i) {
-        m_data[i] = vec[i];
-    }
-    for (int i = vec.size(); i < Fractions::max_size; ++i) {
-        m_data[i] = 0.0;
-    }
-}
-
-ScalarSet ScalarSet::Pure(int idx, double value) {
-    ScalarSet res = ScalarSet::NaN();
-    res[idx] = value;
-    return res;
-}
+    : m_data(frac.array()) { }
 
 std::ostream &operator<<(std::ostream &os, const ScalarSet &frac) {
     os << "{";
-    for (int i = 0; i < Fractions::size() - 1; ++i) {
-        os << frac.m_data[i] << ", ";
+    for (int i = 0; i < frac.size() - 1; ++i) {
+        os << frac[i] << ", ";
     }
-    os << frac.m_data[Fractions::size() - 1] << "}";
+    os << frac[frac.size() - 1] << "}";
     return os;
 }
 
-VectorSet::VectorSet() {
-    m_data.fill(Vector3d::Zero());
-}
-
-VectorSet::VectorSet(const Vector3d& vec, int idx) {
-    m_data.fill(Vector3d::Zero());
-    m_data[idx] = vec;
-}
-
-VectorSet::VectorSet(const std::vector<Vector3d> &list) {
-    if (list.size() > Fractions::max_size) {
-        throw std::runtime_error("When construct VectorSet got list.size() > Fractions::max_size (" +
-                                 std::to_string(list.size()) + " > " + std::to_string(Fractions::max_size));
+VectorSet::VectorSet(std::initializer_list<Vector3d> list) {
+    if (list.size() > max_size) {
+        throw std::runtime_error("When construct VectorSet got list.size() > max_size (" +
+                                 std::to_string(list.size()) + " > " + std::to_string(max_size));
     }
 
     int counter = 0;
     for (auto &elem: list) {
         m_data[counter++] = elem;
     }
-    for (int i = counter; i < Fractions::max_size; ++i) {
+    for (int i = counter; i < max_size; ++i) {
         m_data[i] = Vector3d::Zero();
     }
 }
 
-std::ostream &operator<<(std::ostream &os, const VectorSet &frac) {
+std::ostream &operator<<(std::ostream &os, const VectorSet &arr) {
     os << "{ ";
-    for (int i = 0; i < Fractions::size() - 1; ++i) {
-        os << "{" << frac.m_data[i].transpose() << "}, ";
+    for (int i = 0; i < arr.size() - 1; ++i) {
+        os << "{" << arr[i].transpose() << "}, ";
     }
-    os << "{" << frac.m_data[Fractions::size() - 1].transpose() << "} }";
+    os << "{" << arr[arr.size() - 1].transpose() << "} }";
     return os;
 }
 

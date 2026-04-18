@@ -1,15 +1,18 @@
 #include <zephyr/geom/cell_type.h>
+#include <zephyr/geom/indexing.h>
 #include <zephyr/mesh/euler/amr_cells.h>
 
 namespace zephyr::mesh {
 
 using geom::CellType;
+namespace indexing = geom::indexing;
 
 void AmrAdjacent::resize(index_t n_faces) {
     rank.resize(n_faces, -1);
     index.resize(n_faces, -1);
     alien.resize(n_faces, -1);
     basic.resize(n_faces, -1);
+    rotation.resize(n_faces, -1);
 }
 
 void AmrAdjacent::reserve(index_t n_faces) {
@@ -17,6 +20,7 @@ void AmrAdjacent::reserve(index_t n_faces) {
     index.reserve(n_faces);
     alien.reserve(n_faces);
     basic.reserve(n_faces);
+    rotation.reserve(n_faces);
 }
 
 void AmrAdjacent::shrink_to_fit() {
@@ -24,6 +28,7 @@ void AmrAdjacent::shrink_to_fit() {
     index.shrink_to_fit();
     alien.shrink_to_fit();
     basic.shrink_to_fit();
+    rotation.shrink_to_fit();
 }
 
 void AmrFaces::resize(index_t n_faces) {
@@ -59,50 +64,97 @@ void AmrFaces::shrink_to_fit() {
 void AmrFaces::insert(index_t iface, CellType ctype, int count) {
     int n_faces = -1;
     switch (ctype) {
-        case CellType::AMR2D:
-            vertices[iface + Side2D::L] = Side2D::L.sf();
-            vertices[iface + Side2D::R] = Side2D::R.sf();
-            vertices[iface + Side2D::B] = Side2D::B.sf();
-            vertices[iface + Side2D::T] = Side2D::T.sf();
-            n_faces = 8;
-            break;
+        case CellType::AMR2D: {
+            z_assert(count == 8 || count < 0, "AmrFaces::insert: bad size 2D");
+            vertices[iface + Side2D::L] = indexing::amr::sf(Side2D::L);
+            vertices[iface + Side2D::R] = indexing::amr::sf(Side2D::R);
+            vertices[iface + Side2D::B] = indexing::amr::sf(Side2D::B);
+            vertices[iface + Side2D::T] = indexing::amr::sf(Side2D::T);
+            n_faces = indexing::amr::n_subfaces2d;
+        } break;
 
-        case CellType::AMR3D:
-            vertices[iface + Side3D::L] = Side3D::L.sf();
-            vertices[iface + Side3D::R] = Side3D::R.sf();
-            vertices[iface + Side3D::B] = Side3D::B.sf();
-            vertices[iface + Side3D::T] = Side3D::T.sf();
-            vertices[iface + Side3D::Z] = Side3D::Z.sf();
-            vertices[iface + Side3D::F] = Side3D::F.sf();
-            n_faces = 24;
-            break;
+        case CellType::AMR3D: {
+            z_assert(count == 24 || count < 0, "AmrFaces::insert: bad size 3D");
+            vertices[iface + Side3D::L] = indexing::amr::sf(Side3D::L);
+            vertices[iface + Side3D::R] = indexing::amr::sf(Side3D::R);
+            vertices[iface + Side3D::B] = indexing::amr::sf(Side3D::B);
+            vertices[iface + Side3D::T] = indexing::amr::sf(Side3D::T);
+            vertices[iface + Side3D::Z] = indexing::amr::sf(Side3D::Z);
+            vertices[iface + Side3D::F] = indexing::amr::sf(Side3D::F);
+            n_faces = indexing::amr::n_subfaces3d;
+        } break;
 
-        case CellType::TRIANGLE:
+        case CellType::TRIANGLE: {
+            z_assert(count == 3 || count < 0, "AmrFaces::insert: bad size TRIANGLE");
+            vertices[iface+0] = indexing::tri::sf(0);
+            vertices[iface+1] = indexing::tri::sf(1);
+            vertices[iface+2] = indexing::tri::sf(2);
+            n_faces = 3;
+        } break;
+            
         case CellType::QUAD:
-            // определяем count и идем на CellType::POLYGON
-            count = ctype == CellType::TRIANGLE ? 3 : 4;
+            // Необычный порядок граней
+            z_assert(count == 4 || count < 0, "AmrFaces::insert: bad size QUAD");
+            vertices[iface+0] = indexing::quad::sf(0);
+            vertices[iface+1] = indexing::quad::sf(1);
+            vertices[iface+2] = indexing::quad::sf(2);
+            vertices[iface+3] = indexing::quad::sf(3);
+            n_faces = 4;
+            break;
 
-        case CellType::POLYGON:
+        case CellType::POLYGON: {
             if (count < 0) {
-                std::string message = "AmrFaces::insert error(): set argument 'count' with CellType::POLYGON";
-                std::cerr << message << "\n";
-                throw std::runtime_error(message);
+                throw std::runtime_error("AmrFaces::insert error: set argument 'count' with CellType::POLYGON");
             }
             for (int i = 0; i < count; ++i) {
-                vertices[iface + i].fill(-1);
-                vertices[iface + i][0] = i;
-                vertices[iface + i][1] = (i + 1) % count;
+                vertices[iface + i] = indexing::poly::sf(count, i);
             }
             n_faces = count;
-            break;
+        } break;
+
+        case CellType::TETRA: {
+            z_assert(count == 4 || count < 0, "AmrFaces::insert: bad size TETRA");
+            vertices[iface + 0] = indexing::tetra::sf(0);
+            vertices[iface + 1] = indexing::tetra::sf(1);
+            vertices[iface + 2] = indexing::tetra::sf(2);
+            vertices[iface + 3] = indexing::tetra::sf(3);
+            n_faces = indexing::tetra::n_faces;
+        } break;
+
+        case CellType::PYRAMID: {
+            z_assert(count == 5 || count < 0, "AmrFaces::insert: bad size PYRAMID");
+            vertices[iface + 0] = indexing::pyramid::sf(0);
+            vertices[iface + 1] = indexing::pyramid::sf(1);
+            vertices[iface + 2] = indexing::pyramid::sf(2);
+            vertices[iface + 3] = indexing::pyramid::sf(3);
+            vertices[iface + 4] = indexing::pyramid::sf(4);
+            n_faces = indexing::pyramid::n_faces;
+        } break;
+
+        case CellType::WEDGE: {
+            z_assert(count == 5 || count < 0, "AmrFaces::insert: bad size PYRAMID");
+            vertices[iface + 0] = indexing::wedge::sf(0);
+            vertices[iface + 1] = indexing::wedge::sf(1);
+            vertices[iface + 2] = indexing::wedge::sf(2);
+            vertices[iface + 3] = indexing::wedge::sf(3);
+            vertices[iface + 4] = indexing::wedge::sf(4);
+            n_faces = indexing::wedge::n_faces;
+        } break;
+
+        case CellType::HEXAHEDRON: {
+            z_assert(count == 6 || count < 0, "AmrFaces::insert: bad size HEXAHEDRON");
+            vertices[iface + Side3D::L] = indexing::hex::sf(Side3D::L);
+            vertices[iface + Side3D::R] = indexing::hex::sf(Side3D::R);
+            vertices[iface + Side3D::B] = indexing::hex::sf(Side3D::B);
+            vertices[iface + Side3D::T] = indexing::hex::sf(Side3D::T);
+            vertices[iface + Side3D::Z] = indexing::hex::sf(Side3D::Z);
+            vertices[iface + Side3D::F] = indexing::hex::sf(Side3D::F);
+            n_faces = 6;
+        } break;
 
         case CellType::POLYHEDRON:
-            break;
-
         default:
-            std::string message = "BFaces::BFaces error(): not implemented for current CellType";
-            std::cerr << message << "\n";
-            throw std::runtime_error(message);
+            throw std::runtime_error("AmrFaces::insert: not implemented for current CellType");
     }
 
     for (int i = 0; i < n_faces; ++i) {
@@ -120,6 +172,31 @@ bool AmrFaces::to_skip(index_t iface, Direction dir) const {
         case Direction::Y: return std::abs(normal[iface].y()) < 0.7;
         case Direction::Z: return std::abs(normal[iface].z()) < 0.7;
         default: return false;
+    }
+}
+
+template <class T>
+void reorder(std::vector<T>& field, index_t iface) {
+    // 0 -> 2, 2 -> 3, 3 -> 0
+    T f0 = field[iface];
+    field[iface] = field[iface + 3];
+    field[iface + 3] = field[iface + 2];
+    field[iface + 2] = f0;
+}
+
+void AmrFaces::reorder_quad_faces(index_t iface) {
+    reorder(adjacent.rank, iface);
+    reorder(adjacent.index, iface);
+    reorder(adjacent.alien, iface);
+
+    reorder(boundary, iface);
+    reorder(normal, iface);
+    reorder(center, iface);
+    reorder(area, iface);
+    reorder(vertices, iface);
+
+    if (!area_alt.empty()) {
+        reorder(area_alt, iface);
     }
 }
 

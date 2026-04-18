@@ -1,6 +1,5 @@
 #pragma once
 
-#include <zephyr/configuration.h>
 #include <zephyr/geom/boundary.h>
 #include <zephyr/geom/generator/generator.h>
 
@@ -8,7 +7,7 @@ namespace zephyr::geom::generator {
 
 /// @brief Простой класс для генерации декартовой сетки
 /// или сетки из ячеек Вороного внутри прямоугольной области.
-class Rectangle : public Generator {
+class Rectangle final : public Generator {
 public:
     using Ptr = std::shared_ptr<Rectangle>;
     using Ref = const std::shared_ptr<Rectangle>&;
@@ -39,11 +38,8 @@ public:
         return std::make_shared<Rectangle>(std::forward<Args>(args)...);
     }
 
-    /// @brief Использовать осевую симметрию (вращение вокруг оси Ox)
-    void set_axial(bool axial = true);
-
-    /// @brief
-    bool structured() const { return !m_voronoi; }
+    /// @brief Структурированная сетка?
+    bool structured() const override { return !m_voronoi; }
 
     /// @brief Установить желаемое число ячеек сетки по оси Ox
     /// @details Число ячеек по оси Oy подбирается так, чтобы aspect ячеек
@@ -66,18 +62,26 @@ public:
     /// @brief Установить флаги граничных условий
     void set_boundaries(Boundaries bounds);
 
-    /// @brief Количество ячеек сетки
-    int size() const final;
+    /// @brief Использовать осевую симметрию
+    void set_axial(bool axial) override;
+
+    /// @brief Использовать адаптацию
+    void set_adaptive(bool adaptive) override;
+
+    /// @brief Использовать линейную адаптацию
+    void set_linear(bool) override { m_linear = true; }
 
     /// @brief Ограничивающий объем
-    Box bbox() const final;
+    Box bbox() const override;
 
     /// @brief Создать сетку общего вида
-    Grid make() final;
+    Grid make() const override;
+
+    /// @brief Может инициализировать хранилище (для декартовой сетки)
+    bool can_initialize() const override { return !m_voronoi; }
 
     /// @brief Инициализация SoA-хранилища сетки
-    void initialize(mesh::AmrCells& cells) final;
-
+    void initialize(mesh::AmrCells& cells) const override;
 
     // Далее не самые полезные get-функции
 
@@ -110,13 +114,16 @@ public:
 
 private:
     /// @brief Проверить параметры сетки перед созданием
-    void check_params() const final;
+    void check_params() const;
 
     /// @brief Обновить число ячеек
     void compute_size();
 
     /// @brief Создать классическую декартову сетку
     Grid create_classic() const;
+
+    /// @brief Создать классическую декартову сетку
+    Grid create_classic_amr() const;
 
     /// @brief Создать сетку из шестиугольников
     Grid create_voronoi() const;
@@ -127,14 +134,12 @@ private:
     /// @brief Создать сетку из шестиугольников
     void initialize_voronoi(mesh::AmrCells& cells);
 
-
-    int m_nx, m_ny;         ///< Число ячеек по осям
-    int m_size;             ///< Суммарное число ячеек
+    int m_nx{0}, m_ny{0};   ///< Число ячеек по осям
+    int m_size{0};          ///< Суммарное число ячеек
     double m_xmin, m_xmax;  ///< Границы области по оси X
     double m_ymin, m_ymax;  ///< Границы области по оси Y
     Boundaries m_bounds;    ///< Граничные условия
     bool m_voronoi = false; ///< Использовать ячейки Вороного
-    bool m_axial = false;   ///< Осевая симметрия
 };
 
 } // namespace zephyr::geom::generator

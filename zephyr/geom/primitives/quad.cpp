@@ -4,131 +4,11 @@
 #include <zephyr/geom/primitives/line.h>
 #include <zephyr/geom/primitives/quad.h>
 
+#include "zephyr/utils/numpy.h"
+
 namespace zephyr::geom {
 
-inline double sqr(double x) {
-    return x * x;
-}
-
-// ============================================================================
-//                                    QUAD
-// ============================================================================
-
-Quad::Quad(
-        const Vector3d &v00,
-        const Vector3d &v01,
-        const Vector3d &v10,
-        const Vector3d &v11)
-        : verts({v00, v01, v10, v11}) {}
-
-Vector3d Quad::operator()(double x, double y) const {
-    return get(x, y);
-}
-
-Vector3d Quad::get(double x, double y) const {
-    return 0.25 * (((1.0 - x) * (1.0 - y)) * vs<-1, -1>() +
-                   ((1.0 + x) * (1.0 - y)) * vs<+1, -1>() +
-                   ((1.0 - x) * (1.0 + y)) * vs<-1, +1>() +
-                   ((1.0 + x) * (1.0 + y)) * vs<+1, +1>());
-}
-
-Vector3d Quad::tangent_x(double x, double y) const {
-    return 0.25 * ((1.0 - y) * (vs<+1, -1>() - vs<-1, -1>()) +
-                   (1.0 + y) * (vs<+1, +1>() - vs<-1, +1>()));
-}
-
-Vector3d Quad::tangent_y(double x, double y) const {
-    return 0.25 * ((1.0 - x) * (vs<-1, +1>() - vs<-1, -1>()) +
-                   (1.0 + x) * (vs<+1, +1>() - vs<+1, -1>()));
-}
-
-Vector3d Quad::normal(double x, double y, const Vector3d &c) const {
-    Vector3d n = tangent_x(x, y).cross(tangent_y(x, y)).normalized();
-    return (verts[0] - c).dot(n) > 0 ? n : -n;
-}
-
-double Quad::Jacobian(double x, double y) const {
-    return tangent_x(x, y).cross(tangent_y(x, y)).norm();
-}
-
-Vector3d Quad::center() const {
-    return 0.25 * (verts[0] + verts[1] + verts[2] + verts[3]);
-}
-
-Vector3d Quad::normal(const Vector3d &c) const {
-    Vector3d n = (verts[3] - verts[0]).cross(verts[2] - verts[1]);
-    n.normalize();
-    return (verts[0] - c).dot(n) > 0.0 ? n : -n;
-}
-
-double Quad::area() const {
-    return 0.5 * (verts[3] - verts[0]).cross(verts[2] - verts[1]).norm();
-}
-
-Vector3d Quad::area_n(const Vector3d& c) const {
-    return Quad::area() * Quad::normal(c);
-}
-
-double Quad::volume_as() const {
-    // Обход вершин против часовой стрелки
-    int ord[4] = {0, 1, 3, 2};
-
-    double V = 0.0;
-    for (int i: {0, 1, 2, 3}) {
-        auto &v1 = verts[ord[i]];
-        auto &v2 = verts[ord[(i + 1) % 4]];
-
-        V -= (v2.x() - v1.x()) * (v2.y() * v2.y() + v2.y() * v1.y() + v1.y() * v1.y());
-    }
-
-    return V / 6.0;
-}
-
-Vector3d Quad::centroid(double area) const {
-    if (area == 0.0) {
-        area = Quad::area();
-    }
-
-    // Обход вершин против часовой стрелки
-    int ord[4] = {0, 1, 3, 2};
-
-    Vector3d C = {0.0, 0.0, 0.0};
-    for (int i: {0, 1, 2, 3}) {
-        auto &v1 = verts[ord[i]];
-        auto &v2 = verts[ord[(i + 1) % 4]];
-
-        C.x() += (v2.y() - v1.y()) * (v2.x() * v2.x() + v2.x() * v1.x() + v1.x() * v1.x());
-        C.y() -= (v2.x() - v1.x()) * (v2.y() * v2.y() + v2.y() * v1.y() + v1.y() * v1.y());
-    }
-    C /= (6.0 * area);
-
-    return C;
-}
-
-Vector3d Quad::centroid_as(double vol_as) const {
-    if (vol_as == 0.0) {
-        vol_as = Quad::volume_as();
-    }
-
-    // Обход вершин против часовой стрелки
-    int ord[4] = {0, 1, 3, 2};
-
-    Vector3d C = {0.0, 0.0, 0.0};
-    for (int i: {0, 1, 2, 3}) {
-        auto &v1 = verts[ord[i]];
-        auto &v2 = verts[ord[(i + 1) % 4]];
-
-        C.x() += (+1.5 * std::pow(v1.y(), 2) + v1.y() * v2.y() + 0.5 * std::pow(v2.y(), 2)) * std::pow(v1.x(), 2) +
-                 (-1.5 * std::pow(v2.y(), 2) - v1.y() * v2.y() - 0.5 * std::pow(v1.y(), 2)) * std::pow(v2.x(), 2) +
-                 (v2.y() * v2.y() - v1.y() * v1.y()) * v1.x() * v2.x();
-
-        C.y() -= (std::pow(v1.y(), 3) + std::pow(v1.y(), 2) * v2.y() +
-                  std::pow(v2.y(), 3) + std::pow(v2.y(), 2) * v1.y()) * (v2.x() - v1.x());
-    }
-    C /= (12.0 * vol_as);
-
-    return C;
-}
+inline double sqr(double x) { return x * x; }
 
 // Реализация интегралов по Quad и SqQuad
 namespace integral2D {
@@ -141,7 +21,7 @@ struct Node {
 // N -- число ячеек, точность определения объемной доли ~ 1/N
 template <typename Map2D>
 double volume_fraction(const Map2D& quad, const std::function<bool(const Vector3d&)>& inside, int N) {
-    int n = std::round(std::sqrt(N));
+    int n = static_cast<int>(std::round(std::sqrt(N)));
     double h = 1.0 / n;
     double res = 0.0;
     for (int i = 0; i < n; ++i) {
@@ -161,11 +41,24 @@ double volume_fraction(const Map2D& quad, const std::function<bool(const Vector3
     return res;
 }
 
+template <typename T>
+T zero() {
+    if constexpr (std::is_same_v<T, Vector3d>) {
+        return Vector3d::Zero();
+    }
+    else if (std::is_arithmetic_v<T>) {
+        return {};
+    }
+    else {
+        throw std::runtime_error("Not supported type");
+    }
+}
+
 // type Q is Quad or SqQuad
-template <typename Map2D>
-double integrate_low(const Map2D& quad, const std::function<double(const Vector3d &)> &func, int n) {
-    double h = 1.0 / n;
-    double res = 0.0;
+template <typename T, typename Map2D>
+T integrate_low(const Map2D& quad, const std::function<T(const Vector3d &)> &func, int n) {
+    const double h = 1.0 / n;
+    T res = zero<T>();
     for (int i = 0; i < n; ++i) {
         double x = (2 * i + 1) * h - 1.0;
         for (int j = 0; j < n; ++j) {
@@ -177,13 +70,13 @@ double integrate_low(const Map2D& quad, const std::function<double(const Vector3
 }
 
 // type Q is Quad or SqQuad
-template <typename Map2D>
-double integrate_mid(const Map2D& quad, const std::function<double(const Vector3d &)> &func, int n) {
+template <typename T, typename Map2D>
+T integrate_mid(const Map2D& quad, const std::function<T(const Vector3d &)> &func, int n) {
     static const double cm = 1.0 - 1.0 / std::sqrt(3.0);
     static const double cp = 1.0 + 1.0 / std::sqrt(3.0);
 
     double h = 1.0 / n;
-    double res = 0.0;
+    T res = zero<T>();
     for (int i = 0; i < n; ++i) {
         double x1 = (2 * i + cm) * h - 1.0;
         double x2 = (2 * i + cp) * h - 1.0;
@@ -202,8 +95,8 @@ double integrate_mid(const Map2D& quad, const std::function<double(const Vector3
 }
 
 // type Q is Quad or SqQuad
-template <typename Map2D>
-double integrate_high(const Map2D& quad, const std::function<double(const Vector3d &)> &func, int n) {
+template <typename T, typename Map2D>
+T integrate_high(const Map2D& quad, const std::function<T(const Vector3d &)> &func, int n) {
     static const double a = std::sqrt((114.0 - 3.0 * std::sqrt(583.0)) / 287.0);
     static const double b = std::sqrt((114.0 + 3.0 * std::sqrt(583.0)) / 287.0);
     static const double c = std::sqrt(6.0 / 7.0);
@@ -217,7 +110,7 @@ double integrate_high(const Map2D& quad, const std::function<double(const Vector
     const double bh = b * h;
     const double ch = c * h;
 
-    double res = 0.0;
+    T res = zero<T>();
     for (int i = 0; i < n; ++i) {
         double x_c = (2 * i + 1) * h - 1.0;
         double x_ma = x_c - ah;
@@ -254,9 +147,61 @@ double integrate_high(const Map2D& quad, const std::function<double(const Vector
 }
 
 // type Q is Quad or SqQuad
-template<typename Map2D>
-double integrate_extra(const Map2D& quad, const std::function<double(const Vector3d &)> &func, int n) {
-    static const std::array<Node, 37> weights = {
+template <typename T, typename Map2D>
+T integrate_high2(const Map2D& quad, const std::function<T(double xi, double eta)> &func, int n) {
+    static const double a = std::sqrt((114.0 - 3.0 * std::sqrt(583.0)) / 287.0);
+    static const double b = std::sqrt((114.0 + 3.0 * std::sqrt(583.0)) / 287.0);
+    static const double c = std::sqrt(6.0 / 7.0);
+
+    static const double wa = 307.0 / 810.0 + 923.0 / 270.0 / std::sqrt(583.0);
+    static const double wb = 307.0 / 810.0 - 923.0 / 270.0 / std::sqrt(583.0);
+    static const double wc = 98.0 / 405.0;
+
+    const double h = 1.0 / n;
+    const double ah = a * h;
+    const double bh = b * h;
+    const double ch = c * h;
+
+    T res = zero<T>();
+    for (int i = 0; i < n; ++i) {
+        double x_c = (2 * i + 1) * h - 1.0;
+        double x_ma = x_c - ah;
+        double x_pa = x_c + ah;
+        double x_mb = x_c - bh;
+        double x_pb = x_c + bh;
+        double x_mc = x_c - ch;
+        double x_pc = x_c + ch;
+
+        for (int j = 0; j < n; ++j) {
+            double y_c = (2 * j + 1) * h - 1.0;
+            double y_ma = y_c - ah;
+            double y_pa = y_c + ah;
+            double y_mb = y_c - bh;
+            double y_pb = y_c + bh;
+            double y_mc = y_c - ch;
+            double y_pc = y_c + ch;
+
+            res += wa * (func(x_ma, y_ma) * quad.Jacobian(x_ma, y_ma) +
+                         func(x_ma, y_pa) * quad.Jacobian(x_ma, y_pa) +
+                         func(x_pa, y_ma) * quad.Jacobian(x_pa, y_ma) +
+                         func(x_pa, y_pa) * quad.Jacobian(x_pa, y_pa)) +
+                   wb * (func(x_mb, y_mb) * quad.Jacobian(x_mb, y_mb) +
+                         func(x_mb, y_pb) * quad.Jacobian(x_mb, y_pb) +
+                         func(x_pb, y_mb) * quad.Jacobian(x_pb, y_mb) +
+                         func(x_pb, y_pb) * quad.Jacobian(x_pb, y_pb)) +
+                   wc * (func(x_mc, y_c) * quad.Jacobian(x_mc, y_c) +
+                         func(x_pc, y_c) * quad.Jacobian(x_pc, y_c) +
+                         func(x_c, y_mc) * quad.Jacobian(x_c, y_mc) +
+                         func(x_c, y_pc) * quad.Jacobian(x_c, y_pc));
+        }
+    }
+    return res * sqr(h);
+}
+
+// type Q is Quad or SqQuad
+template<typename T, typename Map2D>
+T integrate_extra(const Map2D& quad, const std::function<T(const Vector3d &)> &func, int n) {
+    static constexpr std::array<Node, 37> weights = {
             Node{-9.1324172678365734e-01, -9.3149501298985338e-01, 9.7554807790077372e-03},
             {-9.7865852404709552e-01, -6.1165306951584819e-01, 1.0171445385633233e-02},
             {-9.3749714215853275e-01, -1.0520434537393597e-02, 2.1998021656947090e-02},
@@ -298,7 +243,7 @@ double integrate_extra(const Map2D& quad, const std::function<double(const Vecto
 
     const double h = 2.0 / n;
 
-    double res = 0.0;
+    T res = zero<T>();
     for (int i = 0; i < n; ++i) {
         double x1 = (i + 0) * h - 1.0;
         double x2 = (i + 1) * h - 1.0;
@@ -318,6 +263,144 @@ double integrate_extra(const Map2D& quad, const std::function<double(const Vecto
 }
 
 } // integral2D
+
+// ============================================================================
+//                                    QUAD
+// ============================================================================
+
+Quad::Quad(
+        const Vector3d &v00,
+        const Vector3d &v01,
+        const Vector3d &v10,
+        const Vector3d &v11)
+        : verts({v00, v01, v10, v11}) {}
+
+Vector3d Quad::operator()(double x, double y) const {
+    return get(x, y);
+}
+
+Vector3d Quad::get(double x, double y) const {
+    return 0.25 * (((1.0 - x) * (1.0 - y)) * vs<-1, -1>() +
+                   ((1.0 + x) * (1.0 - y)) * vs<+1, -1>() +
+                   ((1.0 - x) * (1.0 + y)) * vs<-1, +1>() +
+                   ((1.0 + x) * (1.0 + y)) * vs<+1, +1>());
+}
+
+Vector3d Quad::tangent_x(double x, double y) const {
+    return 0.25 * ((1.0 - y) * (vs<+1, -1>() - vs<-1, -1>()) +
+                   (1.0 + y) * (vs<+1, +1>() - vs<-1, +1>()));
+}
+
+Vector3d Quad::tangent_y(double x, double y) const {
+    return 0.25 * ((1.0 - x) * (vs<-1, +1>() - vs<-1, -1>()) +
+                   (1.0 + x) * (vs<+1, +1>() - vs<+1, -1>()));
+}
+
+bool Quad::oxy() const {
+    return verts[iss<-1, -1>()].z() == 0.0 && verts[iss<+1, +1>()].z() == 0.0;
+}
+
+Vector3d Quad::normal(double x, double y, const Vector3d &c) const {
+    Vector3d n = tangent_x(x, y).cross(tangent_y(x, y)).normalized();
+    return (verts[0] - c).dot(n) > 0 ? n : -n;
+}
+
+double Quad::Jacobian(double x, double y) const {
+    return tangent_x(x, y).cross(tangent_y(x, y)).norm();
+}
+
+Vector3d Quad::center() const {
+    return 0.25 * (verts[0] + verts[1] + verts[2] + verts[3]);
+}
+
+Vector3d Quad::normal(const Vector3d &view) const {
+    Vector3d n = (verts[3] - verts[0]).cross(verts[2] - verts[1]);
+    n.normalize();
+    return (verts[0] - view).dot(n) > 0.0 ? n : -n;
+}
+
+double Quad::area() const {
+    return 0.5 * (verts[3] - verts[0]).cross(verts[2] - verts[1]).norm();
+}
+
+Vector3d Quad::area_n(const Vector3d& view) const {
+    Vector3d S = 0.5 * (verts[3] - verts[0]).cross(verts[2] - verts[1]);
+    return (verts[0] - view).dot(S) > 0.0 ? S : -S;
+}
+
+double Quad::volume_as() const {
+    z_assert(oxy(), "Quad::volume_as: only for plain quads");
+    // Обход вершин против часовой стрелки
+    int ord[4] = {0, 1, 3, 2};
+
+    double V = 0.0;
+    for (int i: {0, 1, 2, 3}) {
+        auto &v1 = verts[ord[i]];
+        auto &v2 = verts[ord[(i + 1) % 4]];
+
+        V -= (v2.x() - v1.x()) * (v2.y() * v2.y() + v2.y() * v1.y() + v1.y() * v1.y());
+    }
+
+    return V / 6.0;
+}
+
+inline Vector3d pos(const Vector3d& r) { return r; }
+
+Vector3d Quad::centroid(double area) const {
+    if (oxy()) { return centroid_oxy(area); }
+
+    if (area == 0.0) { area = Quad::area(); }
+    // Есть ещё вариант в параметрическом пространстве центр посчитать, но он будет другой
+    // Не точный результат, можно вообще extra поставить
+    return integral2D::integrate_high<Vector3d>(*this, pos, 1) / area;
+}
+
+Vector3d Quad::centroid_oxy(double area) const {
+    if (area == 0.0) {
+        area = Quad::area();
+    }
+
+    // Обход вершин против часовой стрелки
+    int ord[4] = {0, 1, 3, 2};
+
+    Vector3d C = {0.0, 0.0, 0.0};
+    for (int i: {0, 1, 2, 3}) {
+        auto &v1 = verts[ord[i]];
+        auto &v2 = verts[ord[(i + 1) % 4]];
+
+        C.x() += (v2.y() - v1.y()) * (v2.x() * v2.x() + v2.x() * v1.x() + v1.x() * v1.x());
+        C.y() -= (v2.x() - v1.x()) * (v2.y() * v2.y() + v2.y() * v1.y() + v1.y() * v1.y());
+    }
+    C /= (6.0 * area);
+
+    return C;
+}
+
+Vector3d Quad::centroid_as(double vol_as) const {
+    z_assert(oxy(), "Quad::centroid_as: only for plain quads");
+    if (vol_as == 0.0) {
+        vol_as = Quad::volume_as();
+    }
+
+    // Обход вершин против часовой стрелки
+    int ord[4] = {0, 1, 3, 2};
+
+    Vector3d C = {0.0, 0.0, 0.0};
+    for (int i: {0, 1, 2, 3}) {
+        auto &v1 = verts[ord[i]];
+        auto &v2 = verts[ord[(i + 1) % 4]];
+
+        C.x() += (+1.5 * sqr(v1.y()) + v1.y() * v2.y() + 0.5 * sqr(v2.y())) * sqr(v1.x()) +
+                 (-1.5 * sqr(v2.y()) - v1.y() * v2.y() - 0.5 * sqr(v1.y())) * sqr(v2.x()) +
+                 (v2.y() * v2.y() - v1.y() * v1.y()) * v1.x() * v2.x();
+
+        C.y() -= (sqr(v1.y()) + sqr(v1.y()) * v2.y() +
+                  sqr(v2.y()) + sqr(v2.y()) * v1.y()) * (v2.x() - v1.x());
+    }
+    C /= (12.0 * vol_as);
+
+    return C;
+}
 
 double Quad::volume_fraction(const std::function<bool(const Vector3d&)>& inside, int N) const {
     return integral2D::volume_fraction(*this, inside, N);
@@ -362,16 +445,19 @@ SqQuad::SqQuad(
                         v20, v21, v22
                 }) {}
 
+SqQuad::SqQuad(std::span<const Vector3d, 9> vertices) {
+    std::ranges::copy(vertices, verts.begin());
+}
+
 SqQuad::SqQuad(const Quad &quad)
         : verts({
                         quad.vs<-1, -1>(), quad(0.0, -1.0), quad.vs<+1, -1>(),
-                        quad(-1.0, 0.0), quad(0.0, 0.0), quad(+1.0, 0.0),
+                        quad(-1.0, 0.0),   quad(0.0, 0.0),  quad(+1.0, 0.0),
                         quad.vs<-1, +1>(), quad(0.0, +1.0), quad.vs<+1, +1>()
                 }) {}
 
 Quad SqQuad::reduce() const {
-    return Quad(vs<-1, -1>(), vs<+1, -1>(),
-                vs<-1, +1>(), vs<+1, +1>());
+    return {vs<-1, -1>(), vs<+1, -1>(), vs<-1, +1>(), vs<+1, +1>()};
 }
 
 Vector3d SqQuad::operator()(double x, double y) const {
@@ -428,11 +514,15 @@ Vector3d SqQuad::tangent_y(double x, double y) const {
     return sqline.tangent(y);
 }
 
-Vector3d SqQuad::normal(double x, double y, const Vector3d &c) const {
+bool SqQuad::oxy() const {
+    return verts[iss<-1, 0>()].z() == 0.0 && verts[iss<0, -1>()].z() == 0.0;
+}
+
+Vector3d SqQuad::normal(double x, double y, const Vector3d &view) const {
     Vector3d tau_x = tangent_x(x, y);
     Vector3d tau_y = tangent_y(x, y);
     Vector3d n = tau_x.cross(tau_y).normalized();
-    return (verts[iss<0, 0>()] - c).dot(n) > 0.0 ? n : -n;
+    return (verts[iss<0, 0>()] - view).dot(n) >= 0.0 ? n : -n;
 }
 
 double SqQuad::Jacobian(double x, double y) const {
@@ -445,23 +535,37 @@ const Vector3d &SqQuad::center() const {
     return verts[iss<0, 0>()];
 }
 
-Vector3d SqQuad::normal(const Vector3d &c) const {
-    // Вроде так же, как для линейного четырехугольника
-    // Перепроверить, как?
-    Vector3d n = (verts[3] - verts[0]).cross(verts[2] - verts[1]);
-    n.normalize();
-    return (verts[0] - c).dot(n) > 0.0 ? n : -n;
+Vector3d SqQuad::area_n(const Vector3d& view) const {
+    // Квадратура Гаусса дает точный результат
+    static const double x1 = -1.0 / std::sqrt(3.0);
+    static const double x2 = +1.0 / std::sqrt(3.0);
+
+    auto func = [this](double xi, double eta) -> Vector3d {
+        return tangent_x(xi, eta).cross(tangent_y(xi, eta));
+    };
+
+    Vector3d S = func(x1, x1) + func(x1, x2) + func(x2, x1) + func(x2, x2);
+
+    return (verts[iss<0, 0>()] - view).dot(S) >= 0.0 ? S : -S;
 }
 
-static const
-std::array<std::array<int, 3>, 4> faces2D = {
-        std::array<int, 3>{6, 3, 0}, // left
-        std::array<int, 3>{2, 5, 8}, // right
-        std::array<int, 3>{0, 1, 2}, // bottom
-        std::array<int, 3>{8, 7, 6}, // top
+Vector3d SqQuad::normal(const Vector3d &view) const {
+    return area_n(view).normalized();
+}
+
+constexpr std::array faces2D = {
+        std::array{6, 3, 0}, // left
+        std::array{2, 5, 8}, // right
+        std::array{0, 1, 2}, // bottom
+        std::array{8, 7, 6}, // top
 };
 
 double SqQuad::area() const {
+    if (oxy()) { return area_oxy(); }
+    return area_n(Vector3d::Zero()).norm();
+}
+
+double SqQuad::area_oxy() const {
     double S = 0.0;
     for (auto &face: faces2D) {
         auto &v1 = verts[face[0]];
@@ -478,6 +582,7 @@ double SqQuad::area() const {
 }
 
 double SqQuad::volume_as() const {
+    z_assert(oxy(), "SqQuad::volume_as: only for plain quads.");
     double V = 0.0;
     for (auto &face: faces2D) {
         auto &v1 = verts[face[0]];
@@ -496,6 +601,15 @@ double SqQuad::volume_as() const {
 }
 
 Vector3d SqQuad::centroid(double area) const {
+    if (oxy()) { return centroid_oxy(area); }
+
+    if (area == 0.0) { area = SqQuad::area(); }
+    // Есть ещё вариант в параметрическом пространстве центр посчитать, но он будет другой
+    // Даже с extra не точный результат, что-то здесь не так
+    return integral2D::integrate_high<Vector3d>(*this, pos, 1) / area;
+}
+
+Vector3d SqQuad::centroid_oxy(double area) const {
     if (area == 0.0) {
         area = SqQuad::area();
     }

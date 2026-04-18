@@ -113,6 +113,13 @@ py::kwargs get_kwargs(const surface_options& opts) {
     return kwargs;
 }
 
+py::kwargs get_kwargs(const text_options& opts) {
+    py::kwargs kwargs;
+    if (opts.ha.has_value()) { kwargs["ha"] = py::str(opts.ha.value()); }
+    if (opts.va.has_value()) { kwargs["va"] = py::str(opts.va.value()); }
+    return kwargs;
+}
+
 }
 
 class pyplot::pyport {
@@ -124,8 +131,21 @@ public:
     pyport() {
         try {
             if (!Py_IsInitialized()) {
+                #ifdef _WIN32
+                Py_SetPythonHome(const_cast<wchar_t*>(PYTHONHOME));
+                #endif
                 py::initialize_interpreter();
             }
+
+            #ifdef _WIN32
+            // У меня нормальные интерактивные графики не запустились,
+            // matplotlib работает только с Web Backend.
+            py::exec(R"(
+                import matplotlib
+                matplotlib.use('WebAgg')
+            )");
+            #endif
+
             plt = py::module::import("matplotlib.pyplot");
             mpl_toolkits  = py::module::import("mpl_toolkits.mplot3d");
             pylab_helpers = py::module::import("matplotlib._pylab_helpers");
@@ -221,8 +241,9 @@ void pyplot::ylabel(const std::string& text) const {
     impl->plt.attr("ylabel")(text);
 }
 
-void pyplot::text(double x, double y, const std::string& text) const {
-    impl->plt.attr("text")(x, y, text);
+void pyplot::text(double x, double y, const std::string& text, const text_options& args) const {
+    auto kwargs = get_kwargs(args);
+    impl->plt.attr("text")(x, y, text, **kwargs);
 }
 
 void pyplot::marker(double x, double y, const line_options& args) const {

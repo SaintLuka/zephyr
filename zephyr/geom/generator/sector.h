@@ -9,7 +9,7 @@ namespace zephyr::geom::generator {
 
 /// @brief Генератор для создания блочно-структурированной
 /// сетки внутри сектора или круга.
-class Sector : public Generator {
+class Sector final : public Generator {
 public:
     using Ptr = std::shared_ptr<Sector>;
 
@@ -43,17 +43,11 @@ public:
     /// @brief Установить флаги граничных условий
     void set_boundaries(Boundaries bounds);
 
-    /// @brief Использовать осевую симметрию
-    void set_axial(bool axial);
-
-    /// @brief Количество ячеек сетки
-    int size() const final;
-
     /// @brief Ограничивающий объем
-    Box bbox() const final;
+    Box bbox() const override;
 
     /// @brief Создать сетку общего вида
-    Grid make() final;
+    Grid make() const override;
 
 private:
     /// @brief Подобрать параметры сетки исходя из геометрии
@@ -61,7 +55,7 @@ private:
     void init_params();
 
     /// @brief Проверить на корявый ввод
-    void check_params() const final;
+    void check_params() const;
 
     /// @brief Повернуть вектор несколько раз на 90 градусов
     /// @param r Число поворотов от 0 до 3 (включительно)
@@ -90,8 +84,6 @@ private:
     int m_ny;      ///< Разбиение по радиусу во внутренней части
     int m_Ny;      ///< Разбиение по радиусу во внешней структурированной части
     int m_size;    ///< Полное число ячеек
-
-    bool m_axial = true;
 };
 
 } // namespace zephyr::geom::generator

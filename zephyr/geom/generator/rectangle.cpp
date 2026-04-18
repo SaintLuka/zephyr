@@ -1,25 +1,25 @@
 #include <iostream>
 #include <algorithm>
+#include <format>
 
+#include <zephyr/geom/boundary.h>
 #include <zephyr/geom/box.h>
 #include <zephyr/geom/grid.h>
+#include <zephyr/geom/side.h>
+#include <zephyr/geom/indexing.h>
 #include <zephyr/geom/generator/rectangle.h>
-
 #include <zephyr/geom/primitives/quad.h>
-#include <zephyr/geom/primitives/polygon.h>
-
-#include <zephyr/mesh/euler/amr_cells.h>
-
 #include <zephyr/utils/json.h>
+#include <zephyr/mesh/euler/amr_cells.h>
 
 namespace zephyr::geom::generator {
 
-using namespace zephyr::mesh;
+using namespace mesh;
 
 Rectangle::Rectangle(const Json& config)
     : Generator("rectangle"),
-      m_xmin(0.0), m_xmax(1.0), m_ymin(0.0), m_ymax(1.0), m_nx(0), m_ny(0),
-      m_voronoi(false) {
+      m_xmin(0.0), m_xmax(1.0),
+      m_ymin(0.0), m_ymax(1.0) {
 
     m_axial = false;
     if (config["axial"]) {
@@ -68,11 +68,8 @@ Rectangle::Rectangle(const Json& config)
         } else if (ny > 0) {
             set_ny(ny);
         } else {
-            std::string message = "Rectangle(json) error: Strange mesh sizes: " +
-                                  std::to_string(nx) + " x " + std::to_string(ny) + "." +
-                                  "Setup size.nx, size.ny or both";
-            std::cerr << message << "\n";
-            throw std::runtime_error(message);
+            throw std::runtime_error(std::format("Rectangle config strange sizes: {}, {}, "
+                                                 "setup key size.nx, size.ny or both", nx, ny));
         }
     }
 }
@@ -84,20 +81,10 @@ Rectangle::Rectangle()
 
 Rectangle::Rectangle(double xmin, double xmax, double ymin, double ymax, bool voronoi) :
         Generator("rectangle"),
-        m_nx(0),
-        m_ny(0),
-        m_size(0),
-        m_xmin(xmin),
-        m_xmax(xmax),
-        m_ymin(ymin),
-        m_ymax(ymax),
-        m_bounds(),
+        m_xmin(xmin), m_xmax(xmax),
+        m_ymin(ymin), m_ymax(ymax),
         m_voronoi(voronoi) {
     check_params();
-}
-
-int Rectangle::size() const {
-    return m_size;
 }
 
 Box Rectangle::bbox() const {
@@ -109,6 +96,10 @@ Box Rectangle::bbox() const {
 
 void Rectangle::set_axial(bool axial) {
     m_axial = axial;
+
+    if (m_axial && m_ymin == 0.0) {
+        m_bounds.bottom = Boundary::WALL;
+    }
 }
 
 void Rectangle::set_nx(int nx) {
@@ -197,6 +188,18 @@ void Rectangle::set_boundaries(Boundaries bounds) {
     if (periodic_along_y()) {
         m_bounds.bottom = m_bounds.top = Boundary::PERIODIC;
     }
+    if (m_axial && m_ymin == 0.0) {
+        m_bounds.bottom = Boundary::WALL;
+    }
+}
+
+void Rectangle::set_adaptive(bool adaptive) {
+    if (!m_voronoi) {
+        m_adaptive = adaptive;
+    }
+    else {
+        m_adaptive = false;
+    }
 }
 
 double Rectangle::x_min() const {
@@ -237,12 +240,10 @@ bool Rectangle::periodic_along_y() const {
 
 void Rectangle::check_params() const {
     if (m_xmin >= m_xmax) {
-        std::cerr << "Rectangle Error: x_min >= x_max\n";
-        throw std::runtime_error("Rectangle Error: x_min >= x_max");
+        throw std::runtime_error("Rectangle::check_params: x_min >= x_max");
     }
     if (m_ymin >= m_ymax) {
-        std::cerr << "Rectangle Error: y_min >= y_max\n";
-        throw std::runtime_error("Rectangle Error: y_min >= y_max");
+        throw std::runtime_error("Rectangle::check_params: y_min >= y_max");
     }
 }
 
@@ -252,89 +253,105 @@ void Rectangle::compute_size() {
     } else {
         m_size = 2 * m_nx * m_ny;
     }
-    if (m_size > 1000000000) {
-        std::cerr << "Attempt to create mesh with more than 1 billion cells\n";
-        throw std::runtime_error("Attempt to create mesh with more than 1 billion cells");
+    if (m_size > max_grid_size) {
+        throw std::runtime_error(std::format("Generator::check_size: attempt to create mesh "
+                                             "that contains more than {} elements", max_grid_size));
     }
 }
 
-Grid Rectangle::make() {
-    check_size();
-
-    if (m_axial && m_ymin == 0.0) {
-        m_bounds.bottom = Boundary::WALL;
-    }
-
+Grid Rectangle::make() const {
     if (m_voronoi) {
         return create_voronoi();
-    } else {
-        return create_classic();
     }
+    if (m_adaptive) {
+        return create_classic_amr();
+    }
+    return create_classic();
 }
 
 Grid Rectangle::create_classic() const {
+    check_size(m_size);
+
     double dx = (m_xmax - m_xmin) / m_nx;
     double dy = (m_ymax - m_ymin) / m_ny;
 
-    std::vector<std::vector<GNode::Ptr>> nodes(
-            m_nx + 1,
-            std::vector<GNode::Ptr>(m_ny + 1, nullptr));
+    Grid grid;
+    grid.reserve_nodes((m_nx + 1) * (m_ny + 1));
+    grid.reserve_cells(m_nx * m_ny);
 
-    int n_nodes = 0;
+    std::vector nodes(m_nx + 1, std::vector<Node::Ptr>(m_ny + 1));
     for (int i = 0; i <= m_nx; ++i) {
         for (int j = 0; j <= m_ny; ++j) {
             double x = m_xmin + i * dx;
             double y = m_ymin + j * dy;
-            nodes[i][j] = GNode::create(x, y);
-            nodes[i][j]->index = n_nodes;
-            ++n_nodes;
+            nodes[i][j] = Node::create({x, y, 0.0});
         }
     }
 
-    for (int i = 0; i <= m_nx; ++i) {
-        nodes[i][0]->add_boundary(m_bounds.bottom);
-        nodes[i][m_ny]->add_boundary(m_bounds.top);
+    // Ячейки как полигоны, обход граней и вершин против часовой
+    // стрелки, начиная с нижней левой вершины (нижней грани)
+    std::vector<Boundary> bc(4);
+    std::vector<Node::Ptr> quad_nodes(4);
+    for (int i = 0; i < m_nx; ++i) {
+        bc[Side2D::L] = i == 0      ? m_bounds.left   : Boundary::INNER;
+        bc[Side2D::R] = i == m_nx-1 ? m_bounds.right  : Boundary::INNER;
+        for (int j = 0; j < m_ny; ++j) {
+            bc[Side2D::B] = j == 0      ? m_bounds.bottom : Boundary::INNER;
+            bc[Side2D::T] = j == m_ny-1 ? m_bounds.top    : Boundary::INNER;
+
+            using indexing::quad::vs;
+            quad_nodes[vs<0, 0>()] = nodes[i][j];
+            quad_nodes[vs<0, 1>()] = nodes[i][j+1];
+            quad_nodes[vs<1, 0>()] = nodes[i+1][j];
+            quad_nodes[vs<1, 1>()] = nodes[i+1][j+1];
+
+            grid.add_cell(CellType::QUAD, quad_nodes, bc);
+        }
     }
-    for (int j = 0; j <= m_ny; ++j) {
-        nodes[0][j]->add_boundary(m_bounds.left);
-        nodes[m_nx][j]->add_boundary(m_bounds.right);
-    }
+    return grid;
+}
+
+Grid Rectangle::create_classic_amr() const {
+    check_size(m_size);
+
+    double dx = (m_xmax - m_xmin) / m_nx;
+    double dy = (m_ymax - m_ymin) / m_ny;
 
     Grid grid;
-    grid.set_axial(m_axial);
-
-    grid.reserve_nodes((m_nx + 1) * (m_ny + 1));
-    for (int i = 0; i <= m_nx; ++i) {
-        for (int j = 0; j <= m_ny; ++j) {
-            grid += nodes[i][j];
-        }
-    }
-
+    grid.reserve_nodes((2 * m_nx + 1) * (2 * m_ny + 1));
     grid.reserve_cells(m_nx * m_ny);
-    int n_cells = 0;
-    for (int i = 0; i < m_nx; ++i) {
-        for (int j = 0; j < m_ny; ++j) {
-            GCell cell = GCell::quad(
-                    {
-                            nodes[i][j],
-                            nodes[i + 1][j],
-                            nodes[i + 1][j + 1],
-                            nodes[i][j + 1]
-                    });
-            cell.index = n_cells;
-            ++n_cells;
 
-            grid += cell;
+    std::vector nodes(2 * m_nx + 1, std::vector<Node::Ptr>(2 * m_ny + 1));
+    for (int i = 0; i <= 2 * m_nx; ++i) {
+        for (int j = 0; j <= 2 * m_ny; ++j) {
+            double x = m_xmin + 0.5 * i * dx;
+            double y = m_ymin + 0.5 * j * dy;
+            nodes[i][j] = Node::create({x, y, 0.0});
         }
     }
 
-    grid.setup_adjacency();
-    grid.assume_structured(m_nx, m_ny);
-
+    // AMR-ячейки, обход граней как в Side2D, вершины в Z-порядке
+    std::vector<Boundary> bc(4);
+    for (int i = 0; i < m_nx; ++i) {
+        bc[Side2D::L] = i == 0      ? m_bounds.left   : Boundary::INNER;
+        bc[Side2D::R] = i == m_nx-1 ? m_bounds.right  : Boundary::INNER;
+        for (int j = 0; j < m_ny; ++j) {
+            bc[Side2D::B] = j == 0      ? m_bounds.bottom : Boundary::INNER;
+            bc[Side2D::T] = j == m_ny-1 ? m_bounds.top    : Boundary::INNER;
+            grid.add_cell(
+                CellType::AMR2D, {
+                    nodes[2*i][2*j + 0], nodes[2*i + 1][2*j + 0], nodes[2*i + 2][2*j + 0],
+                    nodes[2*i][2*j + 1], nodes[2*i + 1][2*j + 1], nodes[2*i + 2][2*j + 1],
+                    nodes[2*i][2*j + 2], nodes[2*i + 1][2*j + 2], nodes[2*i + 2][2*j + 2],
+                }, bc);
+        }
+    }
     return grid;
 }
 
 Grid Rectangle::create_voronoi() const {
+    check_size(m_size);
+
     size_t Nb = m_nx * m_ny;
     double DX = m_xmax - m_xmin;
     double DY = m_ymax - m_ymin;
@@ -348,148 +365,124 @@ Grid Rectangle::create_voronoi() const {
     double y_shift = m_ymin;
 
     // Вершины в виде таблицы
-    std::vector<std::vector<GNode::Ptr>> vertices(
-            Nx + 2, std::vector<GNode::Ptr>(2 * Ny + 1, nullptr)
-    );
+    std::vector vertices(Nx + 2, std::vector<Node::Ptr>(2 * Ny + 1, nullptr));
 
     for (size_t j = 0; j <= 2 * Ny; ++j) {
         double y = y_shift + h * j;
 
         // Часть вершин на левой границе пропускаем
         if (j % 2 == 0) {
-            vertices[0][j] = GNode::create(m_xmin, y);
-            vertices[0][j]->add_boundary(m_bounds.left);
+            vertices[0][j] = Node::create({m_xmin, y, 0.0});
+            vertices[0][j]->bc = m_bounds.left;
         }
 
         for (size_t i = 1; i <= Nx; ++i) {
             double x = x_shift + double(3 * i - (i + j) % 2) * 0.5 * D;
-            vertices[i][j] = GNode::create(x, y);
+            vertices[i][j] = Node::create({x, y, 0.0});
 
             if (j == 0) {
-                vertices[i][j]->add_boundary(m_bounds.bottom);
+                vertices[i][j]->bc = m_bounds.bottom;
             } else if (j == 2 * Ny) {
-                vertices[i][j]->add_boundary(m_bounds.top);
+                vertices[i][j]->bc = m_bounds.top;
             }
         }
 
         // Часть вершин на правой границе пропускаем
         if (j == 0 || j == 2 * Ny || j % 2 == Nx % 2) {
-            vertices[Nx + 1][j] = GNode::create(m_xmax, y);
-            vertices[Nx + 1][j]->add_boundary(m_bounds.right);
+            vertices[Nx + 1][j] = Node::create({m_xmax, y, 0.0});
+            vertices[Nx + 1][j]->bc = m_bounds.right;
         }
     }
 
-    Grid grid;
+    using VList = std::vector<Node::Ptr>;
 
-    // Переносим вершины в один массив
-    grid.reserve_nodes((Nx + 2)*(2*Ny+1));
-    int n_nodes = 0;
-    for (size_t i = 0; i <= Nx + 1; ++i) {
-        for (size_t j = 0; j <= 2 * Ny; ++j) {
-            if (vertices[i][j]) {
-                vertices[i][j]->index = n_nodes;
-                ++n_nodes;
-
-                grid += vertices[i][j];
-            }
-        }
-    }
-
-    using VList = std::vector<GNode::Ptr>;
-
-    auto erase_nulls = [](VList& vlist) {
-        auto to_remove = std::remove(vlist.begin(), vlist.end(), nullptr);
+    auto erase_nans = [](VList& vlist) {
+        const auto to_remove = std::ranges::remove_if(vlist,
+            [](Node::Ref v) -> bool { return !v; }).begin();
         vlist.erase(to_remove, vlist.end());
     };
 
-    // Создаем массив ячеек
-    grid.reserve_nodes(m_size);
-    int n_cells = 0;
+    const double eps = 1.0e-9;
+
+    auto get_bounds = [this, eps](VList& vlist) -> std::vector<Boundary> {
+        std::vector bounds(vlist.size(), Boundary::INNER);
+        for (int i = 0; i < vlist.size(); ++i) {
+            int j = (i + 1) % vlist.size();
+            Vector3d v1 = vlist[i]->pos;
+            Vector3d v2 = vlist[j]->pos;
+            if (std::max(v1.x(), v2.x()) <= m_xmin + eps) { bounds[i] = m_bounds.left; }
+            if (std::min(v1.x(), v2.x()) >= m_xmax - eps) { bounds[i] = m_bounds.right; }
+            if (std::max(v1.y(), v2.y()) <= m_ymin + eps) { bounds[i] = m_bounds.bottom; }
+            if (std::min(v1.y(), v2.y()) >= m_ymax - eps) { bounds[i] = m_bounds.top; }
+        }
+        return bounds;
+    };
+
+    Grid grid;
+    grid.reserve_nodes((Nx + 2)*(2 * Ny + 1));
+    grid.reserve_cells(m_size);
     for (size_t i = 0; i <= Nx; ++i) {
         if (i % 2 == 0) {
             for (size_t j = 0; j < 2 * Ny - 1; j += 2) {
                 VList vlist = {
-                        vertices[i][j], vertices[i + 1][j],
-                        vertices[i + 1][j + 1], vertices[i + 1][j + 2],
-                        vertices[i][j + 2], vertices[i][j + 1]
+                    vertices[i][j], vertices[i + 1][j],
+                    vertices[i + 1][j + 1], vertices[i + 1][j + 2],
+                    vertices[i][j + 2], vertices[i][j + 1]
                 };
-                erase_nulls(vlist);
-                GCell cell = GCell::polygon(vlist);
-                cell.index = n_cells;
-                grid += cell;
-                ++n_cells;
+                erase_nans(vlist);
+                grid.add_cell(CellType::POLYGON, vlist, get_bounds(vlist));
             }
         } else {
             // j == 0
-            auto cell = GCell::quad(
-                    {
-                            vertices[i][0], vertices[i + 1][0],
-                            vertices[i + 1][1], vertices[i][1]
-                    });
-            cell.index = n_cells;
-            grid += cell;
-            ++n_cells;
+            VList vlist = {
+                vertices[i][0], vertices[i + 1][0],
+                vertices[i + 1][1], vertices[i][1]
+            };
+            grid.add_cell(CellType::POLYGON, vlist, get_bounds(vlist));
 
             for (size_t j = 1; j < 2 * Ny - 2; j += 2) {
-                VList vlist = {
-                        vertices[i][j], vertices[i + 1][j],
-                        vertices[i + 1][j + 1], vertices[i + 1][j + 2],
-                        vertices[i][j + 2], vertices[i][j + 1]
+                vlist = {
+                    vertices[i][j], vertices[i + 1][j],
+                    vertices[i + 1][j + 1], vertices[i + 1][j + 2],
+                    vertices[i][j + 2], vertices[i][j + 1]
                 };
-                erase_nulls(vlist);
-                cell = GCell::polygon(vlist);
-                cell.index = n_cells;
-                grid += cell;
-                ++n_cells;
+                erase_nans(vlist);
+                grid.add_cell(CellType::POLYGON, vlist, get_bounds(vlist));
             }
 
             // j == last; i % 2 == 1
-            cell = GCell::quad(
-                    {
-                            vertices[i][2 * Ny - 1], vertices[i + 1][2 * Ny - 1],
-                            vertices[i + 1][2 * Ny], vertices[i][2 * Ny]
-                    });
-            cell.index = n_cells;
-            grid += cell;
-            ++n_cells;
+            vlist = {
+                vertices[i][2 * Ny - 1], vertices[i + 1][2 * Ny - 1],
+                vertices[i + 1][2 * Ny], vertices[i][2 * Ny]
+            };
+            grid.add_cell(CellType::POLYGON, vlist, get_bounds(vlist));
         }
     }
-
-    grid.setup_adjacency();
 
     return grid;
 }
 
-void Rectangle::initialize(AmrCells& cells) {
-    check_size();
-
-    if (m_axial && m_ymin == 0.0) {
-        m_bounds.bottom = Boundary::WALL;
-    }
-
+void Rectangle::initialize(AmrCells& cells) const {
     if (m_voronoi) {
-        return initialize_voronoi(cells);
-    } else {
-        return initialize_classic(cells);
+        throw std::runtime_error("Rectangle::initialize: can't initialize voronoi grid");
     }
-}
+    check_size(m_size);
 
-void Rectangle::initialize_classic(AmrCells& cells) const {
     bool x_period = periodic_along_x();
     bool y_period = periodic_along_y();
 
     double hx = (m_xmax - m_xmin) / m_nx;
     double hy = (m_ymax - m_ymin) / m_ny;
 
-    auto get_index = [=](index_t i, index_t j) -> index_t {
+    auto get_index = [this](index_t i, index_t j) -> index_t {
         return i * m_ny + j;
     };
 
-    auto get_index_pair = [=](index_t n) -> std::array<index_t, 2> {
+    auto get_index_pair = [this](index_t n) -> std::array<index_t, 2> {
         return {n / m_ny, n % m_ny};
     };
 
-    auto get_vertex = [=](index_t i, index_t j) -> Vector3d {
+    auto get_vertex = [=, this](index_t i, index_t j) -> Vector3d {
         return {
                 m_xmin + ((m_xmax - m_xmin) * i) / m_nx,
                 m_ymin + ((m_ymax - m_ymin) * j) / m_ny,
@@ -497,22 +490,20 @@ void Rectangle::initialize_classic(AmrCells& cells) const {
         };
     };
 
-    auto neib_index = [=](index_t i, index_t j, Side2D side) -> index_t {
+    auto neib_index = [=, this](index_t i, index_t j, Side2D side) -> index_t {
         if (side == Side2D::LEFT) {
             return i == 0 && !x_period ?  get_index(i, j) : get_index((i - 1 + m_nx) % m_nx, j);
         }
-        else if (side == Side2D::RIGHT) {
+        if (side == Side2D::RIGHT) {
             return i == m_nx - 1 && !x_period ? get_index(i, j) : get_index((i + 1 + m_nx) % m_nx, j);
         }
-        else if (side == Side2D::BOTTOM) {
+        if (side == Side2D::BOTTOM) {
             return j == 0 && !y_period ? get_index(i, j) : get_index(i, (j - 1 + m_ny) % m_ny);
         }
-        else if (side == Side2D::TOP) {
+        if (side == Side2D::TOP) {
             return j == m_ny - 1 && !y_period ? get_index(i, j): get_index(i, (j + 1 + m_ny) % m_ny);
         }
-        else {
-            throw std::runtime_error("Strange side #142");
-        }
+        throw std::runtime_error("Strange side #142");
     };
 
     cells.set_dimension(2);
@@ -538,10 +529,10 @@ void Rectangle::initialize_classic(AmrCells& cells) const {
         cells.z_idx[ic] = 0;
 
         SqQuad quad(
-                get_vertex(i, j),
-                get_vertex(i + 1, j),
-                get_vertex(i, j + 1),
-                get_vertex(i + 1, j + 1));
+            get_vertex(i, j),
+            get_vertex(i + 1, j),
+            get_vertex(i, j + 1),
+            get_vertex(i + 1, j + 1));
 
         cells.center[ic] = quad.vs<0, 0>();
         cells.volume[ic] = hx * hy;
@@ -559,10 +550,10 @@ void Rectangle::initialize_classic(AmrCells& cells) const {
 
         index_t iface = ic * n_faces;
 
-        cells.faces.boundary[iface + Side2D::L] = i > 0 ? Boundary::ORDINARY : m_bounds.left;
-        cells.faces.boundary[iface + Side2D::R] = i < m_nx - 1 ? Boundary::ORDINARY : m_bounds.right;
-        cells.faces.boundary[iface + Side2D::B] = j > 0 ? Boundary::ORDINARY : m_bounds.bottom;
-        cells.faces.boundary[iface + Side2D::T] = j < m_ny - 1 ? Boundary::ORDINARY : m_bounds.top;
+        cells.faces.boundary[iface + Side2D::L] = i > 0 ? Boundary::INNER : m_bounds.left;
+        cells.faces.boundary[iface + Side2D::R] = i < m_nx - 1 ? Boundary::INNER : m_bounds.right;
+        cells.faces.boundary[iface + Side2D::B] = j > 0 ? Boundary::INNER : m_bounds.bottom;
+        cells.faces.boundary[iface + Side2D::T] = j < m_ny - 1 ? Boundary::INNER : m_bounds.top;
 
         for (auto side: Side2D::items()) {
             cells.faces.adjacent.rank[iface + side] = 0;
@@ -587,10 +578,10 @@ void Rectangle::initialize_classic(AmrCells& cells) const {
         cells.faces.area[iface + Side2D::B] = hx;
         cells.faces.area[iface + Side2D::T] = hx;
 
-        cells.faces.vertices[iface + Side2D::L] = Side2D::L.sf();
-        cells.faces.vertices[iface + Side2D::R] = Side2D::R.sf();
-        cells.faces.vertices[iface + Side2D::B] = Side2D::B.sf();
-        cells.faces.vertices[iface + Side2D::T] = Side2D::T.sf();
+        cells.faces.vertices[iface + Side2D::L] = indexing::amr::sf(Side2D::L);
+        cells.faces.vertices[iface + Side2D::R] = indexing::amr::sf(Side2D::R);
+        cells.faces.vertices[iface + Side2D::B] = indexing::amr::sf(Side2D::B);
+        cells.faces.vertices[iface + Side2D::T] = indexing::amr::sf(Side2D::T);
 
         for (index_t jn = 0; jn < n_nodes; ++jn) {
             cells.verts[ic * n_nodes + jn] = quad[jn];
@@ -608,50 +599,6 @@ void Rectangle::initialize_classic(AmrCells& cells) const {
             cells.center[ic].y() += hy*hy / (12.0 * quad.vs<0, 0>().y());
             cells.faces.center[iface + Side2D::L].y() += hy*hy / (12.0 * quad.vs<-1, 0>().y());
             cells.faces.center[iface + Side2D::R].y() += hy*hy / (12.0 * quad.vs<+1, 0>().y());
-        }
-    }
-}
-
-void Rectangle::initialize_voronoi(AmrCells& cells) {
-    Grid grid = make();
-    m_size = grid.n_cells();
-
-    cells.set_dimension(2);
-    cells.set_adaptive(false);
-    cells.set_linear(true);
-    cells.set_axial(m_axial);
-
-    // Зарезервировать ячейки, добавляем push_back'ом
-    cells.reserve(m_size, 6 * m_size, 6 * m_size);
-
-    for (index_t ic = 0; ic < m_size; ++ic) {
-        GCell cell = grid.cell(ic);
-
-        int n_nodes = cell.n_nodes();
-
-        // Уникальные узлы
-        std::vector<GNode::Ptr> nodes(n_nodes, nullptr);
-
-        Polygon poly(n_nodes);
-        for (int i = 0; i < n_nodes; ++i) {
-            nodes[i] = grid.node(cell.node(i).index);
-            poly.set(i, nodes[i]->v);
-        }
-
-        cells.push_back(poly);
-
-        // Смежность
-        for (int i = 0; i < poly.size(); ++i) {
-            index_t iface = cells.face_begin[ic] + i;
-
-            GNode::Ref v1 = nodes[i];
-            GNode::Ref v2 = nodes[(i + 1) % n_nodes];
-
-            cells.faces.boundary[iface] = cell.boundary({v1, v2});
-            cells.faces.adjacent.rank[iface]  = 0;
-            cells.faces.adjacent.index[iface] = cell.adjacent({v1, v2});
-            cells.faces.adjacent.alien[iface] = -1;
-            cells.faces.adjacent.basic[iface] = ic;
         }
     }
 }

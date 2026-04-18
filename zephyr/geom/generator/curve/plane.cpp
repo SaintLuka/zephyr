@@ -1,4 +1,4 @@
-#include <zephyr/geom/generator/bs_vertex.h>
+#include <zephyr/geom/generator/base_node.h>
 #include <zephyr/geom/generator/curve/plane.h>
 
 namespace zephyr::geom::generator {
@@ -11,8 +11,8 @@ Curve::Ptr Plane::create(const Vector3d &_v1, const Vector3d &_v2) {
     return std::make_shared<Plane>(_v1, _v2);
 }
 
-Curve::Ptr Plane::create(BaseVertex::Ref v1, BaseVertex::Ref v2) {
-    return std::make_shared<Plane>(v1->v(), v2->v());
+Curve::Ptr Plane::create(BaseNode::Ref v1, BaseNode::Ref v2) {
+    return std::make_shared<Plane>(v1->pos(), v2->pos());
 }
 
 double Plane::get_X(double t) const {

@@ -1,7 +1,9 @@
 #include <iostream>
+#include <format>
 
 #include <zephyr/utils/json.h>
 #include <zephyr/geom/box.h>
+#include <zephyr/geom/grid.h>
 #include <zephyr/geom/generator/generator.h>
 #include <zephyr/geom/generator/strip.h>
 #include <zephyr/geom/generator/rectangle.h>
@@ -11,48 +13,42 @@
 
 namespace zephyr::geom {
 
-Generator::Generator(const std::string &type)
-        : m_name(type) { }
+Generator::Generator(const std::string &name)
+    : m_name(name) { }
 
 Generator::Ptr Generator::create(const Json& config) {
     using namespace generator;
 
     if (!config["type"]) {
-        throw std::runtime_error("EuMesh config doesn't contain 'type'");
+        throw std::runtime_error("Generator::create: config doesn't contain key 'type'");
     }
 
-    std::string type = config["type"].as<std::string>();
+    auto type = config["type"].as<std::string>();
     if (type == "strip") {
         return Strip::create(config);
     }
-    else if (type == "rectangle") {
+    if (type == "rectangle") {
         return Rectangle::create(config);
-    } else if (type == "cuboid") {
+    }
+    if (type == "cuboid") {
         return Cuboid::create(config);
-    } else if (type == "sector") {
+    }
+    if (type == "sector") {
         return Sector::create(config);
-    } else if (type.find("collection") != std::string::npos) {
+    }
+    if (type.find("collection") != std::string::npos) {
         // Block Structured from collection
-        int idx = type.find('.') + 1;
+        auto idx = type.find('.') + 1;
         std::string name = type.substr(idx);
 
-        std::transform(name.begin(), name.end(), name.begin(), ::tolower);
+        std::ranges::transform(name, name.begin(), ::tolower);
 
         if (name == "plane-with-hole") {
             return collection::PlaneWithHole::create(config);
         }
-        else {
-            std::string message = "Create generators error: unknown mesh type '"
-                                  + name + "' from collection";
-            std::cerr << message << "\n";
-            throw std::runtime_error(message);
-        }
+        throw std::runtime_error("Generator::create: unknown mesh type '" + name + "' from collection");
     }
-    else {
-        std::string message = "Error: Unknown mesh type '" + type + "'";
-        std::cerr << message << "\n";
-        throw std::runtime_error(message);
-    }
+    throw std::runtime_error("Generator::create: unknown mesh type '" + type + "'");
 }
 
 const std::string &Generator::name() const {
@@ -60,31 +56,28 @@ const std::string &Generator::name() const {
 }
 
 Box Generator::bbox() const {
-    std::string message = "Volume is not defined for the mesh generator.";
-    std::cerr << message << "\n";
-    throw std::runtime_error(message);
+    throw std::runtime_error("Generator::bbox: volume is not defined for generator.");
 }
 
-
-void Generator::check_size() const {
-    if (size() < 1) {
-        std::string message = "'" + m_name + "' generator error: Please set mesh size";
-        std::cerr << message << "\n";
-        throw std::runtime_error(message);
+void Generator::check_size(size_t size) const {
+    if (size < 1) {
+        throw std::runtime_error("Generator::check_size: '" + m_name + "' generator error, cells count is zero.");
     }
-    if (size() > 10000000) {
-        std::string message =
-                "'" + m_name +
-                "' generator error: "
-                "You are trying to create mesh that contains more than 10 million elements, "
-                "I just want to keep your RAM.";
-        std::cerr << message << "\n";
-        throw std::runtime_error(message);
+    if (size > max_grid_size) {
+        throw std::runtime_error(std::format("Generator::check_size: attempt to create mesh that contains more than {} elements", max_grid_size));
     }
 }
 
-void Generator::check_params() const {
+void Generator::set_axial(bool axial) {
+    m_axial = axial;
+}
 
+void Generator::set_adaptive(bool adaptive) {
+    m_adaptive = adaptive;
+}
+
+void Generator::set_linear(bool linear) {
+    m_linear = linear;
 }
 
 } // namespace zephyr::geom

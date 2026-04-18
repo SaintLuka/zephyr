@@ -9,6 +9,10 @@
 
 namespace zephyr::mesh {
 
+using geom::Side;
+using geom::Side2D;
+using geom::Side3D;
+
 /// @brief Индексы смежности граней
 /// @details Короткое объяснение. Если сосед через грань
 ///             с этого процесса  |  с другого процесса
@@ -31,6 +35,9 @@ public:
 
     /// @brief Индекс базовой ячейки, которая содержит грань
     std::vector<index_t> basic;
+
+    /// @brief Относительное вращение ячейки через грань
+    std::vector<std::uint8_t> rotation;
 
     /// @brief Расширить массивы по числу граней
     void resize(index_t n_faces);
@@ -134,11 +141,14 @@ public:
 
     /// @brief Симметричная точка относительно грани
     Vector3d symm_point(index_t iface, const Vector3d& p) const;
+
+    /// @brief Сделать грани полигональной ячейки в AMR порядке
+    void reorder_quad_faces(index_t iface);
 };
 
 
 inline bool AmrFaces::is_boundary(index_t iface) const {
-    return boundary[iface] != Boundary::ORDINARY &&
+    return boundary[iface] != Boundary::INNER &&
            boundary[iface] != Boundary::PERIODIC &&
            boundary[iface] != Boundary::UNDEFINED;
 }

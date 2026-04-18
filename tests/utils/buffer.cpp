@@ -3,7 +3,6 @@
 
 #include <zephyr/utils/buffer.h>
 
-using zephyr::utils::span;
 using zephyr::utils::Buffer;
 using zephyr::geom::Vector3d;
 
@@ -49,12 +48,9 @@ int main() {
     // При доступе к векторному полю получаем span<T>
     buf = Buffer::make<int[2]>(15);
     for (int i = 0; i < buf.size(); ++i) {
-        span<int> sp = buf.get_val<int[]>(i);
+        std::span<int> sp = buf.get_val<int[]>(i);
         sp[0] = i * i;
         sp[1] = i * i + 1;
-
-        // Также для span есть разные плюшки вроде записи
-        // из/в std::array или std::vector
     }
     buf.print<int>(); std::cout << "\n";
 

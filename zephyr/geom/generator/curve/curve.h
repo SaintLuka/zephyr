@@ -17,6 +17,8 @@ public:
     /// @brief Конструктор
     Curve();
 
+    virtual ~Curve() = default;
+
     /// @brief Координата X на параметрической кривой
     virtual double get_X(double t) const = 0;
 

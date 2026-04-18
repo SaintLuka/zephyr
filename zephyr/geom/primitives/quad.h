@@ -1,7 +1,7 @@
 #pragma once
 
 #include <array>
-#include <vector>
+#include <span>
 #include <functional>
 
 #include <zephyr/geom/vector.h>
@@ -19,6 +19,9 @@ protected:
     std::array<Vector3d, 4> verts;
 
 public:
+    /// @brief Конструктор по умолчанию (мусор)
+    Quad() = default;
+
     /// @brief Конструктор по угловым точкам (Z-порядок)
     Quad(const Vector3d& v00,
          const Vector3d& v01,
@@ -36,26 +39,19 @@ public:
     /// @brief Отображает индексы {-1, +1}^2 в [0..3]
     template <int i, int j>
     static constexpr int iss() {
-        static_assert(i * i == 1 && j * j == 1,
-                      "Available indices: {-1, +1}");
+        static_assert(i * i == 1 && j * j == 1, "Available indices: {-1, +1}");
         return j + 1 + (i + 1) / 2;
     }
 
     /// @brief Оператор доступа по индексам отображения
-    /// @tparam i in {-1, +1}
-    /// @tparam j in {-1, +1}
+    /// @tparam i, j in {-1, +1}
     template <int i, int j>
-    Vector3d &vs() {
-        return verts[iss<i, j>()];
-    }
+    Vector3d &vs() { return verts[iss<i, j>()]; }
 
     /// @brief Оператор доступа по индексам отображения
-    /// @tparam i in {-1, +1}
-    /// @tparam j in {-1, +1}
+    /// @tparam i, j in {-1, +1}
     template <int i, int j>
-    const Vector3d &vs() const {
-        return verts[iss<i, j>()];
-    }
+    const Vector3d &vs() const { return verts[iss<i, j>()]; }
 
     /// @brief Отображение из квадрата [-1, 1]^2
     /// @details В угловых точках совпадает с операторами выше
@@ -73,6 +69,9 @@ public:
     /// (производная отображения по параметру y)
     Vector3d tangent_y(double x, double y) const;
 
+    /// @brief Четырехугольник в плоскости Oxy?
+    bool oxy() const;
+
     /// @brief Нормаль к поверхности в точке, направлена от точки c
     Vector3d normal(double x, double y, const Vector3d& c) const;
 
@@ -82,37 +81,39 @@ public:
     /// @brief Центр простой двумерной ячейки
     Vector3d center() const;
 
+    /// @brief Внешняя нормаль, умноженная на площадь, интеграл int vec(n) dS
+    /// @param view Центр ячейки
+    Vector3d area_n(const Vector3d& view) const;
+
     /// @brief Внешняя нормаль к простой двумерной грани
-    /// @param c Центр ячейки
-    Vector3d normal(const Vector3d& c) const;
+    /// @param view Центр ячейки
+    Vector3d normal(const Vector3d& view) const;
 
     /// @brief "Площадь" простой двумерной грани. Равна | int vec(n) dS |,
     /// то есть модулю поверхностного интеграла 2-го рода.
     double area() const;
 
-    /// @brief Внешняя нормаль к простой двумерной грани,
-    /// умноженная на площадь грани
-    /// @param c Центр ячейки
-    Vector3d area_n(const Vector3d& c) const;
-
-    /// @brief Объем обычной двумерной ячейки в осесимметричной постновке
+    /// @brief Объем обычной двумерной ячейки в осесимметричной постановке.
     /// Вершины должны располагаться в плоскости (x, y), где y - радиус
     double volume_as() const;
 
     /// @brief Барицентр простой двумерной ячейки.
-    /// Вершины должны располагаться в плоскости (x, y).
     /// @param area Площадь ячейки (если известна)
     Vector3d centroid(double area = 0.0) const;
+
+    /// @brief Барицентр простой двумерной ячейки.
+    /// Вершины должны располагаться в плоскости (x, y).
+    /// @param area Площадь ячейки (если известна)
+    Vector3d centroid_oxy(double area = 0.0) const;
 
     /// @brief Барицентр осесимметричной ячейки. Вершины должны
     /// располагаться в плоскости (x, y), ось вращения -- Ox.
     /// @param vol_as Объем осесимметричной ячейки (если известен)
     Vector3d centroid_as(double vol_as = 0.0) const;
 
-    /// @brief Посчитать объемную долю, которая отсекается от ячейки некоторым
-    /// телом, точки которого определяются характеристической функцией inside
+    /// @brief Доля площади, которая отсекается от ячейки некоторым телом.
     /// @param inside Характеристическая функция: true, если точка находится
-    /// внутри тела, иначе false
+    /// внутри тела, иначе false.
     /// @param n_points Число тестовых точек, погрешность ~ 1/N.
     double volume_fraction(const std::function<bool(const Vector3d&)>& inside,
             int n_points = 10000) const;
@@ -146,7 +147,7 @@ protected:
     std::array<Vector3d, 9> verts;
 
 public:
-    /// @brief Конструктор по умолчанию
+    /// @brief Конструктор по умолчанию (мусор)
     SqQuad() = default;
 
     /// @brief Конструктор по угловым точкам
@@ -159,6 +160,9 @@ public:
     SqQuad(const Vector3d& v00, const Vector3d& v01, const Vector3d& v02,
            const Vector3d& v10, const Vector3d& v11, const Vector3d& v12,
            const Vector3d& v20, const Vector3d& v21, const Vector3d& v22);
+
+    /// @brief Конструктор по полному набору вершин
+    SqQuad(std::span<const Vector3d, 9> vertices);
 
     /// @brief Конструктор из простого четырехугольника
     SqQuad(const Quad& quad);
@@ -182,26 +186,19 @@ public:
     /// @brief Отображает индексы {-1, 0, +1}^2 в [0..8]
     template <int i, int j>
     static constexpr int iss() {
-        static_assert(i * i <= 1 && j * j <= 1,
-                      "Available indices: {-1, 0, 1}");
+        static_assert(i * i <= 1 && j * j <= 1, "Available indices: {-1, 0, 1}");
         return 3 * j + i + 4;
     }
 
     /// @brief Оператор доступа по индексам отображения
-    /// @tparam i in {-1, 0, +1}
-    /// @tparam j in {-1, 0, +1}
+    /// @tparam i, j in {-1, 0, +1}
     template <int i, int j>
-    Vector3d &vs() {
-        return verts[iss<i, j>()];
-    }
+    Vector3d &vs() { return verts[iss<i, j>()]; }
 
     /// @brief Оператор доступа по индексам отображения
-    /// @tparam i in {-1, 0, +1}
-    /// @tparam j in {-1, 0, +1}
+    /// @tparam i, j in {-1, 0, +1}
     template <int i, int j>
-    const Vector3d &vs() const {
-        return verts[iss<i, j>()];
-    }
+    const Vector3d &vs() const { return verts[iss<i, j>()]; }
 
     /// @brief Отображение из квадрата [-1, 1]^2
     /// @details В угловых точках совпадает с операторами выше
@@ -219,8 +216,11 @@ public:
     /// (производная отображения по параметру y)
     Vector3d tangent_y(double x, double y) const;
 
-    /// @brief Нормаль к поверхности в точке, направлена от точки c
-    Vector3d normal(double x, double y, const Vector3d& c) const;
+    /// @brief Четырехугольник в плоскости Oxy?
+    bool oxy() const;
+
+    /// @brief Нормаль к поверхности в точке, направлена от точки view
+    Vector3d normal(double x, double y, const Vector3d& view) const;
 
     /// @brief Якобиан отображения в точке
     double Jacobian(double x, double y) const;
@@ -228,28 +228,38 @@ public:
     /// @brief Центр криволинейной двумерной ячейки
     const Vector3d& center() const;
 
-    /// @brief Внешняя нормаль к простой двумерной грани
-    /// @param c Центр ячейки
-    Vector3d normal(const Vector3d& c) const;
+    /// @brief Внешняя нормаль, умноженная на площадь, интеграл int vec(n) dS
+    /// @param view Центр ячейки
+    Vector3d area_n(const Vector3d& view) const;
 
-    /// @brief Площадь криволинейной двумерной ячейки.
-    /// Вершины должны располагаться в плоскости (x, y).
+    /// @brief Внешняя нормаль к криволинейной двумерной грани
+    /// @param view Центр ячейки
+    Vector3d normal(const Vector3d& view) const;
+
+    /// @brief "Площадь" криволинейной грани/ячейки. Равна | int vec(n) dS |,
+    /// то есть модулю поверхностного интеграла 2-го рода.
     double area() const;
 
-    /// @brief Объем криволинейной двумерной ячейки в осесимметричной постновке
+    /// @brief Площадь криволинейной грани/ячейки. Вершины в плоскости (x, y).
+    double area_oxy() const;
+
+    /// @brief Объем криволинейной двумерной ячейки в осесимметричной постановке
     /// Вершины должны располагаться в плоскости (x, y), где y - радиус
     double volume_as() const;
 
     /// @brief Барицентр криволинейной двумерной ячейки.
-    /// Вершины должны располагаться в плоскости (x, y).
     /// @param area Площадь криволинейной ячейки
     Vector3d centroid(double area = 0.0) const;
+
+    /// @brief Барицентр криволинейной двумерной ячейки.
+    /// Вершины должны располагаться в плоскости (x, y).
+    /// @param area Площадь криволинейной ячейки
+    Vector3d centroid_oxy(double area = 0.0) const;
 
     /// @brief Дочерние ячейки после операции split на адаптивных сетках
     std::array<SqQuad, 4> children() const;
 
-    /// @brief Посчитать объемную долю, которая отсекается от ячейки некоторым
-    /// телом, точки которого определяются характеристической функцией inside
+    /// @brief Доля площади, которая отсекается от ячейки некоторым телом.
     /// @param inside Характеристическая функция: true, если точка находится
     /// внутри тела, иначе false
     /// @param n_points Число тестовых точек, погрешность ~ 1/N.

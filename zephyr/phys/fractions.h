@@ -1,59 +1,42 @@
 #pragma once
 
 #include <array>
-#include <vector>
-#include <zephyr/math/vectorization.h>
+#include <span>
 #include <zephyr/geom/vector.h>
 
 namespace zephyr::phys {
 
-struct ScalarSet;
+class ScalarSet;
 
 /// @brief Вектор массовых или объемных концентраций
-struct Fractions {
+class Fractions {
+public:
     /// @brief Меньшие объемные/массовые доли не различимы,
     /// при вычитании из единицы остается единица. Около 5.5e-17
     static constexpr double minimal = std::numeric_limits<double>::epsilon() / 4;
 
     /// @brief Максимальное число компонент
-    static constexpr int max_size = 3;
-
-    /// @brief Массив данных
-    std::array<double, max_size> m_data{};
-
+    static constexpr int max_size = 4;
 
     /// @brief Инициализация нулями
-    Fractions();
+    Fractions() = default;
 
     /// @brief Конструктор со списком инициализации
     Fractions(std::initializer_list<double> list);
 
-    /// @brief Конструктор из std::vector
-    explicit Fractions(const std::vector<double> &vec);
-
     /// @brief Конструктор из std::array
-    explicit Fractions(const std::array<double, max_size> &arr);
+    Fractions(const std::array<double, max_size> &arr);
 
-    /// @brief Конструктор из набора скаляров
-    explicit Fractions(const ScalarSet &scalars);
+    /// @brief Массив нулевых концентраций
+    static constexpr Fractions Zero() { return Fractions{}; }
 
-    /// @brief Создать набор с единственной ненулевой
-    static Fractions Pure(int idx);
+    /// @brief Единственная ненулевая концентрация
+    static constexpr Fractions Pure(int idx) {
+        Fractions res = Zero(); res.m_data[idx] = 1.0; return res;
+    }
 
     /// @brief Содержит компоненту с индексом idx
-    bool has(int idx) const;
-
-    /// @brief Оператор доступа по индексу
-    double &operator[](int idx);
-
-    /// @brief Оператор доступа по индексу
-    const double &operator[](int idx) const;
-
-    /// @brief Оператор доступа по индексу
-    double &operator[](size_t idx);
-
-    /// @brief Оператор доступа по индексу
-    const double &operator[](size_t idx) const;
+    bool has(int idx) const { return m_data[idx] > 0.0; }
 
     /// @brief Возвращает true (чистое вещество), если массив содержит
     /// единственную концентрацию больше нуля, в остальных случаях false.
@@ -67,23 +50,6 @@ struct Fractions {
     /// Иначе значение -1.
     int index() const;
 
-    /// @brief Количество компонент.
-    /// Индекс последней ненулевой компоненты плюс один.
-    /// beta = {1.0, 0.0, 0.0, 2.0, 0.0, 3.0, 0.0, 0.0, 0.0},
-    /// тогда beta.count() равно 6!
-    int count() const;
-
-    /// @brief Количество ненулевых компонент.
-    /// Индекс последней ненулевой компоненты плюс один.
-    /// beta = {1.0, 0.0, 0.0, 2.0, 0.0, 3.0, 0.0, 0.0, 0.0},
-    /// тогда beta.nonzero() равно 3!
-    int nonzero() const;
-
-    /// @brief Пара индексов материалов для смешанной ячейки
-    /// Если ячейка содержит меньше двух материалов, тогда возвращает {-1, -1}.
-    /// Если больше двух, тогда возвращает первые два.
-    std::array<int, 2> pair() const;
-
     /// @brief Нормализовать концентрации (сумма равна единице)
     void normalize();
 
@@ -94,65 +60,114 @@ struct Fractions {
     /// @brief Не содержит концентраций?
     bool empty() const;
 
-    /// @brief Указатель на данные
-    double* data() { return m_data.data(); }
+    /// @brief Число компонент. Индекс последней ненулевой компоненты плюс один.
+    /// beta = {1.0, 0.0, 0.0, 2.0, 0.0, 3.0, 0.0, 0.0, 0.0},
+    /// тогда beta.count() равно 6!
+    int count() const;
 
-    /// @brief Константный указатель на данные
-    const double* data() const { return m_data.data(); }
+    /// @brief Пара индексов материалов для смешанной ячейки
+    /// Если ячейка содержит меньше двух материалов, тогда возвращает {-1, -1}.
+    /// Если больше двух, тогда возвращает первые два.
+    std::tuple<int, int> pair() const;
 
-    /// @brief Ссылка на массив данных
-    const std::array<double, Fractions::max_size>& data_ref() const {
-        return m_data;
-    }
+    // --------------------- Standard container functions ---------------------
 
-    VECTORIZE(Fractions)
+    /// @brief Полное число компонент
+    constexpr int size() const { return max_size; }
+
+    /// @brief Оператор доступа по индексу
+    double &operator[](int idx) { return m_data[idx]; }
+
+    /// @brief Оператор доступа по индексу
+    const double &operator[](int idx) const { return m_data[idx]; }
+
+    /// @brief Итератор на начало
+    auto begin() { return m_data.begin(); }
+
+    /// @brief Итератор на конец
+    auto end() { return m_data.end(); }
+
+    /// @brief Константный итератор на начало
+    auto begin() const { return m_data.cbegin(); }
+
+    /// @brief Константный итератор на конец
+    auto end() const { return m_data.cend(); }
+
+    /// @brief Преобразование в std::span
+    std::span<const double, max_size> span() const { return m_data; }
+
+    /// @brief Преобразование в std::array
+    const std::array<double, max_size>& array() const { return m_data; }
+
+private:
+    /// @brief Массив данных
+    std::array<double, max_size> m_data{};
 };
 
 std::ostream &operator<<(std::ostream &os, const Fractions &frac);
 
 
 /// @brief Набор скалярных величин по числу компонент
-struct ScalarSet {
+class ScalarSet {
+    /// @brief Максимальное число компонент
+    static constexpr int max_size = Fractions::max_size;
+
     /// @brief Массив данных
-    std::array<double, Fractions::max_size> m_data{};
+    std::array<double, max_size> m_data{};
 
-
-    /// @brief Конструктор по умолчанию. Инициализирует нулями.
-    ScalarSet();
+public:
+    /// @brief Инициализация нулями
+    ScalarSet() = default;
 
     /// @brief Конструктор со списком инициализации
     ScalarSet(std::initializer_list<double> list);
 
-    /// @brief Установить единственное значение по индексу idx,
-    /// остальные компоненты инициализируются нулями.
-    ScalarSet(int idx, double val);
+    /// @brief Конструктор из std::array
+    ScalarSet(const std::array<double, max_size>& arr);
 
     /// @brief Конструктор из Fractions
-    explicit ScalarSet(const Fractions &frac);
+    ScalarSet(const Fractions& frac);
 
-    /// @brief Конструктор из вектора
-    explicit ScalarSet(const std::vector<double> &vec);
+    /// @brief Массив неопределенных значений
+    static constexpr ScalarSet NaN() {
+        ScalarSet res; res.m_data.fill(NAN); return res;
+    }
 
-    /// @brief Специализация для набора плотностей, все равны NAN,
-    /// кроме компоненты по idx, которая выставляется на value
-    static ScalarSet Pure(int idx, double value);
+    /// @brief Все компоненты кроме одной равны нулю.
+    static constexpr ScalarSet Pure(int idx, double value) {
+        ScalarSet res; res.m_data[idx] = value; return res;
+    }
+
+    /// @brief Все компоненты кроме одной равны NAN.
+    static constexpr ScalarSet PureNaN(int idx, double value) {
+        ScalarSet res = NaN(); res.m_data[idx] = value; return res;
+    }
+
+    // --------------------- Standard container functions ---------------------
+
+    /// @brief Полное число компонент
+    constexpr int size() const { return max_size; }
 
     /// @brief Оператор доступа по индексу
-    double &operator[](int idx) {
-        return m_data[idx];
-    }
+    double &operator[](int idx) { return m_data[idx]; }
 
     /// @brief Оператор доступа по индексу
-    const double &operator[](int idx) const {
-        return m_data[idx];
-    }
+    double operator[](int idx) const { return m_data[idx]; }
 
-    /// @brief Ссылка на массив данных
-    const std::array<double, Fractions::max_size> &data_ref() const {
-        return m_data;
-    }
+    /// @brief Итератор на начало
+    auto begin() { return m_data.begin(); }
 
-    VECTORIZE(ScalarSet)
+    /// @brief Итератор на конец
+    auto end() { return m_data.end(); }
+
+    /// @brief Константный итератор на начало
+    auto begin() const { return m_data.cbegin(); }
+
+    /// @brief Константный итератор на конец
+    auto end() const { return m_data.cend(); }
+
+    /// @brief Преобразование в std::span
+    std::span<const double, max_size> span() const { return m_data; }
 };
 
 std::ostream &operator<<(std::ostream &os, const ScalarSet &frac);
@@ -160,32 +175,45 @@ std::ostream &operator<<(std::ostream &os, const ScalarSet &frac);
 using geom::Vector3d;
 
 /// @brief Набор векторов по числу компонент
-struct VectorSet {
-    /// @brief Массив данных
-    std::array<Vector3d, Fractions::max_size> m_data{};
+class VectorSet {
+public:
+    /// @brief Максимальное число компонент
+    static constexpr int max_size = Fractions::max_size;
 
-    /// @brief Конструктор по умолчанию. Инициализирует нулями.
-    VectorSet();
-
-    /// @brief Установить единственное значение по индексу idx,
-    /// остальные компоненты инициализируются нулями.
-    VectorSet(const Vector3d& vec, int idx);
-
+    /// @brief Инициализация нулями
+    VectorSet() = default;
 
     /// @brief Конструктор из вектора
-    explicit VectorSet(const std::vector<Vector3d> &vec);
+    VectorSet(std::initializer_list<Vector3d> list);
+
+    // --------------------- Standard container functions ---------------------
+
+    /// @brief Полное число компонент
+    constexpr int size() const { return max_size; }
 
     /// @brief Оператор доступа по индексу
-    Vector3d &operator[](int idx) {
-        return m_data[idx];
-    }
+    Vector3d& operator[](int idx) { return m_data[idx]; }
 
     /// @brief Оператор доступа по индексу
-    const Vector3d &operator[](int idx) const {
-        return m_data[idx];
-    }
+    const Vector3d& operator[](int idx) const { return m_data[idx]; }
+
+    /// @brief Итератор на начало
+    auto begin() { return m_data.begin(); }
+
+    /// @brief Итератор на конец
+    auto end() { return m_data.end(); }
+
+    /// @brief Константный итератор на начало
+    auto begin() const { return m_data.cbegin(); }
+
+    /// @brief Константный итератор на конец
+    auto end() const { return m_data.cend(); }
+
+private:
+    /// @brief Массив данных
+    std::array<Vector3d, max_size> m_data{Vector3d::Zero()};
 };
 
-std::ostream &operator<<(std::ostream &os, const VectorSet &frac);
+std::ostream &operator<<(std::ostream &os, const VectorSet &arr);
 
 } // namespace zephyr

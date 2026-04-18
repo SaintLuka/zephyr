@@ -1,129 +1,200 @@
 #pragma once
 
-#include <vector>
 #include <memory>
 
-#include <zephyr/geom/generator/bs_vertex.h>
+#include <zephyr/geom/generator/array2d.h>
+#include <zephyr/geom/generator/base_node.h>
 #include <zephyr/geom/generator/curve/curve.h>
 
 namespace zephyr::geom::generator {
 
-/// @brief Представление четырехугольного блока.
-/// Основа блочно-структурированной сетки, большинство функций класса открыты
-/// только для управляющего класса BlockStructured.
+class BsVertex;
+
+/// @brief Таблица указателей на внутренние узлы
+using Table2D = Array2D<std::shared_ptr<BsVertex>>;
+
+/// @brief Четырёхугольный блок на базисных вершинах
 class Block {
+    using BsVertex_Ptr = std::shared_ptr<BsVertex>;
 public:
+    using Ptr = std::shared_ptr<Block>;
+    using Ref = const std::shared_ptr<Block>&;
+    using WPtr = std::weak_ptr<Block>;
 
-    /// @brief Инициализация структурированного блока.
-    /// @details Вершины сортируются, чтобы получить обход против часовой
-    /// стрелки, первая вершина остается на месте.
-    Block &operator=(std::initializer_list<BaseVertex::Ptr> vertices);
+    /// @brief Конструктор структурированного блока.
+    /// @param nodes Базисные вершины блока в произвольном порядке. Внутри
+    /// конструктора упорядочиваются, первая вершина остается на месте.
+    explicit Block(const std::array<BaseNode::Ptr, 4>& nodes);
 
-    /// @brief Число ячеек вдоль грани
-    /// @param v1, v2 Вершины грани (v1, v2)
-    int size(BaseVertex::Ref v1, BaseVertex::Ref v2) const;
-
-    /// @brief Установить число ячеек вдоль грани (v1, v2)
-    void set_size(BaseVertex::Ref v1, BaseVertex::Ref v2, int N);
-
-    /// @brief Установить границу на грань (v1, v2)
-    void set_boundary(BaseVertex::Ref v1, BaseVertex::Ref v2, Curve::Ref curve);
-    
-    /// @brief Получить вершину
-    BsVertex::Ptr vertex(int i, int j) const;
-
-
-private:
-
-    /// @brief Управляющий класс
-    friend class BlockStructured;
-
-    /// @brief Пустой блок
-    explicit Block(int index);
+    /// @brief Конструктор структурированного блока.
+    /// @param nodes Базисные вершины блока в произвольном порядке. Внутри
+    /// конструктора упорядочиваются, первая вершина остается на месте.
+    static Block::Ptr create(const std::array<BaseNode::Ptr, 4>& nodes);
 
     /// @brief Индекс блока
-    int index() const;
+    int index() const { return m_index; }
 
-    /// @brief Разбиение вдоль граней (v1, v2) и (v3, v4)
-    int size1() const;
+    /// @brief Установить индекс блока
+    void set_index(int i);
 
-    /// @brief Разбиение вдоль граней (v1, v4) и (v2, v3)
-    int size2() const;
+    // ------------------------------ Геометрия -------------------------------
 
-    /// @brief Число ячеек
-    /// @param f_idx Индекс грани
-    int size(int f_idx) const;
+    /// @brief Центр блока (среднее базисных вершин)
+    Vector3d center() const;
 
-    /// @brief Смежный блок
-    /// @param f_idx Индекс грани
-    Block *adjacent_block(int f_idx) const;
+    /// @brief Центр стороны (проецируется на границу, если есть)
+    Vector3d center(Side side) const;
 
-    /// @brief Лежит ли вершина на границе
-    bool is_boundary(BaseVertex::Ref v) const;
+    /// @brief Длина стороны блока
+    double length(Side side) const;
 
-    /// @brief Граница ячейки
-    /// @param f_idx Индекс грани
-    Curve::Ref boundary(int f_idx) const;
+    // --------------------------- Базисные вершины ---------------------------
 
-    /// @brief Индекс вершины
-    int vertex_index(BaseVertex::Ref v) const;
+    /// @brief Базовые вершины
+    const auto& base_nodes() const { return m_base_nodes; }
 
-    /// @brief Базисная вершина
+    /// @brief Базовая вершина
     /// @param v_idx Индекс вершины
-    BaseVertex::Ptr base_vertex(int v_idx) const;
+    BaseNode::Ptr base_node(int v_idx) const { return m_base_nodes[v_idx]; }
+
+    /// @brief Базисная вершина по стороне (индексация против часовой стрелки)
+    BaseNode::Ptr base_node(Side side, int idx) const;
+
+    /// @brief Индекс базисной вершины внутри блока
+    int base_node_index(const BaseNode* v) const;
+
+    /// @brief Индекс базисной вершины внутри блока
+    int base_node_index(BaseNode::Ref v) const { return base_node_index(v.get()); }
+
+    /// @brief Стороны блока, которые прилегают к заданной вершине.
+    /// Гарантируется перечисление против часовой стрелки (внутри блока).
+    std::tuple<Side, Side> incident_sides(const BaseNode* v) const;
+
+    /// @brief Стороны блока, которые прилегают к заданной вершине.
+    /// Гарантируется перечисление против часовой стрелки (внутри блока).
+    std::tuple<Side, Side> incident_sides(BaseNode::Ref v) const;
+
+    /// @brief Пара прилегающих вершин. Гарантируется перечисление вершин против
+    /// часовой стрелки (внутри блока).
+    std::tuple<BaseNode::Ptr, BaseNode::Ptr> adjacent_nodes(const BaseNode* v) const;
+
+    /// @brief Пара прилегающих вершин. Гарантируется перечисление вершин против
+    /// часовой стрелки (внутри блока).
+    std::tuple<BaseNode::Ptr, BaseNode::Ptr> adjacent_nodes(BaseNode::Ref v) const {
+        return adjacent_nodes(v.get());
+    }
+
+    // ---------------------------- Границы блока -----------------------------
+
+    /// @brief Кривая границы области. Возвращает nullptr при отсутствии
+    /// границы, поэтому может использоваться в условиях.
+    Curve::Ref boundary(Side side) const;
+
+    /// @brief Установить границу на сторону
+    void set_boundary(Side side, Curve::Ref curve);
+
+    /// @brief Установить границу на сторону (v1, v2)
+    void set_boundary(BaseNode::Ref v1, BaseNode::Ref v2, Curve::Ref curve);
+
+    // --------------------- Выбор сторон и смежные блоки ---------------------
 
     /// @brief Индекс грани
     /// @param v1, v2 Вершины грани
-    int face_index(BaseVertex::Ref v1, BaseVertex::Ref v2) const;
+    Side get_side(BaseNode::Ref v1, BaseNode::Ref v2) const;
 
-    /// @brief Индекс такой же грани у соседа
-    int neib_face(int f_idx) const;
+    /// @brief Ось выбранной грани
+    /// @param v1, v2 Вершины грани
+    Axis get_axis(BaseNode::Ref v1, BaseNode::Ref v2) const;
 
-    /// @brief Связать блок с соседним
-    void link(Block *block);
+    /// @brief Смежный блок, может вернуть nullptr (для expired).
+    /// @param side Сторона ячейки
+    Block::Ptr adjacent_block(Side side) const;
 
-    /// @brief Сгенерировать узлы сетки
-    void create_vertices();
+    /// @brief Сторона этой же грани у соседнего блока
+    Side twin_face(Side side) const;
 
-    /// @brief Связать узлы сетки
-    void link_vertices();
+    // ---------------------- Функции "верхнего уровня" -----------------------
 
-    /// @brief Сглаживание вершин в блоке
-    /// @return Максимальный относительный сдивг вершин
-    double smooth();
+    /// @brief Связать два блока
+    static void link(Block::Ref B1, Block::Ref B2);
 
-    /// @brief Обновить положение вершин
-    void update();
+    /// @brief Сгенерировать таблицу узлов сетки, если в блоке определено
+    /// конформное отображение, то оно будет использовано для генерации.
+    Table2D create_vertices(AxisPair<int> sizes) const;
 
-    /// @brief Угловая вершина блока
-    BsVertex::Ptr &corner_vertex(int v_idx);
+    // -------------------------- Конформные приколы --------------------------
 
-    /// @brief Граничная вершина блока
-    BsVertex::Ptr &boundary_vertex(int f_idx, int idx);
+    /// @brief Конформный модуль криволинейного четырехугольника
+    double modulus() const { return m_modulus; }
 
-    /// @brief Вершина со второго ряда от границы
-    BsVertex::Ptr &preboundary_vertex(int f_idx, int idx);
+    /// @brief Установить конформный модуль
+    void set_modulus(double K);
 
-    /// @brief Индекс блока
-    int m_index;
+    /// @brief Оценить и установить конформный модуль четырехугольника
+    void estimate_modulus();
 
-    /// @brief Базовые вершины обходятся против часовой стрелки
-    std::array<BaseVertex::Ptr, 4> m_base_vertices;
+    /// @brief Пересчитывает модуль и коэффициенты сглаживания
+    void update_modulus(const Table2D& vertices);
+
+    /// @brief Сохранить текущее отображение
+    void set_mapping(const Table2D& vertices);
+
+    /// @brief Сохранить текущее отображение
+    void set_mapping(Array2D<Vector3d>&& vertices);
+
+    /// @brief Получить конформное отображение блока
+    const Array2D<Vector3d>& mapping() const { return m_mapping; }
+
+private:
+    /// @brief Сгенерировать узлы сетки с нуля
+    Table2D create_vertices_init(AxisPair<int> sizes) const;
+
+    /// @brief Сгенерировать узлы сетки на основе сохраненного отображения
+    Table2D create_vertices_again(AxisPair<int> sizes) const;
+
+    /// @brief Индекс блока в общем списке блоков
+    int m_index{-1};
+
+    /// @brief Базовые вершины (Z-ordering)
+    std::array<BaseNode::Ptr, 4> m_base_nodes{};
 
     /// @brief Границы области (nullptr для внутренних границ)
-    std::array<Curve::Ptr, 4> m_boundaries;
+    std::array<Curve::Ptr, 4> m_boundaries{};
+
+    // Связи блоков, находятся при вызове link()
 
     /// @brief Ссылки на соседние блоки (nullptr для границ области)
-    std::array<Block *, 4> m_adjacent_blocks;
+    std::array<Block::WPtr, 4> m_adjacent_blocks{};
 
     /// @brief Поворот соседнего блока [0..3]
-    std::array<int, 4> m_rotations;
+    std::array<int, 4> m_rotations{};
 
-    int m_size1;     ///< Число ячеек вдоль граней (v1, v2) и (v3, v4)
-    int m_size2;     ///< Число ячеек вдоль вершин (v1, v4) и (v2, v3)
+    /// @brief Конформный модуль блока (геометрическая характеристика)
+    double m_modulus{NAN};
 
-    /// @brief Двумерный массив с вершинами
-    std::vector<std::vector<BsVertex::Ptr>> m_vertices;
+    /// @brief Конформное отображение блока в виде таблицы вершин
+    Array2D<Vector3d> m_mapping{};
+};
+
+/// @brief Пара смежных блоков
+struct BlockPair {
+    /// @brief Пара смежных блоков
+    Block::WPtr b1{}, b2{};
+
+    /// @brief Стороны у смежных блоков
+    Side side1{}, side2{};
+
+    /// @brief Смежные блоки не заданы
+    bool empty() const { return b1.expired(); }
+
+    /// @brief У ребра только один блок (граница)
+    bool boundary() const { return b2.expired(); }
+
+    /// @brief У ребра два блока (внутреннее ребро)
+    bool inner() const { return b2.expired(); }
+
+    /// @brief Добавить блок (не кидает ошибок)
+    void add(Block::Ref block, Side side);
 };
 
 } // namespace zephyr::mesh::generator

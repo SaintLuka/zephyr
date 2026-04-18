@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <span>
 
 #include <zephyr/phys/fractions.h>
 #include <zephyr/phys/matter/eos/eos.h>
@@ -15,12 +16,12 @@ struct MixOptions {
     double T0   = NAN;   ///< Начальное приближение температуры
 
     /// @brief Начальные приближения для истинных плотностей
-    const ScalarSet* rhos = nullptr;
+    std::span<const double> rhos{};
 
     /// @brief Преобразование в опции одного УрС
     EosOptions operator[](int idx) const {
         return {.deriv = deriv,
-                .rho0 = (rhos != nullptr ? (*rhos)[idx] : NAN),
+                .rho0 = rhos.empty() ? NAN : rhos[idx],
                 .P0 = P0, .T0 = T0};
     }
 };
@@ -28,11 +29,10 @@ struct MixOptions {
 /// @brief Смесь с равновесием по давлению и температуре (PT-замыкание).
 class MixturePT {
 public:
-
     /// @brief Конструктор по умолчанию (пустой список)
-    MixturePT(bool old_style = true) : m_old(old_style) { };
+    explicit MixturePT(bool old_style = true) : m_old(old_style) { }
 
-    /// @brief Создать из списка инициалиации
+    /// @brief Создать из списка инициализации
     MixturePT(const std::initializer_list<Eos::Ptr>& il)
         : m_materials(il) { }
 
@@ -43,7 +43,7 @@ public:
     void use_new() { m_old = false; }
 
     /// @brief Число компонент
-    int size() const;
+    int size() const { return static_cast<int>(m_materials.size()); }
 
     /// @brief Удалить материалы
     void clear();
@@ -56,22 +56,22 @@ public:
 
     /// @brief Оператор доступа к конкретному материалу
     /// @param idx Индекс материала
-    inline Eos& operator[](int idx) { return *m_materials[idx]; }
+    Eos& operator[](int idx) { return *m_materials[idx]; }
 
     /// @brief Оператор доступа к конкретному материалу
     /// @param idx Индекс материала
-    inline const Eos& operator[](int idx) const { return *m_materials[idx]; }
+    const Eos& operator[](int idx) const { return *m_materials[idx]; }
 
 
     /// @brief Найти равновесное давление смеси
     /// @param density Смесевая плотность
-    /// @param e Внутренняя энергия смеси
+    /// @param energy Внутренняя энергия смеси
     /// @param beta Массовые концентрации компонент
     /// @param options В качестве опций целесообразно передавать начальные
     /// приближения для температуры и давления. Также указать {.deriv = true},
     /// если требуется получить производные.
-    /// @details Решается метом итераций Ньютона по паре уравнений.
-    dRdE pressure_re(double density, double e, const Fractions& beta,
+    /// @details Решается методом итераций Ньютона по паре уравнений.
+    dRdE pressure_re(double density, double energy, const Fractions& beta,
                      const MixOptions& options = {}) const;
 
     /// @brief Найти равновесное давление смеси
@@ -81,8 +81,8 @@ public:
     /// @param options В качестве опции можно передать начальное приближение
     /// для давления.
     /// @details Решается метом итераций Ньютона по одному уравнению.
-    dRdT pressure_rT(double density, double temperature,
-                     const Fractions& beta, const MixOptions& = {}) const;
+    dRdT pressure_rT(double density, double temperature, const Fractions& beta,
+                     const MixOptions& options = {}) const;
 
     /// @brief Найти внутреннюю энергию смеси
     /// @param density Смесевая плотность
@@ -106,7 +106,7 @@ public:
     /// @param beta Массовые концентрации компонент
     /// @param options В качестве опции можно передать начальное приближение
     /// для температуры.
-    /// @details Решается метом итераций Ньютона по одному уравнению.
+    /// @details Решается методом итераций Ньютона по одному уравнению.
     /// Для смеси StiffenedGas точное решение получается за одну итерацию.
     double temperature_rP(double density, double pressure,
                           const Fractions& beta, const MixOptions& options = {}) const;
@@ -117,7 +117,7 @@ public:
     /// @param beta Массовые концентрации компонент
     /// @param options В качестве опций целесообразно передавать начальные
     /// приближения для температуры и давления.
-    /// @details Решается метом итераций Ньютона по паре уравнений.
+    /// @details Решается методом итераций Ньютона по паре уравнений.
     double sound_speed_re(double density, double energy, const Fractions& beta,
                           const MixOptions& options = {}) const;
 
@@ -127,7 +127,7 @@ public:
     /// @param beta Массовые концентрации компонент
     /// @param options В качестве опции можно передать начальное приближение
     /// для температуры.
-    /// @details Решается метом итераций Ньютона по одному уравнению.
+    /// @details Решается методом итераций Ньютона по одному уравнению.
     /// Для смеси StiffenedGas точное решение получается за одну итерацию.
     double sound_speed_rP(double density, double pressure, const Fractions& beta,
                           const MixOptions& options = {}) const;
@@ -136,7 +136,7 @@ public:
     /// @param pressure Равновесная плотность смеси
     /// @param temperature Равновесная температура смеси
     /// @param beta Массовые концентрации компонент
-    /// @details Быстрая функция, т.к. удельный объем выражается в явном виде
+    /// @details Быстрая функция, если удельный объем выражается в явном виде.
     /// Очевидно, вычислительная сложность увеличивается, если в одном из
     /// уравнений состояния плотность считается неявно (частая ситуация).
     dPdT volume_PT(double pressure, double temperature,
@@ -146,8 +146,8 @@ public:
     /// @param pressure Равновесная плотность смеси
     /// @param temperature Равновесная температура смеси
     /// @param beta Массовые концентрации компонент
-    /// @details Быстрая функция, т.к. смесевая энергия выражается в явном виде.
-    /// Очевидно, вычислительная сложность увеличиывется, если в одном из
+    /// @details Быстрая функция, если смесевая энергия выражается в явном виде.
+    /// Очевидно, вычислительная сложность увеличивается, если в одном из
     /// уравнений состояния энергия считается неявно (частая ситуация).
     dPdT energy_PT(double pressure, double temperature,
                    const Fractions& beta, const MixOptions& = {}) const;
@@ -158,7 +158,7 @@ public:
     /// @param beta Массовые концентрации компонент
     /// @param options В качестве опции целесообразно передавать начальное
     /// приближение для температуры.
-    /// @details Решается метом итераций Ньютона по одному уравнению.
+    /// @details Решается методом итераций Ньютона по одному уравнению.
     /// Для смеси StiffenedGas точное решение получается за одну итерацию.
     StiffenedGas stiffened_gas(double density, double pressure,
             const Fractions& beta, const MixOptions& options = {}) const;
@@ -169,10 +169,10 @@ public:
     double min_pressure(const Fractions& beta) const;
 
     /// @brief Подгон теплоемкости Cv
-    void adjust_cv(double rho_ref, double P_ref, double T_ref);
+    void adjust_cv(const std::vector<double>& rho_ref, double P_ref, double T_ref) const;
 
     /// @brief Подгон аддитивной постоянной T_0
-    void adjust_T0(double rho_ref, double P_ref, double T_ref);
+    void adjust_T0(const std::vector<double> &rho_ref, double P_ref, double T_ref) const;
 
 
     // Предыдущие функции повторяют интерфейс обычных УрС.
@@ -189,20 +189,18 @@ public:
     using triplet_rP = std::tuple<ScalarSet, dRdP, dRdP>;
     using triplet_rT = std::tuple<ScalarSet, dRdT, dRdT>;
 
+    /// ...
+    triplet_re get_rPT(double density, double energy, const Fractions& beta,
+                       const MixOptions& options = {}) const;
 
     /// ...
-    triplet_re get_rPT(double density, double energy,
-                       const Fractions& beta, const MixOptions& options = {}) const;
-
-    /// ...
-    triplet_rP get_reT(double density, double pressure,
-                       const Fractions& beta, const MixOptions& options = {}) const;
+    triplet_rP get_reT(double density, double pressure, const Fractions& beta,
+                       const MixOptions& options = {}) const;
 
 protected:
     // Начальное приближение для истинных плотностей
     // Если beta[i] > 0.0, тогда densities[i] адекватно определена.
     ScalarSet init_densities(const Fractions& beta, const MixOptions& options) const;
-
 
 
     // Метод Ньютона для поиска равновесного давления

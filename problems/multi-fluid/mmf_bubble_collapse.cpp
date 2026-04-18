@@ -1,54 +1,38 @@
-/// @file Двумерная задача переноса
+/// @file mmf_bubble_collapse.cpp
+/// @brief Bubble collapse under the water
+///
+/// Nourgaliev R., Dinh T., Theofanous T. Adaptive characteristics-based matching
+/// for compressible multifluid dynamics // Journal of Computational Physics.
+/// –– 2006. –– Vol. 213, no. 2. –– P. 500–529.
 
-#include <iostream>
 #include <iomanip>
 
-#include <zephyr/geom/generator/strip.h>
-#include <zephyr/mesh/mesh.h>
+#include <zephyr/geom/primitives/polygon.h>
+#include <zephyr/geom/generator/rectangle.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
 
-#include <zephyr/phys/tests/test_1D.h>
-
-#include <zephyr/math/solver/riemann.h>
+#include <zephyr/phys/literals.h>
+#include <zephyr/phys/matter/eos/ideal_gas.h>
+#include <zephyr/phys/matter/eos/stiffened_gas.h>
 #include <zephyr/math/solver/mm_fluid.h>
 
 #include <zephyr/io/pvd_file.h>
-#include <zephyr/io/csv_file.h>
-
+#include <zephyr/utils/mpi.h>
+#include <zephyr/utils/threads.h>
 #include <zephyr/utils/stopwatch.h>
 
-using namespace zephyr::io;
 using namespace zephyr::phys;
 using namespace zephyr::math;
 using namespace zephyr::math::mmf;
 
-using zephyr::mesh::EuMesh;
-using zephyr::mesh::EuCell;
-
+using zephyr::io::PvdFile;
+using zephyr::utils::mpi;
+using zephyr::utils::threads;
 using zephyr::utils::Stopwatch;
 
+void init_cells(EuMesh& mesh, MixturePT& mixture, Storable<PState> z) {
+    mixture.adjust_cv({1.0_kg_m3, 1000.0_kg_m3}, 1.0_bar, 300.0);
 
-// Для быстрого доступа по типу
-MmFluid::State U;
-
-/// Переменные для сохранения
-double get_rho(AmrStorage::Item& cell) { return cell(U).density; }
-double get_vx(AmrStorage::Item& cell) { return cell(U).velocity.x(); }
-double get_vy(AmrStorage::Item& cell) { return cell(U).velocity.y(); }
-double get_p(AmrStorage::Item& cell) { return cell(U).pressure; }
-double get_e(AmrStorage::Item& cell) { return cell(U).energy; }
-double get_T(AmrStorage::Item &cell) { return cell(U).temperature; }
-double get_cln(AmrStorage::Item &cell) { return cell(U).mass_frac.index(); }
-double get_mfrac1(AmrStorage::Item &cell) { return cell(U).mass_frac[0]; }
-double get_mfrac2(AmrStorage::Item &cell) { return cell(U).mass_frac[1]; }
-double get_vfrac1(AmrStorage::Item &cell) { return cell(U).vol_frac(0); }
-double get_vfrac2(AmrStorage::Item &cell) { return cell(U).vol_frac(1); }
-double get_rho1(AmrStorage::Item &cell) { return cell(U).densities[0]; }
-double get_rho2(AmrStorage::Item &cell) { return cell(U).densities[1]; }
-double get_normal_x(AmrStorage::Item &cell) { return cell(U).n[0].x(); }
-double get_normal_y(AmrStorage::Item &cell) { return cell(U).n[0].y(); }
-
-
-void initialize(EuMesh& mesh, const MixturePT& mixture) {
     PState z_air(
             1.0_kg_m3,          // density
             Vector3d::Zero(),   // velocity
@@ -82,23 +66,26 @@ void initialize(EuMesh& mesh, const MixturePT& mixture) {
 
     mesh.for_each([&](EuCell &cell) {
         if (cell.center().x() < x_shock) {
-            cell(U).set_state(z_shock);
+            cell[z] = z_shock;
             return;
         }
 
         double vol_frac1 = cell.approx_vol_fraction(in_water);
         if (vol_frac1 == 0.0 || vol_frac1 == 1.0) {
-            // Чистое вещество
-            cell(U).set_state(vol_frac1 > 0.5 ? z_water : z_air);
+            // Pure cell (air or water)
+            cell[z] = vol_frac1 > 0.5 ? z_water : z_air;
         }
         else {
-            // Граница веществ
+            // Mixed cell (air and water)
             double vol_frac0 = cell.polygon().disk_clip_area(bubble_center, r) / cell.volume();
-            double vol_frac1 = 1.0 - vol_frac0;
-
+            vol_frac1 = 1.0 - vol_frac0;
 
             mmf::PState &z0 = z_air;
             mmf::PState &z1 = z_water;
+
+            //double T = vol_frac0 * z0.temperature + vol_frac1 * z1.temperature;
+            //z0.density = 1.0 / mixture[0].volume_PT(z0.pressure, T);
+            //z1.density = 1.0 / mixture[1].volume_PT(z1.pressure, T);
 
             // rho = sum a_i rho_i
             double    density   = vol_frac0 * z0.density + vol_frac1 * z1.density;
@@ -107,55 +94,33 @@ void initialize(EuMesh& mesh, const MixturePT& mixture) {
             Vector3d  velocity  = mass_frac[0] * z0.velocity + mass_frac[1] * z1.velocity;
             double    pressure  = vol_frac0 * z0.pressure + vol_frac1 * z1.pressure;
 
-            PState z(density, velocity, pressure, mass_frac, mixture);
+            PState mix(density, velocity, pressure, mass_frac, mixture);
 
-            cell(U).set_state(z);
+            cell[z] = mix;
         }
     });
 }
 
+int main(int argc, char** argv) {
+    mpi::handler handler(argc, argv);
+    threads::init(argc, argv);
+    threads::info();
 
-int main() {
-    zephyr::utils::threads::off();
-
-    // Материалы
-    Eos::Ptr air = IdealGas::create("Air");
-    Eos::Ptr water = StiffenedGas::create("Water");
-
-    // Смесь
-    MixturePT mixture = {air, water};
-
-    // Файл для записи
-    PvdFile pvd("BC", "output");
-    PvdFile pvd_bubble("bubble", "output");
-
-    // Переменные для сохранения
-    pvd.variables += {"cln", get_cln};
-    pvd.variables += {"rho", get_rho};
-    pvd.variables += {"vx", get_vx};
-    pvd.variables += {"vy", get_vy};
-    pvd.variables += {"e", get_e};
-    pvd.variables += {"P", get_p};
-    pvd.variables += {"T", get_T};
-    pvd.variables += {"b1", get_mfrac1};
-    pvd.variables += {"b2", get_mfrac2};
-    pvd.variables += {"a1", get_vfrac1};
-    pvd.variables += {"a2", get_vfrac2};
-    pvd.variables += {"rho1", get_rho1};
-    pvd.variables += {"rho2", get_rho2};
-    pvd.variables += {"n.x", get_normal_x};
-    pvd.variables += {"n.y", get_normal_y};
-
-    // Создаем одномерную сетку
-    Rectangle gen(0.0_cm, 1.2_cm, 0.0_cm, 1.2_cm);
+    // Generator of a Cartesian grid
+    generator::Rectangle gen(0.0_cm, 1.2_cm, 0.0_cm, 1.2_cm);
     gen.set_nx(120);
-    gen.set_boundaries({.left=Boundary::ZOE, .right=Boundary::WALL,
+    gen.set_boundaries({.left=Boundary::ZOE, .right=Boundary::ZOE,
                         .bottom=Boundary::WALL, .top=Boundary::WALL});
 
-    // Создать сетку
-    EuMesh mesh(gen, U);
+    // Create mesh
+    EuMesh mesh(gen);
 
-    // Создать решатель
+    // Create EoS of materials and mixture
+    Eos::Ptr air = IdealGas::create("Air");
+    Eos::Ptr water = StiffenedGas::create("Water");
+    MixturePT mixture = {air, water};
+
+    // Create and configure solver
     MmFluid solver(mixture);
     solver.set_CFL(0.5);
     solver.set_accuracy(1);
@@ -163,12 +128,51 @@ int main() {
     solver.set_crp_mode(CrpMode::PLIC);
     solver.set_splitting(DirSplit::SIMPLE);
 
-    initialize(mesh, mixture);
+    // Add data fields, choose main data layer
+    auto data = solver.add_types(mesh);
+    auto z = data.init;
+
+    // Configure mesh
+    mesh.set_decomposition("XY");
+    mesh.set_max_level(4);
+    mesh.set_distributor(solver.distributor());
+
+    // Files for output
+    PvdFile pvd("BC", "output");
+    PvdFile pvd_bubble("bubble", "output");
+
+    // Variables to save
+    pvd.variables = {"level"};
+    pvd.variables += {"cln", [z](EuCell cell) -> double { return cell[z].mass_frac.index(); }};
+    pvd.variables += {"rho", [z](EuCell cell) -> double { return cell[z].density; }};
+    pvd.variables += {"vx",  [z](EuCell cell) -> double { return cell[z].velocity.x(); }};
+    pvd.variables += {"vy",  [z](EuCell cell) -> double { return cell[z].velocity.y(); }};
+    pvd.variables += {"e",   [z](EuCell cell) -> double { return cell[z].energy; }};
+    pvd.variables += {"P",   [z](EuCell cell) -> double { return cell[z].pressure; }};
+    pvd.variables += {"T",   [z](EuCell cell) -> double { return cell[z].temperature; }};
+    pvd.variables += {"b0",  [z](EuCell cell) -> double { return cell[z].mass_frac[0]; }};
+    pvd.variables += {"b1",  [z](EuCell cell) -> double { return cell[z].mass_frac[1]; }};
+    pvd.variables += {"a0",  [z](EuCell cell) -> double { return cell[z].alpha(0); }};
+    pvd.variables += {"a1",  [z](EuCell cell) -> double { return cell[z].alpha(1); }};
+    pvd.variables += {"rho0",[z](EuCell cell) -> double { return cell[z].densities[0]; }};
+    pvd.variables += {"rho1",[z](EuCell cell) -> double { return cell[z].densities[1]; }};
+    //pvd.variables += {"e0",[z,mixture](EuCell cell) -> double { return cell[z].true_energy(mixture, 0); }};
+    //pvd.variables += {"e1",[z,mixture](EuCell cell) -> double { return cell[z].true_energy(mixture, 1); }};
+    pvd.variables += {"n.x", [n=data.n](EuCell cell) -> double { return cell[n][0].x(); }};
+    pvd.variables += {"n.y", [n=data.n](EuCell cell) -> double { return cell[n][0].y(); }};
+
+    // Initial conditions (adaptive to initial data)
+    for (int k = 0; mesh.adaptive() && k < mesh.max_level() + 3; ++k) {
+        init_cells(mesh, mixture, data.init);
+        solver.set_flags(mesh);
+        mesh.refine();
+    }
+    init_cells(mesh, mixture, data.init);
 
     size_t n_step = 0;
     double curr_time = 0.0;
     double next_write = 0.0;
-    double max_time = 2.0 * 4.5_us;
+    double max_time = 4.5_us;
 
     Stopwatch elapsed(true);
     while (curr_time < max_time) {
@@ -178,17 +182,19 @@ int main() {
             pvd.save(mesh, curr_time);
 
             solver.interface_recovery(mesh);
-            auto bubble = solver.body(mesh, 0);
+            auto bubble = solver.domain(mesh, 0);
             pvd_bubble.save(bubble, curr_time);
 
-            next_write += 0.0; //max_time / 50;
+            next_write += max_time / 50;
         }
 
-        // Точное завершение в end_time
+        // Finish exactly at max_time
         solver.set_max_dt(max_time - curr_time);
 
-        // Обновляем слои
+        // Integration step
         solver.update(mesh);
+        solver.set_flags(mesh);
+        mesh.refine();
 
         curr_time += solver.dt();
         n_step += 1;
@@ -196,7 +202,7 @@ int main() {
     pvd.save(mesh, max_time);
 
     solver.interface_recovery(mesh);
-    auto bubble = solver.body(mesh, 0);
+    auto bubble = solver.domain(mesh, 0);
     pvd_bubble.save(bubble, max_time);
 
     elapsed.stop();

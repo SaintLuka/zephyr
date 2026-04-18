@@ -14,13 +14,14 @@
 namespace zephyr::geom::generator::collection {
 
 PlaneWithHole::PlaneWithHole(const Json& config) :
-        BlockStructured(12),
+        Generator("collection.plane-with-hole"),
         m_xmin(0.0), m_xmax(0.0),
         m_ymin(0.0), m_ymax(0.0),
         m_xc(0.0), m_yc(0.0),
-        m_r(0.0), m_xi(2.0) {
+        m_r(0.0) {
 
-    /*
+    throw std::runtime_error("PlaneWithHole(const Json& config): not implemented");
+/*
     if (!config["geometry"]) {
         throw std::runtime_error("EuMesh config doesn't contain 'geometry'");
     }
@@ -32,10 +33,6 @@ PlaneWithHole::PlaneWithHole(const Json& config) :
     m_xc   = config["geometry"]["x_c"].as<double>();
     m_yc   = config["geometry"]["y_c"].as<double>();
     m_r    = config["geometry"]["r"].as<double>();
-
-    if (config["geometry"]["xi"]) {
-        m_xi = config["geometry"]["xi"].as<double>();
-    }
 
     if (!config["boundary"]) {
         throw std::runtime_error("EuMesh config doesn't contain 'boundary'");
@@ -56,19 +53,17 @@ PlaneWithHole::PlaneWithHole(const Json& config) :
         N = config["nx"].as<int>();
     }
     else {
-        std::string message = "Config.mesh doesn't contain size 'nx'";
-        std::cerr << message << "\n";
-        throw std::runtime_error(message);
+        throw std::runtime_error("Config.mesh doesn't contain size 'nx'");
     }
     set_nx(N);
 
     if (config["verbose"]) {
-        blocks.set_verbose(config["verbose"].as<bool>());
+        m_blocks.set_verbosity(config["verbosity"].as<bool>());
     }
-    if (config["epsilon"]) {
-        blocks.set_accuracy(config["epsilon"].as<double>());
+    if (config["iters_count"]) {
+        m_blocks.set_iters_count(config["iters_count"].as<int>());
     }
-     */
+    */
 }
 
 PlaneWithHole::PlaneWithHole(
@@ -76,314 +71,133 @@ PlaneWithHole::PlaneWithHole(
         double ymin, double ymax,
         double xc, double yc,
         double r) :
-        BlockStructured(4), //12
+        Generator("collection.plane-with-hole"),
         m_xmin(xmin), m_xmax(xmax),
         m_ymin(ymin), m_ymax(ymax),
         m_xc(xc), m_yc(yc),
-        m_r(r), m_xi(2.0) {
+        m_r(r) {
 
-    m_name = "collection.plane-with-hole";
-
-    init_blocks();
-}
-
-/*
-void PlaneWithHole::set_nx(int Nx) {
-    // Характерный размер ячейки
-    double DX = (m_xmax - m_xmin) / Nx;
-
-    int Ny = static_cast<int>((m_ymax - m_ymin) / DX);
-    int np = static_cast<int>(M_PI_2 * m_r * m_xi / DX);
-
-    np = std::max(np, 1);
-    Nx = std::max(Nx, np + 2);
-    Ny = std::max(Ny, np + 2);
-
-    int nr = static_cast<int>(std::log(m_xi) / std::log(1.0 + M_PI_2/np));
-
-    int Nx1, Nx2;
-
-    double dx1 = m_xc - m_xmin;
-    double dx2 = m_xmax - m_xc;
-    if (dx1 > dx2) {
-        Nx1 = static_cast<int>(std::round(dx1/(dx1 + dx2) * Nx - np / 2.0));
-        Nx1 = std::max(Nx1, 1);
-        Nx2 = Nx - np - Nx1;
-    }
-    else {
-        Nx2 = static_cast<int>(std::round(dx2/(dx1 + dx2) * Nx - np / 2.0));
-        Nx2 = std::max(Nx2, 1);
-        Nx1 = Nx - np - Nx2;
-    }
-
-    int Ny1, Ny2;
-
-    double dy1 = m_yc - m_ymin;
-    double dy2 = m_ymax - m_yc;
-    if (dy1 > dy2) {
-        Ny1 = static_cast<int>(std::round(dy1/(dy1 + dy2) * Ny - np / 2.0));
-        Ny1 = std::max(Ny1, 1);
-        Ny2 = Ny - np - Ny1;
-    }
-    else {
-        Ny2 = static_cast<int>(std::round(dy2/(dy1 + dy2) * Ny - np / 2.0));
-        Ny2 = std::max(Ny2, 1);
-        Ny1 = Ny - np - Ny2;
-    }
-
-    if (Nx1 + np + Nx2 != Nx) {
-        throw std::runtime_error("PlaneWithHole error: Strange error #1");
-    }
-    if (Ny1 + np + Ny2 != Ny) {
-        throw std::runtime_error("PlaneWithHole error: Strange error #1");
-    }
-
-    // Нет необходимости устанавливать все размеры
-    // у каждого блока, поскольку они связаны
-    m_blocks[0].set_size(v1, v2, Nx1);
-    m_blocks[1].set_size(v2, v3, np);
-    m_blocks[2].set_size(v3, v4, Nx2);
-    m_blocks[10].set_size(v18, v19, np);
-
-    m_blocks[0].set_size(v1, v5, Ny1); 
-    m_blocks[3].set_size(v5, v13, np);
-    m_blocks[9].set_size(v13, v17, Ny2);
-    m_blocks[8].set_size(v8, v16, np);
-
-    m_blocks[4].set_size(v6, v9, nr);
-}
-*/
-
-void PlaneWithHole::set_nx(int Nx) {
-
-    double H = m_ymax - m_ymin;
-    double H1 = m_yc - m_ymin;
-    double H2 = m_ymax - m_yc;
-    
-    double L = m_xmax - m_xmin;
-    double L1 = m_xc - m_xmin;
-    double L2 = m_xmax - m_xc;
-
-    double a1 = std::atan(H1 / L1);
-    double a2 = std::atan(H2 / L1);
-    double a3 = std::atan(H1 / L2);
-    double a4 = std::atan(H2 / L2); 
-
-    int N1 = (int)(Nx * L1 / L2);
-    int N2 = Nx - N1;
-
-    int Ny = (int)(Nx * H / L); 
-
-    double xi1 = L1 / m_r; // Соотношение "окружностей"
-    int Nr1 = (int)(std::log(xi1) / std::log(1.0 + a1 / N1));
-    int Nr2 = (int)(std::log(xi1) / std::log(1.0 + a2 / N1));
-
-    double xi2 = L2 / m_r;
-    int Nr3 = (int)(std::log(xi2) / std::log(1.0 + a3 / N2));
-    int Nr4 = (int)(std::log(xi2) / std::log(1.0 + a4 / N2)); 
-
-    m_blocks[0].set_size(v2, v1, Nr1);
-    m_blocks[0].set_size(v2, v8, Ny);
-
-    m_blocks[1].set_size(v3, v4, Nr3);
-    m_blocks[1].set_size(v1, v3, Ny);
-
-    m_blocks[2].set_size(v6, v5, Nr4);
-    m_blocks[2].set_size(v4, v6, Ny);
-
-    m_blocks[3].set_size(v7, v8, Nr2);
-    m_blocks[3].set_size(v5, v7, Ny);
-}
-
-void PlaneWithHole::set_boundaries(Boundaries bounds) {
-    m_bounds = bounds;
-}
-
-/*
-void PlaneWithHole::init_blocks() {
-    check_params();
-
-    double xi = 1.5;
+    double xi = 1.1;
     double x_l = m_xc - xi * m_r;
     double x_r = m_xc + xi * m_r;
     double y_b = m_yc - xi * m_r;
     double y_t = m_yc + xi * m_r;
-    
+
     double a = m_r / std::sqrt(2.0);
 
-    // Задаем базисные вершины для струтурированных блоков
-    v1 = BaseVertex::create(m_xmin, m_ymin, true);
-    v2 = BaseVertex::create(x_l,    m_ymin, false);
-    v3 = BaseVertex::create(x_r,    m_ymin, false);
-    v4 = BaseVertex::create(m_xmax, m_ymin, true);
+    // Задаем базисные вершины для блоков
+    v1 = BaseNode::create(m_xmin, m_ymin);
+    v2 = BaseNode::create(x_l,  m_ymin);
+    v3 = BaseNode::create(x_r,  m_ymin);
+    v4 = BaseNode::create(m_xmax, m_ymin);
 
-    v5 = BaseVertex::create(m_xmin, y_b, false);
-    v6 = BaseVertex::create(x_l,    y_b, false);
-    v7 = BaseVertex::create(x_r,    y_b, false);
-    v8 = BaseVertex::create(m_xmax, y_b, false);
+    v5 = BaseNode::create(m_xmin, y_b);
+    v6 = BaseNode::create(x_l,  y_b);
+    v7 = BaseNode::create(x_r,  y_b);
+    v8 = BaseNode::create(m_xmax, y_b);
 
-    v9  = BaseVertex::create(m_xc - a, m_yc - a, false);
-    v10 = BaseVertex::create(m_xc + a, m_yc - a, false);
-    v11 = BaseVertex::create(m_xc - a, m_yc + a, false);
-    v12 = BaseVertex::create(m_xc + a, m_yc + a, false);
+    v9  = BaseNode::create(m_xc - a, m_yc - a);
+    v10 = BaseNode::create(m_xc + a, m_yc - a);
+    v11 = BaseNode::create(m_xc - a, m_yc + a);
+    v12 = BaseNode::create(m_xc + a, m_yc + a);
 
-    v13 = BaseVertex::create(m_xmin, y_t, false);
-    v14 = BaseVertex::create(x_l,    y_t, false);
-    v15 = BaseVertex::create(x_r,    y_t, false);
-    v16 = BaseVertex::create(m_xmax, y_t, false);
+    v13 = BaseNode::create(m_xmin, y_t);
+    v14 = BaseNode::create(x_l,  y_t);
+    v15 = BaseNode::create(x_r,  y_t);
+    v16 = BaseNode::create(m_xmax, y_t);
 
-    v17 = BaseVertex::create(m_xmin, m_ymax, true);
-    v18 = BaseVertex::create(x_l,    m_ymax, false);
-    v19 = BaseVertex::create(x_r,    m_ymax, false);
-    v20 = BaseVertex::create(m_xmax, m_ymax, true);
+    v17 = BaseNode::create(m_xmin, m_ymax);
+    v18 = BaseNode::create(x_l,  m_ymax);
+    v19 = BaseNode::create(x_r,  m_ymax);
+    v20 = BaseNode::create(m_xmax, m_ymax);
 
-    // Ограничивающие прямые области
+    // Генератор сетки
+    m_blocks += {v1, v6, v2, v5};
+    m_blocks += {v2, v3, v7, v6};
+    m_blocks += {v3, v8, v4, v7};
+    m_blocks += {v5, v13, v6, v14};
+    m_blocks += {v9, v6, v11, v14};
+    m_blocks += {v6, v7, v10, v9};
+    m_blocks += {v7, v10, v15, v12};
+    m_blocks += {v11, v15, v12, v14};
+    m_blocks += {v7, v8, v16, v15};
+    m_blocks += {v13, v18, v14, v17};
+    m_blocks += {v14, v15, v19, v18};
+    m_blocks += {v15, v16, v20, v19};
+
+    // Окружность в центре области
     circle = Circle::create(m_r, {m_xc, m_yc, 0.0});
     left   = Plane::create(v1, v17);
     right  = Plane::create(v4, v20);
     bottom = Plane::create(v1, v4);
     top    = Plane::create(v17, v20);
 
-    left->set_boundary(m_bounds.left);
-    right->set_boundary(m_bounds.right);
-    bottom->set_boundary(m_bounds.bottom);
-    top->set_boundary(m_bounds.top);
-    circle->set_boundary(m_bounds.hole);
+    m_blocks.set_boundary({v9, v11, v12, v10, v9}, circle);
+    m_blocks.set_boundary({v1, v5, v13, v17}, left);
+    m_blocks.set_boundary({v4, v8, v16, v20}, right);
+    m_blocks.set_boundary({v1, v2, v3, v4}, bottom);
+    m_blocks.set_boundary({v17, v18, v19, v20}, top);
 
-    // Генератор сетки
-    m_blocks[0] = {v1, v2, v5, v6};
-    m_blocks[0].set_boundary(v1, v5, left);
-    m_blocks[0].set_boundary(v1, v2, bottom);
-
-    m_blocks[1] = {v2, v3, v7, v6};
-    m_blocks[1].set_boundary(v2, v3, bottom);
-
-    m_blocks[2] = {v3, v4, v8, v7};
-    m_blocks[2].set_boundary(v3, v4, bottom);
-    m_blocks[2].set_boundary(v4, v8, right);
-
-    m_blocks[3] = {v5, v6, v14, v13};
-    m_blocks[3].set_boundary(v5, v13, left);
-
-    m_blocks[4] = {v6, v9, v11, v14};
-    m_blocks[4].set_boundary(v9, v11, circle);
-
-    m_blocks[5] = {v6, v7, v10, v9};
-    m_blocks[5].set_boundary(v9, v10, circle);
-
-    m_blocks[6] = {v10, v7, v15, v12};
-    m_blocks[6].set_boundary(v10, v12, circle);
-
-    m_blocks[7] = {v11, v12, v15, v14};
-    m_blocks[7].set_boundary(v11, v12, circle);
-
-    m_blocks[8] = {v7, v8, v16, v15};
-    m_blocks[8].set_boundary(v8, v16, right);
-
-    m_blocks[9] = {v13, v14, v18, v17};
-    m_blocks[9].set_boundary(v13, v17, left);
-    m_blocks[9].set_boundary(v17, v18, top);
-
-    m_blocks[10] = {v14, v15, v19, v18};
-    m_blocks[10].set_boundary(v18, v19, top);
-
-    m_blocks[11] = {v15, v16, v20, v19};
-    m_blocks[11].set_boundary(v16, v20, right);
-    m_blocks[11].set_boundary(v19, v20, top);
-
-    // Необходимо связать блоки
-    link();
-
-    // Точность сглаживания (необязательно)
-    set_accuracy(1.0e-5);
+    //m_blocks.plot_layout();
+    //m_blocks.set_iters_count(1);
+    m_blocks.optimize();
+    //m_blocks.plot();
 }
-*/
 
-void PlaneWithHole::init_blocks() {
-    check_params();
+void PlaneWithHole::set_nx(int Nx) {
+    // Установить по нижней/верхней границе
+    m_blocks.set_size({v1, v2, v3, v4}, Nx);
+    m_blocks.set_size({v17, v18, v19, v20}, Nx);
+}
 
-    v1 = BaseVertex::create(m_xmin, m_ymin, true);
-    v3 = BaseVertex::create(m_xmax, m_ymin, true);
-    v5 = BaseVertex::create(m_xmax, m_ymax, true);
-    v7 = BaseVertex::create(m_xmin, m_ymax, true);
+void PlaneWithHole::set_ny(int Ny) {
+    // Установить по левой/правой границе
+    m_blocks.set_size({v1, v5, v13, v17}, Ny);
+    m_blocks.set_size({v4, v8, v16, v20}, Ny);
+}
 
-    v2 = BaseVertex::create(m_xc - m_r * std::sin(M_PI / 5.0), 
-                            m_yc - m_r * std::cos(M_PI / 5.0), 
-                            true);
-    v4 = BaseVertex::create(m_xc + m_r * std::sin(M_PI / 3.0),
-                            m_yc - m_r * std::cos(M_PI / 3.0),
-                            true);
-    v6 = BaseVertex::create(m_xc + m_r * std::sin(M_PI / 3.0),
-                            m_yc + m_r * std::cos(M_PI / 3.0), 
-                            true);
-    v8 = BaseVertex::create(m_xc - m_r * std::sin(M_PI / 5.0),
-                            m_yc + m_r * std::cos(M_PI / 5.0), 
-                            true);
+void PlaneWithHole::set_boundaries(Boundaries bounds) const {
+    circle->set_boundary(bounds.hole);
+    left->set_boundary(bounds.left);
+    right->set_boundary(bounds.right);
+    top->set_boundary(bounds.top);
+    bottom->set_boundary(bounds.bottom);
+}
 
-    // Ограничивающие прямые области
-    circle = Circle::create(m_r, {m_xc, m_yc, 0.0});
-    left   = Plane::create(v1, v7);
-    right  = Plane::create(v3, v5);
-    bottom = Plane::create(v1, v3);
-    top    = Plane::create(v5, v7);
+void PlaneWithHole::set_axial(bool axial) {
+    m_blocks.set_axial(axial);
+}
 
-    left->set_boundary(m_bounds.left);
-    right->set_boundary(m_bounds.right);
-    bottom->set_boundary(m_bounds.bottom);
-    top->set_boundary(m_bounds.top);
-    circle->set_boundary(m_bounds.hole);
+void PlaneWithHole::set_adaptive(bool adaptive) {
+    m_blocks.set_adaptive(adaptive);
+}
 
-    // Генератор сетки
-    m_blocks[0] = {v1, v2, v7, v8};
-    m_blocks[0].set_boundary(v1, v7, left);
-    m_blocks[0].set_boundary(v2, v8, circle);
-
-    m_blocks[1] = {v1, v3, v2, v4};
-    m_blocks[1].set_boundary(v1, v3, bottom);
-    m_blocks[1].set_boundary(v2, v4, circle);
-
-    m_blocks[2] = {v3, v4, v6, v5};
-    m_blocks[2].set_boundary(v3, v5, right);
-    m_blocks[2].set_boundary(v4, v6, circle);
-
-    m_blocks[3] = {v5, v6, v7, v8};
-    m_blocks[3].set_boundary(v5, v7, top);
-    m_blocks[3].set_boundary(v6, v8, circle);
-
-    // Необходимо связать блоки
-    link();
-
-    // Точность сглаживания (необязательно)
-    set_accuracy(1.0e-5);
+void PlaneWithHole::set_linear(bool linear) {
+    m_blocks.set_linear(linear);
 }
 
 Box PlaneWithHole::bbox() const {
     Vector3d vmin(m_xmin, m_ymin, 0.0);
     Vector3d vmax(m_xmax, m_ymax, 0.0);
-
     return {vmin, vmax};
 }
 
 void PlaneWithHole::check_params() const {
     if (m_xmin >= m_xmax) {
-        std::string message = "PlaneWithHole Error: x_min >= x_max";
-        std::cerr << message << "\n";
-        throw std::runtime_error(message);
+        throw std::runtime_error("PlaneWithHole Error: x_min >= x_max");
     }
     if (m_ymin >= m_ymax) {
-        std::string message = "PlaneWithHole Error: y_min >= y_max";
-        std::cerr << message << "\n";
-        throw std::runtime_error(message);
+        throw std::runtime_error("PlaneWithHole Error: y_min >= y_max");
     }
 
-    double R = m_r * m_xi;
-    if (m_xmin >= m_xc - R || m_xmax <= m_xc + R
-        || m_ymin >= m_yc - R || m_ymax <= m_yc + R) {
-        std::string message = "PlaneWithHole Error: big hole";
-        std::cerr << message << "\n";
-        throw std::runtime_error(message);
-
+    double R = 1.2 * m_r;
+    if (m_xmin >= m_xc - R || m_xmax <= m_xc + R || m_ymin >= m_yc - R || m_ymax <= m_yc + R) {
+        throw std::runtime_error("PlaneWithHole Error: big hole");
     }
+}
+
+Grid PlaneWithHole::make() const {
+    return m_blocks.make();
 }
 
 } // namespace zephyr::geom::generator::collection

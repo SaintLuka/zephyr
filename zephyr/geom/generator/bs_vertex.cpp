@@ -1,18 +1,37 @@
 #include <algorithm>
+#include <ranges>
 
-#include <zephyr/geom/generator/curve/curve.h>
 #include <zephyr/geom/generator/bs_vertex.h>
-
+#include <zephyr/geom/generator/curve/curve.h>
 
 namespace zephyr::geom::generator {
 
-BsVertex::BsVertex(const Vector3d &v)
-    : index(-1), v1(v), v2(v) {
+BsEdge::BsEdge(BsVertex* v, double* lambda_1, double* lambda_2)
+    : neib(v), lambda1(lambda_1), lambda2(lambda_2) { }
+
+BsEdge BsEdge::Border(BsVertex_Ref v, double* lambda) {
+    return BsEdge{v.get(), lambda, nullptr};
 }
 
-BsVertex::BsVertex(double x, double y)
-    : index(-1), v1(x, y, 0.0), v2(x, y, 0.0) {
+BsEdge BsEdge::Inside(BsVertex_Ref v, double* lambda) {
+    return BsEdge{v.get(), lambda, lambda};
 }
+
+BsEdge BsEdge::Inside(BsVertex::Ref v, double* lambda1, double* lambda2) {
+    return BsEdge{v.get(), lambda1, lambda2};
+}
+
+double BsEdge::lambda() const {
+    z_assert(lambda1 != nullptr, "BsEdge::lambda: lambda1 is null");
+    if (boundary()) { return (*lambda1); }
+    return std::sqrt((*lambda1) * (*lambda2));
+}
+
+BsVertex::BsVertex(const Vector3d &v)
+    : index(-1), pos(v), next(v) { }
+
+BsVertex::BsVertex(double x, double y)
+    : index(-1), pos(x, y, 0.0), next(x, y, 0.0) { }
 
 BsVertex::Ptr BsVertex::create(const Vector3d &v) {
     return std::make_shared<BsVertex>(v);
@@ -22,58 +41,43 @@ BsVertex::Ptr BsVertex::create(double x, double y) {
     return std::make_shared<BsVertex>(x, y);
 }
 
-int BsVertex::n_adjacent() const {
-    return m_adjacent.size();
-}
-
-void BsVertex::fix() {
-    m_adjacent.clear();
-}
-
-const std::vector<BsVertex *> &BsVertex::adjacent_vertices() const {
-    return m_adjacent;
-}
-
-void BsVertex::set_adjacent_vertices(const std::vector<BsVertex::Ptr> &vertices) {
-    std::vector<std::pair<double, BsVertex::Ptr>> vec_verts;
-    vec_verts.reserve(vertices.size());
-    for (auto &v: vertices) {
-        vec_verts.emplace_back(std::make_pair(std::atan2(v->v1.y() - v1.y(), v->v1.x() - v1.x()), v));
+void BsVertex::set_edges(const std::vector<BsEdge> &edges) {
+    std::vector<std::pair<double, BsEdge>> sorted;
+    sorted.reserve(edges.size());
+    for (auto &edge: edges) {
+        sorted.emplace_back(std::atan2(edge.y() - pos.y(), edge.x() - pos.x()), edge);
     }
 
-    for (size_t i = 1; i < vec_verts.size(); ++i) {
-        if (vec_verts[i].first < vec_verts[0].first) {
-            vec_verts[i].first += 2.0 * M_PI;
+    for (size_t i = 1; i < sorted.size(); ++i) {
+        if (sorted[i].first < sorted[0].first) {
+            sorted[i].first += 2.0 * M_PI;
         }
     }
 
-    std::sort(vec_verts.begin(), vec_verts.end(),
-              [](const std::pair<double, BsVertex::Ptr> &p1, const
-              std::pair<double, BsVertex::Ptr> &p2) {
-                  return p1.first < p2.first;
-              });
+    std::ranges::sort(sorted,
+                      [](const std::pair<double, BsEdge> &p1,
+                         const std::pair<double, BsEdge> &p2) {
+                          return p1.first < p2.first;
+                      });
 
-    m_adjacent.reserve(vec_verts.size());
-    for (auto &p: vec_verts) {
-        m_adjacent.emplace_back(p.second.get());
+    m_edges.clear();
+    m_edges.reserve(sorted.size());
+    for (auto& val: sorted | std::views::values) {
+        m_edges.emplace_back(val);
     }
 }
 
-bool BsVertex::inner() const {
-    return m_boundaries.empty();
+void BsVertex::add_boundary(Curve* boundary) {
+    if (boundary) {
+        m_boundaries.insert(boundary);
+    }
 }
 
-bool BsVertex::corner() const {
-    return m_boundaries.size() > 1;
-}
-
-Curve *BsVertex::boundary() const {
+Curve* BsVertex::boundary() const {
     if (m_boundaries.size() == 1) {
         return *m_boundaries.begin();
     }
-    else {
-        throw std::runtime_error("BsVertex error: #1464");
-    }
+    throw std::runtime_error("BsVertex::boundary: more than one boundary");
 }
 
 std::set<Boundary> BsVertex::boundaries() const {
@@ -82,47 +86,6 @@ std::set<Boundary> BsVertex::boundaries() const {
         res.insert(curve->boundary());
     }
     return res;
-}
-
-void BsVertex::add_boundary(Curve *boundary) {
-    m_boundaries.insert(boundary);
-}
-
-BaseVertex::BaseVertex(const Vector3d &v, bool fixed)
-    : m_v(v), m_fixed(fixed) {
-}
-
-BaseVertex::Ptr BaseVertex::create(const Vector3d &v, bool fixed) {
-    return std::make_shared<BaseVertex>(v, fixed);
-}
-
-BaseVertex::Ptr BaseVertex::create(double x, double y, bool fixed) {
-    return std::make_shared<BaseVertex>(Vector3d(x, y, 0.0), fixed);
-}
-
-bool BaseVertex::is_fixed() const {
-    return m_fixed;
-}
-
-const Vector3d &BaseVertex::v() const {
-    return m_v;
-}
-
-int BaseVertex::degree() const {
-    return m_adjacent_blocks.size();
-}
-
-void BaseVertex::add_adjacent_block(Block *block) {
-    for (auto b: m_adjacent_blocks) {
-        if (b == block) {
-            return;
-        }
-    }
-    m_adjacent_blocks.push_back(block);
-}
-
-const std::vector<Block *> &BaseVertex::adjacent_blocks() const {
-    return m_adjacent_blocks;
 }
 
 } // namespace zephyr::geom::generator

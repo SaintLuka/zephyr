@@ -110,4 +110,4 @@ inline void check_flags(AmrCells& cells, int max_level) {
     check_flags(cells, aliens, max_level);
 }
 
-} // namespace zephyr
+} // namespace zephyr::mesh::amr

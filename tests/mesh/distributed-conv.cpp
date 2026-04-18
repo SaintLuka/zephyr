@@ -34,13 +34,13 @@ Vector3d velocity(const Vector3d& c) {
 double calc_loads(EuMesh& mesh, Storable<double> load) {
     double full = 0;
     for (auto cell: mesh) {
-        full += cell(load);
+        full += cell[load];
     }
     return full;
 }
 
-int main() {
-    mpi::handler init;
+int main(int argc, char** argv) {
+    mpi::handler init(argc, argv);
 
     // Сеточный генератор
     //Cuboid gen(0.0, 1.0, 0.0, 0.6, 0.0, 0.9);
@@ -52,7 +52,7 @@ int main() {
     EuMesh mesh(gen);
 
     // Добавить переменные на сетку
-    auto [u1, u2, load] = mesh.add<double>("u1", "u2", "load");
+    auto [u1, u2, load] = mesh.add_multi<double>("u1", "u2", "load");
 
     // Bounding Box для сетки
     Box domain = gen.bbox();
@@ -69,9 +69,9 @@ int main() {
     Vector3d vc = domain.vmin + 0.2 * domain.size();
     double D = 0.1 * domain.diameter();
     for (auto cell: mesh) {
-        cell(u1) = (cell.center() - vc).norm() < D ? 1.0 : 0.0;
-        cell(u2) = 0.0;
-        cell(load) = cell(u1);
+        cell[u1] = (cell.center() - vc).norm() < D ? 1.0 : 0.0;
+        cell[u2] = 0.0;
+        cell[load] = cell[u1];
     }
 
     // Файл для записи
@@ -85,7 +85,7 @@ int main() {
     double CFL = 0.5;
 
     Stopwatch elapsed(true);
-    for (int step = 0; step < 200; ++step) {
+    for (int step = 0; step < 500; ++step) {
         // Балансировка декомпозиции
         {
             double full = calc_loads(mesh, load);
@@ -111,7 +111,7 @@ int main() {
 
         // Расчет по схеме upwind
         for (auto& cell: mesh) {
-            double zc = cell(u1);
+            double zc = cell[u1];
 
             double fluxes = 0.0;
             for (auto& face: cell.faces()) {
@@ -124,14 +124,14 @@ int main() {
                 fluxes += (a_p * zc + a_m * zn) * face.area();
             }
 
-            cell(u2) = cell(u1) - dt * fluxes / cell.volume();
+            cell[u2] = cell[u1] - dt * fluxes / cell.volume();
         }
 
         // Обновляем слои
         for (auto& cell: mesh) {
-            cell(u1) = cell(u2);
-            cell(u2) = 0.0;
-            cell(load) = cell(u1);
+            cell[u1] = cell[u2];
+            cell[u2] = 0.0;
+            cell[load] = cell[u1];
         }
     }
     elapsed.stop();

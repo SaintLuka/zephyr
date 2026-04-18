@@ -33,6 +33,21 @@ public:
     /// @brief Деструктор по умолчанию
 	virtual ~Decomposition() = default;
 
+	/// @brief Проверить, что можно преобразовать к наследнику
+	template <class T>
+	std::enable_if_t<std::is_base_of_v<Decomposition, T>, bool>
+	can_cast() { return dynamic_cast<T*>(this) != nullptr; };
+
+	/// @brief Приведение к конкретному типу
+	/// @throw segfault при невозможности приведения
+	/// @code
+	///     Decomposition::Ptr decomp;
+	///     ORB& orb = decomp->cast<ORB>();
+	/// @endcode
+	template <class T>
+	std::enable_if_t<std::is_base_of_v<Decomposition, T>, T&>
+	cast() { return *(dynamic_cast<T*>(this)); }
+
 	/// @brief Размер декомпозиции
 	int size() const { return m_size; }
 

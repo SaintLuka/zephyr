@@ -2,11 +2,11 @@
 #include <iostream>
 #include <iomanip>
 #include <vector>
+#include <cmath>
 
 #include <boost/algorithm/string.hpp>
 
 #include <zephyr/math/cfd/limiter.h>
-#include <cmath>
 
 namespace zephyr::math {
 

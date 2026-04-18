@@ -9,7 +9,7 @@
 // Forward declaration
 namespace zephyr::mesh {
 template<typename T>
-struct Storable;
+class Storable;
 class EuCell;
 }
 

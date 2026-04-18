@@ -15,9 +15,11 @@ set(ZEPHYR_GEOM_GENERATOR_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/curve/plane.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/curve/circle.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/curve/cubic.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/base_node.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/bs_vertex.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/block.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/block_structured.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/block_structured_plot.cpp
 
 	${ZEPHYR_GENERATOR_COLLECTION}
 	PARENT_SCOPE
@@ -38,6 +40,8 @@ install(FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/rectangle.h
 	${CMAKE_CURRENT_SOURCE_DIR}/sector.h
 	${CMAKE_CURRENT_SOURCE_DIR}/cuboid.h
+	${CMAKE_CURRENT_SOURCE_DIR}/array2d.h
+	${CMAKE_CURRENT_SOURCE_DIR}/base_node.h
 	${CMAKE_CURRENT_SOURCE_DIR}/bs_vertex.h
 	${CMAKE_CURRENT_SOURCE_DIR}/block.h
 	${CMAKE_CURRENT_SOURCE_DIR}/block_structured.h

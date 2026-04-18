@@ -4,12 +4,12 @@
 
 namespace zephyr::geom::generator {
 
-class BaseVertex;
+class BaseNode;
 
 /// @brief Окружность, заданная параметрически
 class Circle : public Curve {
 private:
-    using BaseVertex_Ref = const std::shared_ptr<BaseVertex> &;
+    using BaseVertex_Ref = const std::shared_ptr<BaseNode> &;
 
 public:
     /// @brief Окружность по радиусу и центру

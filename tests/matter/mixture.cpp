@@ -453,7 +453,10 @@ int main() {
             ScalarSet rhos = {1.0 / ((gam_1 - 1.0) * Cv_1),
                               1.0 / ((gam_2 - 1.0) * Cv_2),
                               1.0 / ((gam_3 - 1.0) * Cv_3)};
-            rhos *= P_test / T_test;
+
+            for (int i = 0; i < mixture.size(); ++i) {
+                rhos[i] *= P_test / T_test;
+            }
 
             alpha = {beta[0] * rho_test / rhos[0],
                      beta[1] * rho_test / rhos[1],

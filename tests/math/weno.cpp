@@ -19,15 +19,8 @@ using generator::Rectangle;
 
 using zephyr::math::WENO5;
 
-struct _U_ {
-    double u;
-    double du_dx;
-
-    _U_() = default;
-};
-
-static _U_ U;
-
+static Storable<double> u;
+static Storable<double> du_dx;
 
 class TestFunc {
 public:
@@ -53,14 +46,15 @@ void test_1D(TestFunc test) {
     gen.set_nx(54);
 
     EuMesh cells(gen);
-    cells.add<_U_>("U");
+    u = cells.add<double>("u");
+    du_dx = cells.add<double>("du_dx");
 
     // Установить начальные данные (средние величины в ячейках)
     for (int i = 0; i < cells.nx(); ++i) {
         auto cell = cells[i];
         double x1 = cell.face(Side3D::L).x();
         double x2 = cell.face(Side3D::R).x();
-        cell(U).u = (test.integral(x2) - test.integral(x1)) / (x2 - x1);
+        cell[u] = (test.integral(x2) - test.integral(x1)) / (x2 - x1);
     }
 
     // Посчитаем численную производную
@@ -68,7 +62,7 @@ void test_1D(TestFunc test) {
         auto cell = cells[i];
         auto neib_r = cell.face(Side3D::R).neib();
         auto neib_l = cell.face(Side3D::L).neib();
-        cell(U).du_dx = (neib_r(U).u - neib_l(U).u) / (neib_r.center().x() - neib_l.center().x());
+        cell[du_dx] = (neib_r[u] - neib_l[u]) / (neib_r.center().x() - neib_l.center().x());
     }
 
     // Строим все полученные реконструкции
@@ -103,23 +97,23 @@ void test_1D(TestFunc test) {
         plt.plot(xs, exact, {.linestyle="solid", .linewidth=0.5, .color= "blue"});
 
         // Средние значения
-        plt.plot(std::vector{x1, x2}, std::vector{cell(U).u, cell(U).u}, {.linestyle="dashed", .linewidth=1.0, .color= "black"});
+        plt.plot(std::vector{x1, x2}, std::vector{cell[u], cell[u]}, {.linestyle="dashed", .linewidth=1.0, .color= "black"});
 
         // Наклоны
         std::vector<double> slopes(xs);
         for (int k = 0; k < M; ++k) {
-            slopes[k] = cell(U).u + (xs[k] - cell.x()) * cell(U).du_dx;;
+            slopes[k] = cell[u] + (xs[k] - cell.x()) * cell[du_dx];
         }
 
         plt.plot(xs, slopes, {.linestyle="solid", .linewidth=1.0, .color= "green"});
 
         // WENO
         WENO5 weno {
-            cells(i - 2, 0)(U).u,
-            cells(i - 1, 0)(U).u,
-            cells(i - 0, 0)(U).u,
-            cells(i + 1, 0)(U).u,
-            cells(i + 2, 0)(U).u
+            cells(i - 2, 0)[u],
+            cells(i - 1, 0)[u],
+            cells(i - 0, 0)[u],
+            cells(i + 1, 0)[u],
+            cells(i + 2, 0)[u]
         };
 
         plt.plot(std::vector{x1, x2}, std::vector{weno.m(), weno.p()}, {.linestyle="solid", .linewidth=1.0, .color= "orange"});

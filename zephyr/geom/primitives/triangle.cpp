@@ -5,12 +5,32 @@
 
 namespace zephyr::geom {
 
-inline double sqr(double x) {
-    return x * x;
-}
-
 Triangle::Triangle(const Vector3d& v1, const Vector3d& v2, const Vector3d& v3)
     : verts({v1, v2, v3}) { }
+
+void Triangle::sort(std::span<Vector3d, 3> verts) {
+    if ((verts[1] - verts[0]).cross(verts[2] - verts[0]).z() < 0.0) {
+        std::swap(verts[1], verts[2]);
+    }
+}
+
+void Triangle::sort(std::span<Vector3d, 3> verts, const Vector3d& view) {
+    constexpr double coeff = 1.0 / 3.0;
+    Vector3d dr = coeff * (verts[0] + verts[1] + verts[2]) - view;
+    if ((verts[1] - verts[0]).cross(verts[2] - verts[0]).dot(dr) < 0.0) {
+        std::swap(verts[1], verts[2]);
+    }
+}
+
+Triangle& Triangle::sort() {
+    sort(verts);
+    return *this;
+}
+
+Triangle& Triangle::sort(const Vector3d& view) {
+    sort(verts, view);
+    return *this;
+}
 
 Vector3d Triangle::pget(double x1, double x2, double x3) const {
     return verts[0] * x1 + verts[1] * x2 + verts[2] * x3;
@@ -30,13 +50,13 @@ Vector3d Triangle::normal() const {
     return (verts[1] - verts[0]).cross(verts[2] - verts[0]).normalized();
 }
 
-Vector3d Triangle::normal(const Vector3d& c) const {
+Vector3d Triangle::normal(const Vector3d& view) const {
     Vector3d n = normal();
-    return n.dot(verts[0] - c) > 0.0 ? n : -n;
+    return n.dot(verts[0] - view) > 0.0 ? n : -n;
 }
 
 Vector3d Triangle::center() const {
-    static const double coeff = 1.0 / 3.0;
+    constexpr double coeff = 1.0 / 3.0;
     return coeff * (verts[0] + verts[1] + verts[2]);
 }
 

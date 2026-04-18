@@ -4,6 +4,7 @@
 
 #include <zephyr/utils/mpi.h>
 #include <zephyr/geom/geom.h>
+#include <zephyr/geom/indexing.h>
 #include <zephyr/mesh/euler/amr_cells.h>
 
 using zephyr::utils::mpi;
@@ -49,6 +50,7 @@ void AmrCells::print_info(index_t ic) const {
         std::cout << "\t\t\t\tadj.index:  " << faces.adjacent.index[iface] << "\n";
         std::cout << "\t\t\t\tadj.alien:  " << faces.adjacent.alien[iface] << "\n";
         std::cout << "\t\t\t\tadj.basic:  " << faces.adjacent.basic[iface] << "\n";
+        std::cout << "\t\t\t\tadj.rotat:  " << int(faces.adjacent.rotation[iface]) << "\n";
     }
 }
 
@@ -158,10 +160,10 @@ int AmrCells::check_geometry(index_t ic) const {
         if (faces.is_undefined(iface)) continue;
 
         Vector3d fc(0.0, 0.0, 0.0);
-        for (int iv = 0; iv < VpF(m_dim); ++iv) {
+        for (int iv = 0; iv < indexing::VpF(m_dim); ++iv) {
             fc += verts[node_begin[ic] + faces.vertices[iface][iv]];
         }
-        fc /= VpF(m_dim);
+        fc /= indexing::VpF(m_dim);
 
         // Нормаль внешняя
         if (faces.normal[iface].dot(fc - center[ic]) < 0.0) {
@@ -514,6 +516,11 @@ int AmrCells::check_connectivity(index_t ic, const AmrCells& aliens) const {
                 print_info(ic);
                 return -1;
             }
+            if (adj.rotation[iface] != 0) {
+                std::cout << "\tBoundary face should point to origin cell (rotation)\n";
+                print_info(ic);
+                return -1;
+            }
             continue;
         }
 
@@ -530,10 +537,17 @@ int AmrCells::check_connectivity(index_t ic, const AmrCells& aliens) const {
             return -1;
         }
 
+        int n_symmetries = m_dim == 2 ? 8 : 48;
+        if (adj.rotation[iface] > n_symmetries) {
+            std::cout << "\tadjacent.rotation out of range\n";
+            print_info(ic);
+            return -1;
+        }
+
         if (adj.rank[iface] == mpi::rank()) {
             // Локальный сосед
             if (adj.index[iface] >= m_size) {
-                std::cout << "\tadjacent.index out of range #1\n";
+                std::cout << "\tadjacent.index out of range #2\n";
                 print_info(ic);
                 return -1;
             }
@@ -604,7 +618,8 @@ int AmrCells::check_connectivity(index_t ic, const AmrCells& aliens) const {
                 return -1;
             }
             // Указывает на исходную ячейку
-            if (neibs.faces.adjacent.index[jface] != ic) {
+            if (neibs.faces.adjacent.alien[jface] < 0 &&
+                neibs.faces.adjacent.index[jface] != ic) {
                 std::cout << "\tWrong connection (index != ic). " << f_name << " face\n";
                 std::cout << "\tCurrent cell:\n";
                 print_info(ic);
@@ -632,14 +647,14 @@ int AmrCells::check_connectivity(index_t ic, const AmrCells& aliens) const {
             }
         }
         if (counter < 1) {
-            std::cout << "\tHas no neighbor across ordinary " << f_name << "\n";
+            std::cout << "\tHas no neighbor across inner " << f_name << "\n";
             print_info(ic);
             std::cout << "\tNeighbor:\n";
             neibs.print_info(jc);
             return -1;
         }
         if (counter > 1) {
-            std::cout << "\tMore than one neighbor across ordinary face\n";
+            std::cout << "\tMore than one neighbor across inner face\n";
             print_info(ic);
             return -1;
         }

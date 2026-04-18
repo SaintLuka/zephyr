@@ -44,7 +44,6 @@ enum class CrpMode {
 /// газодинамики с равновесием по давлению и температуре.
 class MmFluid {
 public:
-
     /// @brief Расширенный вектор состояния на котором решается задача
     struct Parts {
         Storable<PState> init;  ///< Состояние на начало шага
@@ -54,52 +53,12 @@ public:
         /// @brief Градиент вектора состояния
         Storable<PState> d_dx, d_dy, d_dz;
 
-        Storable<VectorSet> n;      ///< Нормаль к реконструкции границы
-        Storable<VectorSet> p;      ///< Точка реконструкции границы
-        Storable<VectorSet> grad_a; ///< Градиент объемных долей (для CrpMode::MUSCL)
+        Storable<Vector3d[]> n;      ///< Нормаль к реконструкции границы
+        Storable<double[]>   p;      ///< Точка реконструкции границы
+        Storable<Vector3d[]> grad_a; ///< Градиент объемных долей (для CrpMode::MUSCL)
     };
-
-    /*
-        bool is_bad1() const { return get_state().is_bad(); }
-
-        bool is_bad2() const { return half.is_bad(); }
-
-        bool is_bad3() const { return next.is_bad(); }
-
-        bool is_bad() const { return is_bad1() || is_bad3(); }
-
-        /// @brief Собрать вектор состояния на предыдущем шаге
-        PState get_state() const {
-            return PState(density, velocity, pressure, energy,
-                          temperature, mass_frac, densities);
-        }
-
-        /// @brief Установить вектор состояния на предыдущем шаге
-        void set_state(const PState &z) {
-            density     = z.density;
-            velocity    = z.velocity;
-            pressure    = z.pressure;
-            energy      = z.energy;
-            temperature = z.temperature;
-
-            mass_frac   = z.mass_frac;
-            densities   = z.densities;
-        }
-
-        /// @brief Массив объемных долей
-        double vol_frac(int idx) const;
-
-        /// @brief Массив объемных долей
-        Fractions vol_fracs() const;
-    };
-
-    /// @brief В поток вывода
-    friend std::ostream &operator<<(std::ostream &os, const State &state);
-    */
 
     Parts part;
-
-
 
     /// @brief Конструктор класса
     explicit MmFluid(const phys::MixturePT &eos);
@@ -144,7 +103,7 @@ public:
     void update(EuMesh &mesh);
 
     /// @brief Сделать отсечение, построить поверхность
-    EuMesh body(EuMesh& mesh, int idx) const;
+    EuMesh domain(EuMesh& mesh, int idx) const;
 
     /// @brief Установить флаги адаптации
     void set_flags(EuMesh &mesh);
@@ -202,23 +161,5 @@ protected:
     double m_dt;        ///< Шаг интегрирования
     double m_max_dt;    ///< Максимальный шаг интегрирования
 };
-
-/*
-std::ostream &operator<<(std::ostream &os, const MmFluid::State &state) {
-    os << boost::format(
-            "Main state: density: %1%, velocity: {%2%, %3%, %4%}, pressure: %5%, temperature: %6%, energy: %7%, mass_frac: %8%\n") %
-          state.density % state.velocity.x() % state.velocity.y() % state.velocity.z() % state.pressure %
-          state.temperature % state.energy % state.mass_frac;
-    os << boost::format(
-            "Half state: density: %1%, velocity: {%2%, %3%, %4%}, pressure: %5%, temperature: %6%, energy: %7%, mass_frac: %8%\n") %
-          state.half.density % state.half.velocity.x() % state.half.velocity.y() % state.half.velocity.z() %
-          state.half.pressure % state.half.temperature % state.half.energy % state.half.mass_frac;
-    os << boost::format(
-            "Next state: density: %1%, velocity: {%2%, %3%, %4%}, pressure: %5%, temperature: %6%, energy: %7%, mass_frac: %8%\n") %
-          state.next.density % state.next.velocity.x() % state.next.velocity.y() % state.next.velocity.z() %
-          state.next.pressure % state.next.temperature % state.next.energy % state.next.mass_frac;
-    return os;
-}
-*/
 
 } // namespace zephyr

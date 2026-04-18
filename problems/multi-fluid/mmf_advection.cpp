@@ -1,91 +1,43 @@
-/// @file Двумерная задача переноса
+/// @file mmf_advection.cpp
+/// @brief Two-dimensional advection problem for two materials.
+/// Problem is simulated with multimaterial hydrodynamic solver.
 
-#include <iostream>
 #include <iomanip>
 
-#include <zephyr/geom/generator/strip.h>
-#include <zephyr/mesh/mesh.h>
+#include <zephyr/geom/generator/rectangle.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
 
-#include <zephyr/phys/tests/test_1D.h>
-
-#include <zephyr/math/solver/riemann.h>
+#include <zephyr/phys/matter/eos/ideal_gas.h>
+#include <zephyr/phys/matter/mixture_pt.h>
 #include <zephyr/math/solver/mm_fluid.h>
 
 #include <zephyr/io/pvd_file.h>
-#include <zephyr/io/csv_file.h>
+#include <zephyr/utils/threads.h>
 
-using namespace zephyr::io;
 using namespace zephyr::phys;
 using namespace zephyr::math;
 using namespace zephyr::math::mmf;
 
-using zephyr::mesh::generator::Strip;
-using zephyr::math::RiemannSolver;
-using zephyr::mesh::EuMesh;
+using zephyr::io::PvdFile;
+using zephyr::utils::threads;
 
-
-// Для быстрого доступа по типу
-MmFluid::State U;
-
-/// Переменные для сохранения
-double get_rho(AmrStorage::Item& cell) { return cell(U).density; }
-double get_vx(AmrStorage::Item& cell) { return cell(U).velocity.x(); }
-double get_vy(AmrStorage::Item& cell) { return cell(U).velocity.y(); }
-double get_p(AmrStorage::Item& cell) { return cell(U).pressure; }
-double get_e(AmrStorage::Item& cell) { return cell(U).energy; }
-double get_T(AmrStorage::Item &cell) { return cell(U).temperature; }
-double get_cln(AmrStorage::Item &cell) { return cell(U).mass_frac.index(); }
-double get_mfrac1(AmrStorage::Item &cell) { return cell(U).mass_frac[0]; }
-double get_mfrac2(AmrStorage::Item &cell) { return cell(U).mass_frac[1]; }
-double get_vfrac1(AmrStorage::Item &cell) { return cell(U).vol_frac(0); }
-double get_vfrac2(AmrStorage::Item &cell) { return cell(U).vol_frac(1); }
-double get_rho1(AmrStorage::Item &cell) { return cell(U).densities[0]; }
-double get_rho2(AmrStorage::Item &cell) { return cell(U).densities[1]; }
-double get_normal_x(AmrStorage::Item &cell) { return cell(U).n[0].x(); }
-double get_normal_y(AmrStorage::Item &cell) { return cell(U).n[0].y(); }
-
+// Indicator function of the domain
+bool inside(const Vector3d& r) {
+    return std::abs(r.x() - 0.15) < 0.1 && std::abs(r.y() - 0.50) < 0.1;
+}
 
 int main() {
-    // Материал
+    threads::on();
+
+    // Two identical materials
     double gamma = 1.4;
     Eos::Ptr sg1 = IdealGas::create(gamma, 1.0);
     Eos::Ptr sg2 = IdealGas::create(gamma, 1.0);
 
-    // Формальная смесь
+    // Formal mixture
     MixturePT mixture = {sg1, sg2};
 
-    // Файл для записи
-    PvdFile pvd("Transfer2D", "output");
-    PvdFile pvd_body("body", "output");
-
-    // Переменные для сохранения
-    pvd.variables += {"cln", get_cln};
-    pvd.variables += {"rho", get_rho};
-    pvd.variables += {"vx", get_vx};
-    pvd.variables += {"vy", get_vy};
-    pvd.variables += {"e", get_e};
-    pvd.variables += {"P", get_p};
-    pvd.variables += {"T", get_T};
-    pvd.variables += {"b1", get_mfrac1};
-    pvd.variables += {"b2", get_mfrac2};
-    pvd.variables += {"a1", get_vfrac1};
-    pvd.variables += {"a2", get_vfrac2};
-    pvd.variables += {"rho1", get_rho1};
-    pvd.variables += {"rho2", get_rho2};
-    pvd.variables += {"n.x", get_normal_x};
-    pvd.variables += {"n.y", get_normal_y};
-
-
-    // Создаем одномерную сетку
-    Rectangle gen(0.0, 1.0, 0.0, 0.7);
-    gen.set_nx(200);
-    gen.set_boundaries({.left=Boundary::ZOE, .right=Boundary::ZOE,
-                        .bottom=Boundary::ZOE, .top=Boundary::ZOE});
-
-    // Создать сетку
-    EuMesh mesh(gen, U);
-
-    // Создать решатель
+    // Create and configure solver
     MmFluid solver(mixture);
     solver.set_CFL(0.5);
     solver.set_accuracy(1);
@@ -93,46 +45,63 @@ int main() {
     solver.set_crp_mode(CrpMode::PLIC);
     solver.set_splitting(DirSplit::SIMPLE);
 
+    // Generator of a Cartesian grid
+    generator::Rectangle gen(0.0, 1.0, 0.0, 0.7);
+    gen.set_nx(200);
+    gen.set_boundaries({Boundary::ZOE, Boundary::ZOE, Boundary::ZOE, Boundary::ZOE});
+
+    // Create mesh
+    EuMesh mesh(gen);
+
+    // Add data fields, choose main data layer
+    auto data = solver.add_types(mesh);
+    auto z = data.init;
+
+    // Files for output
+    PvdFile pvd("Advection2D", "output");
+    PvdFile pvd_domain("domain", "output");
+
+    // Variables to save
+    pvd.variables = {"level"};
+    pvd.variables += {"cln", [z](EuCell cell) -> double { return cell[z].mass_frac.index(); }};
+    pvd.variables += {"rho", [z](EuCell cell) -> double { return cell[z].density; }};
+    pvd.variables += {"vx",  [z](EuCell cell) -> double { return cell[z].velocity.x(); }};
+    pvd.variables += {"vy",  [z](EuCell cell) -> double { return cell[z].velocity.y(); }};
+    pvd.variables += {"e",   [z](EuCell cell) -> double { return cell[z].energy; }};
+    pvd.variables += {"P",   [z](EuCell cell) -> double { return cell[z].pressure; }};
+    pvd.variables += {"T",   [z](EuCell cell) -> double { return cell[z].temperature; }};
+    pvd.variables += {"b0",  [z](EuCell cell) -> double { return cell[z].mass_frac[0]; }};
+    pvd.variables += {"b1",  [z](EuCell cell) -> double { return cell[z].mass_frac[1]; }};
+    pvd.variables += {"a0",  [z](EuCell cell) -> double { return cell[z].alpha(0); }};
+    pvd.variables += {"a1",  [z](EuCell cell) -> double { return cell[z].alpha(1); }};
+    pvd.variables += {"rho0",[z](EuCell cell) -> double { return cell[z].densities[0]; }};
+    pvd.variables += {"rho1",[z](EuCell cell) -> double { return cell[z].densities[1]; }};
+    pvd.variables += {"n.x", [n=data.n](EuCell cell) -> double { return cell[n][0].x(); }};
+    pvd.variables += {"n.y", [n=data.n](EuCell cell) -> double { return cell[n][0].y(); }};
+
+    // Initial conditions
     for (auto cell: mesh) {
-        Vector3d r = cell.center();
+        cell[z].velocity    = {0.7, -0.35, 0.0};
+        cell[z].density     = 1.0;
+        cell[z].pressure    = 1.0 / gamma;
+        //cell[z].energy      = 1.0 / (gamma * (gamma - 1.0));
+        //cell[z].temperature = 1.0;
 
-        bool in = std::abs(r.x() - 0.15) < 0.1 &&
-                  std::abs(r.y() - 0.50) < 0.1;
+        //if (r.x() < 0.1) cell[z].mass_frac[0]  = 0.0;
+        //if (std::abs(r.x() - 0.2) < 0.1) cell[z].mass_frac[0]  = (r.x() - 0.1) / 0.2;
+        //if (r.x() > 0.3) cell[z].mass_frac[0]  = 1.0;
 
-        cell(U).velocity    = {0.7, -0.35, 0.0};
-        cell(U).density     = 1.0;
-        cell(U).pressure    = 1.0 / gamma;
-        //cell(U).energy      = 1.0 / (gamma * (gamma - 1.0));
-        //cell(U).temperature = 1.0;
+        cell[z].mass_frac[0] = inside(cell.center()) ? 1.0 : 0.0;
+        cell[z].mass_frac[1] = 1.0 - cell[z].mass_frac[0];
 
-        /*
-        if (r.x() < 0.1) {
-            cell(U).mass_frac[0]  = 0.0;
-        }
-        if (std::abs(r.x() - 0.2) < 0.1) {
-            cell(U).mass_frac[0]  = (r.x() - 0.1) / 0.2;
-        }
-        if (r.x() > 0.3) {
-            cell(U).mass_frac[0]  = 1.0;
-        }
-         */
-        cell(U).mass_frac[0] = in ? 1.0 : 0.0;
-        cell(U).mass_frac[1] = 1.0 - cell(U).mass_frac[0];
+        cell[z].densities[0] = cell[z].mass_frac[0] > 0.0 ? cell[z].density : NAN;
+        cell[z].densities[1] = cell[z].mass_frac[1] > 0.0 ? cell[z].density : NAN;
 
-        cell(U).densities[0] = cell(U).mass_frac[0] > 0.0 ? cell(U).density : NAN;
-        cell(U).densities[1] = cell(U).mass_frac[1] > 0.0 ? cell(U).density : NAN;
+        //cell[z].density = 1.0 / mixture.volume_PT(cell[z].pressure, cell[z].temperature, cell[z].mass_frac);
+        //cell[z].energy = mixture.energy_PT(cell[z].pressure, cell[z].temperature, cell[z].mass_frac);
 
-        /*
-        cell(U).density = 1.0 / mixture.volume_PT(
-                cell(U).pressure, cell(U).temperature, cell(U).mass_frac);
-        cell(U).energy = mixture.energy_PT(
-                cell(U).pressure, cell(U).temperature, cell(U).mass_frac);
-                */
-        cell(U).energy      = mixture.energy_rP(
-                cell(U).density, cell(U).pressure, cell(U).mass_frac);
-        cell(U).temperature = mixture.temperature_rP(
-                cell(U).density, cell(U).pressure, cell(U).mass_frac);
-
+        cell[z].energy      = mixture.energy_rP     (cell[z].density, cell[z].pressure, cell[z].mass_frac);
+        cell[z].temperature = mixture.temperature_rP(cell[z].density, cell[z].pressure, cell[z].mass_frac);
     }
 
     size_t n_step = 0;
@@ -147,22 +116,26 @@ int main() {
             pvd.save(mesh, curr_time);
 
             solver.interface_recovery(mesh);
-            auto body_mesh = solver.body(mesh, 0);
-            pvd_body.save(body_mesh, curr_time);
+            auto domain = solver.domain(mesh, 0);
+            pvd_domain.save(domain, curr_time);
 
-            next_write += 0.0;// max_time / 200;
+            next_write += max_time / 200;
         }
 
-        // Точное завершение в end_time
+        // Finish exactly at max_time
         solver.set_max_dt(max_time - curr_time);
 
-        // Обновляем слои
+        // Integration step
         solver.update(mesh);
 
         curr_time += solver.dt();
         n_step += 1;
     }
     pvd.save(mesh, max_time);
+
+    solver.interface_recovery(mesh);
+    auto domain = solver.domain(mesh, 0);
+    pvd_domain.save(domain, curr_time);
 
     return 0;
 }

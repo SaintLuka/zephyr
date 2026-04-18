@@ -125,19 +125,13 @@ mmf::Flux HLL::flux(const mmf::PState &zL, const mmf::PState &zR, const MixtureP
 mmf::Flux HLL::calc_flux(const mmf::PState &zL, const mmf::PState &zR, const MixturePT &mix) {
     using namespace mmf;
 
-    // Нормальные скорости слева и справа
-    const double& u_L = zL.velocity.x();
-    const double& u_R = zR.velocity.x();
-
     // Скорость звука слева и справа
-    double c_L = mix.sound_speed_rP(zL.density, zL.pressure, zL.mass_frac,
-                                    {.T0 = zL.T(), .rhos = &zL.densities});
-    double c_R = mix.sound_speed_rP(zR.density, zR.pressure, zR.mass_frac,
-                                    {.T0 = zR.T(), .rhos = &zR.densities});
+    double c_L = mix.sound_speed_rP(zL.rho(), zL.P(), zL.beta(), {.T0 = zL.T(), .rhos = zL.rhos()});
+    double c_R = mix.sound_speed_rP(zR.rho(), zR.P(), zR.beta(), {.T0 = zR.T(), .rhos = zR.rhos()});
 
     // Оценки скоростей расходящихся волн
-    double S_L = min(u_L - c_L, u_R - c_R, 0.0);
-    double S_R = max(u_L + c_L, u_R + c_R, 0.0);
+    double S_L = min(zL.vx() - c_L, zR.vx() - c_R, 0.0);
+    double S_R = max(zL.vx() + c_L, zR.vx() + c_R, 0.0);
 
     QState Q_L(zL); // Консервативный вектор слева
     QState Q_R(zR); // Консервативный вектор справа
@@ -160,19 +154,14 @@ mmf::Flux HLL::calc_flux(const mmf::PState &zL, const mmf::PState &zR, const Mix
     return F;
 }
 
-mmf::WaveConfig2 HLL::wave_config(const MixturePT& mix,
-                                  const mmf::PState& zL, const mmf::PState& zR) {
-    // Нормальные скорости слева и справа
-    const double &u_L = zL.velocity.x();
-    const double &u_R = zR.velocity.x();
-
+mmf::WaveConfig2 HLL::wave_config(const MixturePT& mix, const mmf::PState& zL, const mmf::PState& zR) {
     // Скорость звука слева и справа
-    double c_L = mix.sound_speed_rP(zL.density, zL.pressure, zL.mass_frac, {.T0=zL.T(), .rhos=&zL.rhos()});
-    double c_R = mix.sound_speed_rP(zR.density, zR.pressure, zR.mass_frac, {.T0=zR.T(), .rhos=&zR.rhos()});
+    double c_L = mix.sound_speed_rP(zL.rho(), zL.P(), zL.beta(), {.T0 = zL.T(), .rhos = zL.rhos()});
+    double c_R = mix.sound_speed_rP(zR.rho(), zR.P(), zR.beta(), {.T0 = zR.T(), .rhos = zR.rhos()});
 
     // Оценки скоростей расходящихся волн
-    double S_L = min(u_L - c_L, u_R - c_R, 0.0);
-    double S_R = max(u_L + c_L, u_R + c_R, 0.0);
+    double S_L = min(zL.vx() - c_L, zR.vx() - c_R, 0.0);
+    double S_R = max(zL.vx() + c_L, zR.vx() + c_R, 0.0);
 
     mmf::QState Q_L(zL); // Консервативный вектор слева
     mmf::QState Q_R(zR); // Консервативный вектор справа
@@ -195,8 +184,11 @@ mmf::WaveConfig2 HLL::wave_config(const MixturePT& mix,
     double eL = Q_L.energy / Q_L.density - 0.5 * vL.squaredNorm();
     double eR = Q_R.energy / Q_R.density - 0.5 * vR.squaredNorm();
 
-    Fractions beta_L = Q_L.mass_frac.arr() / Q_L.density;
-    Fractions beta_R = Q_R.mass_frac.arr() / Q_R.density;
+    Fractions beta_L, beta_R;
+    for (int i = 0; i < mix.size(); ++i) {
+        beta_L[i] = Q_L.mass_frac[i] / Q_L.density;
+        beta_R[i] = Q_R.mass_frac[i] / Q_R.density;
+    }
 
     // Скорость звука слева и справа
     double c_L = mix.sound_speed_re(Q_L.density, eL, beta_L);

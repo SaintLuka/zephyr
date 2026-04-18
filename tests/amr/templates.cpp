@@ -42,42 +42,42 @@ struct _U_ {
     double err_new()   const { return err_n.norm(); }
 };
 
-_U_ U;
+static Storable<_U_> U;
 
 // Переменные для сохранения
-double get_interesting(EuCell& cell)  { return double(cell(U).target); }
-double get_u(EuCell& cell) { return cell(U).u; }
-double get_ux(EuCell& cell) { return cell(U).grad.x(); }
-double get_uy(EuCell& cell) { return cell(U).grad.y(); }
-double get_du_dx_o(EuCell& cell) { return cell(U).grad_o.x(); }
-double get_du_dy_o(EuCell& cell) { return cell(U).grad_o.y(); }
-double get_err_x_o(EuCell& cell) { return cell(U).err_o.x(); }
-double get_err_y_o(EuCell& cell) { return cell(U).err_o.y(); }
-double get_du_dx_n(EuCell& cell) { return cell(U).grad_n.x(); }
-double get_du_dy_n(EuCell& cell) { return cell(U).grad_n.y(); }
-double get_err_x_n(EuCell& cell) { return cell(U).err_n.x(); }
-double get_err_y_n(EuCell& cell) { return cell(U).err_n.y(); }
-double get_du_dx_g(EuCell& cell) { return cell(U).grad_g.x(); }
-double get_du_dy_g(EuCell& cell) { return cell(U).grad_g.y(); }
-double get_err_x_g(EuCell& cell) { return cell(U).err_g.x(); }
-double get_err_y_g(EuCell& cell) { return cell(U).err_g.y(); }
+int get_interesting(EuCell& cell)  { return cell[U].target; }
+double get_u(EuCell& cell) { return cell[U].u; }
+double get_ux(EuCell& cell) { return cell[U].grad.x(); }
+double get_uy(EuCell& cell) { return cell[U].grad.y(); }
+double get_du_dx_o(EuCell& cell) { return cell[U].grad_o.x(); }
+double get_du_dy_o(EuCell& cell) { return cell[U].grad_o.y(); }
+double get_err_x_o(EuCell& cell) { return cell[U].err_o.x(); }
+double get_err_y_o(EuCell& cell) { return cell[U].err_o.y(); }
+double get_du_dx_n(EuCell& cell) { return cell[U].grad_n.x(); }
+double get_du_dy_n(EuCell& cell) { return cell[U].grad_n.y(); }
+double get_err_x_n(EuCell& cell) { return cell[U].err_n.x(); }
+double get_err_y_n(EuCell& cell) { return cell[U].err_n.y(); }
+double get_du_dx_g(EuCell& cell) { return cell[U].grad_g.x(); }
+double get_du_dy_g(EuCell& cell) { return cell[U].grad_g.y(); }
+double get_err_x_g(EuCell& cell) { return cell[U].err_g.x(); }
+double get_err_y_g(EuCell& cell) { return cell[U].err_g.y(); }
 
 
 // Расчет градиента методом Гаусса
 void gauss(EuCell &cell) {
-    if (!cell(U).target) {
-        cell(U).grad_g = Vector2d::Zero();
-        cell(U).err_g  = Vector2d::Zero();
+    if (!cell[U].target) {
+        cell[U].grad_g = Vector2d::Zero();
+        cell[U].err_g  = Vector2d::Zero();
         return;
     }
 
-    double zc = cell(U).u;
+    double zc = cell[U].u;
 
     Vector2d F = Vector2d::Zero();
     for (auto &face: cell.faces()) {
         auto neib = face.neib();
 
-        double zn = neib(U).u;
+        double zn = neib[U].u;
 
         Vector3d S = face.normal() * face.area();
 
@@ -93,26 +93,26 @@ void gauss(EuCell &cell) {
     }
     F /= cell.volume();
 
-    cell(U).grad_g = F;
-    cell(U).err_g = (cell(U).grad_g - cell(U).grad).cwiseAbs();
+    cell[U].grad_g = F;
+    cell[U].err_g = (cell[U].grad_g - cell[U].grad).cwiseAbs();
 }
 
 // Расчет градиента старым МНК
 void LSM_old(EuCell &cell) {
-    if (!cell(U).target) {
-        cell(U).grad_o = Vector2d::Zero();
-        cell(U).err_o  = Vector2d::Zero();
+    if (!cell[U].target) {
+        cell[U].grad_o = Vector2d::Zero();
+        cell[U].err_o  = Vector2d::Zero();
         return;
     }
 
-    double zc = cell(U).u;
+    double zc = cell[U].u;
 
     Vector3d F = Vector3d::Zero();
     Matrix3d A = Matrix3d::Zero();
     for (auto &face: cell.faces()) {
         auto neib = face.neib();
 
-        double zn = neib(U).u;
+        double zn = neib[U].u;
 
         Vector3d dr = neib.center() - cell.center();
 
@@ -124,26 +124,26 @@ void LSM_old(EuCell &cell) {
     }
 
     Vector3d grad = A.colPivHouseholderQr().solve(F);
-    cell(U).grad_o = {grad.x(), grad.y()};
-    cell(U).err_o = (cell(U).grad_o - cell(U).grad).cwiseAbs();
+    cell[U].grad_o = {grad.x(), grad.y()};
+    cell[U].err_o = (cell[U].grad_o - cell[U].grad).cwiseAbs();
 }
 
 // Расчет градиента новым МНК
 void LSM_new(EuCell &cell) {
-    if (!cell(U).target) {
-        cell(U).grad_n = Vector2d::Zero();
-        cell(U).err_n  = Vector2d::Zero();
+    if (!cell[U].target) {
+        cell[U].grad_n = Vector2d::Zero();
+        cell[U].err_n  = Vector2d::Zero();
         return;
     }
 
-    double zc = cell(U).u;
+    double zc = cell[U].u;
 
     Vector3d F = Vector3d::Zero();
     Matrix3d A = Matrix3d::Zero();
     for (auto &face: cell.faces()) {
         auto neib = face.neib();
 
-        double zn = neib(U).u;
+        double zn = neib[U].u;
 
         Vector3d dr = neib.center() - cell.center();
 
@@ -157,8 +157,8 @@ void LSM_new(EuCell &cell) {
     }
 
     Vector3d grad = A.colPivHouseholderQr().solve(F);
-    cell(U).grad_n = {grad.x(), grad.y()};
-    cell(U).err_n = (cell(U).grad_n - cell(U).grad).cwiseAbs();
+    cell[U].grad_n = {grad.x(), grad.y()};
+    cell[U].err_n = (cell[U].grad_n - cell[U].grad).cwiseAbs();
 }
 
 // Количество двумерных шаблонов
@@ -173,7 +173,7 @@ EuMesh get_template(int num, double H) {
         rect.set_nx(3);
 
         EuMesh mesh(rect);
-        mesh.add<_U_>("U");
+        U = mesh.add<_U_>("U");
         mesh.set_max_level(1);
 
         if (num == 0) {
@@ -232,7 +232,7 @@ EuMesh get_template(int num, double H) {
         mesh.refine();
         for (auto cell: mesh) {
             if (cell.center().norm() < 0.1 * H) {
-                cell(U).target = 1;
+                cell[U].target = 1;
             }
         }
 
@@ -243,7 +243,7 @@ EuMesh get_template(int num, double H) {
         rect.set_nx(2);
 
         EuMesh mesh(rect);
-        mesh.add<_U_>("U");
+        U = mesh.add<_U_>("U");
         mesh.set_max_level(2);
 
         if (num == 6) {
@@ -293,7 +293,7 @@ EuMesh get_template(int num, double H) {
         mesh.refine();
         for (auto cell: mesh) {
             if (cell.center().norm() < 0.1 * H) {
-                cell(U).target = 1;
+                cell[U].target = 1;
             }
         }
 
@@ -396,8 +396,8 @@ void set_data(EuMesh& mesh,
               std::function<Vector2d(double, double)> grad) {
 
     for (auto cell: mesh) {
-        cell(U).u    = func(cell.x(), cell.y());
-        cell(U).grad = grad(cell.x(), cell.y());
+        cell[U].u    = func(cell.x(), cell.y());
+        cell[U].grad = grad(cell.x(), cell.y());
     }
 
     mesh.for_each(gauss);
@@ -458,10 +458,10 @@ int main() {
             //set_data(mesh, test_arb_func, test_arb_grad);
 
             for (auto cell: mesh) {
-                if (cell(U).target) {
-                    lsm_old.push_back(cell(U).err_orig());
-                    lsm_new.push_back(cell(U).err_new());
-                    gauss.push_back(cell(U).err_gauss());
+                if (cell[U].target) {
+                    lsm_old.push_back(cell[U].err_orig());
+                    lsm_new.push_back(cell[U].err_new());
+                    gauss.push_back(cell[U].err_gauss());
                     break;
                 }
             }

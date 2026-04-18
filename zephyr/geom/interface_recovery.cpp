@@ -16,14 +16,14 @@ inline double cross(const Vector3d& v1, const Vector3d& v2) {
 
 // Производная по теореме Гаусса--Остроградского
 void InterfaceRecovery::compute_normal(EuCell &cell) const {
-    double uc = cell(a);
+    double uc = cell[a];
 
     if (uc < 1.0e-12 || uc > 1.0 - 1.0e-12) {
-        cell(n) = Vector3d::Zero();
+        cell[n] = Vector3d::Zero();
         return;
     }
 
-    cell(n) = Vector3d::Zero();
+    cell[n] = Vector3d::Zero();
     for (auto &face: cell.faces()) {
         if (face.is_boundary()) {
             continue;
@@ -32,10 +32,10 @@ void InterfaceRecovery::compute_normal(EuCell &cell) const {
         double un = face.neib(a);
 
         Vector3d S = face.normal() * face.area();
-        cell(n) -= face_fraction(uc, un) * S;
+        cell[n] -= face_fraction(uc, un) * S;
     }
 
-    cell(n).normalize();
+    cell[n].normalize();
 }
 
 void InterfaceRecovery::compute_normals(EuMesh &mesh) const {
@@ -45,11 +45,11 @@ void InterfaceRecovery::compute_normals(EuMesh &mesh) const {
 }
 
 void InterfaceRecovery::find_section(EuCell &cell) const {
-    if (cell(n).isZero()) {
-        cell(p) = cell.center();
+    if (cell[n].isZero()) {
+        cell[p] = cell.center();
     } else {
         auto poly = cell.polygon();
-        cell(p) = poly.find_section(cell(n), cell(a));
+        cell[p] = poly.find_section(cell[n], cell[a]);
     }
 }
 
@@ -60,11 +60,11 @@ void InterfaceRecovery::find_sections(EuMesh &mesh) const {
 }
 
 void InterfaceRecovery::adjust_normal(EuCell &cell) const {
-    if (cell(n).isZero()) {
+    if (cell[n].isZero()) {
         return;
     }
 
-    obj::plane plane{cell(p), cell(n)};
+    obj::plane plane{cell[p].dot(cell[n]), cell[n]};
 
     std::vector <Vector3d> ints;
     for (auto face: cell.faces()) {
@@ -78,7 +78,7 @@ void InterfaceRecovery::adjust_normal(EuCell &cell) const {
                     ints.emplace_back(seg.get(-0.001));
                 }
             } else {
-                obj::segment seg2{plane.p, face.neib(p)};
+                obj::segment seg2{plane.r0(), face.neib(p)};
                 Vector3d vi = intersection2D::find_fast(seg, seg2);
                 ints.emplace_back(vi);
             }
@@ -86,14 +86,14 @@ void InterfaceRecovery::adjust_normal(EuCell &cell) const {
     }
 
     if (ints.size() > 1) {
-        cell(n) = {ints[0].y() - ints[1].y(),
-                       ints[1].x() - ints[0].x(), 0.0};
+        cell[n] = {ints[0].y() - ints[1].y(),
+                   ints[1].x() - ints[0].x(), 0.0};
 
-        if (cell(n).dot(plane.n) < 0.0) {
-            cell(n) *= -1.0;
+        if (cell[n].dot(plane.n) < 0.0) {
+            cell[n] *= -1.0;
         }
 
-        cell(n).normalize();
+        cell[n].normalize();
     }
 }
 
@@ -115,7 +115,7 @@ void InterfaceRecovery::update(EuMesh &mesh, int smoothing) const {
 EuMesh InterfaceRecovery::body(EuMesh& mesh) const {
     int count = 0;
     for (auto cell: mesh) {
-        if (cell(a) < 1.0e-12) {
+        if (cell[a] < 1.0e-12) {
             continue;
         }
         ++count;
@@ -129,24 +129,24 @@ EuMesh InterfaceRecovery::body(EuMesh& mesh) const {
 
     count = 0;
     for (auto cell: mesh) {
-        if (cell(a) < 1.0e-12) {
+        if (cell[a] < 1.0e-12) {
             continue;
         }
 
-        if (cell(a) < 1.0 - 1.0e-12) {
-            if (cell(n).isZero()) {
-                double d = 0.5 * std::sqrt(cell(a) * cell.volume());
+        if (cell[a] < 1.0 - 1.0e-12) {
+            if (cell[n].isZero()) {
+                double d = 0.5 * std::sqrt(cell[a] * cell.volume());
                 Polygon poly = {
-                        cell(p) + Vector3d{-d, -d, 0.0},
-                        cell(p) + Vector3d{+d, -d, 0.0},
-                        cell(p) + Vector3d{+d, +d, 0.0},
-                        cell(p) + Vector3d{-d, +d, 0.0},
+                        cell[p] + Vector3d{-d, -d, 0.0},
+                        cell[p] + Vector3d{+d, -d, 0.0},
+                        cell[p] + Vector3d{+d, +d, 0.0},
+                        cell[p] + Vector3d{-d, +d, 0.0},
                 };
                 cells.push_back(poly);
             }
             else {
                 auto poly = cell.polygon();
-                auto part = poly.clip(cell(p), cell(n));
+                auto part = poly.clip(cell[p], cell[n]);
                 cells.push_back(part);
             }
         }

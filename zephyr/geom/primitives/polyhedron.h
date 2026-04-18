@@ -134,8 +134,7 @@ public:
     //Тоже самое методом Брента
     Vector3d find_section_brent(const Vector3d& n, double alpha) const;
 
-    /// @brief Посчитать объемную долю, которая отсекается от ячейки некоторым
-    /// телом, точки которого определяются характеристической функцией inside
+    /// @brief Объемная доля, которая отсекается от ячейки некоторым телом.
     /// @param inside Характеристическая функция: true, если точка находится
     /// внутри тела, иначе false
     /// @param n_points Число тестовых точек, погрешность ~ 1/N.
@@ -212,9 +211,9 @@ protected:
     std::vector<std::vector<int>> faces;  ///< Индексы вершин граней
 
     // Вычисляемые
-    Vector3d m_center;                    ///< Центр многогранника
-    std::vector<Vector3d> faces_c;        ///< Центры граней
-    std::vector<Vector3d> faces_s;        ///< Нормаль с площадью
+    Vector3d m_center{};                  ///< Центр многогранника
+    std::vector<Vector3d> faces_c{};      ///< Центры граней
+    std::vector<Vector3d> faces_s{};      ///< Нормаль с площадью
 };
 
 /// @brief Вывод многогранника

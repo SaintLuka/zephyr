@@ -18,14 +18,16 @@
 #endif
 
 #include <array>
+#include <bitset>
 
 #include <zephyr/configuration.h>
 
+#include <zephyr/geom/side.h>
+#include <zephyr/geom/indexing.h>
 #include <zephyr/geom/primitives/line.h>
 #include <zephyr/geom/primitives/quad.h>
 #include <zephyr/geom/primitives/cube.h>
 
-#include <zephyr/mesh/side.h>
 #include <zephyr/mesh/euler/eu_prim.h>
 #include <zephyr/mesh/euler/tourism.h>
 
@@ -38,6 +40,7 @@
 
 namespace zephyr::mesh::amr {
 
+namespace indexing = geom::indexing;
 using geom::Vector3d;
 using geom::Line;
 using geom::Quad;
@@ -45,6 +48,12 @@ using geom::SqQuad;
 using geom::Cube;
 using geom::SqCube;
 using geom::Boundary;
+
+using geom::indexing::FpF;
+using geom::indexing::FpC;
+using geom::indexing::FpC;
+using geom::indexing::CpC;
+
 using mesh::AmrCells;
 using mesh::Children;
 
@@ -62,27 +71,25 @@ using utils::Stopwatch;
 static constexpr size_t check_frequency = 100;
 #endif
 
-// Локальные индексы ячеек, прилегающих к стороне.
-template<int dim>
-constexpr std::array<std::array<int, FpF(dim)>, FpC(dim)> get_children_by_side() {
-    if constexpr (dim == 2) {
-        return {
-            std::array<int, 2>({0, 2}),
-            std::array<int, 2>({1, 3}),
-            std::array<int, 2>({0, 1}),
-            std::array<int, 2>({2, 3})
-        };
+inline index_t pack_children(index_t next, std::bitset<8> children) {
+    z_assert(next < (1 << 23), "Too large next");
+    return static_cast<index_t>((children.to_ulong() << 24) + next);
+}
+
+inline std::tuple<index_t, std::bitset<8>> unpack_children(index_t next) {
+    return {static_cast<std::make_unsigned_t<index_t>>(next) % (1 << 24), std::bitset<8>(next >> 24) };
+}
+
+// coded_children - закодированные дочерние ячейки, формата bitset<8> [01010101]
+// z_ch локальный индекс дочерней ячейки (внутри родительской)
+inline int child_next(index_t coded_next, int z_ch) {
+    auto[next, children] = unpack_children(coded_next);
+    scrutiny_check(children[z_ch], "Has no such children");
+    // Узнать номер nc внутри cset
+    for (int i = 0; i < z_ch; ++i) {
+        if (children[i]) ++next;
     }
-    else {
-        return {
-            std::array<int, 4>({0, 2, 4, 6}),
-            std::array<int, 4>({1, 3, 5, 7}),
-            std::array<int, 4>({0, 1, 4, 5}),
-            std::array<int, 4>({2, 3, 6, 7}),
-            std::array<int, 4>({0, 1, 2, 3}),
-            std::array<int, 4>({4, 5, 6, 7})
-        };
-    }
+    return next;
 }
 
 } // namespace zephyr::mesh::amr

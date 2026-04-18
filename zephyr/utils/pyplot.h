@@ -47,6 +47,12 @@ struct arrow_options {
     std::optional<double>      head_width  = std::nullopt;
 };
 
+/// @brief Опции текста pyplot.text
+struct text_options {
+    std::optional<std::string> ha = std::nullopt; // {"left", "center", "right"}
+    std::optional<std::string> va = std::nullopt; // {"baseline", "bottom", "center", "center_baseline", "top"}
+};
+
 /// @brief Опции фукнции scatter plot
 struct scatter_options {
     /// @brief Размер маркера. Единственно число, либо массив чисел
@@ -122,7 +128,7 @@ public:
 
     void grid(bool enable) const nopython;
 
-    void set_aspect_equal() const;
+    void set_aspect_equal() const nopython;
 
     void xlim(double xmin, double xmax) const nopython;
 
@@ -142,7 +148,7 @@ public:
 
     void ylabel(const std::string& text) const nopython;
 
-    void text(double x, double y, const std::string& text) const nopython;
+    void text(double x, double y, const std::string& text, const text_options& args = {}) const nopython;
 
     /// @}
 

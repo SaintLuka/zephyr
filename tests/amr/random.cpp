@@ -35,37 +35,48 @@ void set_flag(EuCell& cell) {
     }
 }
 
-int main() {
-    threads::on();
+int main(int argc, char** argv) {
+    mpi::handler init(argc, argv);
+    threads::init(argc, argv);
+    threads::info();
 
     Rectangle gen(-1.0, 1.0, -1.0, 1.0);
     gen.set_nx(50);
 
     EuMesh mesh(gen);
     mesh.set_max_level(4);
+    mesh.set_decomposition("XY");
 
     PvdFile pvd("mesh", "output");
     pvd.variables = {"rank", "index", "next", "level", "flag", "faces2D"};
 
     if (mesh.check_base() < 0) {
-        std::cout << "Bad init mesh\n";
+        mpi::cout << "Bad init mesh\n";
         return 0;
     }
 
     Stopwatch elapsed;
     Stopwatch sw_write;
+    Stopwatch sw_balancing;
     Stopwatch sw_set_flags;
     Stopwatch sw_refine;
 
-    std::cout << "RUN\n";
+    mpi::cout << "RUN\n";
     elapsed.start();
     for (int step = 0; step < 1000; ++step) {
         if (step % 20 == 0) {
-            std::cout << "  Step " << std::setw(4) << step << " / 1000\n";
+            mpi::cout << "  Step " << std::setw(4) << step << " / 1000\n";
             sw_write.resume();
             pvd.save(mesh, step);
             sw_write.stop();
         }
+        
+        sw_balancing.resume();
+        if (step % 20 == 0) {
+            mesh.balancing();
+            mesh.redistribute();
+        }
+        sw_balancing.stop();
 
         sw_set_flags.resume();
         mesh.for_each(set_flag);
@@ -80,18 +91,12 @@ int main() {
         //}
     }
     elapsed.stop();
-
-    std::cout << "\nElapsed:     " << elapsed.extended_time()
-              << " ( " << elapsed.milliseconds() << " ms)\n";
-
-    std::cout << "  Write:     " << sw_write.extended_time()
-              << " ( " << sw_write.milliseconds() << " ms)\n";
-
-    std::cout << "  Set flags: " << sw_set_flags.extended_time()
-              << " ( " << sw_set_flags.milliseconds() << " ms)\n";
-
-    std::cout << "  Refine:    " << sw_refine.extended_time()
-              << " ( " << sw_refine.milliseconds() << " ms)\n";
+    
+    mpi::cout << "\nElapsed:     " << elapsed.extended_time() << " ( " << elapsed.milliseconds() << " ms)\n";
+    mpi::cout << "  Write:      " << sw_write.extended_time() << " ( " << sw_write.milliseconds() << " ms)\n";
+    mpi::cout << "  Balancing:  " << sw_balancing.extended_time() << " ( " << sw_balancing.milliseconds() << " ms)\n";
+    mpi::cout << "  Set flags:  " << sw_set_flags.extended_time() << " ( " << sw_set_flags.milliseconds() << " ms)\n";
+    mpi::cout << "  Refine:     " << sw_refine.extended_time() << " ( " << sw_refine.milliseconds() << " ms)\n";
 
     return 0;
 }

@@ -12,165 +12,169 @@
 
 namespace zephyr::geom::generator::collection {
 
-/// @brief PlaneWithCube gen(0, 3.2, 0, 3.2, 1.6, 1.6, 0.3); должно быть симметричным. пока только так)
 PlaneWithCube::PlaneWithCube(
         double xmin, double xmax,
         double ymin, double ymax,
         double xc, double yc,
         double r) :
-        BlockStructured(8),
+        Generator("collection.plane-with-cube"),
         m_xmin(xmin), m_xmax(xmax),
         m_ymin(ymin), m_ymax(ymax),
         m_xc(xc), m_yc(yc),
-        m_r(r), m_xi(2.0) {
+        m_r(r) {
 
-    m_name = "collection.plane-with-cube";
+    double a = r;
+    double b = 1.7 * a;
+    
+    double x1 = m_xmin;
+    double x2 = m_xc - b;
+    double x3 = m_xc;
+    double x4 = m_xc + b;
+    double x5 = m_xmax;
+    double y1 = m_ymin;
+    double y2 = m_yc - b;
+    double y3 = m_yc;
+    double y4 = m_yc + b;
+    double y5 = m_ymax;
 
-    init_blocks();
+    double d = 0.5 * a;
+
+    v01 = BaseNode::create(x1, y1);
+    v02 = BaseNode::create(x2, y1);
+    v03 = BaseNode::create(x3, y1);
+    v04 = BaseNode::create(x4, y1);
+    v05 = BaseNode::create(x5, y1);
+    v06 = BaseNode::create(x1, y2);
+    v07 = BaseNode::create(x2, y2);
+    v08 = BaseNode::create(x3, y2);
+    v09 = BaseNode::create(x4, y2);
+    v10 = BaseNode::create(x5, y2);
+    v11 = BaseNode::create(x1, y3);
+    v12 = BaseNode::create(x2, y3);
+    v13 = BaseNode::create(x3-a, y3);
+    v14 = BaseNode::create(x3-d, y3-d);
+    v15 = BaseNode::create(x3, y3-a);
+    v16 = BaseNode::create(x3+d, y3-d);
+    v17 = BaseNode::create(x3+a, y3);
+    v18 = BaseNode::create(x4, y3);
+    v19 = BaseNode::create(x5, y3);
+    v20 = BaseNode::create(x1, y4);
+    v21 = BaseNode::create(x2, y4);
+    v22 = BaseNode::create(x3-d, y3+d);
+    v23 = BaseNode::create(x3, y3+a);
+    v24 = BaseNode::create(x3, y4);
+    v25 = BaseNode::create(x3+d, y3+d);
+    v26 = BaseNode::create(x4, y4);
+    v27 = BaseNode::create(x5, y4);
+    v28 = BaseNode::create(x1, y5);
+    v29 = BaseNode::create(x2, y5);
+    v30 = BaseNode::create(x3, y5);
+    v31 = BaseNode::create(x4, y5);
+    v32 = BaseNode::create(x5, y5);
+
+    m_blocks += {v01, v02, v06, v07};
+    m_blocks += {v02, v03, v07, v08};
+    m_blocks += {v03, v04, v08, v09};
+    m_blocks += {v04, v05, v09, v10};
+
+    m_blocks += {v06, v07, v11, v12};
+    m_blocks += {v07, v14, v12, v13};
+    m_blocks += {v07, v08, v14, v15};
+    m_blocks += {v08, v09, v15, v16};
+    m_blocks += {v16, v09, v17, v18};
+    m_blocks += {v09, v10, v18, v19};
+
+    m_blocks += {v11, v12, v20, v21};
+    m_blocks += {v12, v13, v21, v22};
+    m_blocks += {v22, v21, v23, v24};
+    m_blocks += {v23, v25, v24, v26};
+    m_blocks += {v17, v18, v25, v26};
+    m_blocks += {v18, v19, v26, v27};
+
+    m_blocks += {v20, v21, v28, v29};
+    m_blocks += {v21, v24, v29, v30};
+    m_blocks += {v24, v26, v30, v31};
+    m_blocks += {v26, v27, v31, v32};
+
+    left  = Plane::create(v01, v28);
+    right = Plane::create(v05, v32);
+    bottom = Plane::create(v01, v05);
+    top   = Plane::create(v28, v32);
+    side1 = Plane::create(v13, v15);
+    side2 = Plane::create(v15, v17);
+    side3 = Plane::create(v13, v23);
+    side4 = Plane::create(v23, v17);
+
+    m_blocks.set_boundary({v01, v06, v11, v20, v28}, left);
+    m_blocks.set_boundary({v05, v10, v19, v27, v32}, right);
+    m_blocks.set_boundary({v01, v02, v03, v04, v05}, bottom);
+    m_blocks.set_boundary({v28, v29, v30, v31, v32}, top);
+    m_blocks.set_boundary({v13, v14, v15}, side1);
+    m_blocks.set_boundary({v15, v16, v17}, side2);
+    m_blocks.set_boundary({v13, v22, v23}, side3);
+    m_blocks.set_boundary({v23, v25, v17}, side4);
+
+    //m_blocks.plot_layout();
+    //m_blocks.set_verbosity(5);
+    m_blocks.set_iters_count(100);
+    m_blocks.optimize();
 }
 
-/// @brief 8 x 20 
 void PlaneWithCube::set_nx(int Nx) {
-
-    // TODO
-    m_blocks[0].set_size(v1, v7, 8);
-    m_blocks[0].set_size(v1, v5, 20);
-
-    m_blocks[1].set_size(v1, v2, 8);
-
-    m_blocks[2].set_size(v2, v3, 8);
-
-    m_blocks[3].set_size(v3, v10, 8);
-
-    m_blocks[4].set_size(v10, v16, 8);
-
-    m_blocks[5].set_size(v15, v16, 8);
-
-    m_blocks[6].set_size(v14, v15, 8);
-
-    m_blocks[7].set_size(v7, v14, 8);
+    m_blocks.set_size({v01, v02, v03, v04, v05}, Nx); // Нижняя граница
+    m_blocks.set_size({v28, v29, v30, v31, v32}, Nx); // Верхняя граница
 }
 
-
-void PlaneWithCube::set_boundaries(Boundaries bounds) {
-    m_bounds = bounds;
+void PlaneWithCube::set_ny(int Ny) {
+    m_blocks.set_size({v01, v06, v11, v20, v28}, Ny); // Левая граница
+    m_blocks.set_size({v05, v10, v19, v27, v32}, Ny); // Правая граница
 }
 
+void PlaneWithCube::set_boundaries(Boundaries bounds) const {
+    left->set_boundary(bounds.left);
+    right->set_boundary(bounds.right);
+    bottom->set_boundary(bounds.bottom);
+    top->set_boundary(bounds.top);
+    side1->set_boundary(bounds.hole);
+    side2->set_boundary(bounds.hole);
+    side3->set_boundary(bounds.hole);
+    side4->set_boundary(bounds.hole);
+}
 
-void PlaneWithCube::init_blocks() {
-    check_params();
+void PlaneWithCube::set_axial(bool axial) {
+    m_blocks.set_axial(axial);
+}
 
-    //снизу вверх
-    v1 = BaseVertex::create(m_xmin, m_ymin, true);
-    v2 = BaseVertex::create(m_xc,   m_ymin, false);
-    v3 = BaseVertex::create(m_xmax, m_ymin, true);
+void PlaneWithCube::set_adaptive(bool adaptive) {
+    m_blocks.set_adaptive(adaptive);
+}
 
-    v4 = BaseVertex::create(m_xc, m_yc - m_r, true);
-
-    v5 = BaseVertex::create(m_xc - 0.5 * m_r, m_yc - 0.5 * m_r, false);
-    v6 = BaseVertex::create(m_xc + 0.5 * m_r, m_yc - 0.5 * m_r, false);
-
-    v7 = BaseVertex::create(m_xmin,      m_yc, false);
-    v8 = BaseVertex::create(m_xc - m_r,  m_yc, true);
-    v9 = BaseVertex::create(m_xc + m_r,  m_yc, true);
-    v10 = BaseVertex::create(m_xmax,     m_yc, false);
-
-    v11 = BaseVertex::create(m_xc - 0.5 * m_r, m_yc + 0.5 * m_r, false);
-    v12 = BaseVertex::create(m_xc + 0.5 * m_r, m_yc + 0.5 * m_r, false);
-
-    v13 = BaseVertex::create(m_xc, m_yc + m_r, true);
-
-    v14 = BaseVertex::create(m_xmin, m_ymax, true);
-    v15 = BaseVertex::create(m_xc,   m_ymax, false);
-    v16 = BaseVertex::create(m_xmax, m_ymax, true);
-
-
-    // Ограничивающие прямые области
-    cube_side1 = Plane::create(v4, v8);
-    cube_side2 = Plane::create(v4, v9);
-    cube_side3 = Plane::create(v9, v13);
-    cube_side4 = Plane::create(v13, v8);
-    left   = Plane::create(v1, v14);
-    right  = Plane::create(v3, v16);
-    bottom = Plane::create(v1, v3);
-    top    = Plane::create(v14, v16);
-
-    cube_side1->set_boundary(m_bounds.hole);
-    cube_side2->set_boundary(m_bounds.hole);
-    cube_side3->set_boundary(m_bounds.hole);
-    cube_side4->set_boundary(m_bounds.hole);
-    left->set_boundary(m_bounds.left);
-    right->set_boundary(m_bounds.right);
-    bottom->set_boundary(m_bounds.bottom);
-    top->set_boundary(m_bounds.top);
-
-    // Генератор сетки
-    m_blocks[0] = {v1, v5, v7, v8};
-    m_blocks[0].set_boundary(v1, v7, left);
-    m_blocks[0].set_boundary(v5, v8, cube_side1);
-
-    m_blocks[1] = {v1, v2, v4, v5};
-    m_blocks[1].set_boundary(v1, v2, bottom);
-    m_blocks[1].set_boundary(v4, v5, cube_side1);
-
-    m_blocks[2] = {v2, v3, v4, v6};
-    m_blocks[2].set_boundary(v2, v3, bottom);
-    m_blocks[2].set_boundary(v4, v6, cube_side2);
-
-    m_blocks[3] = {v3, v6, v9, v10};
-    m_blocks[3].set_boundary(v6, v9, cube_side2);
-    m_blocks[3].set_boundary(v3, v10, right);
-
-    m_blocks[4] = {v9, v10, v12, v16};
-    m_blocks[4].set_boundary(v9, v12, cube_side3);
-    m_blocks[4].set_boundary(v10, v16, right);
-
-    m_blocks[5] = {v12, v13, v15, v16};
-    m_blocks[5].set_boundary(v12, v13, cube_side3);
-    m_blocks[5].set_boundary(v15, v16, top);
-
-    m_blocks[6] = {v11, v13, v14, v15};
-    m_blocks[6].set_boundary(v11, v13, cube_side4);
-    m_blocks[6].set_boundary(v14, v15, top);
-
-    m_blocks[7] = {v7, v8, v11, v14};
-    m_blocks[7].set_boundary(v8, v11, cube_side4);
-    m_blocks[7].set_boundary(v7, v14, left);
-
-    // Необходимо связать блоки
-    link();
-
-    // Точность сглаживания (необязательно)
-    set_accuracy(1.0e-5);
+void PlaneWithCube::set_linear(bool linear) {
+    m_blocks.set_linear(linear);
 }
 
 Box PlaneWithCube::bbox() const {
     Vector3d vmin(m_xmin, m_ymin, 0.0);
     Vector3d vmax(m_xmax, m_ymax, 0.0);
-
     return {vmin, vmax};
 }
 
 void PlaneWithCube::check_params() const {
     if (m_xmin >= m_xmax) {
-        std::string message = "PlaneWithCube Error: x_min >= x_max";
-        std::cerr << message << "\n";
-        throw std::runtime_error(message);
+        throw std::runtime_error("PlaneWithCube Error: x_min >= x_max");
     }
     if (m_ymin >= m_ymax) {
-        std::string message = "PlaneWithCube Error: y_min >= y_max";
-        std::cerr << message << "\n";
-        throw std::runtime_error(message);
+        throw std::runtime_error("PlaneWithCube Error: y_min >= y_max");
     }
 
-    double R = m_r * m_xi;
-    if (m_xmin >= m_xc - R || m_xmax <= m_xc + R
-        || m_ymin >= m_yc - R || m_ymax <= m_yc + R) {
-        std::string message = "PlaneWithCube Error: big hole";
-        std::cerr << message << "\n";
-        throw std::runtime_error(message);
-
+    double R = 1.5 * m_r;
+    if (m_xmin >= m_xc - R || m_xmax <= m_xc + R || m_ymin >= m_yc - R || m_ymax <= m_yc + R) {
+        throw std::runtime_error("PlaneWithCube Error: big hole");
     }
+}
+
+Grid PlaneWithCube::make() const {
+    return m_blocks.make();
 }
 
 } // namespace zephyr::geom::generator::collection

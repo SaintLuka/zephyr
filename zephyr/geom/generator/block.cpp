@@ -1,546 +1,521 @@
 #include <algorithm>
+#include <cassert>
 #include <array>
-#include <map>
+#include <memory>
 #include <set>
-
-#include <zephyr/geom/primitives/cube.h>
+#include <format>
 
 #include <zephyr/geom/generator/block.h>
 #include <zephyr/geom/generator/bs_vertex.h>
 #include <zephyr/geom/generator/curve/curve.h>
 
+#include <zephyr/geom/intersection.h>
+#include <zephyr/geom/primitives/triangle.h>
+#include <zephyr/math/funcs.h>
 
 namespace zephyr::geom::generator {
 
-inline int next(int idx) {
-    return (idx + 1) % 4;
+inline bool good_number(double num) {
+    return !std::isinf(num) && !std::isnan(num) && num > 0.0;
 }
 
-inline int prev(int idx) {
-    return (idx + 3) % 4;
+inline bool bad_number(double num) {
+    return std::isinf(num) || std::isnan(num) || num <= 0.0;
 }
 
-inline int opp(int idx) {
-    return (idx + 2) % 4;
+// Перпендикулярная ось
+constexpr Axis orthogonal(Axis axis) {
+    return axis == Axis::X ? Axis::Y : Axis::X;
 }
 
-Block::Block(int index)
-    : m_index(index) {
-
-    m_size1 = 0;
-    m_size2 = 0;
-    m_boundaries = {nullptr, nullptr, nullptr, nullptr};
-    m_base_vertices = {nullptr, nullptr, nullptr, nullptr};
-    m_adjacent_blocks = {nullptr, nullptr, nullptr, nullptr};
-    m_rotations = {-1, -1, -1, -1};
+// Стороны, которые лежат вдоль выбранной оси
+constexpr std::array<Side, 2> sides_by_axis(Axis axis) {
+    return axis == Axis::X? std::array{Side::B, Side::T} : std::array{Side::L, Side::R};
 }
 
-int Block::index() const {
-    return m_index;
-}
-
-int Block::size(BaseVertex::Ref bv1, BaseVertex::Ref bv2) const {
-    return face_index(bv1, bv2) % 2 ? m_size2 : m_size1;
-}
-
-int Block::size1() const {
-    return m_size1;
-}
-
-int Block::size2() const {
-    return m_size2;
-}
-
-Block &Block::operator=(std::initializer_list<BaseVertex::Ptr> vertices) {
-    if (vertices.size() != 4) {
-        throw std::runtime_error("Wrong number of base vertices");
+// Переход к индексации сторон против часовой стрелки
+constexpr int side_to_idx(Side side) {
+    z_assert(0 <= static_cast<int>(side) && static_cast<int>(side) < 4,
+        "side_to_idx: Invalid side");
+    switch (side) {
+        case Side::BOTTOM: return 0;
+        case Side::RIGHT:  return 1;
+        case Side::TOP:    return 2;
+        case Side::LEFT:
+        default:           return 3;
     }
+}
 
-    std::vector<std::pair<double, BaseVertex::Ptr>> vec_verts;
-    for (auto &v: vertices) {
-        vec_verts.emplace_back(std::make_pair(0.0, v));
+// Переход от индексации сторон против часовой стрелки
+constexpr Side idx_to_side(int idx) {
+    z_assert(0 <= idx && idx < 4, "idx_to_side: Invalid side");
+    switch (idx) {
+        case 0: return Side::BOTTOM;
+        case 1: return Side::RIGHT;
+        case 2: return Side::TOP;
+        case 3:
+        default: return Side::LEFT;
     }
+}
 
-    Vector3d v0 = {0.0, 0.0, 0.0};
+// Индекс базисной вершины на стороне
+constexpr int node_idx(Side side, int idx) {
+    z_assert(0 <= static_cast<int>(side) && static_cast<int>(side) < 4,
+        "node_idx: Invalid side");
+    switch (side) {
+        case Side::LEFT:   return std::array{2, 0}[idx];
+        case Side::RIGHT:  return std::array{1, 3}[idx];
+        case Side::BOTTOM: return std::array{0, 1}[idx];
+        case Side::TOP:
+        default:           return std::array{3, 2}[idx];
+    }
+}
+
+// Поворот одного блока относительно другого при смежных сторонах (side1, side2)
+constexpr int rotation(Side side1, Side side2) {
+    int f1 = side_to_idx(side1);
+    int f2 = side_to_idx(side2);
+    return (f1 - f2 + 4) % 4;
+}
+
+// Пара сторон, связанных с вершиной (обход против часовой внутри блока)
+constexpr std::tuple<Side, Side> node_incident_sides(int v_idx) {
+    z_assert(0 <= v_idx && v_idx < 4, "node_incident_sides: Invalid index");
+    switch (v_idx) {
+        case 0: return {Side::B, Side::L};
+        case 1: return {Side::R, Side::B};
+        case 2: return {Side::L, Side::T};
+        case 3:
+        default: return {Side::T, Side::R};
+    }
+}
+
+Block::Block(const std::array<BaseNode::Ptr, 4>& nodes) {
+    for (const auto& node: nodes) {
+        if (!node) {
+            throw std::runtime_error("Block::creat: node does not exist (nullptr)");
+        }
+    }
+    // Центр блока
+    Vector3d vc = Vector3d::Zero();
+    for (const auto& v: nodes) {
+        vc += v->pos();
+    }
+    vc *= 0.25;
+
+    // Пары (угол, вершина)
+    std::array<std::pair<double, BaseNode::Ptr>, 4> sorted;
     for (int i = 0; i < 4; ++i) {
-        v0 += vec_verts[i].second->v();
-    }
-    v0 /= 4;
-
-    for (int i = 0; i < 4; ++i) {
-        vec_verts[i].first =
-            std::atan2(vec_verts[i].second->v().y() - v0.y(),
-                       vec_verts[i].second->v().x() - v0.x());
-
-        if (vec_verts[i].first < vec_verts[0].first) {
-            vec_verts[i].first += 2.0 * M_PI;
+        sorted[i].second = nodes[i];
+        sorted[i].first = std::atan2(sorted[i].second->y() - vc.y(),
+                                     sorted[i].second->x() - vc.x());
+        if (sorted[i].first < sorted[0].first) {
+            sorted[i].first += 2.0 * M_PI;
         }
     }
 
-    std::sort(vec_verts.begin(), vec_verts.end(),
-              [](const std::pair<double, BaseVertex::Ptr> &p1, const
-              std::pair<double, BaseVertex::Ptr> &p2) {
+    // Сортировка по углу
+    std::sort(sorted.begin() + 1, sorted.end(),
+              [](const std::pair<double, BaseNode::Ptr> &p1,
+                 const std::pair<double, BaseNode::Ptr> &p2) {
                   return p1.first < p2.first;
               });
 
-    for (int i = 0; i < 4; ++i) {
-        m_base_vertices[i] = vec_verts[i].second;
-    }
-
-    return *this;
+    // Z-ordering
+    m_base_nodes[0] = sorted[0].second;
+    m_base_nodes[1] = sorted[1].second;
+    m_base_nodes[2] = sorted[3].second;
+    m_base_nodes[3] = sorted[2].second;
 }
 
-bool Block::is_boundary(BaseVertex::Ref v) const {
-    for (auto block: v->adjacent_blocks()) {
-        int v_idx = block->vertex_index(v);
-        if (block->boundary(v_idx) != nullptr ||
-            block->boundary(prev(v_idx)) != nullptr) {
-            return true;
+Block::Ptr Block::create(const std::array<BaseNode::Ptr, 4>& nodes) {
+    return std::make_shared<Block>(nodes);
+}
+
+void Block::set_index(int i) {
+    if (i < 0) {
+        throw std::out_of_range("Block::set_index error: invalid index");
+    }
+    m_index = i;
+}
+
+// ---------- Геометрия ------------------------------------------------------------------------------------------------
+
+Vector3d Block::center() const {
+    return 0.25 * (m_base_nodes[0]->pos() + m_base_nodes[1]->pos() +
+                   m_base_nodes[2]->pos() + m_base_nodes[3]->pos());
+}
+
+Vector3d Block::center(Side side) const {
+    Vector3d v1 = base_node(side, 0)->pos();
+    Vector3d v2 = base_node(side, 1)->pos();
+    Vector3d vc = 0.5 * (v1 + v2);
+    if (boundary(side)) {
+        vc = boundary(side)->projection(vc);
+    }
+    return vc;
+}
+
+double Block::length(Side side) const {
+    Vector3d v1 = base_node(side, 0)->pos();
+    Vector3d v2 = base_node(side, 1)->pos();
+    return (v2 - v1).norm();
+}
+
+// ---------- Базисные вершины -----------------------------------------------------------------------------------------
+
+int Block::base_node_index(const BaseNode* v) const {
+    if (!v) { throw std::logic_error("Block::base_node_index: BaseNode is nullptr"); }
+    for (int idx = 0; idx < 4; ++idx) {
+        if (m_base_nodes[idx].get() == v) {
+            return idx;
         }
     }
-    return false;
+    throw std::runtime_error("Block::base_node_index: can't find base node");
 }
 
-Curve::Ref Block::boundary(int f_idx) const {
-    return m_boundaries[f_idx];
+BaseNode::Ptr Block::base_node(Side side, int idx) const {
+    return m_base_nodes[node_idx(side, idx)];
 }
 
-Block* Block::adjacent_block(int f_idx) const {
-    return m_adjacent_blocks[f_idx];
+std::tuple<Side, Side> Block::incident_sides(const BaseNode* v) const {
+    if (!v) { throw std::runtime_error("Block::incident_sides: BaseNode is nullptr"); }
+    return node_incident_sides(base_node_index(v));
 }
 
-BaseVertex::Ptr Block::base_vertex(int v_idx) const {
-    return m_base_vertices[v_idx];
+std::tuple<Side, Side> Block::incident_sides(BaseNode::Ref v) const {
+    return incident_sides(v.get());
 }
 
-int Block::vertex_index(BaseVertex::Ref v) const {
-    int idx = 0;
-    while (idx < 4 && m_base_vertices[idx] != v) {
-        ++idx;
+std::tuple<BaseNode::Ptr, BaseNode::Ptr> Block::adjacent_nodes(const BaseNode* v) const {
+    if (!v) { throw std::runtime_error("Block::adjacent_nodes: BaseNode is nullptr"); }
+    switch (base_node_index(v)) {
+        case 0: return {base_node(1), base_node(2)};
+        case 1: return {base_node(3), base_node(0)};
+        case 2: return {base_node(0), base_node(3)};
+        case 3: return {base_node(2), base_node(1)};
+        default: throw std::runtime_error("Block::adjacent_nodes: invalid BaseNode index");
     }
-    if (idx >= 4) {
-        throw std::runtime_error("Can't find base vertex");
-    }
-    return idx;
 }
 
-int Block::face_index(BaseVertex::Ref v1, BaseVertex::Ref v2) const {
-    int idx = vertex_index(v1);
+// ---------- Границы блока ------------------ -------------------------------------------------------------------------
 
-    auto i = m_base_vertices[next(idx)];
-    auto j = m_base_vertices[prev(idx)];
+Curve::Ref Block::boundary(Side side) const {
+    return m_boundaries[static_cast<int>(side)];
+}
 
-    if (v2 == m_base_vertices[next(idx)]) {
-        return idx;
+void Block::set_boundary(Side side, Curve::Ref curve) {
+    m_boundaries[static_cast<int>(side)] = curve;
+    m_adjacent_blocks[static_cast<int>(side)].reset();
+}
+
+void Block::set_boundary(BaseNode::Ref v1, BaseNode::Ref v2, Curve::Ref curve) {
+    set_boundary(get_side(v1, v2), curve);
+}
+
+// ---------- Выбор сторон и смежные блоки ----------- -----------------------------------------------------------------
+
+Side Block::get_side(BaseNode::Ref v1, BaseNode::Ref v2) const {
+    // Глупый полный перебор, хотя тут всего по 4 узла/грани
+    int idx_v1 = base_node_index(v1);
+    int idx_v2 = base_node_index(v2);
+    z_assert(idx_v1 != idx_v2, "Block::get_side: invalid side, two same nodes");
+    if (idx_v2 < idx_v1) {
+        std::swap(idx_v1, idx_v2);
     }
-    else if (v2 == m_base_vertices[prev(idx)]) {
-        return prev(idx);
+
+    for (Side side: sides_2D) {
+        int idx_w1 = node_idx(side, 0);
+        int idx_w2 = node_idx(side, 1);
+        if (idx_w2 < idx_w1) {
+            std::swap(idx_w1, idx_w2);
+        }
+
+        if (idx_v1 == idx_w1 && idx_v2 == idx_w2) {
+            return side;
+        }
+    }
+
+    for (Side side: sides_2D) {
+        int idx_w1 = node_idx(side, 0);
+        int idx_w2 = node_idx(side, 1);
+        if (idx_w2 < idx_w1) {
+            std::swap(idx_w1, idx_w2);
+        }
+
+        if (idx_v1 == idx_w1 && idx_v2 == idx_w2) {
+            return side;
+        }
+    }
+    throw std::runtime_error("Block::get_side: can't find face between two vertices");
+}
+
+Axis Block::get_axis(BaseNode::Ref v1, BaseNode::Ref v2) const {
+    return to_axis(get_side(v1, v2));
+}
+
+Block::Ptr Block::adjacent_block(Side side) const {
+    return m_adjacent_blocks[static_cast<int>(side)].lock();
+}
+
+Side Block::twin_face(Side side) const {
+    int f_idx = side_to_idx(side);
+    return idx_to_side((f_idx - m_rotations[static_cast<int>(side)] + 4) % 4);
+}
+
+// ---------- Функции "верхнего уровня" --------------------------------------------------------------------------------
+
+void Block::link(Block::Ref B1, Block::Ref B2) {
+    if (!B1 || !B2) {
+        throw std::runtime_error("Block::link: Block is nullptr");
+    }
+    if (B1 == B2) {
+        throw std::logic_error("Block::link: can't link same blocks");
+    }
+
+    // Ищем просто полным перебором
+    for (Side side1: sides_2D) {
+        BaseNode::Ptr a1 = B1->base_node(side1, 0);
+        BaseNode::Ptr b1 = B1->base_node(side1, 1);
+        if (a1.get() > b1.get()) std::swap(a1, b1);
+
+        for (Side side2: sides_2D) {
+            BaseNode::Ptr a2 = B2->base_node(side2, 0);
+            BaseNode::Ptr b2 = B2->base_node(side2, 1);
+            if (a2.get() > b2.get()) std::swap(a2, b2);
+
+            if (a1 == a2 && b1 == b2) {
+                if (B1->boundary(side1)) {
+                    throw std::runtime_error("Block::link: attempt to link through boundary #1");
+                }
+                B1->m_adjacent_blocks[static_cast<int>(side1)] = B2;
+                B1->m_rotations[static_cast<int>(side1)] = rotation(side1, side2);
+
+                if (B2->boundary(side2)) {
+                    throw std::runtime_error("Block::link: attempt to link through boundary #1");
+                }
+                B2->m_adjacent_blocks[static_cast<int>(side2)] = B1;
+                B2->m_rotations[static_cast<int>(side2)] = rotation(side2, side1);
+            }
+        }
+    }
+}
+
+Table2D Block::create_vertices(AxisPair<int> sizes) const {
+    if (m_mapping.empty()) {
+        return create_vertices_init(sizes);
     }
     else {
-        throw std::runtime_error("Can't find face between two vertices");
+        return create_vertices_again(sizes);
     }
 }
 
-void Block::set_boundary(BaseVertex::Ref v1, BaseVertex::Ref v2, Curve::Ref curve) {
-    m_boundaries[face_index(v1, v2)] = curve;
-}
-
-BsVertex::Ptr Block::vertex(int i, int j) const {
-    assert(i <= m_size1);
-    assert(j <= m_size2);
-
-    return m_vertices[i][j];
-}
-
-int Block::size(int f_idx) const {
-    return f_idx % 2 ? m_size2 : m_size1;
-}
-
-void Block::set_size(BaseVertex::Ref v1, BaseVertex::Ref v2, int N) {
-    int k = face_index(v1, v2);
-    if (k % 2) {
-        m_size2 = N;
-    } else {
-        m_size1 = N;
+Table2D Block::create_vertices_init(AxisPair<int> sizes) const {
+    if (sizes[Axis::X] * sizes[Axis::Y] > 10'000'000) {
+        throw std::runtime_error("Block::create_vertices_init: too much vertices");
     }
 
-    for (int l: {k, opp(k)}) {
-        if (m_adjacent_blocks[l]) {
-            BaseVertex::Ref BV1 = m_base_vertices[l];
-            BaseVertex::Ref BV2 = m_base_vertices[next(l)];
-            if (m_adjacent_blocks[l]->size(BV1, BV2) != N) {
-                m_adjacent_blocks[l]->set_size(BV1, BV2, N);
+    Table2D vertices({sizes[Axis::X] + 1, sizes[Axis::Y] + 1}, nullptr);
+
+    for (Side side: sides_2D) {
+        Vector3d p1 = base_node(side, 0)->pos();
+        Vector3d p2 = base_node(side, 1)->pos();
+
+        for (int i = 0; i <= sizes[side]; ++i) {
+            double x = static_cast<double>(i) / sizes[side];
+            vertices.boundary(side, i) = BsVertex::create((1.0 - x) * p1 + x * p2);
+        }
+
+        if (boundary(side)) {
+            auto curve = boundary(side);
+            for (int idx = 1; idx < sizes[side]; ++idx) {
+                Vector3d p = vertices.boundary(side, idx)->pos;
+                vertices.boundary(side, idx)->pos = curve->projection(p);
+            }
+
+            // Сглаживание границы
+            for (int k = 0; k < 10; ++k) {
+                for (int idx = 1; idx < sizes[side]; ++idx) {
+                    Vector3d v = 0.5 * (vertices.boundary(side, idx - 1)->pos +
+                                        vertices.boundary(side, idx + 1)->pos);
+                    vertices.boundary(side, idx)->next = curve->projection(v);
+                }
+
+                for (int idx = 1; idx < sizes[side]; ++idx) {
+                    vertices.boundary(side, idx)->pos = vertices.boundary(side, idx)->next;
+                }
             }
         }
     }
-}
 
-BsVertex::Ptr &Block::corner_vertex(int v_idx) {
-    switch (v_idx) {
-        case 0:
-            return m_vertices[0][0];
-        case 1:
-            return m_vertices[m_size1][0];
-        case 2:
-            return m_vertices[m_size1][m_size2];
-        default:
-            return m_vertices[0][m_size2];
-    }
-}
+    // Генерация внутренних вершин, Coons patch.
+    for (int i = 1; i < sizes[Axis::X]; ++i) {
+        for (int j = 1; j < sizes[Axis::Y]; ++j) {
+            double t = static_cast<double>(i) / sizes[Axis::X];
+            double s = static_cast<double>(j) / sizes[Axis::Y];
 
-BsVertex::Ptr &Block::boundary_vertex(int f_idx, int idx) {
-    switch (f_idx) {
-        case 0:
-            return m_vertices[idx][0];
-        case 1:
-            return m_vertices[m_size1][idx];
-        case 2:
-            return m_vertices[m_size1 - idx][m_size2];
-        default:
-            return m_vertices[0][m_size2 - idx];
-    }
-}
-
-BsVertex::Ptr &Block::preboundary_vertex(int f_idx, int idx) {
-    switch (f_idx) {
-        case 0:
-            return m_vertices[idx][1];
-        case 1:
-            return m_vertices[m_size1 - 1][idx];
-        case 2:
-            return m_vertices[m_size1 - idx][m_size2 - 1];
-        default:
-            return m_vertices[1][m_size2 - idx];
-    }
-}
-
-int Block::neib_face(int f_idx) const {
-    return (f_idx - m_rotations[f_idx] + 4) % 4;
-}
-
-void Block::link(Block* block) {
-    for (int f1 = 0; f1 < 4; ++f1) {
-        BaseVertex::Ptr a1 = base_vertex(f1);
-        BaseVertex::Ptr b1 = base_vertex(next(f1));
-
-        for (int f2 = 0; f2 < 4; ++f2) {
-            BaseVertex::Ptr a2 = block->base_vertex(f2);
-            BaseVertex::Ptr b2 = block->base_vertex(next(f2));
-
-            if (a1 == b2 && b1 == a2) {
-                m_adjacent_blocks[f1] = block;
-                block->m_adjacent_blocks[f2] = this;
-
-                m_rotations[f1] = (f1 - f2 + 4) % 4;
-                block->m_rotations[f2] = (f2 - f1 + 4) % 4;
-            }
+            Vector3d Lc = (1 - t) * vertices(0, j)->pos + t * vertices(-1, j)->pos;
+            Vector3d Ld = (1 - s) * vertices(i, 0)->pos + s * vertices(i, -1)->pos;
+            Vector3d B = (1 - t) * (1 - s) * vertices(0, 0)->pos + (1 - t) * s * vertices(0, -1)->pos +
+                         t * (1 - s) * vertices(-1, 0)->pos + t * s * vertices(-1, -1)->pos;
+            Vector3d v = Lc + Ld - B;
+            vertices(i, j) = BsVertex::create(v.x(), v.y());
         }
     }
+    return vertices;
 }
 
-void Block::create_vertices() {
-    m_vertices.resize(m_size1 + 1, std::vector<BsVertex::Ptr>(m_size2 + 1, nullptr));
-
-    using zephyr::geom::SqQuad;
-
-    Vector3d v0 = base_vertex(0)->v();
-    Vector3d v1 = base_vertex(1)->v();
-    Vector3d v2 = base_vertex(3)->v();
-    Vector3d v3 = base_vertex(2)->v();
-    Vector3d vL = (v0 + v2) / 2.0;
-    Vector3d vR = (v1 + v3) / 2.0;
-    Vector3d vB = (v0 + v1) / 2.0;
-    Vector3d vT = (v2 + v3) / 2.0;
-
-    if (m_boundaries[3]) {
-        vL = m_boundaries[3]->projection(vL);
+Table2D Block::create_vertices_again(AxisPair<int> sizes) const {
+    if (sizes[Axis::X] * sizes[Axis::Y] > 10'000'000) {
+        throw std::runtime_error("Block::create_vertices_again: too much vertices");
     }
-    if (m_boundaries[1]) {
-        vR = m_boundaries[1]->projection(vR);
+    if (m_mapping.empty()) {
+        throw std::runtime_error("Block::create_vertices_again: empty mapping array #1");
     }
-    if (m_boundaries[0]) {
-        vB = m_boundaries[0]->projection(vB);
-    }
-    if (m_boundaries[2]) {
-        vT = m_boundaries[2]->projection(vT);
+    if (m_mapping.size1() < 2 || m_mapping.size2() < 2) {
+        throw std::runtime_error("Block::create_vertices_again: empty mapping array #2");
     }
 
-    Vector3d vC = (vL + vR + vB + vT) / 4.0;
-    SqQuad quad = {
-            v0, vB, v1,
-            vL, vC, vR,
-            v2, vT, v3
+    // Берем прошлые вершины за основу
+    auto bilinear = [&prev=m_mapping](double x, double y) -> Vector3d {
+        double i = x * (prev.size1() - 1);
+        double j = y * (prev.size2() - 1);
+        int i1 = std::min(static_cast<int>(std::floor(i)), prev.size1() - 2);
+        int j1 = std::min(static_cast<int>(std::floor(j)), prev.size2() - 2);
+        int i2 = i1 + 1;
+        int j2 = j1 + 1;
+        return (j2 - j) * ((i2 - i) * prev(i1, j1) + (i - i1) * prev(i2, j1)) +
+               (j - j1) * ((i2 - i) * prev(i1, j2) + (i - i1) * prev(i2, j2));
     };
 
-    for (int i = 0; i <= m_size1; ++i) {
-        double x = (2.0 * i - m_size1) / m_size1;
-
-        m_vertices[i][0]       = BsVertex::create(quad(x, -1.0));
-        m_vertices[i][m_size2] = BsVertex::create(quad(x, +1.0));
-    }
-
-    for (int j = 0; j <= m_size2; ++j) {
-        double y = (2.0 * j - m_size2) / m_size2;
-
-        m_vertices[0][j]       = BsVertex::create(quad(-1.0, y));
-        m_vertices[m_size1][j] = BsVertex::create(quad(+1.0, y));
-    }
-
-    for (int k = 0; k < 0; ++k) {
-        for (int f_idx = 0; f_idx < 4; ++f_idx) {
-            if (!boundary(f_idx)) {
-                continue;
-            }
-
-            for (int idx = 1; idx < size(f_idx); ++idx) {
-                Vector3d v = (boundary_vertex(f_idx, idx - 1)->v1 +
-                    boundary_vertex(f_idx, idx + 1)->v1) / 2.0;
-                v = boundary(f_idx)->projection(v);
-
-                boundary_vertex(f_idx, idx)->v2 = v;
-            }
-        }
-
-        for (int f_idx = 0; f_idx < 4; ++f_idx) {
-            if (!boundary(f_idx)) {
-                continue;
-            }
-
-            for (int idx = 1; idx < size(f_idx); ++idx) {
-                boundary_vertex(f_idx, idx)->v1 = boundary_vertex(f_idx, idx)->v2;
-            }
+    Array2D<BsVertex::Ptr> vertices({sizes[Axis::X] + 1, sizes[Axis::Y] + 1}, nullptr);
+    for (int i = 0; i <= sizes[Axis::X]; ++i) {
+        for (int j = 0; j <= sizes[Axis::Y]; ++j) {
+            double x = math::between(static_cast<double>(i) / sizes[Axis::X], 0.0, 1.0);
+            double y = math::between(static_cast<double>(j) / sizes[Axis::Y], 0.0, 1.0);
+            vertices(i,  j) = BsVertex::create(bilinear(x, y));
         }
     }
 
-    for (int i = 1; i < m_size1; ++i) {
-        for (int j = 1; j < m_size2; ++j) {
-            double x = (2.0 * i - m_size1) / m_size1;
-            double y = (2.0 * j - m_size2) / m_size2;
+    // Проекция на границах
+    for (Side side: sides_2D) {
+        if (!boundary(side)) { continue; }
 
-            m_vertices[i][j] = BsVertex::create(quad(x, y));
+        auto curve = boundary(side);
+        for (int idx = 0; idx <= sizes[side]; ++idx) {
+            Vector3d v = vertices.boundary(side, idx)->pos;
+            vertices.boundary(side, idx)->pos = curve->projection(v);
+        }
+    }
+    return vertices;
+}
+
+// ---------- Конформные приколы ---------------------------------------------------------------------------------------
+
+inline double restricted_modulus(double K) {
+    static constexpr double max_modulus = 100.0;
+    static constexpr double min_modulus = 1.0 / max_modulus;
+    if (K > max_modulus) {
+        std::cerr << "Modulus exceeded max\n";
+        K = max_modulus;
+    }
+    if (K < min_modulus) {
+        std::cerr << "Modulus exceeded min\n";
+        K = min_modulus;
+    }
+    return K;
+}
+
+void Block::set_modulus(double K) {
+    z_assert(good_number(K), "Block::update_ratio: bad modulus");
+    m_modulus = restricted_modulus(K);
+}
+
+void Block::estimate_modulus() {
+    double len1 = length(Side::B) + length(Side::T);
+    double len2 = length(Side::L) + length(Side::R);
+    set_modulus(len1 / len2);
+}
+
+void Block::update_modulus(const Array2D<BsVertex::Ptr>& vertices) {
+    const int Nx = vertices.size(Axis::X) - 1;
+    const int Ny = vertices.size(Axis::Y) - 1;
+
+    // TODO: Посчитать лучше?
+    double sum_x = 0.0;
+    double sum_y = 0.0;
+    for (int i = 0; i < Nx; ++i) {
+        for (int j = 0; j < Ny; ++j) {
+            Vector3d v1 = vertices(i, j)->pos;
+            Vector3d v2 = vertices(i+1, j)->pos;
+            Vector3d v3 = vertices(i+1, j+1)->pos;
+            Vector3d v4 = vertices(i, j+1)->pos;
+
+            // Triangle Method
+            Triangle T1 = {v4, v1, v2};
+            Triangle T2 = {v1, v2, v3};
+            Triangle T3 = {v2, v3, v4};
+            Triangle T4 = {v3, v4, v1};
+
+            double A1 = T1.area();
+            double A2 = T2.area();
+            double A3 = T3.area();
+            double A4 = T4.area();
+
+            double int_x = (v2 - v3).squaredNorm() * (1/A2 + 1/A3) + (v1 - v4).squaredNorm() * (1/A1 + 1/A4);
+            double int_y = (v1 - v2).squaredNorm() * (1/A1 + 1/A2) + (v3 - v4).squaredNorm() * (1/A3 + 1/A4);
+            int_x /= (8 * Nx * Nx);
+            int_y /= (8 * Ny * Ny);
+
+            sum_x += int_x;
+            sum_y += int_y;
         }
     }
 
-    for (int i = 0; i < 4; ++i) {
-        auto neib = m_adjacent_blocks[i];
+    //std::cout << "M: " << sum_y << "; 1/M: " << sum_x << "; 1: " << sum_x * sum_y << std::endl;
+    //std::cout << "M avg: " << std::sqrt(sum_y / sum_x) << std::endl;
+    //std::cout << "M avg: " << 0.5 * (sum_y + 1.0 / sum_x) << std::endl;
 
-        if (!neib) {
-            continue;
-        }
+    double K = std::sqrt(sum_y / sum_x);
+    set_modulus(K);
+}
 
-        // Сосед есть и уже с вершинами
-        if (neib->m_vertices.empty()) {
-            continue;
-        }
-
-        int j = neib_face(i);
-
-        int N = size(i);
-        for (int k = 0; k <= N; ++k) {
-            boundary_vertex(i, k) = neib->boundary_vertex(j, N - k);
+void Block::set_mapping(const Array2D<BsVertex::Ptr>& vertices) {
+    m_mapping.resize(vertices.sizes());
+    for (int i = 0; i < vertices.size1(); ++i) {
+        for (int j = 0; j < vertices.size2(); ++j) {
+            m_mapping(i, j) = vertices(i, j)->pos;
         }
     }
 }
 
-void Block::link_vertices() {
-    // Базисные вершины
-    for (int v_idx = 0; v_idx < 4; ++v_idx) {
-        auto bv = m_base_vertices[v_idx];
-
-        /// Фиксированная точка
-        if (bv->is_fixed()) {
-            continue;
-        }
-
-        // Угловая вершина области, должна быть неподвижной
-        if (bv->degree() < 2) {
-            continue;
-        }
-
-        // Угловая вершина области по другому критерию
-        if (m_boundaries[v_idx] && m_boundaries[prev(v_idx)]) {
-            continue;
-        }
-
-        Curve *boundary = nullptr;
-        std::vector<BsVertex::Ptr> adj_vertices;
-
-        // Вершина на границе
-        if (is_boundary(bv)) {
-            int f_idx = v_idx;
-            Block* block = this;
-
-            while (block) {
-                adj_vertices.insert(
-                    adj_vertices.begin(),
-                    block->boundary_vertex(f_idx, 1)
-                );
-
-                boundary = block->boundary(f_idx).get();
-
-                Block *next_block = block->adjacent_block(f_idx);
-                f_idx = next(block->neib_face(f_idx));
-                block = next_block;
-
-                if (adj_vertices.size() > bv->degree() + 1) {
-                    throw std::runtime_error("Infinite loop #1");
-                }
-            }
-
-            f_idx = prev(v_idx);
-            block = this;
-
-            while (block) {
-                adj_vertices.push_back(
-                    block->boundary_vertex(f_idx, block->size(f_idx) - 1)
-                );
-
-                boundary = block->boundary(f_idx).get();
-
-                Block *next_block = block->adjacent_block(f_idx);
-                f_idx = prev(block->neib_face(f_idx));
-                block = next_block;
-
-                if (adj_vertices.size() > bv->degree() + 1) {
-                    throw std::runtime_error("Infinite loop #2");
-                }
-            }
-
-            if (adj_vertices.size() != bv->degree() + 1) {
-                throw std::runtime_error("Boundary error");
-            }
-
-        } else {
-            for (auto adj: bv->adjacent_blocks()) {
-                auto v_idx2 = adj->vertex_index(bv);
-                adj_vertices.emplace_back(adj->boundary_vertex(v_idx2, 1));
-            }
-        }
-
-        corner_vertex(v_idx)->add_boundary(boundary);
-        corner_vertex(v_idx)->set_adjacent_vertices(adj_vertices);
-    }
-
-    // Вершины на границе
-    for (int f_idx = 0; f_idx < 4; ++f_idx) {
-        if (!boundary(f_idx) && !adjacent_block(f_idx)) {
-            throw std::runtime_error("BFace is not boundary and has no neighbor");
-        }
-
-        // Число ячеек по грани
-        int N = size(f_idx);
-
-        if (boundary(f_idx)) {
-
-            for (int idx = 1; idx < N; ++idx) {
-                boundary_vertex(f_idx, idx)->set_adjacent_vertices(
-                    {
-                        boundary_vertex(f_idx, idx + 1),
-                        preboundary_vertex(f_idx, idx),
-                        boundary_vertex(f_idx, idx - 1)
-                    }
-                );
-
-                boundary_vertex(f_idx, idx)->add_boundary(
-                    m_boundaries[f_idx].get()
-                );
-            }
-
-        } else {
-            auto neib = m_adjacent_blocks[f_idx];
-            int fn_idx = neib_face(f_idx);
-
-            for (int idx = 1; idx < N; ++idx) {
-                auto K0 = boundary_vertex(f_idx, idx);
-                auto K1 = boundary_vertex(f_idx, idx - 1);
-                auto K2 = boundary_vertex(f_idx, idx + 1);
-                auto K3 = preboundary_vertex(f_idx, idx);
-                auto K4 = neib->preboundary_vertex(fn_idx, N - idx);
-
-                boundary_vertex(f_idx, idx)->set_adjacent_vertices(
-                    {
-                        boundary_vertex(f_idx, idx - 1),
-                        boundary_vertex(f_idx, idx + 1),
-                        preboundary_vertex(f_idx, idx),
-                        neib->preboundary_vertex(fn_idx, N - idx)
-                    });
-            }
-        }
-    }
-
-    // Внутренние вершины
-    for (int i = 1; i < m_size1; ++i) {
-        for (int j = 1; j < m_size2; ++j) {
-            m_vertices[i][j]->set_adjacent_vertices(
-                {
-                    m_vertices[i + 1][j],
-                    m_vertices[i - 1][j],
-                    m_vertices[i][j - 1],
-                    m_vertices[i][j + 1]
-                }
-            );
-        }
-    }
+void Block::set_mapping(Array2D<Vector3d>&& vertices) {
+    m_mapping = std::move(vertices);
 }
 
-double Block::smooth() {
-    double err = 0.0;
-
-    for (auto& row: m_vertices) {
-        for (auto& vertex: row) {
-            auto &adjacent = vertex->adjacent_vertices();
-
-            Vector3d avg = {0.0, 0.0, 0.0};
-
-            if (adjacent.empty()) {
-                // Фиксированная вершина
-                avg = vertex->v1;
-            } else if (!vertex->inner()) {
-                // Вершина на границе
-                if (vertex->corner()) {
-                    avg = vertex->v1;
+void BlockPair::add(Block::Ref block, Side side) {
+    if (b1.expired()) {
+        b1 = block;
+        b2.reset();
+        side1 = side;
+    }
+    else {
+        if (b1.lock() == block) {
+            std::cerr << "Attempt to add block second time\n";
+        }
+        else {
+            if (b2.expired()) {
+                b2 = block;
+                side2 = side;
+            }
+            else {
+                if (b2.lock() == block) {
+                    std::cerr << "Attempt to add block second time\n";
                 }
                 else {
-                    Curve *boundary = vertex->boundary();
-
-                    // bug for PlaneWithHole
-                    // vertex->boundary() is 0
-
-                    avg += adjacent[0]->v1 / 2.0;
-                    for (int n = 1; n < int(adjacent.size()) - 1; ++n) {
-                        avg += boundary->projection(adjacent[n]->v1);
-                    }
-                    avg += adjacent.back()->v1 / 2.0;
-                    avg /= adjacent.size() - 1.0;
-
-                    avg = vertex->boundary()->projection(avg);
+                    std::cerr << "Edge with more than two blocks\n";
                 }
-            } else {
-                // Внутренняя вершина
-                for (auto neib: adjacent) {
-                    avg += neib->v1;
-                }
-                avg /= vertex->n_adjacent();
             }
-
-            vertex->v2 = avg;
-
-            double L = 0.0;
-            for (auto adj: adjacent) {
-                L = std::max(L, (vertex->v1 - adj->v1).norm());
-            }
-
-            err = std::max(err, (vertex->v1 - vertex->v2).norm() / L);
-        }
-    }
-
-    return err;
-}
-
-void Block::update() {
-    for (auto &rows: m_vertices) {
-        for (auto &vertex: rows) {
-            vertex->v1 = vertex->v2;
         }
     }
 }

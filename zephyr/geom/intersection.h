@@ -1,7 +1,6 @@
 #pragma once
 
 #include <zephyr/geom/vector.h>
-#include <iostream>
 
 namespace zephyr::geom {
 
@@ -52,29 +51,30 @@ struct ray {
     }
 };
 
-/// @brief Плоскость
-/// @details Множество точек r: (r - p, n) = 0.
-///          Считается, что нормаль n -- внешняя.
+/// @brief Плоскость (r, n) = p.
+/// @details n - внешняя нормаль, p - расстояние до прямой со знаком.
 struct plane {
-    Vector3d p;   ///< Точка плоскости
+    double   p;   ///< Точка плоскости
     Vector3d n;   ///< Внешняя нормаль плоскости
+
+    /// @brief Точка плоскости
+    Vector3d r0() const { return p * n; }
 
     /// @brief Параметризация в двумерном случае (прямая)
     /// Нормаль n - правая при движении вдоль прямой.
     Vector3d get(double t) const {
-        return {p.x() - n.y() * t, p.y() + n.x() * t, 0.0};
+        return {p * n.x() - n.y() * t, p * n.y() + n.x() * t, 0.0};
     }
 
     /// @brief Под плоскостью? (n -- внешняя нормаль)
     bool under(const Vector3d& v) const {
-        return (v - p).dot(n) < 0.0;
+        return v.dot(n) < p;
     }
 
     /// @brief Положение точки относительно плоскости
     /// @return -1: под, 0: на, +1: над
     int position(const Vector3d& v, double eps=1.0e-15) const {
-        double val = (v - p).dot(n);
-//        std::cout << "(v - p).dot(n): " << (v - p).dot(n) << std::endl;
+        double val = v.dot(n) - p;
         return val > eps ? 1 : (val < -eps ? -1 : 0);
     }
 };
@@ -82,7 +82,7 @@ struct plane {
 /// @brief Окружность
 struct circle {
     Vector3d c;  ///< Центр окружности
-    double r;    ///< Радиус окружности
+    double   r;  ///< Радиус окружности
 };
 
 } // namespace obj

@@ -1,6 +1,15 @@
 #include <iostream>
 #include <vector>
 
+#include <zephyr/geom/grid.h>
+#include <zephyr/geom/generator/generator.h>
+#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/io/vtu_file.h>
+
+using namespace zephyr::geom;
+using namespace zephyr::mesh;
+using namespace zephyr::io;
+
 #if 0
 #include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/io/vtu_file.h>
@@ -510,5 +519,46 @@ LaMesh Test::gen_la() const {
     return mesh;
 }
 #else
-int main(int argc, char *argv[]) { return -1; }
+
+int main(int argc, char *argv[]) {
+    Grid grid;
+
+    constexpr int nx = 10;
+    constexpr int ny = 10;
+    std::array<std::array<Node::Ptr, ny + 1>, nx + 1> ps{};
+    for (int i = 0; i <= nx; ++i) {
+        for (int j = 0; j <= ny; ++j) {
+            ps[i][j] = Node::create(Vector3d{0.1 * i, 0.2 * j, 0.0});
+        }
+    }
+
+    for (int i = 0; i <= nx; ++i) {
+        for (int j = 0; j <= ny; ++j) {
+            grid.add_node(ps[i][j]);
+        }
+    }
+
+
+    for (int i = 0; i < nx; ++i) {
+        for (int j = 0; j < ny; ++j) {
+            if (rand() % 2 == 0) {
+                grid.add_cell(CellType::QUAD, {ps[i][j], ps[i+1][j], ps[i+1][j+1], ps[i][j+1]});
+            }
+            else {
+                grid.add_cell(CellType::TRIANGLE, {ps[i][j], ps[i+1][j], ps[i+1][j+1]});
+                grid.add_cell(CellType::TRIANGLE, {ps[i][j], ps[i+1][j+1], ps[i][j+1]});
+            }
+        }
+    }
+
+    Grid::BuildOptions opts{.build_faces=true };
+
+    grid.finalize(opts);
+
+    EuMesh mesh(std::move(grid));
+
+    VtuFile::save("out/mesh.vtu", mesh, Variables{"index", "faces2D"});
+
+    return 0;
+}
 #endif

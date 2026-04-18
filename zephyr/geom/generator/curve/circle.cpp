@@ -1,4 +1,4 @@
-#include <zephyr/geom/generator/bs_vertex.h>
+#include <zephyr/geom/generator/base_node.h>
 #include <zephyr/geom/generator/curve/circle.h>
 
 namespace zephyr::geom::generator {
@@ -12,9 +12,9 @@ Curve::Ptr Circle::create(double _R, const Vector3d &_v0) {
     return std::make_shared<Circle>(_R, _v0);
 }
 
-Curve::Ptr Circle::create(BaseVertex::Ref v1, BaseVertex::Ref v2, BaseVertex::Ref v3) {
-    Vector3d a = v2->v() - v1->v();
-    Vector3d b = v3->v() - v1->v();
+Curve::Ptr Circle::create(BaseNode::Ref v1, BaseNode::Ref v2, BaseNode::Ref v3) {
+    Vector3d a = v2->pos() - v1->pos();
+    Vector3d b = v3->pos() - v1->pos();
 
     double L = std::max(a.norm(), b.norm());
 
@@ -24,23 +24,23 @@ Curve::Ptr Circle::create(BaseVertex::Ref v1, BaseVertex::Ref v2, BaseVertex::Re
         throw std::runtime_error("Can't create circle (three points belong to the same line)");
     }
 
-    Vector3d B = v2->v() - v1->v();
-    Vector3d C = v3->v() - v1->v();
+    Vector3d B = v2->pos() - v1->pos();
+    Vector3d C = v3->pos() - v1->pos();
 
     double D = 2.0 * (B.cross(C).z());
 
     Vector3d v0 = {
-        v1->v().x() + (C.y() * (B.x() * B.x() + B.y() * B.y()) - B.y() * (C.x() * C.x() + C.y() * C.y())) / D,
-        v1->v().y() + (B.x() * (C.x() * C.x() + C.y() * C.y()) - C.x() * (B.x() * B.x() + B.y() * B.y())) / D,
+        v1->x() + (C.y() * (B.x() * B.x() + B.y() * B.y()) - B.y() * (C.x() * C.x() + C.y() * C.y())) / D,
+        v1->y() + (B.x() * (C.x() * C.x() + C.y() * C.y()) - C.x() * (B.x() * B.x() + B.y() * B.y())) / D,
         0.0
     };
 
-    double R = ((v0 - v1->v()).norm() + (v0 - v2->v()).norm() + (v0 - v3->v()).norm()) / 3.0;
+    double R = ((v0 - v1->pos()).norm() + (v0 - v2->pos()).norm() + (v0 - v3->pos()).norm()) / 3.0;
 
     double err =
-        std::fabs((v0 - v1->v()).norm() / R - 1.0) +
-        std::fabs((v0 - v2->v()).norm() / R - 1.0) +
-        std::fabs((v0 - v3->v()).norm() / R - 1.0);
+        std::fabs((v0 - v1->pos()).norm() / R - 1.0) +
+        std::fabs((v0 - v2->pos()).norm() / R - 1.0) +
+        std::fabs((v0 - v3->pos()).norm() / R - 1.0);
 
     if (err > 1.0e-10) {
         throw std::runtime_error("Can't create circle");

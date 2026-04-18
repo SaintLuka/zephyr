@@ -4,20 +4,20 @@
 
 namespace zephyr::geom::generator {
 
-class BaseVertex;
+class BaseNode;
 
 /// @brief Прямая линия с параметрическим заданием X(t), Y(t).
-/// Полная прямая получается при пробегании t от -1 до 1 (используется
+/// Полная прямая получается при изменении t от -1 до 1 (используется
 /// отображение в виде тангенса).
 class Plane : public Curve {
 private:
-    using BaseVertex_Ref = const std::shared_ptr<BaseVertex> &;
+    using BaseVertex_Ref = const std::shared_ptr<BaseNode> &;
 
 public:
     /// @brief Конструктор по двум точкам
     Plane(const Vector3d &v1, const Vector3d &v2);
 
-    /// @brief Созадние указателя по двум точкам
+    /// @brief Создание указателя по двум точкам
     static Curve::Ptr create(const Vector3d &v1, const Vector3d &v2);
 
     /// @brief Создание указателя по двум базисным точкам

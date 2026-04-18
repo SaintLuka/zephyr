@@ -50,7 +50,7 @@ int main() {
     auto flag = s.add<int>("flag");
 
     // Векторное поле с 3 компонентами double
-    auto arr = s.add<double>("arr", 3);
+    auto arr = s.add<double[]>("arr", 3);
 
     // Не эквивалентно предыдущему, Vector3d рассматривается как скалярный тип
     auto vec = s.add<Vector3d>("vec");

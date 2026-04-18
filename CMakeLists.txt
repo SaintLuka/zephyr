@@ -5,22 +5,32 @@ project(zephyr
 
 set(CMAKE_LIB_NAME zephyr)
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_FLAGS_DEBUG   "-Wno-attributes -Wno-unused-result -O0 -g")
-set(CMAKE_CXX_FLAGS_RELEASE "-Wno-attributes -Wno-unused-result -O3")
+# Флаги компиляции
+set(CMAKE_CXX_STANDARD 20)
+if (MSVC)
+    set(BASIC_FLAGS "/W1")
+    set(CMAKE_CXX_FLAGS         "${CMAKE_CXX_FLAGS} ${BASIC_FLAGS}")
+    set(CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS_DEBUG} ${BASIC_FLAGS} /Od")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${BASIC_FLAGS} /O2")
+else()
+    set(BASIC_FLAGS "-Wno-attributes -Wno-unused-result")
+    set(CMAKE_CXX_FLAGS         "${CMAKE_CXX_FLAGS} ${BASIC_FLAGS}")
+    set(CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS_DEBUG} ${BASIC_FLAGS} -O0 -g")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${BASIC_FLAGS} -O3")
+endif()
 
 set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type: Release / Debug")
 set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS Release Debug)
 
+option(ZEPHYR_ASSERTS      "Enable asserts"     OFF)
 option(ZEPHYR_DOXYGEN      "Create docs"        OFF)
 option(ZEPHYR_EIGEN        "Use Eigen library"  ON)
 option(ZEPHYR_MPI          "Use MPI functions"  OFF)
 option(ZEPHYR_PROBLEMS     "Build problems"     ON)
 option(ZEPHYR_PROBLEMS_ALL "Build ALL problems" OFF)
 option(ZEPHYR_PYTHON       "Use python libs"    OFF)
-option(ZEPHYR_TESTS        "Build tests"        ON)
+option(ZEPHYR_TESTS        "Build tests"        OFF)
 option(ZEPHYR_TESTS_ALL    "Build ALL tests"    OFF)
-option(ZEPHYR_ASSERTS      "Enable asserts"     OFF)
 
 set(THREADS_TYPE "STD" CACHE STRING "Choose thread style: STD, TBB")
 set_property(CACHE THREADS_TYPE PROPERTY STRINGS STD TBB)
@@ -35,29 +45,38 @@ if (CMAKE_BUILD_TYPE STREQUAL Debug)
     set(ZEPHYR_ASSERTS ON)
 endif ()
 
-configure_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/configuration.h.in
-    ${CMAKE_CURRENT_BINARY_DIR}/zephyr/configuration.h
-)
-
 if (ZEPHYR_TBB)
     find_package(TBB REQUIRED)
 else ()
     find_package(Threads REQUIRED)
 endif ()
-set(Eigen3_DIR "C:/msys64/mingw64/share/eigen3/cmake")
 find_package(Eigen3  REQUIRED)
 if(POLICY CMP0167)
     cmake_policy(SET CMP0167 NEW)
 endif()
-set(Boost_DIR "C:/msys64/mingw64/lib/cmake/Boost-1.89.0")
 find_package(Boost   COMPONENTS program_options REQUIRED)
 if (ZEPHYR_PYTHON)
-    set(Python3_ROOT_DIR "C:/msys64/mingw64")
-    set(Python3_FIND_VIRTUALENV FIRST)
     find_package(Python3 COMPONENTS Interpreter Development NumPy REQUIRED)
     find_package(pybind11 REQUIRED)
+
+    get_filename_component(PYTHON_EXE_DIR "${Python3_EXECUTABLE}" DIRECTORY)
+    get_filename_component(PYTHONHOME "${PYTHON_EXE_DIR}" ABSOLUTE)
+
+    if(WIN32)
+        file(TO_CMAKE_PATH "${PYTHONHOME}" PYTHONHOME_CMAKE)
+        string(REPLACE "/" "\\" PYTHONHOME_NATIVE "${PYTHONHOME_CMAKE}")
+        string(REPLACE "\\" "\\\\" PYTHONHOME_CPP "${PYTHONHOME_NATIVE}")
+        set(PYTHONHOME "${PYTHONHOME_CPP}")
+    endif()
+
+    message(STATUS "PYTHONHOME: ${PYTHONHOME}")
 endif()
+
+add_definitions(-D_USE_MATH_DEFINES)
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/configuration.h.in
+    ${CMAKE_CURRENT_BINARY_DIR}/zephyr/configuration.h
+)
 
 add_subdirectory(zephyr)
 
@@ -65,8 +84,7 @@ add_subdirectory(zephyr)
 set(BUILD_SHARED_LIBS YES)
 
 # Тип компиляции (SHARED/STATIC) пропущен, полагаемся на переменную BUILD_SHARED_LIBS
-add_library(zephyr ${ZEPHYR_SOURCES}
-        tests/geom/polyhedra.cpp)
+add_library(zephyr ${ZEPHYR_SOURCES})
 if (ZEPHYR_TBB)
     target_link_libraries(zephyr PUBLIC TBB::tbb)
 else ()
@@ -94,6 +112,23 @@ if (ZEPHYR_MPI)
     target_include_directories(zephyr PUBLIC ${MPI_INCLUDE_PATH})
     target_link_libraries(zephyr PUBLIC ${MPI_LIBRARIES})
 endif()
+
+if(MSVC)
+    set_target_properties(zephyr PROPERTIES
+            WINDOWS_EXPORT_ALL_SYMBOLS TRUE
+            CXX_VISIBILITY_PRESET hidden)
+
+    #set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
+
+    target_compile_definitions(zephyr PRIVATE ZEPHYR_EXPORTS)
+
+    set_target_properties(zephyr PROPERTIES
+            ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+            LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+            RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+            )
+endif()
+
 install(TARGETS zephyr DESTINATION lib EXPORT zephyr-targets)
 
 install(EXPORT zephyr-targets DESTINATION share/cmake/zephyr)
@@ -125,8 +160,6 @@ endif()
 if (${ZEPHYR_PROBLEMS} OR ${ZEPHYR_PROBLEMS_ALL})
     add_subdirectory(problems)
 endif()
-
-add_subdirectory(python)
 
 # Включить опцию ZEPHYR_DOXYGEN, затем вызвать make docs
 if (ZEPHYR_DOXYGEN)

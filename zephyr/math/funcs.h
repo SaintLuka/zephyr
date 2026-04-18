@@ -60,7 +60,7 @@ inline double heav_s(double x, double w = 1.0) {
 /// @brief Гладкая функция Хевисайда с полиномом
 /// @param w Ширина (>= 0.0)
 template <int n = 4>
-inline double heav_p(double x, double w = 1.0) {
+double heav_p(double x, double w = 1.0) {
     if (x <= 0.0) return 0.0;
     if (x >= w)   return 1.0;
     return 1.0 - std::pow(1.0 - x / w, n);
@@ -69,7 +69,7 @@ inline double heav_p(double x, double w = 1.0) {
 /// @brief Гладкая функция Хевисайда с корнем
 /// @param w Ширина (>= 0.0)
 template <int n = 3>
-inline double heav_r(double x, double w = 1.0) {
+double heav_r(double x, double w = 1.0) {
     if (x <= 0.0) return 0.0;
     if (x >= w)   return 1.0;
     double y = n == 3 ? std::cbrt(x / w) :
@@ -87,7 +87,7 @@ inline double sign_s(double x, double w = 1.0) {
 /// @brief Гладкая функция Хевисайда с полиномом
 /// @param w Ширина (>= 0.0)
 template <int n = 4>
-inline double sign_p(double x, double w = 1.0) {
+double sign_p(double x, double w = 1.0) {
     if (std::abs(x) >= w) return sign(x);
     return sign(x) * (1.0 - std::pow(1.0 - std::abs(x / w), n));
 }
@@ -95,7 +95,7 @@ inline double sign_p(double x, double w = 1.0) {
 /// @brief Гладкая функция Хевисайда с корнем
 /// @param w Ширина (>= 0.0)
 template <int n = 3>
-inline double sign_r(double x, double w = 1.0) {
+double sign_r(double x, double w = 1.0) {
     if (std::abs(x) >= w) return sign(x);
 
     double xi = std::abs(x / w);

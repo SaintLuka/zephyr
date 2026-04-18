@@ -38,7 +38,7 @@ private:
 
 
 template<>
-double WENO<-2, 0>::p() const {
+inline double WENO<-2, 0>::p() const {
     const double w1 = +1.0 / 3.0;
     const double w2 = -7.0 / 6.0;
     const double w3 = 11.0 / 6.0;
@@ -46,7 +46,7 @@ double WENO<-2, 0>::p() const {
 }
 
 template<>
-double WENO<-1, 1>::p() const {
+inline double WENO<-1, 1>::p() const {
     const double w1 = -1.0 / 6.0;
     const double w2 = +5.0 / 6.0;
     const double w3 = +1.0 / 3.0;
@@ -54,7 +54,7 @@ double WENO<-1, 1>::p() const {
 }
 
 template<>
-double WENO<0, 2>::p() const {
+inline double WENO<0, 2>::p() const {
     const double w1 = +1.0 / 3.0;
     const double w2 = +5.0 / 6.0;
     const double w3 = -1.0 / 6.0;
@@ -62,7 +62,7 @@ double WENO<0, 2>::p() const {
 }
 
 template<>
-double WENO<-2, 0>::m() const {
+inline double WENO<-2, 0>::m() const {
     const double w1 = -1.0 / 6.0;
     const double w2 = +5.0 / 6.0;
     const double w3 = +1.0 / 3.0;
@@ -70,7 +70,7 @@ double WENO<-2, 0>::m() const {
 }
 
 template<>
-double WENO<-1, 1>::m() const {
+inline double WENO<-1, 1>::m() const {
     const double w1 = +1.0 / 3.0;
     const double w2 = +5.0 / 6.0;
     const double w3 = -1.0 / 6.0;
@@ -78,7 +78,7 @@ double WENO<-1, 1>::m() const {
 }
 
 template<>
-double WENO<0, 2>::m() const {
+inline double WENO<0, 2>::m() const {
     const double w1 = 11.0 / 6.0;
     const double w2 = -7.0 / 6.0;
     const double w3 = +1.0 / 3.0;
@@ -86,21 +86,21 @@ double WENO<0, 2>::m() const {
 }
 
 template<>
-double WENO<-2, 0>::beta() const {
+inline double WENO<-2, 0>::beta() const {
     double d1 = m_data[0] - 4.0 * m_data[1] + 3.0 * m_data[2];
     double d2 = m_data[0] - 2.0 * m_data[1] + m_data[2];
     return 13.0 / 12.0 * d2 * d2 + 1.0 / 4.0 * d1 * d1;
 }
 
 template<>
-double WENO<-1, 1>::beta() const {
+inline double WENO<-1, 1>::beta() const {
     double d1 = m_data[0] - m_data[2];
     double d2 = m_data[0] - 2.0 * m_data[1] + m_data[2];
     return 13.0 / 12.0 * d2 * d2 + 1.0 / 4.0 * d1 * d1;
 }
 
 template<>
-double WENO<0, 2>::beta() const {
+inline double WENO<0, 2>::beta() const {
     double d1 = 3.0 * m_data[0] - 4.0 * m_data[1] + m_data[2];
     double d2 = m_data[0] - 2.0 * m_data[1] + m_data[2];
     return 13.0 / 12.0 * d2 * d2 + 1.0 / 4.0 * d1 * d1;

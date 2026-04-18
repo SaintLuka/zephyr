@@ -65,16 +65,15 @@ public:
     Json(const T &t) : Json(t.to_json()) {}
 
     // Implicit constructor: map-like objects (std::map, std::unordered_map, etc)
-    template<class M, typename std::enable_if<
-            std::is_constructible<std::string, typename M::key_type>::value
-            && std::is_constructible<Json, typename M::mapped_type>::value,
-            int>::type = 0>
+    template<class M, std::enable_if_t<
+            std::is_constructible_v<std::string, typename M::key_type>
+            && std::is_constructible_v<Json, typename M::mapped_type>,
+            int> = 0>
     Json(const M &m) : Json(object(m.begin(), m.end())) {}
 
     // Implicit constructor: vector-like objects (std::list, std::vector, std::set, etc)
-    template<class V, typename std::enable_if<
-            std::is_constructible<Json, typename V::value_type>::value,
-            int>::type = 0>
+    template<class V,
+    std::enable_if_t<std::is_constructible_v<Json, typename V::value_type>, int> = 0>
     Json(const V &v) : Json(array(v.begin(), v.end())) {}
 
     // This prevents Json(some_pointer) from accidentally producing a bool. Use
@@ -113,16 +112,16 @@ public:
     // Return the enclosed std::map if this is an object, or an empty map otherwise.
     const object &object_items() const;
 
-    template <typename T, std::enable_if_t<std::is_same<T, bool>::value, bool> = true>
+    template <typename T, std::enable_if_t<std::is_same_v<T, bool>, bool> = true>
     bool as() const { return bool_value(); }
 
-    template <typename T, std::enable_if_t<std::is_same<T, std::string>::value, bool> = true>
+    template <typename T, std::enable_if_t<std::is_same_v<T, std::string>, bool> = true>
     std::string as() const { return string_value(); }
 
-    template <typename T, std::enable_if_t<std::is_integral<T>::value && !std::is_same<T, bool>::value, bool> = true>
+    template <typename T, std::enable_if_t<std::is_integral_v<T> && !std::is_same_v<T, bool>, bool> = true>
     T as() const { return T(int_value()); }
 
-    template <typename T, std::enable_if_t<std::is_floating_point<T>::value, bool> = true>
+    template <typename T, std::enable_if_t<std::is_floating_point_v<T>, bool> = true>
     T as() const { return number_value(); }
 
     // Return a reference to arr[i] if this is an array, Json() otherwise.
