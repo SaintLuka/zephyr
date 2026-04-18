@@ -1,15 +1,21 @@
-#list(APPEND TESTS crp_interface)
+list(APPEND TESTS crp_interface)
+
 list(APPEND TESTS cuboid_clip)
 list(APPEND TESTS cuboid_3clip)
-#list(APPEND TESTS curves)
-#list(APPEND TESTS mapping)
+
+list(APPEND TESTS curves)
+list(APPEND TESTS mapping)
+
 list(APPEND TESTS PLIC_2D)
 list(APPEND TESTS PLIC_3D)
-#list(APPEND TESTS poly_integrate)
-#list(APPEND TESTS polygon_clip)
+
+list(APPEND TESTS poly_integrate)
+list(APPEND TESTS polygon_clip)
+
 list(APPEND TESTS polyhedra)
-#list(APPEND TESTS rotations)
-#list(APPEND TESTS splines)
+
+list(APPEND TESTS rotations)
+list(APPEND TESTS splines)
 
 # Assume all files in direcory are tests
 if (ZEPHYR_TESTS_ALL)
@@ -51,15 +57,6 @@ foreach(test IN LISTS TESTS)
             $<TARGET_FILE:zephyr>
             $<TARGET_FILE_DIR:${test}>
     )
-
-
-    if(test IN_LIST CPP20_TESTS)
-        set_target_properties(${test} PROPERTIES
-                CXX_STANDARD 20
-                CXX_STANDARD_REQUIRED ON
-                CXX_EXTENSIONS OFF
-        )
-    endif()
 
     install(TARGETS ${test} DESTINATION tests/geom)
 endforeach()
