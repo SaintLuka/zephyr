@@ -60,6 +60,11 @@ public:
 	/// @brief Балансировка нагрузки
     virtual void balancing(const std::vector<double>& w) = 0;
 
+	/// @brief Выполняет точную балансировку, если возможно. Возвращает true,
+	/// если декомпозиция была выполнена, иначе false.
+	virtual bool exact_balancing(const std::vector<geom::Vector3d>& points) {
+		return false;
+	}
 
 protected:
     ///< Размер декомпозиции, не обязательно равен mpi::size(),

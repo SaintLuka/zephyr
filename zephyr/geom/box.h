@@ -27,14 +27,14 @@ struct Box {
 
     /// @brief Минимально возможный bounding box, предполагает
     /// последовательное увеличение путем помещения новых точек.
-    /// vmin = {+inf, +inf, +inf}
-    /// vmax = {-inf, -inf, -inf}
+    /// vmin = {+inf, +inf, 0.0} или {+inf, +inf, +inf}
+    /// vmax = {-inf, -inf, 0.0} или {-inf, -inf, -inf}
     /// @param dim Размерность ящика (2 или 3)
     static Box Empty(int dim);
 
     /// @brief Bounding box охватывающий всё пространство
-    /// vmin = {-inf, -inf, -inf}
-    /// vmax = {+inf, +inf, +inf}
+    /// vmin = {-inf, -inf, 0.0} или {-inf, -inf, -inf}
+    /// vmax = {+inf, +inf, 0.0} или {+inf, +inf, +inf}
     /// @param dim Размерность ящика (2 или 3)
     static Box Infinite(int dim);
 
@@ -42,7 +42,7 @@ struct Box {
     Vector3d center() const;
 
     /// @brief Вектор размеров ящика по осям координат
-    Vector3d size() const;
+    Vector3d sizes() const;
 
     /// @brief Расстояние между крайними точками ящика
     double diameter() const;

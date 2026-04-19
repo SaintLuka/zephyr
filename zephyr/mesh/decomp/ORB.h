@@ -14,19 +14,19 @@ public:
     /// @brief Параметры декомпозиции
     struct params {
         bool   newton = false;  ///< Использовать метод Ньютона
-        double mobility = 0.1;  ///< Скрость смещения генераторов (0, 0.5)
+        double mobility = 0.1;  ///< Скорость смещения генераторов (0, 0.5)
     };
 
-    /// @brief Декмопозиция для прямоугольной области
+    /// @brief Декомопозиция для прямоугольной области
     /// @param domain Прямоугольная/кубическая область
-    /// @param type Тип декмопозиции: X, XY, YX, XYZ, ...
+    /// @param type Тип декомопозиции: X, XY, YX, XYZ, ...
     /// @param size Количество блоков
     /// @param p Опции балансировки
     ORB(Box domain, const std::string& type, int size,
         const params& p = {.newton = false, .mobility = 0.1});
 
     /// @brief Конструктор с автоматической декомпозицией по размерам области
-    /// @param box Домен
+    /// @param domain Домен
     /// @param type Тип декомпозиции
     /// @param size Число блоков
     /// @param nx Число блоков по первой координате
@@ -34,7 +34,7 @@ public:
         int nx, const params& p = {.newton = false, .mobility = 0.1});
 
     /// @brief Конструктор с автоматической декомпозицией по размерам области
-    /// @param box Домен
+    /// @param domain Домен
     /// @param type Тип декомпозиции
     /// @param size Число блоков
     /// @param ny Число блоков по второй координате, для двумерной декомпозиции
@@ -78,19 +78,30 @@ public:
 
     // set функции
 
+    void use_exact(bool val = true);
+
     void use_newton(bool val = true);
 
     void set_mobility(double val);
 
     // get функции
 
+    bool exact() const;
+
     bool newton() const;
 
     double mobility() const;
 
+    const Blocks& blocks() const { return m_blocks; }
+
     void balancing(const std::vector<double>& w) final;
 
+    /// @brief Точная декомпозиция для ORB
+    bool exact_balancing(const std::vector<Vector3d>& points) final;
+
 private:
+    /// @brief Использовать точный метод
+    bool m_exact;
 
     /// @brief Использовать метод Ньютона
     bool m_newton;

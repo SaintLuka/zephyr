@@ -56,6 +56,9 @@ void EuMesh::balancing() {
 #ifdef ZEPHYR_MPI
     if (mpi::single()) { return; }
 
+    bool done = m_decomp->exact_balancing(m_locals.center);
+    if (done) return;
+
     double load = m_locals.size();
     balancing(load);
 #endif
@@ -64,6 +67,9 @@ void EuMesh::balancing() {
 void EuMesh::balancing(double load){
 #ifdef ZEPHYR_MPI
     if (mpi::single()) { return; }
+
+    bool done = m_decomp->exact_balancing(m_locals.center);
+    if (done) return;
 
     auto ws = mpi::all_gather(load);
     m_decomp->balancing(ws);
@@ -74,10 +80,8 @@ void EuMesh::prebalancing(int n_iters) {
 #ifdef ZEPHYR_MPI
     if (mpi::single()) return;
 
-    if (mpi::master()) {
-        // Что я имел в виду? Неидеальный алгоритм сейчас?
-        std::cerr << "Warning: prebalancing is not optimal\n";
-    }
+    bool done = m_decomp->exact_balancing(m_locals.center);
+    if (done) return;
 
     for (int i = 0; i < n_iters; ++i) {
         balancing();
@@ -88,7 +92,7 @@ void EuMesh::prebalancing(int n_iters) {
 
 void EuMesh::setup_ranks() {
     // Определим новый rank для всех ячеек из locals
-    for_each([decomp=m_decomp](EuCell cell) {
+    for_each([decomp=m_decomp](const EuCell &cell) {
         cell.set_rank(decomp->rank(cell));
     });
 }

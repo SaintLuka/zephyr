@@ -17,7 +17,7 @@ Decomposition::Decomposition(int size) {
 }
 
 double Decomposition::imbalance(const std::vector<double>& ws) {
-    return *std::max_element(ws.begin(), ws.end()) * ws.size() / std::accumulate(ws.begin(), ws.end(), 0.0)  - 1.0;
+    return *std::ranges::max_element(ws) * ws.size() / std::accumulate(ws.begin(), ws.end(), 0.0)  - 1.0;
 }
 
 Decomposition::Ptr Decomposition::create(const Box& domain, const utils::Json& config) {

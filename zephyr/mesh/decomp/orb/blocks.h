@@ -11,12 +11,12 @@ namespace zephyr::mesh::decomp {
 using zephyr::geom::Box;
 
 struct barrier {
-    double val;
-    double dx;
+    double val{0.0};
+    double dx{0.0};
 
-    barrier() : val(0.0), dx(0.0) { }
+    barrier() = default;
 
-    barrier(double _val) : val(_val), dx(0.0) { }
+    barrier(double _val) : val(_val) { }
 
     operator double& () { return val; }
 
@@ -25,8 +25,7 @@ struct barrier {
 
 class Blocks {
 public:
-    /// @brief Тривиальный конструктор.
-    /// Создает единственный блок на всё пространство.
+    /// @brief Единственный блок на всё пространство
     Blocks();
 
     /// @brief Конструктор с автоматической декомпозицией по размерам области.
@@ -51,7 +50,7 @@ public:
     /// @param type Тип декомпозиции
     /// @param size Общее число блоков. Для двумерной декомпозиции можно
     /// указать size = -1, в этом случае параметр ny определяет размер
-    /// @param nx Число блоков по первой координате
+    /// @param ny Число блоков по первой координате
     Blocks(const Box& domain, const std::string& type, int size,
             const std::vector<int>& ny);
 
@@ -61,11 +60,8 @@ public:
     /// @brief Обратное отображение
     Vector3d inverse(const Vector3d& ) const;
 
-    /// @brief Установить границы
-    void setup_bounds(Vector3d vmin, Vector3d vmax);
-
     /// @brief Обновить границы
-    void update_bounds(const Vector3d& vmin, const Vector3d& vmax);
+    void update_bounds(const Box& domain);
 
     /// @brief Ранг процесса
     /// @param v Вектор в локальных координатах
@@ -89,6 +85,9 @@ public:
     /// @brief Балансировка нагрузки
     void balancing_newton(const std::vector<double>& loads, double alpha);
 
+    /// @brief Поделить область точно
+    void split_exact(const std::vector<Vector3d>& points);
+
     /// @brief Границы блоков
     std::vector<std::vector<Vector3d>> lines() const;
 
@@ -96,9 +95,6 @@ public:
     void info() const;
 
 private:
-    /// @brief Инициализировать единичный блок
-    void init_single();
-
     /// @brief Проинициализировать массивы m_nx, m_ny, m_nz
     /// @details Одномерная декомпозиция
     void init_sizes_1D(int nx);
@@ -110,9 +106,6 @@ private:
     /// @brief Проинициализировать массивы m_nx, m_ny, m_nz
     /// @details Трехмерная декомпозиция
     void init_sizes_3D(const std::vector<std::vector<int>>& nz);
-
-    /// @brief Проинициализировать пределы
-    void init_limits();
 
     /// @brief Проставить ранги и индексы
     void init_indices();
@@ -141,24 +134,25 @@ private:
 
 
     /// @brief Готовность
-    bool m_ready;
+    bool m_ready{false};
+
+    /// @brief Полное число блоков декомпозиции
+    int m_size;
 
     /// @brief Отображение в кубоид
     Transform m_map;
 
-    /// @brief Кубоид
-    Box m_box;
-
-    /// @brief Число блоков
-    int m_size;
+    /// @brief Число блоков по осям
     int m_nx;
     std::vector<int> m_ny;
     std::vector<std::vector<int>> m_nz;
 
+    struct index_t {
+        int i{}, j{}, k{};
+    };
+
     /// @brief Координаты блоков по рангу
-    std::vector<int> m_i;
-    std::vector<int> m_j;
-    std::vector<int> m_k;
+    std::vector<index_t> m_ids;
 
     /// @brief Ранги блоков
     std::vector<std::vector<std::vector<int>>> m_ranks;

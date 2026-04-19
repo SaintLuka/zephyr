@@ -53,7 +53,7 @@ ORB::ORB(Box domain, const utils::Json& config)
 
         // Попытка разбить двумерную сетку по оси Z приводит к ошибке
         if (domain.is_2D()) {
-            type.erase(std::remove(type.begin(), type.end(), 'Z'), type.end());
+            type.erase(std::ranges::remove(type, 'Z').begin(), type.end());
         }
     } else {
         type = domain.is_2D() ? "XY" : "XYZ";
@@ -79,12 +79,20 @@ inline double between(double val, double min_val, double max_val) {
     return std::max(min_val, std::min(val, max_val));
 }
 
+void ORB::use_exact(bool val) {
+    m_exact = val;
+}
+
 void ORB::use_newton(bool val) {
     m_newton = val;
 }
 
 void ORB::set_mobility(double val) {
     m_mobility = between(val, 0.0, 0.45);
+}
+
+bool ORB::exact() const {
+    return m_exact;
 }
 
 double ORB::mobility() const {
@@ -102,6 +110,12 @@ void ORB::balancing(const std::vector<double> &w) {
     else {
         m_blocks.balancing_simple(w, m_mobility);
     }
+}
+
+bool ORB::exact_balancing(const std::vector<Vector3d>& points) {
+    if (!m_exact) return false;
+    m_blocks.split_exact(points);
+    return true;
 }
 
 } // namespace zephyr::mesh::decomp
