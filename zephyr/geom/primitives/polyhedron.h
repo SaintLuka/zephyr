@@ -114,24 +114,32 @@ public:
     /// проходящей через точку p
     /// @return Отсеченный многогранник
     Polyhedron clip(const Vector3d& p, const Vector3d& n) const;
+    /// Версия принимающая p как параметр прямой.
+    Polyhedron clip(double p, const Vector3d& n) const;
 
     /// @brief Объем многогранника, отсекаемого прямой с внешней нормалью n,
     /// проходящей через точку p.
     /// Равносильно вызову polyhedron.clip(p, n).volume(), но быстрее.
     double clip_volume(const Vector3d& p, const Vector3d& n) const;
+    /// Версия принимающая p как параметр прямой.
+    double clip_volume(double p, const Vector3d& n) const;
 
     /// @brief Объем многогранника, отсекаемого прямой с внешней нормалью n и площадь грани сечения
     /// проходящей через точку p.
     VolArea clip_volume_and_area(const Vector3d& p, const Vector3d& n) const;
+    /// Версия принимающая p как параметр прямой.
+    VolArea clip_volume_and_area(double p, const Vector3d& n) const;
 
     /// @brief Находит отсечение от многогранника с заданной объемной долей
     /// @param n Внешняя нормаль плоскости
     /// @param alpha Объемная доля
     /// @return Точка плоскости
     Vector3d find_section(const Vector3d& n, double alpha) const;
-    //Тоже самое методом Ньютона
+
+    ///Тоже самое методом Ньютона
     Vector3d find_section_newton(const Vector3d& n, double alpha) const;
-    //Тоже самое методом Брента
+
+    ///Тоже самое методом Брента
     Vector3d find_section_brent(const Vector3d& n, double alpha) const;
 
     /// @brief Объемная доля, которая отсекается от ячейки некоторым телом.

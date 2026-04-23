@@ -567,18 +567,154 @@ double Polyhedron::clip_volume(
     return NAN;
 }
 
+Polyhedron Polyhedron::clip(double p, const Vector3d& n) const {
+    obj::plane plane{.p=p, .n=n};
+    std::map<edge_t, point_t> edges;
+
+    int count_inside = 0; // Подсчёт кол-ва вершин в
+    int count_outside = 0; // Подсчёт кол-ва вершин вне
+    int count_on = 0; // Подсчёт кол-ва вершин на
+
+    double L = std::cbrt(volume()); // характерестический размер
+    double eps = (1.0e-10) * L; // Погрешность с которой определяем проходит ли плоскость ч/з вершины
+
+    std::vector<int> vs_pos(n_verts()); // вектор фиксирующий положение вершин относительно плоскости
+    for (int i = 0; i < n_verts(); ++i) { // цикл по вершинам
+        vs_pos[i] = plane.position(verts[i], eps); // высчитываем позицию вершины (+1, -1, 0)
+        if (vs_pos[i] > 0) { // Подсчёт кол-ва вершин вне
+            ++count_outside;
+        }
+        else {
+            if (vs_pos[i] < 0) { // Подсчёт кол-ва вершин в
+                ++count_inside;
+                edges[edge_t(i)] = {.v=verts[i], .index=-1}; //Заполняем edges теми вершинами что войдут в отсечённую часть
+            }
+            if (vs_pos[i] == 0) { // Подсчёт кол-ва вершин на
+                ++count_on;
+            }
+        }
+    }
+
+    if (count_inside == 0) {
+        return Polyhedron::Empty();
+    }
+
+    if (count_outside == 0) {
+        return *this;
+    }
+
+    std::vector<edge_t> slice; // Массив для хранения рёбер, через который пройдёт плоскость сечения
+    std::vector<std::vector<edge_t>> parts; // Массив для хранения массивов вершин граней, находящихся "под"
+
+    for (int i = 0; i < n_faces(); ++i) { //Цикл по граням
+        count_inside  = 0; // Счётчик для подсчёта вершин в, принадлежащих текущей грани
+        count_outside = 0; // Счётчик для подсчёта вершин вне, принадлежащих текущей грани
+        count_on = 0; // Счётчик для подсчёта вершин на, принадлежащих текущей грани
+        for (auto j: faces[i]) { //Цикл по вершинам граней для заполнения счётчиков
+            if (vs_pos[j] < 0) {
+                ++count_inside;
+            } else if (vs_pos[j] > 0) {
+                ++count_outside;
+            } else {
+                ++count_on; // Попытка учитывать вершины на
+            }
+        }
+        if (count_inside == 0) {
+            continue;
+        }
+
+        int nv = faces[i].size(); // Кол-во вершин в грани
+
+        if (count_outside == 0) { // Вся грань внутри
+            // Грань целиком внутри
+            std::vector<edge_t> part; // Массив задающий грань (индексов вершин, входящих в неё)
+            part.reserve(nv); // Выделяем память под создаваемую грань, загружаемую в parts
+            for (int j = 0; j < nv; ++j) { // Цикл по вершинам грани
+                part.emplace_back(edge_t(faces[i][j])); // Заполняем part индексами вершин
+            }
+            parts.emplace_back(part); //Заполняем parts гранью исходного многогранника лежащей "под" плоскостью сечения
+        }
+        else {
+            std::vector<edge_t> part; // Массив задающий грань (индексов вершин, входящих в неё)
+            part.reserve(nv + 1); // Выделяем память под обрезанную грань
+
+            for (int j = 0; j < nv; ++j) { //цикл по рёбрам
+                int v_idx1 = faces[i][j]; //Первая вершина ребра
+                int v_idx2 = faces[i][(j + 1) % nv]; //Вторая вершина ребра
+
+                if (vs_pos[v_idx1] <= 0) {//Проверяем, что первая вершина ребра в/на плоскости сечения.
+                    part.emplace_back(edge_t(v_idx1)); //Добавляем эту вершину в отсекаемую грань.
+                }
+                if (vs_pos[v_idx1] == 0 && edges.count(edge_t(v_idx1)) == 0) {
+                    edge_t edge(v_idx1);
+                    edges[edge] = {.v=verts[v_idx1], .index=-1};
+                    slice.push_back(edge_t(v_idx1));
+                }
+                if (vs_pos[v_idx1] * vs_pos[v_idx2] < 0) { //Проверяем что одна из вершин на / есть пересечение на ребре
+                    edge_t edge(v_idx1, v_idx2); // Ребро (индексы вершин ребра)
+
+                    if (edges.count(edge) > 0) { //Проверяем есть ли уже это ребро как ключ в мапе вершина/ребро - координаты
+                        part.push_back(edge); //Если есть - добавляем это ребро в грань
+                        continue; //Идём к следующему ребру игнорируя нахождение пересечения
+                    }
+
+                    obj::segment seg{verts[edge.v1()], verts[edge.v2()]}; //Ребро как геом объект
+
+                    Vector3d new_v = intersection2D::find_fast(plane, seg); //Находим координаты точки пересечения ребра с плоскостью
+                    edges[edge] = {.v=new_v, .index=-1}; //Добавляем под ключом ребра на котором нашли точку пересечения координаты точки пересечения
+
+                    part.push_back(edge); //Добавление ребра в грань
+                    slice.push_back(
+                            edge); //Добавление ребра (индексов вершин ребра) в массив, в котором хранятся рёбра, на которых есть точка пересечения с плоскостью
+                }
+            }
+            parts.emplace_back(std::move(part)); //Перемещаем массив содержащий вершины обрезанной грани и рёбра на которых происходила обрезка
+        }
+    }
+
+    std::vector<Vector3d> out_verts(edges.size()); // Массив вершин загружаемый в build
+
+    int counter = 0; //Счётчик для считывания вершин
+    for (auto& edge: edges) { //Цикл по вершинам (В случае моём, костыльном, "<=" породит одинаковые вершины под разными ключами)
+        edge.second.index = counter; //Индексация вершин
+        out_verts[counter] = edge.second.v; //Добавление координат вершины в выходной массив
+        ++counter;
+    }
+
+    std::vector<std::vector<int>> out_faces; //Массив индексов вершин, составляющих грань
+    out_faces.reserve(parts.size() + 1); // parts + slice
+    for (auto& face: parts) { //Цикл по массивам построенным на гранях из их вершин -1 и рёбер с пересечением
+        std::vector<int> ids; //массив индексов вершин, составящих грань (смежные соеденены рёбрами)
+        ids.reserve(face.size()); //Выделение памяти
+        for (auto edge: face) { // Цикл по вершинам и рёбрам с пересечением
+            ids.push_back(edges[edge].index); //Записываем индексы вершин, составящих грань
+        }
+        out_faces.push_back(ids); //Записываем составленные грани в массив граней
+    }
+
+    std::vector<int> ids; // Массив индексов вершин, составящих грань сечения
+    ids.reserve(slice.size()); // Выделение памяти
+    for (auto edge: slice) { // Цикл по рёбрам на которых лежат точки сечения
+        ids.push_back(edges[edge].index); // Берём из упорядоченной мапы индексы вершин, образованных пересечением.
+    }
+
+    out_faces.push_back(ids); //Добавляем грань отсечения ко всем
+
+    return Polyhedron(out_verts, out_faces); //Просто билд строящий многогранник, старый, бескостыльный вариант.
+}
+
 Polyhedron Polyhedron::clip(const Vector3d& p, const Vector3d& n) const {
 //    std::cout << "clipping..." << std::endl;
     // Плоскость
-    obj::plane plane{.p=p, .n=n}; // Создаём отсекающую плоскость
+    obj::plane plane{.p=p.dot(n), .n=n}; // Создаём отсекающую плоскость
     // Пересечения рёбер с индексами вершин (i, j).
     // Или сама точка, тогда индекс (i, i).
     std::map<edge_t, point_t> edges;    /*
- *                                      ключ - структура, представляющая ребро / вершину многогранника,
- *                                      хранящая упорядоченную пару индексов вершин / индекс вершины,
- *                                      значение - координаты вершин + индекс (помечаем индекс у значения везде как -1 и
- *                                      позже упорядочиваем в build)
-                                        */
+*                                      ключ - структура, представляющая ребро / вершину многогранника,
+*                                      хранящая упорядоченную пару индексов вершин / индекс вершины,
+*                                      значение - координаты вершин + индекс (помечаем индекс у значения везде как -1 и
+*                                      позже упорядочиваем в build)
+                                    */
     // Считаем вершины строго снаружи или внутри
 
     int count_inside = 0; // Подсчёт кол-ва вершин в
@@ -628,7 +764,7 @@ Polyhedron Polyhedron::clip(const Vector3d& p, const Vector3d& n) const {
 
     std::vector<edge_t> slice; // Массив для хранения рёбер, через который пройдёт плоскость сечения
     std::vector<std::vector<edge_t>> parts; // Массив для хранения массивов вершин граней, находящихся "под"
-                                            // и рёбер этих же граней с пересечением с плоскостью
+    // и рёбер этих же граней с пересечением с плоскостью
 
     for (int i = 0; i < n_faces(); ++i) { //Цикл по граням
         // Считаем вершины строго снаружи или внутри
@@ -733,7 +869,7 @@ Polyhedron Polyhedron::clip(const Vector3d& p, const Vector3d& n) const {
     }
 
     std::vector<std::vector<int>> out_faces; //Массив индексов вершин, составляющих грань
-                                             //В случае моём, костыльном, "<=" Породит одинаковые вершины с разными индексами в out_verts
+    //В случае моём, костыльном, "<=" Породит одинаковые вершины с разными индексами в out_verts
     out_faces.reserve(parts.size() + 1); // parts + slice
     for (auto& face: parts) { //Цикл по массивам построенным на гранях из их вершин -1 и рёбер с пересечением
         std::vector<int> ids; //массив индексов вершин, составящих грань (смежные соеденены рёбрами)
@@ -829,6 +965,69 @@ double Polyhedron::clip_volume(const Vector3d& p, const Vector3d& n) const {
     return volume;
 }
 
+double Polyhedron::clip_volume(double p, const Vector3d& n) const {
+    Vector3d p_point = n * p;
+    std::vector<double> distances(n_verts()); // Поиск направленных расстояний от вершин до плоскости сечения
+    for (int i = 0; i < n_verts(); ++i) {
+        distances[i] = n.dot(verts[i] - p_point);
+    }
+
+    bool all = true;  // Проверяем случаи если все вершины над/под
+    bool none = true;
+    for (double d : distances) {
+        if (d >= 0) all = false;
+        if (d <= 0) none = false;
+        if (!all && !none) break;
+    }
+    if (all) return volume();
+    if (none) return 0.;
+
+    double volume = 0.;
+
+    for (int i = 0; i < n_faces(); ++i) { //Цикл по граням
+        const auto& face = faces[i];
+        int nv = face.size();
+
+        std::vector<Vector3d> clipped_face; //Массив для отсечения от текущей грани
+        for (int j = 0; j < nv; ++j) { //Цикл по рёбрам грани
+            int v1 = face[j];
+            int v2 = face[(j + 1) % nv];
+            double d1 = distances[v1];
+            double d2 = distances[v2];
+
+            if (d1 <= 0) { // Добавляем первую вершину ребра, если она под/на
+                clipped_face.push_back(verts[v1]);
+            }
+
+            if (d1 * d2 < 0) {  // Если есть пересечение добавляем новую вершину
+                double t = d1 / (d1 - d2);
+                Vector3d new_verts = verts[v1] + t * (verts[v2] - verts[v1]);
+                clipped_face.push_back(new_verts);
+            }
+        }
+        if (clipped_face.size() >= 3) { //Проверка на то, что хотя бы три вершины было получено от грани.
+            Vector3d face_center = Vector3d::Zero(); //Ищем центр грани
+            for (const auto& v : clipped_face) {
+                face_center += v;
+            }
+            face_center /= clipped_face.size();
+
+            Vector3d area = Vector3d::Zero(); //Ищем вектор площади грани методом веерной триангуляции (получить площадь можно посчитав модуль)
+            for (size_t j = 0; j < clipped_face.size(); ++j) {
+                size_t k = (j + 1) % clipped_face.size();
+                area += clipped_face[j].cross(clipped_face[k]);
+            }
+            area *= 0.5;
+
+            volume += area.dot(face_center - p_point) / 3.; //Вычисляем объём пирамиды
+            //Когда p - внешняя некоторые пирамиды имеют отрицательный объём
+            //(Сначала я сам не верил, что получится то что надо в случае внешних точек)
+        }
+    }
+
+    return volume;
+}
+
 VolArea Polyhedron::clip_volume_and_area(const Vector3d& p, const Vector3d& n) const {
     VolArea out;
     out.volume = 0.;
@@ -916,6 +1115,133 @@ VolArea Polyhedron::clip_volume_and_area(const Vector3d& p, const Vector3d& n) c
     std::sort(cut_face.begin(), cut_face.end(), // Сортируем точки в порядке обхода вокруг нормали
                                                          // Иначе выдаёт как clip, а там в некоторых случаях сортировка
                                                          // уже в build происходить, чего тут нет
+              [&](const Vector3d& a, const Vector3d& b) {
+                  Vector3d va = a - section_center;
+                  Vector3d vb = b - section_center;
+
+                  // Проекции на плоскость, перпендикулярную n
+                  // Находим произвольный базис в плоскости
+                  Vector3d basis_x;
+                  if (std::abs(n.x()) > std::abs(n.y())) {
+                      basis_x = Vector3d(-n.z(), 0, n.x()).normalized();
+                  } else {
+                      basis_x = Vector3d(0, n.z(), -n.y()).normalized();
+                  }
+                  Vector3d basis_y = n.cross(basis_x).normalized();
+                  //находим и сравниваем полярные углы
+                  double angle_a = std::atan2(va.dot(basis_y), va.dot(basis_x));
+                  double angle_b = std::atan2(vb.dot(basis_y), vb.dot(basis_x));
+
+                  return angle_a < angle_b;
+              });
+
+    Vector3d area = Vector3d::Zero(); //Ищем вектор площади грани методом веерной триангуляции (получить площадь можно посчитав модуль)
+    for (size_t j = 0; j < cut_face.size(); ++j) {
+        size_t k = (j + 1) % cut_face.size();
+        area += cut_face[j].cross(cut_face[k]);
+    }
+    area *= 0.5;
+
+    //тут закомменчена проверка на грань, проверял, совпадает ли clip, нужна ли сортировка, которая выше
+//    std::cout << "clip_volume_and_area: " << std::endl;
+//    for (size_t j = 0; j < cut_face.size(); ++j) {
+//        std::cout << cut_face[j][0] << " " << cut_face[j][1] << " " << cut_face[j][2] << " " << std::endl;
+//    }
+//    std::cout << std::endl;
+
+    out.area = area.norm();
+
+    return out;
+}
+
+VolArea Polyhedron::clip_volume_and_area(double p, const Vector3d& n) const {
+    VolArea out;
+    out.volume = 0.;
+    out.area = 0.;
+    Vector3d p_point = n * p;
+
+    std::vector<double> distances(n_verts()); // Поиск направленных расстояний от вершин до плоскости сечения
+    for (int i = 0; i < n_verts(); ++i) {
+        distances[i] = n.dot(verts[i] - p_point);
+    }
+
+    bool all = true;  // Проверяем случаи если все вершины над/под
+    bool none = true;
+    for (double d : distances) {
+        if (d >= 0) all = false;
+        if (d <= 0) none = false;
+        if (!all && !none) break;
+    }
+    if (all) {
+        out.volume = volume();
+        return out;
+    };
+    if (none) {
+        return out;
+    }
+
+    std::vector<Vector3d> cut_face; //Массив для грани сечения
+    std::set<edge_t> edges; //Рёбра, уже давшие одну из вершин грани сечения
+
+    for (int i = 0; i < n_faces(); ++i) { //Цикл по граням
+        const auto& face = faces[i];
+        int nv = face.size();
+
+        std::vector<Vector3d> clipped_face; //Массив для отсечения от текущей грани
+        for (int j = 0; j < nv; ++j) { //Цикл по рёбрам грани
+            int v1 = face[j];
+            int v2 = face[(j + 1) % nv];
+            double d1 = distances[v1];
+            double d2 = distances[v2];
+
+            if (d1 <= 0) { // Добавляем первую вершину ребра, если она под/на
+                clipped_face.push_back(verts[v1]);
+            }
+            if (d1 == 0 && edges.count(edge_t(v1)) == 0) { // Если вершина на плоскости сечения - добавим её.
+                edge_t edge(v1);
+                edges.insert(edge);
+                cut_face.push_back(verts[v1]);
+            }
+            if (d1 * d2 < 0) {  // Если есть пересечение добавляем новую вершину
+                double t = d1 / (d1 - d2);
+                Vector3d new_vert = verts[v1] + t * (verts[v2] - verts[v1]);
+                clipped_face.push_back(new_vert);
+                edge_t edge(v1, v2);
+                if (edges.count(edge) == 0) {
+                    edges.insert(edge);
+                    cut_face.push_back(new_vert);
+                }
+            }
+        }
+        if (clipped_face.size() >= 3) { //Проверка на то, что хотя бы три вершины было получено от грани.
+            Vector3d face_center = Vector3d::Zero(); //Ищем центр грани
+            for (const auto& v : clipped_face) {
+                face_center += v;
+            }
+            face_center /= clipped_face.size();
+
+            Vector3d area = Vector3d::Zero(); //Ищем вектор площади грани методом веерной триангуляции (получить площадь можно посчитав модуль)
+            for (size_t j = 0; j < clipped_face.size(); ++j) {
+                size_t k = (j + 1) % clipped_face.size();
+                area += clipped_face[j].cross(clipped_face[k]);
+            }
+            area *= 0.5;
+
+            out.volume += area.dot(face_center - p_point) / 3.; //Вычисляем объём пирамиды
+            //Когда p - внешняя некоторые пирамиды имеют отрицательный объём
+            //(Сначала я сам не верил, что получится то что надо в случае внешних точек)
+        }
+    }
+
+    Vector3d section_center = Vector3d::Zero(); // Находим центр точек сечения
+    for (const auto& point : cut_face) {
+        section_center += point;
+    }
+    section_center /= cut_face.size();
+
+    std::sort(cut_face.begin(), cut_face.end(), // Сортируем точки в порядке обхода вокруг нормали
+            // Иначе выдаёт как clip, а там в некоторых случаях сортировка
+            // уже в build происходить, чего тут нет
               [&](const Vector3d& a, const Vector3d& b) {
                   Vector3d va = a - section_center;
                   Vector3d vb = b - section_center;
