@@ -9,7 +9,6 @@
 #include <zephyr/utils/mpi.h>
 
 namespace zephyr::mesh::decomp {
-
 static constexpr double inf = std::numeric_limits<double>::infinity();
 
 // Декомпозиция прямоугольника на size блоков,
@@ -876,6 +875,14 @@ void bucket_sort(const Container& points, std::span<const double> sections,
 
 using zephyr::utils::mpi;
 
+// Формальный тип для MPI-группы
+struct group_t {
+#ifdef ZEPHYR_MPI
+    MPI_Comm comm = MPI_COMM_WORLD;
+#endif
+    group_t() = default;
+};
+
 // Локальное число точек
 inline int sum(const std::vector<int>& counts) {
     return std::accumulate(counts.begin(), counts.end(), 0);
@@ -919,14 +926,14 @@ inline std::vector<double> merge_sorted(const std::vector<std::vector<double>>& 
 
 // На каждом MPI-процессе в группе (!) есть отсортированный массив, собрать на корневом процессе
 // группы единый отсортированный массив.
-inline std::vector<double> merge_sorted(const std::vector<double>& points if_mpi(, MPI_Comm comm)) {
+inline std::vector<double> merge_sorted(const std::vector<double>& points, group_t group) {
 #ifndef ZEPHYR_MPI
     return points;
 #else
     // Ранг и размер группы
     int rank, size;
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
+    MPI_Comm_rank(group.comm, &rank);
+    MPI_Comm_size(group.comm, &size);
 
     if (size == 1) {
         return points;
@@ -937,7 +944,7 @@ inline std::vector<double> merge_sorted(const std::vector<double>& points if_mpi
     const int n_points = points.size();
     std::vector<int> all_sizes(size, 0);
 
-    MPI_Gather(&n_points, 1, MPI_INT, all_sizes.data(), 1, MPI_INT, root, comm);
+    MPI_Gather(&n_points, 1, MPI_INT, all_sizes.data(), 1, MPI_INT, root, group.comm);
 
     if (rank == root) {
         std::vector<int> offsets(size, 0);
@@ -950,7 +957,7 @@ inline std::vector<double> merge_sorted(const std::vector<double>& points if_mpi
         std::vector<double> flat_data(total_size);
         MPI_Gatherv(points.data(), n_points, MPI_DOUBLE,
                     flat_data.data(), all_sizes.data(), offsets.data(), MPI_DOUBLE,
-                    root, comm);
+                    root, group.comm);
 
         std::vector<std::vector<double>> result(size);
         for (int i = 0; i < size; ++i) {
@@ -963,7 +970,7 @@ inline std::vector<double> merge_sorted(const std::vector<double>& points if_mpi
     else {
         MPI_Gatherv(points.data(), n_points, MPI_DOUBLE,
                     nullptr, nullptr, nullptr, MPI_DOUBLE,
-                    root, comm);
+                    root, group.comm);
         return {};
     }
 #endif
