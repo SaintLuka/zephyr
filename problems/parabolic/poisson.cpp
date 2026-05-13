@@ -2,127 +2,148 @@
 #include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/mesh/euler/eu_mesh.h>
 #include <zephyr/io/pvd_file.h>
+#include <zephyr/utils/threads.h>
 
 using namespace zephyr::geom;
 using namespace zephyr::mesh;
 using namespace zephyr::io;
 using generator::Rectangle;
 
-double left_x(double y) {
+double left_x(const EuCell& cell) {
     return 0.0;
 }
 
-double right_x(double y) {
+double right_x(const EuCell& cell) {
+  	double y = cell.y();
     return std::sin(5) * std::cos(M_PI * std::pow(y, 2) / 2);
 }
 
-double left_y(double x) {
+double left_y(const EuCell& cell) {
+  	double x = cell.x();
     return std::sin(5 * x);
 }
 
-double right_y(double x) {
-    return - std::sin(5 * x);
+double right_y(const EuCell& cell) {
+    double x = cell.x();
+  	return - std::sin(5 * x);
 }
 
-double func(double x, double y) {
+double func(const EuCell& cell) {
+  	double x = cell.x();
+    double y = cell.y();
     return std::sin(5 * x) * (
         (25 + std::pow(M_PI * y, 2)) * std::cos(M_PI * std::pow(y, 2) / 2) +
         M_PI * std::sin(M_PI * std::pow(y, 2) / 2)
     );
 }
 
-void OpL(EuMesh &mesh, Storable<double> &in_var, Storable<double> &out_var) {
-    for (auto cell: mesh) {
-        cell[out_var] = 0.0;
+template <typename T = double>
+using operator_t = std::function<T(const EuCell&, Storable<T>)>;
+
+operator_t<> OpL = [](const EuCell& cell, Storable<double> u) {
+	double res = 0.0;
+    for (auto face: cell.faces()) {
+    	if (face.is_boundary()) {
+          	double coef = face.area() /
+                        (face.center() - cell.center()).norm() /
+                        cell.volume();
+    		res += cell[u] * coef;
+    	} else {
+          	double coef = face.area() /
+                        (face.neib_center() - cell.center()).norm() /
+                        cell.volume();
+    		res += (cell[u] - face.neib(u)) * coef;
+    	}
     }
-    for (auto cell: mesh) {
-        if (cell.x() - cell.hx() / 2 < 1e-11) {
-            cell[out_var] += 2 * cell[in_var] / std::pow(cell.hx(), 2);
-        } else {
-            cell[out_var] += (cell[in_var] - cell.face(Side2D::LEFT).neib(in_var)) / std::pow(cell.hx(), 2);
-        }
-        if (cell.x() + cell.hx() / 2 > 1 - 1e-11) {
-            cell[out_var] += 2 * cell[in_var] / std::pow(cell.hx(), 2);
-        } else {
-            cell[out_var] += (cell[in_var] - cell.face(Side2D::RIGHT).neib(in_var)) / std::pow(cell.hx(), 2);
-        }
-        if (cell.y() - cell.hy() / 2 < 1e-11) {
-            cell[out_var] += 2 * cell[in_var] / std::pow(cell.hy(), 2);
-        } else {
-            cell[out_var] += (cell[in_var] - cell.face(Side2D::BOTTOM).neib(in_var)) / std::pow(cell.hy(), 2);
-        }
-        if (cell.y() + cell.hy() / 2 > sqrt(2) - 1e-11) {
-            cell[out_var] += 2 * cell[in_var] / std::pow(cell.hy(), 2);
-        } else {
-            cell[out_var] += (cell[in_var] - cell.face(Side2D::TOP).neib(in_var)) / std::pow(cell.hy(), 2);
-        }
-    }
+    return res;
+};
+
+template <typename T = double>
+using rhs_t = std::function<T(const EuCell&)>;
+
+rhs_t<> RHS = [](const EuCell& cell) {
+    double res = func(cell);
+    for (auto face: cell.faces()) {
+    	if (face.is_boundary()) {
+          	double coef = face.area() /
+                        (face.center() - cell.center()).norm() /
+                        cell.volume();
+    		if (face.normal().x() < 1.0e-10) {
+               	res += left_x(cell) * coef;
+            } else if (face.normal().x() > 1.0e-10) {
+              	res += right_x(cell) * coef;
+            } else if (face.normal().y() < 1.0e-10) {
+              	res += left_y(cell) * coef;
+            } else if (face.normal().y() > 1.0e-10) {
+            	res += right_y(cell) * coef;
+            }
+    	}
+	}
+    return res;
+};
+
+double get_err(EuMesh &mesh, Storable<double> u, Storable<double> rhs) {
+	return mesh.max(
+    	[u, rhs](EuCell cell) {
+        	return std::abs(cell[u] - cell[rhs]);
+    	}
+	);
 }
 
-void RHS(EuMesh &mesh, Storable<double> &rhs) {
-    for (auto cell: mesh) {
-        cell[rhs] = func(cell.x(), cell.y());
-        if (cell.x() - cell.hx() / 2 < 1e-11) {
-            cell[rhs] += 2 * left_x(cell.y()) / std::pow(cell.hx(), 2);
-        }
-        if (cell.x() + cell.hx() / 2 > 1 - 1e-11) {
-            cell[rhs] += 2 * right_x(cell.y()) / std::pow(cell.hx(), 2);
-        }
-        if (cell.y() - cell.hy() / 2 < 1e-11) {
-            cell[rhs] += 2 * left_y(cell.x()) / std::pow(cell.hy(), 2);
-        }
-        if (cell.y() + cell.hy() / 2 > sqrt(2) - 1e-11) {
-            cell[rhs] += 2 * right_y(cell.x()) / std::pow(cell.hy(), 2);
-        }
-    }
-}
-
-double get_err(EuMesh &mesh, Storable<double> &lu_cur, Storable<double> &rhs) {
-    double err = std::abs(mesh[0][lu_cur] - mesh[0][rhs]);
-    for (auto cell: mesh) {
-        double cur_err = std::abs(cell[lu_cur] - cell[rhs]);
-        if (cur_err > err) {
-            err = cur_err;
-        }
-    }
-    return err;
-}
-
-double aim_func(double x, double y) {
+double aim_func(const EuCell& cell) {
+  	double x = cell.x(), y = cell.y();
     return std::sin(5 * x) * std::cos(M_PI * std::pow(y, 2) / 2);
 }
 
-void gd(EuMesh &mesh, Storable<double> &u_cur, double rtol, int max_iter, PvdFile &pvd) {
-    for (auto cell: mesh) {
-        cell[u_cur] = 0.0;
-    }
+template <typename T = double>
+struct options_t {
+   int max_iters = 10000;
+   double rtol = 1e-10;
+   bool use_initial = false;
+   std::function<void(EuMesh&, Storable<T>)> callback = nullptr;
+};
 
-    Storable<double> lu_cur = mesh.add<double>("lu_cur");
-    Storable<double> rhs = mesh.add<double>("rhs");
+template <typename T = double>
+void solver(EuMesh& mesh, Storable<T> u, const operator_t<T>& OpL, const rhs_t<T>& RHS, const options_t<T>& opts) {
+	if (!opts.use_initial) {
+    	mesh.for_each([u](EuCell cell) {
+            cell[u] = 0.0;
+    	});
+	}
 
-    RHS(mesh, rhs);
+    Storable<T> lu_cur = mesh.add<T>("lu_cur");
+    Storable<T> rhs = mesh.add<T>("rhs");
+
+    mesh.for_each([rhs, RHS](EuCell cell) {
+      	cell[rhs] = RHS(cell);
+    });
 
     int counter = 0;
-    double tau = std::pow(mesh[0].hx(), 2) / 16;
+    double tau = std::pow(mesh[0].linear_size(), 2) / 16;
 
     do {
-        OpL(mesh, u_cur, lu_cur);
-        for (auto cell: mesh) {
-            cell[u_cur] -= tau * (cell[lu_cur] - cell[rhs]);
-        }
+        mesh.for_each([u, lu_cur, OpL](EuCell cell) {
+        	cell[lu_cur] = OpL(cell, u);
+        });
+        mesh.for_each([u, lu_cur, rhs, tau](EuCell cell) {
+            cell[u] -= tau * (cell[lu_cur] - cell[rhs]);
+        });
         counter++;
         if (counter % 1000 == 0) {
             std::cout << "Iteration: " << counter << std::endl;
         }
-    } while ((get_err(mesh, lu_cur, rhs) > rtol) && (counter < max_iter));
-    pvd.save(mesh, counter);
+    } while ((get_err(mesh, lu_cur, rhs) > opts.rtol) && (counter < opts.max_iters));
+    if (opts.callback) {
+      	opts.callback(mesh, u);
+    }
 }
 
 int main() {
-    Rectangle gen(0.0, 1.0, 0.0, sqrt(2));  // [x_min, x_max, y_min, y_max]
-    gen.set_sizes(200, 200);
-    gen.set_boundaries({.left=Boundary::UNDEFINED, .right=Boundary::UNDEFINED,
-                        .bottom=Boundary::UNDEFINED, .top=Boundary::UNDEFINED});
+	zephyr::utils::threads::on();
+    Rectangle gen(0.0, 1.0, 0.0, sqrt(2), true);  // [x_min, x_max, y_min, y_max]
+    gen.set_nx(200);
+    gen.set_boundaries({.left=Boundary::WALL, .right=Boundary::WALL,
+                        .bottom=Boundary::WALL, .top=Boundary::WALL});
     EuMesh mesh(gen);
 
     Storable<double> u_cur = mesh.add<double>("u_cur");
@@ -132,10 +153,16 @@ int main() {
     pvd.variables.append("u_approx", u_cur);
     pvd.variables.append("u_orig", u_orig);
 
-    for (auto cell: mesh) {
-        cell[u_orig] = aim_func(cell.x(), cell.y());
-    }
+    mesh.for_each(
+        [u_orig](EuCell cell) {
+			cell[u_orig] = aim_func(cell);
+        }
+    );
 
-    gd(mesh, u_cur, 1e-10, 10000, pvd);
+    options_t<> opts;
+
+    solver<>(mesh, u_cur, OpL, RHS, opts);
+
+    pvd.save(mesh, 1);
     return 0;
 }
