@@ -67,7 +67,8 @@ void plot_sections(
         }
         double s2 = poly.clip_volume_and_area(p, normal).area;
 
-//        Vector3d p2 = poly.find_section_newton(normal, v1/v);
+        int a = 0;
+        Vector3d p2 = poly.find_section_newton(normal, v1/v, a);
 //        Vector3d p3 = poly.find_section(normal, v2/v);
         Vector3d p4 = poly.find_section_brent(normal, v2/v);
 
@@ -93,17 +94,17 @@ void plot_sections(
 //            std::cout << poly.clip_volume(p3, normal)/v << std::endl;
 //        }
 
-//        double epsilon_fsn = std::abs((p2-p).dot(normal));
-//        avg_epsilon_fsn += epsilon_fsn;
-//        if (max_epsilon_fsn < epsilon_fsn)
-//            max_epsilon_fsn = epsilon_fsn;
-////
-//        if (epsilon_fsn > 0.5) {
-//            std::cout << " p: " << p[0] << " " << p[1] << " " << p[2] << std::endl;
-//            std::cout << " p2: " << p2[0] << " " << p2[1] << " " << p2[2] << std::endl;
-//            std::cout << " v2/v: " << v1/v << std::endl;
-//            std::cout << " i: " << i << std::endl;
-//        }
+        double epsilon_fsn = std::abs((p2-p).dot(normal));
+        avg_epsilon_fsn += epsilon_fsn;
+        if (max_epsilon_fsn < epsilon_fsn)
+            max_epsilon_fsn = epsilon_fsn;
+
+        if (epsilon_fsn > 0.01) {
+            std::cout << " p: " << p[0] << " " << p[1] << " " << p[2] << std::endl;
+            std::cout << " p2: " << p2[0] << " " << p2[1] << " " << p2[2] << std::endl;
+            std::cout << " v2/v: " << v1/v << std::endl;
+            std::cout << " i: " << i << std::endl;
+        }
 
         double epsilon_fsb = std::abs((p4-p).dot(normal));
         avg_epsilon_fsb += epsilon_fsb;
@@ -129,11 +130,11 @@ void plot_sections(
 //    std::cout << figname << " find_section max error: " << max_epsilon_fs << std::endl;
 //    std::cout << figname << " find_section avg error: " << avg_epsilon_fs / N << std::endl;
 
-//    std::cout << figname << " find_section_newton max error: " << max_epsilon_fsn << std::endl;
-//    std::cout << figname << " find_section_newton avg error: " << avg_epsilon_fsn / N << std::endl;
+    std::cout << figname << " find_section_newton max error: " << max_epsilon_fsn << std::endl;
+    std::cout << figname << " find_section_newton avg error: " << avg_epsilon_fsn / N << std::endl;
 
-    std::cout << figname << " find_section_brent max error: " << max_epsilon_fsb << std::endl;
-    std::cout << figname << " find_section_brent avg error: " << avg_epsilon_fsb / N << std::endl;
+//    std::cout << figname << " find_section_brent max error: " << max_epsilon_fsb << std::endl;
+//    std::cout << figname << " find_section_brent avg error: " << avg_epsilon_fsb / N << std::endl;
 //    std::cout << " checks's size: " << checks.size() << " , checks: ";
     for (size_t i = 0; i < checks.size(); ++i) {
         std::cout << checks[i];
@@ -146,7 +147,6 @@ void plot_sections(
 }
 
 int main() {
-    std::cout << "polyhedra: " << std::endl;
 //    Vector3d n = {0.4, 0.5, 0.3};
 //    Vector3d p = {-0.159999, -0.199999, -0.12};
 //    Vector3d p = {-0., -3223., -0.4};
@@ -164,11 +164,11 @@ int main() {
 //    p = {0, 0.001, 0};
 //    std::cout << Polyhedron::Cube().clip(p, n).face_area(Polyhedron::Cube().clip(p, n).n_faces() - 1)  << std::endl;
 
-    Vector3d n = {0.4, 0.5, 0.3};
-    Vector3d p = {0.0750303, 0.0937879, 0.0562727};
-    n.normalize();
-
-    Polyhedron::Cube().find_section(n, 0.83);
+//    Vector3d n = {0.4, 0.5, 0.3};
+//    Vector3d p = {0.0750303, 0.0937879, 0.0562727};
+//    n.normalize();
+//
+//    Polyhedron::Cube().find_section(n, 0.83);
 //
 //    std::cout <<  Polyhedron::Cube().clip_volume_and_area(p, n).area << std::endl;
 //
@@ -182,17 +182,21 @@ int main() {
 //    std::cout << "p: " << p.transpose() << std::endl;
 //    std::cout << "alpha: " << Polyhedron::Tetrahedron().clip_volume(p, n) / Polyhedron::Tetrahedron().volume() << std::endl;
 
-//    Vector3d n = {0.4, 0.5, 0.3};
-//    n.normalize();
-//    plot_sections(Polyhedron::Cube(), n, "cube");
-//    plot_sections(Polyhedron::Cuboid(1.0, 1.2, 0.8), n, "cuboid");
-//    plot_sections(Polyhedron::Pyramid(), n, "pyramid");
-//    plot_sections(Polyhedron::Wedge(), n, "wedge");
-//    plot_sections(Polyhedron::Tetrahedron(), n, "tetrahedron");
-//    plot_sections(Polyhedron::Octahedron(), n, "octahedron");
-//    plot_sections(Polyhedron::Dodecahedron(), n, "dodecahedron");
-//    plot_sections(Polyhedron::Icosahedron(), n, "icosahedron");
-//    plot_sections(Polyhedron::TruncatedCube(), n, "truncated_cube");
+
+
+    Vector3d n = {0.4, 0.5, 0.3};
+    n.normalize();
+//    std::cout << Polyhedron::Tetrahedron().find_section_newton(n, 0.0829277).transpose()  << std::endl;
+
+    plot_sections(Polyhedron::Cube(), n, "cube");
+    plot_sections(Polyhedron::Cuboid(1.0, 1.2, 0.8), n, "cuboid");
+    plot_sections(Polyhedron::Pyramid(), n, "pyramid");
+    plot_sections(Polyhedron::Wedge(), n, "wedge");
+    plot_sections(Polyhedron::Tetrahedron(), n, "tetrahedron");
+    plot_sections(Polyhedron::Octahedron(), n, "octahedron");
+    plot_sections(Polyhedron::Dodecahedron(), n, "dodecahedron");
+    plot_sections(Polyhedron::Icosahedron(), n, "icosahedron");
+    plot_sections(Polyhedron::TruncatedCube(), n, "truncated_cube");
 
 //    n = {-1, 0, 1};
 //    n.normalize();

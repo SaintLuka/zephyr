@@ -135,12 +135,15 @@ public:
     /// @param alpha Объемная доля
     /// @return Точка плоскости
     Vector3d find_section(const Vector3d& n, double alpha) const;
+    Vector3d find_section(const Vector3d& n, double alpha, int& iter_out) const;
 
     ///Тоже самое методом Ньютона
     Vector3d find_section_newton(const Vector3d& n, double alpha) const;
+    Vector3d find_section_newton(const Vector3d& n, double alpha, int& iter_out) const;
 
     ///Тоже самое методом Брента
     Vector3d find_section_brent(const Vector3d& n, double alpha) const;
+    Vector3d find_section_brent(const Vector3d& n, double alpha, int& iter_out) const;
 
     /// @brief Объемная доля, которая отсекается от ячейки некоторым телом.
     /// @param inside Характеристическая функция: true, если точка находится

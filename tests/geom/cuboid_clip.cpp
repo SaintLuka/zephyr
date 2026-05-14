@@ -91,6 +91,7 @@ void test2(Polyhedron poly, Vector3d normal) {
 }
 
 int main() {
+    std::cout << "cuboid_clip launched" << std::endl;
     auto poly = Polyhedron::Cuboid(A, B, C);
 
     Vector3d n = {-0.12, 0.16, -0.51};

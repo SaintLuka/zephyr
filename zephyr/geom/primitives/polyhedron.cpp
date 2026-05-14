@@ -1283,7 +1283,7 @@ VolArea Polyhedron::clip_volume_and_area(double p, const Vector3d& n) const {
 
 Vector3d Polyhedron::find_section(const Vector3d& n, double alpha) const {
     double L = std::cbrt(volume()); // характерестический размер
-    double eps = (1.0e-10) * L;
+    double eps = (1.0e-12) * L;
 
     double V0 = volume(); // Объём исходного многогранника
 
@@ -1335,54 +1335,152 @@ Vector3d Polyhedron::find_section(const Vector3d& n, double alpha) const {
     return p;
 }
 
+//Vector3d Polyhedron::find_section_newton(const Vector3d& n, double alpha) const {
+//    double L = std::cbrt(volume()); // характерестический размер
+//    double eps = (1.0e-12) * L;
+//
+//    double V0 = volume(); // Объём исходного многогранника
+//
+//    double d_min = n.dot(verts[0]);
+//    double d_max = n.dot(verts[0]);
+//    for (int i = 1; i < n_verts(); ++i) { //Ищем интервал параметра
+//        if (d_min > n.dot(verts[i])) {
+//            d_min = n.dot(verts[i]);
+//        }
+//        if (d_max < n.dot(verts[i])) {
+//            d_max = n.dot(verts[i]);
+//        }
+//    }
+//    double d = d_min + alpha * (d_max - d_min); //Проекция точки на нормаль к плоскости
+////    std::cout << "d: " << d << std::endl;
+//    Vector3d p = m_center + (d - n.dot(m_center)) * n; //Точка на плоскости
+////    std::cout << "p0: " << p[0] << " " << p[1] << " " << p[2] << std::endl;
+//    VolArea VS = clip_volume_and_area(p, n); //Объём и площадь итерации
+//    if (VS.volume >= V0 || VS.volume <= 0) {
+//        VS.area = eps;
+//    }
+//    double F = VS.volume-alpha*V0; //Я так понимаю это можно назвать невязкой
+////    std::cout << "F: " << F << std::endl;
+//
+//    int counter = 0;
+//    while (abs(F) > eps && counter < 1000) {
+//        double d_prev = d;
+//        d -= F / VS.area;
+//        if (d > d_max) { //
+//            d = d_prev * 0.95 + 0.05 * d_max;
+//        }
+//        else if (d < d_min) {
+//            d = d_min * 0.95 + 0.05 * d_prev;
+//        }
+////        std::cout << "d: " << d << std::endl;
+//        p = m_center - (n.dot(m_center) - d) * n; //Проекция центра многогранника на плоскость сечения
+//        VS = clip_volume_and_area(p, n); //Объём и площадь итерации
+//
+//        if (VS.volume >= V0 || VS.volume <= 0) {
+//            VS.area = eps;
+//        }
+//
+//        F = VS.volume-alpha*V0; //Я так понимаю это можно назвать невязкой
+////        std::cout << "F: " << F << std::endl;
+//        counter++;
+//    }
+//
+//    return p;
+//}
+
 Vector3d Polyhedron::find_section_newton(const Vector3d& n, double alpha) const {
-    double L = std::cbrt(volume()); // характерестический размер
-    double eps = (1.0e-6) * L;
+    double L = std::cbrt(volume());
+    double eps = (1.0e-12) * L;
 
-    double V0 = volume(); // Объём исходного многогранника
+    double V0 = volume();
+    double target = alpha * V0;
 
+    // Находим диапазон d
     double d_min = n.dot(verts[0]);
     double d_max = n.dot(verts[0]);
-    for (int i = 1; i < n_verts(); ++i) { //Ищем интервал параметра
-        if (d_min > n.dot(verts[i])) {
-            d_min = n.dot(verts[i]);
-        }
-        if (d_max < n.dot(verts[i])) {
-            d_max = n.dot(verts[i]);
-        }
+    for (int i = 1; i < n_verts(); ++i) {
+        double dot_val = n.dot(verts[i]);
+        if (d_min > dot_val) d_min = dot_val;
+        if (d_max < dot_val) d_max = dot_val;
     }
-    double d = d_min + alpha * (d_max - d_min); //Проекция точки на нормаль к плоскости
-    std::cout << "d: " << d << std::endl;
-    Vector3d p = m_center - (n.dot(m_center) - d) * n; //Точка на плоскости
-    std::cout << "p0: " << p[0] << " " << p[1] << " " << p[2] << std::endl;
-    VolArea VS = clip_volume_and_area(p, n); //Объём и площадь итерации
-    if (VS.volume >= V0 || VS.volume <= 0) {
-        VS.area = eps;
+
+    // Крайние случаи - возвращаем сразу
+    if (alpha <= 0.0) return m_center + (d_min - n.dot(m_center)) * n;
+    if (alpha >= 1.0) return m_center + (d_max - n.dot(m_center)) * n;
+
+    double d = d_min + alpha * (d_max - d_min);
+    Vector3d p = m_center + (d - n.dot(m_center)) * n;
+    VolArea VS = clip_volume_and_area(p, n);
+
+    double F = VS.volume - target;
+
+    // Если сразу попали в край (объём 0 или V0), немного сдвигаемся
+    if (VS.volume <= 0.0) {
+        d = d_min + 0.01 * (d_max - d_min);
+        p = m_center + (d - n.dot(m_center)) * n;
+        VS = clip_volume_and_area(p, n);
+        F = VS.volume - target;
+    } else if (VS.volume >= V0) {
+        d = d_max - 0.01 * (d_max - d_min);
+        p = m_center + (d - n.dot(m_center)) * n;
+        VS = clip_volume_and_area(p, n);
+        F = VS.volume - target;
     }
-    double F = VS.volume-alpha*V0; //Я так понимаю это можно назвать невязкой
-    std::cout << "F: " << F << std::endl;
 
     int counter = 0;
-    while (abs(F) > eps && counter < 1000) {
-        double d_prev = d;
-        d -= F / VS.area;
-        if (d > d_max) { //
-            d = d_prev * 0.95 + 0.05 * d_max;
-        }
-        else if (d < d_min) {
-            d = d_min * 0.95 + 0.05 * d_prev;
-        }
-        std::cout << "d: " << d << std::endl;
-        p = m_center - (n.dot(m_center) - d) * n; //Проекция центра многогранника на плоскость сечения
-        VS = clip_volume_and_area(p, n); //Объём и площадь итерации
-
-        if (VS.volume >= V0 || VS.volume <= 0) {
-            VS.area = eps;
-        }
-
-        F = VS.volume-alpha*V0; //Я так понимаю это можно назвать невязкой
-        std::cout << "F: " << F << std::endl;
+    while (std::abs(F) > eps && counter < 200) {
         counter++;
+
+        double S = VS.area;
+
+        // Если площадь слишком мала, используем характерную площадь
+        if (S < eps * 0.01) {
+            double delta = 1e-4 * (d_max - d_min);
+            Vector3d p_test = m_center + ((d + delta) - n.dot(m_center)) * n;
+            VolArea VS_test = clip_volume_and_area(p_test, n);
+
+            if (VS_test.area > eps * 0.01) {
+                S = VS_test.area;
+                // Используем объём из смещённой точки для лучшей сходимости
+                VS = VS_test;
+                F = VS.volume - target;
+            } else {
+                S = L * L;
+            }
+        }
+
+        double step = F / S;
+        double max_step = 0.1 * (d_max - d_min);
+        if (std::abs(step) > max_step) {
+            step = (step > 0) ? max_step : -max_step;
+        }
+
+        double d_new = d - step;
+
+        if (d_new > d_max - 0.001 * (d_max - d_min)) {
+            d_new = d_max - 0.001 * (d_max - d_min);
+        } else if (d_new < d_min + 0.001 * (d_max - d_min)) {
+            d_new = d_min + 0.001 * (d_max - d_min);
+        }
+
+        // Проверяем, не слишком ли маленький шаг
+        if (std::abs(d_new - d) < 1e-15 * L) {
+            break;
+        }
+
+        d = d_new;
+        p = m_center + (d - n.dot(m_center)) * n;
+        VS = clip_volume_and_area(p, n);
+        F = VS.volume - target;
+
+        // Если объём стал 0 или V0, возвращаемся
+        if (VS.volume <= 0.0 || VS.volume >= V0) {
+            // Откатываем и делаем половинный шаг
+            d = (d + (d - step)) / 2.0;
+            p = m_center + (d - n.dot(m_center)) * n;
+            VS = clip_volume_and_area(p, n);
+            F = VS.volume - target;
+        }
     }
 
     return p;
@@ -1390,7 +1488,7 @@ Vector3d Polyhedron::find_section_newton(const Vector3d& n, double alpha) const 
 
 Vector3d Polyhedron::find_section_brent(const Vector3d& n, double alpha) const {
     double L = std::cbrt(volume());
-    double eps = (1.0e-8) * L;
+    double eps = (1.0e-12) * L;
     double V0 = volume();
     double target = alpha * V0;
 
@@ -1474,6 +1572,242 @@ Vector3d Polyhedron::find_section_brent(const Vector3d& n, double alpha) const {
     }
 
     return b * n;
+}
+
+Vector3d Polyhedron::find_section_brent(const Vector3d& n, double alpha, int& iter_out) const {
+    double L = std::cbrt(volume());
+    double eps = (1.0e-12) * L;
+    double V0 = volume();
+    double target = alpha * V0;
+
+    double a = n.dot(verts[0]);
+    double b = n.dot(verts[0]);
+    for (int i = 1; i < n_verts(); ++i) {
+        double d = n.dot(verts[i]);
+        if (d < a) a = d;
+        if (d > b) b = d;
+    }
+
+    Vector3d p_a = a * n;
+    Vector3d p_b = b * n;
+    double fa = clip_volume(p_a, n) - target;
+    double fb = clip_volume(p_b, n) - target;
+
+    double c = a;
+    double fc = fa;
+    double d = 0.0;
+    double e = 0.0;
+
+    if (std::abs(fa) < std::abs(fb)) {
+        std::swap(a, b);
+        std::swap(fa, fb);
+    }
+
+    double tol = eps;
+    int iter = 0;
+    const int max_iter = 100;
+    bool mflag = true;
+
+    while (iter < max_iter) {
+        iter++;
+
+        if (std::abs(fb) < tol || std::abs(b - a) < tol) {
+            iter_out = iter;
+            return b * n;
+        }
+
+        double s;
+
+        if (fa != fc && fb != fc && fa != fb) {
+            s = a * fb * fc / ((fa - fb) * (fa - fc))
+                + b * fa * fc / ((fb - fa) * (fb - fc))
+                + c * fa * fb / ((fc - fa) * (fc - fb));
+        } else {
+            s = b - fb * (b - a) / (fb - fa);
+        }
+
+        bool condition1 = (s < (3*a + b)/4 || s > b);
+        bool condition2 = (mflag && std::abs(s - b) >= std::abs(b - c)/2);
+        bool condition3 = (!mflag && std::abs(s - b) >= std::abs(c - d)/2);
+        bool condition4 = (mflag && std::abs(b - c) < tol);
+        bool condition5 = (!mflag && std::abs(c - d) < tol);
+
+        if (condition1 || condition2 || condition3 || condition4 || condition5) {
+            s = (a + b) / 2.0;
+            mflag = true;
+        } else {
+            mflag = false;
+        }
+
+        Vector3d p_s = s * n;
+        double fs = clip_volume(p_s, n) - target;
+
+        d = c;
+        c = b;
+        fc = fb;
+
+        if (fa * fs < 0) {
+            b = s;
+            fb = fs;
+        } else {
+            a = s;
+            fa = fs;
+        }
+
+        if (std::abs(fa) < std::abs(fb)) {
+            std::swap(a, b);
+            std::swap(fa, fb);
+        }
+    }
+
+    iter_out = iter;
+    return b * n;
+}
+
+Vector3d Polyhedron::find_section_newton(const Vector3d& n, double alpha, int& iter_out) const {
+    double L = std::cbrt(volume());
+    double eps = (1.0e-12) * L;
+
+    double V0 = volume();
+    double target = alpha * V0;
+
+    double d_min = n.dot(verts[0]);
+    double d_max = n.dot(verts[0]);
+    for (int i = 1; i < n_verts(); ++i) {
+        double dot_val = n.dot(verts[i]);
+        if (d_min > dot_val) d_min = dot_val;
+        if (d_max < dot_val) d_max = dot_val;
+    }
+
+    if (alpha <= 0.0) {
+        iter_out = 0;
+        return m_center + (d_min - n.dot(m_center)) * n;
+    }
+    if (alpha >= 1.0) {
+        iter_out = 0;
+        return m_center + (d_max - n.dot(m_center)) * n;
+    }
+
+    double d = d_min + alpha * (d_max - d_min);
+    Vector3d p = m_center + (d - n.dot(m_center)) * n;
+    VolArea VS = clip_volume_and_area(p, n);
+
+    if (VS.volume <= 0.0) {
+        d = d_min + 0.01 * (d_max - d_min);
+        p = m_center + (d - n.dot(m_center)) * n;
+        VS = clip_volume_and_area(p, n);
+    } else if (VS.volume >= V0) {
+        d = d_max - 0.01 * (d_max - d_min);
+        p = m_center + (d - n.dot(m_center)) * n;
+        VS = clip_volume_and_area(p, n);
+    }
+
+    double F = VS.volume - target;
+
+    int counter = 0;
+    while (std::abs(F) > eps && counter < 200) {
+        counter++;
+
+        double S = VS.area;
+
+        if (S < eps * 0.01) {
+            double delta = 1e-4 * (d_max - d_min);
+            Vector3d p_test = m_center + ((d + delta) - n.dot(m_center)) * n;
+            VolArea VS_test = clip_volume_and_area(p_test, n);
+
+            if (VS_test.area > eps * 0.01) {
+                S = VS_test.area;
+                VS = VS_test;
+                F = VS.volume - target;
+            } else {
+                S = L * L;
+            }
+        }
+
+        double step = F / S;
+        double max_step = 0.1 * (d_max - d_min);
+        if (std::abs(step) > max_step) {
+            step = (step > 0) ? max_step : -max_step;
+        }
+
+        double d_new = d - step;
+
+        if (d_new > d_max - 0.001 * (d_max - d_min)) {
+            d_new = d_max - 0.001 * (d_max - d_min);
+        } else if (d_new < d_min + 0.001 * (d_max - d_min)) {
+            d_new = d_min + 0.001 * (d_max - d_min);
+        }
+
+        if (std::abs(d_new - d) < 1e-15 * L) {
+            break;
+        }
+
+        d = d_new;
+        p = m_center + (d - n.dot(m_center)) * n;
+        VS = clip_volume_and_area(p, n);
+        F = VS.volume - target;
+
+        if (VS.volume <= 0.0 || VS.volume >= V0) {
+            d = (d + (d - step)) / 2.0;
+            p = m_center + (d - n.dot(m_center)) * n;
+            VS = clip_volume_and_area(p, n);
+            F = VS.volume - target;
+        }
+    }
+
+    iter_out = counter;
+    return p;
+}
+
+Vector3d Polyhedron::find_section(const Vector3d& n, double alpha, int& iter_out) const {
+    double L = std::cbrt(volume());
+    double eps = (1.0e-12) * L;
+
+    double V0 = volume();
+
+    double d_min = n.dot(verts[0]);
+    double d_max = n.dot(verts[0]);
+    Vector3d p_max = verts[0];
+    Vector3d p_min = verts[0];
+    for (int i = 1; i < n_verts(); ++i) {
+        if (d_min > n.dot(verts[i])) {
+            d_min = n.dot(verts[i]);
+            p_min = verts[i];
+        }
+        if (d_max < n.dot(verts[i])) {
+            d_max = n.dot(verts[i]);
+            p_max = verts[i];
+        }
+    }
+
+    if (alpha > 1 - eps) {
+        iter_out = 0;
+        return p_max;
+    } else if (alpha < eps) {
+        iter_out = 0;
+        return p_min;
+    }
+
+    double d = d_min + alpha * (d_max - d_min);
+    Vector3d p = d * n;
+    double V = clip_volume(p, n);
+
+    int counter = 0;
+    while (std::abs(V - alpha * V0) > eps && counter < 10000) {
+        counter++;
+        if (V > alpha * V0) {
+            d_max = d;
+            d = (d_min + d) / 2;
+        } else if (V < alpha * V0) {
+            d_min = d;
+            d = (d_max + d) / 2;
+        }
+        p = d * n;
+        V = clip_volume(p, n);
+    }
+
+    iter_out = counter;
+    return p;
 }
 
 double Polyhedron::volume_fraction(
