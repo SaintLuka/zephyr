@@ -1317,7 +1317,7 @@ Vector3d Polyhedron::find_section(const Vector3d& n, double alpha) const {
     double F = abs(V-alpha*V0);
     double target = alpha*V0;
     int counter = 0;
-    while (F > eps && counter < 10000) {
+    while (F > eps && counter < 1000) {
         if (V > alpha*V0) {
             d_max = d;
             d = (d_min + d) / 2;
@@ -1428,7 +1428,7 @@ Vector3d Polyhedron::find_section_newton(const Vector3d& n, double alpha) const 
     }
 
     int counter = 0;
-    while (std::abs(F) > eps && counter < 200) {
+    while (std::abs(F) > eps && counter < 100) {
         counter++;
 
         double S = VS.area;
@@ -1464,7 +1464,7 @@ Vector3d Polyhedron::find_section_newton(const Vector3d& n, double alpha) const 
         }
 
         // Проверяем, не слишком ли маленький шаг
-        if (std::abs(d_new - d) < 1e-15 * L) {
+        if (std::abs(d_new - d) < 1e-12 * L) {
             break;
         }
 
@@ -1705,7 +1705,7 @@ Vector3d Polyhedron::find_section_newton(const Vector3d& n, double alpha, int& i
     double F = VS.volume - target;
 
     int counter = 0;
-    while (std::abs(F) > eps && counter < 200) {
+    while (std::abs(F) > eps && counter < 100) {
         counter++;
 
         double S = VS.area;
@@ -1793,7 +1793,7 @@ Vector3d Polyhedron::find_section(const Vector3d& n, double alpha, int& iter_out
     double V = clip_volume(p, n);
 
     int counter = 0;
-    while (std::abs(V - alpha * V0) > eps && counter < 10000) {
+    while (std::abs(V - alpha * V0) > eps && counter < 1000) {
         counter++;
         if (V > alpha * V0) {
             d_max = d;
