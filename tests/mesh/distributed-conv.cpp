@@ -66,7 +66,7 @@ int main(int argc, char** argv) {
     mesh.set_decomposition(orb);
 
     // Заполняем начальные данные и нагрузку
-    Vector3d vc = domain.vmin + 0.2 * domain.size();
+    Vector3d vc = domain.vmin + 0.2 * domain.sizes();
     double D = 0.1 * domain.diameter();
     for (auto cell: mesh) {
         cell[u1] = (cell.center() - vc).norm() < D ? 1.0 : 0.0;

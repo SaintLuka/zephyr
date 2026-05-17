@@ -6,6 +6,7 @@
 #include <zephyr/geom/boundary.h>
 #include <zephyr/geom/cell_type.h>
 #include <zephyr/mesh/index.h>
+#include <zephyr/mesh/memory.h>
 
 namespace zephyr::mesh {
 
@@ -65,6 +66,9 @@ public:
             return {aliens, alien[iface]};
         }
     }
+
+    /// @brief Расход памяти
+    memory_t memory_usage() const;
 };
 
 /// @brief Направление внешней нормали к грани
@@ -144,6 +148,9 @@ public:
 
     /// @brief Сделать грани полигональной ячейки в AMR порядке
     void reorder_quad_faces(index_t iface);
+
+    /// @brief Расход памяти (без adjacent)
+    memory_t memory_usage() const;
 };
 
 

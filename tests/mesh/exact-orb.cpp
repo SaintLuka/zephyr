@@ -13,9 +13,6 @@
 #include <zephyr/geom/generator/cuboid.h>
 #include <zephyr/geom/generator/rectangle.h>
 
-#include "zephyr/geom/generator/array2d.h"
-#include "zephyr/utils/pyplot.h"
-
 using namespace zephyr::mesh;
 using namespace zephyr::geom;
 
@@ -34,115 +31,18 @@ double imbalance(const std::vector<T>& ws) {
     return  max / avg - 1.0;
 }
 
-void test_points_single() {
-    int size = 9; // число блоков декомпозиции
+int main() {
+    mpi::handler init;
 
-    std::vector<Vector3d> points(53 * size);
-
-    for (auto& p : points) {
-        p.x() = rand() / double(RAND_MAX);
-        p.y() = rand() / double(RAND_MAX);
-    }
-
-    Box domain = Box::Empty(2);
-    for (auto& p: points) {
-        domain.capture(p);
-    }
-
-
-    ORB orb(domain, "X", size);
-
-    std::vector<int> ranks(points.size());
-    std::vector<double> f_ranks(points.size());
-    for (int i = 0; i < points.size(); ++i) {
-        ranks[i] = orb.rank(points[i]);
-        f_ranks[i] = ranks[i];
-    }
-
-    std::vector<int> block_count(size, 0);
-    for (auto r: ranks) {
-        ++block_count[r];
-    }
-
-    std::cout << "Counts: ";
-    for (auto r: block_count) {
-        std::cout << r << ", ";
-    }
-    std::cout << "\nImbalance: " << imbalance(block_count) << "\n";
-
-
-    orb.exact_balancing(points);
-
-
-    for (int i = 0; i < points.size(); ++i) {
-        ranks[i] = orb.rank(points[i]);
-        f_ranks[i] = ranks[i];
-    }
-
-    std::ranges::fill(block_count, 0);
-    for (auto r: ranks) {
-        ++block_count[r];
-    }
-
-    std::cout << "Counts: ";
-    for (auto r: block_count) {
-        std::cout << r << ", ";
-    }
-    std::cout << "\nImbalance: " << imbalance(block_count) << "\n";
-
-
-
-    zephyr::utils::pyplot plt;
-    plt.set_aspect_equal();
-    std::vector<double> xs(points.size());
-    std::vector<double> ys(points.size());
-    for (int i = 0; i < points.size(); ++i) {
-        xs[i] = points[i].x();
-        ys[i] = points[i].y();
-    }
-    plt.scatter(xs, ys, {.c=f_ranks, .cmap="Paired"});
-
-    auto lines = orb.blocks().lines();
-    for (const auto& line: lines) {
-        xs.resize(line.size());
-        ys.resize(line.size());
-        for (int i = 0; i < line.size(); ++i) {
-            xs[i] = line[i].x();
-            ys[i] = line[i].y();
-        }
-        plt.plot(xs, ys, {.color="black"});
-    }
-
-    plt.tight_layout();
-    plt.show();
-
-
-
-}
-
-void test_points_mpi() {
-    throw std::runtime_error("Not implemented");
-}
-
-void test_points() {
-    if (mpi::single()) {
-        test_points_single();
-    }
-    else {
-        test_points_mpi();
-    }
-}
-
-void test_grid() {
     // Сеточный генератор
-    //Cuboid gen(0.0, 1.0, 0.0, 0.6, 0.0, 0.9);
-    //gen.set_nx(50);
-    Rectangle gen(0.0, 1.5, 0.0, 1.0);
-    gen.set_nx(150);
+    Cuboid gen(0.0, 1.0, 0.0, 0.6, 0.0, 0.5);
+    gen.set_nx(70);
+    //Rectangle gen(0.0, 1.5, 0.0, 1.0);
+    //gen.set_nx(150);
 
     // Создаем сетку
     EuMesh mesh(gen);
-    mesh.set_max_level(3);
+    mesh.set_max_level(2);
 
     // Добавить переменные на сетку
     auto u = mesh.add<double>("u");
@@ -151,7 +51,7 @@ void test_grid() {
     Box domain = gen.bbox();
 
     // Варианты инициализации ORB декомпозиции
-    ORB orb(domain, "X", mpi::size());
+    ORB orb(domain, "XYZ", mpi::size());
     //ORB orb(domain, "YX", 13);
     //ORB orb(domain, "YX", 13, 3);
 
@@ -184,21 +84,15 @@ void test_grid() {
     pvd.save(mesh, 0.0);
     Stopwatch elapsed(true);
     mesh.balancing();
-    mesh.redistribute(u);
     elapsed.stop();
+    mesh.redistribute(u);
     pvd.save(mesh, 1.0);
 
     auto ws = mpi::all_gather(static_cast<double>(mesh.n_cells()));
-    mpi::cout << "Imbalance:  " << mesh.decomp().imbalance(ws) << "\n";
+    mpi::cout << "Imbalance:  " << imbalance(ws) << "\n";
 
-    mpi::cout << "\nElapsed time:   " << elapsed.extended_time()
+    mpi::cout << "\nBalancing time:   " << elapsed.extended_time()
               << " ( " << elapsed.milliseconds() << " ms)\n";
-}
-
-int main(int argc, char** argv) {
-    mpi::handler init(argc, argv);
-
-    test_points();
 
     return 0;
 }

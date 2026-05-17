@@ -1,4 +1,5 @@
-
+#include <algorithm>
+#include <ranges>
 #include <zephyr/utils/mpi.h>
 
 namespace zephyr::utils {
@@ -158,7 +159,6 @@ std::vector<std::string> proc_names() {
 mpi::master_stream mpi::cout = {};
 
 namespace {
-
 // Удаление MPI-типа, выполняет MPI_Type_free, а затем удаляет указатель на
 // MPI_Datatype, добавляется к std::shared_ptr<MPI_Datatype>.
 void free_deleter(MPI_Datatype *ptr) {
@@ -192,6 +192,89 @@ mpi::datatype mpi::datatype::hvector(int count, int blocklength,
     MPI_Type_create_hvector(count, blocklength, stride, oldtype, newtype);
     MPI_Type_commit(newtype);
     return mpi::datatype(newtype);
+}
+
+// ------------------------------------------ MPI GROUP ------------------------------------------
+
+namespace {
+void comm_deleter(MPI_Comm *comm) {
+    if (*comm != MPI_COMM_NULL && *comm != MPI_COMM_WORLD && *comm != MPI_COMM_SELF) {
+        MPI_Comm_free(&*comm);
+    }
+    delete (comm);
+}
+}
+
+mpi::group mpi::group::world() {
+    mpi::group g;
+    g.rank_ = mpi::rank();
+    g.size_ = mpi::size();
+    g.ranks_.resize(g.size_);
+    for (int r = 0; r < g.size_; ++r) {
+        g.ranks_[r] = r;
+    }
+    g.comm_ = std::make_shared<MPI_Comm>(MPI_COMM_WORLD);
+    return g;
+}
+
+// Подгруппа MPI_COMM_WORLD по выбранным ranks
+mpi::group mpi::group::subgroup(const std::vector<int>& ranks) {
+    mpi::group g;
+    if (ranks.empty()) return g;
+    if (mpi::single()) return mpi::group::world();
+
+    g.ranks_ = ranks;
+
+    // сортировка и удаление дублей
+    std::ranges::sort(g.ranks_);
+    auto new_end = std::ranges::unique(g.ranks_);
+    g.ranks_.erase(new_end.begin(), g.ranks_.end());
+
+    if (g.ranks_.back() >= mpi::size()) {
+        throw std::runtime_error("Group rank is out of range (greater than mpi::size())");
+    }
+
+    MPI_Group world_group;
+    MPI_Comm_group(MPI_COMM_WORLD, &world_group);
+
+    MPI_Group new_group;
+    MPI_Group_incl(world_group, (int) g.ranks_.size(), g.ranks_.data(), &new_group);
+    MPI_Group_free(&world_group);
+
+    if (std::ranges::binary_search(g.ranks_, mpi::rank())) {
+        MPI_Comm* group_comm = new MPI_Comm();
+        MPI_Comm_create_group(MPI_COMM_WORLD, new_group, 0, group_comm);
+        g.comm_ = std::shared_ptr<MPI_Comm>(group_comm, comm_deleter);
+        MPI_Comm_rank(g.comm(), &g.rank_);
+        MPI_Comm_size(g.comm(), &g.size_);
+    }
+    else {
+        g.comm_ = nullptr;
+        g.rank_ = -1;
+        g.size_ = 0;
+    }
+    MPI_Group_free(&new_group);
+    return g;
+}
+
+void mpi::group::throw_if_null_() const {
+    if (!valid()) throw std::runtime_error("Invalid MPI group");
+}
+
+MPI_Comm mpi::group::comm() const {
+    return comm_ ? *comm_ : MPI_COMM_NULL;
+}
+
+int mpi::group::root_rank() const {
+    return ranks_.empty() ? -1 : ranks_.front();
+}
+
+int mpi::group::local_rank(int r) const {
+    auto it = std::ranges::lower_bound(ranks_, r);
+    if (it != ranks_.end() && *it == r) {
+        return std::distance(ranks_.begin(), it);
+    }
+    return -1; // ранг не найден
 }
 
 #endif

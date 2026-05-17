@@ -31,6 +31,16 @@ void AmrAdjacent::shrink_to_fit() {
     rotation.shrink_to_fit();
 }
 
+memory_t AmrAdjacent::memory_usage() const {
+    memory_t mem;
+    mem.add(rank);
+    mem.add(index);
+    mem.add(alien);
+    mem.add(basic);
+    mem.add(rotation);
+    return mem;
+}
+
 void AmrFaces::resize(index_t n_faces) {
     boundary.resize(n_faces);
     adjacent.resize(n_faces);
@@ -59,6 +69,17 @@ void AmrFaces::shrink_to_fit() {
     area.shrink_to_fit();
     area_alt.shrink_to_fit();
     vertices.shrink_to_fit();
+}
+
+memory_t AmrFaces::memory_usage() const {
+    memory_t mem;
+    mem.add(boundary);
+    mem.add(normal);
+    mem.add(center);
+    mem.add(area);
+    mem.add(area_alt);
+    mem.add(vertices);
+    return mem;
 }
 
 void AmrFaces::insert(index_t iface, CellType ctype, int count) {

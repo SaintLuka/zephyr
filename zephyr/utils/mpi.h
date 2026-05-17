@@ -50,17 +50,15 @@ public:
     static bool single();
 
     /// @brief Сеть коммуникаций
-    inline static constexpr MPI_Comm comm() { return MPI_COMM_WORLD; };
+    static MPI_Comm comm() { return MPI_COMM_WORLD; };
 
     /// @brief Блокирует все процессы данной сети, пока они не достигнут
     /// данного вызова.
     static void barrier();
 
-    /// @brief Выполнить функцию последоватьно (!) на каждом процессе
-    /// @details Помогает при отладке
-    /// @param F Целевая функция
+    /// @brief Выполнить функцию поочередно (!) на каждом процессе
     template <class F>
-    static void for_each(F&&);
+    static void for_each(F&& func);
 
     /// @brief Прикольный интерфейс, чтобы можно было писать
     /// mpi::cout << ... и сообщения выводил только мастер-процесс
@@ -133,6 +131,13 @@ public:
     template <class T>
     static void broadcast(int root, T& value);
 
+    /// @brief Отправляет массив с "корневого" процесса всем процессам.
+    /// @param root Ранг "корневого" процесса.
+    /// @param values Массив значений, должны быть одного размера на всех
+    /// процессах, после выполнения синхронизуются.
+    template <class T>
+    static void broadcast(int root, std::vector<T>& values);
+
     /// @brief Коллективная операция. Собирает величину value со всех
     /// процессов, записывает в массив и раздает этот массив всем процессам.
     template <class T>
@@ -196,7 +201,7 @@ public:
         MPI_Datatype short8 = MPI_DATATYPE_NULL;  ///< Для std::array<short, 8>
 
 
-        static const int byte4_count = 50;
+        static constexpr int byte4_count = 50;
 
         /// @brief Типы кратные 4 байтам
         std::array<MPI_Datatype, byte4_count> byte4_types;
@@ -220,6 +225,78 @@ public:
 
         return default_types.byte4_types[sizeof(T) / 4];
     }
+
+    /// @brief MPI-коммуникатор/группа (подгруппа MPI_COMM_WORLD)
+    class group {
+    public:
+        /// @brief Нулевая MPI-группа
+        group() = default;
+
+        /// @brief Нулевая MPI-группа
+        static group null() { return {}; }
+
+        /// @brief Полная группа (MPI_COMM_WORLD)
+        static group world();
+
+        /// @brief Подгруппа MPI_COMM_WORLD по выбранным ranks
+        /// @details Коллективная операция. Если процесс не входит в группу, то
+        /// возвращает нулевой коммуникатор, но всё равно хранит список рангов.
+        static group subgroup(const std::vector<int>& ranks);
+
+        /// @brief Данный процесс входит в группу (участвует в коммуникациях)?
+        bool valid() const { return comm_ != nullptr; }
+
+        /// @brief Данный процесс входит в группу (участвует в коммуникациях)?
+        operator bool() const { return valid(); }
+
+        /// @brief Мастер-процесс группы?
+        bool master() const { return rank_ == 0; }
+
+        /// @brief Группа из одного процесса?
+        bool single() const { return size_ == 1; }
+
+        /// @brief Ранг процесса в групе
+        int rank() const { return rank_; }
+
+        /// @brief Число процессов в группе
+        int size() const { return size_; }
+
+        /// @brief Коммуникатор группы
+        MPI_Comm comm() const;
+
+        /// @brief Ранг в группе по глобальному рангу, возвращает -1
+        /// если процесс с рангом не в группе.
+        int local_rank(int r) const;
+
+        /// @brief Ранг мастер-процесса группы в глобальном коммуникаторе
+        /// (-1 для пустой группы)
+        int root_rank() const;
+
+        /// @brief Сумма значений по группе
+        template <class T>
+        T sum(const T& value) const;
+
+        /// @brief Поэлементно суммировать массивы с нескольких процессов
+        template <class T>
+        std::vector<T> sum(const std::vector<T>& values) const;
+
+        /// @brief Собрать несколько массивов на корневом процессе группы.
+        /// На остальных процессах возвращает пустой массив.
+        template <class T>
+        std::vector<std::vector<T>> gather(const std::vector<T>& values) const;
+
+    private:
+        void throw_if_null_() const;
+
+        int rank_{-1};  ///< Ранг в группе
+        int size_{ 0};  ///< Размер группы
+
+        /// @brief Глобальные ранги процессов в группе
+        std::vector<int> ranks_{};
+
+        /// @brief Коммуникатор (к нему добавляется кастомный deleter)
+        std::shared_ptr<MPI_Comm> comm_ = nullptr;
+    };
 };
 
 
@@ -329,7 +406,7 @@ std::vector<T> mpi::sum(const std::vector<T>& values) {
 
 template <class T>
 mpi::value_rank<T> mpi::argmin(const T& value) {
-    static_assert(std::is_same<T, double>::value, "Only doubles");
+    static_assert(std::is_same_v<T, double>, "Only doubles");
     mpi::value_rank<T> in {.value=value, .rank=rank()};
     mpi::value_rank<T> out{.value=value, .rank=rank()};
     MPI_Allreduce(&in, &out, 1, MPI_DOUBLE_INT, MPI_MINLOC, MPI_COMM_WORLD);
@@ -338,7 +415,7 @@ mpi::value_rank<T> mpi::argmin(const T& value) {
 
 template <class T>
 mpi::value_rank<T> mpi::argmax(const T& value) {
-    static_assert(std::is_same<T, double>::value, "Only doubles");
+    static_assert(std::is_same_v<T, double>, "Only doubles");
     mpi::value_rank<T> in {.value=value, .rank=rank()};
     mpi::value_rank<T> out{.value=value, .rank=rank()};
     MPI_Allreduce(&in, &out, 1, MPI_DOUBLE_INT, MPI_MAXLOC, MPI_COMM_WORLD);
@@ -348,6 +425,11 @@ mpi::value_rank<T> mpi::argmax(const T& value) {
 template <class T>
 void mpi::broadcast(int root, T& value) {
     MPI_Bcast((void*)&value, sizeof(value), MPI_CHAR, root, comm());
+}
+
+template <class T>
+void mpi::broadcast(int root, std::vector<T>& values) {
+    MPI_Bcast(values.data(), (int)values.size(), mpi::type<T>(), root, comm());
 }
 
 template <class T>
@@ -374,6 +456,66 @@ template <class T>
 void mpi::all_to_all(const std::vector<T>& send, std::vector<T>& recv) {
     recv.resize(size());
     MPI_Alltoall(send.data(), 1, mpi::type<T>(), recv.data(), 1, mpi::type<T>(), comm());
+}
+
+template <class T>
+T mpi::group::sum(const T& value) const {
+    throw_if_null_();
+
+    if (this->single()) return value;
+    T g_value;
+    MPI_Allreduce(&value, &g_value, 1, mpi::type<T>(), MPI_SUM, comm());
+    return g_value;
+}
+
+template <class T>
+std::vector<T> mpi::group::sum(const std::vector<T>& values) const {
+    throw_if_null_();
+
+    if (this->single()) return values;
+    std::vector<T> values_sum(values.size());
+    MPI_Allreduce(values.data(), values_sum.data(), int(values.size()),
+                  mpi::type<T>(), MPI_SUM, comm());
+    return values_sum;
+}
+
+template <class T>
+std::vector<std::vector<T>> mpi::group::gather(const std::vector<T>& values) const {
+    throw_if_null_();
+
+    if (this->single()) return {values};
+
+    const int loc_size = static_cast<int>(values.size());
+    std::vector<int> all_sizes(size_);
+    MPI_Gather(&loc_size, 1, MPI_INT, all_sizes.data(), 1, MPI_INT, 0, comm());
+
+    if (constexpr int root = 0; rank_ == root) {
+        std::vector<int> offsets(size_, 0);
+        int total_size = 0;
+        for (int r = 0; r < size_; ++r) {
+            offsets[r] = total_size;
+            total_size += all_sizes[r];
+        }
+
+        std::vector<T> flat_data(total_size);
+        MPI_Gatherv(values.data(), loc_size, mpi::type<T>(),
+                    flat_data.data(), all_sizes.data(), offsets.data(), mpi::type<T>(),
+                    root, comm());
+
+        std::vector<std::vector<T>> result(size_);
+        for (int r = 0; r < size_; ++r) {
+            result[r].assign(flat_data.begin() + offsets[r],
+                             flat_data.begin() + offsets[r] + all_sizes[r]);
+        }
+
+        return result;
+    }
+    else {
+        MPI_Gatherv(values.data(), loc_size, mpi::type<T>(),
+                    nullptr, nullptr, nullptr, mpi::type<T>(),
+                    root, comm());
+        return {};
+    }
 }
 
 } // namespace zephyr::utils
@@ -489,6 +631,13 @@ public:
     /// принимает пересланное значение.
     template <class T>
     static void broadcast(int root, T& value) { }
+
+    /// @brief Отправляет массив с "корневого" процесса всем процессам.
+    /// @param root Ранг "корневого" процесса.
+    /// @param values Массив значений, должны быть одного размера на всех
+    /// процессах, после выполнения синхронизуются.
+    template <class T>
+    static void broadcast(int root, std::vector<T>& values) { }
 
     /// @brief Коллективная операция. Собирает величину value со всех
     /// процессов, записывает в массив и раздает этот массив всем процессам.

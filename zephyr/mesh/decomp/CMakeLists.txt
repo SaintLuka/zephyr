@@ -2,6 +2,7 @@ set(ZEPHYR_MESH_DECOMP_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/decomposition.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/orb/transform.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/orb/blocks.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/orb/blocks_split.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/orb/ORB.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/rwalk.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/VD3.cpp
@@ -19,7 +20,7 @@ install(FILES
 )
 
 install(FILES
-	${CMAKE_CURRENT_SOURCE_DIR}/orb/blocks.h
+		${CMAKE_CURRENT_SOURCE_DIR}/orb/blocks.h
 	${CMAKE_CURRENT_SOURCE_DIR}/orb/transform.h
 	DESTINATION include/${PROJECT_NAME}/mesh/decomp/orb
 )
