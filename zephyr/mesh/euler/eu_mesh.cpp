@@ -506,6 +506,49 @@ void EuMesh::check_reference(bool fix) {
     }
 }
 
+std::string bytes(size_t n_bytes) {
+    if (n_bytes < 1'000) {
+        return std::format("{:6d} B ", n_bytes);
+    }
+    if (n_bytes < 1'000'000) {
+        return std::format("{:6.1f} KB", 1.0e-3 * double(n_bytes));
+    }
+    if (n_bytes < 1'000'000'000) {
+        return std::format("{:6.1f} MB", 1.0e-6 * double(n_bytes));
+    }
+    return std::format("{:6.1f} GB", 1.0e-9 * double(n_bytes));
+}
+
+void EuMesh::memory_usage() const {
+    memory_t geom_size = m_locals.memory_usage();
+    memory_t face_size = m_locals.faces.memory_usage();
+    memory_t adj_size = m_locals.faces.adjacent.memory_usage();
+    memory_t node_size;
+    node_size.add(m_locals.verts);
+
+    memory_t cells_size;
+    cells_size.needed = geom_size.needed + face_size.needed + adj_size.needed + node_size.needed;
+    cells_size.actual = geom_size.actual + face_size.actual + adj_size.actual + node_size.actual;
+
+    size_t geom_per_cell = cells_size.needed / m_locals.n_cells();
+
+    std::cout << "Local cells: " << m_locals.n_cells() << "\n";
+    std::cout << "  Cells:   " << bytes(cells_size.needed)  << " / " << bytes(cells_size.actual);
+    std::cout << " (avg" << bytes(geom_per_cell) << " per cell)\n";
+    std::cout << "    Geom:  " << bytes(geom_size.needed) << " / " << bytes(geom_size.actual) << "\n";
+    std::cout << "    Adj:   " << bytes(adj_size.needed)  << " / " << bytes(adj_size.actual) << "\n";
+    std::cout << "    Nodes: " << bytes(node_size.needed) << " / " << bytes(node_size.actual) << "\n";
+    std::cout << "    Faces: " << bytes(face_size.needed) << " / " << bytes(face_size.actual) << "\n";
+
+    memory_t data_size = m_locals.data.memory_usage();
+    size_t data_per_cell = data_size.needed / m_locals.n_cells();
+    std::cout << "  Data:    " << bytes(data_size.needed) << " / " << bytes(data_size.actual);
+    std::cout << " (avg" << bytes(data_per_cell) << " per cell)\n";
+
+    // TODO: Проверить размеры unique_nodes, tourists, migrants.
+    // Сделать MPI-версию проверки памяти. Ну и подумать над оптимизацией размеров
+}
+
 int EuMesh::check_base() const {
     if (m_locals.empty()) {
         if (mpi::single()) {

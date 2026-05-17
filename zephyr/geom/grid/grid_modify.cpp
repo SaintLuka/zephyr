@@ -55,7 +55,7 @@ void Grid::rotate(const Matrix3d& R) {
         });
 }
 
-void Grid::transform(std::function<Vector3d(const Vector3d&)>& func) {
+void Grid::transform(const std::function<Vector3d(const Vector3d&)>& func) {
     require_editable_();
     threads::for_each(
         m_nodes.begin(), m_nodes.end(),

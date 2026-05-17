@@ -33,6 +33,15 @@ void Storage::shrink_to_fit() {
     }
 }
 
+memory_t Storage::memory_usage() const {
+    memory_t mem;
+    for (const auto& buf: m_data) {
+        mem.needed = buf.element_size() * buf.size();
+        mem.actual = buf.element_size() * buf.capacity();
+    }
+    return mem;
+}
+
 const utils::Buffer& Storage::operator[](const std::string& name) const {
     for (size_t i = 0; i < m_names.size(); ++i) {
         if (m_names[i] == name) {

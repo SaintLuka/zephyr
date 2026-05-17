@@ -9,6 +9,7 @@
 #include <type_traits>
 
 #include <zephyr/utils/buffer.h>
+#include <zephyr/mesh/memory.h>
 
 namespace zephyr::mesh {
 
@@ -155,6 +156,9 @@ public:
 
     /// @brief Изменить размеры буферов под размеры данных
     void shrink_to_fit();
+
+    /// @brief Использование памяти
+    memory_t memory_usage() const;
 
     /// @brief Добавить новое поле данных
     /// @param name Имя поля данных должно быть уникальным

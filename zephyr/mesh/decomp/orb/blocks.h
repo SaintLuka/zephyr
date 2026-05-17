@@ -126,6 +126,9 @@ private:
     /// @brief
     void readiness() const;
 
+    /// @brief Ранг для уже отображенной точки
+    int rank_mapped(const Vector3d& v) const;
+
     static void move_simple(double alpha, const std::vector<double>& loads,
             const std::vector<double>& widths, std::vector<barrier>& coords);
 

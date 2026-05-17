@@ -35,7 +35,7 @@ Vector3d velocity(const Vector3d& c) {
 // Шар в левом нижнем углу области
 void set_initials(EuMesh& mesh, const Box& domain,
         Storable<double> u1, Storable<double> u2) {
-    Vector3d vc = domain.vmin + 0.2 * domain.size();
+    Vector3d vc = domain.vmin + 0.2 * domain.sizes();
     double D = 0.1 * domain.diameter();
     for (auto cell: mesh) {
         cell[u1] = (cell.center() - vc).norm() < D ? 1.0 : 0.0;
