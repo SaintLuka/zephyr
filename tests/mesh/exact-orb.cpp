@@ -35,10 +35,10 @@ int main() {
     mpi::handler init;
 
     // Сеточный генератор
-    Cuboid gen(0.0, 1.0, 0.0, 0.6, 0.0, 0.5);
-    gen.set_nx(70);
-    //Rectangle gen(0.0, 1.5, 0.0, 1.0);
-    //gen.set_nx(150);
+    //Cuboid gen(0.0, 1.0, 0.0, 0.6, 0.0, 0.5);
+    //gen.set_nx(70);
+    Rectangle gen(0.0, 1.3, 0.0, 0.84);
+    gen.set_nx(150);
 
     // Создаем сетку
     EuMesh mesh(gen);
@@ -51,7 +51,7 @@ int main() {
     Box domain = gen.bbox();
 
     // Варианты инициализации ORB декомпозиции
-    ORB orb(domain, "XYZ", mpi::size());
+    ORB orb(domain, "PR", mpi::size());
     //ORB orb(domain, "YX", 13);
     //ORB orb(domain, "YX", 13, 3);
 
@@ -61,8 +61,10 @@ int main() {
     mesh.set_decomposition(orb);
 
     // Заполняем начальные данные и нагрузку
-    auto init_cells = [u](EuCell& cell) {
-        const Vector3d vc = {0.67, 0.43, 0.0};
+    auto init_cells = [u, &domain](EuCell& cell) {
+        Vector3d vm = domain.vmin;
+        Vector3d ds = domain.sizes();
+        Vector3d vc = {vm.x() + 0.23 * ds.x(), vm.y() + 0.43 * ds.y(), 0.0};
         cell[u] = (cell.center() - vc).norm() < 0.23 ? 1.0 : 0.0;
     };
 
@@ -91,7 +93,7 @@ int main() {
     auto ws = mpi::all_gather(static_cast<double>(mesh.n_cells()));
     mpi::cout << "Imbalance:  " << imbalance(ws) << "\n";
 
-    mpi::cout << "\nBalancing time:   " << elapsed.extended_time()
+    mpi::cout << "Balancing time: " << elapsed.extended_time()
               << " ( " << elapsed.milliseconds() << " ms)\n";
 
     return 0;

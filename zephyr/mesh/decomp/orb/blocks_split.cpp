@@ -121,6 +121,7 @@ void bucket_sort(const Container& values, std::span<const double> barriers,
     for (auto p: values) {
         int i = std::ranges::lower_bound(barriers, p) - barriers.begin();
         if (i < 1 || i >= barriers.size()) {
+            std::cout << barriers.front() <<" -- " << p << " -- " << barriers.back() << "\n";
             throw std::runtime_error("bucket_sort error: bad range");
         }
         buckets[i - 1].push_back(p);
@@ -396,9 +397,12 @@ void split_coords(
 
     debug_code {
         // Выход за границы барьера
-        auto [min, max] = minmax_value(coords);
-        if (min < barriers.front() || max > barriers.back()) {
-            throw std::runtime_error("Some point is out of bounds");
+        if (!coords.empty()) {
+            auto [min, max] = minmax_value(coords);
+            if (min < barriers.front() || max > barriers.back()) {
+                std::cout << barriers.front() <<" -- " << min << " -- " << max << " -- " << barriers.back() << "\n";
+                throw std::runtime_error("Some point is out of bounds");
+            }
         }
 
         // Число точек на группу процессов

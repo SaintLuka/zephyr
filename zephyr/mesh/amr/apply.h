@@ -228,7 +228,8 @@ void apply_impl(AmrCells &locals, const Distributor& op, Tourism& tourism) {
 /// @brief Специализация для пустых хранилищ
 template<>
 inline void apply_impl<0>(AmrCells &locals, const Distributor& op, Tourism& tourism) {
-    throw std::runtime_error("MPI amr::apply<0> not implemented #1");
+    // там коллективная операция у роутера
+    tourism.setup_positions<0>(locals.next);
 }
 
 /// @brief Автоматический выбор размерности

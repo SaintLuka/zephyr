@@ -470,8 +470,8 @@ void balance_flags_fast(AmrCells& locals, int max_level) {
 }
 
 #ifdef ZEPHYR_MPI
-/// Отличия параллельной реализации?
-/// Объяснить безумие с отправкой флагов.
+// Отличия параллельной реализации?
+// Объяснить безумие с отправкой флагов.
 template <int dim>
 void balance_flags_fast(AmrCells &locals, int max_level, Tourism& tourism) {
     static Stopwatch restriction_timer;

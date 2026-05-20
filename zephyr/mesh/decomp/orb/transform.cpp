@@ -81,17 +81,43 @@ Vector3d inv_zxy(const Vector3d& v) { Vector3d w = rotate_3d_inv(v); return {w.y
 Vector3d inv_zy (const Vector3d& v) { Vector3d w = rotate_2d_inv(v); return {w.z(), w.y(), w.x()}; }
 Vector3d inv_zyx(const Vector3d& v) { Vector3d w = rotate_3d_inv(v); return {w.z(), w.y(), w.x()}; }
 
-Vector3d map_rp(const Vector3d& v) {
+Vector3d map_rp_1(const Vector3d& v) {
     return {std::sqrt(v.x() * v.x() + v.y() * v.y()), std::atan2(v.y(), v.x()), v.z()};
 }
-Vector3d map_pr(const Vector3d& v) {
+Vector3d map_pr_1(const Vector3d& v) {
     return {std::atan2(v.y(), v.x()), std::sqrt(v.x() * v.x() + v.y() * v.y()), v.z()};
 }
-Vector3d inv_rp(const Vector3d& v) {
-    return {v.x() * std::cos(v.y()), v.x() * std::sin(v.y()), v.z()};
+std::function<Vector3d(const Vector3d&)> map_rp(double p_min = -M_PI, double p_max = M_PI, double r_avg = 1.0) {
+    return [p_min, p_max, r_avg](const Vector3d& v) -> Vector3d {
+        double r = std::sqrt(v.x() * v.x() + v.y() * v.y());
+        double p = std::atan2(v.y(), v.x());
+        while (p > p_max) { p -= 2*M_PI; }
+        while (p < p_min) { p += 2*M_PI; }
+        double P = r_avg * (p - p_min) / (p_max - p_min);
+        return Vector3d{r, P, v.z()};
+    };
 }
-Vector3d inv_pr(const Vector3d& v) {
-    return {v.y() * std::cos(v.x()), v.y() * std::sin(v.x()), v.z()};
+std::function<Vector3d(const Vector3d&)> map_pr(double p_min = -M_PI, double p_max = M_PI, double r_avg = 1.0) {
+    return [p_min, p_max, r_avg](const Vector3d& v) -> Vector3d {
+        double r = std::sqrt(v.x() * v.x() + v.y() * v.y());
+        double p = std::atan2(v.y(), v.x());
+        while (p > p_max) { p -= 2*M_PI; }
+        while (p < p_min) { p += 2*M_PI; }
+        double P = r_avg * (p - p_min) / (p_max - p_min);
+        return Vector3d{P, r, v.z()};
+    };
+}
+std::function<Vector3d(const Vector3d&)> inv_rp(double p_min = -M_PI, double p_max = M_PI, double r_avg = 1.0) {
+    return [p_min, p_max, r_avg](const Vector3d& v) -> Vector3d {
+        double p = v.y() * (p_max - p_min) / r_avg + p_min;
+        return {v.x() * std::cos(p), v.x() * std::sin(p), v.z()};
+    };
+}
+std::function<Vector3d(const Vector3d&)> inv_pr(double p_min = -M_PI, double p_max = M_PI, double r_avg = 1.0) {
+    return [p_min, p_max, r_avg](const Vector3d& v) -> Vector3d {
+        double p = v.x() * (p_max - p_min) / r_avg + p_min;
+        return {v.y() * std::cos(p), v.y() * std::sin(p), v.z()};
+    };
 }
 
 Limits::Limits() {
@@ -162,19 +188,19 @@ void Transform::init_(const std::string &type) {
     const std::vector<map_function> mapping = {
         map_xy,  map_xz,  map_yx,  map_yz,  map_zx,  map_zy,
         map_xyz, map_xzy, map_yxz, map_yzx, map_zxy, map_zyx,
-        map_rp, map_pr
+        map_rp(), map_pr()
     };
 
     const std::vector<map_function> inverse = {
         inv_xy,  inv_xz,  inv_yx,  inv_yz,  inv_zx,  inv_zy,
         inv_xyz, inv_xzy, inv_yxz, inv_yzx, inv_zxy, inv_zyx,
-        inv_rp, inv_pr
+        inv_rp(), inv_pr()
     };
 
     if (mapping.size() != available.size() ||
         inverse.size() != available.size()) {
         throw std::runtime_error("Transform: something wrong");
-        }
+    }
 
     m_type = available[idx];
     m_mapping = mapping[idx];
@@ -182,8 +208,98 @@ void Transform::init_(const std::string &type) {
 }
 
 void Transform::update_limits(const Box& domain) {
+    constexpr double inf = std::numeric_limits<double>::infinity();
+
     if (m_type == "RP" || m_type == "PR") {
-        throw std::runtime_error("Transform::init_box_ polar not supported");
+        if (!domain.is_2D()) {
+            throw std::runtime_error("Polar decomposition for 3D domain");
+        }
+
+        // Точки домена против часовой с левой нижней
+        Vector3d v1 = {domain.vmin.x(), domain.vmin.y(), 0.0};
+        Vector3d v2 = {domain.vmax.x(), domain.vmin.y(), 0.0};
+        Vector3d v3 = {domain.vmax.x(), domain.vmax.y(), 0.0};
+        Vector3d v4 = {domain.vmin.x(), domain.vmax.y(), 0.0};
+
+        double r_max = std::max({v1.norm(), v2.norm(), v3.norm(), v4.norm()});
+
+        double r_min, p_min, p_max;
+        // Положение центра координат относительно домена
+        if (0.0 <= domain.vmin.x()) { // слева
+            if (0.0 <= domain.vmin.y()) {
+                // слева внизу
+                p_min = std::atan2(v2.y(), v2.x());
+                p_max = std::atan2(v4.y(), v4.x());
+                r_min = v1.norm();
+            }
+            else if (domain.vmax.y() <= 0.0) {
+                // слева сверху
+                p_min = std::atan2(v1.y(), v1.x());
+                p_max = std::atan2(v3.y(), v3.x());
+                r_min = v4.norm();
+            }
+            else {
+                // слева посередине
+                p_min = std::atan2(v1.y(), v1.x());
+                p_max = std::atan2(v4.y(), v4.x());
+                r_min = std::abs(domain.vmin.x());
+            }
+        }
+        else if (domain.vmax.x() <= 0.0) { // справа
+            if (0.0 <= domain.vmin.y()) {
+                // справа внизу
+                p_min = std::atan2(v3.y(), v3.x());
+                p_max = std::atan2(v1.y(), v1.x());
+                r_min = v2.norm();
+            }
+            else if (domain.vmax.y() <= 0.0) {
+                // справа сверху
+                p_min = std::atan2(v4.y(), v4.x());
+                p_max = std::atan2(v2.y(), v2.x());
+                r_min = v3.norm();
+            }
+            else {
+                // справа посередине
+                p_min = std::atan2(v3.y(), v3.x());
+                p_max = std::atan2(v2.y(), v2.x()) + 2.0*M_PI;
+                r_min = std::abs(domain.vmax.x());
+            }
+        }
+        else { // посередине
+            if (0.0 <= domain.vmin.y()) {
+                // посередине внизу
+                p_min = std::atan2(v2.y(), v2.x());
+                p_max = std::atan2(v1.y(), v1.x());
+                r_min = std::abs(domain.vmin.y());
+            }
+            else if (domain.vmax.y() <= 0.0) {
+                // посередине сверху
+                p_min = std::atan2(v4.y(), v4.x());
+                p_max = std::atan2(v3.y(), v3.x());
+                r_min = std::abs(domain.vmax.y());
+            }
+            else {
+                // в центре
+                p_min = -M_PI;
+                p_max = +M_PI;
+                r_min = 0.0;
+            }
+        }
+
+        double r_avg = 0.5 * (r_min + r_max);
+        if (m_type == "RP") {
+            m_box.vmin = {r_min, 0.0,   -inf};
+            m_box.vmax = {r_max, r_avg, +inf};
+            m_mapping = map_rp(p_min, p_max, r_avg);
+            m_inverse = inv_rp(p_min, p_max, r_avg);
+        }
+        else {
+            m_box.vmin = {0.0,   r_min, -inf};
+            m_box.vmax = {r_avg, r_max, +inf};
+            m_mapping = map_pr(p_min, p_max, r_avg);
+            m_inverse = inv_pr(p_min, p_max, r_avg);
+        }
+        return;
     }
 
     // Строим box, который захватывает углы m_mapping(domain)
@@ -196,8 +312,8 @@ void Transform::update_limits(const Box& domain) {
             }
         }
         m_box.extend(0.01, 0.01);
-        m_box.vmin.z() = -std::numeric_limits<double>::infinity();
-        m_box.vmax.z() = +std::numeric_limits<double>::infinity();
+        m_box.vmin.z() = -inf;
+        m_box.vmax.z() = +inf;
     }
     else {
         m_box = Box::Empty(3);
