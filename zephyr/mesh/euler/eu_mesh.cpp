@@ -314,6 +314,39 @@ void EuMesh::refine() {
 
     full.stop();
 
+
+    /*//R version
+    threads::parallel_for(0, m_locals.size(),
+        [&locals=m_locals](index_t ic) {
+            index_t iface = locals.face_begin[ic];
+            std::array<double, 4> areas;
+            for (Side2D side: Side2D::items()) {
+                areas[side] = locals.faces.area[iface + side];
+                if (locals.faces.is_actual(iface + side[1])) {
+                    areas[side] += locals.faces.area[iface + side[1]];
+                }
+            }
+            double avg_lr = 0.5 * (areas[Side2D::L] + areas[Side2D::R]);
+            double avg_bt = 0.5 * (areas[Side2D::B] + areas[Side2D::T]);
+            areas[Side2D::L] = avg_lr;
+            areas[Side2D::R] = avg_lr;
+            areas[Side2D::B] = avg_bt;
+            areas[Side2D::T] = avg_bt;
+
+            for (Side2D side: Side2D::items()) {
+                if (locals.faces.is_undefined(iface + side[1])) {
+                    locals.faces.area[iface + side] = areas[side];
+                }
+                else {
+                    locals.faces.area[iface + side[0]] = 0.5 * areas[side];
+                    locals.faces.area[iface + side[1]] = 0.5 * areas[side];
+                }
+            }
+        });*/
+    //Rversion
+
+
+
 #if CHECK_PERFORMANCE
     static size_t counter = 0;
     if (counter % amr::check_frequency == 0) {
@@ -468,7 +501,7 @@ void EuMesh::check_reference(bool fix) {
     if (fix) {
         for (auto& cell: m_locals) {
             index_t ic = cell.index();
-            
+
             int i = std::round((cell.x() - 0.5 * hx - xmin) / hx);
             int j = std::round((cell.y() - 0.5 * hy - ymin) / hy);
 

@@ -377,6 +377,15 @@ void MmFluid::fluxes(EuMesh &mesh, double dt, Direction dir) {
 
         // Примитивный вектор в ячейке
         PState z_c = cell[part.init];
+        if( z_c.density < 0.0 ) {
+        //throw std::runtime_error("MmFluid::fluxes error: z_c.density < 0.0 ");
+        }
+        if( z_c.pressure < 0.0 ) {
+        //throw std::runtime_error("MmFluid::fluxes error: z_c.pressure < 0.0 ");
+        }
+        if( z_c.temperature < 0.0 ) {
+        //throw std::runtime_error("MmFluid::fluxes error: z_c.temperature < 0.0 ");
+        }
 
         // Переменная для потока
         Flux flux;
@@ -397,7 +406,6 @@ void MmFluid::fluxes(EuMesh &mesh, double dt, Direction dir) {
 
             // Значение на грани со стороны ячейки
             PState z_m = z_c.in_local(normal);
-
             // Значение на грани со стороны соседа
             PState z_p = z_n.in_local(normal);
 
@@ -420,7 +428,10 @@ void MmFluid::fluxes(EuMesh &mesh, double dt, Direction dir) {
         // Обновляем значение в ячейке (консервативные переменные)
         q_c.arr() -= (dt / V_c) * flux.arr();
 
-        // Новое значение примитивных переменных
+        if(q_c.density < 0.0) {
+            throw std::runtime_error("MmFluid::fluxes addfdsdfdg  error: z_L.density < 0.0 ");
+        }
+
         cell[part.next] = PState(q_c, mixture, z_c.P(), z_c.T(), z_c.rhos());
     });
 }
@@ -658,6 +669,10 @@ void MmFluid::fluxes_stage2(EuMesh &mesh, double dt, Direction dir)  {
 
         // Обновляем значение в ячейке (консервативные переменные)
         q_c.arr() -= (dt / cell.volume()) * flux.arr();
+
+        if(q_c.density < 0.0 ) {
+            throw std::runtime_error("MmFluid::fluxes_stage2 error: z_L.density < 0.0 ");
+        }
 
         // Значение примитивных переменных на полушаге
         cell[part.next] = PState(q_c, mixture, z_c.P(), z_c.T(), z_c.rhos());

@@ -195,8 +195,14 @@ mmf::WaveConfig3 HLLC::wave_config(
     double c_R = mix.sound_speed_rP(zR.rho(), zR.P(), zR.beta(), {.T0 = zR.T(), .rhos = zR.rhos()});
 
     // Оценки скоростей расходящихся волн
-    double S_L = std::min(zL.vx() - c_L, zR.vx() - c_R);
-    double S_R = std::max(zL.vx() + c_L, zR.vx() + c_R);
+    double S_L = std::min(zL.vx() - c_L, zR.vx() - c_L);
+    double S_R = std::max(zL.vx() + c_R, zR.vx() + c_R);
+
+    // Более робастная оценка, гарантирует S_L < S_R
+    if (S_L >= S_R) {
+        S_L = std::min(zL.vx() - c_L, zR.vx() - c_R);
+        S_R = std::max(zL.vx() + c_L, zR.vx() + c_R);
+    }
 
     // Перенос массы через левую/правую волну
     double a_L = zL.rho() * (S_L - zL.vx());
@@ -204,6 +210,10 @@ mmf::WaveConfig3 HLLC::wave_config(
 
     // Скорость контактного разрыва
     double S_C = (zL.P() - zR.P() + a_R * zR.vx() - a_L * zL.vx()) / (a_R - a_L);
+
+    // Скорость S_C должна быть между S_L, S_R
+    if (S_C < S_L) { S_C = S_L + 1.0e-9 * std::max(c_L, c_R); }
+    if (S_C > S_R) { S_C = S_R - 1.0e-9 * std::max(c_L, c_R); }
 
     // Плотность слева/справа от контактного разрыва
     double rho_sL = a_L / (S_L - S_C);
@@ -264,8 +274,14 @@ mmf::WaveConfig3 HLLC::wave_config(const MixturePT& mix,
     double c_R = mix.sound_speed_re(Q_R.density, e_R, beta_R);
 
     // Оценки скоростей расходящихся волн
-    double S_L = min(v_L.x() - c_L, v_R.x() - c_R, 0.0);
-    double S_R = max(v_L.x() + c_L, v_R.x() + c_R, 0.0);
+    double S_L = std::min(v_L.x() - c_L, v_R.x() - c_L);
+    double S_R = std::max(v_L.x() + c_R, v_R.x() + c_R);
+
+    // Более робастная оценка, гарантирует S_L < S_R
+    if (S_L >= S_R) {
+        S_L = std::min(v_L.x() - c_L, v_R.x() - c_R);
+        S_R = std::max(v_L.x() + c_L, v_R.x() + c_R);
+    }
 
     // Поток через левую/правую волну
     mmf::Flux a_L = F_L.arr() - S_L * Q_L.arr();
@@ -273,6 +289,10 @@ mmf::WaveConfig3 HLLC::wave_config(const MixturePT& mix,
 
     // Скорость контактного разрыва
     double S_C = (a_R.momentum.x() - a_L.momentum.x()) / (a_R.density - a_L.density);
+
+    // Скорость S_C должна быть между S_L, S_R
+    if (S_C < S_L) { S_C = S_L + 1.0e-9 * std::max(c_L, c_R); }
+    if (S_C > S_R) { S_C = S_R - 1.0e-9 * std::max(c_L, c_R); }
 
     // Плотность слева/справа от контактного разрыва
     double rho_sL = a_L.density / (S_C - S_L);
@@ -327,8 +347,14 @@ mmf::Flux HLLC::calc_flux(const mmf::PState &zL, const mmf::PState &zR, const Mi
     double c_R = mix.sound_speed_rP(zR.rho(), zR.P(), zR.beta(), {.T0 = zR.T(), .rhos = zR.rhos()});
 
     // Оценки скоростей расходящихся волн
-    double S_L = std::min(zL.vx() - c_L, zR.vx() - c_R);
-    double S_R = std::max(zL.vx() + c_L, zR.vx() + c_R);
+    double S_L = std::min(zL.vx() - c_L, zR.vx() - c_L);
+    double S_R = std::max(zL.vx() + c_R, zR.vx() + c_R);
+
+    // Более робастная оценка, гарантирует S_L < S_R
+    if (S_L >= S_R) {
+        S_L = std::min(zL.vx() - c_L, zR.vx() - c_R);
+        S_R = std::max(zL.vx() + c_L, zR.vx() + c_R);
+    }
 
     // Сверхзвуковое течение
     if (S_L >= 0.0) { return Flux(zL); }
@@ -339,6 +365,10 @@ mmf::Flux HLLC::calc_flux(const mmf::PState &zL, const mmf::PState &zR, const Mi
 
     // Скорость контактного разрыва
     double S_C = (zL.P() - zR.P() + a_R * zR.vx() - a_L * zL.vx()) / (a_R - a_L);
+
+    // Скорость S_C должна быть между S_L, S_R
+    if (S_C < S_L) { S_C = S_L + 1.0e-9 * std::max(c_L, c_R); }
+    if (S_C > S_R) { S_C = S_R - 1.0e-9 * std::max(c_L, c_R); }
 
     // Плотность слева/справа от контактного разрыва
     double rho_sL = a_L / (S_L - S_C);
