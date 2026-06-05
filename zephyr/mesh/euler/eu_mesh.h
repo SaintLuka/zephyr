@@ -344,6 +344,9 @@ public:
 
     /// @{ @name debug functions
 
+    /// @brief Статистика по использованию памяти
+    void memory_usage() const;
+
     /// @brief Проверить базовую сетку
     int check_base() const;
 

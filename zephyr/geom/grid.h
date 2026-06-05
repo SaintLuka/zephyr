@@ -367,7 +367,7 @@ public:
     void rotate(const Matrix3d& R);
 
     /// @brief Преобразовать узлы сетки
-    void transform(std::function<Vector3d(const Vector3d&)>& func);
+    void transform(const std::function<Vector3d(const Vector3d&)>& func);
 
     /// @brief Достроить зеркальное отражение сетки. Все узлы сетки должны
     /// лежать в полуплоскости X < 0 или X > 0.

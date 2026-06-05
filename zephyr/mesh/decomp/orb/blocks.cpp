@@ -1,16 +1,19 @@
 #include <iostream>
 #include <algorithm>
+#include <iomanip>
 #include <numeric>
+#include <span>
+#include <ranges>
 
 #include <zephyr/mesh/decomp/orb/blocks.h>
+#include <zephyr/utils/mpi.h>
 
 namespace zephyr::mesh::decomp {
-
-static const double inf = std::numeric_limits<double>::infinity();
+static constexpr double inf = std::numeric_limits<double>::infinity();
 
 // Декомпозиция прямоугольника на size блоков,
 // по оси x задано nx блоков
-std::vector<int> decomp(int size, int n_x) {
+inline std::vector<int> decomp(int size, int n_x) {
     int N_YZ = size / n_x;
     int big_count = size - n_x * N_YZ;
 
@@ -35,32 +38,53 @@ std::vector<int> decomp(int size, int n_x) {
 }
 
 // Декомпозиция прямоугольника [Lx, Ly] на size блоков
-std::vector<int> decomp(double Lx, double Ly, int size) {
+inline std::vector<int> decomp(double Lx, double Ly, int size) {
     double H = std::sqrt((Lx * Ly) / size);
     int nx = static_cast<int>(std::round(Lx / H ));
     nx = std::min(std::max(1, nx), size);
     return decomp(size, nx);
 }
 
-Blocks::Blocks()
-    : m_box(Box::Infinite(3)) {
+Blocks::Blocks() {
+    m_ready = true;
 
-    init_single();
+    m_map = Transform();
+
+    m_size = 1;
+    m_nx = 1;
+    m_ny = {1};
+    m_nz = {{1}};
+
+    m_ids = {index_t{0, 0, 0}};
+
+    m_ranks = {{{0}}};
+
+    m_x_coords = {  m_map.x_min(), m_map.x_max()};
+    m_y_coords = {{ m_map.y_min(), m_map.y_max()}};
+    m_z_coords = {{{m_map.z_min(), m_map.z_max()}}};
+
+    m_x_widths = {  m_map.x_width()};
+    m_y_widths = {{ m_map.y_width()}};
+    m_z_widths = {{{m_map.z_width()}}};
+
+    m_x_loads = {0.0};
+    m_y_loads = {{0.0}};
+    m_z_loads = {{{0.0}}};
 }
 
 Blocks::Blocks(const Box& domain, const std::string& type, int size)
-    : m_ready(false), m_box(domain), m_map(type), m_size(size) {
+    : m_size(size), m_map(domain, type) {
 
-    if (m_map.dimension() == 1) {
+    if (type.size() == 1) {
         init_sizes_1D(m_size);
     }
-    else if (m_map.dimension() == 2) {
-        Vector3d L = m_map(m_box.size());
+    else if (type.size() == 2) {
+        Vector3d L = m_map.box().sizes();
         std::vector<int> n_y = decomp(L.x(), L.y(), size);
         init_sizes_2D(n_y);
     }
-    else if (m_map.dimension() == 3) {
-        Vector3d L = m_map(m_box.size());
+    else if (type.size() == 3) {
+        Vector3d L = m_map.box().sizes();
         double H = std::cbrt((L.x() * L.y() * L.z()) / m_size);
         int nx = static_cast<int>(std::round(L.x() / H ));
         nx = std::min(std::max(1, nx), m_size);
@@ -83,32 +107,31 @@ Blocks::Blocks(const Box& domain, const std::string& type, int size)
         throw std::runtime_error("Странная декомпозиция с размерностью > 3");
     }
 
-    init_limits();
     init_indices();
     init_coords();
     init_widths();
     init_loads();
-    setup_bounds(domain.vmin, domain.vmax);
+    m_ready = true;
 }
 
 Blocks::Blocks(const Box& domain, const std::string& type, int size, int nx)
-        : m_ready(false), m_box(domain), m_map(type), m_size(size) {
+    : m_size(size), m_map(domain, type) {
 
-    if (m_map.dimension() == 1) {
+    if (type.size() == 1) {
         if (size < 0) {
             m_size = nx;
         }
         init_sizes_1D(m_size);
     }
-    else if (m_map.dimension() == 2) {
+    else if (type.size() == 2) {
         std::vector<int> n_y = decomp(size, nx);
         init_sizes_2D(n_y);
     }
-    else if (m_map.dimension() == 3) {
+    else if (type.size() == 3) {
         std::vector<int> nYZ = decomp(size, nx);
         std::vector<std::vector<int>> nz(nx);
         for (int i = 0; i < nx; ++i) {
-            Vector3d L = m_map(m_box.size());
+            Vector3d L = m_map.box().sizes();
             nz[i] = decomp(L.y(), L.z(), nYZ[i]);
         }
         int check_sum = 0;
@@ -124,29 +147,28 @@ Blocks::Blocks(const Box& domain, const std::string& type, int size, int nx)
         throw std::runtime_error("Странная декомпозиция с размерностью > 3");
     }
 
-    init_limits();
     init_indices();
     init_coords();
     init_widths();
     init_loads();
-    setup_bounds(domain.vmin, domain.vmax);
+    m_ready = true;
 }
 
 Blocks::Blocks(const Box& domain, const std::string& type, int size,
                const std::vector<int>& ny)
-    : m_ready(false), m_box(domain), m_map(type), m_size(size) {
+    : m_size(size), m_map(domain, type) {
 
-    if (m_map.dimension() == 1) {
+    if (type.size() == 1) {
         init_sizes_1D(m_size);
     }
-    else if (m_map.dimension() == 2) {
+    else if (type.size() == 2) {
         if (size < 0) {
             m_size = std::accumulate(ny.begin(), ny.end(), 0);
         }
         init_sizes_2D(ny);
     }
-    else if (m_map.dimension() == 3) {
-        Vector3d L = m_map(m_box.size());
+    else if (type.size() == 3) {
+        Vector3d L = m_map.box().sizes();
         int nx = ny.size();
         std::vector<std::vector<int>> nz(nx);
         for (int i = 0; i < nx; ++i) {
@@ -169,12 +191,11 @@ Blocks::Blocks(const Box& domain, const std::string& type, int size,
         throw std::runtime_error("Странная декомпозиция с размерностью > 3");
     }
 
-    init_limits();
     init_indices();
     init_coords();
     init_widths();
     init_loads();
-    setup_bounds(domain.vmin, domain.vmax);
+    m_ready = true;
 }
 
 void Blocks::readiness() const {
@@ -191,59 +212,25 @@ Vector3d Blocks::inverse(const Vector3d& vec) const {
     return m_map.inverse(vec);
 }
 
-// Коэффициент расширения области
-const double EC = 0.0;
-
-void Blocks::setup_bounds(Vector3d vmin, Vector3d vmax) {
-    vmin = m_map(vmin);
-    vmax = m_map(vmax);
-
-    int dim = m_map.dimension();
-    for (size_t d = 0; d < dim; ++d) {
-        if (std::isinf(vmin[d]) || std::isnan(vmin[d]) ||
-            std::isinf(vmax[d]) || std::isnan(vmax[d])) {
-            throw std::runtime_error("Blocks::setup_bounds error: bad limits");
-        }
-
-        double dv = std::abs(vmax[d] - vmin[d]);
-        m_box.vmin[d] = vmin[d] - EC * dv;
-        m_box.vmax[d] = vmax[d] + EC * dv;
-    }
-
-    init_coords();
-    init_widths();
-
-    m_ready = true;
-}
-
-void Blocks::update_bounds(const Vector3d &vmin, const Vector3d &vmax) {
+void Blocks::update_bounds(const Box& domain) {
     readiness();
 
-    int dim = m_map.type().size();
-    for (size_t d = 0; d < dim; ++d) {
-        if (std::isinf(vmin[d]) || std::isnan(vmin[d]) ||
-            std::isinf(vmax[d]) || std::isnan(vmax[d])) {
-            throw std::runtime_error("Blocks::update_bounds error: bad limits");
-        }
+    m_map.update_limits(domain);
 
-        double dv = std::abs(vmax[d] - vmin[d]);
-        m_box.vmin[d] = vmin[d] - EC * dv;
-        m_box.vmax[d] = vmax[d] + EC * dv;
-    }
-
+    int dim = m_map.dim();
     if (dim > 0) {
-        m_x_coords.front() = m_box.vmin.x();
-        m_x_coords.back()  = m_box.vmax.x();
+        m_x_coords.front() = m_map.x_min();
+        m_x_coords.back()  = m_map.x_max();
 
         if (dim > 1) {
             for (int i = 0; i < m_nx; ++i) {
-                m_y_coords[i].front() = m_box.vmin.y();
-                m_y_coords[i].back()  = m_box.vmax.y();
+                m_y_coords[i].front() = m_map.y_min();
+                m_y_coords[i].back()  = m_map.y_max();
 
                 if (dim > 2) {
                     for (int j = 0; j < m_ny[i]; ++j) {
-                        m_z_coords[i][j].front() = m_box.vmin.z();
-                        m_z_coords[i][j].back()  = m_box.vmax.z();
+                        m_z_coords[i][j].front() = m_map.z_min();
+                        m_z_coords[i][j].back()  = m_map.z_max();
                     }
                 }
             }
@@ -253,33 +240,35 @@ void Blocks::update_bounds(const Vector3d &vmin, const Vector3d &vmax) {
     init_widths();
 }
 
-int Blocks::rank(const Vector3d& v) const {
-    readiness();
-
-    Vector3d vec = m_map.mapping(v);
-
+int Blocks::rank_mapped(const Vector3d& v) const {
+    // TODO: заменить на бинарный поиск
     int i = 0;
     for (; i < m_nx - 1; ++i) {
-        if (vec.x() < m_x_coords[i + 1]) {
+        if (v.x() < m_x_coords[i + 1]) {
             break;
         }
     }
 
     int j = 0;
     for (; j < m_ny[i] - 1; ++j) {
-        if (vec.y() < m_y_coords[i][j + 1]) {
+        if (v.y() < m_y_coords[i][j + 1]) {
             break;
         }
     }
 
     int k = 0;
     for (; k < m_nz[i][j] + 1; ++k) {
-        if (vec.z() < m_z_coords[i][j][k + 1]) {
+        if (v.z() < m_z_coords[i][j][k + 1]) {
             break;
         }
     }
 
     return m_ranks[i][j][k];
+}
+
+int Blocks::rank(const Vector3d& v) const {
+    readiness();
+    return rank_mapped(m_map.mapping(v));
 }
 
 int Blocks::size() const {
@@ -299,11 +288,9 @@ int Blocks::size(int i, int j) const {
 }
 
 Vector3d Blocks::center(int rank) const {
-    int i = m_i[rank];
-    int j = m_j[rank];
-    int k = m_k[rank];
+    auto [i, j, k] = m_ids[rank];
 
-    auto dim = m_map.dimension();
+    const auto dim = m_map.dim();
 
     Vector3d c = {0.0, 0.0, 0.0};
     c.x() = m_nx > 1 ? (m_x_coords[i] + m_x_coords[j]) / 2.0 : 0.0;
@@ -351,9 +338,8 @@ std::vector<std::vector<Vector3d>> Blocks::lines() const {
         }
     };
 
-    for (size_t r = 0; r < m_size; ++r) {
-        int i = m_i[r];
-        int j = m_j[r];
+    for (int r = 0; r < m_size; ++r) {
+        auto [i, j, k] = m_ids[r];
 
         Vector3d p1 = {m_x_coords[i], m_y_coords[i][j], 0.0};
         Vector3d p2 = {m_x_coords[i + 1], m_y_coords[i][j], 0.0};
@@ -373,14 +359,10 @@ void Blocks::set_loads(const std::vector<double>& loads) {
     if (loads.size() != m_size) {
         throw std::runtime_error("Blocks::set_loads error #1");
     }
-    int N = static_cast<int>(m_size);
 
     // Нагрузка блоков
-    for (int r = 0; r < N; ++r) {
-        int i = m_i[r];
-        int j = m_j[r];
-        int k = m_k[r];
-
+    for (int r = 0; r < m_size; ++r) {
+        auto [i, j, k] = m_ids[r];
         m_z_loads[i][j][k] = loads[r];
     }
 
@@ -428,7 +410,7 @@ void Blocks::move_simple(
 // A_i u_{i-1} + B_i u_i + C_i u_{i+1} = F_i, i = 1..N-1
 // B_0 u_0 + C_0 u_1 + A_0 u_2 = F_0
 // C_N u_{N-2} + A_N u_{N-1} + B_N u_N = F_N
-std::vector<double> progon(std::vector<double> A, std::vector<double> B,std::vector<double>  C, std::vector<double> F) {
+std::vector<double> progon(std::vector<double> A, std::vector<double> B, std::vector<double>  C, std::vector<double> F) {
     auto N = A.size();
 
     std::vector<double> a(N, 0.0);
@@ -436,7 +418,7 @@ std::vector<double> progon(std::vector<double> A, std::vector<double> B,std::vec
 
     a[1] = -C[0] / B[0];
     b[1] = F[0] / B[0];
-    for (size_t i = 1; i < N - 1; ++i) {
+    for (int i = 1; i < N - 1; ++i) {
         double Q = (A[i] * a[i] + B[i]);
         a[i + 1] = -C[i] / Q;
         b[i + 1] = (F[i] - A[i] * b[i]) / Q;
@@ -445,7 +427,7 @@ std::vector<double> progon(std::vector<double> A, std::vector<double> B,std::vec
     std::vector<double> u(N, 0.0);
     u[N - 1] = (F[N - 1] - A[N - 1] * b[N - 1]) / (B[N - 1] + A[N - 1] * a[N - 1]);
 
-    for (size_t i = N - 1; i > 0; --i) {
+    for (int i = N - 1; i > 0; --i) {
         u[i - 1] = a[i] * u[i] + b[i];
     }
 
@@ -458,8 +440,8 @@ inline double fit(double val, double min_val, double max_val) {
 
 inline double imb_func(double Imax) {
     // Значение дисбаланса, при котором возвращается 1/2
-    // Приемлимое значение дисбаланса
-    const double I0 = 1.0e-1;
+    // Приемлемое значение дисбаланса
+    constexpr double I0 = 0.1;
     return Imax / (Imax + I0);
 }
 
@@ -583,53 +565,9 @@ void Blocks::balancing_newton(const std::vector<double>& loads, double alpha) {
     init_widths();
 }
 
-void Blocks::init_single() {
-    m_ready = true;
-
-    if (m_box.size().x() == 0.0) {
-        m_box.vmin.x() = -inf;
-        m_box.vmax.x() = +inf;
-    }
-    if (m_box.size().y() == 0.0) {
-        m_box.vmin.y() = -inf;
-        m_box.vmax.y() = +inf;
-    }
-    if (m_box.size().z() == 0.0) {
-        m_box.vmin.z() = -inf;
-        m_box.vmax.z() = +inf;
-    }
-
-    m_map = Transform();
-
-    m_size = 1;
-    m_nx = 1;
-    m_ny = {1};
-    m_nz = {{1}};
-
-    m_i = {0};
-    m_j = {0};
-    m_k = {0};
-
-    m_ranks = {{{0}}};
-
-    m_x_coords = {m_box.vmin.x(), m_box.vmax.x()};
-    m_y_coords = {{m_box.vmin.y(), m_box.vmax.y()}};
-    m_z_coords = {{{m_box.vmin.z(), m_box.vmax.z()}}};
-
-    m_x_widths = {m_box.size().x()};
-    m_y_widths = {{m_box.size().y()}};
-    m_z_widths = {{{m_box.size().z()}}};
-
-    m_x_loads = {0.0};
-    m_y_loads = {{0.0}};
-    m_z_loads = {{{0.0}}};
-}
-
 void Blocks::init_sizes_1D(int nx) {
     if (nx != m_size) {
-        std::string message = "Blocks::init_sizes_1D error: Wrong 1D decomposition";
-        std::cerr << message << "\n";
-        throw std::runtime_error(message);
+        throw std::runtime_error("Blocks::init_sizes_1D error: Wrong 1D decomposition");
     }
 
     m_nx = nx;
@@ -648,9 +586,7 @@ void Blocks::init_sizes_1D(int nx) {
 void Blocks::init_sizes_2D(const std::vector<int>& ny) {
     int checkout_sum = std::accumulate(ny.begin(), ny.end(), 0);
     if (checkout_sum != m_size) {
-        std::string message = "Blocks::init_sizes_2D error: Wrong 2D decomposition";
-        std::cerr << message << "\n";
-        throw std::runtime_error(message);
+        throw std::runtime_error("Blocks::init_sizes_2D error: Wrong 2D decomposition");
     }
 
     m_nx = ny.size();
@@ -675,9 +611,7 @@ void Blocks::init_sizes_3D(const std::vector<std::vector<int>>& nz) {
         size += std::accumulate(r.begin(), r.end(), 0);
     }
     if (size != m_size) {
-        std::string message = "Blocks::init_sizes_3D error: Wrong 3D decomposition";
-        std::cerr << message << "\n";
-        throw std::runtime_error(message);
+        throw std::runtime_error("Blocks::init_sizes_3D error: Wrong 3D decomposition");
     }
 
     m_nz = nz;
@@ -688,11 +622,6 @@ void Blocks::init_sizes_3D(const std::vector<std::vector<int>>& nz) {
     }
 }
 
-void Blocks::init_limits() {
-    m_box.vmin = m_map.limits().min;
-    m_box.vmax = m_map.limits().max;
-}
-
 void Blocks::init_indices() {
     int counter = 0;
     m_ranks.resize(m_nx);
@@ -701,9 +630,7 @@ void Blocks::init_indices() {
         for (int j = 0; j < m_ny[i]; ++j) {
             m_ranks[i][j].resize(m_nz[i][j]);
             for (int k = 0; k < m_nz[i][j]; ++k) {
-                m_i.push_back(i);
-                m_j.push_back(j);
-                m_k.push_back(k);
+                m_ids.emplace_back(i, j, k);
                 m_ranks[i][j][k] = counter;
                 ++counter;
             }
@@ -714,45 +641,47 @@ void Blocks::init_indices() {
     }
 }
 
+constexpr double EC = 0.01;
+
 void Blocks::init_coords() {
     m_x_coords.resize(m_nx + 1);
     if (m_nx == 1) {
-        m_x_coords[0] = m_map.limits().min.x();
-        m_x_coords[1] = m_map.limits().max.x();
+        m_x_coords[0] = m_map.x_min();
+        m_x_coords[1] = m_map.x_max();
     }
     else {
         // Тут небольшая поправочка на EC, поскольку используется
         // расширенная область (больше domain на долю EC)
-        double dx = m_box.size().x() * EC / (1 + 2 * EC);
-        double xi = (m_box.size().x() - 2 * dx) / m_size;
+        double dx = m_map.x_width() * EC / (1 + 2 * EC);
+        double xi = (m_map.x_width() - 2 * dx) / m_size;
 
-        m_x_coords[0] = m_box.vmin.x() + dx;
+        m_x_coords[0] = m_map.x_min() + dx;
         for (int i = 1; i < m_nx; ++i) {
             m_x_coords[i] = m_x_coords[i - 1] + xi * size(i - 1);
         }
-        m_x_coords[0] = m_box.vmin.x();
-        m_x_coords[m_nx] = m_box.vmax.x();
+        m_x_coords[0] = m_map.x_min();
+        m_x_coords[m_nx] = m_map.x_max();
     }
 
     m_y_coords.resize(m_nx);
     for (int i = 0; i < m_nx; ++i) {
         m_y_coords[i].resize(m_ny[i] + 1);
         if (m_ny[i] == 1) {
-            m_y_coords[i][0] = m_map.limits().min.y();
-            m_y_coords[i][1] = m_map.limits().max.y();
+            m_y_coords[i][0] = m_map.y_min();
+            m_y_coords[i][1] = m_map.y_max();
         }
         else {
             // Тут небольшая поправочка на EC, поскольку используется
             // расширенная область (больше domain на долю EC)
-            double dy = m_box.size().y() * EC / (1 + 2 * EC);
-            double xi = (m_box.size().y() - 2 * dy) / size(i);
+            double dy = m_map.y_width() * EC / (1 + 2 * EC);
+            double xi = (m_map.y_width() - 2 * dy) / size(i);
 
-            m_y_coords[i][0] = m_box.vmin.y() + dy;
+            m_y_coords[i][0] = m_map.y_min() + dy;
             for (int j = 1; j < m_ny[i]; ++j) {
                 m_y_coords[i][j] = m_y_coords[i][j - 1] + xi * size(i, j - 1);
             }
-            m_y_coords[i][0] = m_box.vmin.y();
-            m_y_coords[i][m_ny[i]] = m_box.vmax.y();
+            m_y_coords[i][0] = m_map.y_min();
+            m_y_coords[i][m_ny[i]] = m_map.y_max();
         }
     }
 
@@ -762,19 +691,19 @@ void Blocks::init_coords() {
         for (int j = 0; j < m_ny[i]; ++j) {
             m_z_coords[i][j].resize(m_nz[i][j] + 1);
             if (m_nz[i][j] == 1) {
-                m_z_coords[i][j][0] = m_map.limits().min.z();
-                m_z_coords[i][j][1] = m_map.limits().max.z();
+                m_z_coords[i][j][0] = m_map.z_min();
+                m_z_coords[i][j][1] = m_map.z_max();
             }
             else {
                 // Тут небольшая поправочка на EC, поскольку используется
                 // расширенная область (больше domain на долю EC)
-                double dz = m_box.size().z() * EC / (1 + 2 * EC);
+                double dz = m_map.z_width() * EC / (1 + 2 * EC);
 
-                m_z_coords[i][j][0] = m_box.vmin.z();
+                m_z_coords[i][j][0] = m_map.z_min();
                 for (int k = 1; k < m_nz[i][j]; ++k) {
-                    m_z_coords[i][j][k] = m_box.vmin.z() + dz + ((m_box.size().z() - 2 * dz) * k) / m_nz[i][j];
+                    m_z_coords[i][j][k] = m_map.z_min() + dz + ((m_map.z_width() - 2 * dz) * k) / m_nz[i][j];
                 }
-                m_z_coords[i][j][m_nz[i][j]] = m_box.vmax.z();
+                m_z_coords[i][j][m_nz[i][j]] = m_map.z_max();
             }
         }
     }
@@ -838,64 +767,64 @@ void Blocks::info() const {
 
     std::cout << "Информация по блочной декомпозиции.\n\n";
     std::cout << "Индексы рангов:\n";
-    for (size_t r = 0; r < m_i.size(); ++r) {
-        std::cout << "    Ранг " << r << "    (" <<
-                  m_i[r] << ", " << m_j[r] << ", " << m_k[r] << ")\n";
+    for (int r = 0; r < m_ids.size(); ++r) {
+        auto [i, j, k] = m_ids[r];
+        std::cout << "    Ранг " << r << "    (" << i << ", " << j << ", " << k << ")\n";
     }
     std::cout << "Блоков по X:   " << m_nx << "\n";
     std::cout << "Ширина по X:   ";
-    for (size_t i = 0; i < m_nx; ++i) {
+    for (int i = 0; i < m_nx; ++i) {
         std::cout << m_x_widths[i] << " ";
     }
     std::cout << "\n";
     std::cout << "Нагрузка по X: ";
-    for (size_t i = 0; i < m_nx; ++i) {
+    for (int i = 0; i < m_nx; ++i) {
         std::cout << m_x_loads[i] << " ";
     }
     std::cout << "\n";
     std::cout << "Разделители:   ";
-    for (size_t i = 0; i <= m_nx; ++i) {
+    for (int i = 0; i <= m_nx; ++i) {
         std::cout << m_x_coords[i] << " ";
     }
     std::cout << "\n";
-    for (size_t i = 0; i < m_nx; ++i) {
+    for (int i = 0; i < m_nx; ++i) {
         std::cout << "    X блок " << i << "\n";
         std::cout << "        Блоков по Y:   " << m_ny[i] << "\n";
         std::cout << "        Ширина по Y:   ";
-        for (size_t j = 0; j < m_ny[i]; ++j) {
+        for (int j = 0; j < m_ny[i]; ++j) {
             std::cout << m_y_widths[i][j] << " ";
         }
         std::cout << "\n";
         std::cout << "        Нагрузка по Y: ";
-        for (size_t j = 0; j < m_ny[i]; ++j) {
+        for (int j = 0; j < m_ny[i]; ++j) {
             std::cout << m_y_loads[i][j] << " ";
         }
         std::cout << "\n";
         std::cout << "        Разделители:   ";
-        for (size_t j = 0; j <= m_ny[i]; ++j) {
+        for (int j = 0; j <= m_ny[i]; ++j) {
             std::cout << m_y_coords[i][j] << " ";
         }
         std::cout << "\n";
-        for (size_t j = 0; j < m_ny[i]; ++j) {
+        for (int j = 0; j < m_ny[i]; ++j) {
             std::cout << "            Y блок " << j << "\n";
             std::cout << "                Блоков по Z:   " << m_nz[i][j] << "\n";
             std::cout << "                Ширина по Z:   ";
-            for (size_t k = 0; k < m_nz[i][j]; ++k) {
+            for (int k = 0; k < m_nz[i][j]; ++k) {
                 std::cout << m_z_widths[i][j][k] << " ";
             }
             std::cout << "\n";
             std::cout << "                Нагрузка по Z: ";
-            for (size_t k = 0; k < m_nz[i][j]; ++k) {
+            for (int k = 0; k < m_nz[i][j]; ++k) {
                 std::cout << m_z_loads[i][j][k] << " ";
             }
             std::cout << "\n";
             std::cout << "                Разделители:   ";
-            for (size_t k = 0; k <= m_nz[i][j]; ++k) {
+            for (int k = 0; k <= m_nz[i][j]; ++k) {
                 std::cout << m_z_coords[i][j][k] << " ";
             }
             std::cout << "\n";
             std::cout << "                Ранги:         ";
-            for (size_t k = 0; k < m_nz[i][j]; ++k) {
+            for (int k = 0; k < m_nz[i][j]; ++k) {
                 std::cout << m_ranks[i][j][k] << " ";
             }
             std::cout << "\n";

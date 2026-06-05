@@ -10,7 +10,7 @@ inline std::tuple<double, double> figsize(Box bbox) {
     constexpr double max_width{10.0};
     constexpr double max_height{6.0};
 
-    double aspect = bbox.size()[0] / bbox.size()[1];
+    double aspect = bbox.sizes()[0] / bbox.sizes()[1];
 
     double width{max_width}, height{max_height};
     if (aspect > 1.0) {

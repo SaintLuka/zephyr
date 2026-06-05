@@ -38,24 +38,24 @@ inline void balance_flags(AmrCells &cells, int max_level) {
 
 /// @brief Функция балансировки флагов верхнего уровня
 inline void balance_flags(AmrCells &locals, int max_level, Tourism& tourism) {
+#if FAST_BALANCING
+    if (locals.dim() < 3) {
+        amr::balance_flags_fast<2>(locals, max_level, tourism);
+    } else {
+        amr::balance_flags_fast<3>(locals, max_level, tourism);
+    }
+#else
     if (locals.empty()) {
         amr::balance_flags_slow<0>(locals, max_level, tourism);
     }
     else {
-#if FAST_BALANCING
-        if (locals.dim() < 3) {
-            amr::balance_flags_fast<2>(locals, max_level, tourism);
-        } else {
-            amr::balance_flags_fast<3>(locals, max_level, tourism);
-        }
-#else
         if (locals.dim() < 3) {
             amr::balance_flags_slow<2>(locals, max_level, tourism);
         } else {
             amr::balance_flags_slow<3>(locals, max_level, tourism);
         }
-#endif
     }
+#endif
 
 #if SCRUTINY
     amr::check_flags(locals, tourism.aliens(), max_level);

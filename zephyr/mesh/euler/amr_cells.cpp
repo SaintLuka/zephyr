@@ -667,6 +667,23 @@ void AmrCells::shrink_to_fit() {
     verts.shrink_to_fit();
 }
 
+memory_t AmrCells::memory_usage() const {
+    memory_t mem;
+    mem.add(next);
+    mem.add(rank);
+    mem.add(index);
+    mem.add(center);
+    mem.add(volume);
+    mem.add(volume_alt);
+    mem.add(face_begin);
+    mem.add(node_begin);
+    mem.add(flag);
+    mem.add(b_idx);
+    mem.add(z_idx);
+    mem.add(level);
+    return mem;
+}
+
 void AmrCells::set_cell(index_t ic, const Quad& quad) {
     assert(m_dim == 2);
     assert(m_adaptive);

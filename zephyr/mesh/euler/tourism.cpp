@@ -471,6 +471,22 @@ void Tourism::setup_positions(const std::vector<index_t>& locals_next) {
     update_border_indices<dim>(locals_next);
 }
 
+template <>
+void Tourism::setup_positions<0>(const std::vector<index_t>&) {
+    // Вызывается для пустых
+
+    // Установить число на отправку
+    std::vector<index_t> send_count(mpi::size(), 0);
+    m_cell_router.set_send_count(send_count);
+    m_face_router.set_send_count(send_count);
+    m_node_router.set_send_count(send_count);
+
+    // Заполнить recv массивы
+    m_cell_router.fill_partial();
+    m_face_router.fill_partial();
+    m_node_router.fill_partial();
+}
+
 template void Tourism::setup_positions<2>(const std::vector<index_t>&);
 template void Tourism::setup_positions<3>(const std::vector<index_t>&);
 

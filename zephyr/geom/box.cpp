@@ -38,16 +38,16 @@ Vector3d Box::center() const {
     return 0.5 * (vmin + vmax);
 }
 
-Vector3d Box::size() const {
+Vector3d Box::sizes() const {
     return vmax - vmin;
 }
 
 bool Box::is_2D() const {
-    return std::abs(vmax.z() - vmin.z()) <  1.0e-6 * std::abs(vmax.x() - vmin.x());
+    return std::abs(vmax.z() - vmin.z()) <  1.0e-9 * std::abs(vmax.x() - vmin.x());
 }
 
 bool Box::is_3D() const {
-    return std::abs(vmax.z() - vmin.z()) >= 1.0e-6 * std::abs(vmax.x() - vmin.x());
+    return std::abs(vmax.z() - vmin.z()) >= 1.0e-9 * std::abs(vmax.x() - vmin.x());
 }
 
 double Box::diameter() const {
@@ -109,7 +109,7 @@ void Box::extend(double margin) {
 }
 
 void Box::extend(double margin_x, double margin_y, double margin_z) {
-    Vector3d L = size();
+    Vector3d L = sizes();
     vmin.x() -= margin_x * L.x();
     vmin.y() -= margin_y * L.y();
     vmin.z() -= margin_z * L.z();
@@ -133,7 +133,7 @@ math::Random2D Box::random2D(int seed) const {
 }
 
 math::QuasiRandom2D Box::quasiRandom2D() const {
-    return math::QuasiRandom2D(vmin, size());
+    return math::QuasiRandom2D(vmin, sizes());
 }
 
 } // namespace zephyr::geom

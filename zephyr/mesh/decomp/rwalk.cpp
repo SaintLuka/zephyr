@@ -37,10 +37,10 @@ void RWalk::balancing(const std::vector<double> &w) {
         y += 2.0 * m_step * (uniform(gen) - 0.5);
 
         if (x < m_domain.vmin.x() || x > m_domain.vmax.x()) {
-            x = m_domain.vmin.x() + m_domain.size().x() * uniform(gen);
+            x = m_domain.vmin.x() + m_domain.sizes().x() * uniform(gen);
         }
         if (y < m_domain.vmin.y() || y > m_domain.vmax.y()) {
-            y = m_domain.vmin.y() + m_domain.size().y() * uniform(gen);
+            y = m_domain.vmin.y() + m_domain.sizes().y() * uniform(gen);
         }
 
         m_diagram.set_coords(i, x, y);
