@@ -93,10 +93,75 @@ double aim_func(const EuCell& cell) {
 template <typename T = double>
 struct options_t {
    int max_iters = 20000;
-   double rtol = 1e-6;
+   double rtol = 0.0;
    bool use_initial = false;
    std::function<void(EuMesh&, Storable<T>)> callback = nullptr;
 };
+
+// Метод сопряженных градиентов
+template <typename T = double>
+void cg_solver(EuMesh& mesh, Storable<T> u, const operator_t<T>& OpL, const rhs_t<T>& RHS, const options_t<T>& opts) {
+  	//Использовать начальное приближение?
+	if (!opts.use_initial) {
+    	mesh.for_each([u](EuCell cell) {
+            cell[u] = 0.0;
+    	});
+	}
+
+    //Переменные для хранения на сетке. Невязка и правая часть (без невязки никак не обойтись(?))
+    Storable<T> r_cur = mesh.add<T>("r_cur");
+    Storable<T> p_cur = mesh.add<T>("p_cur");
+
+    // Инициализация начальных значений для r_cur и p_cur
+    T max_rhs = mesh.max([r_cur, p_cur, u, OpL, RHS](EuCell cell) {
+      	cell[r_cur] = OpL(cell, u) - RHS(cell);
+        cell[p_cur] = -cell[r_cur];
+        return RHS(cell);
+    });
+
+    int counter = 0;
+    T tau, max_r;
+    T vdot_r_cur = 0, vdot_r_prev = 1, vdot_lp_cur;
+    T beta;
+
+    vdot_r_cur = mesh.sum([r_cur](EuCell cell) {
+  		return cell[r_cur] * cell[r_cur];
+	}, 0.0);
+
+    vdot_lp_cur = mesh.sum([p_cur, OpL](EuCell cell) {
+        return OpL(cell, p_cur) * cell[p_cur];
+    }, 0.0);
+
+    do {
+        tau = vdot_r_cur / vdot_lp_cur;
+        vdot_r_prev = vdot_r_cur;
+        vdot_r_cur = 0;
+        max_r = mesh.max([u, r_cur, p_cur, OpL, tau, &vdot_r_cur](EuCell cell) {
+          	cell[u] += tau * cell[p_cur];
+          	cell[r_cur] += tau * OpL(cell, p_cur);
+            vdot_r_cur += cell[r_cur] * cell[r_cur];
+            return cell[r_cur];
+        });
+
+        beta = vdot_r_cur / vdot_r_prev;
+
+        mesh.for_each([r_cur, p_cur, beta](EuCell cell) {
+          	cell[p_cur] = -cell[r_cur] + beta * cell[p_cur];
+        });
+
+        vdot_lp_cur = mesh.sum([p_cur, OpL](EuCell cell) {
+          	return OpL(cell, p_cur) * cell[p_cur];
+        }, 0.0);
+
+        counter++;
+        if (counter % 1000 == 0) {
+            std::cout << "Iteration: " << counter << "; Error: " << max_r / max_rhs << std::endl;
+        }
+    } while ((max_r / max_rhs > opts.rtol) && (counter < opts.max_iters));
+    if (opts.callback) {
+      	opts.callback(mesh, u);
+    }
+}
 
 template <typename T = double>
 void solver(EuMesh& mesh, Storable<T> u, const operator_t<T>& OpL, const rhs_t<T>& RHS, const options_t<T>& opts) {
@@ -112,36 +177,53 @@ void solver(EuMesh& mesh, Storable<T> u, const operator_t<T>& OpL, const rhs_t<T
     Storable<T> rhs = mesh.add<T>("rhs");
 
     //Инициализация правой части
-    mesh.for_each([rhs, RHS](EuCell cell) {
+    T max_rhs = mesh.max([rhs, RHS](EuCell cell) {
       	cell[rhs] = RHS(cell);
+        return cell[rhs];
     });
 
     int counter = 0;
-    T tau, max_err;
+    T tau, max_r;
+    T vdot_r_cur = 0, vdot_lr_cur = 1;
 
     //Начало цикла
     do {
-		T vdot_r_cur = 0, vdot_lr_cur = 0;
-
-        //Обновление невязки и подсчет скалярных произведений (r_cur, r_cur) и (L[r_cur], r_cur)
-        mesh.for_each([u, r_cur, rhs, OpL, &vdot_r_cur, &vdot_lr_cur](EuCell cell) {
-            cell[r_cur] = OpL(cell, u) - cell[rhs];
-            vdot_r_cur += cell[r_cur] * cell[r_cur];
-            vdot_lr_cur += OpL(cell, r_cur) * cell[r_cur];
-        });
-
         tau = vdot_r_cur / vdot_lr_cur; //Обновление значения тау
 
-        //Обновление текущего приближения u
-      	max_err = mesh.max([u, r_cur, tau](EuCell cell){
-            cell[u] -= tau * cell[r_cur];
-            return cell[r_cur];
-      	});
+        vdot_r_cur = 0;
+        vdot_lr_cur = 0;
+
+        // Обновление текущего приближения u, подсчет ошибки, обновление значения невязки
+    	max_r = mesh.max([u, r_cur, rhs, OpL, tau, &vdot_r_cur, &vdot_lr_cur](EuCell cell){
+			cell[u] -= tau * cell[r_cur];
+
+    		// OpL использует соседние ячейки, что может быть некорректно в данном месте
+            // Может возникнуть ситуация, когда для текущей ячейки соседние еще не обновили значение u
+			cell[r_cur] = OpL(cell, u) - cell[rhs];
+			vdot_r_cur += cell[r_cur] * cell[r_cur];
+			vdot_lr_cur += OpL(cell, r_cur) * cell[r_cur]; //Аналогичная ситуация только для значения r_cur
+			return cell[r_cur];
+		});
+        // Ниже в закомментирован код для данного метода из теории
+//        // Обновление значения u
+//      	mesh.for_each([u, r_cur, tau](EuCell cell){
+//            cell[u] -= tau * cell[r_cur];
+//      	});
+//        // Подсчет ошибки и обновление невязки
+//    	max_err = mesh.max([u, r_cur, rhs, OpL](EuCell cell){
+//			cell[r_cur] = OpL(cell, u) - cell[rhs];
+//			return cell[r_cur];
+//		});
+//        // Подсчет скалярных произведений для вычисления тау
+//    	mesh.for_each([r_cur, OpL, &vdot_r_cur, &vdot_lr_cur](EuCell cell){
+//			vdot_r_cur += cell[r_cur] * cell[r_cur];
+//			vdot_lr_cur += OpL(cell, r_cur) * cell[r_cur];
+//		});
         counter++;
         if (counter % 1000 == 0) {
-            std::cout << "Iteration: " << counter << std::endl;
+            std::cout << "Iteration: " << counter << "; Error: " << max_r / max_rhs << std::endl;
         }
-    } while ((max_err > opts.rtol) && (counter < opts.max_iters));
+    } while ((max_r / max_rhs > opts.rtol) && (counter < opts.max_iters));
     if (opts.callback) {
       	opts.callback(mesh, u);
     }
