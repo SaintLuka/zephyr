@@ -18,7 +18,6 @@ install(FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/threads.h
         ${CMAKE_CURRENT_SOURCE_DIR}/numpy.h
         ${CMAKE_CURRENT_SOURCE_DIR}/range.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/span.h
         ${CMAKE_CURRENT_SOURCE_DIR}/stopwatch.h
     DESTINATION
     include/${PROJECT_NAME}/utils)

@@ -46,6 +46,9 @@ ORB::ORB(Box domain, const utils::Json& config)
     if (config["newton"]) {
         m_newton = config["newton"].as<double>();
     }
+    if (config["exact"]) {
+        m_exact = config["exact"].as<bool>();
+    }
 
     std::string type;
     if (config["type"]) {
