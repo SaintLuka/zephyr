@@ -129,9 +129,14 @@ mmf::Flux HLL::calc_flux(const mmf::PState &zL, const mmf::PState &zR, const Mix
     double c_L = mix.sound_speed_rP(zL.rho(), zL.P(), zL.beta(), {.T0 = zL.T(), .rhos = zL.rhos()});
     double c_R = mix.sound_speed_rP(zR.rho(), zR.P(), zR.beta(), {.T0 = zR.T(), .rhos = zR.rhos()});
 
-    // Оценки скоростей расходящихся волн
-    double S_L = min(zL.vx() - c_L, zR.vx() - c_R, 0.0);
-    double S_R = max(zL.vx() + c_L, zR.vx() + c_R, 0.0);
+    double S_L = std::min(zL.vx() - c_L, zR.vx() - c_L);
+    double S_R = std::max(zL.vx() + c_R, zR.vx() + c_R);
+
+    // Более робастная оценка, гарантирует S_L < S_R
+    if (S_L >= S_R) {
+        S_L = std::min(zL.vx() - c_L, zR.vx() - c_R);
+        S_R = std::max(zL.vx() + c_L, zR.vx() + c_R);
+    }
 
     QState Q_L(zL); // Консервативный вектор слева
     QState Q_R(zR); // Консервативный вектор справа
@@ -160,8 +165,14 @@ mmf::WaveConfig2 HLL::wave_config(const MixturePT& mix, const mmf::PState& zL, c
     double c_R = mix.sound_speed_rP(zR.rho(), zR.P(), zR.beta(), {.T0 = zR.T(), .rhos = zR.rhos()});
 
     // Оценки скоростей расходящихся волн
-    double S_L = min(zL.vx() - c_L, zR.vx() - c_R, 0.0);
-    double S_R = max(zL.vx() + c_L, zR.vx() + c_R, 0.0);
+    double S_L = std::min(zL.vx() - c_L, zR.vx() - c_L);
+    double S_R = std::max(zL.vx() + c_R, zR.vx() + c_R);
+
+    // Более робастная оценка, гарантирует S_L < S_R
+    if (S_L >= S_R) {
+        S_L = std::min(zL.vx() - c_L, zR.vx() - c_R);
+        S_R = std::max(zL.vx() + c_L, zR.vx() + c_R);
+    }
 
     mmf::QState Q_L(zL); // Консервативный вектор слева
     mmf::QState Q_R(zR); // Консервативный вектор справа
@@ -195,8 +206,14 @@ mmf::WaveConfig2 HLL::wave_config(const MixturePT& mix,
     double c_R = mix.sound_speed_re(Q_R.density, eR, beta_R);
 
     // Оценки скоростей расходящихся волн
-    double S_L = min(vL.x() - c_L, vR.x() - c_R, 0.0);
-    double S_R = max(vL.x() + c_L, vR.x() + c_R, 0.0);
+    double S_L = std::min(vL.x() - c_L, vR.x() - c_L);
+    double S_R = std::max(vL.x() + c_R, vR.x() + c_R);
+
+    // Более робастная оценка, гарантирует S_L < S_R
+    if (S_L >= S_R) {
+        S_L = std::min(vL.x() - c_L, vR.x() - c_R);
+        S_R = std::max(vL.x() + c_L, vR.x() + c_R);
+    }
 
     // Поток через левую/правую волну
     mmf::Flux a_L = F_L.arr() - S_L * Q_L.arr();

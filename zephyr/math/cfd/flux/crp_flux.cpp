@@ -4,7 +4,6 @@
 #include <zephyr/math/cfd/flux/hll.h>
 #include <zephyr/math/cfd/flux/hllc.h>
 
-//#define USE_HLL_FLUX
 
 namespace zephyr::math {
 
@@ -56,6 +55,7 @@ struct Char {
 
 }
 
+#define USE_HLL_FLUX
 #ifdef USE_HLL_FLUX
 
 // Классическая задача для CRP
@@ -70,6 +70,10 @@ mmf::Flux CrpFlux::classic(const mmf::PState& zLA, const mmf::PState& zLB, const
     auto[S_0L, S_0R, Q_s1, F_s1] = HLL::wave_config(mixture, qLB, fLB, Q_R, F_R);
     Char C_0L = {.x = 0.0, .t = 0.0, .S = S_0L};
     Char C_0R = {.x = 0.0, .t = 0.0, .S = S_0R};
+
+    if (S_0L > 0.0) {
+        throw std::runtime_error("Supersonic HLL flux #1");
+    }
 
     // Первый поток через грань
     const mmf::Flux& F1 = F_s1;
