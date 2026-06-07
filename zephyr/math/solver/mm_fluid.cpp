@@ -428,8 +428,8 @@ void MmFluid::fluxes(EuMesh &mesh, double dt, Direction dir) {
         // Обновляем значение в ячейке (консервативные переменные)
         q_c.arr() -= (dt / V_c) * flux.arr();
 
-        if(q_c.density < 0.0) {
-            throw std::runtime_error("MmFluid::fluxes addfdsdfdg  error: z_L.density < 0.0 ");
+        if (q_c.density < 0.0) {
+            throw std::runtime_error("MmFluid::fluxes error: q_c.density < 0.0 ");
         }
 
         cell[part.next] = PState(q_c, mixture, z_c.P(), z_c.T(), z_c.rhos());

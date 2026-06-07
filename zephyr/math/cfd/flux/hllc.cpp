@@ -194,12 +194,13 @@ mmf::WaveConfig3 HLLC::wave_config(
     double c_L = mix.sound_speed_rP(zL.rho(), zL.P(), zL.beta(), {.T0 = zL.T(), .rhos = zL.rhos()});
     double c_R = mix.sound_speed_rP(zR.rho(), zR.P(), zR.beta(), {.T0 = zR.T(), .rhos = zR.rhos()});
 
-    // Оценки скоростей расходящихся волн
+    // Оценки скоростей расходящихся волн (важно для пары разных материалов
+    // слева и справа, у которых сильно отличаются скорости звука)
     double S_L = std::min(zL.vx() - c_L, zR.vx() - c_L);
     double S_R = std::max(zL.vx() + c_R, zR.vx() + c_R);
 
     // Более робастная оценка, гарантирует S_L < S_R
-    if (S_L >= S_R) {
+    if (S_L >= S_R || zL.beta().index() == zR.beta().index()) {
         S_L = std::min(zL.vx() - c_L, zR.vx() - c_R);
         S_R = std::max(zL.vx() + c_L, zR.vx() + c_R);
     }
@@ -273,12 +274,13 @@ mmf::WaveConfig3 HLLC::wave_config(const MixturePT& mix,
     double c_L = mix.sound_speed_re(Q_L.density, e_L, beta_L);
     double c_R = mix.sound_speed_re(Q_R.density, e_R, beta_R);
 
-    // Оценки скоростей расходящихся волн
+    // Оценки скоростей расходящихся волн (важно для пары разных материалов
+    // слева и справа, у которых сильно отличаются скорости звука)
     double S_L = std::min(v_L.x() - c_L, v_R.x() - c_L);
     double S_R = std::max(v_L.x() + c_R, v_R.x() + c_R);
 
     // Более робастная оценка, гарантирует S_L < S_R
-    if (S_L >= S_R) {
+    if (S_L >= S_R || beta_L.index() == beta_R.index()) {
         S_L = std::min(v_L.x() - c_L, v_R.x() - c_R);
         S_R = std::max(v_L.x() + c_L, v_R.x() + c_R);
     }
@@ -346,12 +348,13 @@ mmf::Flux HLLC::calc_flux(const mmf::PState &zL, const mmf::PState &zR, const Mi
     double c_L = mix.sound_speed_rP(zL.rho(), zL.P(), zL.beta(), {.T0 = zL.T(), .rhos = zL.rhos()});
     double c_R = mix.sound_speed_rP(zR.rho(), zR.P(), zR.beta(), {.T0 = zR.T(), .rhos = zR.rhos()});
 
-    // Оценки скоростей расходящихся волн
+    // Оценки скоростей расходящихся волн (важно для пары разных материалов
+    // слева и справа, у которых сильно отличаются скорости звука)
     double S_L = std::min(zL.vx() - c_L, zR.vx() - c_L);
     double S_R = std::max(zL.vx() + c_R, zR.vx() + c_R);
 
     // Более робастная оценка, гарантирует S_L < S_R
-    if (S_L >= S_R) {
+    if (S_L >= S_R || zL.beta().index() == zR.beta().index()) {
         S_L = std::min(zL.vx() - c_L, zR.vx() - c_R);
         S_R = std::max(zL.vx() + c_L, zR.vx() + c_R);
     }

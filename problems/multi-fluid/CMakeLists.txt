@@ -2,7 +2,7 @@
 list(APPEND PROBLEMS mmf_bubble_collapse)
 list(APPEND PROBLEMS mmf_static)
 #list(APPEND PROBLEMS mmf_test_1D)
-#list(APPEND PROBLEMS mmf_triple_point)
+list(APPEND PROBLEMS mmf_triple_point)
 
 # Assuming all files in the directory are tests
 if (ZEPHYR_PROBLEMS_ALL)

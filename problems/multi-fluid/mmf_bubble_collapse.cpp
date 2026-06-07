@@ -33,7 +33,7 @@ using zephyr::utils::threads;
 using zephyr::utils::Stopwatch;
 
 void init_cells(EuMesh& mesh, MixturePT& mixture, Storable<PState> z) {
-    mixture.adjust_cv({1.0_kg_m3, 1000.0_kg_m3}, 1.0_bar, 300.0);
+    //mixture.adjust_cv({1.0_kg_m3, 1000.0_kg_m3}, 1.0_bar, 300.0);
 
     const PState z_air(
             1.0_kg_m3,          // density
@@ -180,14 +180,14 @@ int main(int argc, char** argv) {
     while (curr_time < max_time) {
         if (curr_time >= next_write) {
             std::cout << "\tStep: " << std::setw(6) << n_step << ";"
-                      << "\tTime: " << std::setw(6) << std::setprecision(3) << 1.0e6 * curr_time << " us\n";
+                      << "\tTime: " << std::setw(6) << std::setprecision(3) << 1.0e6 * curr_time << " μs\n";
             pvd.save(mesh, curr_time);
 
-            //solver.interface_recovery(mesh);
-            //auto bubble = solver.domain(mesh, 0);
-            //pvd_bubble.save(bubble, curr_time);
+            solver.interface_recovery(mesh);
+            auto bubble = solver.domain(mesh, 0);
+            pvd_bubble.save(bubble, curr_time);
 
-            next_write += max_time / 50;
+            next_write += max_time / 100;
         }
 
         // Finish exactly at max_time
@@ -203,9 +203,9 @@ int main(int argc, char** argv) {
     }
     pvd.save(mesh, max_time);
 
-    //solver.interface_recovery(mesh);
-    //auto bubble = solver.domain(mesh, 0);
-    //pvd_bubble.save(bubble, max_time);
+    solver.interface_recovery(mesh);
+    auto bubble = solver.domain(mesh, 0);
+    pvd_bubble.save(bubble, max_time);
 
     elapsed.stop();
 

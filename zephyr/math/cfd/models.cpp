@@ -294,6 +294,8 @@ std::pair<mmf::PState, mmf::PState> PState::split(const MixturePT& mixture, int 
             ScalarSet::NaN());
 
 #if 0 // MRV VERSION
+    // ПОЧЕМУ ВЕРСИЯ НЕ РАБОТАЕТ?
+    // Она должна быть более робастной
 
     // Массовые концентрации, с которыми смешиваются zA и zB
     double beta_A = mass_frac[iA];

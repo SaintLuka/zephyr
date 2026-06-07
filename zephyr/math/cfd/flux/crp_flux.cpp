@@ -1,5 +1,4 @@
 #include <iostream>
-#include <boost/function/function_base.hpp>
 #include <zephyr/math/cfd/flux/crp_flux.h>
 #include <zephyr/math/cfd/flux/hll.h>
 #include <zephyr/math/cfd/flux/hllc.h>
@@ -55,7 +54,7 @@ struct Char {
 
 }
 
-#define USE_HLL_FLUX
+//#define USE_HLL_FLUX
 #ifdef USE_HLL_FLUX
 
 // Классическая задача для CRP
@@ -250,11 +249,67 @@ mmf::Flux CrpFlux::classic(const mmf::PState& zLA, const mmf::PState& zLB, const
      Point O0( 0.0, 0.0);
      Point Odt(0.0, dt );
 
+     //O1.x = std::min(O1.x, -1.e-15);
+     //if( O1.x >= 0.0 ) {
+     //throw std::runtime_error("CrpFlux::classic:   O1.x > 0.0");
+     //}
+
+     //point O1 at right cell
+     if( O1.x >= 0.0 ) {
+         //throw std::runtime_error("CrpFlux::classic:   O1.x > 0.0");
+        //Char C_U = {.x = O1.x, .t = O1.t, .S = zLB.vx() };
+        double t2u = C_0.edge_t();
+        //Char C_1L = {.x = O1.x, .t = O1.t, .S = S_1L};
+        //double t3 = C_1L.edge_t();
+
+        if( dt <= t2u ) {
+            return fLB;
+        }
+
+        // ВТОРОЙ распад
+        mmf::QState qLA(zLA);
+        mmf::Flux   fLA(zLA);
+        auto [S_1L, S_1C, S_1R, Q_s1L, F_s1L, Q_s1R, F_s1R] = HLLC::wave_config(mixture, qLA, fLA, Q_s0L, F_s0L);
+
+        auto lb = -O1.x/( dt - O1.t );
+        auto F = fLA;
+        auto Q = qLA;
+
+        if( dt > O1.t ) {
+            if (lb < S_1L) {
+                F = fLA;
+                Q = qLA;
+            } else if (lb < S_1C) {
+                F = F_s1L;
+                Q = Q_s1L;
+            } else if (lb < S_1R) {
+                F = F_s1R;
+                Q = Q_s1R;
+            } else {
+                F = F_s0L;
+                Q = Q_s0L;
+            }
+        }
+
+        mmf::Flux G_OdtO1 = F.arr()*( O1.t - Odt.t ) - Q.arr()*( O1.x - Odt.x );
+
+        F = fLB;
+        Q = qLB;
+        mmf::Flux G_O1O0   = F.arr()*( O0.t  - O1.t ) - Q.arr()*(  O0.x - O1.x );
+
+        //mmf::Flux G_O0dt  = F.arr()*( Odt.t - O0.t ) - Q.arr()*( Odt.x - O0.x );
+        // G_O0dt + G_O1O + G_OdtO1 = 0
+        mmf::Flux Ftot = ( G_OdtO1.arr() + G_O1O0.arr() )/(0.0 - dt);
+
+        return Ftot;
+    }
+
+
      //mix2clear
      if( S_0C >= 0.0 ) {
 
          // Нет взаимодействия S_0L за dt
-         if( dt <= O1.t ) {
+         if( dt <= O1.t && O1.x < 0.0 ) {
              return F_s0L;
          }
 
@@ -262,13 +317,11 @@ mmf::Flux CrpFlux::classic(const mmf::PState& zLA, const mmf::PState& zLB, const
          mmf::QState Q_L(zLA);
          mmf::Flux   F_L(zLA);
          auto [S_1L, S_1C, S_1R, Q_s1L, F_s1L, Q_s1R, F_s1R] = HLLC::wave_config(mixture, Q_L, F_L, Q_s0L, F_s0L);
-
          //time t1
          Char C_1R = {.x = O1.x, .t = O1.t, .S = S_1R};
          double t1 = C_1R.edge_t();
-
          //формально захватывается случаем Odt O1 O
-         if( dt <= t1 ) {
+         if( dt <= t1 && O1.x < 0.0 ) {
              return F_s0L;
          }
 
@@ -277,7 +330,7 @@ mmf::Flux CrpFlux::classic(const mmf::PState& zLA, const mmf::PState& zLB, const
          //full flux Ftot
          double lb = -O1.x/( dt - O1.t );
          if( lb > S_1R ) {
-             throw std::runtime_error("Flux::classic: larger than S_1L");
+             //throw std::runtime_error("Flux::classic: larger than S_1L");
          }
          auto F =  lb < S_1L ? F_L : ( lb < S_1C ? F_s1L : F_s1R );
          auto Q =  lb < S_1L ? Q_L : ( lb < S_1C ? Q_s1L : Q_s1R );
@@ -290,12 +343,10 @@ mmf::Flux CrpFlux::classic(const mmf::PState& zLA, const mmf::PState& zLB, const
          mmf::Flux G_O1O = F.arr()*( O0.t - O1.t ) - Q.arr()*( O0.x - O1.x );
 
          mmf::Flux Ftot1 = ( G_OdtO1.arr() + G_O1O.arr() )/(0.0 - dt);
-         //return Ftot1;
-
+         return Ftot1;
 
          //version to distinguish A/B material fluxes
          //triangles:  Ott O1 O  and  Odt O1 Ott
-
          //flux of B of Ftot
          Char C_1C = {.x = O1.x, .t = O1.t, .S = S_1C};
          double t2 = C_1C.edge_t();
@@ -303,28 +354,29 @@ mmf::Flux CrpFlux::classic(const mmf::PState& zLA, const mmf::PState& zLB, const
          double w1 = tt/dt;
 
          Point Ott(0.0, tt);
-         lb = -O1.x/( tt - O1.t );
+         //lb = -O1.x/( tt - O1.t );
          F = F_s1R;
          Q = Q_s1R;
          mmf::Flux G_OttO1 = F.arr()*( O1.t  - Ott.t ) - Q.arr()*( O1.x - Ott.x );
 
-         F = F_s0L;
-         Q = Q_s0L;
-         G_O1O = F.arr()*( O0.t - O1.t ) - Q.arr()*( O0.x - O1.x );
+         //F = F_s0L;
+         //Q = Q_s0L;
+         //G_O1O = F.arr()*( O0.t - O1.t ) - Q.arr()*( O0.x - O1.x );
 
          mmf::Flux F_B = ( G_OttO1.arr() + G_O1O.arr() )/( 0.0 - tt );
 
-         if( dt < t2) {
-             return F_B;
+         if( dt < t2 ) {
+             //return F_B;
+             return Ftot1;
          }
-
 
          //flux of A of Ftot
          Point Ot2(0.0, t2);
          lb = -O1.x/( dt - O1.t );
          F = lb < S_1L  ?  F_L  :  F_s1L;
          Q = lb < S_1L  ?  Q_L  :  Q_s1L;
-         G_OdtO1 = F.arr()*( O1.t  - Ott.t ) - Q.arr()*( O1.x - Ott.x );
+         //G_OdtO1 = F.arr()*( O1.t  - Ott.t ) - Q.arr()*( O1.x - Ott.x ); mistake
+         G_OdtO1 = F.arr()*( O1.t  - Odt.t ) - Q.arr()*( O1.x - Odt.x );
 
          F = F_s1L;
          Q = Q_s1L;
@@ -342,7 +394,6 @@ mmf::Flux CrpFlux::classic(const mmf::PState& zLA, const mmf::PState& zLB, const
          if( O1.t >= dt ) {
              return F_s0R;
          }
-
 
          //ВТОРОЙ распад в точке O1
          mmf::QState Q_L(zLA);
