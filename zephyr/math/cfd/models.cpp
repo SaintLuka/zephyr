@@ -293,6 +293,10 @@ std::pair<mmf::PState, mmf::PState> PState::split(const MixturePT& mixture, int 
             Fractions::Zero(),
             ScalarSet::NaN());
 
+#if 0 // MRV VERSION
+    // ПОЧЕМУ ВЕРСИЯ НЕ РАБОТАЕТ?
+    // Она должна быть более робастной
+
     // Массовые концентрации, с которыми смешиваются zA и zB
     double beta_A = mass_frac[iA];
     double beta_B = 1.0 - mass_frac[iA];
@@ -324,6 +328,53 @@ std::pair<mmf::PState, mmf::PState> PState::split(const MixturePT& mixture, int 
         zB.energy  = mix_e;
     }
 
+#else // ZPP VERSION
+
+    double beta_B = 1.0 - mass_frac[iA];
+    Fractions alpha;
+    for (int i = 0; i < mass_frac.size(); ++i) {
+        if( mass_frac.has(i) && i != iA ) {
+            zB.densities[i] = densities[i];
+            zB.mass_frac[i] = mass_frac[i] / beta_B;
+        }
+        if( mass_frac.has(i) ) {
+            alpha[i] = density*mass_frac[i]/densities[i];
+            alpha[i] = this->alpha(i);
+        }
+    }
+    zB.mass_frac.normalize();
+
+    //alphas at splitted z2
+    double alpha_B = 1.0 - alpha[iA];
+    alpha[iA] = 0.0;
+    for (int i = 0; i < mass_frac.size(); ++i) {
+        if( mass_frac.has(i) && i != iA ) {
+            alpha[i] = alpha[i]/alpha_B;
+        }
+    }
+    alpha.normalize();
+    //mixture density at splited zB
+    zB.density = 0.0;
+    for (int i = 0; i < mass_frac.size(); ++i) {
+        if( mass_frac.has(i) && i != iA ) {
+            zB.density = zB.density + densities[i]*alpha[i];
+        }
+    }
+    //betas at splitted zB
+    zB.energy = 0.0;
+    for (int i = 0; i < mass_frac.size(); ++i) {
+        if( mass_frac.has(i) && i != iA ) {
+            zB.mass_frac[i]  = alpha[i]*densities[i]/zB.density;
+            zB.energy += zB.mass_frac[i]*mixture[i].energy_rT(densities[i], temperature, {.P0=pressure});
+        }
+    }
+    if(zB.is_bad()) {
+        std::cout << "bad split #1\n";
+    }
+    if(zB.density != zB.densities[zB.mass_frac.index()] ) {
+        std::cout << "bad split #2\n";
+    }
+#endif
     return {zA, zB};
 }
 

@@ -106,11 +106,11 @@ int main() {
     grid.transform(
         [](const Vector3d& v) -> Vector3d {
             Vector3d res = v;
-            res.x() += 0.00 * (2.0 * rand() / double(RAND_MAX) - 1.0);
-            //res.y() += 0.002 * (2.0 * rand() / double(RAND_MAX) - 1.0);
+            res.x() += 0.002 * (2.0 * rand() / double(RAND_MAX) - 1.0);
+            res.y() += 0.002 * (2.0 * rand() / double(RAND_MAX) - 1.0);
             return res;
         });
-    //grid.make_amr();
+    grid.make_amr();
 
     // Create mesh
     EuMesh mesh(std::move(grid)); //gen);
@@ -120,15 +120,13 @@ int main() {
     Eos::Ptr water = StiffenedGas::create("Water");
     MixturePT mixture = {air, water};
 
-    std::cout << water->pressure_re( 999.51476, +7.78500e+05) << "???\n";
-
     // Create and configure solver
     MmFluid solver(mixture);
     solver.set_CFL(0.5);
     solver.set_accuracy(1);
     solver.set_method(Fluxes::CRP);
     solver.set_crp_mode(CrpMode::PLIC);
-    solver.set_splitting(DirSplit::SIMPLE);
+    solver.set_splitting(DirSplit::NONE);
 
     // Add data fields, choose main data layer
     auto data = solver.add_types(mesh);
@@ -172,7 +170,7 @@ int main() {
     while (n_step < 100'000) {
         std::cout << "\tStep: " << std::setw(6) << n_step << ";\n";
 
-        if (n_step > 1) {
+        if (n_step % 100 == 0) {
             pvd.save(mesh, n_step);
         }
 

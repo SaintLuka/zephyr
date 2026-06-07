@@ -21,6 +21,8 @@
 #include <zephyr/utils/threads.h>
 #include <zephyr/utils/stopwatch.h>
 
+#include <zephyr/geom/sections.h>
+
 using namespace zephyr::phys;
 using namespace zephyr::math;
 using namespace zephyr::math::mmf;
@@ -31,23 +33,23 @@ using zephyr::utils::threads;
 using zephyr::utils::Stopwatch;
 
 void init_cells(EuMesh& mesh, MixturePT& mixture, Storable<PState> z) {
-    mixture.adjust_cv({1.0_kg_m3, 1000.0_kg_m3}, 1.0_bar, 300.0);
+    //mixture.adjust_cv({1.0_kg_m3, 1000.0_kg_m3}, 1.0_bar, 300.0);
 
-    PState z_air(
+    const PState z_air(
             1.0_kg_m3,          // density
             Vector3d::Zero(),   // velocity
             1.0_bar,            // pressure
             Fractions::Pure(0), // mass fractions
             mixture);
 
-    PState z_water(
-            1000.0_kg_m3,       // density
+    const PState z_water(
+            1.e3_kg_m3,         // density
             Vector3d::Zero(),   // velocity
             1.0_bar,            // pressure
             Fractions::Pure(1), // mass fractions
             mixture);
 
-    PState z_shock(
+    const PState z_shock(
             1323.65_kg_m3,          // density
             {681.58_m_s, 0.0, 0.0}, // velocity
             1.9e4_bar,              // pressure
@@ -80,12 +82,12 @@ void init_cells(EuMesh& mesh, MixturePT& mixture, Storable<PState> z) {
             double vol_frac0 = cell.polygon().disk_clip_area(bubble_center, r) / cell.volume();
             vol_frac1 = 1.0 - vol_frac0;
 
-            mmf::PState &z0 = z_air;
-            mmf::PState &z1 = z_water;
+            mmf::PState z0 = z_air;
+            mmf::PState z1 = z_water;
 
-            //double T = vol_frac0 * z0.temperature + vol_frac1 * z1.temperature;
-            //z0.density = 1.0 / mixture[0].volume_PT(z0.pressure, T);
-            //z1.density = 1.0 / mixture[1].volume_PT(z1.pressure, T);
+            double T = vol_frac0 * z0.temperature + vol_frac1 * z1.temperature;
+            z0.density = 1.0 / mixture[0].volume_PT(z0.pressure, T);
+            z1.density = 1.0 / mixture[1].volume_PT(z1.pressure, T);
 
             // rho = sum a_i rho_i
             double    density   = vol_frac0 * z0.density + vol_frac1 * z1.density;
@@ -178,14 +180,14 @@ int main(int argc, char** argv) {
     while (curr_time < max_time) {
         if (curr_time >= next_write) {
             std::cout << "\tStep: " << std::setw(6) << n_step << ";"
-                      << "\tTime: " << std::setw(6) << std::setprecision(3) << 1.0e6 * curr_time << " us\n";
+                      << "\tTime: " << std::setw(6) << std::setprecision(3) << 1.0e6 * curr_time << " μs\n";
             pvd.save(mesh, curr_time);
 
             solver.interface_recovery(mesh);
             auto bubble = solver.domain(mesh, 0);
             pvd_bubble.save(bubble, curr_time);
 
-            next_write += max_time / 50;
+            next_write += max_time / 100;
         }
 
         // Finish exactly at max_time

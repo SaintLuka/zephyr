@@ -4,6 +4,7 @@ add_subdirectory(sle)
 add_subdirectory(solver)
 
 set(ZEPHYR_MATH_SRC
+        ${TIS_TIS_SOURCES}
         ${ZEPHYR_MATH_CALC_SRC}
         ${ZEPHYR_MATH_CFD_SRC}
         ${ZEPHYR_MATH_SLE_SRC}
