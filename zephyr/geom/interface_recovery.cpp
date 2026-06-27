@@ -106,6 +106,7 @@ void InterfaceRecovery::adjust_normals(EuMesh &mesh) const {
 void InterfaceRecovery::update(EuMesh &mesh, int smoothing) const {
     compute_normals(mesh);
     find_sections(mesh);
+    return;
     for (int i = 0; i < smoothing; ++i) {
         adjust_normals(mesh);
         find_sections(mesh);
