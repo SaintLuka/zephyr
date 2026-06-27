@@ -47,7 +47,7 @@ Transfer::Transfer() {
     m_limiter = "MC";
 }
 
-void Transfer::add_types(EuMesh& mesh) {
+Transfer::State Transfer::add_types(EuMesh& mesh) {
     data.u1 = mesh.add<double>("u1");
     data.u2 = mesh.add<double>("u2");
     data.n = mesh.add<Vector3d>("n");
@@ -56,6 +56,7 @@ void Transfer::add_types(EuMesh& mesh) {
     data.du_dy = mesh.add<double>("du/dy");
 
     interface = InterfaceRecovery(data.u1, data.n, data.p);
+    return data;
 }
 
 double Transfer::CFL() const {

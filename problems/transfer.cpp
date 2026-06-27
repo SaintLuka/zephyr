@@ -6,6 +6,7 @@
 #include <zephyr/io/pvd_file.h>
 #include <zephyr/geom/geom.h>
 #include <zephyr/geom/generator/rectangle.h>
+#include <zephyr/geom/surface/solid_body_2d.h>
 #include <zephyr/math/solver/transfer.h>
 
 using namespace zephyr::geom;
@@ -16,70 +17,8 @@ using generator::Rectangle;
 
 class Solver;
 
-/// @brief Некоторая геометрия
-class Body {
-public:
-    /// @brief Выставить на сетке начальные условия
-    virtual void initial(Solver& solver, EuMesh& mesh, bool exact) const = 0;
-
-    virtual double volume_inside(EuMesh& body) const = 0;
-
-    std::function<bool(const Vector3d& v)> inside;
-
-
-    Vector3d C0;  ///< Начальные координаты центра
-    Vector3d C;   ///< Текущие координаты центра
-
-    /// @brief Точки границы
-    std::vector<Vector3d> vs;
-};
-
-/// @brief Начальные условия в виде полосы
-class BodyLine : public Body {
-public:
-    // Полоса задается двумя плоскостями
-    Vector3d p1, n1;
-    Vector3d p2, n2;
-
-
-    BodyLine();
-
-    /// @brief Установить начальные данные
-    void initial(Solver& solver, EuMesh& mesh, bool exact) const final;
-
-    double volume_inside(EuMesh& body) const final;
-};
-
-/// @brief Начальные условия в виде квадрата
-class BodySquare : public Body {
-public:
-    double a;     ///< Сторона квадрата
-
-    BodySquare();
-
-    /// @brief Установить начальные данные
-    void initial(Solver& solver, EuMesh& mesh, bool exact) const final;
-
-    double volume_inside(EuMesh& body) const final;
-
-};
-
-/// @brief Начальные условия в виде круга
-class BodyDisk : public Body {
-public:
-    double R;     ///< Радиус круга
-
-    BodyDisk();
-
-    /// @brief Установить начальные данные
-    void initial(Solver& solver, EuMesh& mesh, bool exact) const final;
-
-    double volume_inside(EuMesh& body) const final;
-
-};
-
-/// @brief Наследуем собственный решатель от Transfer, теперь переопределив
-/// поле скорости можно решать произвольные задачи на перенос.
+// Наследуем собственный решатель от Transfer, теперь переопределив
+// поле скорости можно решать произвольные задачи на перенос.
 class Solver : public zephyr::math::Transfer {
 public:
     enum class Test {
@@ -89,11 +28,11 @@ public:
 
     Test test = Test::Translation;
 
-    /// @brief Скорость переноса в соответсвии с Solver::test
+    /// @brief Скорость переноса в соответствии с Solver::test
     Vector3d velocity(const Vector3d& p) const override;
 
     /// @brief Сетка с точным решением от времени
-    EuMesh exact(Body& body, double curr_time) const;
+    EuMesh exact(SolidBody2D& body, double curr_time) const;
 };
 
 static Solver::State data;
@@ -102,8 +41,16 @@ static Solver::State data;
 double volume(EuMesh& cells, Storable<double> u1) {
     double sum = 0.0;
     for (auto cell: cells) {
-        if (cell.volume() >= 0)
-            sum += cell.volume() * cell[u1];
+        sum += cell.volume() * cell[u1];
+    }
+    return sum;
+}
+
+// Какой объем сетки отсекается телом
+double volume_inside(const SolidBody2D& body, EuMesh &cells) {
+    double sum = 0.0;
+    for (auto cell: cells) {
+        sum += body.volume_inside(cell, 1.0e-3);
     }
     return sum;
 }
@@ -119,7 +66,7 @@ int main() {
 
     // Геометрия области
     Rectangle rect(0.0, 1.0, 0.0, 0.7, voronoi);
-    rect.set_nx(200);
+    rect.set_nx(91);
     rect.set_boundaries({
         .left   = Boundary::ZOE, .right = Boundary::ZOE,
         .bottom = Boundary::ZOE, .top   = Boundary::ZOE});
@@ -132,25 +79,26 @@ int main() {
     bool splitting = true;
 
     // Настройки метода
-    solver.set_method(Solver::Method::CRP_N1);
+    solver.set_method(Solver::Method::VOF);
 
     // Настройки теста
-    BodyDisk body;
-    solver.test = Solver::Test::Translation;
+    //BodyStrip body(0.1, {0.15, 0.5, 0.0});
+    //BodyDisk body(0.1, {0.15, 0.5, 0.0});
+    BodySquare body(0.2, {0.15, 0.5, 0.0});
+
+    solver.test = Solver::Test::Rotation;
 
     // Создать сетку
     EuMesh mesh(rect);
 
     // Добавить типы
-    solver.add_types(mesh);
-
-    data = solver.data;
+    data = solver.add_types(mesh);
 
     // Переменные для сохранения
     pvd.variables = {"level"};
     pvd.variables.append("u", data.u1);
     pvd.variables.append("u2", data.u2);
-    //pvd.variables.append("n", data.n);
+    pvd.variables.append("n", data.n);
     //pvd.variables.append("p", data.p);
     //pvd.variables += {"du/dx", grad_x};
     //pvd.variables += {"du/dy", grad_y};
@@ -163,16 +111,10 @@ int main() {
         return std::abs(u < 0.5 ? u : 1.0 - u);
     }};
 
-    // Настраиваем адаптацию
-    mesh.set_max_level(0);
-    mesh.set_distributor(solver.distributor());
-
-    // Адаптация под начальные данные
-    int n_init_loops = mesh.adaptive() ? mesh.max_level() + 2 : 0;
-    for (int k = n_init_loops; k >= 0; --k) {
-        body.initial(solver, mesh, k < 1);
-        solver.set_flags(mesh);
-        mesh.refine();
+    // Начальные условия
+    for (auto cell: mesh) {
+        cell[data.u1] = body.volume_fraction(cell, 1.0e-4);
+        cell[data.u2] = 0.0;
     }
 
     solver.update_interface(mesh);
@@ -199,18 +141,21 @@ int main() {
             EuMesh crop = solver.body(mesh);
             pvd_body.save(crop, curr_time);
 
-            EuMesh exact = solver.exact(body, curr_time);
+            auto curr_body = body;
+            EuMesh exact = solver.exact(curr_body, curr_time);
             pvd_exact.save(exact, curr_time);
 
             write_next += write_freq;
 
+            /*
             if (curr_time >= end_time) {
-                //double vi = body.volume_inside(crop);
+                double vi = volume_inside(body, crop);
                 std::cout << std::setprecision(3) << std::fixed;
-                //std::cout << "  Volume loss: " << 100 * (1.0 - vi / init_volume) << "%\n";
-                //pvd_body.save(crop, curr_time + 1.0e-13);
+                std::cout << "  Volume loss: " << 100 * (1.0 - vi / init_volume) << "%\n";
+                pvd_body.save(crop, curr_time + 1.0e-13);
                 break;
             }
+            */
         }
 
         // Определить шаг
@@ -229,12 +174,6 @@ int main() {
             solver.update(mesh, Direction::ANY);
         }
 
-        // Установить флаги адаптации
-        //solver.set_flags(mesh);
-
-        // Адаптировать сетку
-        //mesh.refine();
-
         n_step += 1;
         curr_time += solver.get_dt();
     }
@@ -242,127 +181,6 @@ int main() {
     return 0;
 }
 
-BodyLine::BodyLine() {
-    p1 = { 0.1, 0.0, 0.0};
-    p2 = { 0.3, 0.0, 0.0};
-    n1 = {-1.0, 0.0, 0.0};
-    n2 = {+1.0, 0.0, 0.0};
-
-    inside = [this](const Vector3d& v) -> bool {
-        return (v - p1).dot(n1) < 0.0 &&
-               (v - p2).dot(n2) < 0.0;
-    };
-}
-
-void BodyLine::initial(Solver& solver, EuMesh& mesh, bool exact) const {
-    for (auto cell: mesh) {
-        if (!exact) {
-            cell[data.u1] = inside(cell.center());
-        }
-        else {
-            double vol_frac = cell.approx_vol_fraction(inside);
-            if (0.0 < vol_frac && vol_frac < 1.0) {
-                vol_frac = cell.volume_fraction(inside, 10000);
-            }
-            cell[data.u1] = vol_frac;
-        }
-        cell[data.u2] = 0.0;
-    }
-}
-
-double BodyLine::volume_inside(EuMesh &body) const {
-    double res = 0.0;
-    for (auto& cell: body) {
-        double a = cell.approx_vol_fraction(inside);
-        if (0.0 < a && a < 1.0) {
-            a = cell.volume_fraction(inside, 1000);
-        }
-        res += a * cell.volume();
-    }
-    return res;
-}
-
-BodySquare::BodySquare() {
-    a = 0.2;
-    C = C0 = {0.15, 0.5, 0.0};
-
-    // характеристическая функция области
-    inside = [this](const Vector3d &v) -> bool {
-        return std::abs(v.x() - C.x()) < 0.5 * a &&
-               std::abs(v.y() - C.y()) < 0.5 * a;
-    };
-
-    // граница области
-    vs = {
-            Vector3d{C.x() - 0.5 * a, C.y() - 0.5 * a, 0.0},
-            Vector3d{C.x() + 0.5 * a, C.y() - 0.5 * a, 0.0},
-            Vector3d{C.x() + 0.5 * a, C.y() + 0.5 * a, 0.0},
-            Vector3d{C.x() - 0.5 * a, C.y() + 0.5 * a, 0.0},
-    };
-}
-
-void BodySquare::initial(Solver& solver, EuMesh& mesh, bool exact) const {
-    for (auto cell: mesh) {
-        if (!exact) {
-            cell[data.u1] = inside(cell.center());
-        }
-        else {
-            double vol_frac = cell.approx_vol_fraction(inside);
-            if (0.0 < vol_frac && vol_frac < 1.0) {
-                vol_frac = cell.volume_fraction(inside, 10000);
-            }
-            cell[data.u1] = vol_frac;
-        }
-        cell[data.u2] = 0.0;
-    }
-}
-
-double BodySquare::volume_inside(EuMesh &body) const {
-    double res = 0.0;
-    for (auto& cell: body) {
-        double vol = cell.approx_vol_fraction(inside);
-        if (0.0 < vol && vol < 1.0) {
-            vol = cell.volume_fraction(inside, 1000);
-        }
-        cell[data.u1] = vol;
-        vol *= cell.volume();
-        res += vol;
-    }
-    return res;
-}
-
-BodyDisk::BodyDisk() {
-    R = 0.1;
-    C = C0 = {0.15, 0.5, 0.0};
-
-    size_t M = 100;
-    vs.resize(M);
-    for (size_t i = 0; i < M; ++i) {
-        double phi = 2.0 * M_PI * (i - 1.0) / M;
-        vs[i].x() = C.x() + R * std::cos(phi);
-        vs[i].y() = C.y() + R * std::sin(phi);
-        vs[i].z() = 0.0;
-    }
-}
-
-void BodyDisk::initial(Solver& solver, EuMesh& mesh, bool exact) const {
-    for (auto cell: mesh) {
-        auto poly = cell.polygon();
-        cell[data.u1] = poly.disk_clip_area(C, R) / cell.volume();
-        cell[data.u2] = 0.0;
-    }
-}
-
-double BodyDisk::volume_inside(EuMesh &body) const {
-    double res = 0.0;
-    for (auto& cell: body) {
-        auto poly = cell.polygon();
-        double vol = poly.disk_clip_area(C, R);
-        cell[data.u1] = vol / cell.volume();
-        res += vol;
-    }
-    return res;
-}
 
 Vector3d Solver::velocity(const Vector3d& p) const {
     if (test == Test::Translation) {
@@ -379,38 +197,19 @@ Vector3d Solver::velocity(const Vector3d& p) const {
     }
 }
 
-EuMesh Solver::exact(Body& body, double curr_time) const {
-    using zephyr::geom::Quad;
-
-    // Точная граница в начальный момент времени
-    std::vector<Vector3d> vs = body.vs;
-
+EuMesh Solver::exact(SolidBody2D& body, double curr_time) const {
     // Точное решение
     if (test == Test::Translation) {
         Vector3d V0 = {0.7, -0.35, 0.0};
-        for (auto& v: vs) {
-            v += curr_time * V0;
-        }
-        body.C = body.C0 + curr_time * V0;
+        body.move(curr_time * V0);
     }
     else if (test == Test::Rotation) {
+        double omega = M_PI;  // Угловая частота
         Vector3d center = {0.5, 0.5, 0.0};  // Центр вращения
-        Vector3d omega = {0.0, 0.0, M_PI};  // Угловая частота
-
-        double phi = -M_PI * curr_time;
-        for (auto& v: vs) {
-            Vector3d r = v - center;
-            v.x() = center.x() + r.x() * std::cos(phi) + r.y() * std::sin(phi);
-            v.y() = center.y() - r.x() * std::sin(phi) + r.y() * std::cos(phi);
-            v.z() = 0.0;
-        }
-
-        Vector3d r = body.C0 - center;
-        body.C.x() = center.x() + r.x() * std::cos(phi) + r.y() * std::sin(phi);
-        body.C.y() = center.y() - r.x() * std::sin(phi) + r.y() * std::cos(phi);
-        body.C.z() = 0.0;
+        body.rotation_relative(omega * curr_time, center);
     }
 
+    auto vs = body.outline(100);
     EuMesh cells(2, false);
     for (size_t i = 0; i < vs.size(); ++i) {
         size_t j = (i + 1) % vs.size();

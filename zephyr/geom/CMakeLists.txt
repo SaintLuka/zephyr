@@ -1,13 +1,15 @@
 add_subdirectory(curves)
 add_subdirectory(generator)
-add_subdirectory(primitives)
 add_subdirectory(grid)
+add_subdirectory(primitives)
+add_subdirectory(surface)
 
 set(ZEPHYR_GEOM_SRC
         ${ZEPHYR_GEOM_CURVES_SRC}
         ${ZEPHYR_GEOM_GENERATOR_SRC}
         ${ZEPHYR_GEOM_GRID_SRC}
         ${ZEPHYR_GEOM_PRIMITIVES_SRC}
+        ${ZEPHYR_GEOM_SURFACE_SRC}
         ${CMAKE_CURRENT_SOURCE_DIR}/box.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/sections.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/intersection.cpp
