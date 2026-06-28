@@ -1,5 +1,55 @@
 // PLIC реконструкция интерфейса на трёхмерных декартовых сетках
 #include "PLIC.h"
+#include <chrono>
+
+struct PerformanceCounters {
+    std::atomic<long long> brent_iters{0};
+    std::atomic<long long> brent_calls{0};
+    std::atomic<double> brent_time{0.0};
+
+    std::atomic<long long> newton_iters{0};
+    std::atomic<long long> newton_calls{0};
+    std::atomic<double> newton_time{0.0};
+
+    std::atomic<long long> bisection_iters{0};
+    std::atomic<long long> bisection_calls{0};
+    std::atomic<double> bisection_time{0.0};
+
+    void print() const {
+        std::cout << "\nPERFORMANCE STATISTICS\n";
+
+        if (brent_calls > 0) {
+            std::cout << "Brent:\n";
+            std::cout << "  Calls: " << brent_calls << "\n";
+            std::cout << "  Avg iterations: " << (double)brent_iters / brent_calls << "\n";
+            std::cout << "  Total time: " << brent_time << " s\n";
+            std::cout << "  Avg time per call: " << (brent_time / brent_calls) * 1000 << " ms\n";
+        }
+
+        if (newton_calls > 0) {
+            std::cout << "Newton:\n";
+            std::cout << "  Calls: " << newton_calls << "\n";
+            std::cout << "  Avg iterations: " << (double)newton_iters / newton_calls << "\n";
+            std::cout << "  Total time: " << newton_time << " s\n";
+            std::cout << "  Avg time per call: " << (newton_time / newton_calls) * 1000 << " ms\n";
+        }
+
+        if (bisection_calls > 0) {
+            std::cout << "Bisection:\n";
+            std::cout << "  Calls: " << bisection_calls << "\n";
+            std::cout << "  Avg iterations: " << (double)bisection_iters / bisection_calls << "\n";
+            std::cout << "  Total time: " << bisection_time << " s\n";
+            std::cout << "  Avg time per call: " << (bisection_time / bisection_calls) * 1000 << " ms\n";
+        }
+        std::cout << std::endl;
+    }
+};
+
+static PerformanceCounters perf;
+
+inline double plane_parameter(const Vector3d& point, const Vector3d& normal) {
+    return normal.dot(point);
+}
 
 // Нормаль для теста с плоскостью
 static Vector3d some_n = Vector3d{0.24512, 0.48123, 0.91253}.normalized();
@@ -54,8 +104,102 @@ inline bool boundary(EuCell& cell) {
     return false;
 }
 
+//void make_interface(EuMesh& mesh) {
+//    std::cout << "  Computing interfaces...\n";
+//
+//    std::atomic<int> mixed_counter{0};
+//    std::atomic<int> processed{0};
+//
+//    mesh.for_each([&](EuCell& cell) {
+//        if (!mixed(cell)) {
+//            for (auto& n: cell[ns]) n = Vector3d::Zero();
+//            for (auto& p: cell[ps]) p = 0.0;
+//            for (auto& e: cell[es]) e = 0.0;
+//            return;
+//        }
+//
+//        mixed_counter++;
+//
+//        double hx = cell.hx();
+//        double hy = cell.hy();
+//        double hz = cell.hz();
+//
+//        Vector3d grad = Vector3d::Zero();
+//        for (auto face: cell.faces()) {
+//            double a_f = 0.5 * (cell[a] + face.neib(a));
+//            grad += a_f * face.area_n();
+//        }
+//        cell[ns][0] = -grad.normalized();
+//
+//        Stencil3D C(cell, a);
+//        cell[ns][1] = C.Youngs(hx, hy, hz);
+//        cell[ns][2] = C.ELVIRA(hx, hy, hz);
+//
+//        grad = Vector3d::Zero();
+//        for (auto face: cell.faces()) {
+//            double a_f = face_fraction(cell[a], face.neib(a));
+//            grad += a_f * face.area_n();
+//        }
+//        cell[ns][3] = -grad.normalized();
+//
+//        std::array<double, Side3D::count()> a_neib;
+//        for (auto side: Side3D::items()) {
+//            a_neib[side] = cell.face(side).neib(a);
+//        }
+//        auto a_f = face_fractions(cell[a], a_neib);
+//        grad = Vector3d::Zero();
+//        for (auto face: cell.faces()) {
+//            grad += a_f[face.side()] * face.area_n();
+//        }
+//        cell[ns][4] = -grad.normalized();
+//
+//        auto polyhedron = cell.polyhedron();
+//
+//        for (int i = 0; i < 5; ++i) {
+//            const Vector3d& n = cell[ns][i];
+//            double alpha = cell[a];
+//
+//            int iterations = 0;
+//            auto start = std::chrono::high_resolution_clock::now();
+//
+//            Vector3d point_on_plane = polyhedron.find_section_newton(n, alpha, iterations);
+//
+//            // Глобальный параметр плоскости
+//            double d_global = n.dot(point_on_plane);
+//            // Локальный параметр (относительно центра ячейки)
+//            double d_local = d_global - n.dot(cell.center());
+//
+//            cell[ps][i] = d_local;
+//
+//            auto end = std::chrono::high_resolution_clock::now();
+//            double elapsed = std::chrono::duration<double>(end - start).count();
+//
+//            perf.newton_iters += iterations;
+//            perf.newton_calls++;
+//            perf.newton_time += elapsed;
+//        }
+//
+//        int done = ++processed;
+//        if (done % 50 == 0 || done == mixed_counter) {
+//            std::cout << "\r    Mixed cells: " << done << "/" << mixed_counter << std::flush;
+//        }
+//    });
+//
+//    std::cout << "\n  Interfaces computed! (" << mixed_counter << " mixed cells)\n";
+//    perf.print();
+//}
+//
 void make_interface(EuMesh& mesh) {
-    mesh.for_each([](EuCell& cell) {
+    std::cout << "  Computing interfaces...\n";
+
+    std::atomic<int> mixed_counter{0};
+    std::atomic<int> processed{0};
+
+    // Счётчики для аналитического метода
+    std::atomic<double> analytic_time{0.0};
+    std::atomic<long long> analytic_calls{0};
+
+    mesh.for_each([&](EuCell& cell) {
         if (!mixed(cell)) {
             for (auto& n: cell[ns]) n = Vector3d::Zero();
             for (auto& p: cell[ps]) p = 0.0;
@@ -63,12 +207,12 @@ void make_interface(EuMesh& mesh) {
             return;
         }
 
-        // Размеры ячейки
+        mixed_counter++;
+
         double hx = cell.hx();
         double hy = cell.hy();
         double hz = cell.hz();
 
-        // Простая производная
         Vector3d grad = Vector3d::Zero();
         for (auto face: cell.faces()) {
             double a_f = 0.5 * (cell[a] + face.neib(a));
@@ -80,7 +224,6 @@ void make_interface(EuMesh& mesh) {
         cell[ns][1] = C.Youngs(hx, hy, hz);
         cell[ns][2] = C.ELVIRA(hx, hy, hz);
 
-        // Моя формула (2D)
         grad = Vector3d::Zero();
         for (auto face: cell.faces()) {
             double a_f = face_fraction(cell[a], face.neib(a));
@@ -88,17 +231,11 @@ void make_interface(EuMesh& mesh) {
         }
         cell[ns][3] = -grad.normalized();
 
-        // Моя формула (3D)
-        // Собрать доли в соседних ячейках
         std::array<double, Side3D::count()> a_neib;
         for (auto side: Side3D::items()) {
             a_neib[side] = cell.face(side).neib(a);
         }
-
-        // Объемные доли на гранях
         auto a_f = face_fractions(cell[a], a_neib);
-
-        // И обычный Гаусс
         grad = Vector3d::Zero();
         for (auto face: cell.faces()) {
             grad += a_f[face.side()] * face.area_n();
@@ -106,10 +243,86 @@ void make_interface(EuMesh& mesh) {
         cell[ns][4] = -grad.normalized();
 
         for (int i = 0; i < 5; ++i) {
-            cell[ps][i] = cube_find_section(cell[a], cell[ns][0], hx, hy, hz);
+            auto start = std::chrono::high_resolution_clock::now();
+
+            cell[ps][i] = cube_find_section(cell[a], cell[ns][i], hx, hy, hz);
+
+            auto end = std::chrono::high_resolution_clock::now();
+            double elapsed = std::chrono::duration<double>(end - start).count();
+
+            analytic_time += elapsed;
+            analytic_calls++;
+        }
+
+        int done = ++processed;
+        if (done % 50 == 0 || done == mixed_counter) {
+            std::cout << "\r    Mixed cells: " << done << "/" << mixed_counter << std::flush;
         }
     });
+
+    std::cout << "\n  Interfaces computed! (" << mixed_counter << " mixed cells)\n";
+
+    std::cout << "  Calls: " << analytic_calls << "\n";
+    std::cout << "  Total time: " << analytic_time << " s\n";
+    std::cout << "  Avg time per call: " << (analytic_time / analytic_calls) * 1000 << " ms\n";
 }
+
+//void make_interface(EuMesh& mesh) {
+//    mesh.for_each([](EuCell& cell) {
+//        if (!mixed(cell)) {
+//            for (auto& n: cell[ns]) n = Vector3d::Zero();
+//            for (auto& p: cell[ps]) p = 0.0;
+//            for (auto& e: cell[es]) e = 0.0;
+//            return;
+//        }
+//
+//        // Размеры ячейки
+//        double hx = cell.hx();
+//        double hy = cell.hy();
+//        double hz = cell.hz();
+//
+//        // Простая производная
+//        Vector3d grad = Vector3d::Zero();
+//        for (auto face: cell.faces()) {
+//            double a_f = 0.5 * (cell[a] + face.neib(a));
+//            grad += a_f * face.area_n();
+//        }
+//        cell[ns][0] = -grad.normalized();
+//
+//        Stencil3D C(cell, a);
+//        cell[ns][1] = C.Youngs(hx, hy, hz);
+//        cell[ns][2] = C.ELVIRA(hx, hy, hz);
+//
+//        // Моя формула (2D)
+//        grad = Vector3d::Zero();
+//        for (auto face: cell.faces()) {
+//            double a_f = face_fraction(cell[a], face.neib(a));
+//            grad += a_f * face.area_n();
+//        }
+//        cell[ns][3] = -grad.normalized();
+//
+//        // Моя формула (3D)
+//        // Собрать доли в соседних ячейках
+//        std::array<double, Side3D::count()> a_neib;
+//        for (auto side: Side3D::items()) {
+//            a_neib[side] = cell.face(side).neib(a);
+//        }
+//
+//        // Объемные доли на гранях
+//        auto a_f = face_fractions(cell[a], a_neib);
+//
+//        // И обычный Гаусс
+//        grad = Vector3d::Zero();
+//        for (auto face: cell.faces()) {
+//            grad += a_f[face.side()] * face.area_n();
+//        }
+//        cell[ns][4] = -grad.normalized();
+//
+//        for (int i = 0; i < 5; ++i) {
+//            cell[ps][i] = cube_find_section(cell[a], cell[ns][0], hx, hy, hz);
+//        }
+//    });
+//}
 
 void calc_errors(EuMesh& mesh, InFunction func, int nx) {
     // Число несовпадающих точек
@@ -281,16 +494,38 @@ void set_flag(EuCell& cell) {
 
 // Выставить значения объемной доли и провести адаптацию
 void initialize(EuMesh& mesh, std::function<void(EuCell&)> set_alpha) {
+    std::cout << "  [1/3] Setting distributor...\n";
     mesh.set_distributor(Distributor::initializer(set_alpha));
-    std::cout << "  setup init\t(" << mesh.n_cells() << " cells)\n";
-    mesh.for_each(set_alpha);
+
+    std::cout << "  [2/3] Computing volume fractions (" << mesh.n_cells() << " cells)...\n";
+
+    std::atomic<int> counter{0};
+    int total = mesh.n_cells();
+    int prev_percent = -1;
+
+    mesh.for_each([&](EuCell& cell) {
+        set_alpha(cell);
+        int done = ++counter;
+        int percent = (100 * done) / total;
+        if (percent > prev_percent) {
+            prev_percent = percent;
+            std::cout << "\r    Progress: " << percent << "% ("
+                      << done << "/" << total << " cells)" << std::flush;
+        }
+    });
+    std::cout << "\n  Volume fractions done!\n";
+
     if (mesh.adaptive()) {
+        std::cout << "  [3/3] Adaptive refinement...\n";
         for (int i = 0; i <= mesh.max_level(); ++i) {
-            std::cout << "  setup " << i << " / " << mesh.max_level() << "\t(" << mesh.n_cells() << " cells)\n";
+            std::cout << "    Level " << i << " / " << mesh.max_level()
+                      << " (" << mesh.n_cells() << " cells)\n";
             mesh.for_each(set_flag);
             mesh.make_shuba(2);
             mesh.refine();
         }
+    } else {
+        std::cout << "  [3/3] No adaptation needed\n";
     }
 }
 
@@ -364,8 +599,9 @@ void convergence(EuMesh& mesh, InFunction func, int nx) {
 }
 
 int main() {
+    std::cout << "PLIC_3D is launched" << std::endl;
     utils::mpi::handler mpi_init;
-    utils::threads::on();
+    utils::threads::off();
 
     Cuboid gen(-1.0, 1.0, -1.0, 1.0, -0.5, 0.5);
     gen.set_nx(22);
@@ -379,7 +615,7 @@ int main() {
     ns = mesh.add<Vector3d[5]>("ns");
     es = mesh.add<double[5]>("es");
 
-    int test = 6;
+    int test = 2;
 
     switch (test) {
         case 0: show_plain(mesh); break;
