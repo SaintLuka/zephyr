@@ -1003,7 +1003,7 @@ void save_vector(
     file << tab << "  \"sizeof\": " << sizeof(T) << ",\n";
 
     // Относительное имя файла
-    std::string filename = path / name;
+    std::string filename = (path / name).string();
     if (mpi::single()) {
         file << tab << "  \"data\": ";
         file << "{ \"size\": " << arr.size() << ", \"file\": \"" << filename << ".bin\" }\n";
@@ -1054,7 +1054,7 @@ inline void save_buffer(
     file << tab << "  \"sizeof\": " << buffer.element_size() << ",\n";
 
     // Относительное имя файла
-    std::string filename = path / var;
+    std::string filename = (path / var).string();
     if (mpi::single()) {
         file << tab << "  \"data\": ";
         file << "{ \"size\": " << buffer.size() << ", \"file\": \"" << filename << ".bin\" }\n";

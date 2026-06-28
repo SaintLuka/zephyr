@@ -81,8 +81,10 @@ void EuMesh::prebalancing(int n_iters) {
     if (mpi::single()) return;
 
     bool done = m_decomp->exact_balancing(m_locals.center);
-    if (done) return;
-
+    if (done) {
+        redistribute();
+        return;
+    }
     for (int i = 0; i < n_iters; ++i) {
         balancing();
         redistribute();
