@@ -113,6 +113,12 @@ public:
     /// @param alpha Объемная доля
     section find_section(const Vector3d& n, double alpha) const;
 
+    /// @brief Находит отсечение от полигона с заданной объемной долей
+    /// @param n Внешняя нормаль прямой
+    /// @param alpha Объемная доля
+    /// @return Расстояние со знаком от центра ячейки до прямой
+    double find_section2(const Vector3d& n, double alpha) const;
+
     /// @brief Площадь пересечения многоугольника с кругом
     /// @param c, R Центр круга, радиус круга
     double disk_clip_area(const Vector3d& c, double R) const;

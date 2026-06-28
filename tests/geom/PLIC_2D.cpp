@@ -74,7 +74,19 @@ inline bool mixed(EuCell& cell) {
 }
 
 void make_interface(EuMesh& mesh) {
-    mesh.for_each([](EuCell& cell) {
+    Plic::get_fraction_t get_vf = [](const EuCell& cell, int idx) ->double {
+        return cell[a];
+    };
+
+    // 4 способа реконструкции плоскости
+    std::array plic = {
+        Plic(2, true, Plic::GRAD,   get_vf),
+        Plic(2, true, Plic::PnY,    get_vf),
+        Plic(2, true, Plic::ELVIRA, get_vf),
+        Plic(2, true, Plic::CSIR,   get_vf),
+    };
+
+    mesh.for_each([&plic](EuCell& cell) {
         if (!mixed(cell)) {
             for (auto& n: cell[ns]) n = Vector3d::Zero();
             for (auto& p: cell[ps]) p = 0.0;
@@ -82,33 +94,10 @@ void make_interface(EuMesh& mesh) {
             return;
         }
 
-        // Размеры ячейки
-        double hx = cell.hx();
-        double hy = cell.hy();
-
-        // Простая производная
-        Vector3d grad = Vector3d::Zero();
-        for (auto face: cell.faces()) {
-            double a_f = 0.5 * (cell[a] + face.neib(a));
-            grad += a_f * face.area_n();
-        }
-        cell[ns][0] = -grad.normalized();
-
-        Stencil2D C(cell, a);
-        cell[ns][1] = C.Youngs(hx, hy);
-        cell[ns][2] = C.ELVIRA(hx, hy);
-
-        // Моя формула
-        grad = Vector3d::Zero();
-        for (auto face: cell.faces()) {
-            double a_f = face_fraction(cell[a], face.neib(a));
-            grad += a_f * face.area_n();
-        }
-        cell[ns][3] = -grad.normalized();
-
-        // Пересчитываем позиции прямых
-        for (int i = 0; i < 4; ++i) {
-            cell[ps][i] = quad_find_section(cell[a], cell[ns][i], hx, hy);
+        for (int k = 0; k < plic.size(); ++k) {
+            auto [p, n] = plic[k].plane(cell, 0);
+            cell[ps][k] = p;
+            cell[ns][k] = n;
         }
     });
 }

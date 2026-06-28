@@ -55,7 +55,20 @@ inline bool boundary(EuCell& cell) {
 }
 
 void make_interface(EuMesh& mesh) {
-    mesh.for_each([](EuCell& cell) {
+    Plic::get_fraction_t get_vf = [](const EuCell& cell, int idx) ->double {
+        return cell[a];
+    };
+
+    // 5 способов реконструкции плоскости
+    std::array plic = {
+        Plic(3, true, Plic::GRAD,    get_vf),
+        Plic(3, true, Plic::PnY,     get_vf),
+        Plic(3, true, Plic::ELVIRA,  get_vf),
+        Plic(3, true, Plic::CSIR_2D, get_vf),
+        Plic(3, true, Plic::CSIR,    get_vf),
+    };
+
+    mesh.for_each([&plic](EuCell& cell) {
         if (!mixed(cell)) {
             for (auto& n: cell[ns]) n = Vector3d::Zero();
             for (auto& p: cell[ps]) p = 0.0;
@@ -63,50 +76,10 @@ void make_interface(EuMesh& mesh) {
             return;
         }
 
-        // Размеры ячейки
-        double hx = cell.hx();
-        double hy = cell.hy();
-        double hz = cell.hz();
-
-        // Простая производная
-        Vector3d grad = Vector3d::Zero();
-        for (auto face: cell.faces()) {
-            double a_f = 0.5 * (cell[a] + face.neib(a));
-            grad += a_f * face.area_n();
-        }
-        cell[ns][0] = -grad.normalized();
-
-        Stencil3D C(cell, a);
-        cell[ns][1] = C.Youngs(hx, hy, hz);
-        cell[ns][2] = C.ELVIRA(hx, hy, hz);
-
-        // Моя формула (2D)
-        grad = Vector3d::Zero();
-        for (auto face: cell.faces()) {
-            double a_f = face_fraction(cell[a], face.neib(a));
-            grad += a_f * face.area_n();
-        }
-        cell[ns][3] = -grad.normalized();
-
-        // Моя формула (3D)
-        // Собрать доли в соседних ячейках
-        std::array<double, Side3D::count()> a_neib;
-        for (auto side: Side3D::items()) {
-            a_neib[side] = cell.face(side).neib(a);
-        }
-
-        // Объемные доли на гранях
-        auto a_f = face_fractions(cell[a], a_neib);
-
-        // И обычный Гаусс
-        grad = Vector3d::Zero();
-        for (auto face: cell.faces()) {
-            grad += a_f[face.side()] * face.area_n();
-        }
-        cell[ns][4] = -grad.normalized();
-
-        for (int i = 0; i < 5; ++i) {
-            cell[ps][i] = cube_find_section(cell[a], cell[ns][0], hx, hy, hz);
+        for (int k = 0; k < plic.size(); ++k) {
+            auto [p, n] = plic[k].plane(cell, 0);
+            cell[ps][k] = p;
+            cell[ns][k] = n;
         }
     });
 }
@@ -379,7 +352,7 @@ int main() {
     ns = mesh.add<Vector3d[5]>("ns");
     es = mesh.add<double[5]>("es");
 
-    int test = 6;
+    int test = 4;
 
     switch (test) {
         case 0: show_plain(mesh); break;

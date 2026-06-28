@@ -573,6 +573,17 @@ Polygon::section Polygon::find_section(const Vector3d& _n, double alpha) const {
     return find_section_newton(*this, n, alpha);
 }
 
+
+double Polygon::find_section2(const Vector3d& n_in, double alpha) const {
+    if (empty() || n_in.isZero() || n_in.hasNaN()) {
+        return 0.0;
+    }
+
+    Vector3d n = n_in.normalized();
+    auto kek = find_section_newton(*this, n, alpha);
+    return (kek.p1 - m_center).dot(n);
+}
+
 // Средний угол между векторами p1 - c, p2 - c.
 inline double angle_avg(const Vector3d& c, const Vector3d& p1, const Vector3d& p2) {
     return std::atan2(0.5 * (p1.y() + p2.y()) - c.y(),

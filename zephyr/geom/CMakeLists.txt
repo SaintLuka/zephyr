@@ -13,6 +13,7 @@ set(ZEPHYR_GEOM_SRC
         ${CMAKE_CURRENT_SOURCE_DIR}/box.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/sections.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/intersection.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/plic.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/interface_recovery.cpp
         PARENT_SCOPE
 )
@@ -27,6 +28,7 @@ install(FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/grid.h
         ${CMAKE_CURRENT_SOURCE_DIR}/indexing.h
         ${CMAKE_CURRENT_SOURCE_DIR}/intersection.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/plic.h
         ${CMAKE_CURRENT_SOURCE_DIR}/interface_recovery.h
         ${CMAKE_CURRENT_SOURCE_DIR}/vector.h
         DESTINATION include/${PROJECT_NAME}/geom
