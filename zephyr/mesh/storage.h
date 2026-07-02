@@ -21,6 +21,8 @@ public:
 
     Storable() = default;
 
+    operator bool() const { return index >= 0; }
+
     bool operator!=(Storable<T> other) const { return index != other.index; }
 
     bool operator==(Storable<T> other) const { return index == other.index; }
@@ -52,6 +54,8 @@ public:
 
     Storable() = default;
 
+    operator bool() const { return index >= 0; }
+
     bool operator!=(Storable<T[N]> other) const { return index != other.index; }
 
     bool operator==(Storable<T[N]> other) const { return index == other.index; }
@@ -82,6 +86,8 @@ public:
     using type = T; ///< Хранимый тип
 
     Storable() = default;
+
+    operator bool() const { return index >= 0; }
 
     bool operator!=(Storable<T[]> other) const { return index != other.index; }
 

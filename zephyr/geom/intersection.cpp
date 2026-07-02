@@ -69,6 +69,26 @@ Vector3d find_fast(const obj::plane& plane, const obj::segment& seg) {
     return find_fast(plane, obj::line{seg.v2, seg.v2 - seg.v1});
 }
 
+double edge_fraction(const obj::segment& edge, const obj::plane& plane) {
+    bool in1 = plane.under(edge.v1);
+    bool in2 = plane.under(edge.v2);
+
+    if (in1 && in2) {
+        return 1.0;
+    }
+    if (!in1 && !in2) {
+        return 0.0;
+    }
+
+    Vector3d in = find_fast(plane, edge);
+    if (in1) {
+        return (in - edge.v1).norm() / edge.length();
+    }
+    else {
+        return (in - edge.v2).norm() / edge.length();
+    }
+}
+
 circle_segment_intersection find(
         const obj::circle &circle, const obj::line &line) {
 

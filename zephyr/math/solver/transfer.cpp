@@ -43,19 +43,22 @@ inline bool WENO_type(Transfer::Method m) {
 Transfer::Transfer() {
     m_dt  = 1.0e+300;
     m_CFL = 0.5;
+    m_dim = 2;
     m_method = Method::VOF;
     m_limiter = "MC";
+    m_max_dt = std::numeric_limits<double>::max();
+}
+
+void Transfer::set_dim(int dim) {
+    m_dim = std::max(2, std::min(dim, 3));
 }
 
 Transfer::State Transfer::add_types(EuMesh& mesh) {
     data.u1 = mesh.add<double>("u1");
     data.u2 = mesh.add<double>("u2");
     data.n = mesh.add<Vector3d>("n");
-    data.p = mesh.add<Vector3d>("p");
-    data.du_dx = mesh.add<double>("du/dx");
-    data.du_dy = mesh.add<double>("du/dy");
-
-    interface = InterfaceRecovery(data.u1, data.n, data.p);
+    data.p = mesh.add<double>("p");
+    data.grad = mesh.add<Vector3d>("grad");
     return data;
 }
 
@@ -75,19 +78,34 @@ void Transfer::set_method(Transfer::Method method) {
     m_method = method;
 }
 
+void Transfer::set_plic_type(Plic::Type type) {
+    if (!data.u1) {
+        throw std::runtime_error("Call 'add_types' before set PLIC type");
+    }
+
+    m_plic = Plic(m_dim, true, type,
+        [&u=data.u1](const EuCell& cell, int idx) -> double {
+            return cell[u];
+        });
+}
+
 double Transfer::get_dt() const {
     return m_dt;
 }
 
 void Transfer::set_dt(double dt) {
-    m_dt = dt;
+    m_dt = std::min(dt, m_max_dt);
+}
+
+void Transfer::set_max_dt(double dt) {
+    m_max_dt = dt;
 }
 
 Vector3d Transfer::velocity(const Vector3d &c) const {
     return Vector3d::UnitX();
 }
 
-double Transfer::compute_dt(EuCell &cell) {
+double Transfer::compute_dt(EuCell &cell) const {
     double max_area = 0.0;
     for (auto &face: cell.faces()) {
         max_area = std::max(max_area, face.area());
@@ -96,9 +114,8 @@ double Transfer::compute_dt(EuCell &cell) {
     return dx / velocity(cell.center()).norm();
 }
 
-double Transfer::compute_dt(EuMesh &mesh) {
+double Transfer::compute_dt(EuMesh &mesh) const {
     double tau = std::numeric_limits<double>::max();
-
     for (auto &cell: mesh) {
         tau = std::min(tau, compute_dt(cell));
     }
@@ -122,10 +139,34 @@ double flux_2D(double a1, double a2, double S, double V1, double V2, double as, 
     return sign(vn) * between(gamma * as, F_min, F_max);
 }
 
+// Точная доля отсечения от грани для заданной плоскости
+double face_fraction_n1(EuCell& cell, EuCell& neib, EuFace& face, double vn, const Transfer::State& data) {
+    // Реконструкция в ячейке
+    obj::plane plane{
+        .p = vn > 0.0 ? cell[data.p] + cell.center().dot(cell[data.n]) : neib[data.p] + neib.center().dot(neib[data.n]),
+        .n = vn > 0.0 ? cell[data.n] : neib[data.n]
+    };
+
+    double a_sig;
+    if (cell.dim() == 2) {
+        // Грань это отрезок
+        obj::segment seg{
+            .v1 = face.vs(0),
+            .v2 = face.vs(1)
+        };
+        a_sig = intersection2D::edge_fraction(seg, plane);
+    }
+    else {
+        throw std::runtime_error("intersection3D::quad fraction");
+    }
+    auto [a_min, a_max] = sorted(cell[data.u1], neib[data.u1]);
+    return between(a_sig, a_min, a_max);
+}
+
 // n1, n2 --- нормали к интерфейсу
 // fn --- нормаль к грани
 // vn --- нормальная компонента скорости
-double face_fraction_n1(
+double face_fraction_n2(
         double a1, double a2, const Vector3d& n1, const Vector3d& n2,
         const Vector3d& fn, double vn, double V1, double V2, double S, double dt) {
     double a = vn > 0.0 ? a1 : a2;
@@ -138,43 +179,17 @@ double face_fraction_n1(
     return between(a_sig, a1, a2);
 }
 
-double face_fraction_n2(EuCell& cell, EuCell& neib, EuFace& face, double vn, const Transfer::State& data) {
-    // Отрезок - грань
-    obj::segment seg{
-            .v1 = face.vs(0),
-            .v2 = face.vs(1)
-    };
+double face_fraction_n2_3D(
+        double a1, double a2, const Vector3d& n1, const Vector3d& n2,
+        const Vector3d& fn, double vn, double V1, double V2, double S, double dt) {
+    double a = vn > 0.0 ? a1 : a2;
+    double V = vn > 0.0 ? V1 : V2;
+    Vector3d n = vn > 0.0 ? n1 : n2;
 
-    // Реконструкция в ячейке
-    obj::plane plane{
-            .p = vn > 0.0 ? cell[data.p].dot(cell[data.n]) : neib[data.p].dot(neib[data.p]),
-            .n = vn > 0.0 ? cell[data.n] : neib[data.n]
-    };
+    double C = dt * std::abs(vn) * S / V;
 
-    bool in1 = plane.under(seg.v1);
-    bool in2 = plane.under(seg.v2);
-
-    double a_sig;
-    if (in1 && in2) {
-        a_sig = 1.0;
-    }
-    else if (!in1 && !in2) {
-        a_sig = 0.0;
-    }
-    else {
-        Vector3d in = geom::intersection2D::find_fast(plane, seg);
-
-        if (in1) {
-            a_sig = (in - seg.v1).norm() / seg.length();
-        }
-        else {
-            a_sig = (in - seg.v2).norm() / seg.length();
-        }
-    }
-
-    auto [a_min, a_max] = sorted(cell[data.u1], neib[data.u1]);
-
-    return between(a_sig, a_min, a_max);
+    double a_sig = average_flux(a, n, vn > 0.0 ? fn : -fn, C);
+    return between(a_sig, a1, a2);
 }
 
 // Находит оптимальное деление грани a_sig, при котором поток максимально близок к Flux
@@ -206,7 +221,7 @@ double flux_CRP(EuCell& cell, EuCell& neib, EuFace& face, double vn, double dt, 
     return flux_2D(a1, a2, S, vol1, vol2, a_sig, vn, dt);
 }
 
-void Transfer::fluxes_CRP(EuCell &cell, Direction dir) {
+void Transfer::fluxes_CRP(EuCell &cell, Direction dir) const {
     double a1 = cell[data.u1];
     Vector3d n1 = cell[data.n];
 
@@ -236,10 +251,15 @@ void Transfer::fluxes_CRP(EuCell &cell, Direction dir) {
                 a_sig = face_fraction_v5(a1, a2);
                 break;
             case Method::CRP_N1:
-                a_sig = face_fraction_n1(a1, a2, n1, n2, fn, vn, V1, V2, S, m_dt);
+                a_sig = face_fraction_n1(cell, neib, face, vn, data);
                 break;
             case Method::CRP_N2:
-                a_sig = face_fraction_n2(cell, neib, face, vn, data);
+                if (cell.dim() == 2) {
+                    a_sig = face_fraction_n2(a1, a2, n1, n2, fn, vn, V1, V2, S, m_dt);
+                }
+                else {
+                    a_sig = face_fraction_n2_3D(a1, a2, n1, n2, fn, vn, V1, V2, S, m_dt);
+                }
                 break;
             default:
                 a_sig = face_fraction_s(a1, a2);
@@ -291,11 +311,12 @@ double flux_VOF(EuCell &cell, EuFace &face,
         return poly.area();
     }
     else {
-        return poly.clip_area(cell[data.p], cell[data.n]);
+        Vector3d P = cell.center() + cell[data.p] * cell[data.n];
+        return poly.clip_area(P, cell[data.n]);
     }
 }
 
-void Transfer::fluxes_VOF(EuCell &cell, Direction dir) {
+void Transfer::fluxes_VOF(EuCell &cell, Direction dir) const {
     double fluxes = 0.0;
     for (auto &face: cell.faces(dir)) {
         if (face.is_boundary()) {
@@ -343,7 +364,7 @@ void Transfer::fluxes_VOF(EuCell &cell, Direction dir) {
     cell[data.u2] = cell[data.u1] - fluxes / cell.volume();
 }
 
-void Transfer::fluxes_MUSCL(EuCell &cell, Direction dir) {
+void Transfer::fluxes_MUSCL(EuCell &cell, Direction dir) const {
     double fluxes = 0.0;
     for (auto &face: cell.faces(dir)) {
         if (face.is_boundary()) {
@@ -365,8 +386,8 @@ void Transfer::fluxes_MUSCL(EuCell &cell, Direction dir) {
                 //std::cout << neib[data.u1] << " " <<  neib[data.du_dx] << " " << neib[data.du_dy] << "\n";
             }
             auto fe = FaceExtra::Direct(
-                    cell[data.u1], cell[data.du_dx], cell[data.du_dy], 0.0,
-                    neib[data.u1], neib[data.du_dx], neib[data.du_dy], 0.0,
+                    cell[data.u1], cell[data.grad].x(), cell[data.grad].y(), 0.0,
+                    neib[data.u1], neib[data.grad].x(), neib[data.grad].y(), 0.0,
                     cell.center(), neib.center(), face.center());
 
             a_sig = vn > 0.0 ? fe.m(cell[data.u1]) : fe.p(neib[data.u1]);
@@ -374,8 +395,8 @@ void Transfer::fluxes_MUSCL(EuCell &cell, Direction dir) {
         }
         else {
             auto fe = FaceExtra::ATvL(
-                    cell[data.u1], cell[data.du_dx], cell[data.du_dy], 0.0,
-                    neib[data.u1], neib[data.du_dx], neib[data.du_dy], 0.0,
+                    cell[data.u1], cell[data.grad].x(), cell[data.grad].y(), 0.0,
+                    neib[data.u1], neib[data.grad].x(), neib[data.grad].y(), 0.0,
                     cell.center(), neib.center(), face.center());
 
             a_sig = vn > 0.0 ? fe.m(cell[data.u1]) : fe.p(neib[data.u1]);
@@ -406,47 +427,24 @@ void Transfer::compute_slopes(EuMesh& mesh) const {
     if (m_method == Method::MUSCLn ||
         m_method == Method::MUSCLn_CRP) {
         for (auto cell: mesh) {
-            double grad_x = 0.0;
-            double grad_y = 0.0;
-
             // Реконструкция в ячейке
             obj::plane plane{
-                    .p = cell[data.p].dot(cell[data.n]),
+                    .p = cell[data.p] + cell.center().dot(cell[data.n]),
                     .n = cell[data.n]
             };
 
+            Vector3d grad = Vector3d::Zero();
             for (auto face: cell.faces()) {
                 // Отрезок - грань
                 obj::segment seg{
                         .v1 = face.vs(0),
                         .v2 = face.vs(1)
                 };
-
-                bool in1 = plane.under(seg.v1);
-                bool in2 = plane.under(seg.v2);
-
-                double a_sig;
-                if (in1 && in2) {
-                    a_sig = 1.0;
-                } else if (!in1 && !in2) {
-                    a_sig = 0.0;
-                } else {
-                    Vector3d in = geom::intersection2D::find_fast(plane, seg);
-
-                    if (in1) {
-                        a_sig = (in - seg.v1).norm() / seg.length();
-                    } else {
-                        a_sig = (in - seg.v2).norm() / seg.length();
-                    }
-                }
-
-                grad_x += a_sig * face.area() * face.normal().x();
-                grad_y += a_sig * face.area() * face.normal().y();
+                double a_sig = intersection2D::edge_fraction(seg, plane);
+                grad += a_sig * face.area_n();
             }
-            cell[data.du_dx] = grad_x / cell.volume();
-            cell[data.du_dy] = grad_y / cell.volume();
+            cell[data.grad] = grad / cell.volume();
         }
-
         return;
     }
 
@@ -460,15 +458,13 @@ void Transfer::compute_slopes(EuMesh& mesh) const {
 
     for (auto cell: mesh) {
         auto grad = gradient::LSM<double>(cell, get_state, boundary_value);
-        cell[data.du_dx] = grad.x;
-        cell[data.du_dy] = grad.y;
+        cell[data.grad] = {grad.x, grad.y, 0.0};
 
         if (m_method == Method::MUSCL_MC || m_method == Method::MUSCL_MC_CRP) {
             auto lim_grad = gradient::limiting<double>(cell, m_limiter,
                     grad, get_state, boundary_value);
 
-            cell[data.du_dx] = lim_grad.x;
-            cell[data.du_dy] = lim_grad.y;
+            cell[data.grad] = {lim_grad.x, lim_grad.y, 0.0};
         }
     }
 }
@@ -491,17 +487,17 @@ void Transfer::update(EuMesh &mesh, Direction dir) {
     }
 }
 
-void Transfer::update_CRP(EuMesh& mesh, Direction dir) {
+void Transfer::update_CRP(EuMesh& mesh, Direction dir) const {
     // Считаем потоки
-    for (auto cell: mesh) {
+    mesh.for_each([&](EuCell& cell) {
         fluxes_CRP(cell, dir);
-    }
+    });
 
     // Обновляем слои
-    for (auto cell: mesh) {
-        cell[data.u1] =  between(cell[data.u2], 0.0, 1.0);
+    mesh.for_each([this](EuCell& cell) {
+        cell[data.u1] = between(cell[data.u2], 0.0, 1.0);
         cell[data.u2] = 0.0;
-    }
+    });
 
     // Без сглаживаний, чисто для реконструкции
     update_interface(mesh, 0);
@@ -522,7 +518,7 @@ void Transfer::update_VOF(EuMesh& mesh, Direction dir) {
     update_interface(mesh);
 }
 
-void Transfer::update_MUSCL(EuMesh& mesh, Direction dir) {
+void Transfer::update_MUSCL(EuMesh& mesh, Direction dir) const {
     compute_slopes(mesh);
 
     // Считаем потоки
@@ -539,7 +535,11 @@ void Transfer::update_MUSCL(EuMesh& mesh, Direction dir) {
     update_interface(mesh);
 }
 
-void Transfer::update_WENO(EuMesh& mesh, Direction dir) {
+void Transfer::update_WENO(EuMesh& mesh, Direction dir) const {
+    if (mesh.dim() == 3) {
+        throw std::runtime_error("NO WENO");
+    }
+
     // Считаем потоки
     for (int i = 0; i < mesh.nx(); ++i) {
         for (int j = 0; j < mesh.ny(); ++j) {
@@ -666,12 +666,16 @@ void Transfer::update_WENO(EuMesh& mesh, Direction dir) {
     update_interface(mesh);
 }
 
-void Transfer::update_interface(EuMesh& mesh, int smoothing) {
-    interface.update(mesh, smoothing);
+void Transfer::update_interface(EuMesh& mesh, int smoothing) const {
+    mesh.for_each([this](EuCell& cell) {
+        auto [p, n] = m_plic.plane(cell, 0);
+        cell[data.p] = p;
+        cell[data.n] = n;
+    });
 }
 
-void Transfer::set_flags(EuMesh& mesh) {
-    for (auto cell: mesh) {
+void Transfer::set_flags(EuMesh& mesh) const {
+    mesh.for_each([this](EuCell& cell) {
         double min_val = cell[data.u1];
         double max_val = cell[data.u1];
 
@@ -689,7 +693,7 @@ void Transfer::set_flags(EuMesh& mesh) {
         else {
             cell.set_flag(-1);
         }
-    }
+    });
 }
 
 Distributor Transfer::distributor() const {
@@ -714,8 +718,76 @@ Distributor Transfer::distributor() const {
     return distr;
 }
 
-EuMesh Transfer::body(EuMesh& mesh) {
-    return interface.body(mesh);
+EuMesh Transfer::body(EuMesh& mesh) const {
+    auto empty_cell = [this](EuCell& cell) -> bool {
+        return cell[data.u1] <= 1.0e-12 || (cell[data.u1] < 0.5 && cell[data.n].isZero());
+    };
+
+    using Eigen::Vector3i;
+
+    Vector3i count = mesh.sum([&empty_cell](EuCell& cell) -> Vector3i {
+        if (empty_cell(cell)) {
+            return {0, 0, 0};
+        }
+        return {1, cell.face_count() + 1, cell.node_count() + 2};
+    }, Vector3i{0, 0, 0});
+
+    int n_cells = count[0];
+    int n_faces = count[1];
+    int n_nodes = count[2];
+
+    EuMesh clipped(mesh.dim(), false);
+    clipped.locals().reserve(n_cells, n_faces, n_nodes);
+
+    if (mesh.dim() == 2) {
+        for (auto cell: mesh) {
+            if (empty_cell(cell)) {
+                continue;
+            }
+
+            if (cell[data.u1] > 1.0 - 1.0e-12) {
+                clipped.push_back(cell.polygon());
+                continue;
+            }
+
+            Vector3d P = cell.center() + cell[data.p] * cell[data.n];
+            if (cell[data.n].isZero()) {
+                double d = 0.5 * std::sqrt(cell[data.u1] * cell.volume());
+                Polygon poly = {
+                    P + Vector3d{-d, -d, 0.0},
+                    P + Vector3d{+d, -d, 0.0},
+                    P + Vector3d{+d, +d, 0.0},
+                    P + Vector3d{-d, +d, 0.0},
+                };
+                clipped.push_back(poly);
+            }
+            else {
+                auto poly = cell.polygon();
+                auto part = poly.clip(P, cell[data.n]);
+                clipped.push_back(part);
+            }
+        }
+        return clipped;
+    }
+    else {
+        for (auto& cell: mesh) {
+            if (empty_cell(cell)) {
+                continue;
+            }
+            if (cell[data.u1] > 1.0 - 1.0e-12) {
+                clipped.push_back(cell.polyhedron());
+                continue;
+            }
+
+            Vector3d P = cell.center() + cell[data.p] * cell[data.n];
+            auto poly = cell.polyhedron();
+            auto clip = poly.clip(P, cell[data.n]);
+            if (!clip.empty()) {
+                clipped.push_back(clip);
+            }
+        }
+    }
+    return clipped;
 }
 
 } // namespace zephyr::math

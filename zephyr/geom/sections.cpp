@@ -609,4 +609,43 @@ std::array<double, Side3D::count()> face_fractions(double a_cell, const std::arr
     return res;
 }
 
+double average_flux(double alpha, const Vector3d& n, const Vector3d& face_n, double CFL) {
+    double p1 = cube_find_section(alpha, n);
+
+    double p2 = p1 + 0.5 * (CFL - 1.0) * n.dot(face_n);
+
+    // Переход к двумерному сечению
+    if (CFL < 1.0e-8) {
+        Vector3d n2;
+        if (std::abs(face_n.x()) > 0.95) {
+            n2 = {n.y(), n.z(), 0.0};
+        }
+        else if (std::abs(face_n.y()) > 0.95) {
+            n2 = {n.x(), n.z(), 0.0};
+        }
+        else if (std::abs(face_n.z()) > 0.95) {
+            n2 = {n.x(), n.y(), 0.0};
+        }
+        else {
+            throw std::runtime_error("average_flux: can't define direction #1");
+        }
+
+        double r = n2.norm();
+        n2 /= r;
+        p2 /= r;
+        return quad_volume_fraction(p2, n2);
+    }
+
+    if (std::abs(face_n.x()) > 0.95) {
+        return cube_volume_fraction(p2, n, CFL, 1.0, 1.0);
+    }
+    if (std::abs(face_n.y()) > 0.95) {
+        return cube_volume_fraction(p2, n, 1.0, CFL, 1.0);
+    }
+    if (std::abs(face_n.z()) > 0.95) {
+        return cube_volume_fraction(p2, n, 1.0, 1.0, CFL);
+    }
+    throw std::runtime_error("average_flux: can't define direction #2");
+}
+
 } // namespace zephyr::geom

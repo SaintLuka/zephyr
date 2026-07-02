@@ -65,13 +65,13 @@ Vector3d csir3_normal(const EuCell& cell, int idx, const Plic::get_fraction_t& g
 }
 
 double polygon_section(const EuCell& cell, int idx, const Vector3d& n, const Plic::get_fraction_t& get_vf) {
-    Vector3d P = cell.polygon().find_section(n, get_vf(cell, idx)).p1;
-    return (P - cell.center()).dot(n);
+    Vector3d p = cell.polygon().find_section(n, get_vf(cell, idx));
+    return (p - cell.center()).dot(n);
 }
 
 double polyhedron_section(const EuCell& cell, int idx, const Vector3d& n, const Plic::get_fraction_t& get_vf) {
-    Vector3d P = cell.polyhedron().find_section(n, get_vf(cell, idx));
-    return (P - cell.center()).dot(n);
+    Vector3d p = cell.polyhedron().find_section(n, get_vf(cell, idx));
+    return (p - cell.center()).dot(n);
 }
 
 double quad_section(const EuCell& cell, int idx, const Vector3d& n, const Plic::get_fraction_t& get_vf) {

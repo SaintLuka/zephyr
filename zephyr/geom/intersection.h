@@ -54,7 +54,7 @@ struct ray {
 /// @brief Плоскость (r, n) = p.
 /// @details n - внешняя нормаль, p - расстояние до прямой со знаком.
 struct plane {
-    double   p;   ///< Точка плоскости
+    double   p;   ///< Расстояние до плоскости со знаком
     Vector3d n;   ///< Внешняя нормаль плоскости
 
     /// @brief Точка плоскости
@@ -125,6 +125,9 @@ Vector3d find_fast(const obj::plane& plane, const obj::line& line);
 /// @details Для параллельных, вероятнее всего, выдаст NAN
 /// Точка пересечения может лежать вне отрезка
 Vector3d find_fast(const obj::plane& plane, const obj::segment& seg);
+
+/// @brief Найти долю отрезка под плоскостью
+double edge_fraction(const obj::segment& edge, const obj::plane& plane);
 
 
 /// @brief Пересечение окружности и отрезка

@@ -352,7 +352,7 @@ int main() {
     ns = mesh.add<Vector3d[5]>("ns");
     es = mesh.add<double[5]>("es");
 
-    int test = 4;
+    int test = 1;
 
     switch (test) {
         case 0: show_plain(mesh); break;

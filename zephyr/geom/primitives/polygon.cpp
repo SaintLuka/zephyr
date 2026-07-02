@@ -484,7 +484,7 @@ Vector3d find_section_bisect(const Polygon& poly, const Vector3d& n, double alph
 
 // Сходится дольше, чем метод дихотомии, почему?
 // Надо ещё метод Брента попробовать
-Polygon::section find_section_newton(const Polygon& poly, const Vector3d& n, double alpha) {
+Vector3d find_section_newton(const Polygon& poly, const Vector3d& n, double alpha) {
 #if COUNT_ITERATIONS
     static int n_starts = 0; ++n_starts;
     static int total_iterations = 0;
@@ -493,11 +493,10 @@ Polygon::section find_section_newton(const Polygon& poly, const Vector3d& n, dou
 
     // Отсекаем сразу только очень близкие к 0.0 и 1.0
     if (alpha < 1.0e-14) {
-        Vector3d out = v_min - 0.1 * n;
-        return {out, out};
-    } else if (alpha > 1.0 - 1.0e-14) {
-        Vector3d out = v_max + 0.1 * n;
-        return {out, out};
+        return v_min - 0.1 * n;
+    }
+    if (alpha > 1.0 - 1.0e-14) {
+        return v_max + 0.1 * n;
     }
 
     double DV = (v_max - v_min).dot(n);
@@ -541,47 +540,25 @@ Polygon::section find_section_newton(const Polygon& poly, const Vector3d& n, dou
 #endif
 
     if (alpha < 1.0e-14) {
-        Vector3d out = v_min - 0.1 * n;
-        return {out, out};
-    } else if (alpha > 1.0 - 1.0e-14) {
-        Vector3d out = v_max + 0.1 * n;
-        return {out, out};
+        return v_min - 0.1 * n;
     }
-    else {
-        return {0.5 * (func.p1 + func.p2), func.p2};
+    if (alpha > 1.0 - 1.0e-14) {
+        return v_max + 0.1 * n;
     }
+    return 0.5 * (func.p1 + func.p2);
 }
 
-Polygon::section Polygon::find_section(const Vector3d& _n, double alpha) const {
-    const Vector3d nan = {NAN, NAN, NAN};
+Vector3d Polygon::find_section(const Vector3d& n, double alpha) const {
     if (empty()) {
-        return {nan, nan};
+        return Vector3d{NAN, NAN, NAN};
     }
 
-    Vector3d n = _n.normalized();
-
-    if (bad_normal(n)) {
-        if (alpha < 0.5) {
-            return {nan, nan};
-        }
-        else {
-            return {center(), center()};
-        }
+    if (n.isZero()) {
+        return center();
     }
 
-    //return {find_section_bisect(*this, n, alpha), Vector3d::Zero()};
+    //return find_section_bisect(*this, n, alpha);
     return find_section_newton(*this, n, alpha);
-}
-
-
-double Polygon::find_section2(const Vector3d& n_in, double alpha) const {
-    if (empty() || n_in.isZero() || n_in.hasNaN()) {
-        return 0.0;
-    }
-
-    Vector3d n = n_in.normalized();
-    auto kek = find_section_newton(*this, n, alpha);
-    return (kek.p1 - m_center).dot(n);
 }
 
 // Средний угол между векторами p1 - c, p2 - c.

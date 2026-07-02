@@ -1,13 +1,13 @@
 #pragma once
 
 #include <zephyr/mesh/euler/eu_mesh.h>
-#include <zephyr/geom/interface_recovery.h>
+#include <zephyr/geom/plic.h>
 #include <zephyr/math/cfd/limiter.h>
 
 namespace zephyr::math {
 
 using zephyr::geom::Vector3d;
-using zephyr::geom::InterfaceRecovery;
+using zephyr::geom::Plic;
 
 using zephyr::mesh::EuCell;
 using zephyr::mesh::EuMesh;
@@ -55,12 +55,11 @@ public:
     // Расширенный вектор состояния на котором решается задача
     struct State {
         Storable<double> u1, u2;  ///< Объемные доли
+        Storable<double> p;       ///< Расстояние от центра ячейки до плоскости
         Storable<Vector3d> n;     ///< Внешняя нормаль поверхности
-        Storable<Vector3d> p;     ///< Базисная точка поверхности
 
-        // Градиенты нужны для схемы MUSCL
-        Storable<double> du_dx;
-        Storable<double> du_dy;
+        // Градиент нужен для схемы MUSCL
+        Storable<Vector3d> grad;
     };
 
     // Доступ к данным в хранилище
@@ -71,6 +70,9 @@ public:
     Transfer();
 
     virtual ~Transfer() = default;
+
+    /// @brief Задать размерность
+    void set_dim(int dim);
 
     /// @brief Добавить типы для хранения на сетку
     State add_types(EuMesh& mesh);
@@ -87,11 +89,17 @@ public:
     /// @brief Версия функции update
     void set_method(Method method);
 
+    /// @brief Установить тип PLIC реконструкции
+    void set_plic_type(Plic::Type type);
+
     /// @brief Шаг интегрирования на предыдущем вызове update()
     double get_dt() const;
 
     /// @brief Установить временной шаг
     void set_dt(double dt);
+
+    /// @brief Установить шаг интегрирования по времени
+    void set_max_dt(double dt);
 
     /// @brief Векторное поле скорости
     /// @details Виртуальная функция, следует унаследоваться от класса
@@ -100,57 +108,58 @@ public:
 
     /// @brief Посчитать шаг интегрирования по времени с учетом
     /// условия Куранта (для всех ячеек)
-    double compute_dt(EuMesh& mesh);
+    double compute_dt(EuMesh& mesh) const;
 
     /// @brief Один шаг интегрирования по времени
     void update(EuMesh& mesh, Direction dir = Direction::ANY);
 
     /// @brief Подсеточная реконструкция границы
     /// @param smoothing Число итераций сглаживания
-    void update_interface(EuMesh& mesh, int smoothing = 3);
+    void update_interface(EuMesh& mesh, int smoothing = 3) const;
 
     /// @brief Установить флаги адаптации
-    void set_flags(EuMesh& mesh);
+    void set_flags(EuMesh& mesh) const;
 
     /// @brief Распределитель данных при адаптации
     Distributor distributor() const;
 
-    EuMesh body(EuMesh& mesh);
+    EuMesh body(EuMesh& mesh) const;
 
 protected:
 
     /// @brief Посчитать шаг интегрирования по времени с учетом
     /// условия Куранта (для одной ячейки)
-    double compute_dt(EuCell& cell);
+    double compute_dt(EuCell& cell) const;
 
     void compute_slopes(EuMesh& mesh) const;
 
-    void update_CRP(EuMesh& mesh, Direction dir);
+    void update_CRP(EuMesh& mesh, Direction dir) const;
 
     void update_VOF(EuMesh& mesh, Direction dir);
 
-    void update_MUSCL(EuMesh& mesh, Direction dir);
+    void update_MUSCL(EuMesh& mesh, Direction dir) const;
 
-    void update_WENO(EuMesh& mesh, Direction dir);
+    void update_WENO(EuMesh& mesh, Direction dir) const;
 
 
     /// @brief Потоки по схеме CRP
-    void fluxes_CRP(EuCell& cell, Direction dir = Direction::ANY);
+    void fluxes_CRP(EuCell& cell, Direction dir = Direction::ANY) const;
 
     /// @brief Потоки по аналогу VOF
-    void fluxes_VOF(EuCell& cell, Direction dir = Direction::ANY);
+    void fluxes_VOF(EuCell& cell, Direction dir = Direction::ANY) const;
 
     /// @brief Потоки по схеме MUSCL
-    void fluxes_MUSCL(EuCell& cell, Direction dir = Direction::ANY);
+    void fluxes_MUSCL(EuCell& cell, Direction dir = Direction::ANY) const;
 
 protected:
     double m_dt;       ///< Шаг интегрирования
     double m_CFL;      ///< Число Куранта
+    int    m_dim;      ///< Размерность сетки/решателя
     Method m_method;   ///< Методика вычисления потоков
+    Plic   m_plic;     ///< Метод реконструкции границы
     Limiter m_limiter; ///< Ограничитель для MUSCL_MC
 
-    /// @brief Реконструкция границы
-    InterfaceRecovery interface;
+    double m_max_dt=1.e300;  ///< Максимальный шаг интегрирования
 };
 
 } // namespace zephyr::math

@@ -97,27 +97,11 @@ public:
     /// проходящей через точку p
     double clip_area(const Vector3d& p, const Vector3d& n) const;
 
-    /// @brief Две точки прямой (p1, p2). Точка p1 находится в центре
-    /// сечения, точка p2 на многоугольнике, таким образом, что при обходе
-    /// в направлении p1 -> p2 область остается слева.
-    struct section {
-        Vector3d p1, p2;
-
-        section(const Vector3d& v1, const Vector3d& v2) : p1(v1), p2(v2) { }
-
-        operator const Vector3d&() const { return p1; }
-    };
-
     /// @brief Находит отсечение от полигона с заданной объемной долей
     /// @param n Внешняя нормаль прямой
     /// @param alpha Объемная доля
-    section find_section(const Vector3d& n, double alpha) const;
-
-    /// @brief Находит отсечение от полигона с заданной объемной долей
-    /// @param n Внешняя нормаль прямой
-    /// @param alpha Объемная доля
-    /// @return Расстояние со знаком от центра ячейки до прямой
-    double find_section2(const Vector3d& n, double alpha) const;
+    /// @return Точка плоскости
+    Vector3d find_section(const Vector3d& n, double alpha) const;
 
     /// @brief Площадь пересечения многоугольника с кругом
     /// @param c, R Центр круга, радиус круга
@@ -134,7 +118,7 @@ public:
     /// внутри тела, иначе false
     /// @param n_points Число тестовых точек, погрешность ~ 1/N.
     double volume_fraction(const std::function<bool(const Vector3d&)>& inside,
-                           int n_points = 10000) const;
+                           int n_points = 10'000) const;
 
     /// @brief Интеграл скалярной функции по полигону элементу
     /// @param n Разбиение по сторонам

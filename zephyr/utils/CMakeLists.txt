@@ -14,6 +14,7 @@ install(FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/json.h
         ${CMAKE_CURRENT_SOURCE_DIR}/pyplot.h
         ${CMAKE_CURRENT_SOURCE_DIR}/mpi.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests.h
         ${CMAKE_CURRENT_SOURCE_DIR}/thread-pool.h
         ${CMAKE_CURRENT_SOURCE_DIR}/threads.h
         ${CMAKE_CURRENT_SOURCE_DIR}/numpy.h

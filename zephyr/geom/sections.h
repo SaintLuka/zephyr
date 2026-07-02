@@ -90,4 +90,16 @@ double face_fraction_cos(double a1, double a2);
 // перетекает за время dt. C = dt * speed * area / volume.
 double average_flux(double alpha, double cos, double CFL);
 
+/// @brief Сложно объяснить....
+/// По сути делает все VOF сечения, но это выписано в конечных формулах.
+/// Работает в 2D и 3D, но для производительности в 2D лучше использовать предыдущую.
+/// @param alpha Объемная доля в ячейке, из которой считается поток
+/// @param n Внешняя нормаль к интерфейсу
+/// @param face_n Внешняя нормаль к грани, направлена от ячейки, из которой берется
+/// объемная доля и нормаль к интерфейсу
+/// @param CFL "Локальное" число Куранта. Объемная доля ячейки, которая
+/// перетекает за время dt. C = dt * speed * area / volume.
+/// @warning Работает только для декартовых сеток с квадратными ячейками!
+double average_flux(double alpha, const Vector3d& n, const Vector3d& face_n, double CFL);
+
 } // namespace zephyr::geom

@@ -68,7 +68,7 @@ void plot_sections(
         double s2 = poly.clip_volume_and_area(p, normal).area;
 
         int a = 0;
-        Vector3d p2 = poly.find_section_newton(normal, v1/v, a);
+        Vector3d p2 = poly.find_section_newton(normal, v1/v);
 //        Vector3d p3 = poly.find_section(normal, v2/v);
         Vector3d p4 = poly.find_section_brent(normal, v2/v);
 
