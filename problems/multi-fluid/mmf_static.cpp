@@ -1,9 +1,5 @@
-/// @file mmf_bubble_collapse.cpp
-/// @brief Bubble collapse under the water
-///
-/// Nourgaliev R., Dinh T., Theofanous T. Adaptive characteristics-based matching
-/// for compressible multifluid dynamics // Journal of Computational Physics.
-/// –– 2006. –– Vol. 213, no. 2. –– P. 500–529.
+/// @file mmf_static.cpp
+/// @brief Static test for two materials
 
 #include <iomanip>
 
@@ -22,8 +18,6 @@
 #include <zephyr/utils/threads.h>
 #include <zephyr/utils/stopwatch.h>
 
-#include "zephyr/geom/sections.h"
-
 using namespace zephyr::phys;
 using namespace zephyr::math;
 using namespace zephyr::math::mmf;
@@ -33,7 +27,7 @@ using zephyr::utils::mpi;
 using zephyr::utils::threads;
 using zephyr::utils::Stopwatch;
 
-void init_cells(EuMesh& mesh, MixturePT& mixture, Storable<PState> z) {
+void init_cells(EuMesh& mesh, const MixturePT& mixture, Storable<PState> z) {
     mixture.adjust_cv({1.0_kg_m3, 1000.0_kg_m3}, 1.0_bar, 300.0);
 
     const PState z_air(
@@ -56,36 +50,20 @@ void init_cells(EuMesh& mesh, MixturePT& mixture, Storable<PState> z) {
     n.normalize();
 
     mesh.for_each([&](EuCell &cell) {
-
-        double vol_frac0 = quad_volume_fraction((cell.center() - c).dot(n), n, cell.linear_size(), cell.linear_size());
+        // Exact section by plane
+        double vol_frac0 = cell.polygon().clip_area(c, n) / cell.volume();
         double vol_frac1 = 1.0 - vol_frac0;
 
-        if (vol_frac0 == 1.0) {
-            cell[z] = z_air;
-            return;
-        }
-        if (vol_frac0 == 0.0) {
+        if (vol_frac0 < 1.0e-12) {
             cell[z] = z_water;
             return;
         }
+        if (vol_frac0 > 1.0 - 1.0e-12) {
+            cell[z] = z_air;
+            return;
+        }
 
-        mmf::PState z0 = z_air;
-        mmf::PState z1 = z_water;
-
-        double T = std::min(z0.T(), z1.T());
-        z0.density = 1.0 / mixture[0].volume_PT(z0.pressure, T);
-        z1.density = 1.0 / mixture[1].volume_PT(z1.pressure, T);
-
-        // rho = sum a_i rho_i
-        double    density   = vol_frac0 * z0.density + vol_frac1 * z1.density;
-        Fractions mass_frac = {vol_frac0 * z0.density / density, vol_frac1 * z1.density / density};
-        mass_frac.normalize();
-        Vector3d  velocity  = mass_frac[0] * z0.velocity + mass_frac[1] * z1.velocity;
-        double    pressure  = vol_frac0 * z0.pressure + vol_frac1 * z1.pressure;
-
-        PState mix(density, velocity, pressure, mass_frac, mixture);
-
-        cell[z] = mix;
+        cell[z] = PState::Mix1(mixture, {vol_frac0, vol_frac1}, {z_air, z_water});
     });
 }
 
@@ -99,10 +77,10 @@ int main() {
     gen.set_sizes(nx, ny);
     gen.set_boundaries({.left=Boundary::ZOE, .right=Boundary::ZOE,
                         .bottom=Boundary::WALL, .top=Boundary::WALL});
-    //gen.set_adaptive(true);
 
     Grid grid = gen.make();
 
+    // Distort the grid (add random offsets to nodes)
     grid.transform(
         [](const Vector3d& v) -> Vector3d {
             Vector3d res = v;
@@ -113,7 +91,7 @@ int main() {
     grid.make_amr();
 
     // Create mesh
-    EuMesh mesh(std::move(grid)); //gen);
+    EuMesh mesh(std::move(grid));
 
     // Create EoS of materials and mixture
     Eos::Ptr air = IdealGas::create("Air");
@@ -131,11 +109,6 @@ int main() {
     // Add data fields, choose main data layer
     auto data = solver.add_types(mesh);
     auto z = data.init;
-
-    // Configure mesh
-    mesh.set_decomposition("XY");
-    mesh.set_max_level(0);
-    mesh.set_distributor(solver.distributor());
 
     // Files for output
     PvdFile pvd("mesh", "output");
@@ -157,10 +130,10 @@ int main() {
     pvd.variables += {"rho1",[z](EuCell cell) -> double { return cell[z].densities[1]; }};
     //pvd.variables += {"e0",[z,mixture](EuCell cell) -> double { return cell[z].true_energy(mixture, 0); }};
     //pvd.variables += {"e1",[z,mixture](EuCell cell) -> double { return cell[z].true_energy(mixture, 1); }};
-    pvd.variables += {"n.x", [n=data.n](EuCell cell) -> double { return cell[n][0].x(); }};
-    pvd.variables += {"n.y", [n=data.n](EuCell cell) -> double { return cell[n][0].y(); }};
+    //pvd.variables += {"n.x", [n=data.n](EuCell cell) -> double { return cell[n][0].x(); }};
+    //pvd.variables += {"n.y", [n=data.n](EuCell cell) -> double { return cell[n][0].y(); }};
 
-    // Initial conditions (adaptive to initial data)
+    // Initial conditions
     init_cells(mesh, mixture, data.init);
 
     size_t n_step = 0;
@@ -170,7 +143,7 @@ int main() {
     while (n_step < 100'000) {
         std::cout << "\tStep: " << std::setw(6) << n_step << ";\n";
 
-        if (n_step % 100 == 0) {
+        if (n_step % 1000 == 0) {
             pvd.save(mesh, n_step);
         }
 

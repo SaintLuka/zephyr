@@ -5,6 +5,7 @@
 #include <zephyr/math/cfd/models.h>
 #include <zephyr/geom/geom.h>
 #include <zephyr/geom/sections.h>
+#include <zephyr/geom/plic.h>
 
 namespace zephyr::math {
 
@@ -128,6 +129,9 @@ void MmFluid::update(EuMesh &mesh) {
             integrate(mesh, m_dt, Direction::Y);
         //}
         //++counter;
+        if (mesh.dim() > 2) {
+            integrate(mesh, m_dt, Direction::Z);
+        }
     }
     else if (m_split == DirSplit::STRANG) {
         integrate(mesh, 0.5 * m_dt, Direction::X);
@@ -252,10 +256,22 @@ double alpha_sigma(CrpMode mode, EuCell &cell, const MmFluid::Parts& part, EuFac
             // Фактически CrpMode::PLIC
             double vi = 0.5 * (zm.vx() + zp.vx()); // Скорость интерфейса
             bool upwind = vi > 0.0;
-            double CFL = dt * std::abs(vi) / (upwind ? hL : hR);
-            double cos = face.normal().dot(upwind ? cell[part.n][idx] : -face.neib(part.n)[idx]);
-            double a_sig = geom::average_flux(upwind ? a_L : a_R, cos, CFL);
-            return math::between(a_sig, a_L, a_R);
+            // double CFL = dt * std::abs(vi) / (upwind ? hL : hR);
+            // double cos = face.normal().dot(upwind ? cell[part.n][idx] : -face.neib(part.n)[idx]);
+            // double a_sig = geom::average_flux(upwind ? a_L : a_R, cos, CFL);
+
+            double a = upwind ? a_L : a_R;
+            double h = upwind ? hL : hR;
+            Vector3d ni = upwind ? cell[part.n][idx] : face.neib(part.n)[idx];
+            if (ni.isZero()) {
+                return std::min(a_L, a_R);
+            }
+
+            Vector3d fn = face.normal();
+            double CFL = dt * std::abs(vi) / h;
+            double a_sig = average_flux(a, ni, upwind ? fn : -fn, CFL);
+
+            return between(a_sig, a_L, a_R);
         }
     }
 }
@@ -377,15 +393,6 @@ void MmFluid::fluxes(EuMesh &mesh, double dt, Direction dir) {
 
         // Примитивный вектор в ячейке
         PState z_c = cell[part.init];
-        if( z_c.density < 0.0 ) {
-        //throw std::runtime_error("MmFluid::fluxes error: z_c.density < 0.0 ");
-        }
-        if( z_c.pressure < 0.0 ) {
-        //throw std::runtime_error("MmFluid::fluxes error: z_c.pressure < 0.0 ");
-        }
-        if( z_c.temperature < 0.0 ) {
-        //throw std::runtime_error("MmFluid::fluxes error: z_c.temperature < 0.0 ");
-        }
 
         // Переменная для потока
         Flux flux;
@@ -485,6 +492,48 @@ void MmFluid::interface_recovery(EuMesh &mesh) {
     z_assert(part.n.size() == mixture.size(), "Bad normals size #1");
     z_assert(part.p.size() == mixture.size(), "Bad normals size #2");
 
+    if (false) {
+        auto get_vf = [&z=part.init](const EuCell &cell, int idx) -> double {
+            return cell[z].alpha(idx);
+        };
+
+        Plic plic(mesh.dim(), true, Plic::PnY, get_vf);
+
+        mesh.for_each([this, &plic](EuCell &cell) {
+            bool pure = cell[part.init].beta().is_pure();
+            if (pure) {
+                for (int i = 0; i < mixture.size(); ++i) {
+                    cell[part.p][i] = 0.0;
+                    cell[part.n][i] = Vector3d::Zero();
+                }
+                return;
+            }
+            for (int i = 0; i < mixture.size(); ++i) {
+                if (cell[part.init].beta().has(i)) {
+                    auto [p, n] = plic.plane(cell, i);
+                    cell[part.p][i] = p;
+                    cell[part.n][i] = n;
+                }
+                else {
+                    cell[part.p][i] = 0.0;
+                    cell[part.n][i] = Vector3d::Zero();
+                }
+            }
+        });
+        return;
+    }
+
+    // Метод на компактных шаблонах (CSIR)
+    if (mesh.dim() == 2) {
+        interface_recovery_CSIR_2D(mesh);
+    }
+    else {
+        //interface_recovery_CSIR_2D(mesh);
+        interface_recovery_CSIR_3D(mesh);
+    }
+}
+
+void MmFluid::interface_recovery_CSIR_2D(EuMesh &mesh) const {
     // Сделаю пока простую схему для квадратов
     mesh.for_each([this](EuCell& cell) {
         for (auto& n: cell[part.n]) n = Vector3d::Zero();
@@ -512,7 +561,65 @@ void MmFluid::interface_recovery(EuMesh &mesh) {
         for (int i = 0; i < ns.size(); ++i) {
             if (a_c.has(i)) {
                 ns[i].normalize();
-                ps[i] = quad_find_section(a_c[i], ns[i], cell.hx(), cell.hy());
+                if (cell.dim() == 2) {
+                    ps[i] = quad_find_section(a_c[i], ns[i], cell.hx(), cell.hy());
+                }
+                else {
+                    ps[i] = cube_find_section(a_c[i], ns[i], cell.hx(), cell.hy(), cell.hz());
+                }
+            }
+        }
+    });
+}
+
+void MmFluid::interface_recovery_CSIR_3D(EuMesh &mesh) const {
+    mesh.for_each([this](EuCell& cell) {
+        for (auto& n: cell[part.n]) n = Vector3d::Zero();
+        for (auto& p: cell[part.p]) p = 0.0;
+
+        // Чистый материал, нечего восстанавливать
+        if (cell[part.init].beta().is_pure()) {
+            return;
+        }
+
+        auto ns = cell[part.n];
+        auto ps = cell[part.p];
+
+        // Объемные доли в ячейке
+        Fractions a_c = cell[part.init].volume_fractions();
+
+        // Собрать доли в соседних ячейках
+        std::array<std::array<double, Side3D::count()>, Fractions::max_size> a_neib;
+        for (auto side: Side3D::items()) {
+            Fractions frac = cell.face(side).neib(part.init).volume_fractions();
+            for (int i = 0; i < mixture.size(); ++i) {
+                if (a_c.has(i)) {
+                    a_neib[i][side] = frac[i];
+                }
+            }
+        }
+
+        // Объемные доли на гранях
+        std::array<std::array<double, Side3D::count()>, Fractions::max_size> a_f;
+        for (int i = 0; i < mixture.size(); ++i) {
+            if (a_c.has(i)) {
+                a_f[i] = face_fractions(a_c[i], a_neib[i]);
+            }
+        }
+
+        // И обычный Гаусс
+        for (auto face: cell.faces()) {
+            for (int i = 0; i < mixture.size(); ++i) {
+                if (a_c.has(i)) {
+                    ns[i] -= a_f[i][face.side()] * face.area_n();
+                }
+            }
+        }
+
+        for (int i = 0; i < mixture.size(); ++i) {
+            if (a_c.has(i)) {
+                ns[i].normalize();
+                ps[i] = cube_find_section(a_c[i], ns[i], cell.hx(), cell.hy(), cell.hz());
             }
         }
     });
@@ -691,75 +798,81 @@ EuMesh MmFluid::domain(EuMesh& mesh, int idx) const {
     z_assert(part.p.size() == mixture.size(), "Bad normals size (body) #2");
 
     // Сделаю пока для квадратов / кубов
+    auto empty_cell = [this, idx](EuCell& cell) -> bool {
+        double a = cell[part.init].alpha(idx);
+        return a <= 1.0e-12 || (a < 0.5 && cell[part.n][idx].isZero());
+    };
+
+    using Eigen::Vector3i;
+
+    Vector3i count = mesh.sum([&empty_cell](EuCell& cell) -> Vector3i {
+        if (empty_cell(cell)) {
+            return {0, 0, 0};
+        }
+        return {1, cell.face_count() + 1, cell.node_count() + 2};
+    }, Vector3i{0, 0, 0});
+
+    int n_cells = count[0];
+    int n_faces = count[1];
+    int n_nodes = count[2];
+
+    EuMesh clipped(mesh.dim(), false);
+    clipped.locals().reserve(n_cells, n_faces, n_nodes);
+
     if (mesh.dim() == 2) {
-        EuMesh clipped(2, false);
         for (auto cell: mesh) {
-            if (cell[part.init].alpha(idx) <= 0.0 || (cell[part.init].alpha(idx) < 0.5 && cell[part.n][idx].isZero())) {
+            if (empty_cell(cell)) {
                 continue;
             }
-            if (cell[part.init].alpha(idx) >= 1.0 || (cell[part.init].alpha(idx) > 0.5 && cell[part.n][idx].isZero())) {
+
+            double a = cell[part.init].alpha(idx);
+
+            if (a > 1.0 - 1.0e-12) {
                 clipped.push_back(cell.polygon());
                 continue;
             }
 
-            Vector3d point = cell.center() + cell[part.p][idx] * cell[part.n][idx];
-            auto poly = cell.polygon().clip(point, cell[part.n][idx]);
-            clipped.push_back(poly);
+            Vector3d P = cell.center() + cell[part.p][idx] * cell[part.n][idx];
+            if (cell[part.n][idx].isZero()) {
+                double d = 0.5 * std::sqrt(a * cell.volume());
+                Polygon poly = {
+                    P + Vector3d{-d, -d, 0.0},
+                    P + Vector3d{+d, -d, 0.0},
+                    P + Vector3d{+d, +d, 0.0},
+                    P + Vector3d{-d, +d, 0.0},
+                };
+                clipped.push_back(poly);
+            }
+            else {
+                auto poly = cell.polygon();
+                auto clip = poly.clip(P, cell[part.n][idx]);
+                clipped.push_back(clip);
+            }
         }
         return clipped;
     }
     else {
-        throw std::runtime_error("Not implemented 3D body");
-    }
-
-#if 0
-    int count = 0;
-    for (auto cell: mesh) {
-        double alpha = cell(U).vol_frac(idx);
-        if (std::isnan(alpha) || alpha < 1.0e-12) {
-            continue;
-        }
-        ++count;
-    }
-
-    EuCell cells(count);
-
-    count = 0;
-    for (auto cell: mesh) {
-        double alpha = cell(U).vol_frac(idx);
-
-        if (std::isnan(alpha) || alpha < 1.0e-12) {
-            continue;
-        }
-
-        Vector3d normal = cell(U).n[idx];
-
-        if (alpha < 1.0 - 1.0e-12) {
-            if (normal.isZero()) {
-                double d = 0.5 * std::sqrt(alpha * cell.volume());
-                Quad quad = {
-                        cell.center() + Vector3d{-d, -d, 0.0},
-                        cell.center() + Vector3d{+d, -d, 0.0},
-                        cell.center() + Vector3d{-d, +d, 0.0},
-                        cell.center() + Vector3d{+d, +d, 0.0},
-                };
-                cells[count] = mesh::AmrCell(quad);
+        for (auto& cell: mesh) {
+            if (empty_cell(cell)) {
+                continue;
             }
-            else {
-                auto poly = cell.polygon();
-                Vector3d point = poly.find_section(normal, alpha);
-                auto part = poly.clip(point, normal);
-                cells[count] = mesh::AmrCell(part);
+
+            double a = cell[part.init].alpha(idx);
+
+            if (a > 1.0 - 1.0e-12) {
+                clipped.push_back(cell.polyhedron());
+                continue;
+            }
+
+            Vector3d P = cell.center() + cell[part.p][idx] * cell[part.n][idx];
+            auto poly = cell.polyhedron();
+            auto clip = poly.clip(P, cell[part.n][idx]);
+            if (!clip.empty()) {
+                clipped.push_back(clip);
             }
         }
-        else {
-            cells[count] = cell.geom();
-        }
-        ++count;
     }
-
-    return cells;
-#endif
+    return clipped;
 }
 
 Distributor MmFluid::distributor() const {

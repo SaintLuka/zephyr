@@ -121,6 +121,25 @@ mmf::Flux CrpFlux::classic(const mmf::PState& zLA, const mmf::PState& zLB, const
 
 #else
 
+// Очень простая функция, выбирает решение в нужной области в зависимости от S
+inline std::tuple<mmf::QState, mmf::Flux> choose(
+    double S, double S_L, double S_C, double S_R,
+    const mmf::QState& Q_L, const mmf::QState& Q_sL, const mmf::QState& Q_sR, const mmf::QState& Q_R,
+    const mmf::Flux&   F_L, const mmf::Flux&   F_sL, const mmf::Flux&   F_sR, const mmf::Flux&   F_R) {
+    if (S < S_C) {
+        if (S < S_L)
+            return {Q_L,  F_L};
+        else
+            return {Q_sL, F_sL};
+    }
+    else {
+        if (S < S_R)
+            return {Q_sR, F_sR};
+        else
+            return {Q_R,  F_R};
+    }
+}
+
 // Классическая задача для CRP
 mmf::Flux CrpFlux::classic(const mmf::PState& zLA, const mmf::PState& zLB, const mmf::PState& zRB,
                            const MixturePT& mixture, double delta, double dt) {
@@ -244,7 +263,7 @@ mmf::Flux CrpFlux::classic(const mmf::PState& zLA, const mmf::PState& zLB, const
     mmf::Flux   F_R(zRB);
     auto[S_0L, S_0C, S_0R, Q_s0L, F_s0L, Q_s0R, F_s0R] = HLLC::wave_config(mixture, qLB, fLB, Q_R, F_R);
 
-    // точка O1, OO, Odt
+    // точка O1 = (x1, t1) - взаимодействие C_0 и C_0L
     Char C_0  = {.x = -delta, .t = 0.0, .S = zLA.vx()};
     Char C_0L = {.x = 0.0, .t = 0.0, .S = S_0L};
     auto [x1, t1]  = C_0.cross(C_0L);
@@ -266,23 +285,12 @@ mmf::Flux CrpFlux::classic(const mmf::PState& zLA, const mmf::PState& zLB, const
         auto Q = qLA;
 
         if( dt > t1 ) {
-            auto [S_1L, S_1C, S_1R, Q_s1L, F_s1L, Q_s1R, F_s1R] =
-                HLLC::wave_config(mixture, qLA, fLA, Q_s0L, F_s0L);
+            auto [S_1L, S_1C, S_1R, Q_s1L, F_s1L, Q_s1R, F_s1R] = HLLC::wave_config(mixture, qLA, fLA, Q_s0L, F_s0L);
 
             auto lb = -x1 / (dt - t1);
-            if (lb < S_1L) {
-                F = fLA;
-                Q = qLA;
-            } else if (lb < S_1C) {
-                F = F_s1L;
-                Q = Q_s1L;
-            } else if (lb < S_1R) {
-                F = F_s1R;
-                Q = Q_s1R;
-            } else {
-                F = F_s0L;
-                Q = Q_s0L;
-            }
+            std::tie(Q, F) = choose(lb, S_1L, S_1C, S_1R,
+                                    qLA, Q_s1L, Q_s1R, Q_s0L,
+                                    fLA, F_s1L, F_s1R, F_s0L);
         }
 
         mmf::Flux G_O1_Odt = F.arr()*( dt - t1 ) - Q.arr()*( x0 - x1 );
@@ -290,7 +298,7 @@ mmf::Flux CrpFlux::classic(const mmf::PState& zLA, const mmf::PState& zLB, const
         return (G_O0_O1.arr() + G_O1_Odt.arr()) / dt;
     }
 
-     //mix2clear
+    // mix2clear
     if( S_0C >= 0.0 ) {
         // Нет взаимодействия S_0L за dt
         if( t1 >= dt ) {
@@ -314,129 +322,102 @@ mmf::Flux CrpFlux::classic(const mmf::PState& zLA, const mmf::PState& zLB, const
         // но по какой-то причине она оказывается менее устойчивой?
         mmf::Flux G_O0_O1 = F_s0L.arr()*( t1 - t0 ) - Q_s0L.arr()*( x1 - x0 );
 
-        mmf::Flux F;
-        mmf::QState Q;
         double lb = x1 / ( t1 - dt );
-        if ( lb < S_1L ) {
-            F = F_L;
-            Q = Q_L;
-        }
-        else if ( lb < S_1C ) {
-            F = F_s1L;
-            Q = Q_s1L;
-        }
-        else if ( lb < S_1R ){
-            F = F_s1R;
-            Q = Q_s1R;
-        }
-        else {
-            F = F_s0L;
-            Q = Q_s0L;
-        }
+        auto[Q, F] = choose(lb, S_1L, S_1C, S_1R,
+                            Q_L, Q_s1L, Q_s1R, Q_s0L,
+                            F_L, F_s1L, F_s1R, F_s0L);
 
         mmf::Flux G_01_Odt = F.arr()*( dt - t1 ) - Q.arr()*( x0 - x1 );
 
         return ( G_O0_O1.arr() + G_01_Odt.arr() ) / dt;
     }
-    //clear2mix
-    else{
+    // clear2mix
+    else {
+        // Нет взаимодействия S_0L за dt
+        if( t1 >= dt ) {
+            return F_s0R;
+        }
 
-         // Нет взаимодействия S_0L за dt
-         if( t1 >= dt ) {
-             return F_s0R;
-         }
+        // Второй распад в точке O1
+        mmf::QState Q_L(zLA);
+        mmf::Flux   F_L(zLA);
+        auto[S_1L, S_1C, S_1R, Q_s1L, F_s1L, Q_s1R, F_s1R] = HLLC::wave_config(mixture, Q_L, F_L, Q_s0L, F_s0L);
 
-         //ВТОРОЙ распад в точке O1
-         mmf::QState Q_L(zLA);
-         mmf::Flux   F_L(zLA);
-         auto[S_1L, S_1C, S_1R, Q_s1L, F_s1L, Q_s1R, F_s1R] = HLLC::wave_config(mixture, Q_L, F_L, Q_s0L, F_s0L);
+        // Точка O2 = (x2, t2) - взаимодействие C_0C и C_1R
+        Char C_0C = {.x = 0.0,  .t = 0.0,  .S = S_0C};
+        Char C_1R = {.x = x1, .t = t1, .S = S_1R};
+        auto [x2, t2]  = C_1R.cross(C_0C);
 
-         //точка O2 - взаимодействие C_1R C_0C
-         Char C_0C = {.x = 0.0,  .t = 0.0,  .S = S_0C};
-         Char C_1R = {.x = x1, .t = t1, .S = S_1R};
-         Point O2  = C_1R.cross(C_0C);
+        // нет взаимодействия C_1R C_0C за dt
+        if( t2 > dt ) {
+            return F_s0R;
+        }
 
-         // нет взаимодействия C_1R C_0C за dt
-         // или редкая хуета при малых C_0C.S; O2.x > 0.0
-         if( O2.t > dt || O2.x > 0.0 ) {
-             return F_s0R;
-         }
+        // Редкий случай при скорости S_0С около нуля
+        if( x2 > 0.0 ){
+            // При скорости S_0C около нуля поток непрерывен, то есть F_s0R ~ F_s0L,
+            // поэтому вообще говоря не принципиально какой использовать.
+            // Но почему распады далее не рассматриваются? Свести к предыдущим if-ам
+            return F_s0R;
+        }
 
+        // Третий распад в точке O2
+        auto[S_2L, S_2C, S_2R, Q_s2L, F_s2L, Q_s2R, F_s2R] = HLLC::wave_config(mixture, Q_s1R, F_s1R, Q_s0R, F_s0R);
 
-         //ТРЕТИЙ распад в точке O2
-         auto[S_2L, S_2C, S_2R, Q_s2L, F_s2L, Q_s2R, F_s2R] = HLLC::wave_config(mixture, Q_s1R, F_s1R, Q_s0R, F_s0R);
+        // Точка O3 = (x3, t3) - взаимодействие C_2L и C_1C
+        Char C_2L = {.x = x2, .t = t2, .S = S_2L};
+        Char C_1C = {.x = x1, .t = t1, .S = S_1C};
+        auto [x3, t3] = C_1C.cross(C_2L);
 
-         //точка O3
-         Char C_2L = {.x = O2.x, .t = O2.t, .S = S_2L};
-         Char C_1C = {.x = x1, .t = t1, .S = S_1C};
-         Point O3 = C_1C.cross(C_2L);
+        //case 2 search
+        if( x3 >= 0.0 ) {
+            throw std::runtime_error("Flux::classic: very strange case");
+        }
 
-         //case 2 search
-         if( O3.x >= 0.0 ) {
-             throw std::runtime_error("Flux::classic: c2m;  very strange case");
-         }
+        // Четвертый распад в точке 03
+        auto[S_3L, S_3C, S_3R, Q_s3L, F_s3L, Q_s3R, F_s3R] = HLLC::wave_config(mixture, Q_s1L, F_s1L, Q_s2L, F_s2L);
 
-         //ЧЕТВЕРТНЫЙ распад в точке 03
-         auto[S_3L, S_3C, S_3R, Q_s3L, F_s3L, Q_s3R, F_s3R] = HLLC::wave_config(mixture, Q_s1L, F_s1L, Q_s2L, F_s2L);
+        Char C_3R = {.x = x3, .t = t3, .S = S_3R};
+        double tau_3 = C_3R.edge_t();
 
-         //some times
-         Char C_2C = {.x = O2.x, .t = O2.t, .S = S_2C};
-         double t3 = C_2C.edge_t();
-         Char C_3C = {.x = O3.x, .t = O3.t, .S = S_3C};
-         double t5 = C_3C.edge_t();
+        // Вещество не перетекает
+        if( dt <= tau_3 ) {
+            // Формально этот случай захватывается формулами ниже
+            // внесен в этот иф, тк может быть t1 > t4 ????
+            Char C_2R = {.x = x2, .t = t2, .S = S_2R};
+            double tau_2 = C_2R.edge_t();
+            if( dt <= tau_2 ) {
+                return F_s0R;
+            }
 
-         Char C_2R = {.x = O2.x, .t = O2.t, .S = S_2R};
-         Char C_3R = {.x = O3.x, .t = O3.t, .S = S_3R};
-         double t1u = C_2R.edge_t();
-         double t4u = C_3R.edge_t();
+            // Треугольник: O0 O2 Odt
+            mmf::Flux G_O0_O2 = F_s0R.arr()*( t2 - t0 ) - Q_s0R.arr()*( x2 - x0 );
 
+            // Гарантируется x2 < 0, t2 < dt, т.е. lb > 0
+            double lb = -x2 / (dt - t2);
+            auto[Q, F] = choose(lb, S_2L, S_2C, S_2R,
+                                Q_s1R, Q_s2L, Q_s2R, Q_s0R,
+                                F_s1R, F_s2L, F_s2R, F_s0R);
 
-         if( dt <= t4u ) {
-         //by triangle Odt O2 O
+            mmf::Flux G_O2_Odt = F.arr()*( dt - t2 ) - Q.arr()*( x0 - x2 );
 
-             //формально этот случай захватывается формулами ниже
-             //внесен в этот иф, тк может быть t1 > t4
-             if( dt <= t1u ) {
-                 return F_s0R;
-             }
+            return ( G_O0_O2.arr() + G_O2_Odt.arr() ) / dt;
+        }
+        else {
+            // Полигон: O0 O2 O3 Odt
+            mmf::Flux G_O0_O2 = F_s0R.arr()*( t2 - t0 ) - Q_s0R.arr()*( x2 - x0 );
+            mmf::Flux G_O2_O3 = F_s2L.arr()*( t3 - t2 ) - Q_s2L.arr()*( x3 - x2 );
 
-             double lb = -O2.x/( dt - O2.t );
-             //auto F = lb < S_2C ? F_s2L :               F_s2R;
-             //auto Q = lb < S_2C ? Q_s2L :               Q_s2R;
-             auto   F = lb < S_2C ? F_s2L : ( lb < S_2R ? F_s2R : F_s0R );
-             auto   Q = lb < S_2C ? Q_s2L : ( lb < S_2R ? Q_s2R : Q_s0R );
-             mmf::Flux G_OdtO2 = F.arr()*( O2.t  - dt ) - Q.arr()*( O2.x - x0);
+            double lb = -x3/(dt - t3);
+            auto[Q, F] = choose(lb, S_3L, S_3C, S_3R,
+                                Q_s1L, Q_s3L, Q_s3R, Q_s2L,
+                                F_s1L, F_s3L, F_s3R, F_s2L);
 
-             F = F_s0R;
-             Q = Q_s0R;
-             mmf::Flux G_O2O0   = F.arr()*( t0 - O2.t )  - Q.arr()*( x0 - O2.x );
+            mmf::Flux G_O3_Odt = F.arr()*( dt - t3 ) - Q.arr()*( x0 - x3 );
 
-             mmf::Flux Ftot = ( G_OdtO2.arr() + G_O2O0.arr() )/(0.0 - dt);
-             return Ftot;
-
-         }else{
-         //by poly Odt O3 O2 O
-
-             double lb = -O3.x/(dt - O3.t);
-
-             //auto F =                     lb < S_3C ? F_s3L : F_s3R;
-             //auto Q =                     lb < S_3C ? Q_s3L : Q_s3R;
-             auto F = lb < S_3L ? F_s1L : ( lb < S_3C ? F_s3L : F_s3R );
-             auto Q = lb < S_3L ? Q_s1L : ( lb < S_3C ? Q_s3L : Q_s3R );
-             mmf::Flux G_OdtO3 = F.arr()*( O3.t  - dt ) - Q.arr()*( O3.x - x0);
-
-             F = F_s2L;
-             Q = Q_s2L;
-             mmf::Flux G_O3O2  = F.arr()*( O2.t  - O3.t )  - Q.arr()*( O2.x - O3.x );
-
-             F = F_s0R;
-             Q = Q_s0R;
-             mmf::Flux G_O2O0  = F.arr()*( t0 - O2.t )   - Q.arr()*( x0 - O2.x );
-
-             mmf::Flux Ftot = ( G_OdtO3.arr() + G_O3O2.arr() + G_O2O0.arr() )/(0.0 - dt);
-             return Ftot;
-         }
-     }
+            return ( G_O0_O2.arr() + G_O2_O3.arr() + G_O3_Odt.arr() ) / dt;
+        }
+    }
 #endif
 }
 

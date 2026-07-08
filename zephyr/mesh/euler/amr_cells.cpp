@@ -308,7 +308,7 @@ double AmrCells::approx_vol_fraction(index_t ic, const InFunction &inside) const
         }
         else {
             throw std::runtime_error("Approx volume fraction error #1");
-        };
+        }
     }
 }
 

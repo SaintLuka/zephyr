@@ -255,6 +255,29 @@ ScalarSet MixturePT::init_densities(const Fractions &beta, const MixOptions &opt
     return rhos;
 }
 
+inline void normalize_densities(ScalarSet& rhos, double rho, const Fractions& beta) {
+    // В разных функциях после итераций Ньютона возвращается массив плотностей rhos,
+    // но поскольку они получены итерациями, выражение 1/rho = sum_i beta_i / rho_i
+    // выполняется только приближенно, с точностью до 10^{-13} или около того.
+    // Плотности можно отнормировать, как здесь, но в этом случае они не будут
+    // соответствовать давлению и температуре (P, T) которые параллельно находятся
+    // в методе Ньютона. В общем с нормировкой получилось хуже.
+    return;
+
+    double C = 0.0;
+    for (int i = 0; i < beta.size(); ++i) {
+        if (!std::isnan(rhos[i]) && beta.has(i)) {
+            C += beta[i] / rhos[i];
+        }
+    }
+    C *= rho;
+    for (int i = 0; i < beta.size(); ++i) {
+        if (!std::isnan(rhos[i]) && beta.has(i)) {
+            rhos[i] *= C;
+        }
+    }
+}
+
 MixturePT::doublet_rT MixturePT::find_rP_rT(double density, double temperature,
         const Fractions& beta, const MixOptions& options) const {
     return m_old ? find_rP_rT_old(density, temperature, beta, options) :
@@ -363,6 +386,7 @@ MixturePT::doublet_rT MixturePT::find_rP_rT_old(double rho, double T,
         P1.dT = -v.dT / v.dP;
     }
 
+    normalize_densities(rhos, rho, beta);
     return {rhos, P1};
 }
 
@@ -428,6 +452,7 @@ MixturePT::doublet_rP MixturePT::find_rT_rP_old(double rho, double P,
         T1.dP = -v.dP / v.dT;
     }
 
+    normalize_densities(rhos, rho, beta);
     return {rhos, T1};
 }
 
@@ -529,28 +554,29 @@ MixturePT::triplet_re MixturePT::find_rPT_old(double rho, double e_mix,
         P1.dR = inv_D * e.dT * std::pow(v, 2);
     }
 
+    normalize_densities(rhos, rho, beta);
     return {rhos, P1, T};
 }
 
 
 namespace Transform {
 struct identity_map {
-    inline double operator()(double x) const { return x; }
+    double operator()(double x) const { return x; }
 };
 struct const_map {
-    inline double operator()(double x) const { return 1.0; }
+    double operator()(double x) const { return 1.0; }
 };
 struct inverse_map {
     double val;
-    inline double operator()(double x) const { return 1.0 / (x - val); }
+    double operator()(double x) const { return 1.0 / (x - val); }
 };
 struct inverse_inverse_map {
     double val;
-    inline double operator()(double x) const { return 1.0 / x + val; }
+    double operator()(double x) const { return 1.0 / x + val; }
 };
 struct inverse_deriv_map {
     double val;
-    inline double operator()(double x) const { return -1.0 / std::pow(x + val, 2); }
+    double operator()(double x) const { return -1.0 / std::pow(x + val, 2); }
 };
 
 std::tuple<identity_map, const_map, identity_map> Identity() {
@@ -657,6 +683,7 @@ MixturePT::doublet_rT MixturePT::find_rP_rT_new(double rho, double T,
         ++counter;
     }
 
+    normalize_densities(rhos, rho, beta);
     return {rhos, P};
 }
 
@@ -684,6 +711,7 @@ MixturePT::triplet_rT MixturePT::find_reP_rT_new(double rho, double T,
         e2.dT = e1.dP * P.dT + e1.dT;
     }
 
+    normalize_densities(rhos, rho, beta);
     return {rhos, e2, P};
 }
 
@@ -783,6 +811,7 @@ MixturePT::doublet_rP MixturePT::find_rT_rP_new(double rho, double P,
         ++counter;
     }
 
+    normalize_densities(rhos, rho, beta);
     return {rhos, T};
 }
 
@@ -921,6 +950,7 @@ MixturePT::triplet_re MixturePT::find_rPT_new(double rho, double e,
         ++counter;
     }
 
+    normalize_densities(rhos, rho, beta);
     return {rhos, P, T};
 }
 

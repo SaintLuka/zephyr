@@ -129,6 +129,12 @@ public:
     /// @brief Подсеточная линейная реконструкция интерфейса
     void interface_recovery(EuMesh &mesh);
 
+    /// @brief Реконструкция PLIC для 2D/3D сеток из квадратов/кубов
+    void interface_recovery_CSIR_2D(EuMesh &mesh) const;
+
+    /// @brief Реконструкция PLIC для 3D сеток из кубов
+    void interface_recovery_CSIR_3D(EuMesh &mesh) const;
+
     /// @brief Расчёт потоков с первым порядком
     void fluxes(EuMesh &mesh, double dt, Direction dir = Direction::ANY);
 

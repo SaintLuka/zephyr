@@ -21,8 +21,6 @@
 #include <zephyr/utils/threads.h>
 #include <zephyr/utils/stopwatch.h>
 
-#include <zephyr/geom/sections.h>
-
 using namespace zephyr::phys;
 using namespace zephyr::math;
 using namespace zephyr::math::mmf;
@@ -32,7 +30,7 @@ using zephyr::utils::mpi;
 using zephyr::utils::threads;
 using zephyr::utils::Stopwatch;
 
-void init_cells(EuMesh& mesh, MixturePT& mixture, Storable<PState> z) {
+void init_cells(EuMesh& mesh, const MixturePT& mixture, Storable<PState> z) {
     //mixture.adjust_cv({1.0_kg_m3, 1000.0_kg_m3}, 1.0_bar, 300.0);
 
     const PState z_air(
@@ -82,23 +80,7 @@ void init_cells(EuMesh& mesh, MixturePT& mixture, Storable<PState> z) {
             double vol_frac0 = cell.polygon().disk_clip_area(bubble_center, r) / cell.volume();
             vol_frac1 = 1.0 - vol_frac0;
 
-            mmf::PState z0 = z_air;
-            mmf::PState z1 = z_water;
-
-            double T = vol_frac0 * z0.temperature + vol_frac1 * z1.temperature;
-            z0.density = 1.0 / mixture[0].volume_PT(z0.pressure, T);
-            z1.density = 1.0 / mixture[1].volume_PT(z1.pressure, T);
-
-            // rho = sum a_i rho_i
-            double    density   = vol_frac0 * z0.density + vol_frac1 * z1.density;
-            Fractions mass_frac = {vol_frac0 * z0.density / density, vol_frac1 * z1.density / density};
-            mass_frac.normalize();
-            Vector3d  velocity  = mass_frac[0] * z0.velocity + mass_frac[1] * z1.velocity;
-            double    pressure  = vol_frac0 * z0.pressure + vol_frac1 * z1.pressure;
-
-            PState mix(density, velocity, pressure, mass_frac, mixture);
-
-            cell[z] = mix;
+            cell[z] = PState::Mix1(mixture, {vol_frac0, vol_frac1}, {z_air, z_water});
         }
     });
 }
@@ -140,7 +122,7 @@ int main(int argc, char** argv) {
     mesh.set_distributor(solver.distributor());
 
     // Files for output
-    PvdFile pvd("BC", "output");
+    PvdFile pvd("mesh", "output");
     PvdFile pvd_bubble("bubble", "output");
 
     // Variables to save
@@ -160,8 +142,8 @@ int main(int argc, char** argv) {
     pvd.variables += {"rho1",[z](EuCell cell) -> double { return cell[z].densities[1]; }};
     //pvd.variables += {"e0",[z,mixture](EuCell cell) -> double { return cell[z].true_energy(mixture, 0); }};
     //pvd.variables += {"e1",[z,mixture](EuCell cell) -> double { return cell[z].true_energy(mixture, 1); }};
-    pvd.variables += {"n.x", [n=data.n](EuCell cell) -> double { return cell[n][0].x(); }};
-    pvd.variables += {"n.y", [n=data.n](EuCell cell) -> double { return cell[n][0].y(); }};
+    //pvd.variables += {"n.x", [n=data.n](EuCell cell) -> double { return cell[n][0].x(); }};
+    //pvd.variables += {"n.y", [n=data.n](EuCell cell) -> double { return cell[n][0].y(); }};
 
     // Initial conditions (adaptive to initial data)
     for (int k = 0; mesh.adaptive() && k < mesh.max_level() + 3; ++k) {
@@ -187,7 +169,7 @@ int main(int argc, char** argv) {
             auto bubble = solver.domain(mesh, 0);
             pvd_bubble.save(bubble, curr_time);
 
-            next_write += max_time / 100;
+            next_write += max_time / 90;
         }
 
         // Finish exactly at max_time

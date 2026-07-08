@@ -4,6 +4,7 @@
 #include <numeric>
 #include <span>
 #include <list>
+#include <map>
 #include <ranges>
 
 #include <zephyr/mesh/decomp/orb/blocks.h>

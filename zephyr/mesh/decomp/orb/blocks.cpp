@@ -3,6 +3,7 @@
 #include <iomanip>
 #include <numeric>
 #include <span>
+#include <map>
 #include <ranges>
 
 #include <zephyr/mesh/decomp/orb/blocks.h>

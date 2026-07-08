@@ -606,10 +606,23 @@ std::array<double, Side3D::count()> face_fractions(double a_cell, const std::arr
     res[Side3D::T] = e2f(a_lt, a_rt, a_tz, a_tf);
     res[Side3D::Z] = e2f(a_zl, a_zr, a_bz, a_tz);
     res[Side3D::F] = e2f(a_fl, a_fr, a_bf, a_tf);
+
+    if (true) {
+        res[Side3D::L] = between(e2f(a_lb, a_lt, a_zl, a_fl), a_cell, a_neib[Side3D::L]);
+        res[Side3D::R] = between(e2f(a_rb, a_rt, a_zr, a_fr), a_cell, a_neib[Side3D::R]);
+        res[Side3D::B] = between(e2f(a_lb, a_rb, a_bz, a_bf), a_cell, a_neib[Side3D::B]);
+        res[Side3D::T] = between(e2f(a_lt, a_rt, a_tz, a_tf), a_cell, a_neib[Side3D::T]);
+        res[Side3D::Z] = between(e2f(a_zl, a_zr, a_bz, a_tz), a_cell, a_neib[Side3D::Z]);
+        res[Side3D::F] = between(e2f(a_fl, a_fr, a_bf, a_tf), a_cell, a_neib[Side3D::F]);
+    }
     return res;
 }
 
 double average_flux(double alpha, const Vector3d& n, const Vector3d& face_n, double CFL) {
+    if (n.z() == 0.0 && face_n.z() == 0.0) {
+        return average_flux(alpha, n.dot(face_n), CFL);
+    }
+
     double p1 = cube_find_section(alpha, n);
 
     double p2 = p1 + 0.5 * (CFL - 1.0) * n.dot(face_n);

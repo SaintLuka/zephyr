@@ -1,4 +1,4 @@
-/// @file mmf_advection.cpp
+/// @file mmf_advection_2D.cpp
 /// @brief Two-dimensional advection problem for two materials.
 /// Problem is simulated with multimaterial hydrodynamic solver.
 
@@ -8,6 +8,8 @@
 #include <zephyr/mesh/euler/eu_mesh.h>
 
 #include <zephyr/phys/matter/eos/ideal_gas.h>
+#include <zephyr/phys/matter/eos/stiffened_gas.h>
+#include <zephyr/phys/matter/eos/mie_gruneisen.h>
 #include <zephyr/phys/matter/mixture_pt.h>
 #include <zephyr/math/solver/mm_fluid.h>
 
@@ -21,21 +23,34 @@ using namespace zephyr::math::mmf;
 using zephyr::io::PvdFile;
 using zephyr::utils::threads;
 
-// Indicator function of the domain
-bool inside(const Vector3d& r) {
-    return std::abs(r.x() - 0.15) < 0.1 && std::abs(r.y() - 0.50) < 0.1;
+// Indicator function of the second material
+bool inside_circle(const Vector3d &v) {
+    Vector3d c = {0.15, 0.5, 0};
+    double r = 0.1;
+    return (v - c).norm() < r;
 }
+
+// Indicator function of the second material
+bool inside_square(const Vector3d &v) {
+    Vector3d c = {0.15, 0.5, 0};
+    double l = 0.1;
+    return (v - c).cwiseAbs().maxCoeff() < l;
+}
+
+// Choose function
+auto inside = inside_circle;
 
 int main() {
     threads::on();
 
-    // Two identical materials
-    double gamma = 1.4;
-    Eos::Ptr sg1 = IdealGas::create(gamma, 1.0);
-    Eos::Ptr sg2 = IdealGas::create(gamma, 1.0);
+    // Two identical/different materials
+    Eos::Ptr eos1 = IdealGas::create("Air");
+    //Eos::Ptr eos2 = IdealGas::create("Air");
+    Eos::Ptr eos2 = StiffenedGas::create("Water");
+    //Eos::Ptr eos2 = MieGruneisen::create("Fe");
 
     // Formal mixture
-    MixturePT mixture = {sg1, sg2};
+    MixturePT mixture = {eos1, eos2};
 
     // Create and configure solver
     MmFluid solver(mixture);
@@ -58,8 +73,8 @@ int main() {
     auto z = data.init;
 
     // Files for output
-    PvdFile pvd("Advection2D", "output");
-    PvdFile pvd_domain("domain", "output");
+    PvdFile pvd("mesh", "output");
+    PvdFile pvd_body("body", "output");
 
     // Variables to save
     pvd.variables = {"level"};
@@ -79,35 +94,41 @@ int main() {
     pvd.variables += {"n.x", [n=data.n](EuCell cell) -> double { return cell[n][0].x(); }};
     pvd.variables += {"n.y", [n=data.n](EuCell cell) -> double { return cell[n][0].y(); }};
 
-    // Initial conditions
-    for (auto cell: mesh) {
-        cell[z].velocity    = {0.7, -0.35, 0.0};
-        cell[z].density     = 1.0;
-        cell[z].pressure    = 1.0 / gamma;
-        //cell[z].energy      = 1.0 / (gamma * (gamma - 1.0));
-        //cell[z].temperature = 1.0;
+    mesh.for_each([&](EuCell &cell) {
+        const Vector3d V0 = {70.0, -35.0, 0.0};
 
-        //if (r.x() < 0.1) cell[z].mass_frac[0]  = 0.0;
-        //if (std::abs(r.x() - 0.2) < 0.1) cell[z].mass_frac[0]  = (r.x() - 0.1) / 0.2;
-        //if (r.x() > 0.3) cell[z].mass_frac[0]  = 1.0;
+        const PState z1(
+                eos1->density(),    // density
+                V0,                 // velocity
+                1.0e5,              // pressure
+                Fractions::Pure(0), // mass fractions
+                mixture);
 
-        cell[z].mass_frac[0] = inside(cell.center()) ? 1.0 : 0.0;
-        cell[z].mass_frac[1] = 1.0 - cell[z].mass_frac[0];
+        const PState z2(
+                eos2->density(),    // density
+                V0,                 // velocity
+                1.0e5,              // pressure
+                Fractions::Pure(1), // mass fractions
+                mixture);
 
-        cell[z].densities[0] = cell[z].mass_frac[0] > 0.0 ? cell[z].density : NAN;
-        cell[z].densities[1] = cell[z].mass_frac[1] > 0.0 ? cell[z].density : NAN;
+        double vol_frac2 = cell.approx_vol_fraction(inside);
+        if (vol_frac2 == 0.0 || vol_frac2 == 1.0) {
+            // Pure cell
+            cell[z] = vol_frac2 < 0.5 ? z1 : z2;
+        }
+        else {
+            // Mixed cell
+            vol_frac2 = cell.volume_fraction(inside, 10'000);
+            double vol_frac1 = 1.0 - vol_frac2;
 
-        //cell[z].density = 1.0 / mixture.volume_PT(cell[z].pressure, cell[z].temperature, cell[z].mass_frac);
-        //cell[z].energy = mixture.energy_PT(cell[z].pressure, cell[z].temperature, cell[z].mass_frac);
-
-        cell[z].energy      = mixture.energy_rP     (cell[z].density, cell[z].pressure, cell[z].mass_frac);
-        cell[z].temperature = mixture.temperature_rP(cell[z].density, cell[z].pressure, cell[z].mass_frac);
-    }
+            cell[z] = PState::Mix1(mixture, {vol_frac1, vol_frac2}, {z1, z2});
+        }
+    });
 
     size_t n_step = 0;
     double curr_time = 0.0;
     double next_write = 0.0;
-    double max_time = 1.0;
+    double max_time = 0.01;
 
     while (curr_time < max_time) {
         if (curr_time >= next_write) {
@@ -116,10 +137,10 @@ int main() {
             pvd.save(mesh, curr_time);
 
             solver.interface_recovery(mesh);
-            auto domain = solver.domain(mesh, 0);
-            pvd_domain.save(domain, curr_time);
+            auto body = solver.domain(mesh, 1);
+            pvd_body.save(body, curr_time);
 
-            next_write += max_time / 200;
+            next_write += max_time / 100;
         }
 
         // Finish exactly at max_time
@@ -134,8 +155,8 @@ int main() {
     pvd.save(mesh, max_time);
 
     solver.interface_recovery(mesh);
-    auto domain = solver.domain(mesh, 0);
-    pvd_domain.save(domain, curr_time);
+    auto body = solver.domain(mesh, 1);
+    pvd_body.save(body, curr_time);
 
     return 0;
 }

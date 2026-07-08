@@ -83,7 +83,6 @@ int main(int argc, char** argv) {
     mpi::handler handler(argc, argv);
     threads::init(argc, argv);
     threads::info();
-    //threads::off();
 
     // Generator of a Cartesian grid
     generator::Rectangle gen(0.0, 7.0, 0.0, 3.0);
@@ -119,7 +118,7 @@ int main(int argc, char** argv) {
     mesh.set_distributor(solver.distributor());
 
     // Files for output
-    PvdFile pvd("TP", "output");
+    PvdFile pvd("mesh", "output");
     std::vector<PvdFile> pvd_domains;
     for (int i = 0; i < mixture.size(); ++i) {
         pvd_domains.emplace_back("domain" + std::to_string(i), "output");

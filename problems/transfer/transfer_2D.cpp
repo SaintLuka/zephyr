@@ -15,8 +15,6 @@ using namespace zephyr::mesh;
 using zephyr::io::PvdFile;
 using generator::Rectangle;
 
-class Solver;
-
 // Наследуем собственный решатель от Transfer, теперь переопределив
 // поле скорости можно решать произвольные задачи на перенос.
 class Solver : public zephyr::math::Transfer {
@@ -28,11 +26,42 @@ public:
 
     Test test = Test::Translation;
 
-    /// @brief Скорость переноса в соответствии с Solver::test
-    Vector3d velocity(const Vector3d& p) const override;
+    // Скорость переноса в соответствии с Solver::test
+    Vector3d velocity(const Vector3d& p) const override {
+        if (test == Test::Translation) {
+            Vector3d V0 = {0.7, -0.35, 0.0};
+            return V0;
+        }
+        if (test == Test::Rotation) {
+            Vector3d center = {0.5, 0.5, 0.0};  // Центр вращения
+            Vector3d omega = {0.0, 0.0, M_PI};  // Угловая частота
+            return omega.cross(p - center);
+        }
+        return Vector3d::Zero();
+    }
 
-    /// @brief Сетка с точным решением от времени
-    EuMesh exact(SolidBody2D& body, double curr_time) const;
+    // Сетка с точным решением от времени
+    EuMesh exact(SolidBody2D& body, double curr_time) const {
+        // Точное решение
+        if (test == Test::Translation) {
+            Vector3d V0 = {0.7, -0.35, 0.0};
+            body.move(curr_time * V0);
+        }
+        else if (test == Test::Rotation) {
+            double omega = M_PI;  // Угловая частота
+            Vector3d center = {0.5, 0.5, 0.0};  // Центр вращения
+            body.rotation_relative(omega * curr_time, center);
+        }
+
+        auto vs = body.outline(100);
+        EuMesh cells(2, false);
+        for (size_t i = 0; i < vs.size(); ++i) {
+            size_t j = (i + 1) % vs.size();
+            Line line = {vs[i], vs[j]};
+            cells.push_back(line);
+        }
+        return cells;
+    }
 };
 
 static Solver::State data;
@@ -88,12 +117,13 @@ int main() {
     // CRP_V3 сейчас не как на картинке, остальное всё повторяется
     solver.set_method(Solver::Method::CRP_N2);
 
-    // Настройки теста
+    // Выбор фигуры
     //BodyStrip body(0.1, {0.15, 0.5, 0.0});
     //BodyDisk body(0.1, {0.15, 0.5, 0.0});
     BodySquare body(0.2, {0.15, 0.5, 0.0});
 
-    solver.test = Solver::Test::Translation;
+    // Выбор теста
+    solver.test = Solver::Test::Rotation;
 
     // Переменные для сохранения
     pvd.variables = {"level"};
@@ -186,42 +216,4 @@ int main() {
     pvd_body.save(crop, curr_time + 1.0e-13);
 
     return 0;
-}
-
-
-Vector3d Solver::velocity(const Vector3d& p) const {
-    if (test == Test::Translation) {
-        Vector3d V0 = {0.7, -0.35, 0.0};
-        return V0;
-    }
-    else if (test == Test::Rotation) {
-        Vector3d center = {0.5, 0.5, 0.0};  // Центр вращения
-        Vector3d omega = {0.0, 0.0, M_PI};  // Угловая частота
-        return omega.cross(p - center);
-    }
-    else {
-        return Vector3d::Zero();
-    }
-}
-
-EuMesh Solver::exact(SolidBody2D& body, double curr_time) const {
-    // Точное решение
-    if (test == Test::Translation) {
-        Vector3d V0 = {0.7, -0.35, 0.0};
-        body.move(curr_time * V0);
-    }
-    else if (test == Test::Rotation) {
-        double omega = M_PI;  // Угловая частота
-        Vector3d center = {0.5, 0.5, 0.0};  // Центр вращения
-        body.rotation_relative(omega * curr_time, center);
-    }
-
-    auto vs = body.outline(100);
-    EuMesh cells(2, false);
-    for (size_t i = 0; i < vs.size(); ++i) {
-        size_t j = (i + 1) % vs.size();
-        Line line = {vs[i], vs[j]};
-        cells.push_back(line);
-    }
-    return cells;
 }

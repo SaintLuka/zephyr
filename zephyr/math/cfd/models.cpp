@@ -2,7 +2,7 @@
 #include <iostream>
 #include <iomanip>
 #include <boost/format.hpp>
-
+#include <zephyr/math/funcs.h>
 #include <zephyr/math/cfd/models.h>
 
 namespace zephyr::math {
@@ -55,7 +55,7 @@ void PState::inverse() {
     velocity.x() = -velocity.x();
 }
 
-bool PState::is_bad(const phys::Eos &eos) {
+bool PState::is_bad(const phys::Eos &eos) const {
     if (!std::isfinite(density) || !std::isfinite(pressure) || !std::isfinite(energy)) {
         return true;
     }
@@ -207,6 +207,101 @@ PState::PState(const QState &q, const phys::MixturePT &mixture,
         mixture.get_rPT(density, energy, mass_frac, {.P0=P0, .T0=T0, .rhos=rhos0});
 }
 
+PState PState::Mix1(
+        const MixturePT &mixture,
+        const std::vector<double>& vol_fracs,
+        const std::vector<PState> &zs,
+        std::vector<int> indices) {
+
+    if (vol_fracs.size() < 2) {
+        throw std::runtime_error("PState::Mix1: require at least two volume fractions");
+    }
+    if (vol_fracs.size() != zs.size()) {
+        throw std::runtime_error("PState::Mix1: number of volume fractions != number of states");
+    }
+
+    int n = static_cast<int>(vol_fracs.size());
+
+    if (indices.empty()) {
+        if (n > mixture.size()) {
+            throw std::runtime_error("PState::Mix1: number of volume fractions more than materials");
+        }
+        indices.resize(n);
+        for (int i = 0; i < n; ++i) {
+            indices[i] = i;
+        }
+    }
+    else {
+        if (indices.size() != n) {
+            throw std::runtime_error("PState::Mix1: number of volume fractions != number of indices");
+        }
+        for (int id: indices) {
+            if (id >= mixture.size()) {
+                throw std::runtime_error("PState::Mix1: material index >= mixture.size()");
+            }
+        }
+    }
+
+    // Копируем и нормируем массив объемных долей
+    Fractions alpha = Fractions::Zero();
+    for (int i = 0; i < n; ++i) {
+        alpha[indices[i]] += vol_fracs[i];
+    }
+    alpha.normalize();
+
+    double temperature = 0.0;
+    for (int i = 0; i < n; ++i) {
+        // Вариант 1. Усреднение температуры по объемным долям
+        temperature += alpha[indices[i]] * zs[i].temperature;
+
+        // Вариант 2. Минимум по всем состояниям
+        // temperature = std::min(temperature, zs[i].temperature);
+    }
+
+    // Проверяем совпадение всех давлений
+    double pressure = zs[0].pressure;
+    for (int i = 1; i < n; ++i) {
+        if (std::abs(zs[i].pressure - pressure) > 1.0e-10 * std::abs(pressure)) {
+            throw std::runtime_error("PState::Mix1: assuming pressures are the same for each state");
+        }
+    }
+
+    // Истинные плотности компонент (отличаются от исходных)
+    ScalarSet densities = ScalarSet::NaN();
+    for (int i = 0; i < mixture.size(); ++i) {
+        if (alpha.has(i)) {
+            densities[i] = 1.0 / mixture[i].volume_PT(pressure, temperature);
+        }
+    }
+
+    // Средняя плотность
+    double density = 0.0;
+    for (int i = 0; i < mixture.size(); ++i) {
+        if (alpha.has(i)) {
+            density += alpha[i] * densities[i];
+        }
+    }
+
+    // Массовые доли
+    Fractions mass_frac = Fractions::Zero();
+    for (int i = 0; i < mixture.size(); ++i) {
+        if (alpha.has(i)) {
+            mass_frac[i] = alpha[i] * densities[i] / density;
+        }
+    }
+    mass_frac.normalize();
+
+    // Взвешенная скорость и внутренняя энергия
+    Vector3d velocity = Vector3d::Zero();
+    for (int i = 0; i < n; ++i) {
+        if (alpha.has(indices[i])) {
+            velocity += mass_frac[indices[i]] * zs[i].velocity;
+        }
+    }
+
+    return PState(density, velocity, pressure, mass_frac, mixture);
+}
+
 void PState::to_local(const Vector3d &normal) {
     Rotate::to_local(velocity, normal);
 }
@@ -293,15 +388,25 @@ std::pair<mmf::PState, mmf::PState> PState::split(const MixturePT& mixture, int 
             Fractions::Zero(),
             ScalarSet::NaN());
 
-#if 0 // MRV VERSION
-    // ПОЧЕМУ ВЕРСИЯ НЕ РАБОТАЕТ?
-    // Она должна быть более робастной
+#if 1 // MRV VERSION
 
-    // Массовые концентрации, с которыми смешиваются zA и zB
     double beta_A = mass_frac[iA];
     double beta_B = 1.0 - mass_frac[iA];
 
-    zB.density = beta_B / (1.0 / density - beta_A / densities[iA]);
+    // Для работы функции обязательно выполнение условия
+    // 1/rho = sum_i beta_i / rho_i
+    // Если нет совместности, то split будет приводить к ошибкам.
+    // zB.density = beta_B / (1.0 / density - beta_A / densities[iA]);
+
+    // Эта версия работает, даже если не выполнено условие совместности.
+    double denom = 0.0;
+    for (int i = 0; i < mass_frac.size(); ++i) {
+        if ( mass_frac.has(i) && i != iA) {
+            denom += mass_frac[i] / densities[i];
+        }
+    }
+    zB.density = beta_B / denom;
+
     zB.energy  = (energy - beta_A * energy_A ) / beta_B;
 
     for (int i = 0; i < mass_frac.size(); ++i) {
@@ -311,24 +416,11 @@ std::pair<mmf::PState, mmf::PState> PState::split(const MixturePT& mixture, int 
         }
     }
 
-    // Случай небольших объемных долей. Формулы выше математически верны,
-    // но работают неточно, что приводит к ошибкам.
-    if (beta_B < 1.0e-12) {
-        zB.mass_frac.normalize();
-
-        double mix_vol = 0.0;
-        double mix_e = 0.0;
-        for (int i = 0; i < zB.mass_frac.size(); ++i) {
-            if (zB.mass_frac.has(i)) {
-                mix_vol += zB.mass_frac[i] / zB.densities[i];
-                mix_e += zB.mass_frac[i] * mixture[i].energy_rT(zB.densities[i], zB.temperature);
-            }
-        }
-        zB.density = 1.0 / mix_vol;
-        zB.energy  = mix_e;
+    if (zB.is_bad()) {
+        std::cout << "bad split #1\n";
     }
 
-#else // ZPP VERSION
+#else
 
     double beta_B = 1.0 - mass_frac[iA];
     Fractions alpha;
@@ -369,11 +461,9 @@ std::pair<mmf::PState, mmf::PState> PState::split(const MixturePT& mixture, int 
         }
     }
     if(zB.is_bad()) {
-        std::cout << "bad split #1\n";
-    }
-    if(zB.density != zB.densities[zB.mass_frac.index()] ) {
         std::cout << "bad split #2\n";
     }
+
 #endif
     return {zA, zB};
 }

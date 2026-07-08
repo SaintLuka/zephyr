@@ -16,7 +16,7 @@ enum class Boundary : int {
 };
 
 /// @brief Преобразовать тип граничного условия в строку
-constexpr std::string to_string(Boundary type) {
+inline std::string to_string(Boundary type) {
     switch (type) {
         case Boundary::INNER:    return "inner";
         case Boundary::WALL:     return "wall";

@@ -63,7 +63,7 @@ constexpr int get_dimension(CellType type) {
 }
 
 /// @brief Тип элемента в строку
-constexpr std::string to_string(CellType type) {
+inline std::string to_string(CellType type) {
     switch (type) {
         case CellType::TRIANGLE:   return "Triangle";
         case CellType::QUAD:       return "Quad";

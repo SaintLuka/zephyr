@@ -13,7 +13,7 @@ inline Matrix3d rotation_matrix(double phi) {
     return R;
 }
 
-SolidBody2D::SolidBody2D() { }
+SolidBody2D::SolidBody2D() = default;
 
 SolidBody2D::SolidBody2D(const Vector3d& center)
     : SolidBody(center) { }

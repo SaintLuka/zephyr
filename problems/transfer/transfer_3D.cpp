@@ -15,8 +15,6 @@ using namespace zephyr::mesh;
 using zephyr::io::PvdFile;
 using generator::Cuboid;
 
-class Solver;
-
 // Наследуем собственный решатель от Transfer, теперь переопределив
 // поле скорости можно решать произвольные задачи на перенос.
 class Solver : public zephyr::math::Transfer {
@@ -28,11 +26,45 @@ public:
 
     Test test = Test::Translation;
 
-    /// @brief Скорость переноса в соответствии с Solver::test
-    Vector3d velocity(const Vector3d& p) const override;
+    // Скорость переноса в соответствии с Solver::test
+    Vector3d velocity(const Vector3d& p) const override {
+        if (test == Test::Translation) {
+            Vector3d V0 = {0.7, -0.35, 0.3};
+            return V0;
+        }
+        if (test == Test::Rotation) {
+            Vector3d center = {0.5, 0.5, 0.3}; // Центр вращения
+            Vector3d axis = {-0.3, 0.1, 0.7};  // Ось вращения
+            axis = M_PI * axis.normalized();
+            return axis.cross(p - center);
+        }
+        return Vector3d::Zero();
+    }
 
-    /// @brief Сетка с точным решением от времени
-    EuMesh exact(SolidBody3D& body, double curr_time) const;
+    // Сетка с точным решением от времени
+    EuMesh exact(SolidBody3D& body, double curr_time) const {
+        // Точное решение
+        if (test == Test::Translation) {
+            Vector3d V0 = {0.7, -0.35, 0.3};
+            body.move(curr_time * V0);
+        }
+        else if (test == Test::Rotation) {
+            Vector3d center = {0.5, 0.5, 0.3}; // Центр вращения
+            Vector3d axis = {-0.3, 0.1, 0.7};  // Ось вращения
+            body.rotation_relative(axis, M_PI * curr_time, center);
+        }
+
+        auto triangles = body.triangulation(400);
+        int n_triangles = triangles.size();
+
+        EuMesh cells(2, false);
+        cells.locals().reserve(n_triangles, 3 * n_triangles, 3 * n_triangles);
+        for (const auto& tri: triangles) {
+            Polygon poly(tri);
+            cells.push_back(poly);
+        }
+        return cells;
+    }
 };
 
 static Solver::State data;
@@ -72,7 +104,7 @@ int main() {
 
     // Создать сетку
     EuMesh mesh(gen);
-    mesh.set_max_level(1);
+    mesh.set_max_level(2);
 
     // Создать решатель
     Solver solver;
@@ -88,11 +120,12 @@ int main() {
     // CRP_V3 сейчас не как на картинке, остальное всё повторяется
     solver.set_method(Solver::Method::CRP_N2);
 
-    // Настройки теста
-    //BodyBall body(0.1, {0.15, 0.5, 0.15});
-    BodyCube body(0.2, {0.15, 0.5, 0.15});
+    // Выбор фигуры
+    BodyBall body(0.1, {0.15, 0.5, 0.15});
+    //BodyCube body(0.15, {0.15, 0.5, 0.15});
 
-    solver.test = Solver::Test::Translation;
+    // Выбора теста
+    solver.test = Solver::Test::Rotation;
 
     // Переменные для сохранения
     pvd.variables = {"level"};
@@ -108,6 +141,22 @@ int main() {
     pvd.variables += {"close", [](EuCell& cell) -> double {
         double u = cell[data.u1];
         return std::abs(u < 0.5 ? u : 1.0 - u);
+    }};
+    pvd.variables += {"min_val", [](EuCell& cell) -> double {
+        double min_val = cell[data.u1];
+        for (auto face: cell.faces()) {
+            if (face.is_boundary()) continue;
+            min_val = std::min(min_val, face.neib(data.u1));
+        }
+        return min_val;
+    }};
+    pvd.variables += {"max_val", [](EuCell& cell) -> double {
+        double max_val = cell[data.u1];
+        for (auto face: cell.faces()) {
+            if (face.is_boundary()) continue;
+            max_val = std::max(max_val, face.neib(data.u1));
+        }
+        return max_val;
     }};
 
     // Начальные условия
@@ -135,7 +184,7 @@ int main() {
     int n_step = 0;
     double end_time = 1.0;
     double curr_time = 0.0;
-    double write_freq = end_time / 100;
+    double write_freq = end_time / 50;
     double write_next = 0.0;
 
     // Расщепление по направлениям
@@ -153,6 +202,7 @@ int main() {
 
             pvd.save(mesh, curr_time);
 
+            solver.update_interface(mesh);
             EuMesh crop = solver.body(mesh);
             pvd_body.save(crop, curr_time);
 
@@ -191,6 +241,7 @@ int main() {
     // Финальные записи
     pvd.save(mesh, curr_time);
 
+    solver.update_interface(mesh);
     EuMesh crop = solver.body(mesh);
     pvd_body.save(crop, curr_time);
 
@@ -203,43 +254,4 @@ int main() {
     pvd_body.save(crop, curr_time + 1.0e-13);
 
     return 0;
-}
-
-Vector3d Solver::velocity(const Vector3d& p) const {
-    if (test == Test::Translation) {
-        Vector3d V0 = {0.7, -0.35, 0.3};
-        return V0;
-    }
-    else if (test == Test::Rotation) {
-        Vector3d center = {0.5, 0.5, 0.0};  // Центр вращения
-        Vector3d omega = {0.0, 0.0, M_PI};  // Угловая частота
-        return omega.cross(p - center);
-    }
-    else {
-        return Vector3d::Zero();
-    }
-}
-
-EuMesh Solver::exact(SolidBody3D& body, double curr_time) const {
-    // Точное решение
-    if (test == Test::Translation) {
-        Vector3d V0 = {0.7, -0.35, 0.3};
-        body.move(curr_time * V0);
-    }
-    else if (test == Test::Rotation) {
-        double omega = M_PI;  // Угловая частота
-        Vector3d center = {0.5, 0.5, 0.0};  // Центр вращения
-        //body.rotation_relative(omega * curr_time, center);
-    }
-
-    auto triangles = body.triangulation(400);
-    int n_triangles = triangles.size();
-
-    EuMesh cells(2, false);
-    cells.locals().reserve(n_triangles, 3 * n_triangles, 3 * n_triangles);
-    for (const auto& tri: triangles) {
-        Polygon poly(tri);
-        cells.push_back(poly);
-    }
-    return cells;
 }

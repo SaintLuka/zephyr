@@ -5,14 +5,21 @@
 namespace zephyr::geom {
 // двумерная матрица поворота на угол phi
 inline Matrix3d rotation_matrix(const Vector3d& axis, double phi) {
+    Vector3d n = axis.normalized();
+    double x = n.x();
+    double y = n.y();
+    double z = n.z();
+
     double cos = std::cos(phi);
     double sin = std::sin(phi);
     Matrix3d R;
-    R << cos, -sin, 0.0, sin, cos, 0.0, 0.0, 0.0, 1.0;
+    R << cos + (1 - cos)*x*x, (1 - cos)*x*y - sin*z, (1-cos)*x*z + sin*y,
+         (1 - cos)*y*x + sin*z, cos + (1 - cos)*y*y, (1-cos)*y*z - sin*x,
+         (1 - cos)*z*x - sin*y, (1 - cos)*z*y + sin*x, cos + (1 - cos)*z*z;
     return R;
 }
 
-SolidBody3D::SolidBody3D() { }
+SolidBody3D::SolidBody3D() = default;
 
 SolidBody3D::SolidBody3D(const Vector3d& center)
     : SolidBody(center) { }
@@ -207,12 +214,8 @@ std::vector<std::array<Vector3d, 3>> BodyCube::local_triangulation(int n_element
     std::vector<std::array<Vector3d, 3>> triangles;
     triangles.reserve(12);
     
-    for (int i = 0; i < 12; ++i) {
-        triangles.push_back({
-            v[indices[i][0]],
-            v[indices[i][1]],
-            v[indices[i][2]]
-        });
+    for (const auto& idx: indices) {
+        triangles.push_back({v[idx[0]], v[idx[1]], v[idx[2]]});
     }
     return triangles;
 }

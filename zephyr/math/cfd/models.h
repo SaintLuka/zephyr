@@ -68,7 +68,7 @@ struct PState {
     double E() const { return energy + 0.5 * v2(); }
 
     // Проверить корректность
-    bool is_bad(const phys::Eos &eos);
+    bool is_bad(const phys::Eos &eos) const;
 
     /// @brief В поток вывода
     friend std::ostream &operator<<(std::ostream &os, const PState &state);
@@ -195,6 +195,20 @@ public:
     /// плотностей компонент (densities).
     PState(const QState &q, const MixturePT &mixture,
            double P0, double T0, std::span<const double> rhos = {});
+
+    /// @brief Смешать несколько состояний. Температуры выравниваются некоторым
+    /// образом, при этом у компонент достигаются указанные объемные доли.
+    /// Также предполагается, что у состояний задано одинаковое давление.
+    /// @param mixture Список материалов
+    /// @param vol_fracs Объемные доли смешиваемых компонент
+    /// @param zs Чистые состояния смешиваемых компонент
+    /// @param indices Индексы смешиваемых компонент в списке материалов, если
+    /// аргумент отсутствует, то предполагаются первые компоненты {0, 1, 2, ...}
+    static PState Mix1(
+        const MixturePT &mixture,
+        const std::vector<double>& vol_fracs,
+        const std::vector<PState> &zs,
+        std::vector<int> indices = {});
 
 
     // ----------------------- Прямой доступ к данным -------------------------
