@@ -5,6 +5,7 @@
 
 #include <zephyr/geom/side.h>
 #include <zephyr/mesh/storage.h>
+#include <zephyr/mesh/euler/amr_verts.h>
 #include <zephyr/mesh/euler/amr_faces.h>
 
 // forward declaration для классов из geom
@@ -49,7 +50,6 @@ using SqMap = std::conditional_t<dim < 3, geom::SqQuad, geom::SqCube>;
 class AmrCells final {
     // aliases inside class
     using Vector3d = geom::Vector3d;
-    using AmrVerts = std::vector<Vector3d>;
 
     /// @brief Характеристическая функция (функция-индикатор)
     using InFunction = std::function<bool(const Vector3d &)>;
@@ -300,12 +300,12 @@ public:
 
     /// @brief Указатель на первую вершину
     Vector3d* vertices_data(index_t ic) {
-        return verts.data() + node_begin[ic];
+        return verts.coords.data() + node_begin[ic];
     }
 
     /// @brief Константный указатель на первую вершину
     const Vector3d* vertices_data(index_t ic) const {
-        return verts.data() + node_begin[ic];
+        return verts.coords.data() + node_begin[ic];
     }
 
     /// @brief Получить вершину по индексу внутри ячейки

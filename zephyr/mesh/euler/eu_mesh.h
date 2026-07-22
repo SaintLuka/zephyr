@@ -25,19 +25,6 @@ class Grid;
 
 namespace zephyr::mesh {
 
-/// @brief Список уникальных узлов, дополняет класс AmrCells
-class AmrNodes {
-public:
-    std::vector<index_t> nodes;
-    std::vector<geom::Vector3d> unique_verts;
-
-    bool empty() const;
-
-    void clear();
-
-    void setup_for(const AmrCells& cells);
-};
-
 /// @brief Эйлерова сетка.
 /// @ingroup euler-mesh
 ///
@@ -332,13 +319,13 @@ public:
     /// @{ @name Работа с уникальными узлами
     ///
     /// @brief Заполнен ли массив с уникальными узлами?
-    bool has_nodes() const { return !m_nodes.empty(); }
+    bool has_nodes() const { return !m_local_nodes.empty(); }
 
     /// @brief Ссылка на массив уникальных узлов
-    const AmrNodes& nodes() const { return m_nodes; }
+    const AmrNodes& nodes() const { return m_local_nodes; }
 
     /// @brief Собрать массивы уникальных узлов
-    void collect_nodes();
+    void make_unique_nodes();
 
     /// @}
 
@@ -385,7 +372,8 @@ private:
     /// @brief Процедуры слияния и огрубления данных при адаптации
     Distributor m_distributor;
 
-    AmrCells m_locals;  ///< Ячейки, которые принадлежат данному процессу
+    AmrCells m_locals;       ///< Ячейки, которые принадлежат данному процессу
+    AmrNodes m_local_nodes;  ///< Узлы, которые принадлежат данному процессу
 
     /// @brief Метод декомпозиции
     Decomposition::Ptr m_decomp = nullptr;
@@ -394,9 +382,6 @@ private:
     Tourism   m_tourists;  ///< Построение обменных слоев и обмены
     Migration m_migrants;  ///< Пересылка ячеек при изменении декомпозиции
 #endif
-
-    /// @brief Уникальные узлы
-    AmrNodes m_nodes;
 
     /// @brief Структурированная сетка? (только для однопроцессорных)
     bool m_structured{false};

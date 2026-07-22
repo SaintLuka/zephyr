@@ -291,8 +291,6 @@ void EuMesh::refine() {
     if (!adaptive()) { return; }
     m_structured = false;
 
-    m_nodes.clear();
-
     static Stopwatch balance;
     static Stopwatch apply;
     static Stopwatch full;
@@ -301,6 +299,9 @@ void EuMesh::refine() {
     if (mpi::single() && m_locals.empty()) {
         throw std::runtime_error("EuMesh::refine() error: Empty mesh");
     }
+
+    m_local_nodes.clear();
+    m_locals.verts.clear_unique();
 
     full.resume();
 
@@ -556,12 +557,12 @@ void EuMesh::memory_usage() const {
     memory_t geom_size = m_locals.memory_usage();
     memory_t face_size = m_locals.faces.memory_usage();
     memory_t adj_size = m_locals.faces.adjacent.memory_usage();
-    memory_t node_size;
-    node_size.add(m_locals.verts);
+    memory_t vert_size = m_locals.verts.memory_usage();
+    memory_t node_size = m_local_nodes.memory_usage();
 
     memory_t cells_size;
-    cells_size.needed = geom_size.needed + face_size.needed + adj_size.needed + node_size.needed;
-    cells_size.actual = geom_size.actual + face_size.actual + adj_size.actual + node_size.actual;
+    cells_size.needed = geom_size.needed + face_size.needed + adj_size.needed + vert_size.needed;
+    cells_size.actual = geom_size.actual + face_size.actual + adj_size.actual + vert_size.actual;
 
     size_t geom_per_cell = cells_size.needed / m_locals.n_cells();
 
@@ -570,7 +571,7 @@ void EuMesh::memory_usage() const {
     std::cout << " (avg" << bytes(geom_per_cell) << " per cell)\n";
     std::cout << "    Geom:  " << bytes(geom_size.needed) << " / " << bytes(geom_size.actual) << "\n";
     std::cout << "    Adj:   " << bytes(adj_size.needed)  << " / " << bytes(adj_size.actual) << "\n";
-    std::cout << "    Nodes: " << bytes(node_size.needed) << " / " << bytes(node_size.actual) << "\n";
+    std::cout << "    Verts: " << bytes(vert_size.needed) << " / " << bytes(vert_size.actual) << "\n";
     std::cout << "    Faces: " << bytes(face_size.needed) << " / " << bytes(face_size.actual) << "\n";
 
     memory_t data_size = m_locals.data.memory_usage();
@@ -763,7 +764,7 @@ int EuMesh::check_refined() const {
 
 Box EuMesh::bbox() const {
     Box box1 = Box::Empty(3);
-    for (auto& v: m_locals.verts) {
+    for (auto& v: m_locals.verts.coords) {
         box1.capture(v);
     }
 
@@ -836,182 +837,9 @@ EuCell EuMesh::operator()(int i, int j, int k) {
     return operator[](m_nz * (m_ny * i + j) + k);
 }
 
-inline int nodes_estimation(int n_cells, int dim) {
-    z_assert(dim == 2 || dim == 3, "bad dimension");
-    if (dim < 3) {
-        int nx = int(std::ceil(std::sqrt(n_cells))) + 2;
-        return nx * nx;
-    } else {
-        int nx = int(std::ceil(std::cbrt(n_cells))) + 2;
-        return nx * nx * nx;
-    }
-}
-
-// Владелец узла (любая ячейка, которая содержит узел)
-// Основной владелец: ячейка с минимальным индексом.
-struct NodeOwner {
-    index_t ic; // Индекс ячейки
-    index_t iv; // Индекс вершины
-
-    // Считаем различие только по индексу ячейки
-    bool operator<(const NodeOwner& other) const { return ic < other.ic; }
-};
-
-// Множество ячеек, которые владеют некоторым узлом
-struct NodeOwners {
-    // Добавить владельца
-    void insert(index_t ic, int iv) {
-        owners.insert(NodeOwner{ic, iv});
-    }
-
-    // Имеется владелец с индексом ic?
-    bool contain(index_t ic) const {
-        return owners.count(NodeOwner{ic, -1}) > 0;
-    }
-
-    auto begin() const { return owners.begin(); }
-
-    auto end() const { return owners.end(); }
-
-    std::set<NodeOwner> owners;
-};
-
-NodeOwners find_owners(const AmrCells& cells, index_t ic_start, int iv_start) {
-    // Интересующая нас вершина
-    Vector3d p = cells.verts[iv_start];
-    double eps = 1.0e-10 * cells.linear_size(ic_start);
-
-    // Моделирует стек с ячейками в работе
-    std::vector<NodeOwner> in_work;
-
-    in_work.emplace_back(NodeOwner{ic_start, iv_start});
-
-    NodeOwners owners;
-    while (!in_work.empty()) {
-        // Извлекли из стека последнюю ячейку
-        auto[ic, iv] = in_work.back();
-        in_work.pop_back();
-
-        // Добавили нового владельца
-        owners.insert(ic, iv);
-
-        // Проходим по граням, ищем грани, которые содержат искомую вершину.
-        // Сосед через такую грань также содержит искомую вершину.
-        for (auto iface: cells.faces_range(ic)) {
-            if (cells.faces.is_undefined(iface) ||
-                cells.faces.is_boundary(iface) ||
-                cells.faces.boundary[iface] == Boundary::PERIODIC ||
-                cells.faces.adjacent.is_alien(iface)) {
-                continue;
-            }
-
-            // Проверить, что грань содержит искомую вершину
-            bool contain = false;
-            for (int j = 0; j < AmrFaces::max_vertices; ++j) {
-                int loc_iv = cells.faces.vertices[iface][j];
-                if (loc_iv < 0) break;
-                if (cells.node_begin[ic] + loc_iv == iv) {
-                    contain = true;
-                    break;
-                }
-            }
-
-            if (!contain) continue;
-
-            // Грань содержит целевую вершину
-
-            // Индекс соседа через грань
-            index_t ic_n = cells.faces.adjacent.index[iface];
-            z_assert(ic_n < cells.size(), "Find owners: Out of range");
-
-            // Сосед уже есть в массиве
-            if (owners.contain(ic_n)) continue;
-
-            // Ищем интересующую вершину среди вершин соседа
-            index_t iv_n = -1;
-            for (auto iv2: cells.nodes_range(ic_n)) {
-                if ((cells.verts[iv2] - p).norm() < eps) {
-                    // Проверка на -13??
-                    iv_n = iv2;
-                    break;
-                }
-            }
-
-            z_assert(iv_n >= 0, "AmrFaces::setup_for: Impossible error #1");
-
-            // Соседняя ячейка нам подходит, помещаем в стек
-            in_work.emplace_back(NodeOwner{ic_n, iv_n});
-        }
-    }
-
-    return owners;
-}
-
-bool AmrNodes::empty() const {
-    return nodes.empty();
-}
-
-void AmrNodes::clear() {
-    nodes.clear();
-    unique_verts.clear();
-}
-
-void AmrNodes::setup_for(const AmrCells& cells) {
-    // Стираем существующий массив узлов
-    clear();
-
-    if (cells.empty()) return;
-
-    // Выставляем все индексы на -1
-    nodes.resize(cells.n_nodes(), -1);
-
-    // Помечаем актуальные узлы, которые есть на каких-либо гранях, индексом -13.
-    threads::parallel_for(
-        index_t{0}, cells.n_cells(),
-        [this, &cells](index_t ic) {
-            for (auto iface: cells.faces_range(ic)) {
-                if (cells.faces.is_undefined(iface)) continue;
-
-                for (int j = 0; j < AmrFaces::max_vertices; ++j) {
-                    int loc_iv =  cells.faces.vertices[iface][j];
-                    if (loc_iv < 0) break;
-                    nodes[cells.node_begin[ic] + loc_iv] = -13;
-                }
-            }
-        });
-
-
-    // TODO: Заменить set, vector на быстрые версии на стеке
-    // TODO: Есть только наметки, как это сделать параллельно
-
-    /// Последовательная версия работает за один проход по ячейкам
-    unique_verts.reserve(nodes_estimation(cells.size(), cells.dim()));
-
-    int counter = 0;
-    for (index_t ic = 0; ic < cells.n_cells(); ++ic) {
-        for (index_t iv: cells.nodes_range(ic)) {
-            // Нас интересуют актуальные (отмеченные) узлы, которые
-            // ещё не получили уникальный индекс.
-            if (nodes[iv] != -13) continue;
-
-            // Добавляем узел в массив
-            unique_verts.push_back(cells.verts[iv]);
-
-            // Ищем все ячейки, которые содержат узел
-            auto owners = find_owners(cells, ic, iv);
-
-            // Отмечаем индекс узла у каждого владельца
-            for (auto [ic2, iv2]: owners) {
-                nodes[iv2] = counter;
-            }
-            ++counter;
-        }
-    }
-}
-
-void EuMesh::collect_nodes() {
+void EuMesh::make_unique_nodes() {
     if (has_nodes()) return;
-    m_nodes.setup_for(m_locals);
+    m_local_nodes.setup_for(m_locals);
 }
 
 void EuMesh::backup(const std::string& sroot, const std::vector<std::string>& variables) const {

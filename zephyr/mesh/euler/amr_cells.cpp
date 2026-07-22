@@ -1151,7 +1151,9 @@ void AmrCells::backup(const std::filesystem::path& root, std::ofstream& file,
         file << tab << "},\n"; // mesh.cells.faces
     }
 
-    save_vector(root, file, "cells", tab, "verts", verts, ",\n");
+    throw std::runtime_error("Backup nodes error");
+    // Старая версия сохранения узлов, нужна новая
+    //save_vector(root, file, "cells", tab, "verts", verts, ",\n");
 
     if (mpi::master()) {
         fs::create_directory(root / "cells/data");

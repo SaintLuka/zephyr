@@ -147,36 +147,42 @@ VtuStructure::VtuStructure(const AmrCells &cells, bool polyhedral) {
 }
 
 VtuStructure::VtuStructure(const AmrCells &cells, const AmrNodes& nodes, bool polyhedral) {
-    points = nodes.unique_verts;
+    if (!cells.verts.unique()) {
+        throw std::runtime_error("VtuStructure error: AmrCells.verts is not filled #1");
+    }
+    if (cells.verts.index.size() != cells.verts.size()) {
+        throw std::runtime_error("VtuStructure error: AmrCells.verts is not filled #2");
+    }
+    points = nodes.coords;
 
     if (cells.adaptive()) {
         if (cells.dim() < 3) {
             if (!polyhedral) {
-                fill_adaptive_hex_2D(cells, nodes.nodes);
+                fill_adaptive_hex_2D(cells, cells.verts.index);
                 return;
             }
             else {
-                fill_adaptive_poly_2D(cells, nodes.nodes);
+                fill_adaptive_poly_2D(cells, cells.verts.index);
                 return;
             }
         }
         else {
-            fill_adaptive_hex_3D(cells, nodes.nodes);
+            fill_adaptive_hex_3D(cells, cells.verts.index);
             return;
         }
     }
     else {
         if (cells.dim() == 2) {
-            fill_poly_classic(cells, nodes.nodes);
+            fill_poly_classic(cells, cells.verts.index);
             return;
         }
         else {
             if (!polyhedral) {
-                fill_poly_classic(cells, nodes.nodes);
+                fill_poly_classic(cells, cells.verts.index);
                 return;
             }
             else {
-                fill_polyfaces_3D(cells, nodes.nodes);
+                fill_polyfaces_3D(cells, cells.verts.index);
                 return;
             }
         }
@@ -555,7 +561,7 @@ void VtuFile::save(AmrCells &cells, const AmrNodes& nodes) const {
 void VtuFile::save(const std::string& filename, EuMesh& mesh,
     const Variables &variables, bool polyhedral, bool unique_nodes) {
     if (unique_nodes) {
-        mesh.collect_nodes();
+        mesh.make_unique_nodes();
     }
     if (mesh.has_nodes()) {
         save(filename, mesh.locals(), mesh.nodes(), variables, polyhedral);

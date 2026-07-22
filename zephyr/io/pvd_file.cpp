@@ -137,7 +137,7 @@ void PvdFile::open(const std::string& filename, const std::string& _directory, b
 
 void PvdFile::save(mesh::EuMesh& mesh, double timestep) {
     if (unique_nodes) {
-        mesh.collect_nodes();
+        mesh.make_unique_nodes();
     }
     if (mesh.has_nodes()) {
         VtuFile::save(get_filename(), mesh.locals(), mesh.nodes(), variables, polyhedral);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <zephyr/mesh/euler/amr_cells.h>
+#include <zephyr/mesh/euler/amr_nodes.h>
 #include <zephyr/utils/mpi.h>
 
 namespace zephyr::mesh {
