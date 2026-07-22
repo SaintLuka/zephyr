@@ -23,6 +23,10 @@ using Vector3d = eigen_wrapper::Matrix<double, 3, 1>;
 using Matrix3d = eigen_wrapper::Matrix<double, 3, 3>;
 #endif
 
+/// @brief Eigen векторы без выравнивания для использования внутри структур
+using Vec2d_na = Eigen::Matrix<double, 2, 1, Eigen::DontAlign>;
+using Vec3d_na = Eigen::Matrix<double, 3, 1, Eigen::DontAlign>;
+
 using Vector2d = Eigen::Matrix<double, 2, 1>; ///< 2-х мерный Eigen вектор-столбец
 using Vector4d = Eigen::Matrix<double, 4, 1>; ///< 4-ех мерный Eigen вектор-столбец
 using Vector5d = Eigen::Matrix<double, 5, 1>; ///< 5-и  мерный Eigen вектор-столбец

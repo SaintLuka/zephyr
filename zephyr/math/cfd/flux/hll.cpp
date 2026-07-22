@@ -1,6 +1,7 @@
 #include <iostream>
 
 #include <zephyr/geom/vector.h>
+#include <zephyr/math/funcs.h>
 #include <zephyr/math/cfd/flux/hll.h>
 #include <zephyr/phys/fractions.h>
 
@@ -8,13 +9,61 @@ using namespace zephyr::phys;
 
 namespace zephyr::math {
 
-inline double min(double x, double y, double z) {
-    return std::min(x, std::min(y, z));
+// ============================================================================
+//      Мелкая вода
+// ============================================================================
+
+swe::Flux HLL::calc_flux(const swe::PState &zL, const swe::PState &zR) {
+    using namespace swe;
+
+    // Нормальные скорости слева и справа
+    double u_L = zL.velocity.x();
+    double u_R = zR.velocity.x();
+
+    // Глубина слева и справа
+    double h_L = zL.depth();
+    double h_R = zR.depth();
+
+    // Сухое дно слева/справа
+    bool dry_L = h_L < 1.0e-8;
+    bool dry_R = h_R < 1.0e-8;
+
+    // Скорость волн слева и справа
+    double c_L = dry_L ? 0.0 : std::sqrt(g * h_L);
+    double c_R = dry_R ? 0.0 : std::sqrt(g * h_R);
+
+    // Оценки скоростей расходящихся волн
+    double S_L = dry_L ? (u_R - 2.0 * c_R) : min(u_L - c_L, u_R - c_R, 0.0);
+    double S_R = dry_R ? (u_L + 2.0 * c_L) : max(u_L + c_L, u_R + c_R, 0.0);
+
+    QState Q_L(zL); // Консервативный вектор слева
+    QState Q_R(zR); // Консервативный вектор справа
+
+    Flux F_L(zL);   // Дифференциальный поток слева
+    Flux F_R(zR);   // Дифференциальный поток справа
+
+    Flux F = (S_R * F_L.arr() - S_L * F_R.arr() + S_L * S_R * (Q_R.arr() - Q_L.arr())) / (S_R - S_L);
+
+    if (F.arr().hasNaN()) {
+        std::cerr << "HLL::calc_flux error\n";
+        std::cerr << "  z_L: " << zL << "\n";
+        std::cerr << "  z_R: " << zR << "\n";
+        std::cerr << "  c_L: " << c_L << "; c_R: " << c_R << "\n";
+        std::cerr << "  S_L: " << S_L << "; S_R: " << S_R << "\n";
+        std::cerr << "  F_HLL: " << F.arr().transpose() << "\n";
+        throw std::runtime_error("HLL::calc_flux error: bad value");
+    }
+
+    return F;
 }
 
-inline double max(double x, double y, double z) {
-    return std::max(x, std::max(y, z));
+swe::Flux HLL::flux(const swe::PState &zL, const swe::PState &zR) const {
+    return HLL::calc_flux(zL, zR);
 }
+
+// ============================================================================
+//      Одноматериальная газодинамика
+// ============================================================================
 
 smf::Flux HLL::flux(const smf::PState &zL, const smf::PState &zR, const Eos &eos) const {
     return calc_flux(zL, zR, eos);
@@ -117,6 +166,10 @@ smf::WaveConfig2 HLL::wave_config(const Eos& eos,
 
     return smf::WaveConfig2({.S_L = S_L, .S_R = S_R, .Qs = Q, .Fs = F});
 }
+
+// ============================================================================
+//      Многоматериальная газодинамика
+// ============================================================================
 
 mmf::Flux HLL::flux(const mmf::PState &zL, const mmf::PState &zR, const MixturePT &mix) const {
     return calc_flux(zL, zR, mix);

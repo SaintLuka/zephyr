@@ -14,6 +14,144 @@ namespace zephyr::math {
 
 using namespace geom;
 
+/// @namespace zephyr::math::swe
+/// @brief Двумерная мелкая вода (Shallow-Water equations)
+namespace swe {
+
+/// @brief Гравитационная постоянная
+constexpr double g = 9.81;
+
+struct QState;
+
+/// @brief Примитивный вектор состояния
+struct PState {
+    double   level;    ///< Уровень поверхности
+    Vec2d_na velocity; ///< Тангенциальная скорость
+    double   bed;      ///< Уровень дна (доп параметр)
+
+    /// @brief Инициализация нулями
+    PState();
+
+    /// @brief Инициализация с полным заданием параметров
+    PState(double level, const Vector2d &velocity, double bed);
+
+    /// @brief Инициализация из консервативного вектора состояния,
+    /// давление определяется с использованием УрС.
+    /// @param bed Уровень дна
+    PState(const QState &q, double bed);
+
+    /// @brief Переводит вектор состояния в локальную систему координат
+    void to_local(const Vector3d &normal);
+
+    /// @brief Возвращает вектор состояния в локальной системе координат
+    PState in_local(const Vector3d &normal) const;
+
+    /// @brief Переводит вектор состояния в глобальную систему координат
+    void to_global(const Vector3d &normal);
+
+    /// @brief Возвращает вектор состояния в глобальной системе координат
+    PState in_global(const Vector3d &normal) const;
+
+    /// @brief Отражает систему координат
+    void inverse();
+
+    /// @brief Уровень поверхности
+    double eta() const { return level; }
+
+    /// @brief Глубина столба воды
+    double depth() const { return level - bed; }
+
+    /// @brief Скорость вдоль оси x
+    double vx() const { return velocity.x(); }
+
+    /// @brief Скорость вдоль оси y
+    double vy() const { return velocity.y(); }
+
+    /// @brief Квадрат модуля скорости
+    double v2() const { return velocity.squaredNorm(); }
+
+    /// @brief Проверить корректность
+    bool is_bad() const;
+
+    /// @brief В поток вывода
+    friend std::ostream &operator<<(std::ostream &os, const PState &state);
+
+    VECTORIZE(PState)
+};
+
+/// @brief Консервативный вектор состояния
+struct QState {
+    double   depth;     ///< Глубина столба воды
+    Vec2d_na momentum;  ///< Тангенциальный момент импульса / плотность
+
+    /// @brief Инициализация нулями
+    QState();
+
+    /// @brief Инициализация с полным заданием параметров
+    QState(double depth, const Vector2d &momentum);
+
+    /// @brief Преобразование из примитивного вектора состояния
+    QState(const PState &z);
+
+    /// @brief Переводит вектор состояния в локальную систему координат
+    void to_local(const Vector3d &normal);
+
+    /// @brief Возвращает вектор состояния в локальной системе координат
+    QState in_local(const Vector3d &normal) const;
+
+    /// @brief Переводит вектор состояния в глобальную систему координат
+    void to_global(const Vector3d &normal);
+
+    /// @brief Возвращает вектор состояния в глобальной системе координат
+    QState in_global(const Vector3d &normal) const;
+
+    /// @brief В поток вывода
+    friend std::ostream &operator<<(std::ostream &os, const QState &state);
+
+    VECTORIZE(QState)
+};
+
+/// @brief Вектор потока
+/// @code
+///   density = rho * u;
+///   momentum.x() = rho * u^2 + P;
+///   momentum.y() = rho * u * v;
+///   momentum.z() = rho * u * w;
+///   energy = u * (rho * (e + 0.5 * velocity^2) + P);
+/// @endcode
+struct Flux {
+    double   mass;      ///< Плотность потока массы
+    Vec2d_na momentum;  ///< Плотность потока импульса
+
+    /// @brief Нулевой поток
+    Flux();
+
+    /// @brief Инициализация с полным заданием параметров
+    Flux(double depth, const Vector2d &momentum);
+
+    /// @brief Дифференциальный поток по вектору примитивных переменных
+    explicit Flux(const PState &z);
+
+    /// @brief Переводит вектор потока в локальную систему координат
+    void to_local(const Vector3d &normal);
+
+    /// @brief Возвращает вектор потока в локальной системе координат
+    Flux in_local(const Vector3d &normal) const;
+
+    /// @brief Переводит вектор потока в глобальную систему координат
+    void to_global(const Vector3d &normal);
+
+    /// @brief Возвращает вектор потока в глобальной системе координат
+    Flux in_global(const Vector3d &normal) const;
+
+    /// @brief В поток вывода
+    friend std::ostream &operator<<(std::ostream &os, const Flux &flux);
+
+    VECTORIZE(Flux)
+};
+
+} // namespace swe
+
 /// @namespace zephyr::math::smf
 /// @brief Одноматериальная модель (Single-Material Fluid)
 namespace smf {

@@ -4,6 +4,13 @@ namespace zephyr { namespace math {
 
 using namespace geom;
 
+void Rotate::to_local(Vec2d_na &velocity, const Vector3d &normal) {
+    double vx = velocity.x();
+    double vy = velocity.y();
+    velocity.x() = +normal.x() * vx + normal.y() * vy;
+    velocity.y() = -normal.y() * vx + normal.x() * vy;
+}
+
 void Rotate::to_local(Vector3d &velocity, const Vector3d &no) {
     Vector3d normal = no.normalized();
 
@@ -38,6 +45,13 @@ void Rotate::to_local(Vector3d &velocity, const Vector3d &no) {
     // @formatter:on
 
     velocity = R * velocity;
+}
+
+void Rotate::to_global(Vec2d_na &velocity, const Vector3d &normal) {
+    double vx = velocity.x();
+    double vy = velocity.y();
+    velocity.x() = normal.x() * vx - normal.y() * vy;
+    velocity.y() = normal.y() * vx + normal.x() * vy;
 }
 
 void Rotate::to_global(Vector3d &velocity, const Vector3d &no) {

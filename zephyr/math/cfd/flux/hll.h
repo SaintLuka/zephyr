@@ -29,12 +29,22 @@ public:
     using Ptr = std::shared_ptr<HLL>;
 
     /// @brief Создать умный указатель
-    inline static HLL::Ptr create() {
+    static HLL::Ptr create() {
         return std::make_shared<HLL>();
     }
 
     /// @brief Имя метода
     std::string get_name() const final { return "HLL"; }
+
+    // ========================================================================
+    //                    Одноматериальные версии функций
+    // ========================================================================
+
+    /// @brief Статическая версия
+    static swe::Flux calc_flux(const swe::PState &zL, const swe::PState &zR);
+
+    /// @brief Полиморфная версия
+    swe::Flux flux(const swe::PState &zL, const swe::PState &zR) const final;
 
     // ========================================================================
     //                    Одноматериальные версии функций

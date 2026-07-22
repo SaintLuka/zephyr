@@ -17,7 +17,13 @@ namespace zephyr::math {
 struct Rotate {
 public:
     /// @brief Повернуть вектор скорости
+    static void to_local(geom::Vec2d_na& velocity, const geom::Vector3d& normal);
+
+    /// @brief Повернуть вектор скорости
     static void to_local(geom::Vector3d& velocity, const geom::Vector3d& normal);
+
+    /// @brief Повернуть вектор скорости
+    static void to_global(geom::Vec2d_na& velocity, const geom::Vector3d& normal);
 
     /// @brief Повернуть вектор скорости
     static void to_global(geom::Vector3d& velocity, const geom::Vector3d& normal);

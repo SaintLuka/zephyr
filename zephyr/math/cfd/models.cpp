@@ -1,11 +1,138 @@
 #include <stdexcept>
 #include <iostream>
 #include <iomanip>
+#include <format>
 #include <boost/format.hpp>
 #include <zephyr/math/funcs.h>
 #include <zephyr/math/cfd/models.h>
 
 namespace zephyr::math {
+
+namespace swe {
+
+PState::PState() : level(0.0), velocity({0.0, 0.0}), bed(0.0) {}
+
+PState::PState(double level, const Vector2d &velocity, double bed)
+    : level(level), velocity(velocity), bed(bed) {}
+
+PState::PState(const QState &q, double bed) {
+    level = bed + q.depth;
+    velocity = q.momentum / q.depth;
+    this->bed = bed;
+}
+
+void PState::to_local(const Vector3d &normal) {
+    Rotate::to_local(velocity, normal);
+}
+
+PState PState::in_local(const Vector3d &normal) const {
+    PState z(*this);
+    z.to_local(normal);
+    return z;
+}
+
+void PState::to_global(const Vector3d &normal) {
+    Rotate::to_global(velocity, normal);
+}
+
+PState PState::in_global(const Vector3d &normal) const {
+    PState z(*this);
+    z.to_global(normal);
+    return z;
+}
+
+void PState::inverse() {
+    velocity.x() = -velocity.x();
+}
+
+bool PState::is_bad() const {
+    return !std::isfinite(level) ||
+           !std::isfinite(velocity.x()) ||
+           !std::isfinite(velocity.y()) ||
+           !std::isfinite(bed) || bed >= level;
+}
+
+std::ostream &operator<<(std::ostream &os, const PState &state) {
+    os << std::format("η: {:.5f},  v: [{:.5e}, {:.5e}]",
+        state.level, state.velocity.x(), state.velocity.y());
+    return os;
+}
+
+QState::QState() : depth{0.0}, momentum{0.0, 0.0} {}
+
+QState::QState(double depth, const Vector2d &momentum)
+    : depth(depth), momentum(momentum) {}
+
+QState::QState(const PState &z) {
+    depth = z.depth();
+    momentum = z.velocity * depth;
+}
+
+void QState::to_local(const Vector3d &normal) {
+    Rotate::to_local(momentum, normal);
+}
+
+QState QState::in_local(const Vector3d &normal) const {
+    QState q(*this);
+    q.to_local(normal);
+    return q;
+}
+
+void QState::to_global(const Vector3d &normal) {
+    Rotate::to_global(momentum, normal);
+}
+
+QState QState::in_global(const Vector3d &normal) const {
+    QState q(*this);
+    q.to_global(normal);
+    return q;
+}
+
+std::ostream &operator<<(std::ostream &os, const QState &state) {
+    os << std::format("h: {:.5f},  hv: [{:.5e}, {:.5e}]",
+        state.depth, state.momentum.x(), state.momentum.y());
+    return os;
+}
+
+Flux::Flux() : mass(0.0), momentum({0.0, 0.0}) { }
+
+Flux::Flux(double depth, const Vector2d &momentum)
+    : mass(depth), momentum(momentum) { }
+
+Flux::Flux(const PState &z) {
+    double h = z.depth();
+    mass = h * z.vx();
+    momentum.x() = mass * z.vx() + (0.5 * g) * h * h;
+    momentum.y() = mass * z.vy();
+}
+
+void Flux::to_local(const Vector3d &normal) {
+    Rotate::to_local(momentum, normal);
+}
+
+Flux Flux::in_local(const Vector3d &normal) const {
+    Flux f(*this);
+    f.to_local(normal);
+    return f;
+}
+
+void Flux::to_global(const Vector3d &normal) {
+    Rotate::to_global(momentum, normal);
+}
+
+Flux Flux::in_global(const Vector3d &normal) const {
+    Flux f(*this);
+    f.to_global(normal);
+    return f;
+}
+
+std::ostream &operator<<(std::ostream &os, const Flux &flux) {
+    os << std::format("h: {:.5f},  hv: [{:.5e}, {:.5e}]",
+        flux.mass, flux.momentum.x(), flux.momentum.y());
+    return os;
+}
+
+} // namespace swe
 
 namespace smf {
 

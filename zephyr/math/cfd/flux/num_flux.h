@@ -34,6 +34,11 @@ public:
     /// @brief Название расчетного метода
     virtual std::string get_name() const { return "Flux"; }
 
+    /// @brief Численный поток для мелкой воды
+    virtual swe::Flux flux(const swe::PState& zL, const swe::PState& zR) const {
+        throw std::runtime_error("NumFlux::flux(swe::PState...) is not implemented");
+    }
+
     /// @brief Численный поток для одноматериальной задачи
     virtual smf::Flux flux(const smf::PState& zL, const smf::PState& zR, const phys::Eos& eos) const {
         throw std::runtime_error("NumFlux::flux(smf::PState...) is not implemented");
