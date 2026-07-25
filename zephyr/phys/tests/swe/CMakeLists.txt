@@ -1,0 +1,8 @@
+file(GLOB SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
+file(GLOB HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/*.hpp")
+
+set(ZEPHYR_SWE_SRC ${SOURCES} PARENT_SCOPE)
+
+install(FILES ${HEADERS}
+        DESTINATION
+        include/${PROJECT_NAME}/phys/tests/swe)

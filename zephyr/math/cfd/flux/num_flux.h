@@ -35,7 +35,7 @@ public:
     virtual std::string get_name() const { return "Flux"; }
 
     /// @brief Численный поток для мелкой воды
-    virtual swe::Flux flux(const swe::PState& zL, const swe::PState& zR) const {
+    virtual std::tuple<swe::Flux, double> flux(const swe::PState& zL, const swe::PState& zR, double bed) const {
         throw std::runtime_error("NumFlux::flux(swe::PState...) is not implemented");
     }
 

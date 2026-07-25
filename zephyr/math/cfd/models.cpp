@@ -10,15 +10,14 @@ namespace zephyr::math {
 
 namespace swe {
 
-PState::PState() : level(0.0), velocity({0.0, 0.0}), bed(0.0) {}
+PState::PState() : level(0.0), velocity({0.0, 0.0}) {}
 
-PState::PState(double level, const Vector2d &velocity, double bed)
-    : level(level), velocity(velocity), bed(bed) {}
+PState::PState(double level, const Vector2d &velocity)
+    : level(level), velocity(velocity) {}
 
 PState::PState(const QState &q, double bed) {
     level = bed + q.depth;
     velocity = q.momentum / q.depth;
-    this->bed = bed;
 }
 
 void PState::to_local(const Vector3d &normal) {
@@ -46,10 +45,7 @@ void PState::inverse() {
 }
 
 bool PState::is_bad() const {
-    return !std::isfinite(level) ||
-           !std::isfinite(velocity.x()) ||
-           !std::isfinite(velocity.y()) ||
-           !std::isfinite(bed) || bed >= level;
+    return !std::isfinite(level) || !std::isfinite(velocity.x()) || !std::isfinite(velocity.y());
 }
 
 std::ostream &operator<<(std::ostream &os, const PState &state) {
@@ -63,8 +59,8 @@ QState::QState() : depth{0.0}, momentum{0.0, 0.0} {}
 QState::QState(double depth, const Vector2d &momentum)
     : depth(depth), momentum(momentum) {}
 
-QState::QState(const PState &z) {
-    depth = z.depth();
+QState::QState(const PState &z, double bed) {
+    depth = z.depth(bed);
     momentum = z.velocity * depth;
 }
 
@@ -99,8 +95,8 @@ Flux::Flux() : mass(0.0), momentum({0.0, 0.0}) { }
 Flux::Flux(double depth, const Vector2d &momentum)
     : mass(depth), momentum(momentum) { }
 
-Flux::Flux(const PState &z) {
-    double h = z.depth();
+Flux::Flux(const PState &z, double bed) {
+    double h = z.depth(bed);
     mass = h * z.vx();
     momentum.x() = mass * z.vx() + (0.5 * g) * h * h;
     momentum.y() = mass * z.vy();

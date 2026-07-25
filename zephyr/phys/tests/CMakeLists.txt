@@ -1,9 +1,12 @@
+add_subdirectory(swe)
+
 set(ZEPHYR_PHYS_TESTS_SRC
+        ${ZEPHYR_SWE_SRC}
         ${CMAKE_CURRENT_SOURCE_DIR}/ivp.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/test_1D.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/test_2D.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/test_3D.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/sedov.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/sedov.cpp
         PARENT_SCOPE)
 
 install(FILES

@@ -27,13 +27,12 @@ struct QState;
 struct PState {
     double   level;    ///< Уровень поверхности
     Vec2d_na velocity; ///< Тангенциальная скорость
-    double   bed;      ///< Уровень дна (доп параметр)
 
     /// @brief Инициализация нулями
     PState();
 
     /// @brief Инициализация с полным заданием параметров
-    PState(double level, const Vector2d &velocity, double bed);
+    PState(double level, const Vector2d &velocity);
 
     /// @brief Инициализация из консервативного вектора состояния,
     /// давление определяется с использованием УрС.
@@ -59,7 +58,7 @@ struct PState {
     double eta() const { return level; }
 
     /// @brief Глубина столба воды
-    double depth() const { return level - bed; }
+    double depth(double bed) const { return level - bed; }
 
     /// @brief Скорость вдоль оси x
     double vx() const { return velocity.x(); }
@@ -91,7 +90,7 @@ struct QState {
     QState(double depth, const Vector2d &momentum);
 
     /// @brief Преобразование из примитивного вектора состояния
-    QState(const PState &z);
+    QState(const PState &z, double bed);
 
     /// @brief Переводит вектор состояния в локальную систему координат
     void to_local(const Vector3d &normal);
@@ -112,13 +111,6 @@ struct QState {
 };
 
 /// @brief Вектор потока
-/// @code
-///   density = rho * u;
-///   momentum.x() = rho * u^2 + P;
-///   momentum.y() = rho * u * v;
-///   momentum.z() = rho * u * w;
-///   energy = u * (rho * (e + 0.5 * velocity^2) + P);
-/// @endcode
 struct Flux {
     double   mass;      ///< Плотность потока массы
     Vec2d_na momentum;  ///< Плотность потока импульса
@@ -130,7 +122,7 @@ struct Flux {
     Flux(double depth, const Vector2d &momentum);
 
     /// @brief Дифференциальный поток по вектору примитивных переменных
-    explicit Flux(const PState &z);
+    explicit Flux(const PState &z, double bed);
 
     /// @brief Переводит вектор потока в локальную систему координат
     void to_local(const Vector3d &normal);

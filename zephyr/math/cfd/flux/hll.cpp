@@ -13,7 +13,7 @@ namespace zephyr::math {
 //      Мелкая вода
 // ============================================================================
 
-swe::Flux HLL::calc_flux(const swe::PState &zL, const swe::PState &zR) {
+std::tuple<swe::Flux, double> HLL::calc_flux(const swe::PState &zL, const swe::PState &zR, double bed) {
     using namespace swe;
 
     // Нормальные скорости слева и справа
@@ -21,8 +21,8 @@ swe::Flux HLL::calc_flux(const swe::PState &zL, const swe::PState &zR) {
     double u_R = zR.velocity.x();
 
     // Глубина слева и справа
-    double h_L = zL.depth();
-    double h_R = zR.depth();
+    double h_L = std::max(zL.depth(bed), 0.0);
+    double h_R = std::max(zR.depth(bed), 0.0);
 
     // Сухое дно слева/справа
     bool dry_L = h_L < 1.0e-8;
@@ -36,12 +36,13 @@ swe::Flux HLL::calc_flux(const swe::PState &zL, const swe::PState &zR) {
     double S_L = dry_L ? (u_R - 2.0 * c_R) : min(u_L - c_L, u_R - c_R, 0.0);
     double S_R = dry_R ? (u_L + 2.0 * c_L) : max(u_L + c_L, u_R + c_R, 0.0);
 
-    QState Q_L(zL); // Консервативный вектор слева
-    QState Q_R(zR); // Консервативный вектор справа
+    QState Q_L(zL, bed); // Консервативный вектор слева
+    QState Q_R(zR, bed); // Консервативный вектор справа
 
-    Flux F_L(zL);   // Дифференциальный поток слева
-    Flux F_R(zR);   // Дифференциальный поток справа
+    Flux F_L(zL, bed);   // Дифференциальный поток слева
+    Flux F_R(zR, bed);   // Дифференциальный поток справа
 
+    QState Q = (F_L.arr() - F_R.arr() + S_R * Q_R.arr() - S_L * Q_L.arr()) / (S_R - S_L);
     Flux F = (S_R * F_L.arr() - S_L * F_R.arr() + S_L * S_R * (Q_R.arr() - Q_L.arr())) / (S_R - S_L);
 
     if (F.arr().hasNaN()) {
@@ -54,11 +55,11 @@ swe::Flux HLL::calc_flux(const swe::PState &zL, const swe::PState &zR) {
         throw std::runtime_error("HLL::calc_flux error: bad value");
     }
 
-    return F;
+    return {F, Q.depth};
 }
 
-swe::Flux HLL::flux(const swe::PState &zL, const swe::PState &zR) const {
-    return HLL::calc_flux(zL, zR);
+std::tuple<swe::Flux, double> HLL::flux(const swe::PState &zL, const swe::PState &zR, double bed) const {
+    return HLL::calc_flux(zL, zR, bed);
 }
 
 // ============================================================================

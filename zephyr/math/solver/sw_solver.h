@@ -41,6 +41,40 @@ public:
     }
 };
 
+class ParabolicBed : public IBed {
+    double a;
+    double level;
+public:
+    explicit ParabolicBed(double a, double level) : a(a), level(level) {}
+
+    /// @brief Высота дна и градиент в зависимости от координаты
+    std::tuple<double, Vector2d> get(const Vector3d& v) const final {
+        double res = a * v.squaredNorm() + level;
+        return {res, Vector2d{2.0*a*v.x(), 2.0*a*v.y()}};
+    }
+};
+
+class PitBed : public IBed {
+    double radius;
+    double level;
+    double depth;
+
+public:
+    explicit PitBed(double r, double h, double level) : radius(r), level(level), depth(h) {}
+
+    /// @brief Высота дна и градиент в зависимости от координаты
+    std::tuple<double, Vector2d> get(const Vector3d& v) const final {
+        double r = v.norm();
+        double res = level + depth;
+        Vector2d slope = Vector2d::Zero();
+        if (r < radius) {
+            res = level - depth * std::cos(M_PI * r / radius);
+            slope = depth * M_PI / radius * std::sin(M_PI * r / radius) * v.head<2>() / r;
+        }
+        return {res, slope};
+    }
+};
+
 /// @class SwSolver sw_solver.h
 /// @brief Shallow-Water Solver. Решатель для мелкой воды.
 class SwSolver {
@@ -54,6 +88,9 @@ public:
 
         /// @brief Градиент вектора состояния
         Storable<PState> d_dx, d_dy;
+
+        Storable<double>   bed;   ///< Уровень дна
+        Storable<Vector2d> slope; ///< Наклон дна
     };
 
     Parts part;

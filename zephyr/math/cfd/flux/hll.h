@@ -41,10 +41,10 @@ public:
     // ========================================================================
 
     /// @brief Статическая версия
-    static swe::Flux calc_flux(const swe::PState &zL, const swe::PState &zR);
+    static std::tuple<swe::Flux, double> calc_flux(const swe::PState &zL, const swe::PState &zR, double bed);
 
     /// @brief Полиморфная версия
-    swe::Flux flux(const swe::PState &zL, const swe::PState &zR) const final;
+    std::tuple<swe::Flux, double> flux(const swe::PState &zL, const swe::PState &zR, double bed) const final;
 
     // ========================================================================
     //                    Одноматериальные версии функций

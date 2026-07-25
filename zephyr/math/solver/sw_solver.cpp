@@ -14,7 +14,9 @@ using utils::mpi;
 
 
 SwSolver::SwSolver(double bed) {
-    m_bed = std::make_shared<ConstBed>(bed);
+    //m_bed = std::make_shared<ConstBed>(bed);
+    m_bed = std::make_shared<ParabolicBed>(0.4, bed);
+    m_bed = std::make_shared<PitBed>(0.3, 0.3, bed);
     m_nf = HLLC::create();
     m_CFL = 0.5;
     m_limiter = Limiter("MC");
@@ -28,12 +30,13 @@ SwSolver::Parts SwSolver::add_types(EuMesh& mesh) {
     part.d_dy = mesh.add<PState>("d_dy");
     part.half = mesh.add<PState>("half");
     part.next = mesh.add<PState>("next");
+    part.bed  = mesh.add<double>("bed");
+    part.slope= mesh.add<Vector2d>("slope");
 
     mesh.for_each([this](EuCell& cell) {
         auto[bed, slope] = m_bed->get(cell.center());
-        cell[part.init].bed = bed;
-        cell[part.d_dx].bed = slope.x();
-        cell[part.d_dy].bed = slope.y();
+        cell[part.bed] = bed;
+        cell[part.slope] = slope;
     });
     return part;
 }
@@ -106,7 +109,7 @@ void SwSolver::update(EuMesh &mesh) {
 
 void SwSolver::compute_dt(EuMesh &mesh) {
     double dt = mesh.min([this](EuCell cell) -> double {
-        double c = std::sqrt(swe::g * cell[part.init].depth());
+        double c = std::sqrt(swe::g * cell[part.init].depth(cell[part.bed]));
         return cell.incircle_diameter() / (cell[part.init].velocity.norm() + c);
     });
 
@@ -126,24 +129,42 @@ void SwSolver::compute_grad(EuMesh &mesh) const {
 
 void SwSolver::fluxes(EuMesh &mesh) const {
     mesh.for_each([this](EuCell &cell) {
+        Vector2d cell_c = cell.center().head<2>();
+
         // Примитивный вектор в ячейке
         PState z_c = cell[part.init];
+        double bed_c = cell[part.bed];
+        Vector2d slope_c = cell[part.slope];
 
         // Консервативный вектор в ячейке
-        QState q_c(z_c);
+        QState q_c(z_c, bed_c);
 
         // Переменная для потока
         Flux flux;
         for (auto &face: cell.faces()) {
             // Внешняя нормаль
             auto normal = face.normal();
+            Vector2d face_c = face.center().head<2>();
+
+            // Уровень дна на грани
+            double bed_e;
 
             // Примитивный вектор соседа
             PState z_n;
             if (!face.is_boundary()) {
                 z_n = face.neib(part.init);
+
+                Vector2d neib_c = face.neib_center().head<2>();
+
+                double bed_n = face.neib(part.bed);
+                Vector2d slope_n = face.neib(part.slope);
+
+                double bed_m = bed_c + (face_c - cell_c).dot(slope_c);
+                double bed_p = bed_n + (face_c - neib_c).dot(slope_n);
+                bed_e = 0.5 * (bed_m + bed_p);
             } else {
                 z_n = boundary_value(z_c, normal, face.flag());
+                bed_e = bed_c + (face_c - cell_c).dot(slope_c);
             }
 
             // Значение на грани со стороны ячейки
@@ -153,11 +174,15 @@ void SwSolver::fluxes(EuMesh &mesh) const {
             PState zp = z_n.in_local(normal);
 
             // Численный поток на грани
-            Flux loc_flux = m_nf->flux(zm, zp);
+            auto[loc_flux, _] = m_nf->flux(zm, zp, bed_e);
             loc_flux.to_global(normal);
 
             // Суммируем поток
             flux.arr() += loc_flux.arr() * face.area();
+
+            double h_e = zm.depth(bed_e);  // Глубина на ребре ячейки
+            double h_c = z_c.depth(bed_c); // Глубина в центре ячейки
+            flux.momentum += 0.5 * g * (h_c * h_c - h_e * h_e)*normal.head<2>()*face.area();
         }
 
         // Обновляем значение в ячейке (консервативные переменные)
@@ -166,7 +191,7 @@ void SwSolver::fluxes(EuMesh &mesh) const {
         // Отсутствуют источниковые члены!
 
         // Новое значение примитивных переменных
-        cell[part.next] = PState(q_c, cell[part.init].bed);
+        cell[part.next] = PState(q_c, bed_c);
     });
 }
 

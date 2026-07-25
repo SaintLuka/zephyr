@@ -4,7 +4,9 @@
 #include <iomanip>
 
 #include <zephyr/phys/literals.h>
+#include <zephyr/phys/tests/swe/dam_break.h>
 #include <zephyr/phys/matter/eos/mie_gruneisen.h>
+#include <zephyr/geom/generator/strip.h>
 #include <zephyr/geom/generator/rectangle.h>
 
 #include <zephyr/math/solver/sw_solver.h>
@@ -35,10 +37,14 @@ int main(int argc, char** argv) {
     threads::off();
 
     // Генератор сетки
-    generator::Rectangle gen(-0.5, 0.5, -0.5, 0.5);
-    gen.set_boundaries({.left = Boundary::WALL, .right = Boundary::WALL,
-                        .bottom = Boundary::WALL, .top=Boundary::WALL});
-    gen.set_nx(200);
+	// generator::Strip gen(-0.5, 0.5);
+	// gen.set_boundaries({.left = Boundary::ZOE, .right = Boundary::ZOE});
+	// gen.set_nx(10000);
+
+	generator::Rectangle gen(-0.5, 0.5, -0.5, 0.5);
+	gen.set_boundaries({.left = Boundary::WALL, .right = Boundary::WALL,
+						.bottom = Boundary::WALL, .top=Boundary::WALL});
+	gen.set_nx(100);
 
     // Создать сетку
     EuMesh mesh(gen);
@@ -55,6 +61,7 @@ int main(int argc, char** argv) {
     // Добавляем типы на сетку, выбираем основной слой
     auto data = solver.add_types(mesh);
     auto z = data.init;
+	auto zb = data.bed;
 
     // Настройка сетки
     mesh.set_decomposition("XY");
@@ -64,17 +71,25 @@ int main(int argc, char** argv) {
     // Файл для записи
     PvdFile pvd("mesh", "output");
 
+    double curr_time = 0.0;
+    DamBreak test(2.0, 1.0);
+
     // Переменные для сохранения
     pvd.variables = {"level"};
     pvd.variables += {"eta", [z](EuCell& cell) -> double { return cell[z].level; }};
-    pvd.variables += {"h",   [z](EuCell& cell) -> double { return cell[z].depth(); }};
+    pvd.variables += {"bed", [zb](EuCell& cell) -> double { return cell[zb]; }};
+    pvd.variables += {"h",   [z, zb](EuCell& cell) -> double { return cell[z].depth(cell[zb]); }};
     pvd.variables += {"u",   [z](EuCell& cell) -> double { return cell[z].velocity.x(); }};
     pvd.variables += {"v",   [z](EuCell& cell) -> double { return cell[z].velocity.y(); }};
+
+    pvd.variables += {"eta.exact", [test, &curr_time](EuCell& cell) -> double { return test.level(cell.x(), curr_time); }};
+    pvd.variables += {"h.exact",   [test, &curr_time](EuCell& cell) -> double { return test.depth(cell.x(), curr_time); }};
+    pvd.variables += {"u.exact",   [test, &curr_time](EuCell& cell) -> double { return test.speed(cell.x(), curr_time); }};
 
 	// Задание начальных данных
 	auto init_cells = [&]() {
 		mesh.for_each([&](EuCell& cell) {
-		    cell[z].level = 0.2 * std::exp(-100.0 * cell.center().squaredNorm());
+		    cell[z].level = cell.x() < 0.0 ? 0.0 : 1.0; //0.2 * std::exp(-100.0 * cell.center().squaredNorm());
 		    cell[z].velocity = Vector2d::Zero();
 	    });
 	};
@@ -89,11 +104,10 @@ int main(int argc, char** argv) {
 
     size_t n_step = 0;
     double next_write = 0.0;
-    double curr_time = 0.0;
-    double max_time = 0.5;
+    double max_time = 0.05;
 
     Stopwatch elapsed(true);
-    while (curr_time < max_time && n_step < 1000) {
+    while (curr_time < max_time) {
         if (curr_time >= next_write) {
             mpi::cout << "\tStep: " << std::setw(6) << n_step << ";"
                       << "\tTime: " << std::setw(8) << std::setprecision(3) << curr_time << "\n";
