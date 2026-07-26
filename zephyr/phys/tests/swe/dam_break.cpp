@@ -34,11 +34,10 @@ void DamBreak::compute() {
 	double x_a{0.0}, x_b{0.0}; // variables for dichotomy
 		
 	// Parameters for the dichotomy
-	double eps = 1.0e-6;
+	double eps = 1.0e-8;
 	int nmax = 1000;
 
 	double func = function(c_L, c_L, c_R);
-	std::cout << func << std::endl;
 	if (func < 0.0){
 		x_a = c_L; // func(cl)<0
 	}else{
@@ -46,7 +45,6 @@ void DamBreak::compute() {
 	}//end if
 
 	func = function(c_R, c_L, c_R);
-	std::cout << func << std::endl;
 	if (func < 0.0){
 		x_a = c_R; // func(cr)<0
 	} else {
@@ -60,7 +58,6 @@ void DamBreak::compute() {
 	int iter = 0;
 	while(std::fabs(x_a - x_b) > eps && iter < nmax) {
 		double mid = 0.5 * (x_a + x_b);
-		std::cout << x_a << " " << mid << " " << x_b << "\n";
 
 		func = function(mid, c_L, c_R);
 
@@ -81,12 +78,13 @@ void DamBreak::compute() {
 	h_mid = c_mid*c_mid/GRAV; //the water height hm
 	u_mid = 2.0*(c_L-c_mid); //the velocity um
 	v = h_mid*u_mid/(h_mid-h_R); //the velocity of the shock
-
-	std::cout << h_L << " " << h_mid << " " << h_R << "\n";
-	std::cout << u_mid << " " << v << "\n";
 }
 
 double DamBreak::depth(double x, double t) const {
+	if (t <= 0.0) {
+		return x < x0 ? h_L : h_R;
+	}
+
 	if (x <= x0 - c_L * t){
 		return h_L;
 	}
@@ -101,6 +99,8 @@ double DamBreak::depth(double x, double t) const {
 }
 
 double DamBreak::speed(double x, double t) const {
+	if (t <= 0.0) return 0.0;
+
 	if (x <= x0 - c_L * t) {
 		return 0.0;
 	}

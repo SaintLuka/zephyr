@@ -13,36 +13,33 @@ namespace zephyr::math {
 //      Мелкая вода
 // ============================================================================
 
-std::tuple<swe::Flux, double> HLL::calc_flux(const swe::PState &zL, const swe::PState &zR, double bed) {
+swe::Flux HLL::calc_flux(const swe::PState &zL1, const swe::PState &zR1) {
     using namespace swe;
-
-    // Нормальные скорости слева и справа
-    double u_L = zL.velocity.x();
-    double u_R = zR.velocity.x();
-
-    // Глубина слева и справа
-    double h_L = std::max(zL.depth(bed), 0.0);
-    double h_R = std::max(zR.depth(bed), 0.0);
+    z_assert(zL.depth >= 0.0 && zR.depth >= 0.0);
 
     // Сухое дно слева/справа
-    bool dry_L = h_L < 1.0e-8;
-    bool dry_R = h_R < 1.0e-8;
+    bool dry_L = zL1.depth < swe::min_depth;
+    bool dry_R = zR1.depth < swe::min_depth;
+
+    if (dry_L && dry_R) return {};
+
+    PState zL = dry_L ? PState{} : zL1;
+    PState zR = dry_R ? PState{} : zR1;
 
     // Скорость волн слева и справа
-    double c_L = dry_L ? 0.0 : std::sqrt(g * h_L);
-    double c_R = dry_R ? 0.0 : std::sqrt(g * h_R);
+    double c_L = std::sqrt(g * zL.h());
+    double c_R = std::sqrt(g * zR.h());
 
     // Оценки скоростей расходящихся волн
-    double S_L = dry_L ? (u_R - 2.0 * c_R) : min(u_L - c_L, u_R - c_R, 0.0);
-    double S_R = dry_R ? (u_L + 2.0 * c_L) : max(u_L + c_L, u_R + c_R, 0.0);
+    double S_L = dry_L ? (zR.u() - 2.0 * c_R) : min(zL.u() - c_L, zR.u() - c_R, 0.0);
+    double S_R = dry_R ? (zL.u() + 2.0 * c_L) : max(zL.u() + c_L, zR.u() + c_R, 0.0);
 
-    QState Q_L(zL, bed); // Консервативный вектор слева
-    QState Q_R(zR, bed); // Консервативный вектор справа
+    QState Q_L(zL); // Консервативный вектор слева
+    QState Q_R(zR); // Консервативный вектор справа
 
-    Flux F_L(zL, bed);   // Дифференциальный поток слева
-    Flux F_R(zR, bed);   // Дифференциальный поток справа
+    Flux F_L(zL);   // Дифференциальный поток слева
+    Flux F_R(zR);   // Дифференциальный поток справа
 
-    QState Q = (F_L.arr() - F_R.arr() + S_R * Q_R.arr() - S_L * Q_L.arr()) / (S_R - S_L);
     Flux F = (S_R * F_L.arr() - S_L * F_R.arr() + S_L * S_R * (Q_R.arr() - Q_L.arr())) / (S_R - S_L);
 
     if (F.arr().hasNaN()) {
@@ -54,12 +51,11 @@ std::tuple<swe::Flux, double> HLL::calc_flux(const swe::PState &zL, const swe::P
         std::cerr << "  F_HLL: " << F.arr().transpose() << "\n";
         throw std::runtime_error("HLL::calc_flux error: bad value");
     }
-
-    return {F, Q.depth};
+    return F;
 }
 
-std::tuple<swe::Flux, double> HLL::flux(const swe::PState &zL, const swe::PState &zR, double bed) const {
-    return HLL::calc_flux(zL, zR, bed);
+swe::Flux HLL::flux(const swe::PState &zL, const swe::PState &zR) const {
+    return HLL::calc_flux(zL, zR);
 }
 
 // ============================================================================

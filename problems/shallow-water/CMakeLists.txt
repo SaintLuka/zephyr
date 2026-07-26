@@ -1,4 +1,5 @@
-list(APPEND PROBLEMS swe_drop)
+list(APPEND PROBLEMS swe_lake)
+list(APPEND PROBLEMS swe_test_1D)
 list(APPEND PROBLEMS swe_tests)
 
 # Assuming all files in the directory are tests

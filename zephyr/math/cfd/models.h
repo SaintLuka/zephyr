@@ -21,23 +21,25 @@ namespace swe {
 /// @brief Гравитационная постоянная
 constexpr double g = 9.81;
 
+/// @brief Минимальная глубина
+constexpr double min_depth = 1.0e-8;
+
 struct QState;
 
 /// @brief Примитивный вектор состояния
 struct PState {
-    double   level;    ///< Уровень поверхности
+    double   depth;    ///< Глубина столба воды
     Vec2d_na velocity; ///< Тангенциальная скорость
 
     /// @brief Инициализация нулями
     PState();
 
     /// @brief Инициализация с полным заданием параметров
-    PState(double level, const Vector2d &velocity);
+    PState(double depth, const Vector2d &velocity);
 
     /// @brief Инициализация из консервативного вектора состояния,
     /// давление определяется с использованием УрС.
-    /// @param bed Уровень дна
-    PState(const QState &q, double bed);
+    PState(const QState &q);
 
     /// @brief Переводит вектор состояния в локальную систему координат
     void to_local(const Vector3d &normal);
@@ -51,20 +53,17 @@ struct PState {
     /// @brief Возвращает вектор состояния в глобальной системе координат
     PState in_global(const Vector3d &normal) const;
 
-    /// @brief Отражает систему координат
-    void inverse();
-
     /// @brief Уровень поверхности
-    double eta() const { return level; }
+    double surf(double bed) const { return bed + depth; }
 
-    /// @brief Глубина столба воды
-    double depth(double bed) const { return level - bed; }
+    /// @brief Глубина
+    double h() const { return depth; }
 
     /// @brief Скорость вдоль оси x
-    double vx() const { return velocity.x(); }
+    double u() const { return velocity.x(); }
 
     /// @brief Скорость вдоль оси y
-    double vy() const { return velocity.y(); }
+    double v() const { return velocity.y(); }
 
     /// @brief Квадрат модуля скорости
     double v2() const { return velocity.squaredNorm(); }
@@ -90,7 +89,7 @@ struct QState {
     QState(double depth, const Vector2d &momentum);
 
     /// @brief Преобразование из примитивного вектора состояния
-    QState(const PState &z, double bed);
+    QState(const PState &z);
 
     /// @brief Переводит вектор состояния в локальную систему координат
     void to_local(const Vector3d &normal);
@@ -119,10 +118,10 @@ struct Flux {
     Flux();
 
     /// @brief Инициализация с полным заданием параметров
-    Flux(double depth, const Vector2d &momentum);
+    Flux(double mass, const Vector2d &momentum);
 
     /// @brief Дифференциальный поток по вектору примитивных переменных
-    explicit Flux(const PState &z, double bed);
+    Flux(const PState& z);
 
     /// @brief Переводит вектор потока в локальную систему координат
     void to_local(const Vector3d &normal);
