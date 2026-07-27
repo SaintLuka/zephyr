@@ -5,6 +5,7 @@
 
 #include <zephyr/geom/generator/strip.h>
 #include <zephyr/phys/tests/swe/dam_break.h>
+#include <zephyr/phys/tests/swe/thacker_1d.h>
 
 #include <zephyr/math/solver/sw_solver.h>
 
@@ -29,19 +30,20 @@ using zephyr::utils::Stopwatch;
 int main() {
     threads::off();
 
-	DamBreak test(2.0, 1.0, 0.5);
-    //DamBreak test(2.0, 0.0, 0.5);
+	//DamBreak test(2.0, 1.0);
+    //DamBreak test(2.0, 0.0);
+	Thacker1D test;
 
 	// Генератор сетки
-	generator::Strip gen(0.0, 1.0);
+	generator::Strip gen(test.x_min(), test.x_max());
 	gen.set_boundaries({.left = Boundary::ZOE, .right = Boundary::ZOE});
-	gen.set_nx(2000);
+	gen.set_nx(500);
 
     // Создать сетку
     EuMesh mesh(gen);
 
     // Создать и настроить решатель
-    SwSolver solver(ConstBed::create(0.0));
+    SwSolver solver(test.topography());
     solver.set_accuracy(1);
     solver.set_CFL(0.5);
     solver.set_limiter("MC");
@@ -94,7 +96,7 @@ int main() {
 
     size_t n_step = 0;
     double next_write = 0.0;
-    double max_time = 0.2;
+    double max_time = test.max_time();
 
     Stopwatch elapsed(true);
     while (curr_time < max_time) {

@@ -20,6 +20,10 @@ public:
 
 	double speed(double x, double t) const override;
 
+	IBed::Ptr topography() const override {
+		return math::ConstBed::create(0.0);
+	}
+
 private:
 	/// @brief Computes the solution
 	void compute();

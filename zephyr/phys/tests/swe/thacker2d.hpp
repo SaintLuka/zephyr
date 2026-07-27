@@ -2,9 +2,9 @@
 #include "solution.hpp"
 
 /// @class Thacker2D
-/// @brief Computes %Thacker solutions in 2D
+/// @brief Computes %Thacker1D solutions in 2D
 /// @details
-/// Class that computes the solutions for %Thacker paraboloid, see \cite Thacker81.
+/// Class that computes the solutions for %Thacker1D paraboloid, see \cite Thacker81.
 class Thacker2D : public Solution {
 public:
 	/// @brief Constructor

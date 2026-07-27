@@ -1,17 +1,17 @@
 #pragma once
 #include "solution.hpp"
 
-/// @class Dressler_dam
+/// @class DresslerDam
 /// @brief Computes Dressler dam break solution
 /// @details
 /// Class that computes the solutions for a dam break with friction, see \cite Dressler52.
-class Dressler_dam : public Solution {
+class DresslerDam : public Solution {
 public:
 	/// @brief Constructor
-	explicit Dressler_dam(Parameters &);
+	explicit DresslerDam(Parameters &);
 
 	/// @brief Destructor
-	~Dressler_dam() final = default;
+	~DresslerDam() final = default;
 
 	/// @brief Computes the solution
 	void compute() override;

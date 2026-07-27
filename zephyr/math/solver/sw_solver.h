@@ -71,8 +71,8 @@ public:
 class ParabolicBed : public IBed {
     double coeff, bottom;
 public:
-    ParabolicBed(double coeff, double level)
-        : coeff(coeff), bottom(level) { }
+    ParabolicBed(double coeff, double bottom)
+        : coeff(coeff), bottom(bottom) { }
 
     /// @param coeff Коэффициент параболоида
     /// @param bottom Уровень нижней точки

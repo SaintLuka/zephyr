@@ -1,11 +1,10 @@
 #pragma once
 #include "solution.hpp"
 
-/// @class Sluice_gate
-// * @brief Computes dam break with a sluice gate solutions
-// * @details
-// * Class that computes the solutions for a dam break with a sluice gate without friction, see \cite Cozzolino15.
-// */
+//// @class Sluice_gate
+/// @brief Computes dam break with a sluice gate solutions
+/// @details Class that computes the solutions for a dam break with a sluice gate without friction, see \cite Cozzolino15.
+/// Шлюз открывается около дна, то есть в некоторой точке глубина водного слоя ограничивается сверху (ширина шлюза).
 class Sluice_gate : public Solution {
 public:
 	/// @brief Constructor

@@ -13,7 +13,7 @@
 #include "spherical.hpp"
 #include "macdonald_like.hpp"
 #include "macdonald_like_diffus.hpp"
-#include "thacker.hpp"
+#include "thacker_1d.h"
 #include "bedload.hpp"
 #include "thacker2d.hpp"
 #include "macdonaldb1.hpp"

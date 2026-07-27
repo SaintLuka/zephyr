@@ -7,6 +7,8 @@
 #include <zephyr/phys/tests/swe/dam_break.h>
 
 #include "zephyr/phys/tests/swe/rain.hpp"
+#include <zephyr/phys/tests/swe/sluice_gate.hpp>
+#include <zephyr/phys/tests/swe/thacker_1d.h>
 
 using namespace zephyr;
 using namespace zephyr::utils;
@@ -19,25 +21,23 @@ int main() {
 	params.ny_ex = 1;
 
 	params.choice = 3;
-	params.choicedomain = 1;
 
-	Rain test(params);
-	test.compute();
+	//Sluice_gate test(params);
 
-	//DamBreak test(1.0, 0.0, 0.0);
+	Thacker1D test;
 
 	pyplot plt;
 
-	auto xs = test.xs_; //np::linspace(-10.0, 10.0, 1000);
+	auto xs = np::linspace(-2.0, 2.0, 1000);
 
-	auto bed = test.bed_; //np::zeros_like(xs);
-	auto depth = test.depth_; //np::zeros_like(xs);
+	auto bed = np::zeros_like(xs);
+	auto depth = np::zeros_like(xs);
 	auto level = np::zeros_like(xs);
 
-	double t = 0.5;
+	double t = 0.0;
 	for (int i = 0; i < xs.size(); ++i) {
-		//bed[i] = bed(xs[i], t);
-		//depth[i] = test.depth(xs[i], t);
+		bed[i] = test.bed(xs[i]);
+		depth[i] = test.depth(xs[i], t);
 		level[i] = bed[i] + depth[i]; //test.level(xs[i], t);
 	}
 

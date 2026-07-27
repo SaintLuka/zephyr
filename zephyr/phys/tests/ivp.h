@@ -24,6 +24,7 @@ protected:
 
 public:
     virtual ~IVP() = default;
+
     /// @brief Получить название теста
     virtual std::string name() const { return "SomeTest"; }
 

@@ -69,7 +69,7 @@ Sluice_gate::Sluice_gate(Parameters& par) :Solution(par) {
 	lx_ = 10.;
 	xdam = lx_ / 2.;
 	dx_ = lx_ / nx_;
-	t_end_ = 6.;
+	t_end_ = 6.e-8;
 
 
 	//we also initialize a few variable that will be usefull later:

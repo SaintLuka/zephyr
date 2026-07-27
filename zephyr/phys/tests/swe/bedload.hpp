@@ -27,10 +27,4 @@ private:
 	double uexl, hexl, z0l, zexl, uexr, hexr, z0r, zexr; // boundary values
 	double alpha, beta, A, C, q, ucr2, p, ue2;
 	double k, f, d, s, tcr, c1, c2; // for MPM
-
-	/// @brief Copy constructor
-	Bedload(const Bedload &);
-
-	/// @brief operator=
-	Bedload & operator=(const Bedload &);
 };

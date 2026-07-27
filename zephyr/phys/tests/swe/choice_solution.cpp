@@ -352,7 +352,7 @@ Choice_solution::Choice_solution(Parameters & par){
 
 							switch (par.get_choice()){
 								case 3:
-									sol = new Dressler_dam(par);
+									sol = new DresslerDam(par);
 									break;
 
 								default:
@@ -393,27 +393,9 @@ Choice_solution::Choice_solution(Parameters & par){
 				case 4:
 					/******************************************************************************
 					 * Oscillations
-					 *  see Thacker.* and Sampson.* files for details (dimension, water heights, ...)
+					 *  see Thacker1D.* and Sampson.* files for details (dimension, water heights, ...)
 					 ******************************************************************************/
 					switch (par.get_choicedomain()){
-						case 1:
-
-							/******************************************************************************
-							 * L=4 m
-							 * 1: Planar surface in a parabola without friction (Thacker's solution)
-							 ******************************************************************************/
-
-							switch (par.get_choice()){
-								case 1:
-									sol = new Thacker(par);
-									break;
-
-								default:
-									cerr<< "This oscillation solution for L=4 m does not exist!"<< endl;
-									exit(EXIT_FAILURE);
-							}
-							break;
-
 						case 2:
 							/******************************************************************************
 							 * L=10000 m
@@ -709,8 +691,8 @@ Choice_solution::Choice_solution(Parameters & par){
 
 							/******************************************************************************
 							 * L=4 m
-							 * 1: radially-symmetrical paraboloid (Thacker's solution)
-							 * 2: Planar surface in a paraboloid (Thacker's solution)
+							 * 1: radially-symmetrical paraboloid (Thacker1D's solution)
+							 * 2: Planar surface in a paraboloid (Thacker1D's solution)
 							 ******************************************************************************/
 
 							switch (par.get_choice()){
