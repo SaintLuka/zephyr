@@ -2,19 +2,102 @@
 #include <iomanip>
 
 #include <zephyr/geom/vector.h>
+#include <zephyr/math/funcs.h>
 #include <zephyr/math/cfd/flux/hllc.h>
 
 using namespace zephyr::phys;
 
 namespace zephyr::math {
 
-inline double min(double x, double y, double z) {
-    return std::min(x, std::min(y, z));
+// ============================================================================
+//      Мелкая вода
+// ============================================================================
+
+swe::Flux HLLC::calc_flux(const swe::PState &zL1, const swe::PState &zR1) {
+    using namespace swe;
+    z_assert(zL.depth >= 0.0 && zR.depth >= 0.0);
+
+    // Сухое дно слева/справа
+    bool dry_L = zL1.depth < swe::min_depth;
+    bool dry_R = zR1.depth < swe::min_depth;
+
+    if (dry_L && dry_R) return {};
+
+    PState zL = dry_L ? PState{} : zL1;
+    PState zR = dry_R ? PState{} : zR1;
+
+    // Скорость волн слева и справа
+    double c_L = std::sqrt(g * zL.h());
+    double c_R = std::sqrt(g * zR.h());
+
+    // Оценки Эйнфельдта
+    double ue = 0.5*(zL.u() + zR.u()) + c_L - c_R;
+    double he = (1.0/(16.0 * g)) * std::pow(c_L + c_R + 0.5 * (zL.u() - zR.u()), 2);
+    double ce = std::sqrt(g * he);
+
+    // Оценки скоростей расходящихся волн
+    double S_L = dry_L ? (zR.u() - 2.0 * c_R) : std::min(zL.u() - c_L, ue - ce);
+    double S_R = dry_R ? (zL.u() + 2.0 * c_L) : std::max(zR.u() + c_R, ue + ce);
+    
+    assert(S_L < S_R);
+
+    // Перенос массы через левую/правую волну
+    double a_L = zL.h() * (S_L - zL.u());
+    double a_R = zR.h() * (S_R - zR.u());
+    
+    double S_C;
+    if (dry_L || dry_R) {
+        S_C = 0.5 * (S_L + S_R);
+    } else {
+        S_C = (a_R * S_L - a_L * S_R) / (a_R - a_L);
+    }
+
+    QState Q_L(zL); // Консервативный вектор слева
+    QState Q_R(zR); // Консервативный вектор справа
+
+    Flux F_L(zL);   // Дифференциальный поток слева
+    Flux F_R(zR);   // Дифференциальный поток справа
+
+    if (S_L >= 0.0) return F_L;
+    if (S_R <= 0.0) return F_R;
+
+    assert(S_L < S_C && S_C < S_R);
+
+    double h_sL = a_L / (S_L - S_C);
+    double h_sR = a_R / (S_R - S_C);
+
+    PState z_sL(h_sL, {S_C, zL.v()});
+    PState z_sR(h_sR, {S_C, zR.v()});
+
+    // Консервативный вектор слева/справа от контактного разрыва
+    QState Q_sL(z_sL);
+    QState Q_sR(z_sR);
+
+    Flux F = 0.5 * (F_L.arr() + F_R.arr() +
+            S_L * (Q_sL.arr() - Q_L.arr()) +
+            std::abs(S_C) * (Q_sL.arr() - Q_sR.arr()) +
+            S_R * (Q_sR.arr() - Q_R.arr())
+    );
+
+    if (F.arr().hasNaN()) {
+        std::cerr << "HLLC::calc_flux error\n";
+        std::cerr << "  z_L: " << zL << "\n";
+        std::cerr << "  z_R: " << zR << "\n";
+        std::cerr << "  c_L: " << c_L << "; c_R: " << c_R << "\n";
+        std::cerr << "  S_L: " << S_L << "; S_C: " << S_C << "; S_R: " << S_R << "\n";
+        std::cerr << "  F_HLLC: " << F << "\n";
+        throw std::runtime_error("HLLC::calc_flux error: bad value");
+    }
+    return F;
 }
 
-inline double max(double x, double y, double z) {
-    return std::max(x, std::max(y, z));
+swe::Flux HLLC::flux(const swe::PState &zL, const swe::PState &zR) const {
+    return HLLC::calc_flux(zL, zR);
 }
+
+// ============================================================================
+//      Одноматериальная газодинамика
+// ============================================================================
 
 smf::Flux HLLC::flux(const smf::PState &zL, const smf::PState &zR, const Eos &eos) const {
     return calc_flux(zL, zR, eos);
@@ -184,6 +267,10 @@ smf::WaveConfig3 HLLC::wave_config(
                              .QsL = Q_sL, .FsL = F_sL,
                              .QsR = Q_sR, .FsR = F_sR});
 }
+
+// ============================================================================
+//      Многоматериальная газодинамика
+// ============================================================================
 
 mmf::WaveConfig3 HLLC::wave_config(
         const MixturePT& mix,

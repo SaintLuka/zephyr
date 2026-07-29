@@ -31,7 +31,7 @@ using zephyr::utils::Stopwatch;
 int main() {
     threads::off();
 
-    //DamBreak test(1);
+    //DamBreak test(2);
 	//Thacker1D test;
 	Step test;
 
@@ -46,7 +46,7 @@ int main() {
     // Создать и настроить решатель
     SwSolver solver(test.topography());
     solver.set_accuracy(1);
-    solver.set_CFL(0.5);
+    solver.set_CFL(0.2);
     solver.set_limiter("MC");
     solver.set_method(Fluxes::HLL);
 

@@ -31,7 +31,7 @@ int main() {
     threads::off();
 
 	// Двумерный тест
-	Thacker2D test(0);
+	Thacker2D test(2);
 
 	// Генератор сетки
 	generator::Rectangle gen(test.x_min(), test.x_max(), test.y_min(), test.y_max());
@@ -47,7 +47,7 @@ int main() {
     solver.set_accuracy(1);
     solver.set_CFL(0.5);
     solver.set_limiter("MC");
-    solver.set_method(Fluxes::HLL);
+    solver.set_method(Fluxes::HLLC);
 
     // Добавляем типы на сетку, выбираем основной слой
     auto data = solver.add_types(mesh);
