@@ -61,8 +61,25 @@ void Variables::append(const char* name) {
         m_list.emplace_back("face3D.rotation");
     }
     else {
+        if (contains_name(name)) return;
         m_list.emplace_back(name);
     }
+}
+
+bool Variables::contains_name(const char *name) const {
+    const auto it = std::ranges::find_if(m_list,
+        [&name](const Variable& var) -> bool {
+           return var.name() == name;
+        });
+    if (it != m_list.end()) {
+        std::cerr << "Attempt to add a variable with an existing name '" << name << "'\n";
+        return true;
+    }
+    return false;
+}
+
+bool Variables::contains_name(const std::string& name) const {
+    return contains_name(name.c_str());
 }
 
 void Variables::append(const std::string& name) {
@@ -95,6 +112,7 @@ void Variables::append(const std::vector<std::string> &names) {
 
 void Variables::append(const Variables &variables) {
     for (auto& desc: variables.list()) {
+        if (contains_name(desc.name())) return;
         m_list.emplace_back(desc);
     }
 }

@@ -18,7 +18,7 @@ using namespace geom;
 /// @brief Двумерная мелкая вода (Shallow-Water equations)
 namespace swe {
 
-/// @brief Гравитационная постоянная
+/// @brief Ускорение свободного падения
 constexpr double g = 9.81;
 
 /// @brief Минимальная глубина

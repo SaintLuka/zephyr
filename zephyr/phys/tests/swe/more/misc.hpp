@@ -12,7 +12,6 @@
 #define MAX(a,b) (a>=b?a:b)
 #define MIN(a,b) (a<=b?a:b)
 
-#define GRAV 9.81
 #define GRAV_DEM 4.905
 #define PI 3.14159265
 #define EPSILON_H 1.e-12
@@ -26,6 +25,7 @@ using std::exp;
 using std::complex;
 
 using namespace std;
+inline constexpr double GRAV = 9.81;
 
 using Table1D = std::vector<double>;
 using Table2D = std::vector<std::vector<double>>;

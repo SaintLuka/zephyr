@@ -116,13 +116,17 @@ void SwSolver::update(EuMesh &mesh) {
 
 void SwSolver::compute_dt(EuMesh &mesh) {
     double dt = mesh.min([this](EuCell cell) -> double {
-        double h = std::max(cell[part.init].depth, 0.0);
+        double h = cell[part.init].depth;
+        if (h < swe::min_depth) {
+            // Почему?
+            return std::numeric_limits<double>::max();
+        }
         double c = std::sqrt(swe::g * h);
         Vector2d v = cell[part.init].velocity;
-        //return std::min(cell.hx(), cell.hy()) / (v.norm() + c);
+        return std::min(cell.hx(), cell.hy()) / (v.norm() + c);
 
         // Условие строго из Куликовского
-        return 1.0 / ((std::abs(v.x()) + c) / cell.hx() + (std::abs(v.y()) + c) / cell.hy());
+        //return 1.0 / ((std::abs(v.x()) + c) / cell.hx() + (std::abs(v.y()) + c) / cell.hy());
     });
 
     dt = std::min(m_CFL * dt, m_max_dt);

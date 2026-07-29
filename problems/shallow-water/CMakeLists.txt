@@ -1,6 +1,6 @@
 list(APPEND PROBLEMS swe_lake)
 list(APPEND PROBLEMS swe_test_1D)
-list(APPEND PROBLEMS swe_tests)
+list(APPEND PROBLEMS swe_test_2D)
 
 # Assuming all files in the directory are tests
 if (ZEPHYR_PROBLEMS_ALL)

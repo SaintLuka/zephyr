@@ -1,12 +1,10 @@
-/// @file swe_test_1D.cpp
-/// @brief Одномерные тесты, часто с аналитическим решением.
+/// @file swe_test_2D.cpp
+/// @brief Двумерные тесты, часто с аналитическим решением.
 
 #include <iomanip>
 
-#include <zephyr/geom/generator/strip.h>
-#include <zephyr/phys/tests/swe/dam_break.h>
+#include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/phys/tests/swe/thacker.h>
-#include <zephyr/phys/tests/swe/step.h>
 
 #include <zephyr/math/solver/sw_solver.h>
 
@@ -18,7 +16,7 @@
 #include <zephyr/utils/stopwatch.h>
 
 using namespace zephyr::io;
-using namespace zephyr::phys::swe;
+using namespace zephyr::phys;
 using namespace zephyr::math;
 
 using zephyr::mesh::EuMesh;
@@ -27,18 +25,19 @@ using zephyr::math::SwSolver;
 using zephyr::utils::mpi;
 using zephyr::utils::threads;
 using zephyr::utils::Stopwatch;
+using zephyr::phys::swe::Thacker2D;
 
 int main() {
     threads::off();
 
-    //DamBreak test(1);
-	//Thacker1D test;
-	Step test;
+	// Двумерный тест
+	Thacker2D test(0);
 
 	// Генератор сетки
-	generator::Strip gen(test.x_min(), test.x_max());
-	gen.set_boundaries({.left = Boundary::ZOE, .right = Boundary::ZOE});
-	gen.set_nx(500);
+	generator::Rectangle gen(test.x_min(), test.x_max(), test.y_min(), test.y_max());
+	gen.set_boundaries({.left = Boundary::ZOE, .right = Boundary::ZOE,
+					    .bottom = Boundary::ZOE, .top = Boundary::ZOE});
+	gen.set_nx(200);
 
     // Создать сетку
     EuMesh mesh(gen);
@@ -62,6 +61,7 @@ int main() {
 
     // Файл для записи
     PvdFile pvd("mesh", "output");
+	pvd.unique_nodes = true;
 
     double curr_time = 0.0;
 
@@ -73,17 +73,17 @@ int main() {
     pvd.variables += {"vel.x", [z](EuCell& cell) -> double { return cell[z].u(); }};
     pvd.variables += {"vel.y", [z](EuCell& cell) -> double { return cell[z].v(); }};
 
-    pvd.variables += {"exact.surf",  [test, &curr_time](EuCell& cell) -> double { return test.level(cell.x(), curr_time); }};
-    pvd.variables += {"exact.depth", [test, &curr_time](EuCell& cell) -> double { return test.depth(cell.x(), curr_time); }};
-    pvd.variables += {"exact.vel",   [test, &curr_time](EuCell& cell) -> double { return test.speed(cell.x(), curr_time); }};
+    pvd.variables += {"exact.surf",  [test, &curr_time](EuCell& cell) -> double { return test.level(cell.center(), curr_time); }};
+    pvd.variables += {"exact.depth", [test, &curr_time](EuCell& cell) -> double { return test.depth(cell.center(), curr_time); }};
+    pvd.variables += {"exact.vel.x", [test, &curr_time](EuCell& cell) -> double { return test.speed(cell.center(), curr_time).x(); }};
+    pvd.variables += {"exact.vel.y", [test, &curr_time](EuCell& cell) -> double { return test.speed(cell.center(), curr_time).y(); }};
 
 	// Задание начальных данных
 	auto init_cells = [&]() {
 		mesh.for_each([&](EuCell& cell) {
-			cell[zb] = test.bed(cell.x());
-			cell[z].depth = test.depth(cell.x(), curr_time);
-			cell[z].velocity.x() = test.speed(cell.x(), curr_time);
-			cell[z].velocity.y() = 0.0;
+			cell[zb] = test.bed(cell.center());
+			cell[z].depth = test.depth(cell.center(), curr_time);
+			cell[z].velocity = test.speed(cell.center(), curr_time);
 	    });
 	};
 
@@ -116,6 +116,8 @@ int main() {
         solver.update(mesh);
         solver.set_flags(mesh);
         mesh.refine();
+
+    	std::cout << "dt: " << solver.dt() << "\n";
 
         curr_time += solver.dt();
         n_step += 1;

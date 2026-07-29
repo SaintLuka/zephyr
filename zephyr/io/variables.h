@@ -60,6 +60,14 @@ public:
     /// @brief Аналогично функции append(const char* )
     void append(const std::string &name);
 
+    /// @brief Список уже содержит переменную с именем name?
+    /// Если true, то выводит предупреждение
+    bool contains_name(const char *name) const;
+
+    /// @brief Список уже содержит переменную с именем name?
+    /// Если true, то выводит предупреждение
+    bool contains_name(const std::string& name) const;
+
     /// @brief Добавить в список переменную с полным описанием
     /// @param name Имя переменной
     /// @param n_components Размер вектора для хранения переменной
@@ -78,24 +86,28 @@ public:
     /// @endcode
     template<class T>
     void append(const char *name, int n_components, const WriteCell<T> &func) {
+        if (contains_name(name)) return;
         m_list.emplace_back(name, n_components, func);
     }
 
     /// @brief Аналогично функции append(const char*, ...)
     template<class T>
     void append(const std::string &name, int n_components, const WriteCell<T> &func) {
+        if (contains_name(name)) return;
         m_list.emplace_back(name, n_components, func);
     }
 
     /// @brief Аналогично функции append(const char*, ... )
     template<class T>
     void append(const char *name, const WriteCell<T> &func) {
+        if (contains_name(name)) return;
         m_list.emplace_back(name, 1, func);
     }
 
     /// @brief Аналогично функции append(const char*, ...)
     template<class T>
     void append(const std::string &name, const WriteCell<T> &func) {
+        if (contains_name(name)) return;
         m_list.emplace_back(name, 1, func);
     }
 
@@ -103,6 +115,7 @@ public:
     template <typename T = double>
     std::enable_if_t<std::is_arithmetic_v<T>, void>
     append(const std::string& name, std::function<T(mesh::EuCell&)> f) {
+        if (contains_name(name)) return;
         m_list.emplace_back(name, 1, WriteCell<T>(
                 [f](mesh::EuCell& cell, T *out) {
                     out[0] = f(cell);
@@ -113,6 +126,7 @@ public:
     template <typename T>
     std::enable_if_t<std::is_same_v<T, geom::Vector3d>, void>
     append(const std::string& name, std::function<geom::Vector3d(mesh::EuCell&)> f) {
+        if (contains_name(name)) return;
         m_list.emplace_back(name, 3, WriteCell<double>(
                 [f](mesh::EuCell& cell, double *out) {
                     *reinterpret_cast<geom::Vector3d*>(out) = f(cell);
@@ -128,7 +142,10 @@ public:
 
     /// @brief Добавить существующий список к текущему
     void operator+=(const Variables& other) {
-        for (const auto& var: other.m_list) { m_list.emplace_back(var); }
+        for (const auto& var: other.m_list) {
+            if (contains_name(var.name())) return;
+            m_list.emplace_back(var);
+        }
     }
 
     /// @brief Упрощенный синтаксис для добавления Storable полей типа double/Vector3d

@@ -1,10 +1,22 @@
 #include <cmath>
-#include <iostream>
 #include <zephyr/phys/tests/swe/dam_break.h>
 
-namespace zephyr::phys {
+namespace zephyr::phys::swe {
 
-constexpr double GRAV = 9.81;
+DamBreak::DamBreak(int sol) {
+	if (sol == 1) {
+		h_L = 1.0;
+		h_R = 0.2;
+		x0 = 0.0;
+	}
+	else {
+		h_L = 0.3;
+		h_R = 0.0;
+		x0 = 0.0;
+	}
+
+	compute();
+}
 
 DamBreak::DamBreak(double depth_L, double depth_R, double x_dam) {
 	h_L = depth_L;
@@ -113,4 +125,4 @@ double DamBreak::speed(double x, double t) const {
 	return 0.0;
 }
 
-} // namespace zephyr::phys
+} // namespace zephyr::phys::swe
