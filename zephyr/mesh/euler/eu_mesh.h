@@ -319,7 +319,7 @@ public:
     /// @{ @name Работа с уникальными узлами
     ///
     /// @brief Заполнен ли массив с уникальными узлами?
-    bool has_nodes() const { return !m_local_nodes.empty(); }
+    bool unique_nodes() const { return !m_local_nodes.empty(); }
 
     /// @brief Ссылка на массив уникальных узлов
     const AmrNodes& nodes() const { return m_local_nodes; }

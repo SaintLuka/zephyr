@@ -47,6 +47,9 @@ Rectangle::Rectangle(const Json& config)
         m_voronoi = config["voronoi"].as<bool>();
     }
 
+    // Адаптивная по умолчанию
+    m_adaptive = !m_voronoi;
+
     if (!config["size"]) {
         throw std::runtime_error("Rectangle config doesn't contain key 'size'");
     }
@@ -84,6 +87,9 @@ Rectangle::Rectangle(double xmin, double xmax, double ymin, double ymax, bool vo
         m_xmin(xmin), m_xmax(xmax),
         m_ymin(ymin), m_ymax(ymax),
         m_voronoi(voronoi) {
+    if (!voronoi) {
+        set_adaptive(true);
+    }
     check_params();
 }
 
@@ -463,8 +469,8 @@ Grid Rectangle::create_voronoi() const {
 }
 
 void Rectangle::initialize(AmrCells& cells) const {
-    if (m_voronoi) {
-        throw std::runtime_error("Rectangle::initialize: can't initialize voronoi grid");
+    if (m_voronoi && !m_adaptive) {
+        throw std::runtime_error("Rectangle::initialize: can't initialize voronoi grid and classic cartesian");
     }
     check_size(m_size);
 

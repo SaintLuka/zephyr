@@ -600,12 +600,6 @@ int EuMesh::check_base() const {
         return -1;
     }
 
-    // Только для адаптивных сеток
-    if (!m_locals.adaptive()) {
-        std::cout << "\tOnly adaptive meshes\n";
-        return -1;
-    }
-
     int res = 0;
     for (index_t ic = 0; ic < m_locals.size(); ++ic) {
         if (m_locals.index[ic] < 0 || m_locals.index[ic] != ic) {
@@ -618,39 +612,71 @@ int EuMesh::check_base() const {
             return -1;
         }
 
-        // Число граней
-        for (int i = 0; i < FpC(dim); ++i) {
-            if (m_locals.faces.is_undefined(m_locals.face_begin[ic] + i)) {
-                std::cout << "\tCell has no one of main faces\n";
+        // Проверим число вершин
+        int n_nodes = m_locals.node_count(ic);
+        int n_max_nodes = m_locals.max_node_count(ic);
+        if (m_locals.adaptive()) {
+            if ((dim == 2 && n_nodes == n_max_nodes && n_max_nodes != 9) ||
+                (dim == 3 && n_nodes == n_max_nodes && n_max_nodes != 27)) {
+                std::cout << "\tCell has wrong node count " << n_nodes << " " << n_max_nodes << "\n";
+                m_locals.print_info(ic);
+                return -1;
+            }
+        }
+        else {
+            if (n_nodes != n_max_nodes) {
+                std::cout << "\tCell has strange number of nodes (" << n_nodes << ")\n";
+                m_locals.print_info(ic);
+                return -1;
+            }
+            if (n_nodes < dim + 1) {
+                std::cout << "\tCell has too little nodes (" << n_nodes << ")\n";
                 m_locals.print_info(ic);
                 return -1;
             }
         }
 
-        if (m_locals.face_count(ic) > FpC(dim)) {
-            std::cout << "\tCell has too much faces (" << m_locals.face_count(ic) << ")\n";
-            m_locals.print_info(ic);
-            return -1;
-        }
-
-        // Проверим число вершин
-        int n_nodes = m_locals.node_count(ic);
-        int n_max_nodes = m_locals.max_node_count(ic);
-        if ((dim == 2 && n_nodes == n_max_nodes && n_max_nodes != 9) ||
-            (dim == 3 && n_nodes == n_max_nodes && n_max_nodes != 27)) {
-            std::cout << "\tCell has wrong node count " << n_nodes << " " << n_max_nodes << "\n";
-            m_locals.print_info(ic);
-            return -1;
-        }
-
         // Проверим число граней
         int n_faces = m_locals.face_count(ic);
         int n_max_faces = m_locals.max_face_count(ic);
-        if ((dim == 2 && (n_faces > n_max_faces || n_max_faces != 8)) ||
-            (dim == 3 && (n_faces > n_max_faces || n_max_faces != 24))) {
-            std::cout << "\tCell has wrong face count " << n_faces << " " << n_max_faces << "\n";
-            m_locals.print_info(ic);
-            return -1;
+        if (m_locals.adaptive()) {
+            for (int i = 0; i < FpC(dim); ++i) {
+                if (m_locals.faces.is_undefined(m_locals.face_begin[ic] + i)) {
+                    std::cout << "\tCell has no one of main faces\n";
+                    m_locals.print_info(ic);
+                    return -1;
+                }
+            }
+            if (n_faces > FpC(dim)) {
+                std::cout << "\tCell has too much faces (" << m_locals.face_count(ic) << ")\n";
+                m_locals.print_info(ic);
+                return -1;
+            }
+            if ((dim == 2 && (n_faces > n_max_faces || n_max_faces != 8)) ||
+                (dim == 3 && (n_faces > n_max_faces || n_max_faces != 24))) {
+                std::cout << "\tCell has wrong face count " << n_faces << " " << n_max_faces << "\n";
+                m_locals.print_info(ic);
+                return -1;
+            }
+        }
+        else {
+            if (n_faces != n_max_faces) {
+                std::cout << "\tCell has strange number of faces (" << n_faces << ")\n";
+                m_locals.print_info(ic);
+                return -1;
+            }
+            if (n_faces < dim + 1) {
+                std::cout << "\tCell has too little faces (" << n_max_faces << ")\n";
+                m_locals.print_info(ic);
+                return -1;
+            }
+            for (int i = 0; i < n_faces; ++i) {
+                if (m_locals.faces.is_undefined(m_locals.face_begin[ic] + i)) {
+                    std::cout << "\tCell has undefined face\n";
+                    m_locals.print_info(ic);
+                    return -1;
+                }
+            }
         }
 
         // Правильное задание геометрии
@@ -838,7 +864,7 @@ EuCell EuMesh::operator()(int i, int j, int k) {
 }
 
 void EuMesh::make_unique_nodes() {
-    if (has_nodes()) return;
+    if (unique_nodes()) return;
     m_local_nodes.setup_for(m_locals);
 }
 

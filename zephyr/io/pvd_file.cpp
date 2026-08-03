@@ -139,7 +139,7 @@ void PvdFile::save(mesh::EuMesh& mesh, double timestep) {
     if (unique_nodes) {
         mesh.make_unique_nodes();
     }
-    if (mesh.has_nodes()) {
+    if (mesh.unique_nodes()) {
         VtuFile::save(get_filename(), mesh.locals(), mesh.nodes(), variables, polyhedral);
     }
     else {

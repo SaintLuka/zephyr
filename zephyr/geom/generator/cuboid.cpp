@@ -22,6 +22,9 @@ Cuboid::Cuboid(const Json& config)
       m_ymin(0.0), m_ymax(1.0),
       m_zmin(0.0), m_zmax(1.0) {
 
+    // Адаптивная по умолчанию
+    m_adaptive = true;
+
     if (!config["geometry"]) {
         throw std::runtime_error("Cuboid config doesn't contain key 'geometry'");
     }
@@ -84,6 +87,8 @@ Cuboid::Cuboid(double xmin, double xmax, double ymin, double ymax, double zmin, 
         m_xmin(xmin), m_xmax(xmax),
         m_ymin(ymin), m_ymax(ymax),
         m_zmin(zmin), m_zmax(zmax) {
+    // Адаптивная по умолчанию
+    m_adaptive = true;
     check_params();
 }
 
@@ -298,6 +303,10 @@ Grid Cuboid::make() const {
 }
 
 void Cuboid::initialize(AmrCells& cells) const {
+    if (!m_adaptive) {
+        throw std::runtime_error("Cuboid::initialize: can initialize only AMR cartesian mesh");
+    }
+
     bool x_period = periodic_along_x();
     bool y_period = periodic_along_y();
     bool z_period = periodic_along_z();

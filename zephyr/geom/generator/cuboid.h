@@ -6,6 +6,7 @@
 namespace zephyr::geom::generator {
 
 /// @brief Генератор декартовой сетки внутри параллелепипеда.
+/// По умолчанию генерируется адаптивная сетка!
 class Cuboid final : public Generator {
 public:
     using Ptr = std::shared_ptr<Cuboid>;
@@ -77,7 +78,7 @@ public:
     Grid make() const override;
 
     /// @brief Может инициализировать хранилище
-    bool can_initialize() const override { return true; }
+    bool can_initialize() const override { return m_adaptive; }
 
     /// @brief Инициализация SoA-хранилища сетки
     void initialize(mesh::AmrCells& cells) const override;

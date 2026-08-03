@@ -172,19 +172,76 @@ int AmrCells::check_geometry(index_t ic) const {
             return -1;
         }
 
-        // Вершины грани перечислены в правильном порядке
-        if (m_dim > 2) {
-            Vector3d v0 = verts[node_begin[ic] + faces.vertices[iface][0]];
-            Vector3d v1 = verts[node_begin[ic] + faces.vertices[iface][1]];
-            Vector3d v2 = verts[node_begin[ic] + faces.vertices[iface][2]];
-            Vector3d v3 = verts[node_begin[ic] + faces.vertices[iface][3]];
-
-            Vector3d n1 = (v2 - v1).cross(v0 - v1);
-            Vector3d n2 = (v1 - v2).cross(v3 - v2);
-            if (n1.dot(n2) < 0.0) {
-                std::cout << "Wrong order of vertices on face\n";
+        // Число вершин грани
+        int n_verts_per_face = 0;
+        for (auto iv: faces.vertices[iface]) {
+            if (iv >= 0) {
+                ++n_verts_per_face;
+            }
+            if (iv >= max_node_count(ic)) {
+                std::cout << "\tWrong local vertex index\n";
                 print_info(ic);
                 return -1;
+            }
+        }
+        if (n_verts_per_face < m_dim) {
+            std::cout << "\tWrong number of vertices in face\n";
+            print_info(ic);
+            return -1;
+        }
+        // Должны быть проинициализированы как -1
+        for (int i = n_verts_per_face; i < AmrFaces::max_vertices; ++i) {
+            if (faces.vertices[iface][i] >= 0) {
+                std::cout << "\tLocal vertices indices should be undefined\n";
+                print_info(ic);
+                return -1;
+            }
+        }
+
+        // Число вершин адаптивной ячейки фиксированно
+        if (m_adaptive && n_verts_per_face != indexing::VpF(m_dim)) {
+            std::cout << "\tWrong number of vertices in face\n";
+            print_info(ic);
+            return -1;
+        }
+
+        // Вершины грани перечислены в правильном порядке
+        if (m_dim > 2) {
+            if (m_adaptive) {
+                // Обход по кривой Мортона (вроде как)
+                Vector3d v0 = verts[node_begin[ic] + faces.vertices[iface][0]];
+                Vector3d v1 = verts[node_begin[ic] + faces.vertices[iface][1]];
+                Vector3d v2 = verts[node_begin[ic] + faces.vertices[iface][2]];
+                Vector3d v3 = verts[node_begin[ic] + faces.vertices[iface][3]];
+
+                Vector3d n1 = (v2 - v1).cross(v0 - v1);
+                Vector3d n2 = (v1 - v2).cross(v3 - v2);
+                if (n1.dot(n2) < 0.0) {
+                    std::cout << "Wrong order of vertices on face (AMR)\n";
+                    print_info(ic);
+                    return -1;
+                }
+            }
+            else {
+                // Обход против часовой
+                std::vector<Vector3d> poly(n_verts_per_face);
+                for (int i = 0; i < n_verts_per_face; ++i) {
+                    int iv = faces.vertices[iface][i];
+                    poly[i] = verts[node_begin[ic] + iv];
+                }
+                // Проверить сортировку?
+                Vector3d face_c = faces.center[iface];
+                Vector3d face_n = faces.normal[iface];
+                for (int i = 0; i < n_verts_per_face; ++i) {
+                    int j = (i + 1) % n_verts_per_face;
+                    Vector3d v1 = poly[i] - face_c;
+                    Vector3d v2 = poly[j] - face_c;
+                    if (v1.cross(v2).dot(face_n) < 0.0) {
+                        std::cout << "Wrong order of vertices on face (general)\n";
+                        print_info(ic);
+                        return -1;
+                    }
+                }
             }
         }
     }
@@ -192,6 +249,9 @@ int AmrCells::check_geometry(index_t ic) const {
 }
 
 int AmrCells::check_base_face_orientation(index_t ic) const {
+    // Для обычных сеток проверять нечего
+    if (!m_adaptive) return 0;
+
     if (m_dim == 2) {
         Vector3d nx1 = faces.normal[face_begin[ic] + Side3D::L];
         Vector3d nx2 = faces.normal[face_begin[ic] + Side3D::R];
@@ -256,6 +316,9 @@ int AmrCells::check_base_face_orientation(index_t ic) const {
 }
 
 int AmrCells::check_base_vertices_order(index_t ic) const {
+    // Для обычных сеток проверять нечего
+    if (!m_adaptive) return 0;
+
     const double h = linear_size(ic);
     auto close = [h](Vector3d& x, Vector3d& y) -> bool {
         return (x - y).norm() < 1.0e-6 * h;
@@ -305,7 +368,7 @@ int AmrCells::check_base_vertices_order(index_t ic) const {
         }
 
         // Пересечения граней по нужным вершинам
-        if (cross_face(face_begin[ic], Side2D::LEFT, Side2D::BOTTOM), SqQuad::iss<-1, -1>()) {
+        if (cross_face(face_begin[ic], Side2D::LEFT, Side2D::BOTTOM) != SqQuad::iss<-1, -1>()) {
             bad = true;
         }
         if (cross_face(face_begin[ic], Side2D::LEFT[0], Side2D::TOP) != SqQuad::iss<-1, +1>() &&
@@ -334,31 +397,30 @@ int AmrCells::check_base_vertices_order(index_t ic) const {
         bool bad = false;
         static bool first = true;
         if (first) {
-            std::cerr << "Can't check 3D cell!!!\n";
             first = false;
         }
-        /*
-        // Индекс пересечения трех граней
-        auto cross_face = [](const Faces& faces, Side3D side1, Side3D side2, Side3D side3) -> int {
-            auto& face1 = faces[side1];
-            auto& face2 = faces[side2];
-            auto& face3 = faces[side3];
 
-            if (face1.is_undefined()) {
+        // Индекс пересечения трех граней
+        auto cross_face = [&](index_t iface_base, Side3D side1, Side3D side2, Side3D side3) -> int {
+            index_t iface = iface_base + side1;
+            index_t jface = iface_base + side2;
+            index_t kface = iface_base + side3;
+
+            if (faces.is_undefined(iface)) {
                 return 100;
             }
-            if (face2.is_undefined()) {
+            if (faces.is_undefined(iface)) {
                 return 100;
             }
-            if (face3.is_undefined()) {
+            if (faces.is_undefined(iface)) {
                 return 100;
             }
             for (int i: {0, 1, 2, 3}) {
                 for (int j: {0, 1, 2, 3}) {
                     for (int k: {0, 1, 2, 3}) {
-                        if (face1.vertices[i] == face2.vertices[j] &&
-                            face2.vertices[j] == face3.vertices[k]) {
-                            return face1.vertices[i];
+                        if (faces.vertices[iface][i] == faces.vertices[jface][j] &&
+                            faces.vertices[iface][i] == faces.vertices[kface][k]) {
+                            return faces.vertices[iface][i];
                         }
                     }
                 }
@@ -391,14 +453,24 @@ int AmrCells::check_base_vertices_order(index_t ic) const {
             }
         }
 
-        // Пересечения граней по нужным вершинам ???
+        // Пересечение трёх сторон по базовой вершине
+#define check_base_vertex(i, j, k) if (cross_face(face_begin[ic], Side3D::by_dir<i, 0, 0>(), Side3D::by_dir<0, j, 0>(), Side3D::by_dir<0, 0, k>()) != SqCube::iss<i, j, k>()) bad = true;
+
+        // Пересечения граней по нужным вершинам
+        check_base_vertex(-1, -1, -1);
+        check_base_vertex(+1, -1, -1);
+        check_base_vertex(-1, +1, -1);
+        check_base_vertex(+1, +1, -1);
+        check_base_vertex(-1, -1, +1);
+        check_base_vertex(+1, -1, +1);
+        check_base_vertex(-1, +1, +1);
+        check_base_vertex(+1, +1, +1);
 
         if (bad) {
             std::cout << "\tBad arrangement of vertices in cell (3D)\n";
             print_info(ic);
             return -1;
         }
-         */
     }
 
     return 0;
@@ -517,7 +589,7 @@ int AmrCells::check_connectivity(index_t ic, const AmrCells& aliens) const {
                 return -1;
             }
             if (adj.rotation[iface] != 0) {
-                std::cout << "\tBoundary face should point to origin cell (rotation)\n";
+                std::cout << "\tBoundary face should have zero rotation\n";
                 print_info(ic);
                 return -1;
             }

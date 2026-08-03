@@ -7,6 +7,7 @@ namespace zephyr::geom::generator {
 
 /// @brief Простой класс для генерации декартовой сетки
 /// или сетки из ячеек Вороного внутри прямоугольной области.
+/// По умолчанию генерируется адаптивная сетка!
 class Rectangle final : public Generator {
 public:
     using Ptr = std::shared_ptr<Rectangle>;
@@ -77,8 +78,8 @@ public:
     /// @brief Создать сетку общего вида
     Grid make() const override;
 
-    /// @brief Может инициализировать хранилище (для декартовой сетки)
-    bool can_initialize() const override { return !m_voronoi; }
+    /// @brief Может инициализировать хранилище (для адаптивной декартовой сетки)
+    bool can_initialize() const override { return m_adaptive && !m_voronoi; }
 
     /// @brief Инициализация SoA-хранилища сетки
     void initialize(mesh::AmrCells& cells) const override;

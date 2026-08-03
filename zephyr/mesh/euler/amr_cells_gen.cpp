@@ -237,6 +237,7 @@ AmrCells::AmrCells(const generator::Rectangle& rect) {
             faces.adjacent.index[iface + side] = neib_index(i, j, side);
             faces.adjacent.alien[iface + side] = -1;
             faces.adjacent.basic[iface + side] = ic;
+            faces.adjacent.rotation[iface + side] = 0;
             faces.vertices[iface + side].fill(-1);
         }
 
@@ -394,6 +395,7 @@ AmrCells::AmrCells(const generator::Cuboid& c) {
             faces.adjacent.index[iface + side] = neib_index(i, j, k, side);
             faces.adjacent.alien[iface + side] = -1;
             faces.adjacent.basic[iface + side] = ic;
+            faces.adjacent.rotation[iface + side] = 0;
             faces.vertices[iface + side].fill(-1);
         }
 
@@ -525,6 +527,7 @@ AmrCells::AmrCells(const Grid& grid) {
             faces.adjacent.index[iface] = face.neib();
             faces.adjacent.alien[iface] = -1;
             faces.adjacent.basic[iface] = ic;
+            faces.adjacent.rotation[iface] = 0;
 
             if (faces.is_boundary(iface)) {
                 faces.adjacent.index[iface] = ic;
