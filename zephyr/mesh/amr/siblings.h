@@ -48,7 +48,7 @@ bool can_coarse(AmrCells& cells, int ic) {
         // локальный z-индекс
         auto z = cells.z_idx[ic] % CpC(dim);
 
-        index_t jface = cells.face_begin[ic] + sides[z];
+        index_t jface = cells.faces.offsets[ic] + sides[z];
 
         if (adj.rank[jface] != cells.rank[ic]) {
             // Сосед на другом процессе
@@ -103,7 +103,7 @@ std::array<int, CpC(dim) - 1> get_siblings(AmrCells &cells, index_t ic) {
         // локальный z-индекс
         auto z = cells.z_idx[jc] % CpC(dim);
 
-        index_t iface = cells.face_begin[jc] + sides[z];
+        index_t iface = cells.faces.offsets[jc] + sides[z];
 
 #if SCRUTINY
         // Следующие недоразумения должны были быть устранены после выполнения
@@ -195,7 +195,7 @@ bool main_border_child(AmrCells& locals, index_t ic, int rank) {
         if (z_idx < min_z_idx) {
             // Проверяем, что сиблинг у границы
             bool on_border = false;
-            for (auto iface: locals.faces_range(is)) {
+            for (auto iface: locals.faces.range(is)) {
                 if (locals.faces.adjacent.rank[iface] == rank) {
                     on_border = true;
                     break;

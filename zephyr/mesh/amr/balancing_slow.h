@@ -59,7 +59,7 @@ public:
         auto &adj = locals.faces.adjacent;
 
         // Поиск соседей
-        for (auto iface: locals.faces_range(ic)) {
+        for (auto iface: locals.faces.range(ic)) {
             if (locals.faces.is_undefined(iface) ||
                 locals.faces.is_boundary(iface)) {
                 continue;

@@ -74,13 +74,13 @@ AmrCells::AmrCells(const generator::Strip& gen) {
         cells.center[ic] = quad.vs<0, 0>();
         cells.volume[ic] = hx * hy;
         cells.volume_alt[ic] = NAN;
-        cells.face_begin[ic] = ic * n_faces;
-        cells.node_begin[ic] = ic * n_nodes;
-        cells.face_begin[ic + 1] = cells.face_begin[ic] + n_faces;
-        cells.node_begin[ic + 1] = cells.face_begin[ic] + n_nodes;
+        cells.faces.offsets[ic] = ic * n_faces;
+        cells.verts.offsets[ic] = ic * n_nodes;
+        cells.faces.offsets[ic + 1] = cells.faces.offsets[ic] + n_faces;
+        cells.verts.offsets[ic + 1] = cells.faces.offsets[ic] + n_nodes;
 
         // INIT FACES
-        for (index_t iface: cells.faces_range(ic)) {
+        for (index_t iface: cells.faces.range(ic)) {
             cells.faces.set_undefined(iface);
             cells.faces.area_alt[iface] = NAN;
         }
@@ -214,13 +214,13 @@ AmrCells::AmrCells(const generator::Rectangle& rect) {
         center[ic] = quad.vs<0, 0>();
         volume[ic] = hx * hy;
         volume_alt[ic] = NAN;
-        face_begin[ic] = ic * n_faces;
-        node_begin[ic] = ic * n_nodes;
-        face_begin[ic + 1] = (ic + 1) * n_faces;
-        node_begin[ic + 1] = (ic + 1) * n_nodes;
+        faces.offsets[ic] = ic * n_faces;
+        verts.offsets[ic] = ic * n_nodes;
+        faces.offsets[ic + 1] = (ic + 1) * n_faces;
+        verts.offsets[ic + 1] = (ic + 1) * n_nodes;
 
         // INIT FACES
-        for (auto iface: faces_range(ic)) {
+        for (auto iface: faces.range(ic)) {
             faces.set_undefined(iface);
             faces.area_alt[iface] = NAN;
         }
@@ -370,13 +370,13 @@ AmrCells::AmrCells(const generator::Cuboid& c) {
         center[ic] = cube.vs<0, 0, 0>();
         volume[ic] = hx * hy * hz;
         volume_alt[ic] = NAN;
-        face_begin[ic] = ic * n_faces;
-        node_begin[ic] = ic * n_nodes;
-        face_begin[ic + 1] = (ic + 1) * n_faces;
-        node_begin[ic + 1] = (ic + 1) * n_nodes;
+        faces.offsets[ic] = ic * n_faces;
+        verts.offsets[ic] = ic * n_nodes;
+        faces.offsets[ic + 1] = (ic + 1) * n_faces;
+        verts.offsets[ic + 1] = (ic + 1) * n_nodes;
 
         // INIT FACES
-        for (auto iface: faces_range(ic)) {
+        for (auto iface: faces.range(ic)) {
             faces.set_undefined(iface);
             faces.area_alt[iface] = NAN;
         }
@@ -453,8 +453,8 @@ AmrCells::AmrCells(const Grid& grid) {
     const auto& nodes = grid.nodes();
     const auto& cells = grid.cells();
 
-    face_begin[0] = 0;
-    node_begin[0] = 0;
+    faces.offsets[0] = 0;
+    verts.offsets[0] = 0;
     for (index_t ic = 0; ic < m_size; ++ic) {
         rank[ic] = 0;
         index[ic] = ic;
@@ -480,12 +480,12 @@ AmrCells::AmrCells(const Grid& grid) {
         }
 
         // Выставить индексы грани
-        face_begin[ic + 1] = face_begin[ic] + max_faces;
+        faces.offsets[ic + 1] = faces.offsets[ic] + max_faces;
         if (cells[ic].type() != CellType::POLYHEDRON) {
-            faces.insert(face_begin[ic], cells[ic].type(), max_faces);
+            faces.insert(faces.offsets[ic], cells[ic].type(), max_faces);
         }
         else {
-            auto iface = face_begin[ic];
+            auto iface = faces.offsets[ic];
             for (int i = 0; i < n_faces; ++i) {
                 const auto& face = cells[ic].get_face(i);
                 faces.vertices[iface + i].fill(-1);
@@ -497,16 +497,16 @@ AmrCells::AmrCells(const Grid& grid) {
         }
         const auto& node_ids = cells[ic].nodes();
 
-        node_begin[ic + 1] = node_begin[ic] + n_nodes;
+        verts.offsets[ic + 1] = verts.offsets[ic] + n_nodes;
         for (int i = 0; i < n_nodes; ++i) {
-            verts[node_begin[ic] + i] = nodes[node_ids[i]].pos;
+            verts[verts.offsets[ic] + i] = nodes[node_ids[i]].pos;
         }
 
         // Геометрия
         for (int i = 0; i < n_faces; ++i) {
             const auto& face = cells[ic].get_face(i);
 
-            int iface = face_begin[ic] + i;
+            int iface = faces.offsets[ic] + i;
             faces.boundary[iface] = face.bc();
             faces.area[iface]     = face.area();
             faces.center[iface]   = face.center();
@@ -521,7 +521,7 @@ AmrCells::AmrCells(const Grid& grid) {
         for (int i = 0; i < n_faces; ++i) {
             const auto& face = cells[ic].get_face(i);
 
-            auto iface = face_begin[ic] + i;
+            auto iface = faces.offsets[ic] + i;
 
             faces.adjacent.rank[iface]  = 0;
             faces.adjacent.index[iface] = face.neib();

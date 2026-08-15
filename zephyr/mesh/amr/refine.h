@@ -10,7 +10,7 @@ namespace zephyr::mesh::amr {
 /// @brief Добавить связь, (i, j) - координаты дочерней ячейки, (x, y) - вектор направления
 template<int i, int j, int x, int y>
 void make_link_2D(AmrCells& cells, index_t main_child, int rank) {
-    index_t iface = cells.face_begin[main_child + Quad::iss<i, j>()] + Side2D::by_dir<x, y>();
+    index_t iface = cells.faces.offsets[main_child + Quad::iss<i, j>()] + Side2D::by_dir<x, y>();
     cells.faces.boundary[iface] = Boundary::INNER;
     cells.faces.adjacent.rank[iface] = rank;
     cells.faces.adjacent.index[iface] = cells.next[main_child + Quad::iss<i + 2 * x, j + 2 * y>()];
@@ -21,7 +21,7 @@ void make_link_2D(AmrCells& cells, index_t main_child, int rank) {
 /// @brief Добавить связь, (i, j, k) - координаты дочерней ячейки, (x, y, z) - вектор направления
 template<int i, int j, int k, int x, int y, int z>
 void make_link_3D(AmrCells& cells, index_t main_child, int rank) {
-    index_t iface = cells.face_begin[main_child + Cube::iss<i, j, k>()] +  + Side3D::by_dir<x, y, z>();
+    index_t iface = cells.faces.offsets[main_child + Cube::iss<i, j, k>()] +  + Side3D::by_dir<x, y, z>();
     cells.faces.boundary[iface] = Boundary::INNER;
     cells.faces.adjacent.rank[iface] = rank;
     cells.faces.adjacent.index[iface] = cells.next[main_child + Cube::iss<i + 2 * x, j + 2 * y, k + 2 * z>()];
@@ -92,7 +92,7 @@ void check_link(AmrCells& cells, index_t ip, index_t main_child) {
 
         int count_sibs = 0;
         for (int side1: Side<dim>::items()) {
-            index_t face1 = cells.face_begin[c1] + side1;
+            index_t face1 = cells.faces.offsets[c1] + side1;
 
             // Грань наружу, пропускаем
             if ((cells.center[ip] - cells.center[c1]).dot(cells.faces.normal[face1]) < 0.0)
@@ -111,7 +111,7 @@ void check_link(AmrCells& cells, index_t ip, index_t main_child) {
 
             int side2 = 0;
             for (; side2 < Side<dim>::count(); ++side2) {
-                index_t face2 = cells.face_begin[c2] + side2;
+                index_t face2 = cells.faces.offsets[c2] + side2;
 
                 if ((cells.faces.center[face1] - cells.faces.center[face2]).norm() < 1.0e-5 * cells.linear_size(ip)) {
                     break;
@@ -127,7 +127,7 @@ void check_link(AmrCells& cells, index_t ip, index_t main_child) {
             }
             // Нашли соответствующую грань, должен быть искомый
             scrutiny_check(side2 < Side<dim>::count(), "not found bro")
-            index_t i3 = cells.faces.adjacent.index[cells.face_begin[c2] + side2] - main_child;
+            index_t i3 = cells.faces.adjacent.index[cells.faces.offsets[c2] + side2] - main_child;
             scrutiny_check(z1 == i3, "Bad link")
         }
 
@@ -161,14 +161,14 @@ index_t make_children(AmrCells &locals, AmrCells& aliens, index_t ip) {
 
     // Установить только геометрию
     if constexpr (dim == 2) {
-        auto quads = locals.mapping<dim>(ip).children();
+        auto quads = locals.verts.mapping<dim>(ip).children();
         locals.set_cell(main_child + 0, quads[0], locals.axial());
         locals.set_cell(main_child + 1, quads[1], locals.axial());
         locals.set_cell(main_child + 2, quads[2], locals.axial());
         locals.set_cell(main_child + 3, quads[3], locals.axial());
     }
     else {
-        auto cubes = locals.mapping<dim>(ip).children();
+        auto cubes = locals.verts.mapping<dim>(ip).children();
         locals.set_cell(main_child + 0, cubes[0]);
         locals.set_cell(main_child + 1, cubes[1]);
         locals.set_cell(main_child + 2, cubes[2]);
@@ -182,11 +182,11 @@ index_t make_children(AmrCells &locals, AmrCells& aliens, index_t ip) {
 #if SCRUTINY
     // Бывают проблемы с выделением граней и вершин
     for (int i = 0; i < CpC(dim); ++i) {
-        if (locals.max_face_count(main_child + i) != FpC(dim) * FpF(dim)) {
+        if (locals.faces.max_count(main_child + i) != FpC(dim) * FpF(dim)) {
             throw std::runtime_error("bad max faces");
         }
-        scrutiny_check(locals.max_face_count(main_child + i) == FpC(dim) * FpF(dim), "make_children error: bad faces")
-        scrutiny_check(locals.max_node_count(main_child + i) == std::pow(3, dim), "make_children error: bad nodes")
+        scrutiny_check(locals.faces.max_count(main_child + i) == FpC(dim) * FpF(dim), "make_children error: bad faces")
+        scrutiny_check(locals.verts.max_count(main_child + i) == std::pow(3, dim), "make_children error: bad nodes")
     }
 #endif
 
@@ -206,7 +206,7 @@ index_t make_children(AmrCells &locals, AmrCells& aliens, index_t ip) {
 
         // adj.basic выставим сразу у всех дочерних ячеек
         for (auto side: Side<dim>::items()) {
-            adj.basic[locals.face_begin[ich] + side] = locals.next[ich];
+            adj.basic[locals.faces.offsets[ich] + side] = locals.next[ich];
         }
     }
 
@@ -218,7 +218,7 @@ index_t make_children(AmrCells &locals, AmrCells& aliens, index_t ip) {
 #endif
 
     // Далее необходимо связать дочерние ячейки с соседями
-    index_t face_beg = locals.face_begin[ip];
+    index_t face_beg = locals.faces.offsets[ip];
     for (Side<dim> side: Side<dim>::items()) {
         auto children_by_side = indexing::children(side);
 
@@ -231,14 +231,14 @@ index_t make_children(AmrCells &locals, AmrCells& aliens, index_t ip) {
         // Копируем флаг родительской на дочерние
         for (int i: children_by_side) {
             index_t ich = main_child + i;
-            locals.faces.boundary[locals.face_begin[ich] + side] = flag;
+            locals.faces.boundary[locals.faces.offsets[ich] + side] = flag;
         }
 
         // Для граничной выставляем индексы и заканчиваем
         if (locals.faces.is_boundary(face_beg + side)) {
             for (int i: children_by_side) {
                 index_t ich = main_child + i;
-                index_t ch_face = locals.face_begin[ich] + side;
+                index_t ch_face = locals.faces.offsets[ich] + side;
                 adj.rank [ch_face] = rank;
                 adj.index[ch_face] = locals.next[ich];
                 adj.alien[ch_face] = -1;
@@ -248,7 +248,7 @@ index_t make_children(AmrCells &locals, AmrCells& aliens, index_t ip) {
         }
 
         // Родительская ячейка имела простую грань по стороне
-        if (locals.simple_face(ip, side)) {
+        if (locals.faces.is_simple(ip, side)) {
             index_t p_face = face_beg + side;
             auto [neibs, jc] = adj.get_neib(p_face, locals, aliens);
             scrutiny_check(0 <= jc && jc < neibs.size(), "Out fo bounds make children #1");
@@ -262,7 +262,7 @@ index_t make_children(AmrCells &locals, AmrCells& aliens, index_t ip) {
             // Ячейка имела простую грань
             for (int i: children_by_side) {
                 index_t ich = main_child + i;
-                index_t ch_face = locals.face_begin[ich] + side;
+                index_t ch_face = locals.faces.offsets[ich] + side;
 
                 adj.rank[ch_face] = adj.rank[p_face];
                 adj.rotation[ch_face] = adj.rotation[p_face];
@@ -304,7 +304,7 @@ index_t make_children(AmrCells &locals, AmrCells& aliens, index_t ip) {
             // Ячейка имела сложную грань
             for (int i: children_by_side) {
                 index_t ich = main_child + i;
-                index_t ch_face = locals.face_begin[ich] + side;
+                index_t ch_face = locals.faces.offsets[ich] + side;
 
                 Side<dim> subface = indexing::subface_by_child(side, i);
                 index_t p_face = face_beg + subface;
@@ -367,8 +367,8 @@ void refine_cell(AmrCells &locals, AmrCells& aliens, index_t ip, const Distribut
     for (auto side: Side<dim>::items()) {
         // Интересующий нас случай встречается только тогда, когда
         // сторона родительской ячейки уже имеет подразбитую грань
-        index_t p_face1 = locals.face_begin[ip] + side;
-        if (locals.simple_face(ip, side) ||
+        index_t p_face1 = locals.faces.offsets[ip] + side;
+        if (locals.faces.is_simple(ip, side) ||
             locals.faces.is_undefined(p_face1) ||
             locals.faces.is_boundary(p_face1)) {
             continue;
@@ -381,7 +381,7 @@ void refine_cell(AmrCells &locals, AmrCells& aliens, index_t ip, const Distribut
                 throw std::runtime_error("[parent.next + i] out of range (refine_cell)");
             }
 #endif
-            index_t iface = locals.face_begin[ich] + side;
+            index_t iface = locals.faces.offsets[ich] + side;
             scrutiny_check(!locals.faces.is_undefined(iface) &&
                 !locals.faces.is_boundary(iface), "Should be rejected by parent check");
 
@@ -403,7 +403,7 @@ void refine_cell(AmrCells &locals, AmrCells& aliens, index_t ip, const Distribut
             }
 #endif
             // Ссылка на соседнюю ячейку
-            index_t p_face = locals.face_begin[ip] + indexing::subface_by_child(side, i);
+            index_t p_face = locals.faces.offsets[ip] + indexing::subface_by_child(side, i);
             auto [neibs, jc] = adj.get_neib(p_face, locals, aliens);
 
             // Желаемый уровень соседней ячейки
@@ -416,7 +416,7 @@ void refine_cell(AmrCells &locals, AmrCells& aliens, index_t ip, const Distribut
 
                 index_t neib_next = neibs.next[jc];
                 for (auto subface: side.subfaces()) {
-                    index_t ch_face = locals.face_begin[ich] + subface;
+                    index_t ch_face = locals.faces.offsets[ich] + subface;
                     adj.rank[ch_face] = adj.rank[p_face];
                     int symm = adj.rotation[ch_face];
 

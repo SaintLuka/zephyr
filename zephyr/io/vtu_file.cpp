@@ -96,9 +96,9 @@ std::vector<Vector3d> collect_points(const AmrCells& cells, index_t n_points) {
     std::vector<Vector3d> points(n_points);
     index_t iv = 0;
     for (mesh::index_t ic = 0; ic < cells.size(); ++ic) {
-        const Vector3d* vertices = cells.vertices_data(ic);
+        const Vector3d* vertices = cells.verts.coords_data(ic);
 
-        int nv = cells.node_count(ic);
+        int nv = cells.verts.count(ic);
         for (int j = 0; j < nv; ++j) {
             points[iv++] = vertices[j];
         }
@@ -167,7 +167,7 @@ void VtuStructure::fill_adaptive_hex_2D(const AmrCells& cells, const AmrNodes& n
     if (nodes.empty()) {
         points.resize(n_points);
         for (mesh::index_t ic = 0; ic < n_cells; ++ic) {
-            const SqQuad& vertices = cells.mapping<2>(ic);
+            const SqQuad& vertices = cells.verts.mapping<2>(ic);
             points[4 * ic + 0] = vertices.vs<-1, -1>();
             points[4 * ic + 1] = vertices.vs<+1, -1>();
             points[4 * ic + 2] = vertices.vs<+1, +1>();
@@ -180,7 +180,7 @@ void VtuStructure::fill_adaptive_hex_2D(const AmrCells& cells, const AmrNodes& n
         connectivity.resize(n_points);
         const auto& node_idx = cells.verts.index;
         for (mesh::index_t ic = 0; ic < n_cells; ++ic) {
-            index_t beg = cells.node_begin[ic];
+            index_t beg = cells.verts.offsets[ic];
             connectivity[4 * ic + 0] = node_idx[beg + SqQuad::iss<-1, -1>()];
             connectivity[4 * ic + 1] = node_idx[beg + SqQuad::iss<+1, -1>()];
             connectivity[4 * ic + 2] = node_idx[beg + SqQuad::iss<+1, +1>()];
@@ -198,10 +198,10 @@ void VtuStructure::fill_adaptive_poly_2D(const AmrCells& cells, const AmrNodes& 
     index_t n_points = 0;
     for (mesh::index_t ic = 0; ic < n_cells; ++ic) {
         int nv = 4;
-        if (cells.complex_face(ic, Side2D::L)) { nv += 1; }
-        if (cells.complex_face(ic, Side2D::R)) { nv += 1; }
-        if (cells.complex_face(ic, Side2D::B)) { nv += 1; }
-        if (cells.complex_face(ic, Side2D::T)) { nv += 1; }
+        if (cells.faces.is_complex(ic, Side2D::L)) { nv += 1; }
+        if (cells.faces.is_complex(ic, Side2D::R)) { nv += 1; }
+        if (cells.faces.is_complex(ic, Side2D::B)) { nv += 1; }
+        if (cells.faces.is_complex(ic, Side2D::T)) { nv += 1; }
 
         n_points += nv;
         offsets[ic] = n_points;
@@ -212,19 +212,19 @@ void VtuStructure::fill_adaptive_poly_2D(const AmrCells& cells, const AmrNodes& 
         points.resize(n_points);
         index_t iv = 0;
         for (mesh::index_t ic = 0; ic < n_cells; ++ic) {
-            const SqQuad& vertices = cells.mapping<2>(ic);
+            const SqQuad& vertices = cells.verts.mapping<2>(ic);
 
             points[iv++] = vertices.vs<-1, -1>();
-            if (cells.complex_face(ic, Side2D::B)) { points[iv++] = vertices.vs<0, -1>(); }
+            if (cells.faces.is_complex(ic, Side2D::B)) { points[iv++] = vertices.vs<0, -1>(); }
 
             points[iv++] = vertices.vs<+1, -1>();
-            if (cells.complex_face(ic, Side2D::R)) { points[iv++] = vertices.vs<+1, 0>(); }
+            if (cells.faces.is_complex(ic, Side2D::R)) { points[iv++] = vertices.vs<+1, 0>(); }
 
             points[iv++] = vertices.vs<+1, +1>();
-            if (cells.complex_face(ic, Side2D::T)) { points[iv++] = vertices.vs<0, +1>(); }
+            if (cells.faces.is_complex(ic, Side2D::T)) { points[iv++] = vertices.vs<0, +1>(); }
 
             points[iv++] = vertices.vs<-1, +1>();
-            if (cells.complex_face(ic, Side2D::L)) { points[iv++] = vertices.vs<-1, 0>(); }
+            if (cells.faces.is_complex(ic, Side2D::L)) { points[iv++] = vertices.vs<-1, 0>(); }
         }
 
         connectivity = arange(n_points);
@@ -236,19 +236,19 @@ void VtuStructure::fill_adaptive_poly_2D(const AmrCells& cells, const AmrNodes& 
         connectivity.resize(n_points);
         const auto& node_idx = cells.verts.index;
         for (mesh::index_t ic = 0; ic < n_cells; ++ic) {
-            index_t beg = cells.node_begin[ic];
+            index_t beg = cells.verts.offsets[ic];
 
             connectivity[iv++] = node_idx[beg + SqQuad::iss<-1, -1>()];
-            if (cells.complex_face(ic, Side2D::B)) { connectivity[iv++] = node_idx[beg + SqQuad::iss<0, -1>()]; }
+            if (cells.faces.is_complex(ic, Side2D::B)) { connectivity[iv++] = node_idx[beg + SqQuad::iss<0, -1>()]; }
 
             connectivity[iv++] = node_idx[beg + SqQuad::iss<+1, -1>()];
-            if (cells.complex_face(ic, Side2D::R)) { connectivity[iv++] = node_idx[beg + SqQuad::iss<+1, 0>()]; }
+            if (cells.faces.is_complex(ic, Side2D::R)) { connectivity[iv++] = node_idx[beg + SqQuad::iss<+1, 0>()]; }
 
             connectivity[iv++] = node_idx[beg + SqQuad::iss<+1, +1>()];
-            if (cells.complex_face(ic, Side2D::T)) { connectivity[iv++] = node_idx[beg + SqQuad::iss<0, +1>()]; }
+            if (cells.faces.is_complex(ic, Side2D::T)) { connectivity[iv++] = node_idx[beg + SqQuad::iss<0, +1>()]; }
 
             connectivity[iv++] = node_idx[beg + SqQuad::iss<-1, +1>()];
-            if (cells.complex_face(ic, Side2D::L)) { connectivity[iv++] = node_idx[beg + SqQuad::iss<-1, 0>()]; }
+            if (cells.faces.is_complex(ic, Side2D::L)) { connectivity[iv++] = node_idx[beg + SqQuad::iss<-1, 0>()]; }
         }
     }
 }
@@ -262,7 +262,7 @@ void VtuStructure::fill_adaptive_hex_3D(const AmrCells& cells, const AmrNodes& n
     if (nodes.empty()) {
         points.resize(n_points);
         for (mesh::index_t ic = 0; ic < n_cells; ++ic) {
-            const SqCube& vertices = cells.mapping<3>(ic);
+            const SqCube& vertices = cells.verts.mapping<3>(ic);
             points[8 * ic + 0] = vertices.vs<-1, -1, -1>();
             points[8 * ic + 1] = vertices.vs<+1, -1, -1>();
             points[8 * ic + 2] = vertices.vs<+1, +1, -1>();
@@ -279,7 +279,7 @@ void VtuStructure::fill_adaptive_hex_3D(const AmrCells& cells, const AmrNodes& n
         connectivity.resize(n_points);
         const auto& node_idx = cells.verts.index;
         for (mesh::index_t ic = 0; ic < n_cells; ++ic) {
-            index_t beg = cells.node_begin[ic];
+            index_t beg = cells.verts.offsets[ic];
             connectivity[8 * ic + 0] = node_idx[beg + SqCube::iss<-1, -1, -1>()];
             connectivity[8 * ic + 1] = node_idx[beg + SqCube::iss<+1, -1, -1>()];
             connectivity[8 * ic + 2] = node_idx[beg + SqCube::iss<+1, +1, -1>()];
@@ -302,7 +302,7 @@ void VtuStructure::fill_poly_classic(const AmrCells& cells, const AmrNodes& node
     types.resize(n_cells);
     offsets.resize(n_cells);
     for (mesh::index_t ic = 0; ic < n_cells; ++ic) {
-        int nv = cells.node_count(ic);
+        int nv = cells.verts.count(ic);
         n_points += nv;
         offsets[ic] = n_points;
         types[ic] = nv_to_type(nv);
@@ -318,7 +318,7 @@ void VtuStructure::fill_poly_classic(const AmrCells& cells, const AmrNodes& node
         connectivity.resize(n_points);
         index_t offset = 0;
         for (mesh::index_t ic = 0; ic < n_cells; ++ic) {
-            index_t beg = cells.node_begin[ic];
+            index_t beg = cells.verts.offsets[ic];
             for (int j = 0; j < offsets[ic] - offset; ++j) {
                 connectivity[offset + j] = cells.verts.index[beg + j];
             }
@@ -336,7 +336,7 @@ void VtuStructure::fill_polyfaces_3D(const AmrCells& cells, const AmrNodes& node
     offsets.resize(n_cells);
 
     for (mesh::index_t ic = 0; ic < n_cells; ++ic) {
-        int nv = cells.node_count(ic);
+        int nv = cells.verts.count(ic);
         n_points += nv;
         offsets[ic] = n_points;
         types[ic] = VTK_POLYHEDRON;
@@ -352,7 +352,7 @@ void VtuStructure::fill_polyfaces_3D(const AmrCells& cells, const AmrNodes& node
         connectivity.resize(n_points);
         index_t offset = 0;
         for (mesh::index_t ic = 0; ic < n_cells; ++ic) {
-            index_t beg = cells.node_begin[ic];
+            index_t beg = cells.verts.offsets[ic];
             for (int j = 0; j < offsets[ic] - offset; ++j) {
                 connectivity[offset + j] = cells.verts.index[beg + j];
             }
@@ -368,14 +368,14 @@ void VtuStructure::fill_polyfaces_3D(const AmrCells& cells, const AmrNodes& node
         faces.push_back(cells.face_count(ic));
 
         // Массив для описания грани
-        for (auto iface: cells.faces_range(ic)) {
+        for (auto iface: cells.faces.range(ic)) {
             if (cells.faces.is_undefined(iface)) continue;
 
             int nv = cells.faces.n_vertices(iface);
             faces.push_back(nv);
             for (int j = 0; j < nv; ++j) {
                 auto loc_i = cells.faces.vertices[iface][j];
-                index_t node_idx = cells.node_begin[ic] + loc_i;
+                index_t node_idx = cells.verts.offsets[ic] + loc_i;
                 if (unique) {
                     node_idx = cells.verts.index[node_idx];
                 }
@@ -388,7 +388,7 @@ void VtuStructure::fill_polyfaces_3D(const AmrCells& cells, const AmrNodes& node
     index_t offset = 0;
     for (mesh::index_t ic = 0; ic < n_cells; ++ic) {
         int n_fverts = 0;
-        for (auto iface: cells.faces_range(ic)) {
+        for (auto iface: cells.faces.range(ic)) {
             if (cells.faces.is_undefined(iface)) continue;
 
             // Допускаются грани с числом вершин до 8

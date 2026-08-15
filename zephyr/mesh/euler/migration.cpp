@@ -104,7 +104,7 @@ void Migration::reindexing(Tourism& tourism, AmrCells& locals, AmrCells& aliens)
     // Переиндексируем грани
     auto& faces = locals.faces;
     for (index_t ic = 0; ic < locals.size(); ++ic) {
-        for(auto iface: locals.faces_range(ic)){
+        for(auto iface: locals.faces.faces_range(ic)){
             if (faces.is_undefined(iface))
                 continue;
 

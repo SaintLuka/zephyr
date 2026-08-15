@@ -5,9 +5,21 @@
 #include <zephyr/geom/vector.h>
 #include <zephyr/mesh/index.h>
 #include <zephyr/mesh/memory.h>
+#include <zephyr/utils/range.h>
 
+// forward declaration для классов из geom
+namespace zephyr::geom {
+class Quad;
+class SqQuad;
+class Cube;
+class SqCube;
+}
 
 namespace zephyr::mesh {
+
+/// @brief Квадратичное отображение на квадрат/куб в зависимости от размерности
+template <int dim>
+using SqMap = std::conditional_t<dim < 3, geom::SqQuad, geom::SqCube>;
 
 /// @brief Набор дублирующихся вершин ячеек в форме Structure of Arrays (набор массивов).
 ///
@@ -20,6 +32,9 @@ class AmrVerts final {
     bool m_unique = false;
 
 public:
+    /// @brief Индексы первых вершин ячеек (CSR-структура)
+    std::vector<index_t>  offsets = {0};
+
     /// @brief Координаты вершин (с дубликатами)
     std::vector<Vector3d> coords;
 
@@ -31,6 +46,9 @@ public:
     /// (или -1, если узел с данного процесса).
     std::vector<index_t> ghost;
 
+
+    /// @brief Пустые массивы по умолчанию
+    AmrVerts() = default;
 
     /// @brief Используются уникальные узлы?
     bool unique() const { return m_unique; }
@@ -61,6 +79,45 @@ public:
 
     /// @brief Расход памяти
     memory_t memory_usage() const;
+
+    /// @brief Число вершин, оно же максимальное, хранение неактуальных вершин
+    /// не допускается.
+    int count(index_t ic) const {
+        return offsets[ic + 1] - offsets[ic];
+    }
+
+    /// @brief Число вершин, оно же максимальное, хранение неактуальных вершин
+    /// сейчас не допускается.
+    int max_count(index_t ic) const {
+        return offsets[ic + 1] - offsets[ic];
+    }
+
+    /// @brief Полный диапазон вершин ячейки
+    range_t<index_t> range(index_t ic) const {
+        return std::views::iota(offsets[ic], offsets[ic + 1]);
+    }
+
+    /// @brief Указатель на первую вершину ячейки
+    Vector3d* coords_data(index_t ic) {
+        return coords.data() + offsets[ic];
+    }
+
+    /// @brief Константный указатель на первую вершину
+    const Vector3d* coords_data(index_t ic) const {
+        return coords.data() + offsets[ic];
+    }
+
+    /// @brief Ссылка на вершины в форме набора узлов квадратичного отображения
+    template <int dim>
+    SqMap<dim>& mapping(index_t ic) {
+        return *reinterpret_cast<SqMap<dim>*>(coords_data(ic));
+    }
+
+    /// @brief Ссылка на вершины в форме набора узлов квадратичного отображения
+    template <int dim>
+    const SqMap<dim>& mapping(index_t ic) const {
+        return *reinterpret_cast<const SqMap<dim>*>(coords_data(ic));
+    }
 };
 
 } // namespace zephyr::mesh

@@ -13,13 +13,7 @@ using zephyr::utils::mpi;
 
 namespace zephyr::mesh {
 
-AmrCells::AmrCells(int dim, bool adaptive, bool axial)
-        : m_size(0) {
-
-    // На единицу больше числа ячеек
-    face_begin = {0};
-    node_begin = {0};
-
+AmrCells::AmrCells(int dim, bool adaptive, bool axial) {
     set_dimension(dim);
     set_adaptive(adaptive);
     set_axial(axial);
@@ -76,7 +70,7 @@ void AmrCells::set_linear(bool linear) {
 int AmrCells::face_count(index_t ic) const {
     if (m_adaptive) {
         int count = 0;
-        for (index_t iface: faces_range(ic)) {
+        for (index_t iface: faces.range(ic)) {
             if (faces.is_actual(iface)) {
                 ++count;
             }
@@ -84,35 +78,35 @@ int AmrCells::face_count(index_t ic) const {
         return count;
     }
     else {
-        return max_face_count(ic);
+        return faces.max_count(ic);
     }
 }
 
 double AmrCells::hx(index_t ic) const {
     z_assert(m_adaptive, "Not adaptive mesh, can't get 'hx' for cell");
-    return (mapping<2>(ic).vs<+1, 0>() - mapping<2>(ic).vs<-1, 0>()).norm();
+    return (verts.mapping<2>(ic).vs<+1, 0>() - verts.mapping<2>(ic).vs<-1, 0>()).norm();
 }
 
 double AmrCells::hy(index_t ic) const {
     z_assert(m_adaptive, "Not adaptive mesh, can't get 'hy' for cell");
-    return (mapping<2>(ic).vs<0, +1>() - mapping<2>(ic).vs<0, -1>()).norm();
+    return (verts.mapping<2>(ic).vs<0, +1>() - verts.mapping<2>(ic).vs<0, -1>()).norm();
 }
 
 double AmrCells::hz(index_t ic) const {
     z_assert(m_adaptive, "Not adaptive mesh, can't get 'hz' for cell");
     z_assert(m_dim == 3, "Two dimensional mesh, can't get 'hz' for cell");
-    return (mapping<3>(ic).vs<0, 0, +1>() - mapping<3>(ic).vs<0, 0, -1>()).norm();
+    return (verts.mapping<3>(ic).vs<0, 0, +1>() - verts.mapping<3>(ic).vs<0, 0, -1>()).norm();
 }
 
 double AmrCells::incircle_diameter(index_t ic) const {
     if (m_adaptive) {
         if (m_dim == 2) {
-            const SqQuad &vertices = mapping<2>(ic);
+            const SqQuad &vertices = verts.mapping<2>(ic);
             return std::sqrt(std::min(
                     (vertices.vs<+1, 0>() - vertices.vs<-1, 0>()).squaredNorm(),
                     (vertices.vs<0, +1>() - vertices.vs<0, -1>()).squaredNorm()));
         } else {
-            const SqCube &vertices = mapping<3>(ic);
+            const SqCube &vertices = verts.mapping<3>(ic);
             return std::sqrt(math::min(
                     (vertices.vs<+1, 0, 0>() - vertices.vs<-1, 0, 0>()).squaredNorm(),
                     (vertices.vs<0, +1, 0>() - vertices.vs<0, -1, 0>()).squaredNorm(),
@@ -120,7 +114,7 @@ double AmrCells::incircle_diameter(index_t ic) const {
         }
     } else {
         if (m_dim == 2) {
-            int n = node_count(ic);
+            int n = verts.count(ic);
             // Диаметр вписанной окружности внутрь правильного многоугольника
             // с площадью volume.
             return 2.0 * std::sqrt(volume[ic] / (n * std::tan(M_PI / n)));
@@ -128,7 +122,7 @@ double AmrCells::incircle_diameter(index_t ic) const {
         else {
             // Найдем минимальное расстояние до грани, умножим на два
             double r = std::numeric_limits<double>::infinity();
-            for (auto j: faces_range(ic)) {
+            for (auto j: faces.range(ic)) {
                 double dist = std::abs((faces.center[j] - center[ic]).dot(faces.normal[j]));
                 r = std::min(r, dist);
             }
@@ -140,7 +134,7 @@ double AmrCells::incircle_diameter(index_t ic) const {
 Box AmrCells::bbox(index_t ic) const {
     // TODO: Сделать оптимальный код для декартовых сеток, и не только здесь
     Box box = Box::Empty(m_dim);
-    for (index_t iv: nodes_range(ic)) {
+    for (index_t iv: verts.range(ic)) {
         box.capture(verts[iv]);
     }
     return box;
@@ -155,31 +149,31 @@ Polygon AmrCells::polygon(index_t ic) const {
         std::vector<Vector3d> poly;
         poly.reserve(8);
 
-        const SqQuad& vertices = mapping<2>(ic);
+        const SqQuad& vertices = verts.mapping<2>(ic);
 
         poly.push_back(vertices.vs<-1, -1>());
-        if (!m_linear && complex_face(ic, Side2D::BOTTOM)) {
+        if (!m_linear && faces.is_complex(ic, Side2D::BOTTOM)) {
             poly.push_back(vertices.vs<0, -1>());
         }
 
         poly.push_back(vertices.vs<+1, -1>());
-        if (!m_linear && complex_face(ic, Side2D::RIGHT)) {
+        if (!m_linear && faces.is_complex(ic, Side2D::RIGHT)) {
             poly.push_back(vertices.vs<+1, 0>());
         }
 
         poly.push_back(vertices.vs<+1, +1>());
-        if (!m_linear && complex_face(ic, Side2D::TOP)) {
+        if (!m_linear && faces.is_complex(ic, Side2D::TOP)) {
             poly.push_back( vertices.vs<0, +1>());
         }
 
         poly .push_back(vertices.vs<-1, +1>());
-        if (!m_linear && complex_face(ic, Side2D::LEFT)) {
+        if (!m_linear && faces.is_complex(ic, Side2D::LEFT)) {
             poly.push_back(vertices.vs<-1, 0>());
         }
 
         return Polygon(std::move(poly));
     }
-    return Polygon(std::span(vertices_data(ic), node_count(ic)));
+    return Polygon(std::span(verts.coords_data(ic), verts.count(ic)));
 }
 
 Polyhedron AmrCells::polyhedron(index_t ic) const {
@@ -189,7 +183,7 @@ Polyhedron AmrCells::polyhedron(index_t ic) const {
 
     if (m_adaptive && m_linear) {
         // Пока я умею делать только кубы
-        const auto& map = mapping<3>(ic);
+        const auto& map = verts.mapping<3>(ic);
         std::vector<Vector3d> vs = {
             map.vs<-1, -1, -1>(),
             map.vs<+1, -1, -1>(),
@@ -209,7 +203,7 @@ Polyhedron AmrCells::polyhedron(index_t ic) const {
 double AmrCells::approx_vol_fraction(index_t ic, const InFunction &inside) const {
     if (m_dim < 3) {
         if (m_adaptive) {
-            const SqQuad& vertices = mapping<2>(ic);
+            const SqQuad& vertices = verts.mapping<2>(ic);
 
             int sum = 0;
             // Угловые точки, вес = 1
@@ -239,10 +233,10 @@ double AmrCells::approx_vol_fraction(index_t ic, const InFunction &inside) const
         }
         else {
             // Не адаптивная ячейка
-            int count = node_count(ic);
+            int count = verts.count(ic);
 
             int sum = 0;
-            for (auto i: nodes_range(ic)) {
+            for (auto i: verts.range(ic)) {
                 // Вершины многоугольника, вес 2
                 if (inside(verts[i])) {
                     sum += 2;
@@ -258,7 +252,7 @@ double AmrCells::approx_vol_fraction(index_t ic, const InFunction &inside) const
     else {
         // Трехмерная ячейка
         if (m_adaptive) {
-            const SqCube& vertices = mapping<3>(ic);
+            const SqCube& vertices = verts.mapping<3>(ic);
 
             int sum = 0;
             // Угловые точки, вес = 1
@@ -316,23 +310,23 @@ double AmrCells::volume_fraction(index_t ic, const InFunction &inside, int n_poi
     if (m_dim < 3) {
         if (m_adaptive) {
             if (m_linear) {
-                return mapping<2>(ic).reduce().volume_fraction(inside, n_points);
+                return verts.mapping<2>(ic).reduce().volume_fraction(inside, n_points);
             }
             else {
-                return mapping<2>(ic).volume_fraction(inside, n_points);
+                return verts.mapping<2>(ic).volume_fraction(inside, n_points);
             }
         }
         else {
             // Полигон
-            int count = node_count(ic);
+            int count = verts.count(ic);
             int N = n_points / count + 1;
 
             double res = 0.0;
             for (int i = 0; i < count; ++i) {
                 int j = (i + 1) % count;
 
-                index_t I = node_begin[ic] + i;
-                index_t J = node_begin[ic] + j;
+                index_t I = verts.offsets[ic] + i;
+                index_t J = verts.offsets[ic] + j;
 
                 Triangle tri(center[ic], verts[I], verts[J]);
                 res += tri.volume_fraction(inside, N) * tri.area();
@@ -343,7 +337,7 @@ double AmrCells::volume_fraction(index_t ic, const InFunction &inside, int n_poi
     }
     else {
         if (m_adaptive) {
-            return mapping<3>(ic).reduce().volume_fraction(inside, n_points);
+            return verts.mapping<3>(ic).reduce().volume_fraction(inside, n_points);
         }
         // Трехмерный многогранник
         throw std::runtime_error("AmrCell::volume_fraction #1");
@@ -354,7 +348,7 @@ bool AmrCells::const_function(index_t ic, const SpFunction& func) const {
     double value = func(center[ic]);
     if (m_dim < 3) {
         if (m_adaptive) {
-            const SqQuad& vertices = mapping<2>(ic);
+            const SqQuad& vertices = verts.mapping<2>(ic);
 
             // Угловые точки
             if (func(vertices.vs<-1, -1>()) != value) { return false; }
@@ -373,7 +367,7 @@ bool AmrCells::const_function(index_t ic, const SpFunction& func) const {
         }
         else {
             // Не адаптивная ячейка
-            for (auto i: nodes_range(ic)) {
+            for (auto i: verts.range(ic)) {
                 if (func(verts[i]) != value) {
                     return false;
                 }
@@ -391,23 +385,23 @@ double AmrCells::integrate_low(index_t ic, const SpFunction& func, int n_points)
     if (m_dim < 3) {
         if (m_adaptive) {
             if (m_linear) {
-                return mapping<2>(ic).reduce().integrate_low(func, n_points);
+                return verts.mapping<2>(ic).reduce().integrate_low(func, n_points);
             }
             else {
-                return mapping<2>(ic).integrate_low(func, n_points);
+                return verts.mapping<2>(ic).integrate_low(func, n_points);
             }
         }
         else {
             // Полигон
-            int count = node_count(ic);
+            int count = verts.count(ic);
             int N = n_points / count + 1;
 
             double sum = 0.0;
             for (int i = 0; i < count; ++i) {
                 int j = (i + 1) % count;
 
-                index_t I = node_begin[ic] + i;
-                index_t J = node_begin[ic] + j;
+                index_t I = verts.offsets[ic] + i;
+                index_t J = verts.offsets[ic] + j;
 
                 Triangle tri(center[ic], verts[I], verts[J]);
                 sum += tri.integrate_low(func, N) * tri.area();
@@ -419,7 +413,7 @@ double AmrCells::integrate_low(index_t ic, const SpFunction& func, int n_points)
     else {
         // Трехмерная ячейка
         if (m_adaptive) {
-            return mapping<3>(ic).reduce().integrate_low(func, n_points);
+            return verts.mapping<3>(ic).reduce().integrate_low(func, n_points);
         }
         throw std::runtime_error("AmrCell::volume_fraction #1");
     }
@@ -440,9 +434,9 @@ void AmrCells::move_item(index_t from, index_t to) {
 
     volume_alt[to] = volume_alt[from];
 
-    for (index_t i = 0; i < face_begin[from + 1] - face_begin[from]; ++i) {
-        index_t iface = face_begin[from] + i;
-        index_t jface = face_begin[to] + i;
+    for (index_t i = 0; i < faces.offsets[from + 1] - faces.offsets[from]; ++i) {
+        index_t iface = faces.offsets[from] + i;
+        index_t jface = faces.offsets[to] + i;
 
         faces.boundary[jface] = faces.boundary[iface];
         faces.normal  [jface] = faces.normal  [iface];
@@ -458,9 +452,9 @@ void AmrCells::move_item(index_t from, index_t to) {
         faces.adjacent.rotation[jface] = faces.adjacent.rotation[iface];
     }
 
-    for (index_t i = 0; i < node_begin[from + 1] - node_begin[from]; ++i) {
-        index_t jv = node_begin[to] + i;
-        index_t iv = node_begin[from] + i;
+    for (index_t i = 0; i < verts.offsets[from + 1] - verts.offsets[from]; ++i) {
+        index_t jv = verts.offsets[to] + i;
+        index_t iv = verts.offsets[from] + i;
         verts[jv] = verts[iv];
     }
 
@@ -492,12 +486,12 @@ void AmrCells::copy_geom(index_t ic, AmrCells& cells,
 
     cells.volume_alt[jc] = volume_alt[ic];
 
-    cells.face_begin[jc] = face_beg;
-    cells.face_begin[jc + 1] = face_beg + max_face_count(ic);
+    cells.faces.offsets[jc] = face_beg;
+    cells.faces.offsets[jc + 1] = face_beg + faces.max_count(ic);
 
-    for (index_t i = 0; i < max_face_count(ic); ++i) {
-        index_t iface = face_begin[ic] + i;
-        index_t jface = cells.face_begin[jc] + i;
+    for (index_t i = 0; i < faces.max_count(ic); ++i) {
+        index_t iface = faces.offsets[ic] + i;
+        index_t jface = cells.faces.offsets[jc] + i;
 
         cells.faces.boundary[jface] = faces.boundary[iface];
         cells.faces.normal  [jface] = faces.normal  [iface];
@@ -513,12 +507,12 @@ void AmrCells::copy_geom(index_t ic, AmrCells& cells,
         cells.faces.adjacent.rotation[jface] = faces.adjacent.rotation[iface];
     }
 
-    cells.node_begin[jc] = node_beg;
-    cells.node_begin[jc + 1] = node_beg + max_node_count(ic);
+    cells.verts.offsets[jc] = node_beg;
+    cells.verts.offsets[jc + 1] = node_beg + verts.max_count(ic);
 
-    for (index_t i = 0; i < max_node_count(ic); ++i) {
-        index_t iv = node_begin[ic] + i;
-        index_t jv = cells.node_begin[jc] + i;
+    for (index_t i = 0; i < verts.max_count(ic); ++i) {
+        index_t iv = verts.offsets[ic] + i;
+        index_t jv = cells.verts.offsets[jc] + i;
         cells.verts[jv] = verts[iv];
     }
 }
@@ -529,12 +523,12 @@ void AmrCells::copy_geom_basic(index_t ic, AmrCells& cells,
     cells.rank [jc] = rank [ic];
     cells.index[jc] = index[ic];
 
-    cells.face_begin[jc] = face_beg;
-    cells.face_begin[jc + 1] = face_beg + max_face_count(ic);
+    cells.faces.offsets[jc] = face_beg;
+    cells.faces.offsets[jc + 1] = face_beg + faces.max_count(ic);
 
-    for (index_t i = 0; i < max_face_count(ic); ++i) {
-        index_t iface = face_begin[ic] + i;
-        index_t jface = cells.face_begin[jc] + i;
+    for (index_t i = 0; i < faces.max_count(ic); ++i) {
+        index_t iface = faces.offsets[ic] + i;
+        index_t jface = cells.faces.offsets[jc] + i;
 
         cells.faces.boundary[jface] = faces.boundary[iface];
 
@@ -544,8 +538,8 @@ void AmrCells::copy_geom_basic(index_t ic, AmrCells& cells,
         cells.faces.adjacent.rotation[jface] = faces.adjacent.rotation[iface];
     }
 
-    cells.node_begin[jc] = node_beg;
-    cells.node_begin[jc + 1] = node_beg + max_node_count(ic);
+    cells.verts.offsets[jc] = node_beg;
+    cells.verts.offsets[jc + 1] = node_beg + verts.max_count(ic);
 }
 
 void AmrCells::clear() {
@@ -586,10 +580,6 @@ void AmrCells::resize_cells(index_t n_cells) {
     volume.resize(n_cells);
     volume_alt.resize(n_cells);
 
-    // +1 для заключительной
-    face_begin.resize(n_cells + 1);
-    node_begin.resize(n_cells + 1);
-
     flag.resize(n_cells);
     b_idx.resize(n_cells);
     z_idx.resize(n_cells);
@@ -597,6 +587,10 @@ void AmrCells::resize_cells(index_t n_cells) {
 
     // Поля данных только для ячеек
     data.resize(n_cells);
+
+    // +1 для заключительной
+    faces.offsets.resize(n_cells + 1);
+    verts.offsets.resize(n_cells + 1);
 }
 
 void AmrCells::reserve_cells(index_t n_cells) {
@@ -609,10 +603,6 @@ void AmrCells::reserve_cells(index_t n_cells) {
     volume.reserve(n_cells);
     volume_alt.reserve(n_cells);
 
-    // +1 для заключительной
-    face_begin.reserve(n_cells + 1);
-    node_begin.reserve(n_cells + 1);
-
     flag.reserve(n_cells);
     b_idx.reserve(n_cells);
     z_idx.reserve(n_cells);
@@ -620,6 +610,10 @@ void AmrCells::reserve_cells(index_t n_cells) {
 
     // Поля данных только для ячеек
     data.reserve(n_cells);
+
+    // +1 для заключительной
+    faces.offsets.reserve(n_cells + 1);
+    verts.offsets.reserve(n_cells + 1);
 }
 
 void AmrCells::shrink_to_fit_cells() {
@@ -632,10 +626,6 @@ void AmrCells::shrink_to_fit_cells() {
     volume.shrink_to_fit();
     volume_alt.shrink_to_fit();
 
-    // +1 для заключительной
-    face_begin.shrink_to_fit();
-    node_begin.shrink_to_fit();
-
     flag.shrink_to_fit();
     b_idx.shrink_to_fit();
     z_idx.shrink_to_fit();
@@ -643,6 +633,10 @@ void AmrCells::shrink_to_fit_cells() {
 
     // Поля данных только для ячеек
     data.shrink_to_fit();
+
+    // +1 для заключительной
+    faces.offsets.shrink_to_fit();
+    verts.offsets.shrink_to_fit();
 }
 
 void AmrCells::resize(index_t n_cells, index_t n_faces, index_t n_nodes) {
@@ -675,8 +669,6 @@ memory_t AmrCells::memory_usage() const {
     mem.add(center);
     mem.add(volume);
     mem.add(volume_alt);
-    mem.add(face_begin);
-    mem.add(node_begin);
     mem.add(flag);
     mem.add(b_idx);
     mem.add(z_idx);
@@ -701,18 +693,18 @@ void AmrCells::set_cell(index_t ic, const Quad& quad) {
     volume[ic] = quad.area();
     center[ic] = quad.centroid(volume[ic]);
 
-    face_begin[ic] = 8 * ic;
-    face_begin[ic + 1] = 8 * (ic + 1);
-    faces.insert(face_begin[ic], CellType::AMR2D);
+    faces.offsets[ic] = 8 * ic;
+    faces.offsets[ic + 1] = 8 * (ic + 1);
+    faces.insert(faces.offsets[ic], CellType::AMR2D);
 
-    node_begin[ic] = 9 * ic;
-    node_begin[ic + 1] = 9 * (ic + 1);
-    mapping<2>(ic) = SqQuad(quad);
+    verts.offsets[ic] = 9 * ic;
+    verts.offsets[ic + 1] = 9 * (ic + 1);
+    verts.mapping<2>(ic) = SqQuad(quad);
 
-    for (index_t iface = face_begin[ic]; iface < face_begin[ic] + Side2D::count(); ++iface) {
+    for (index_t iface = faces.offsets[ic]; iface < faces.offsets[ic] + Side2D::count(); ++iface) {
         Line vs = {
-                verts[node_begin[ic] + faces.vertices[iface][0]],
-                verts[node_begin[ic] + faces.vertices[iface][1]]
+                verts[verts.offsets[ic] + faces.vertices[iface][0]],
+                verts[verts.offsets[ic] + faces.vertices[iface][1]]
         };
 
         faces.area[iface]     = vs.length();
@@ -752,24 +744,24 @@ void AmrCells::set_cell(index_t ic, const Quad& quad, bool axial) {
         center[ic]     = quad.centroid_as(volume_alt[ic]);
     }
 
-    face_begin[ic] = 8 * ic;
-    face_begin[ic + 1] = 8 * (ic + 1);
-    faces.insert(face_begin[ic], CellType::AMR2D);
+    faces.offsets[ic] = 8 * ic;
+    faces.offsets[ic + 1] = 8 * (ic + 1);
+    faces.insert(faces.offsets[ic], CellType::AMR2D);
 
-    node_begin[ic] = 9 * ic;
-    node_begin[ic + 1] = 9 * (ic + 1);
-    mapping<2>(ic) = SqQuad(quad);
+    verts.offsets[ic] = 9 * ic;
+    verts.offsets[ic + 1] = 9 * (ic + 1);
+    verts.mapping<2>(ic) = SqQuad(quad);
 
-    for (auto i: nodes_range(ic)) {
+    for (auto i: verts.range(ic)) {
         if (verts[i].z() != 0.0) {
             throw std::runtime_error("AmrCells add axial cell, vertex.z != 0.0");
         }
     }
 
-    for (index_t iface = face_begin[ic]; iface < face_begin[ic] + Side2D::count(); ++iface) {
+    for (index_t iface = faces.offsets[ic]; iface < faces.offsets[ic] + Side2D::count(); ++iface) {
         Line vs = {
-                verts[node_begin[ic] + faces.vertices[iface][0]],
-                verts[node_begin[ic] + faces.vertices[iface][1]]
+                verts[verts.offsets[ic] + faces.vertices[iface][0]],
+                verts[verts.offsets[ic] + faces.vertices[iface][1]]
         };
 
         faces.area[iface]     = vs.length();
@@ -810,20 +802,20 @@ void AmrCells::set_cell(index_t ic, const Cube& cube) {
     volume[ic] = cube.volume();
     center[ic] = cube.centroid(volume[ic]);
 
-    face_begin[ic] = 24 * ic ;
-    face_begin[ic + 1] = 24 * (ic + 1);
-    faces.insert(face_begin[ic], CellType::AMR3D);
+    faces.offsets[ic] = 24 * ic ;
+    faces.offsets[ic + 1] = 24 * (ic + 1);
+    faces.insert(faces.offsets[ic], CellType::AMR3D);
 
-    node_begin[ic] = 27 * ic;
-    node_begin[ic + 1] = 27 * (ic + 1);
-    mapping<3>(ic) = SqCube(cube);
+    verts.offsets[ic] = 27 * ic;
+    verts.offsets[ic + 1] = 27 * (ic + 1);
+    verts.mapping<3>(ic) = SqCube(cube);
 
-    for (index_t iface = face_begin[ic]; iface < face_begin[ic] + Side3D::count(); ++iface) {
+    for (index_t iface = faces.offsets[ic]; iface < faces.offsets[ic] + Side3D::count(); ++iface) {
         Quad vs = {
-                verts[node_begin[ic] + faces.vertices[iface][0]],
-                verts[node_begin[ic] + faces.vertices[iface][1]],
-                verts[node_begin[ic] + faces.vertices[iface][2]],
-                verts[node_begin[ic] + faces.vertices[iface][3]]
+                verts[verts.offsets[ic] + faces.vertices[iface][0]],
+                verts[verts.offsets[ic] + faces.vertices[iface][1]],
+                verts[verts.offsets[ic] + faces.vertices[iface][2]],
+                verts[verts.offsets[ic] + faces.vertices[iface][3]]
         };
 
         faces.area[iface]     = vs.area();
@@ -871,18 +863,18 @@ void AmrCells::push_back(const Polygon& poly) {
     faces.resize(faces.size() + n_faces);
     verts.resize(verts.size() + n_nodes);
 
-    face_begin[ic + 1] = face_begin[ic] + n_faces;
-    faces.insert(face_begin[ic], CellType::POLYGON, n_faces);
+    faces.offsets[ic + 1] = faces.offsets[ic] + n_faces;
+    faces.insert(faces.offsets[ic], CellType::POLYGON, n_faces);
 
-    node_begin[ic + 1] = node_begin[ic] + n_nodes;
+    verts.offsets[ic + 1] = verts.offsets[ic] + n_nodes;
     for (int i = 0; i < n_nodes; ++i) {
-        verts[node_begin[ic] + i] = poly[i];
+        verts[verts.offsets[ic] + i] = poly[i];
     }
 
-    for (index_t iface = face_begin[ic]; iface < face_begin[ic] + n_faces; ++iface) {
+    for (index_t iface = faces.offsets[ic]; iface < faces.offsets[ic] + n_faces; ++iface) {
         Line vs = {
-                verts[node_begin[ic] + faces.vertices[iface][0]],
-                verts[node_begin[ic] + faces.vertices[iface][1]]
+                verts[verts.offsets[ic] + faces.vertices[iface][0]],
+                verts[verts.offsets[ic] + faces.vertices[iface][1]]
         };
 
         faces.area[iface]     = vs.length();
@@ -934,18 +926,18 @@ void AmrCells::push_back_impl(const Polyhedron& poly) {
     int n_nodes = poly.n_verts();
     verts.resize(verts.size() + n_nodes);
 
-    node_begin[ic + 1] = node_begin[ic] + n_nodes;
+    verts.offsets[ic + 1] = verts.offsets[ic] + n_nodes;
     for (int i = 0; i < n_nodes; ++i) {
-        verts[node_begin[ic] + i] = poly.vertex(i);
+        verts[verts.offsets[ic] + i] = poly.vertex(i);
     }
 
     // Определим грани многогранника
     int n_faces = poly.n_faces();
     faces.resize(faces.size() + n_faces);
 
-    face_begin[ic + 1] = face_begin[ic] + n_faces;
+    faces.offsets[ic + 1] = faces.offsets[ic] + n_faces;
     for (int i = 0; i < poly.n_faces(); ++i) {
-        index_t iface = face_begin[ic] + i;
+        index_t iface = faces.offsets[ic] + i;
 
         faces.area[iface] = poly.face_area(i);
         faces.center[iface] = poly.face_center(i);
@@ -1116,13 +1108,13 @@ void AmrCells::backup(const std::filesystem::path& root, std::ofstream& file,
     if (!volume_alt.empty()) {
         save_vector(root, file, "cells", tab, "volume_alt", volume_alt, ",\n");
     }
-    save_vector(root, file, "cells", tab, "face_begin", face_begin, ",\n");
-    save_vector(root, file, "cells", tab, "node_begin", node_begin, ",\n");
 
     if (mpi::master()) {
         fs::create_directory(root / "cells/faces");
         file << tab << "\"faces\": {\n";
     }
+
+    save_vector(root, file, "cells/faces", tab2, "offsets", faces.offsets, ",\n");
 
     if (mpi::master()) {
         fs::create_directory(root / "cells/faces/adjacent");

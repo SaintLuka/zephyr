@@ -182,11 +182,11 @@ void split_face(AmrCells& cells, index_t ic, Side<dim> side) {
 
     if constexpr (dim == 2) {
         return split_lookup_table_2D[side][cells.axial()](
-            cells.faces, cells.face_begin[ic], cells.mapping<dim>(ic));
+            cells.faces, cells.faces.offsets[ic], cells.verts.mapping<dim>(ic));
     }
     else {
         return split_lookup_table_3D[side](
-            cells.faces, cells.face_begin[ic], cells.mapping<dim>(ic));
+            cells.faces, cells.faces.offsets[ic], cells.verts.mapping<dim>(ic));
     }
 }
 
@@ -219,11 +219,11 @@ void merge_faces(AmrCells& cells, index_t ic, Side<dim> side) {
 
     if constexpr (dim == 2) {
         return merge_lookup_table_2D[side][cells.axial()](
-            cells.faces, cells.face_begin[ic], cells.mapping<dim>(ic));
+            cells.faces, cells.faces.offsets[ic], cells.verts.mapping<dim>(ic));
     }
     else {
         return merge_lookup_table_3D[side](
-            cells.faces, cells.face_begin[ic], cells.mapping<dim>(ic));
+            cells.faces, cells.faces.offsets[ic], cells.verts.mapping<dim>(ic));
     }    
 }
 

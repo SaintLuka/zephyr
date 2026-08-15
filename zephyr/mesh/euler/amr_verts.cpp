@@ -44,6 +44,7 @@ void AmrVerts::init_unique() {
 
 memory_t AmrVerts::memory_usage() const {
     memory_t mem;
+    mem.add(offsets);
     mem.add(coords);
     mem.add(index);
     mem.add(ghost);

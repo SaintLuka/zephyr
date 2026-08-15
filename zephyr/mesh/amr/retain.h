@@ -21,7 +21,7 @@ void retain_cell(AmrCells &locals, AmrCells& aliens, index_t ic) {
     auto& adj = locals.faces.adjacent;
 
     for (auto side: Side<dim>::items()) {
-        index_t face_beg = locals.face_begin[ic];
+        index_t face_beg = locals.faces.offsets[ic];
         index_t iface = face_beg + side;
 
         if (locals.faces.is_undefined(iface)) {
@@ -29,7 +29,7 @@ void retain_cell(AmrCells &locals, AmrCells& aliens, index_t ic) {
         }
         if (locals.faces.is_boundary(iface)) {
             // Сама ячейка может переезжать
-            scrutiny_check(locals.simple_face(ic, side), "Complex boundary face");
+            scrutiny_check(locals.faces.is_simple(ic, side), "Complex boundary face");
             adj.index[iface] = locals.next[ic];
             adj.basic[iface] = locals.next[ic];
             continue;

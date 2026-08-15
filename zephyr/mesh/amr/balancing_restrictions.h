@@ -70,7 +70,7 @@ inline void check_flags(AmrCells& locals, AmrCells& aliens, int max_level) {
             throw std::runtime_error(message);
         }
 
-        for (auto iface: locals.faces_range(ic)) {
+        for (auto iface: locals.faces.range(ic)) {
             if (locals.faces.is_undefined(iface) ||
                 locals.faces.is_boundary(iface)) {
                 continue;

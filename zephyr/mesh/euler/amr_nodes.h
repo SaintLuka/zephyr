@@ -44,6 +44,9 @@ public:
     std::vector<index_t> ghost;
 
 
+    /// @brief Пустые массивы по умолчанию
+    AmrIncident() = default;
+
     /// @brief Очистить массивы
     void clear();
 
@@ -70,10 +73,9 @@ public:
     }
 
     /// @brief Полный диапазон соседних ячеек (могут встречаться неактуальные)
-    range_t<index_t> incident_range(index_t inode) const {
+    range_t<index_t> range(index_t inode) const {
         return std::views::iota(offsets[inode], offsets[inode + 1]);
     }
-
 
     /// @brief Расход памяти
     memory_t memory_usage() const;

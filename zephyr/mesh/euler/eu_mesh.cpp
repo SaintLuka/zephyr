@@ -319,7 +319,7 @@ void EuMesh::refine() {
     /*//R version
     threads::parallel_for(0, m_locals.size(),
         [&locals=m_locals](index_t ic) {
-            index_t iface = locals.face_begin[ic];
+            index_t iface = locals.faces.offsets[ic];
             std::array<double, 4> areas;
             for (Side2D side: Side2D::items()) {
                 areas[side] = locals.faces.area[iface + side];
@@ -509,7 +509,7 @@ void EuMesh::check_reference(bool fix) {
             m_locals.volume[ic] = volume;
             m_locals.center[ic] = get_center(i, j);
 
-            index_t iface = m_locals.face_begin[ic];
+            index_t iface = m_locals.faces.offsets[ic];
 
             m_locals.faces.area[iface + Side2D::L] = hy;
             m_locals.faces.area[iface + Side2D::R] = hy;
@@ -526,7 +526,7 @@ void EuMesh::check_reference(bool fix) {
             m_locals.faces.center[iface + Side2D::B] = bface_center(i, j);
             m_locals.faces.center[iface + Side2D::T] = tface_center(i, j);
 
-            SqQuad& quad = m_locals.mapping<2>(ic);
+            SqQuad& quad = m_locals.verts.mapping<2>(ic);
             quad.vs<-1, -1>() = get_vertex(i + 0.0, j + 0.0);
             quad.vs< 0, -1>() = get_vertex(i + 0.5, j + 0.0);
             quad.vs<+1, -1>() = get_vertex(i + 1.0, j + 0.0);
@@ -613,8 +613,8 @@ int EuMesh::check_base() const {
         }
 
         // Проверим число вершин
-        int n_nodes = m_locals.node_count(ic);
-        int n_max_nodes = m_locals.max_node_count(ic);
+        int n_nodes = m_locals.verts.count(ic);
+        int n_max_nodes = m_locals.verts.max_count(ic);
         if (m_locals.adaptive()) {
             if ((dim == 2 && n_nodes == n_max_nodes && n_max_nodes != 9) ||
                 (dim == 3 && n_nodes == n_max_nodes && n_max_nodes != 27)) {
@@ -638,10 +638,10 @@ int EuMesh::check_base() const {
 
         // Проверим число граней
         int n_faces = m_locals.face_count(ic);
-        int n_max_faces = m_locals.max_face_count(ic);
+        int n_max_faces = m_locals.faces.max_count(ic);
         if (m_locals.adaptive()) {
             for (int i = 0; i < FpC(dim); ++i) {
-                if (m_locals.faces.is_undefined(m_locals.face_begin[ic] + i)) {
+                if (m_locals.faces.is_undefined(m_locals.faces.offsets[ic] + i)) {
                     std::cout << "\tCell has no one of main faces\n";
                     m_locals.print_info(ic);
                     return -1;
@@ -671,7 +671,7 @@ int EuMesh::check_base() const {
                 return -1;
             }
             for (int i = 0; i < n_faces; ++i) {
-                if (m_locals.faces.is_undefined(m_locals.face_begin[ic] + i)) {
+                if (m_locals.faces.is_undefined(m_locals.faces.offsets[ic] + i)) {
                     std::cout << "\tCell has undefined face\n";
                     m_locals.print_info(ic);
                     return -1;
@@ -740,7 +740,7 @@ int EuMesh::check_refined() const {
 
         // Число граней
         for (int i = 0; i < FpC(dim); ++i) {
-            if (m_locals.faces.is_undefined(m_locals.face_begin[ic] + i)) {
+            if (m_locals.faces.is_undefined(m_locals.faces.offsets[ic] + i)) {
                 std::cout << "\tCell has no one of main faces\n";
                 m_locals.print_info(ic);
                 return -1;
@@ -748,8 +748,8 @@ int EuMesh::check_refined() const {
         }
 
         // Вершины дублируются
-        for (int i = m_locals.node_begin[ic]; i < m_locals.node_begin[ic + 1]; ++i) {
-            for (int j = i + 1; j < m_locals.node_begin[ic + 1]; ++j) {
+        for (int i = m_locals.verts.offsets[ic]; i < m_locals.verts.offsets[ic + 1]; ++i) {
+            for (int j = i + 1; j < m_locals.verts.offsets[ic + 1]; ++j) {
                 double dist = (m_locals.verts[i] - m_locals.verts[j]).norm();
                 if (dist < 1.0e-5 * m_locals.linear_size(ic)) {
                     std::cout << "\tIdentical vertices\n";

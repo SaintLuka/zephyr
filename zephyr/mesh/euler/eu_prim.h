@@ -386,7 +386,7 @@ public:
 
     /// @brief Вершины как набор узлов квадратичного отображения
     template <int dim>
-    const SqMap<dim>& mapping() const { return m_cells->mapping<dim>(m_index); }
+    const SqMap<dim>& mapping() const { return m_cells->verts.mapping<dim>(m_index); }
 
     /// @}
 
@@ -630,7 +630,7 @@ inline const geom::Vector3d &EuFace::center() const { return m_cells->faces.cent
 template <int dim >
 Side<dim> EuFace::side() const {
     index_t cell_idx = m_cells->faces.adjacent.basic[m_face_idx];
-    return m_face_idx - m_cells->face_begin[cell_idx];
+    return m_face_idx - m_cells->faces.offsets[cell_idx];
 }
 
 inline double EuFace::area() const { return m_cells->faces.area[m_face_idx]; }
@@ -647,7 +647,7 @@ inline index_t EuFace::vertex_index(int idx) const { return m_cells->faces.verti
 
 inline index_t EuFace::node_index(int idx) const {
     index_t cell_idx = m_cells->faces.adjacent.basic[m_face_idx];
-    return m_cells->node_begin[cell_idx] + static_cast<int>(m_cells->faces.vertices[m_face_idx][idx]);
+    return m_cells->verts.offsets[cell_idx] + static_cast<int>(m_cells->faces.vertices[m_face_idx][idx]);
 }
 
 inline geom::Vector3d EuFace::vs(int idx) const { return m_cells->verts[node_index(idx)]; }
@@ -799,30 +799,30 @@ inline void EuCell::copy_data_to(EuCell &dst_cell) const {
 inline int EuCell::face_count() const { return m_cells->face_count(m_index); }
 
 inline EuFace EuCell::face(int idx) const {
-    return {m_cells, m_cells->face_begin[m_index] + idx, m_aliens};
+    return {m_cells, m_cells->faces.offsets[m_index] + idx, m_aliens};
 }
 
 inline EuFace EuCell::face(Side2D s) const {
-    return {m_cells, m_cells->face_begin[m_index] + s, m_aliens};
+    return {m_cells, m_cells->faces.offsets[m_index] + s, m_aliens};
 }
 
 inline EuFace EuCell::face(Side3D s) const {
-    return {m_cells, m_cells->face_begin[m_index] + s, m_aliens};
+    return {m_cells, m_cells->faces.offsets[m_index] + s, m_aliens};
 }
 
-inline bool EuCell::simple_face(Side2D s) const { return m_cells->simple_face(m_index, s); }
+inline bool EuCell::simple_face(Side2D s) const { return m_cells->faces.is_simple(m_index, s); }
 
-inline bool EuCell::simple_face(Side3D s) const { return m_cells->simple_face(m_index, s); }
+inline bool EuCell::simple_face(Side3D s) const { return m_cells->faces.is_simple(m_index, s); }
 
-inline bool EuCell::complex_face(Side2D s) const { return m_cells->complex_face(m_index, s); }
+inline bool EuCell::complex_face(Side2D s) const { return m_cells->faces.is_complex(m_index, s); }
 
-inline bool EuCell::complex_face(Side3D s) const { return m_cells->complex_face(m_index, s); }
+inline bool EuCell::complex_face(Side3D s) const { return m_cells->faces.is_complex(m_index, s); }
 
 inline EuFaces EuCell::faces(Direction dir) const { return {m_cells, m_index, m_aliens, dir}; }
 
-inline int EuCell::node_count() const { return m_cells->node_count(m_index); }
+inline int EuCell::node_count() const { return m_cells->verts.count(m_index); }
 
-inline const geom::Vector3d* EuCell::vertices_data() const { return m_cells->vertices_data(m_index); }
+inline const geom::Vector3d* EuCell::vertices_data() const { return m_cells->verts.coords_data(m_index); }
 
 inline double EuCell::approx_vol_fraction(const SpFunction& inside) const {
     return m_cells->approx_vol_fraction(m_index, inside);

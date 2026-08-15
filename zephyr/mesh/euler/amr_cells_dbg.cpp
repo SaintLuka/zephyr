@@ -26,17 +26,17 @@ void AmrCells::print_info(index_t ic) const {
     std::cout << "\t\tz_idx:  " << z_idx[ic] << "\n";
 
     std::cout << "\t\tcell.vertices:\n";
-    for (index_t i: nodes_range(ic)) {
+    for (index_t i: verts.range(ic)) {
         if (!verts[i].hasNaN()) {
-            std::cout << "\t\t\t" << i - node_begin[ic] << ": " << verts[i].transpose() << "\n";
+            std::cout << "\t\t\t" << i - verts.offsets[ic] << ": " << verts[i].transpose() << "\n";
         }
     }
 
     std::cout << "\t\tcell.faces:\n";
-    for (index_t iface: faces_range(ic)) {
+    for (index_t iface: faces.range(ic)) {
         if (faces.is_undefined(iface)) continue;
 
-        std::cout << "\t\t\t" << side_to_string(iface - face_begin[ic], m_dim) << ":\n";
+        std::cout << "\t\t\t" << side_to_string(iface - faces.offsets[ic], m_dim) << ":\n";
         std::cout << "\t\t\t\tvertices:";
         for (int j = 0; j < (m_dim < 3 ? 2 : 4); ++j) {
             std::cout << " " << faces.vertices[iface][j];
@@ -77,7 +77,7 @@ void AmrCells::visualize(index_t ic, std::string filename) const {
          << "            color=color)\n\n";
 
     // Основные точки
-    SqQuad map = mapping<2>(ic);
+    SqQuad map = verts.mapping<2>(ic);
 
     file << "fig = plt.figure(dpi=150, figsize=(8, 8))\n";
     file << "ax = fig.add_subplot()\n\n";
@@ -101,7 +101,7 @@ void AmrCells::visualize(index_t ic, std::string filename) const {
         throw std::runtime_error("Can't visualize 3D cell, sorry");
     }
 
-    SqQuad vertices = mapping<2>(ic);
+    SqQuad vertices = verts.mapping<2>(ic);
 
     for (int i = 0; i < 9; ++i) {
         file << "ax.text(" << vertices[i].x() << ", " << vertices[i].y() << ", " << i << ")\n";
@@ -120,7 +120,7 @@ void AmrCells::visualize(index_t ic, std::string filename) const {
         file << "ax.plot(curve_Lx, curve_Ly, linestyle='dotted', color='green', linewidth=0.5)\n\n";
     }
 
-    for (index_t iface: faces_range(ic)) {
+    for (index_t iface: faces.range(ic)) {
         if (faces.is_undefined(iface)) {
             continue;
         }
@@ -156,12 +156,12 @@ void AmrCells::visualize(index_t ic, std::string filename) const {
 }
 
 int AmrCells::check_geometry(index_t ic) const {
-    for (index_t iface: faces_range(ic)) {
+    for (index_t iface: faces.range(ic)) {
         if (faces.is_undefined(iface)) continue;
 
         Vector3d fc(0.0, 0.0, 0.0);
         for (int iv = 0; iv < indexing::VpF(m_dim); ++iv) {
-            fc += verts[node_begin[ic] + faces.vertices[iface][iv]];
+            fc += verts[verts.offsets[ic] + faces.vertices[iface][iv]];
         }
         fc /= indexing::VpF(m_dim);
 
@@ -178,7 +178,7 @@ int AmrCells::check_geometry(index_t ic) const {
             if (iv >= 0) {
                 ++n_verts_per_face;
             }
-            if (iv >= max_node_count(ic)) {
+            if (iv >= verts.max_count(ic)) {
                 std::cout << "\tWrong local vertex index\n";
                 print_info(ic);
                 return -1;
@@ -209,10 +209,10 @@ int AmrCells::check_geometry(index_t ic) const {
         if (m_dim > 2) {
             if (m_adaptive) {
                 // Обход по кривой Мортона (вроде как)
-                Vector3d v0 = verts[node_begin[ic] + faces.vertices[iface][0]];
-                Vector3d v1 = verts[node_begin[ic] + faces.vertices[iface][1]];
-                Vector3d v2 = verts[node_begin[ic] + faces.vertices[iface][2]];
-                Vector3d v3 = verts[node_begin[ic] + faces.vertices[iface][3]];
+                Vector3d v0 = verts[verts.offsets[ic] + faces.vertices[iface][0]];
+                Vector3d v1 = verts[verts.offsets[ic] + faces.vertices[iface][1]];
+                Vector3d v2 = verts[verts.offsets[ic] + faces.vertices[iface][2]];
+                Vector3d v3 = verts[verts.offsets[ic] + faces.vertices[iface][3]];
 
                 Vector3d n1 = (v2 - v1).cross(v0 - v1);
                 Vector3d n2 = (v1 - v2).cross(v3 - v2);
@@ -227,7 +227,7 @@ int AmrCells::check_geometry(index_t ic) const {
                 std::vector<Vector3d> poly(n_verts_per_face);
                 for (int i = 0; i < n_verts_per_face; ++i) {
                     int iv = faces.vertices[iface][i];
-                    poly[i] = verts[node_begin[ic] + iv];
+                    poly[i] = verts[verts.offsets[ic] + iv];
                 }
                 // Проверить сортировку?
                 Vector3d face_c = faces.center[iface];
@@ -253,10 +253,10 @@ int AmrCells::check_base_face_orientation(index_t ic) const {
     if (!m_adaptive) return 0;
 
     if (m_dim == 2) {
-        Vector3d nx1 = faces.normal[face_begin[ic] + Side3D::L];
-        Vector3d nx2 = faces.normal[face_begin[ic] + Side3D::R];
-        Vector3d ny1 = faces.normal[face_begin[ic] + Side3D::B];
-        Vector3d ny2 = faces.normal[face_begin[ic] + Side3D::T];
+        Vector3d nx1 = faces.normal[faces.offsets[ic] + Side3D::L];
+        Vector3d nx2 = faces.normal[faces.offsets[ic] + Side3D::R];
+        Vector3d ny1 = faces.normal[faces.offsets[ic] + Side3D::B];
+        Vector3d ny2 = faces.normal[faces.offsets[ic] + Side3D::T];
 
         if (nx1.dot(nx2) > -0.8) {
             std::cout << "\tOpposite outward normals (left-right) are co-directed\n";
@@ -279,12 +279,12 @@ int AmrCells::check_base_face_orientation(index_t ic) const {
             return -1;
         }
     } else {
-        Vector3d nx1 = faces.normal[face_begin[ic] + Side3D::L];
-        Vector3d nx2 = faces.normal[face_begin[ic] + Side3D::R];
-        Vector3d ny1 = faces.normal[face_begin[ic] + Side3D::B];
-        Vector3d ny2 = faces.normal[face_begin[ic] + Side3D::T];
-        Vector3d nz1 = faces.normal[face_begin[ic] + Side3D::Z];
-        Vector3d nz2 = faces.normal[face_begin[ic] + Side3D::F];
+        Vector3d nx1 = faces.normal[faces.offsets[ic] + Side3D::L];
+        Vector3d nx2 = faces.normal[faces.offsets[ic] + Side3D::R];
+        Vector3d ny1 = faces.normal[faces.offsets[ic] + Side3D::B];
+        Vector3d ny2 = faces.normal[faces.offsets[ic] + Side3D::T];
+        Vector3d nz1 = faces.normal[faces.offsets[ic] + Side3D::Z];
+        Vector3d nz2 = faces.normal[faces.offsets[ic] + Side3D::F];
 
         if (nx1.dot(nx2) > -0.8) {
             std::cout << "\tOpposite outward normals (left-right) are co-directed\n";
@@ -325,7 +325,7 @@ int AmrCells::check_base_vertices_order(index_t ic) const {
     };
 
     if (m_dim == 2) {
-        SqQuad quad = mapping<2>(ic);
+        SqQuad quad = verts.mapping<2>(ic);
 
         bool bad = false;
 
@@ -368,21 +368,21 @@ int AmrCells::check_base_vertices_order(index_t ic) const {
         }
 
         // Пересечения граней по нужным вершинам
-        if (cross_face(face_begin[ic], Side2D::LEFT, Side2D::BOTTOM) != SqQuad::iss<-1, -1>()) {
+        if (cross_face(faces.offsets[ic], Side2D::LEFT, Side2D::BOTTOM) != SqQuad::iss<-1, -1>()) {
             bad = true;
         }
-        if (cross_face(face_begin[ic], Side2D::LEFT[0], Side2D::TOP) != SqQuad::iss<-1, +1>() &&
-            cross_face(face_begin[ic], Side2D::LEFT[1], Side2D::TOP) != SqQuad::iss<-1, +1>()) {
+        if (cross_face(faces.offsets[ic], Side2D::LEFT[0], Side2D::TOP) != SqQuad::iss<-1, +1>() &&
+            cross_face(faces.offsets[ic], Side2D::LEFT[1], Side2D::TOP) != SqQuad::iss<-1, +1>()) {
             bad = true;
         }
-        if (cross_face(face_begin[ic], Side2D::RIGHT, Side2D::BOTTOM[0]) != SqQuad::iss<+1, -1>() &&
-            cross_face(face_begin[ic], Side2D::RIGHT, Side2D::BOTTOM[1]) != SqQuad::iss<+1, -1>()) {
+        if (cross_face(faces.offsets[ic], Side2D::RIGHT, Side2D::BOTTOM[0]) != SqQuad::iss<+1, -1>() &&
+            cross_face(faces.offsets[ic], Side2D::RIGHT, Side2D::BOTTOM[1]) != SqQuad::iss<+1, -1>()) {
             bad = true;
         }
-        if (cross_face(face_begin[ic], Side2D::RIGHT[0], Side2D::TOP[0]) != SqQuad::iss<+1, +1>() &&
-            cross_face(face_begin[ic], Side2D::RIGHT[0], Side2D::TOP[1]) != SqQuad::iss<+1, +1>() &&
-            cross_face(face_begin[ic], Side2D::RIGHT[1], Side2D::TOP[0]) != SqQuad::iss<+1, +1>() &&
-            cross_face(face_begin[ic], Side2D::RIGHT[1], Side2D::TOP[1]) != SqQuad::iss<+1, +1>()) {
+        if (cross_face(faces.offsets[ic], Side2D::RIGHT[0], Side2D::TOP[0]) != SqQuad::iss<+1, +1>() &&
+            cross_face(faces.offsets[ic], Side2D::RIGHT[0], Side2D::TOP[1]) != SqQuad::iss<+1, +1>() &&
+            cross_face(faces.offsets[ic], Side2D::RIGHT[1], Side2D::TOP[0]) != SqQuad::iss<+1, +1>() &&
+            cross_face(faces.offsets[ic], Side2D::RIGHT[1], Side2D::TOP[1]) != SqQuad::iss<+1, +1>()) {
             bad = true;
         }
 
@@ -392,7 +392,7 @@ int AmrCells::check_base_vertices_order(index_t ic) const {
             return -1;
         }
     } else {
-        SqCube cube = mapping<3>(ic);
+        SqCube cube = verts.mapping<3>(ic);
 
         bool bad = false;
         static bool first = true;
@@ -454,7 +454,7 @@ int AmrCells::check_base_vertices_order(index_t ic) const {
         }
 
         // Пересечение трёх сторон по базовой вершине
-#define check_base_vertex(i, j, k) if (cross_face(face_begin[ic], Side3D::by_dir<i, 0, 0>(), Side3D::by_dir<0, j, 0>(), Side3D::by_dir<0, 0, k>()) != SqCube::iss<i, j, k>()) bad = true;
+#define check_base_vertex(i, j, k) if (cross_face(faces.offsets[ic], Side3D::by_dir<i, 0, 0>(), Side3D::by_dir<0, j, 0>(), Side3D::by_dir<0, 0, k>()) != SqCube::iss<i, j, k>()) bad = true;
 
         // Пересечения граней по нужным вершинам
         check_base_vertex(-1, -1, -1);
@@ -479,8 +479,8 @@ int AmrCells::check_base_vertices_order(index_t ic) const {
 int AmrCells::check_complex_faces(index_t ic) const {
     if (m_dim == 2) {
         for (Side2D side: Side2D::items()) {
-            auto iface1 = face_begin[ic] + side;
-            auto iface2 = face_begin[ic] + side[1];
+            auto iface1 = faces.offsets[ic] + side;
+            auto iface2 = faces.offsets[ic] + side[1];
             if (faces.is_undefined(iface2)) {
                 continue;
             }
@@ -506,14 +506,14 @@ int AmrCells::check_complex_faces(index_t ic) const {
         }
     } else {
         for (Side3D side: Side3D::items()) {
-            auto iface1 = face_begin[ic] + side;
-            auto iface2 = face_begin[ic] + side[1];
+            auto iface1 = faces.offsets[ic] + side;
+            auto iface2 = faces.offsets[ic] + side[1];
             if (faces.is_undefined(iface2)) {
                 continue;
             }
 
-            auto iface3 = face_begin[ic] + side[2];
-            auto iface4 = face_begin[ic] + side[3];
+            auto iface3 = faces.offsets[ic] + side[2];
+            auto iface4 = faces.offsets[ic] + side[3];
             if (faces.is_undefined(iface3) || faces.is_undefined(iface4)) {
                 std::cout << "\tComplex 3D face (" + side_to_string(side, m_dim) + " side) has less than 4 subfaces\n";
                 print_info(ic);
@@ -547,7 +547,7 @@ int AmrCells::check_connectivity(index_t ic, const AmrCells& aliens) const {
     if (is_undefined(ic)) return 0;
 
     // Через обычные грани существуют соседи
-    for (index_t iface: faces_range(ic)) {
+    for (index_t iface: faces.range(ic)) {
         if (faces.is_undefined(iface)) {
             // Проверим обнуление параметров
             if (faces.adjacent.rank[iface] >= 0) {
@@ -653,7 +653,7 @@ int AmrCells::check_connectivity(index_t ic, const AmrCells& aliens) const {
         // и ссылаться на текущую ячейку
         int counter = 0;
 
-        for (index_t jface: neibs.faces_range(jc)) {
+        for (index_t jface: neibs.faces.range(jc)) {
             if (neibs.faces.is_undefined(jface)) {
                 continue;
             }

@@ -38,12 +38,12 @@ EuFaces::EuFaces(
         Direction dir)
         :
         m_begin(cells,
-                cells->face_begin[cell_idx],
-                cells->face_begin[cell_idx + 1],
+                cells->faces.offsets[cell_idx],
+                cells->faces.offsets[cell_idx + 1],
                 aliens, dir),
         m_end(cells,
-              cells->face_begin[cell_idx + 1],
-              cells->face_begin[cell_idx + 1],
+              cells->faces.offsets[cell_idx + 1],
+              cells->faces.offsets[cell_idx + 1],
               aliens, dir) { }
 
 geom::Box EuCell::bbox() const {
@@ -64,7 +64,7 @@ void EuCell::replace(int loc_face) {
     z_assert(m_cells->rank[m_index] == utils::mpi::rank(), "Not a local cell #2");
 
     // Индекс правой грани
-    index_t iface = m_cells->face_begin[m_index] + loc_face;
+    index_t iface = m_cells->faces.offsets[m_index] + loc_face;
 
     // Массив, в котором находится правая ячейка, индекс ячейки в этом массиве
     std::tie(m_cells, m_index) = m_cells->faces.adjacent.get_neib(iface, m_cells, m_aliens);

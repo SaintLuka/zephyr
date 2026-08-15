@@ -376,10 +376,10 @@ template <int dim>
 void find_rotations_impl(AmrCells& locals, const AmrCells& aliens) {
     z_assert(locals.adaptive(), "find_rotations: not adaptive mesh");
     for (index_t ic = 0; ic < locals.size(); ++ic) {
-        Map<dim> map1 = locals.mapping<dim>(ic).reduce();
+        Map<dim> map1 = locals.verts.mapping<dim>(ic).reduce();
 
         for (Side<dim> side: Side<dim>::items()) {
-            index_t iface = locals.face_begin[ic] + side;
+            index_t iface = locals.faces.offsets[ic] + side;
             if (locals.faces.is_boundary(iface)) {
                 locals.faces.adjacent.rotation[iface] = 0;
                 continue;
@@ -387,7 +387,7 @@ void find_rotations_impl(AmrCells& locals, const AmrCells& aliens) {
 
             auto [neibs, jc] = locals.faces.adjacent.get_neib(iface, locals, aliens);
 
-            Map<dim> map2 = neibs.mapping<dim>(jc).reduce();
+            Map<dim> map2 = neibs.verts.mapping<dim>(jc).reduce();
 
             auto r = find_rotation(map1, side, map2);
             if (r == 255) {

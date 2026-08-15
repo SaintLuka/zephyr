@@ -56,18 +56,18 @@ Children select_children(AmrCells& locals, index_t ic) {
 /// @brief Вершины родительской ячейки (2D или 3D)
 template <int dim>
 SqMap<dim> parent_vs(const AmrCells& cells, Children& children) {
-#define subs_vertex_3D(i, j, k) (cells.verts[cells.node_begin[children.index[Cube::iss<i, j, k>()]] + SqCube::iss<i, j, k>()])
+#define subs_vertex_3D(i, j, k) (cells.verts[cells.verts.offsets[children.index[Cube::iss<i, j, k>()]] + SqCube::iss<i, j, k>()])
     if constexpr (dim == 2) {
         return {
-            cells.verts[cells.node_begin[children.index[0]] + SqQuad::iss<-1, -1>()],
-            cells.verts[cells.node_begin[children.index[0]] + SqQuad::iss<+1, -1>()],
-            cells.verts[cells.node_begin[children.index[1]] + SqQuad::iss<+1, -1>()],
-            cells.verts[cells.node_begin[children.index[0]] + SqQuad::iss<-1, +1>()],
-            cells.verts[cells.node_begin[children.index[0]] + SqQuad::iss<+1, +1>()],
-            cells.verts[cells.node_begin[children.index[1]] + SqQuad::iss<+1, +1>()],
-            cells.verts[cells.node_begin[children.index[2]] + SqQuad::iss<-1, +1>()],
-            cells.verts[cells.node_begin[children.index[2]] + SqQuad::iss<+1, +1>()],
-            cells.verts[cells.node_begin[children.index[3]] + SqQuad::iss<+1, +1>()]
+            cells.verts[cells.verts.offsets[children.index[0]] + SqQuad::iss<-1, -1>()],
+            cells.verts[cells.verts.offsets[children.index[0]] + SqQuad::iss<+1, -1>()],
+            cells.verts[cells.verts.offsets[children.index[1]] + SqQuad::iss<+1, -1>()],
+            cells.verts[cells.verts.offsets[children.index[0]] + SqQuad::iss<-1, +1>()],
+            cells.verts[cells.verts.offsets[children.index[0]] + SqQuad::iss<+1, +1>()],
+            cells.verts[cells.verts.offsets[children.index[1]] + SqQuad::iss<+1, +1>()],
+            cells.verts[cells.verts.offsets[children.index[2]] + SqQuad::iss<-1, +1>()],
+            cells.verts[cells.verts.offsets[children.index[2]] + SqQuad::iss<+1, +1>()],
+            cells.verts[cells.verts.offsets[children.index[3]] + SqQuad::iss<+1, +1>()]
         };
     }
     else {
@@ -118,21 +118,21 @@ void make_parent(AmrCells& locals, AmrCells& aliens, Children& children, index_t
     for (Side<dim> side: Side<dim>::items()) {
         // Некоторая дочерняя у грани и её грань
         index_t some_ch = children.index[indexing::child(side)];
-        index_t some_ch_face = locals.face_begin[some_ch] + side;
+        index_t some_ch_face = locals.faces.offsets[some_ch] + side;
 #if SCRUTINY
         if (locals.faces.is_undefined(some_ch_face)) {
             throw std::runtime_error("Undefined boundary (coarse cell");
         }
         for (auto subface: side.subfaces()) {
             index_t ich = children.index[indexing::child(subface)];
-            index_t iface = locals.face_begin[ich] + side;
+            index_t iface = locals.faces.offsets[ich] + side;
 
             if (locals.faces.boundary[iface] != locals.faces.boundary[some_ch_face]) {
                 throw std::runtime_error("Different boundary conditions");
             }
         }
 #endif
-        index_t face_beg = locals.face_begin[ip];
+        index_t face_beg = locals.faces.offsets[ip];
         locals.faces.boundary[face_beg + side] = locals.faces.boundary[some_ch_face];
 
         // Внешняя граница, не требуется связывать
@@ -168,7 +168,7 @@ void make_parent(AmrCells& locals, AmrCells& aliens, Children& children, index_t
         auto children_by_side = indexing::children(side);
         for (int i = 1; i < indexing::VpF(dim); ++i) {
             index_t ich = children.index[children_by_side[i]];
-            index_t iface = locals.face_begin[ich] + side;
+            index_t iface = locals.faces.offsets[ich] + side;
 
             if (adj.rank[iface] == rank && (adj.alien[iface] >= 0 ||
                     adj.index[iface] < 0 || adj.index[iface] >= locals.size())) {
@@ -235,7 +235,7 @@ void make_parent(AmrCells& locals, AmrCells& aliens, Children& children, index_t
         // lvl_ch < lvl_n & flan_n < 0 хотя бы у одного, то есть сосед, который делает coarse
         for (auto subface: side.subfaces()) {
             index_t ich = children.index[indexing::child(subface)];
-            index_t ch_face = locals.face_begin[ich] + side;
+            index_t ch_face = locals.faces.offsets[ich] + side;
             auto[neibs, jc] = adj.get_neib(ch_face, locals, aliens);
             scrutiny_check(0 <= jc && jc < neibs.size(), "Out-of-bounds #3");
 
@@ -291,8 +291,8 @@ void make_parent(AmrCells& locals, AmrCells& aliens, Children& children, index_t
         std::array<Vector3d, FpF(dim)> cfaces;
         for (int i = 0; i < FpF(dim); ++i) {
             index_t ich = children.index[children_by_side[i]];
-            index_t iface = locals.face_begin[ich];
-            if (locals.simple_face(ich, side)) {
+            index_t iface = locals.faces.offsets[ich];
+            if (locals.faces.is_simple(ich, side)) {
                 // Простая грань
                 cfaces[i] = locals.faces.center[iface + side];
             } else {
@@ -312,7 +312,7 @@ void make_parent(AmrCells& locals, AmrCells& aliens, Children& children, index_t
         double eps = 1.0e-3 * locals.linear_size(ip);
         for (int i = 0; i < FpF(dim); ++i) {
             index_t ich = children.index[children_by_side[i]];
-            index_t ch_face = locals.face_begin[ich] + side;
+            index_t ch_face = locals.faces.offsets[ich] + side;
             for (int j = 0; j < FpF(dim); ++j) {
                 if ((pfaces[i] - cfaces[j]).norm() < eps) {
                     break;

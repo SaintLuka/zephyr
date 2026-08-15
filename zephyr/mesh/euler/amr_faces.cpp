@@ -73,6 +73,7 @@ void AmrFaces::shrink_to_fit() {
 
 memory_t AmrFaces::memory_usage() const {
     memory_t mem;
+    mem.add(offsets);
     mem.add(boundary);
     mem.add(normal);
     mem.add(center);

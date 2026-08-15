@@ -141,7 +141,7 @@ NodeOwners find_owners(const AmrCells& cells, index_t ic_start, int iv_start) {
 
         // Проходим по граням, ищем грани, которые содержат искомую вершину.
         // Сосед через такую грань также содержит искомую вершину.
-        for (auto iface: cells.faces_range(ic)) {
+        for (auto iface: cells.faces.range(ic)) {
             if (cells.faces.is_undefined(iface) ||
                 cells.faces.is_boundary(iface) ||
                 cells.faces.boundary[iface] == Boundary::PERIODIC ||
@@ -154,7 +154,7 @@ NodeOwners find_owners(const AmrCells& cells, index_t ic_start, int iv_start) {
             for (int j = 0; j < AmrFaces::max_vertices; ++j) {
                 int loc_iv = cells.faces.vertices[iface][j];
                 if (loc_iv < 0) break;
-                if (cells.node_begin[ic] + loc_iv == iv) {
+                if (cells.verts.offsets[ic] + loc_iv == iv) {
                     contain = true;
                     break;
                 }
@@ -173,7 +173,7 @@ NodeOwners find_owners(const AmrCells& cells, index_t ic_start, int iv_start) {
 
             // Ищем интересующую вершину среди вершин соседа
             index_t iv_n = -1;
-            for (auto iv2: cells.nodes_range(ic_n)) {
+            for (auto iv2: cells.verts.range(ic_n)) {
                 if ((cells.verts[iv2] - p).norm() < eps) {
                     // Проверка на -13??
                     iv_n = iv2;
@@ -204,13 +204,13 @@ void AmrNodes::setup_for(AmrCells& cells) {
     threads::parallel_for(
         index_t{0}, cells.n_cells(),
         [&cells](index_t ic) {
-            for (auto iface: cells.faces_range(ic)) {
+            for (auto iface: cells.faces.range(ic)) {
                 if (cells.faces.is_undefined(iface)) continue;
 
                 for (int j = 0; j < AmrFaces::max_vertices; ++j) {
                     int loc_iv =  cells.faces.vertices[iface][j];
                     if (loc_iv < 0) break;
-                    cells.verts.index[cells.node_begin[ic] + loc_iv] = -13;
+                    cells.verts.index[cells.verts.offsets[ic] + loc_iv] = -13;
                 }
             }
         });
@@ -233,7 +233,7 @@ void AmrNodes::setup_for(AmrCells& cells) {
 
     int counter = 0;
     for (index_t ic = 0; ic < cells.n_cells(); ++ic) {
-        for (index_t iv: cells.nodes_range(ic)) {
+        for (index_t iv: cells.verts.range(ic)) {
             // Нас интересуют актуальные (отмеченные) узлы, которые
             // ещё не получили уникальный индекс.
             if (cells.verts.index[iv] != -13) continue;

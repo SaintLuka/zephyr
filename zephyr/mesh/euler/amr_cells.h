@@ -29,11 +29,6 @@ class Cuboid;
 
 namespace zephyr::mesh {
 
-/// @brief Квадратичное отображение на квадрат/куб в зависимости от размерности
-template <int dim>
-using SqMap = std::conditional_t<dim < 3, geom::SqQuad, geom::SqCube>;
-
-
 /// @brief Набор ячеек в форме Structure of Arrays (набор массивов).
 ///
 /// Поддерживается три типа сеток:
@@ -92,9 +87,6 @@ public:
 
     /// @}
     /// @{ @name Грани и вершины ячеек
-
-    std::vector<index_t> face_begin;   ///< Индекс первой грани ячейки
-    std::vector<index_t> node_begin;   ///< Индекс первой вершины ячейки
 
     AmrFaces faces;  ///< Массив граней ячеек
     AmrVerts verts;  ///< Массив вершин ячеек
@@ -218,52 +210,13 @@ public:
     void set_undefined(index_t ic) { index[ic] = -1; }
 
     /// @brief Число актуальных граней ячейки, для адаптивной ячейки может
-    /// быть меньше max_face_count, для неструктурированной ячейки (полигон
-    /// или многогранник совпадает с max_face_count)
+    /// быть меньше faces.max_count, для неструктурированной ячейки (полигон
+    /// или многогранник совпадает с faces.max_count)
     int face_count(index_t ic) const;
-
-    /// @brief Максимальное число граней для ячейки
-    int max_face_count(index_t ic) const {
-        return face_begin[ic + 1] - face_begin[ic];
-    }
-
-    /// @brief Полный диапазон граней ячейки (могут встречаться неактуальные)
-    range_t<index_t> faces_range(index_t ic) const {
-        return std::views::iota(face_begin[ic], face_begin[ic + 1]);
-    }
-
-    /// @brief Число вершин, оно же максимальное, хранение неактуальных вершин
-    /// не допускается.
-    int node_count(index_t ic) const {
-        return node_begin[ic + 1] - node_begin[ic];
-    }
-
-    /// @brief Число вершин, оно же максимальное, хранение неактуальных вершин
-    /// сейчас не допускается.
-    int max_node_count(index_t ic) const {
-        return node_begin[ic + 1] - node_begin[ic];
-    }
-
-    /// @brief Полный диапазон вершин ячейки
-    range_t<index_t> nodes_range(index_t ic) const {
-        return std::views::iota(node_begin[ic], node_begin[ic + 1]);
-    }
-
-    /// @brief Простая грань на стороне?
-    template <int dim>
-    bool simple_face(index_t ic, Side<dim> side) const {
-        return faces.is_undefined(face_begin[ic] + side[1]);
-    }
-
-    /// @brief Сложная грань на стороне?
-    template <int dim>
-    bool complex_face(index_t ic, Side<dim> side) const {
-        return faces.is_actual(face_begin[ic] + side[1]);
-    }
 
     /// @brief Название грани AMR-ячейки
     std::string face_name(index_t ic, index_t iface) const {
-        return geom::side_to_string(iface - face_begin[ic], m_dim);
+        return geom::side_to_string(iface - faces.offsets[ic], m_dim);
     }
 
     /// @}
@@ -298,31 +251,9 @@ public:
     /// стороной прямоугольной ячейки.
     double incircle_diameter(index_t ic) const;
 
-    /// @brief Указатель на первую вершину
-    Vector3d* vertices_data(index_t ic) {
-        return verts.coords.data() + node_begin[ic];
-    }
-
-    /// @brief Константный указатель на первую вершину
-    const Vector3d* vertices_data(index_t ic) const {
-        return verts.coords.data() + node_begin[ic];
-    }
-
     /// @brief Получить вершину по индексу внутри ячейки
     const Vector3d& vertex(index_t ic, int iv) const {
-        return verts[node_begin[ic] + iv];
-    }
-
-    /// @brief Ссылка на вешены в форме набора узлов квадратичного отображения
-    template <int dim>
-    SqMap<dim>& mapping(index_t ic) {
-        return *reinterpret_cast<SqMap<dim>*>(vertices_data(ic));
-    }
-
-    /// @brief Ссылка на вершины в форме набора узлов квадратичного отображения
-    template <int dim>
-    const SqMap<dim>& mapping(index_t ic) const {
-        return *reinterpret_cast<const SqMap<dim>*>(vertices_data(ic));
+        return verts[verts.offsets[ic] + iv];
     }
 
     /// @brief Bounding box ячейки

@@ -108,14 +108,14 @@ void Migration::fill_migrants(AmrCells& locals,
 
     /*
     if (mpi::master()) {
-        std::cout << "locals.fb: " << locals.face_begin << "\n";
-        std::cout << "locals.nb: " << locals.node_begin << "\n";
+        std::cout << "locals.fb: " << locals.faces.offsets << "\n";
+        std::cout << "locals.nb: " << locals.verts.offsets << "\n";
 
         std::cout << "migrants.rank: " << migrants.rank << "\n";
         std::cout << "migrants.b_idx: " << migrants.b_idx << "\n";
         std::cout << "migrants.index: " << migrants.index << "\n";
-        std::cout << "migrants.fb: " << migrants.face_begin << "\n";
-        std::cout << "migrants.nb: " << migrants.node_begin << "\n";
+        std::cout << "migrants.fb: " << migrants.faces.offsets << "\n";
+        std::cout << "migrants.nb: " << migrants.verts.offsets << "\n";
     }
     */
 
@@ -163,10 +163,10 @@ void Migration::migrate(Tourism& tourists, AmrCells& locals, Vars&&... vars) {
     std::array<Buffer*, n_vars> data_dst = locals.data[loc_vars];
 
     // Оптимизируем использование памяти, используем повторно массивы.
-    // Запишем в face_begin и node_begin количество элементов на ячейку
+    // Запишем в faces.offsets и verts.offsets количество элементов на ячейку
     for (index_t ic = 0; ic < migrants.size(); ++ic) {
-        migrants.face_begin[ic] = migrants.face_begin[ic + 1] - migrants.face_begin[ic];
-        migrants.node_begin[ic] = migrants.node_begin[ic + 1] - migrants.node_begin[ic];
+        migrants.faces.offsets[ic] = migrants.faces.offsets[ic + 1] - migrants.faces.offsets[ic];
+        migrants.verts.offsets[ic] = migrants.verts.offsets[ic + 1] - migrants.verts.offsets[ic];
     }
 
     // ============================= ISEND ====================================
@@ -183,8 +183,8 @@ void Migration::migrate(Tourism& tourists, AmrCells& locals, Vars&&... vars) {
     cells_send += m_cell_router.isend(migrants.center, MpiTag::CENTER);
     cells_send += m_cell_router.isend(migrants.volume, MpiTag::VOLUME);
     cells_send += m_cell_router.isend(migrants.volume_alt, MpiTag::VOLUME_ALT);
-    cells_send += m_cell_router.isend(migrants.face_begin, MpiTag::FACE_BEG);
-    cells_send += m_cell_router.isend(migrants.node_begin, MpiTag::NODE_BEG);
+    cells_send += m_cell_router.isend(migrants.faces.offsets, MpiTag::FACE_BEG);
+    cells_send += m_cell_router.isend(migrants.verts.offsets, MpiTag::NODE_BEG);
 
     // Отправить данные ячеек
     RequestsList data_send; data_send.reserve(n_vars);
@@ -232,8 +232,8 @@ void Migration::migrate(Tourism& tourists, AmrCells& locals, Vars&&... vars) {
 
     // При получении используем сдвиг на единицу, чтобы записать нулевой первый элемент
     RequestsList faces_recv; faces_recv.reserve(16);
-    faces_recv += m_cell_router.irecv(locals.face_begin.data() + 1, MpiTag::FACE_BEG);
-    faces_recv += m_cell_router.irecv(locals.node_begin.data() + 1, MpiTag::NODE_BEG);
+    faces_recv += m_cell_router.irecv(locals.faces.offsets.data() + 1, MpiTag::FACE_BEG);
+    faces_recv += m_cell_router.irecv(locals.verts.offsets.data() + 1, MpiTag::NODE_BEG);
 
     // Получить данные граней
     faces_recv += m_face_router.irecv(locals.faces.adjacent.rank, MpiTag::ADJ_RANK);
@@ -266,11 +266,11 @@ void Migration::migrate(Tourism& tourists, AmrCells& locals, Vars&&... vars) {
     nodes_recv.wait();  // Завершить получение вершин
 
     // Восстановить индексацию граней
-    locals.face_begin[0] = 0;
-    locals.node_begin[0] = 0;
+    locals.faces.offsets[0] = 0;
+    locals.verts.offsets[0] = 0;
     for (index_t ic = 0; ic < locals.n_cells(); ++ic) {
-        locals.face_begin[ic + 1] += locals.face_begin[ic];
-        locals.node_begin[ic + 1] += locals.node_begin[ic];
+        locals.faces.offsets[ic + 1] += locals.faces.offsets[ic];
+        locals.verts.offsets[ic + 1] += locals.verts.offsets[ic];
     }
 
     // ========================================================================
@@ -278,8 +278,8 @@ void Migration::migrate(Tourism& tourists, AmrCells& locals, Vars&&... vars) {
     /*
     mpi::for_each([&]() {
         std::cout << "Rank " << mpi::rank() << "\n";
-        std::cout << "  fb: " << locals.face_begin << "\n";
-        std::cout << "  nb: " << locals.node_begin << "\n";
+        std::cout << "  fb: " << locals.faces.offsets << "\n";
+        std::cout << "  nb: " << locals.verts.offsets << "\n";
     });
     */
     /*

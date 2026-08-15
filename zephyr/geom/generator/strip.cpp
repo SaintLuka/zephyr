@@ -239,13 +239,14 @@ void Strip::initialize(AmrCells& cells) const {
         cells.center[ic] = quad.vs<0, 0>();
         cells.volume[ic] = hx * hy;
         cells.volume_alt[ic] = NAN;
-        cells.face_begin[ic] = ic * n_faces;
-        cells.node_begin[ic] = ic * n_nodes;
-        cells.face_begin[ic + 1] = cells.face_begin[ic] + n_faces;
-        cells.node_begin[ic + 1] = cells.face_begin[ic] + n_nodes;
+        cells.verts.offsets[ic] = ic * n_nodes;
+        cells.verts.offsets[ic + 1] = cells.verts.offsets[ic] + n_nodes;
 
         // INIT FACES
-        for (index_t iface: cells.faces_range(ic)) {
+        cells.faces.offsets[ic] = ic * n_faces;
+        cells.faces.offsets[ic + 1] = cells.faces.offsets[ic] + n_faces;
+
+        for (index_t iface: cells.faces.range(ic)) {
             cells.faces.set_undefined(iface);
             cells.faces.area_alt[iface] = NAN;
         }

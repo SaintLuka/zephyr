@@ -40,6 +40,9 @@ public:
     /// @brief Относительное вращение ячейки через грань
     std::vector<std::uint8_t> rotation;
 
+    /// @brief Пустые массивы по умолчанию
+    AmrAdjacent() = default;
+
     /// @brief Расширить массивы по числу граней
     void resize(index_t n_faces);
 
@@ -89,7 +92,10 @@ public:
     /// @brief Максимальное число вершин на одну грань
     static constexpr int max_vertices = 8;
 
-    AmrAdjacent adjacent;            ///< Индексы смежных ячеек
+    /// @brief Индексы первых граней ячеек (CSR-структура)
+    std::vector<index_t>  offsets = {0};
+
+    AmrAdjacent           adjacent;  ///< Индексы смежных ячеек
 
     std::vector<Boundary> boundary;  ///< Тип граничного условия
     std::vector<Vector3d> normal;    ///< Внешняя нормаль к грани
@@ -100,6 +106,8 @@ public:
     /// @brief Индексы вершин в массиве вершин ячейки
     std::vector<std::array<short, max_vertices>> vertices;
 
+    /// @brief Пустые массивы по умолчанию
+    AmrFaces() = default;
 
     /// @brief Число граней
     index_t size() const { return boundary.size(); }
@@ -151,6 +159,28 @@ public:
 
     /// @brief Расход памяти (без adjacent)
     memory_t memory_usage() const;
+
+    /// @brief Максимальное число граней для ячейки
+    int max_count(index_t ic) const {
+        return offsets[ic + 1] - offsets[ic];
+    }
+
+    /// @brief Полный диапазон граней ячейки (могут встречаться неактуальные)
+    range_t<index_t> range(index_t ic) const {
+        return std::views::iota(offsets[ic], offsets[ic + 1]);
+    }
+
+    /// @brief Простая грань на стороне?
+    template <int dim>
+    bool is_simple(index_t ic, Side<dim> side) const {
+        return is_undefined(offsets[ic] + side[1]);
+    }
+
+    /// @brief Сложная грань на стороне?
+    template <int dim>
+    bool is_complex(index_t ic, Side<dim> side) const {
+        return is_actual(offsets[ic] + side[1]);
+    }
 };
 
 

@@ -274,7 +274,7 @@ inline void retain_update_flag(index_t ic, AmrCells &locals, AmrCells& aliens) {
     scrutiny_check(ic < locals.size(), "round_1: cell_idx >= cells.size()")
     scrutiny_check(locals.flag[ic] == 0, "retain_update_flag: cell.flag != 0")
 
-    for (auto iface: locals.faces_range(ic)) {
+    for (auto iface: locals.faces.range(ic)) {
         if (locals.faces.is_undefined(iface) || locals.faces.is_boundary(iface)) {
             continue;
         }
@@ -301,7 +301,7 @@ inline void coarse_update_flag(index_t ic, AmrCells &locals, AmrCells& aliens) {
         return;
     }
 
-    for (auto iface: locals.faces_range(ic)) {
+    for (auto iface: locals.faces.range(ic)) {
         if (locals.faces.is_undefined(iface) || locals.faces.is_boundary(iface)) {
             continue;
         }
