@@ -166,8 +166,8 @@ public:
     /// @brief Полное число граней
     index_t n_faces() const { return faces.size(); }
 
-    /// @brief Полное число вершин
-    index_t n_nodes() const { return verts.size(); }
+    /// @brief Полное число вершин с дубликатами
+    index_t n_verts() const { return verts.size(); }
 
     /// @brief Очистить хранилище
     void clear();

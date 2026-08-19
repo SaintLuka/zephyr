@@ -34,12 +34,12 @@ void AmrVerts::clear_unique() {
     ghost.clear();
 }
 
-void AmrVerts::init_unique() {
+void AmrVerts::init_unique(index_t idx, index_t gst) {
     m_unique = true;
     index.clear();
-    index.resize(coords.size(), -1);
+    index.resize(coords.size(), idx);
     ghost.clear();
-    ghost.resize(coords.size(), -1);
+    ghost.resize(coords.size(), gst);
 }
 
 memory_t AmrVerts::memory_usage() const {

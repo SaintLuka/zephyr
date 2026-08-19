@@ -559,12 +559,19 @@ void EuMesh::memory_usage() const {
     memory_t adj_size = m_locals.faces.adjacent.memory_usage();
     memory_t vert_size = m_locals.verts.memory_usage();
     memory_t node_size = m_local_nodes.memory_usage();
+    memory_t inc_size = m_local_nodes.incident.memory_usage();
 
     memory_t cells_size;
     cells_size.needed = geom_size.needed + face_size.needed + adj_size.needed + vert_size.needed;
     cells_size.actual = geom_size.actual + face_size.actual + adj_size.actual + vert_size.actual;
 
     size_t geom_per_cell = cells_size.needed / m_locals.n_cells();
+
+    memory_t nodes_size;
+    nodes_size.needed = node_size.needed + inc_size.needed;
+    nodes_size.actual = node_size.actual + inc_size.actual;
+
+    size_t geom_per_node = nodes_size.needed / m_local_nodes.n_nodes();
 
     std::cout << "Local cells: " << m_locals.n_cells() << "\n";
     std::cout << "  Cells:   " << bytes(cells_size.needed)  << " / " << bytes(cells_size.actual);
@@ -573,6 +580,10 @@ void EuMesh::memory_usage() const {
     std::cout << "    Adj:   " << bytes(adj_size.needed)  << " / " << bytes(adj_size.actual) << "\n";
     std::cout << "    Verts: " << bytes(vert_size.needed) << " / " << bytes(vert_size.actual) << "\n";
     std::cout << "    Faces: " << bytes(face_size.needed) << " / " << bytes(face_size.actual) << "\n";
+    std::cout << "  Nodes:   " << bytes(nodes_size.needed)  << " / " << bytes(nodes_size.actual);
+    std::cout << " (avg" << bytes(geom_per_node) << " per node)\n";
+    std::cout << "    Geom:  " << bytes(node_size.needed) << " / " << bytes(node_size.actual) << "\n";
+    std::cout << "    Inc:   " << bytes(inc_size.needed) << " / " << bytes(inc_size.actual) << "\n";
 
     memory_t data_size = m_locals.data.memory_usage();
     size_t data_per_cell = data_size.needed / m_locals.n_cells();
@@ -701,6 +712,23 @@ int EuMesh::check_base() const {
         if (res < 0) return res;
     }
 
+    // Если уникальные узлы не построены, то завершаем
+    if (!m_locals.verts.unique()) {
+        if (!m_locals.verts.index.empty() || !m_locals.verts.ghost.empty()) {
+            std::cout << "\tUnique nodes: not empty verts arrays\n";
+            return -1;
+        }
+        return 0;
+    }
+
+#ifdef ZEPHYR_MPI
+    res = m_local_nodes.check_nodes(m_locals, m_tourism.ghosts);
+#else
+    AmrCells aliens = m_locals.same();
+    res = m_local_nodes.check_nodes(m_locals, aliens);
+#endif
+    if (res < 0) return res;
+
     return 0;
 }
 
@@ -784,6 +812,23 @@ int EuMesh::check_refined() const {
 #endif
         if (res < 0) return res;
     }
+
+    // Если уникальные узлы не построены, то завершаем
+    if (!m_locals.verts.unique()) {
+        if (!m_locals.verts.index.empty() || !m_locals.verts.ghost.empty()) {
+            std::cout << "\tUnique nodes: not empty verts arrays\n";
+            return -1;
+        }
+        return 0;
+    }
+
+#ifdef ZEPHYR_MPI
+    res = m_local_nodes.check_nodes(m_locals, m_tourism.ghosts);
+#else
+    AmrCells aliens = m_locals.same();
+    res = m_local_nodes.check_nodes(m_locals, aliens);
+#endif
+    if (res < 0) return res;
 
     return 0;
 }

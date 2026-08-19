@@ -134,7 +134,7 @@ int main(int argc, char** argv) {
     threads::off();
 
     // Создать сетку
-    EuMesh mesh = test3();
+    EuMesh mesh = test2();
 
     // Сетка с уникальными узлами
     mesh.make_unique_nodes();

@@ -379,6 +379,8 @@ private:
     Decomposition::Ptr m_decomp = nullptr;
 
 #ifdef ZEPHYR_MPI
+    AmrNodes m_ghost_nodes;  ///< Узлы, которые принадлежат данному процессу
+
     Tourism   m_tourists;  ///< Построение обменных слоев и обмены
     Migration m_migrants;  ///< Пересылка ячеек при изменении декомпозиции
 #endif

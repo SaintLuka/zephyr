@@ -75,7 +75,7 @@ public:
     void clear_unique();
 
     /// @brief Инициализировать массивы для уникальных узлов
-    void init_unique();
+    void init_unique(index_t idx, index_t gst);
 
     /// @brief Расход памяти
     memory_t memory_usage() const;

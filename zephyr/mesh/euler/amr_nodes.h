@@ -11,7 +11,7 @@ namespace zephyr::mesh {
 
 class AmrCells;
 
-using role_t = std::uint8_t;
+using role_t = std::int8_t;
 
 /// @brief Индексы инцидентных ячеек
 /// @details Короткое объяснение. Если инцидентная ячейка
@@ -21,8 +21,8 @@ using role_t = std::uint8_t;
 ///    ghost :    < 0             |    < ghosts.size
 class AmrIncident final {
 public:
-    const int max_amr_count_2D = 5;
-    const int max_amr_count_3D = 10;
+    static constexpr int max_amr_count_2D = 5;
+    static constexpr int max_amr_count_3D = 10;
 
 
     /// @brief Эта структура имеет формат CSR, даны смещения
@@ -51,10 +51,10 @@ public:
     void clear();
 
     /// @brief Расширить массивы по числу граней
-    void resize(index_t n_values);
+    void resize(index_t n_nodes, index_t n_values);
 
     /// @brief Расширить массивы по числу граней
-    void reserve(index_t n_values);
+    void reserve(index_t n_nodes, index_t n_values);
 
     /// @brief Сжать массивы до актуальных размеров
     void shrink_to_fit();
@@ -105,12 +105,26 @@ public:
     /// @brief Число уникальных узлов
     index_t size() const { return coords.size(); }
 
+    /// @brief Число уникальных узлов
+    index_t n_nodes() const { return coords.size(); }
+
     void clear();
+
+    void shrink_to_fit();
 
     void setup_for(AmrCells& cells);
 
     /// @brief Расход памяти
     memory_t memory_usage() const;
+
+    /// @brief Проверить согласованность размеров
+    int check_sizes() const;
+
+    /// @brief Проверка уникальных узлов для однопроцессорной версии
+    int check_nodes(const AmrCells& locals) const;
+
+    /// @brief Проверка уникальных узлов в MPI версии
+    int check_nodes(const AmrCells& locals, const AmrCells& ghosts) const;
 };
 
 } // namespace zephyr::mesh
