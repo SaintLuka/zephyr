@@ -411,7 +411,7 @@ void Cuboid::initialize(AmrCells& cells) const {
         for (auto side: Side3D::items()) {
             cells.faces.adjacent.rank[iface + side] = 0;
             cells.faces.adjacent.index[iface + side] = neib_index(i, j, k, side);
-            cells.faces.adjacent.alien[iface + side] = -1;
+            cells.faces.adjacent.ghost[iface + side] = -1;
             cells.faces.adjacent.basic[iface + side] = ic;
             cells.faces.vertices[iface + side].fill(-1);
         }

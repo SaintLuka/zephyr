@@ -373,7 +373,7 @@ template <int dim>
 using Map = std::conditional_t<dim == 2, Quad, Cube>;
 
 template <int dim>
-void find_rotations_impl(AmrCells& locals, const AmrCells& aliens) {
+void find_rotations_impl(AmrCells& locals, const AmrCells& ghosts) {
     z_assert(locals.adaptive(), "find_rotations: not adaptive mesh");
     for (index_t ic = 0; ic < locals.size(); ++ic) {
         Map<dim> map1 = locals.verts.mapping<dim>(ic).reduce();
@@ -385,7 +385,7 @@ void find_rotations_impl(AmrCells& locals, const AmrCells& aliens) {
                 continue;
             }
 
-            auto [neibs, jc] = locals.faces.adjacent.get_neib(iface, locals, aliens);
+            auto [neibs, jc] = locals.faces.adjacent.get_neib(iface, locals, ghosts);
 
             Map<dim> map2 = neibs.verts.mapping<dim>(jc).reduce();
 
@@ -400,15 +400,15 @@ void find_rotations_impl(AmrCells& locals, const AmrCells& aliens) {
 
 /// @brief Автоматический выбор размерности
 inline void find_rotations(AmrCells &locals) {
-    static AmrCells aliens;
+    static AmrCells ghosts;
 
     if (locals.empty()) return;
 
     if (locals.dim() < 3) {
-        amr::find_rotations_impl<2>(locals, aliens);
+        amr::find_rotations_impl<2>(locals, ghosts);
     }
     else {
-        amr::find_rotations_impl<3>(locals, aliens);
+        amr::find_rotations_impl<3>(locals, ghosts);
     }
 }
 

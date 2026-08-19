@@ -227,17 +227,17 @@ public:
 
 #ifdef ZEPHYR_MPI
     /// @brief Слой обменных ячеек (с других процессов)
-    AmrCells& aliens() { return m_tourists.aliens(); }
+    AmrCells& ghosts() { return m_tourists.ghosts(); }
 
     /// @brief Слой обменных ячеек (с других процессов)
-    const AmrCells& aliens() const { return m_tourists.aliens(); }
+    const AmrCells& ghosts() const { return m_tourists.ghosts(); }
 #endif
 
     /// @}
 
     /// @{ @name Работа с распределенной сеткой
 
-    /// @brief Обмен данными между процессами, в массивы aliens пересылаются
+    /// @brief Обмен данными между процессами, в массивы ghosts пересылаются
     /// данные с других процессов. Последовательное выполнение send и recv.
     /// @param vars Положительное количество параметров типа Storable<T>, для
     /// которых осуществляется обмен.
@@ -277,7 +277,7 @@ public:
     /// рангом, который возвращает функция m_decomp::rank().
     ///
     /// До вызова redistribute распределенная сетка должна быть согласована
-    /// и после вызова остается согласованной (массивы locals и aliens
+    /// и после вызова остается согласованной (массивы locals и ghosts
     /// корректно связаны). В качестве аргументов передаются параметры,
     /// которые необходимо сохранить и перенести при декомпозиции.
     template <typename... Args>
@@ -379,8 +379,6 @@ private:
     Decomposition::Ptr m_decomp = nullptr;
 
 #ifdef ZEPHYR_MPI
-    AmrNodes m_ghost_nodes;  ///< Узлы, которые принадлежат данному процессу
-
     Tourism   m_tourists;  ///< Построение обменных слоев и обмены
     Migration m_migrants;  ///< Пересылка ячеек при изменении декомпозиции
 #endif

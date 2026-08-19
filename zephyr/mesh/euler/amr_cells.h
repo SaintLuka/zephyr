@@ -384,7 +384,7 @@ public:
     int check_connectivity(index_t ic) const;
 
     /// @brief Проверка связности ячеек в MPI версии
-    int check_connectivity(index_t ic, const AmrCells& aliens) const;
+    int check_connectivity(index_t ic, const AmrCells& ghosts) const;
 
     /// @brief Полное сохранение сетки
     /// @param root Корневая директория для бэкапа (существует и пустая)

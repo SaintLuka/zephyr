@@ -129,22 +129,22 @@ inline void apply(AmrCells &cells, const Distributor& op) {
 /// В расширенной части хранилища NEXT всегда указывает на финальное
 /// положение ячейки. Таким образом, NEXT позволяет точно определить куда
 /// в результате будут перемещены все ячейки, в том числе новые.
-/// Этап 3б. Выполняется для aliens ячеек. Также проставляет параметр NEXT,
-/// но только для border и aliens ячеек. Правил индексации NEXT отличаются.
+/// Этап 3б. Выполняется для ghosts ячеек. Также проставляет параметр NEXT,
+/// но только для border и ghosts ячеек. Правил индексации NEXT отличаются.
 /// Используется другой алгоритм формирования списка border. Ячейки не
 /// перемещаются из конца на неопределенные места, а располагаются на тех же
 /// местах последовательно. Для split ячейки её дети (которые принадлежат
 /// border границе), будут располагаться все вместе в итоговом border на
 /// том же месте, где была ячейка (ну разве что ячейку сдвинут).
-/// Итого, в aliens массивах NEXT указывает:
-///   - флаг = 0: NEXT это финальное положение ячейки в aliens-хранилище.
-///   - флаг < 0: NEXT это финальное положение ячейки в aliens-хранилище.
+/// Итого, в ghosts массивах NEXT указывает:
+///   - флаг = 0: NEXT это финальное положение ячейки в ghosts-хранилище.
+///   - флаг < 0: NEXT это финальное положение ячейки в ghosts-хранилище.
 ///   - флаг > 0: NEXT закодированное положение первой дочерней ячейки в
-///                    aliens-хранилище + закодированные дети.///
+///                    ghosts-хранилище + закодированные дети.///
 /// Этап 4. Создание геометрии ячеек, ячейки создаются на выделенных для них
 /// местах за границами исходного хранилища. Все связи выставляются точно,
 /// исходя из финальных позиций всех ячеек (поле NEXT). А также с правильными
-/// ссылками на финальную версию aliens.
+/// ссылками на финальную версию ghosts.
 /// Этап 5. На начале этапа все ячейки правильно связаны с указанием финальных
 /// индексов, но внутри хранилища часть старых ячеек (не листовых) являются
 /// неопределенными. При этом за пределами исходного хранилища созданы новые
@@ -152,8 +152,8 @@ inline void apply(AmrCells &cells, const Distributor& op) {
 /// ячеек из конца хранилища на места неопределенных ячеек.
 /// В конце этапа все хранилища масштабируются под финальные размеры.
 /// Этап 6. Обменные слои все сделаны корректно, необходимо только запаковать
-/// и отправить геометрию из border в aliens.
-/// Этап 7. Проставить индексы adjacent.index для alien-ячеек.
+/// и отправить геометрию из border в ghosts.
+/// Этап 7. Проставить индексы adjacent.index для ghost-ячеек.
 template<int dim>
 void apply_impl(AmrCells &locals, const Distributor& op, Tourism& tourism) {
     static Stopwatch count_timer;
@@ -181,7 +181,7 @@ void apply_impl(AmrCells &locals, const Distributor& op, Tourism& tourism) {
     setup_positions<dim>(locals, count, swap_list);
     positions_timer1.stop();
 
-    // Этап 3б. Сделать setup_positions для alien-ячеек
+    // Этап 3б. Сделать setup_positions для ghost-ячеек
     positions_timer2.resume();
     tourism.setup_positions<dim>(locals.next);
     positions_timer2.stop();
@@ -196,10 +196,10 @@ void apply_impl(AmrCells &locals, const Distributor& op, Tourism& tourism) {
     swap_list.move_elements(locals);
     locals.resize_amr(count.n_cells_short);
     tourism.resize_border();
-    tourism.resize_aliens();
+    tourism.resize_ghosts();
     remove_timer.stop();
 
-    // Этап 6. Пересылка геометрии locals -> aliens
+    // Этап 6. Пересылка геометрии locals -> ghosts
     exchange_timer.resume();
     tourism.send_geometry(locals);
     exchange_timer.stop();
@@ -215,7 +215,7 @@ void apply_impl(AmrCells &locals, const Distributor& op, Tourism& tourism) {
         mpi::cout << "    Statistics:       " << std::setw(9) << count_timer.milliseconds_mpi() << " ms\n";
         mpi::cout << "    Create SwapList:  " << std::setw(9) << swap_timer.milliseconds_mpi() << " ms\n";
         mpi::cout << "    Local Positions:  " << std::setw(9) << positions_timer1.milliseconds_mpi() << " ms\n";
-        mpi::cout << "    Alien Positions:  " << std::setw(9) << positions_timer2.milliseconds_mpi() << " ms\n";
+        mpi::cout << "    ghost Positions:  " << std::setw(9) << positions_timer2.milliseconds_mpi() << " ms\n";
         mpi::cout << "    Setup Geometry:   " << std::setw(9) << geometry_timer.milliseconds_mpi() << " ms\n";
         mpi::cout << "    Remove undefined: " << std::setw(9) << remove_timer.milliseconds() << " ms\n";
         mpi::cout << "    Send geometry:    " << std::setw(9) << exchange_timer.milliseconds() << " ms\n";

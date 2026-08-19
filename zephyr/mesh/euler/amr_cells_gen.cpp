@@ -93,7 +93,7 @@ AmrCells::AmrCells(const generator::Strip& gen) {
         for (auto side: {Side2D::LEFT, Side2D::RIGHT}) {
             cells.faces.adjacent.rank[iface + side] = 0;
             cells.faces.adjacent.index[iface + side] = neib_index(ic, side);
-            cells.faces.adjacent.alien[iface + side] = -1;
+            cells.faces.adjacent.ghost[iface + side] = -1;
             cells.faces.adjacent.basic[iface + side] = ic;
             cells.faces.vertices[iface + side].fill(-1);
         }
@@ -235,7 +235,7 @@ AmrCells::AmrCells(const generator::Rectangle& rect) {
         for (auto side: Side2D::items()) {
             faces.adjacent.rank[iface + side] = 0;
             faces.adjacent.index[iface + side] = neib_index(i, j, side);
-            faces.adjacent.alien[iface + side] = -1;
+            faces.adjacent.ghost[iface + side] = -1;
             faces.adjacent.basic[iface + side] = ic;
             faces.adjacent.rotation[iface + side] = 0;
             faces.vertices[iface + side].fill(-1);
@@ -393,7 +393,7 @@ AmrCells::AmrCells(const generator::Cuboid& c) {
         for (auto side: Side3D::items()) {
             faces.adjacent.rank[iface + side] = 0;
             faces.adjacent.index[iface + side] = neib_index(i, j, k, side);
-            faces.adjacent.alien[iface + side] = -1;
+            faces.adjacent.ghost[iface + side] = -1;
             faces.adjacent.basic[iface + side] = ic;
             faces.adjacent.rotation[iface + side] = 0;
             faces.vertices[iface + side].fill(-1);
@@ -525,7 +525,7 @@ AmrCells::AmrCells(const Grid& grid) {
 
             faces.adjacent.rank[iface]  = 0;
             faces.adjacent.index[iface] = face.neib();
-            faces.adjacent.alien[iface] = -1;
+            faces.adjacent.ghost[iface] = -1;
             faces.adjacent.basic[iface] = ic;
             faces.adjacent.rotation[iface] = 0;
 

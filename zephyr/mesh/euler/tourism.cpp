@@ -17,50 +17,50 @@ using utils::threads;
 namespace indexing = geom::indexing;
 
 void Tourism::shrink_to_fit() {
-    //m_unique_border_indices.shrink_to_fit();
-    m_border_indices.shrink_to_fit();
-    m_border.shrink_to_fit();
-    m_aliens.shrink_to_fit();
+    //unique_border_indices_.shrink_to_fit();
+    border_indices_.shrink_to_fit();
+    border_.shrink_to_fit();
+    ghosts_.shrink_to_fit();
 }
 
 void Tourism::init_types(const AmrCells& locals) {
-    m_border = locals.same();
-    m_aliens = locals.same();
+    border_ = locals.same();
+    ghosts_ = locals.same();
 }
 
 void Tourism::resize_border() {
-    index_t n_border_cells = m_cell_router.send_buffer_size();
-    index_t n_border_faces = m_face_router.send_buffer_size();
-    index_t n_border_nodes = m_node_router.send_buffer_size();
+    index_t n_border_cells = cell_router_.send_buffer_size();
+    index_t n_border_faces = face_router_.send_buffer_size();
+    index_t n_border_verts = vert_router_.send_buffer_size();
 
-    m_border.resize(n_border_cells, n_border_faces, n_border_nodes);
+    border_.resize(n_border_cells, n_border_faces, n_border_verts);
 }
 
 void Tourism::extend_border() {
-    index_t n_border_cells = m_cell_router.send_buffer_size();
-    index_t n_border_faces = m_face_router.send_buffer_size();
-    index_t n_border_nodes = m_node_router.send_buffer_size();
+    index_t n_border_cells = cell_router_.send_buffer_size();
+    index_t n_border_faces = face_router_.send_buffer_size();
+    index_t n_border_verts = vert_router_.send_buffer_size();
 
-    if (n_border_cells > m_border.size()) {
-        m_border.resize(n_border_cells, n_border_faces, n_border_nodes);
+    if (n_border_cells > border_.size()) {
+        border_.resize(n_border_cells, n_border_faces, n_border_verts);
     }
 }
 
-void Tourism::resize_aliens() {
-    int n_alien_cells = m_cell_router.recv_buffer_size();
-    int n_alien_faces = m_face_router.recv_buffer_size();
-    int n_alien_nodes = m_node_router.recv_buffer_size();
+void Tourism::resize_ghosts() {
+    int n_ghost_cells = cell_router_.recv_buffer_size();
+    int n_ghost_faces = face_router_.recv_buffer_size();
+    int n_ghost_verts = vert_router_.recv_buffer_size();
 
-    m_aliens.resize(n_alien_cells, n_alien_faces, n_alien_nodes);
+    ghosts_.resize(n_ghost_cells, n_ghost_faces, n_ghost_verts);
 }
 
-void Tourism::extend_aliens() {
-    int n_alien_cells = m_cell_router.recv_buffer_size();
-    int n_alien_faces = m_face_router.recv_buffer_size();
-    int n_alien_nodes = m_node_router.recv_buffer_size();
+void Tourism::extend_ghosts() {
+    int n_ghost_cells = cell_router_.recv_buffer_size();
+    int n_ghost_faces = face_router_.recv_buffer_size();
+    int n_ghost_verts = vert_router_.recv_buffer_size();
 
-    if (n_alien_cells > m_aliens.size()) {
-        m_aliens.resize(n_alien_cells, n_alien_faces, n_alien_nodes);
+    if (n_ghost_cells > ghosts_.size()) {
+        ghosts_.resize(n_ghost_cells, n_ghost_faces, n_ghost_verts);
     }
 }
 
@@ -73,7 +73,7 @@ void Tourism::fill_send_count(const AmrCells& locals) {
 
     std::vector<index_t> cell_send_count(size, 0);
     std::vector<index_t> face_send_count(size, 0);
-    std::vector<index_t> node_send_count(size, 0);
+    std::vector<index_t> vert_send_count(size, 0);
 
     for (index_t ic = 0; ic < locals.n_cells(); ++ic) {
         // Для сетки с неактуальными ячейками
@@ -89,15 +89,15 @@ void Tourism::fill_send_count(const AmrCells& locals) {
                 last_append[neib_rank] = ic;
                 cell_send_count[neib_rank] += 1;
                 face_send_count[neib_rank] += locals.faces.max_count(ic);
-                node_send_count[neib_rank] += locals.verts.max_count(ic);
+                vert_send_count[neib_rank] += locals.verts.max_count(ic);
             }
         }
     }
 
     // Установить число на обмены
-    m_cell_router.set_send_count(cell_send_count);
-    m_face_router.set_send_count(face_send_count);
-    m_node_router.set_send_count(node_send_count);
+    cell_router_.set_send_count(cell_send_count);
+    face_router_.set_send_count(face_send_count);
+    vert_router_.set_send_count(vert_send_count);
 }
 
 void Tourism::fill_indices(const AmrCells& locals) {
@@ -108,10 +108,10 @@ void Tourism::fill_indices(const AmrCells& locals) {
     std::vector<index_t> last_append(mpi::size(), -1);
 
     // Смещения, по которым записываются индексы
-    std::vector<index_t> cell_index = m_cell_router.send_offset();
+    std::vector<index_t> cell_index = cell_router_.send_offset();
 
-    m_border_indices.resize(m_cell_router.send_buffer_size());
-    // m_unique_border_indices.reserve(m_cell_route.send_buffer_size());
+    border_indices_.resize(cell_router_.send_buffer_size());
+    // unique_border_indices_.reserve(m_cell_route.send_buffer_size());
 
     for (index_t ic = 0; ic < locals.n_cells(); ++ic) {
         // Для сетки с неактуальными ячейками
@@ -126,11 +126,11 @@ void Tourism::fill_indices(const AmrCells& locals) {
             if (neib_rank != rank) {
                 if (last_append[neib_rank] != ic) {
                     last_append[neib_rank] = ic;
-                    m_border_indices[cell_index[neib_rank]++] = ic;
+                    border_indices_[cell_index[neib_rank]++] = ic;
                 }
                 if (last_unique_append != ic) {
                     last_unique_append = ic;
-                    // m_unique_border_indices.push_back(ic);
+                    // unique_border_indices_.push_back(ic);
                 }
             }
         }
@@ -139,12 +139,12 @@ void Tourism::fill_indices(const AmrCells& locals) {
 
 void Tourism::prepare_geometry(const AmrCells& locals) {
     index_t face_idx = 0;
-    index_t node_idx = 0;
-    for (index_t ic = 0; ic < m_border_indices.size(); ++ic) {
-        locals.copy_geom(m_border_indices[ic], m_border, ic, face_idx, node_idx);
+    index_t vert_idx = 0;
+    for (index_t ic = 0; ic < border_indices_.size(); ++ic) {
+        locals.copy_geom(border_indices_[ic], border_, ic, face_idx, vert_idx);
 
-        face_idx += locals.faces.max_count(m_border_indices[ic]);
-        node_idx += locals.verts.max_count(m_border_indices[ic]);
+        face_idx += locals.faces.max_count(border_indices_[ic]);
+        vert_idx += locals.verts.max_count(border_indices_[ic]);
     }
 }
 
@@ -162,38 +162,38 @@ void Tourism::build_border(const AmrCells& locals) {
     prepare_geometry(locals);
 }
 
-// Инициализация индекса alien = -1 для большинства граней
-void set_undef_aliens(AmrCells& locals, int rank) {
+// Инициализация индекса ghost = -1 для большинства граней
+void set_undef_ghosts(AmrCells& locals, int rank) {
     threads::parallel_for(
         index_t{0}, locals.n_cells(),
         [&locals, rank](index_t ic) {
             for (index_t iface: locals.faces.range(ic)) {
                 if (locals.faces.is_actual(iface) &&
                     locals.faces.adjacent.rank[iface] == rank) {
-                    locals.faces.adjacent.alien[iface] = -1;
+                    locals.faces.adjacent.ghost[iface] = -1;
                 }
             }
         });
 }
 
-// Обходим ячейки в alien и ищем связи
+// Обходим ячейки в ghost и ищем связи
 void Tourism::find_connections(AmrCells& locals, int rank) const {
-    for (index_t ic = 0; ic < m_aliens.n_cells(); ++ic) {
-        for (index_t iface: m_aliens.faces.range(ic)) {
-            if (m_aliens.faces.is_undefined(iface)) {
+    for (index_t ic = 0; ic < ghosts_.n_cells(); ++ic) {
+        for (index_t iface: ghosts_.faces.range(ic)) {
+            if (ghosts_.faces.is_undefined(iface)) {
                 continue;
             }
 
-            if (m_aliens.faces.adjacent.index[iface] >= 0 &&
-                m_aliens.faces.adjacent.rank[iface] == rank) {
+            if (ghosts_.faces.adjacent.index[iface] >= 0 &&
+                ghosts_.faces.adjacent.rank[iface] == rank) {
                 // Индекс соседа
-                index_t jc = m_aliens.faces.adjacent.index[iface];
+                index_t jc = ghosts_.faces.adjacent.index[iface];
 
                 for (index_t l_face: locals.faces.range(jc)) {
-                    if (locals.faces.adjacent.rank [l_face] == m_aliens.rank [ic] &&
-                        locals.faces.adjacent.index[l_face] == m_aliens.index[ic]) {
+                    if (locals.faces.adjacent.rank [l_face] == ghosts_.rank [ic] &&
+                        locals.faces.adjacent.index[l_face] == ghosts_.index[ic]) {
 
-                        locals.faces.adjacent.alien[l_face] = ic;
+                        locals.faces.adjacent.ghost[l_face] = ic;
                         break;
                     }
                 }
@@ -207,20 +207,20 @@ void Tourism::update(AmrCells& locals) {
     build_border(locals);
 
     // Заполнить recv массивы
-    m_cell_router.fill_partial();
-    m_face_router.fill_partial();
-    m_node_router.fill_partial();
+    cell_router_.fill_partial();
+    face_router_.fill_partial();
+    vert_router_.fill_partial();
 
-    // Расширить массив aliens для получения геометрии
-    resize_aliens();
+    // Расширить массив ghosts для получения геометрии
+    resize_ghosts();
 
     // Отправить и получить геометрию
     sync_geometry();
 
-    // Инициализация индекса alien = -1 для большинства граней
-    set_undef_aliens(locals, mpi::rank());
+    // Инициализация индекса ghost = -1 для большинства граней
+    set_undef_ghosts(locals, mpi::rank());
 
-    // Обходим ячейки в alien и ищем связи
+    // Обходим ячейки в ghost и ищем связи
     find_connections(locals, mpi::rank());
 }
 
@@ -270,18 +270,18 @@ std::vector<index_t> Tourism::setup_border_next() {
         index_t next_index = 0; // Локальный новый индекс border-ячейки
 
         coarse_cells.clear();
-        // i - индекс в m_border, m_border_indices
-        for (index_t i: m_cell_router.send_indices(r)) {
-            if (m_border.flag[i] == 0) {
-                m_border.next[i] = next_index;
+        // i - индекс в border_, border_indices_
+        for (index_t i: cell_router_.send_indices(r)) {
+            if (border_.flag[i] == 0) {
+                border_.next[i] = next_index;
                 next_index += 1;
             }
-            else if (m_border.flag[i] == 1) {
+            else if (border_.flag[i] == 1) {
                 // bitset<8> для дочерних ячеек
-                auto children = dim == 2 ? border_children<2>(m_border.faces, i, r) :
-                                           border_children<3>(m_border.faces, i, r);
+                auto children = dim == 2 ? border_children<2>(border_.faces, i, r) :
+                                           border_children<3>(border_.faces, i, r);
                 // Кодируем список дочерних ячеек
-                m_border.next[i] = amr::pack_children(next_index, children);
+                border_.next[i] = amr::pack_children(next_index, children);
                 next_index += static_cast<index_t>(children.count());
             }
             else {
@@ -289,18 +289,18 @@ std::vector<index_t> Tourism::setup_border_next() {
 
                 // Полный индекс родительской ячейки
                 std::tuple<index_t, index_t, index_t> parent = {
-                    m_border.b_idx[i],
-                    m_border.level[i],
-                    m_border.z_idx[i] / indexing::CpC(dim),
+                    border_.b_idx[i],
+                    border_.level[i],
+                    border_.z_idx[i] / indexing::CpC(dim),
                 };
 
                 auto parent_it = coarse_cells.find(parent);
                 if (parent_it != coarse_cells.end()) {
-                    m_border.next[i] = parent_it->second;
+                    border_.next[i] = parent_it->second;
                 }
                 else {
                     coarse_cells[parent] = next_index;
-                    m_border.next[i] = next_index;
+                    border_.next[i] = next_index;
                     next_index += 1;
                 }
             }
@@ -315,48 +315,48 @@ template std::vector<index_t> Tourism::setup_border_next<3>();
 
 template<int dim>
 void Tourism::update_border_indices(const std::vector<index_t>& locals_next) {
-    std::vector<index_t> prev_border_indices = m_border_indices;
-    m_border_indices.resize(m_cell_router.send_buffer_size());
+    std::vector<index_t> prev_border_indices = border_indices_;
+    border_indices_.resize(cell_router_.send_buffer_size());
 
     index_t last_border_next = 0;
     for (index_t i = 0; i < prev_border_indices.size(); ++i) {
-        z_assert(i < m_border.flag.size(), "out of range #1521");
-        z_assert(i < m_border.next.size(), "out of range #1522");
+        z_assert(i < border_.flag.size(), "out of range #1521");
+        z_assert(i < border_.next.size(), "out of range #1522");
         z_assert(i < prev_border_indices.size(), "out of range #1523");
 
-        if (m_border.flag[i] == 0) {
-            index_t border_next = m_border.next[i];
+        if (border_.flag[i] == 0) {
+            index_t border_next = border_.next[i];
 
-            z_assert(border_next < m_border_indices.size(), "out of range #1524");
+            z_assert(border_next < border_indices_.size(), "out of range #1524");
             z_assert(prev_border_indices[i] < locals_next.size(), "out of range #1525");
 
-            m_border_indices[border_next] = locals_next[prev_border_indices[i]];
+            border_indices_[border_next] = locals_next[prev_border_indices[i]];
             last_border_next = std::max(last_border_next, border_next);
         }
-        else if (m_border.flag[i] < 0) {
-            index_t border_next = m_border.next[i];
+        else if (border_.flag[i] < 0) {
+            index_t border_next = border_.next[i];
 
-            z_assert(border_next < m_border_indices.size(), "out of range #1526");
+            z_assert(border_next < border_indices_.size(), "out of range #1526");
             z_assert(prev_border_indices[i] < locals_next.size(), "out of range #1527");
 
             index_t parent_index = locals_next[prev_border_indices[i]];
 
             z_assert(parent_index < locals_next.size(), "out of range #1528");
 
-            m_border_indices[border_next] = locals_next[parent_index];
+            border_indices_[border_next] = locals_next[parent_index];
             last_border_next = std::max(last_border_next, border_next);
         }
         else {
-            auto [border_next, children] = amr::unpack_children(m_border.next[i]);
+            auto [border_next, children] = amr::unpack_children(border_.next[i]);
             index_t main_child = locals_next[prev_border_indices[i]];
             for (int c = 0; c < indexing::CpC(dim); ++c) {
                 if (children[c]) {
-                    if (border_next >= m_border_indices.size()) {
-                        std::cout << m_border.next[i] << "; " << border_next << "; " << children << "; " << m_border_indices.size() << "\n";
+                    if (border_next >= border_indices_.size()) {
+                        std::cout << border_.next[i] << "; " << border_next << "; " << children << "; " << border_indices_.size() << "\n";
                     }
-                    z_assert(border_next < m_border_indices.size(), "out of range #1529");
+                    z_assert(border_next < border_indices_.size(), "out of range #1529");
                     z_assert(main_child + c < locals_next.size(), "out of range #1530");
-                    m_border_indices[border_next] = locals_next[main_child + c];
+                    border_indices_[border_next] = locals_next[main_child + c];
                     ++border_next;
                 }
             }
@@ -382,14 +382,14 @@ void Tourism::setup_positions(const std::vector<index_t>& locals_next) {
     auto recv_next = irecv<MpiTag::NEXT>();
 
     // ========================================================================
-    //              Посчитаем смещения для новых border и aliens
+    //              Посчитаем смещения для новых border и ghosts
     // ========================================================================
 
     std::vector<index_t> n_block_faces(mpi::size(), 0);
-    std::vector<index_t> n_block_nodes(mpi::size(), 0);
+    std::vector<index_t> n_block_verts(mpi::size(), 0);
     for (int r = 0; r < mpi::size(); ++r) {
         n_block_faces[r] = (dim == 2 ? 8 : 24) * n_block_cells[r];
-        n_block_nodes[r] = (dim == 2 ? 9 : 27) * n_block_cells[r];
+        n_block_verts[r] = (dim == 2 ? 9 : 27) * n_block_cells[r];
     }
 
     // Получим значения NEXT, далее можем менять роутеры
@@ -401,34 +401,34 @@ void Tourism::setup_positions(const std::vector<index_t>& locals_next) {
     static io::Variables vars = {"flag", "next", "rank", "level", "index", "b_idx", "z_idx"};
     static io::PvdFile bef_border("sp_border_bef", "debug");
     static io::PvdFile aft_border("sp_border_aft", "debug");
-    static io::PvdFile bef_aliens("sp_aliens_bef", "debug");
-    static io::PvdFile aft_aliens("sp_aliens_aft", "debug");
+    static io::PvdFile bef_ghosts("sp_ghosts_bef", "debug");
+    static io::PvdFile aft_ghosts("sp_ghosts_aft", "debug");
 
     if (pvd_counter == 0) {
         bef_border.variables = vars;
-        bef_aliens.variables = vars;
+        bef_ghosts.variables = vars;
         aft_border.variables = vars;
-        aft_aliens.variables = vars;
+        aft_ghosts.variables = vars;
     }
 
-    bef_border.save(m_border, pvd_counter);
-    bef_aliens.save(m_aliens, pvd_counter);
+    bef_border.save(border_, pvd_counter);
+    bef_ghosts.save(ghosts_, pvd_counter);
 #endif
 
-    Router prev_router = m_cell_router;
+    Router prev_router = cell_router_;
 
     // Установить число на отправку
-    m_cell_router.set_send_count(n_block_cells);
-    m_face_router.set_send_count(n_block_faces);
-    m_node_router.set_send_count(n_block_nodes);
+    cell_router_.set_send_count(n_block_cells);
+    face_router_.set_send_count(n_block_faces);
+    vert_router_.set_send_count(n_block_verts);
 
     // Заполнить recv массивы
-    m_cell_router.fill_partial();
-    m_face_router.fill_partial();
-    m_node_router.fill_partial();
+    cell_router_.fill_partial();
+    face_router_.fill_partial();
+    vert_router_.fill_partial();
 
     // ========================================================================
-    //          Сделаем глобальную индексацию next в border и aliens
+    //          Сделаем глобальную индексацию next в border и ghosts
     // ========================================================================
 
     // Добавляем смещения, теперь индексы NEXT в border идут последовательно (за
@@ -437,23 +437,23 @@ void Tourism::setup_positions(const std::vector<index_t>& locals_next) {
     for (int r = 0; r < mpi::size(); ++r) {
         if (r == rank) { continue; }
         for (index_t i: prev_router.send_indices(r)) {
-            m_border.next[i] += m_cell_router.send_offset(r);
+            border_.next[i] += cell_router_.send_offset(r);
         }
     }
 
-    // Добавляем смещения, теперь индексы NEXT в alien идут последовательно (за
+    // Добавляем смещения, теперь индексы NEXT в ghost идут последовательно (за
     // исключением закодированных индексов для ячеек на разбиение). Для каждой
-    // alien-ячейки указана следующая позиция внутри нового alien-слоя.
+    // ghost-ячейки указана следующая позиция внутри нового ghost-слоя.
     for (int r = 0; r < mpi::size(); ++r) {
         if (r == rank) { continue; }
         for (index_t i: prev_router.recv_indices(r)) {
-            m_aliens.next[i] += m_cell_router.recv_offset(r);
+            ghosts_.next[i] += cell_router_.recv_offset(r);
         }
     }
 
 #if WRITE_DBG
-    aft_border.save(m_border, pvd_counter);
-    aft_aliens.save(m_aliens, pvd_counter);
+    aft_border.save(border_, pvd_counter);
+    aft_ghosts.save(ghosts_, pvd_counter);
     ++pvd_counter;
 #endif
 
@@ -464,10 +464,10 @@ void Tourism::setup_positions(const std::vector<index_t>& locals_next) {
     // Подготовить border массив
     extend_border();
 
-    // Подготовить aliens массив
-    extend_aliens();
+    // Подготовить ghosts массив
+    extend_ghosts();
 
-    // Выставить корректные индексы в m_border_indices
+    // Выставить корректные индексы в border_indices_
     update_border_indices<dim>(locals_next);
 }
 
@@ -477,14 +477,14 @@ void Tourism::setup_positions<0>(const std::vector<index_t>&) {
 
     // Установить число на отправку
     std::vector<index_t> send_count(mpi::size(), 0);
-    m_cell_router.set_send_count(send_count);
-    m_face_router.set_send_count(send_count);
-    m_node_router.set_send_count(send_count);
+    cell_router_.set_send_count(send_count);
+    face_router_.set_send_count(send_count);
+    vert_router_.set_send_count(send_count);
 
     // Заполнить recv массивы
-    m_cell_router.fill_partial();
-    m_face_router.fill_partial();
-    m_node_router.fill_partial();
+    cell_router_.fill_partial();
+    face_router_.fill_partial();
+    vert_router_.fill_partial();
 }
 
 template void Tourism::setup_positions<2>(const std::vector<index_t>&);
@@ -493,55 +493,55 @@ template void Tourism::setup_positions<3>(const std::vector<index_t>&);
 void Tourism::pack_border_indices() {
     // Оптимизируем использование памяти, используем повторно массивы.
     // Запишем в faces.offsets и verts.offsets количество элементов на ячейку
-    for (index_t ic = 0; ic < m_border.size(); ++ic) {
-        m_border.faces.offsets[ic] = m_border.faces.offsets[ic + 1] - m_border.faces.offsets[ic];
-        m_border.verts.offsets[ic] = m_border.verts.offsets[ic + 1] - m_border.verts.offsets[ic];
+    for (index_t ic = 0; ic < border_.size(); ++ic) {
+        border_.faces.offsets[ic] = border_.faces.offsets[ic + 1] - border_.faces.offsets[ic];
+        border_.verts.offsets[ic] = border_.verts.offsets[ic + 1] - border_.verts.offsets[ic];
     }
-    m_border.faces.offsets.back() = -1;
-    m_border.verts.offsets.back() = -1;
+    border_.faces.offsets.back() = -1;
+    border_.verts.offsets.back() = -1;
 }
 
 void Tourism::unpack_border_indices() {
-    int prev_n_face = m_border.faces.offsets[0];
-    int prev_n_node = m_border.verts.offsets[0];
+    int prev_n_face = border_.faces.offsets[0];
+    int prev_n_vert = border_.verts.offsets[0];
 
-    m_border.faces.offsets[0] = 0;
-    m_border.verts.offsets[0] = 0;
+    border_.faces.offsets[0] = 0;
+    border_.verts.offsets[0] = 0;
 
-    for (index_t ic = 1; ic <= m_border.n_cells(); ++ic) {
-        int temp_n_face = m_border.faces.offsets[ic];
-        int temp_n_node = m_border.verts.offsets[ic];
+    for (index_t ic = 1; ic <= border_.n_cells(); ++ic) {
+        int temp_n_face = border_.faces.offsets[ic];
+        int temp_n_vert = border_.verts.offsets[ic];
 
-        m_border.faces.offsets[ic] = m_border.faces.offsets[ic - 1] + prev_n_face;
-        m_border.verts.offsets[ic] = m_border.verts.offsets[ic - 1] + prev_n_node;
+        border_.faces.offsets[ic] = border_.faces.offsets[ic - 1] + prev_n_face;
+        border_.verts.offsets[ic] = border_.verts.offsets[ic - 1] + prev_n_vert;
 
         prev_n_face = temp_n_face;
-        prev_n_node = temp_n_node;
+        prev_n_vert = temp_n_vert;
     }
 }
 
-void Tourism::unpack_aliens_indices() {
+void Tourism::unpack_ghost_indices() {
     // Восстанавливаем индексацию, сейчас в массивах хранится число граней или вершин ячейки
-    m_aliens.faces.offsets[0] = 0;
-    m_aliens.verts.offsets[0] = 0;
-    for (index_t ic = 0; ic < m_aliens.n_cells(); ++ic) {
-        m_aliens.faces.offsets[ic + 1] += m_aliens.faces.offsets[ic];
-        m_aliens.verts.offsets[ic + 1] += m_aliens.verts.offsets[ic];
+    ghosts_.faces.offsets[0] = 0;
+    ghosts_.verts.offsets[0] = 0;
+    for (index_t ic = 0; ic < ghosts_.n_cells(); ++ic) {
+        ghosts_.faces.offsets[ic + 1] += ghosts_.faces.offsets[ic];
+        ghosts_.verts.offsets[ic + 1] += ghosts_.verts.offsets[ic];
     }
 }
 
 template<int dim>
-void set_amr_indices(std::vector<index_t>& faces_beg, std::vector<index_t>& nodes_beg) {
-    z_assert(faces_beg.size() == nodes_beg.size(), "restore amr sizes mismatch");
+void set_amr_indices(std::vector<index_t>& faces_beg, std::vector<index_t>& verts_beg) {
+    z_assert(faces_beg.size() == verts_beg.size(), "restore amr sizes mismatch");
 
     constexpr int n_faces = Side<dim>::n_subfaces();
-    constexpr int n_nodes = dim == 2 ? 9 : 27;
+    constexpr int n_verts = dim == 2 ? 9 : 27;
 
     threads::parallel_for(
         index_t{0}, index_t(faces_beg.size()),
-        [&faces_beg, &nodes_beg](index_t ic) {
+        [&faces_beg, &verts_beg](index_t ic) {
             faces_beg[ic] = n_faces * ic;
-            nodes_beg[ic] = n_nodes * ic;
+            verts_beg[ic] = n_verts * ic;
         });
 }
 
@@ -551,19 +551,19 @@ void Tourism::send_geometry(const AmrCells& locals) {
 }
 
 void Tourism::restore_indices(AmrCells& locals) const {
-    for (index_t ic: m_border_indices) {
+    for (index_t ic: border_indices_) {
         for (index_t iface: locals.faces.range(ic)) {
-            index_t alien_index = locals.faces.adjacent.alien[iface];
-            if (alien_index >= 0) {
-                locals.faces.adjacent.index[iface] = m_aliens.index[alien_index];
+            index_t ghost_index = locals.faces.adjacent.ghost[iface];
+            if (ghost_index >= 0) {
+                locals.faces.adjacent.index[iface] = ghosts_.index[ghost_index];
             }
         }
     }
 }
 
 void Tourism::sync_geometry() {
-    bool amr = m_border.adaptive();
-    bool axial = m_border.axial();
+    bool amr = border_.adaptive();
+    bool axial = border_.axial();
 
     if (!amr) {
         // Оптимизируем пересылку индексов граней/вершин
@@ -574,92 +574,92 @@ void Tourism::sync_geometry() {
 
     // Отправить данные ячеек
     RequestsList cells_send; cells_send.reserve(16);
-    cells_send += m_cell_router.isend(m_border.rank, MpiTag::RANK);
-    cells_send += m_cell_router.isend(m_border.next, MpiTag::NEXT);
-    cells_send += m_cell_router.isend(m_border.index, MpiTag::INDEX);
-    cells_send += m_cell_router.isend(m_border.flag, MpiTag::FLAG);
-    cells_send += m_cell_router.isend(m_border.level, MpiTag::LEVEL);
-    cells_send += m_cell_router.isend(m_border.b_idx, MpiTag::B_IDX);
-    cells_send += m_cell_router.isend(m_border.z_idx, MpiTag::Z_IDX);
-    cells_send += m_cell_router.isend(m_border.center, MpiTag::CENTER);
-    cells_send += m_cell_router.isend(m_border.volume, MpiTag::VOLUME);
+    cells_send += cell_router_.isend(border_.rank, MpiTag::RANK);
+    cells_send += cell_router_.isend(border_.next, MpiTag::NEXT);
+    cells_send += cell_router_.isend(border_.index, MpiTag::INDEX);
+    cells_send += cell_router_.isend(border_.flag, MpiTag::FLAG);
+    cells_send += cell_router_.isend(border_.level, MpiTag::LEVEL);
+    cells_send += cell_router_.isend(border_.b_idx, MpiTag::B_IDX);
+    cells_send += cell_router_.isend(border_.z_idx, MpiTag::Z_IDX);
+    cells_send += cell_router_.isend(border_.center, MpiTag::CENTER);
+    cells_send += cell_router_.isend(border_.volume, MpiTag::VOLUME);
     if (axial) {
-        cells_send += m_cell_router.isend(m_border.volume_alt, MpiTag::VOLUME_ALT);
+        cells_send += cell_router_.isend(border_.volume_alt, MpiTag::VOLUME_ALT);
     }
     if (!amr) {
-        cells_send += m_cell_router.isend(m_border.faces.offsets, MpiTag::FACE_BEG);
-        cells_send += m_cell_router.isend(m_border.verts.offsets, MpiTag::NODE_BEG);
+        cells_send += cell_router_.isend(border_.faces.offsets, MpiTag::FACE_BEG);
+        cells_send += cell_router_.isend(border_.verts.offsets, MpiTag::VERT_BEG);
     }
 
     // Отправить данные граней
     RequestsList faces_send; faces_send.reserve(16);
-    faces_send += m_face_router.isend(m_border.faces.adjacent.rank, MpiTag::ADJ_RANK);
-    faces_send += m_face_router.isend(m_border.faces.adjacent.index, MpiTag::ADJ_INDEX);
-    faces_send += m_face_router.isend(m_border.faces.adjacent.alien, MpiTag::ADJ_ALIEN);
-    faces_send += m_face_router.isend(m_border.faces.adjacent.basic, MpiTag::ADJ_BASIC);
-    faces_send += m_face_router.isend(m_border.faces.adjacent.rotation, MpiTag::ADJ_ROTATION);
-    faces_send += m_face_router.isend(m_border.faces.boundary, MpiTag::BOUNDARY);
-    faces_send += m_face_router.isend(m_border.faces.normal, MpiTag::NORMAL);
-    faces_send += m_face_router.isend(m_border.faces.center, MpiTag::FACE_CENTER);
-    faces_send += m_face_router.isend(m_border.faces.area, MpiTag::AREA);
+    faces_send += face_router_.isend(border_.faces.adjacent.rank, MpiTag::ADJ_RANK);
+    faces_send += face_router_.isend(border_.faces.adjacent.index, MpiTag::ADJ_INDEX);
+    faces_send += face_router_.isend(border_.faces.adjacent.ghost, MpiTag::ADJ_GHOST);
+    faces_send += face_router_.isend(border_.faces.adjacent.basic, MpiTag::ADJ_BASIC);
+    faces_send += face_router_.isend(border_.faces.adjacent.rotation, MpiTag::ADJ_ROTATION);
+    faces_send += face_router_.isend(border_.faces.boundary, MpiTag::BOUNDARY);
+    faces_send += face_router_.isend(border_.faces.normal, MpiTag::NORMAL);
+    faces_send += face_router_.isend(border_.faces.center, MpiTag::FACE_CENTER);
+    faces_send += face_router_.isend(border_.faces.area, MpiTag::AREA);
     if (axial) {
-        faces_send += m_face_router.isend(m_border.faces.area_alt, MpiTag::AREA_ALT);
+        faces_send += face_router_.isend(border_.faces.area_alt, MpiTag::AREA_ALT);
     }
-    faces_send += m_face_router.isend(m_border.faces.vertices, MpiTag::FACE_VERTS);
+    faces_send += face_router_.isend(border_.faces.vertices, MpiTag::FACE_VERTS);
 
     // Отправить вершины
     RequestsList verts_send; verts_send.reserve(3);
-    verts_send += m_node_router.isend(m_border.verts.coords, MpiTag::VERT_COORD);
-    if (m_border.verts.unique()) {
-        verts_send += m_node_router.isend(m_border.verts.index, MpiTag::VERT_INDEX);
-        verts_send += m_node_router.isend(m_border.verts.ghost, MpiTag::VERT_GHOST);
+    verts_send += vert_router_.isend(border_.verts.coords, MpiTag::VERT_COORD);
+    if (border_.verts.unique()) {
+        verts_send += vert_router_.isend(border_.verts.index, MpiTag::VERT_INDEX);
+        verts_send += vert_router_.isend(border_.verts.ghost, MpiTag::VERT_GHOST);
     }
 
     // ============================= IRECV ====================================
 
     // Получить данные ячеек
     RequestsList cells_recv; cells_recv.reserve(16);
-    cells_recv += m_cell_router.irecv(m_aliens.rank, MpiTag::RANK);
-    cells_recv += m_cell_router.irecv(m_aliens.next, MpiTag::NEXT);
-    cells_recv += m_cell_router.irecv(m_aliens.index, MpiTag::INDEX);
-    cells_recv += m_cell_router.irecv(m_aliens.flag, MpiTag::FLAG);
-    cells_recv += m_cell_router.irecv(m_aliens.level, MpiTag::LEVEL);
-    cells_recv += m_cell_router.irecv(m_aliens.b_idx, MpiTag::B_IDX);
-    cells_recv += m_cell_router.irecv(m_aliens.z_idx, MpiTag::Z_IDX);
-    cells_recv += m_cell_router.irecv(m_aliens.center, MpiTag::CENTER);
-    cells_recv += m_cell_router.irecv(m_aliens.volume, MpiTag::VOLUME);
+    cells_recv += cell_router_.irecv(ghosts_.rank, MpiTag::RANK);
+    cells_recv += cell_router_.irecv(ghosts_.next, MpiTag::NEXT);
+    cells_recv += cell_router_.irecv(ghosts_.index, MpiTag::INDEX);
+    cells_recv += cell_router_.irecv(ghosts_.flag, MpiTag::FLAG);
+    cells_recv += cell_router_.irecv(ghosts_.level, MpiTag::LEVEL);
+    cells_recv += cell_router_.irecv(ghosts_.b_idx, MpiTag::B_IDX);
+    cells_recv += cell_router_.irecv(ghosts_.z_idx, MpiTag::Z_IDX);
+    cells_recv += cell_router_.irecv(ghosts_.center, MpiTag::CENTER);
+    cells_recv += cell_router_.irecv(ghosts_.volume, MpiTag::VOLUME);
     if (axial) {
-        cells_recv += m_cell_router.irecv(m_aliens.volume_alt, MpiTag::VOLUME_ALT);
+        cells_recv += cell_router_.irecv(ghosts_.volume_alt, MpiTag::VOLUME_ALT);
     }
 
     if (!amr) {
         // При получении используем сдвиг на единицу, чтобы записать нулевой первый элемент
-        cells_recv += m_cell_router.irecv(m_aliens.faces.offsets.data() + 1, MpiTag::FACE_BEG);
-        cells_recv += m_cell_router.irecv(m_aliens.verts.offsets.data() + 1, MpiTag::NODE_BEG);
+        cells_recv += cell_router_.irecv(ghosts_.faces.offsets.data() + 1, MpiTag::FACE_BEG);
+        cells_recv += cell_router_.irecv(ghosts_.verts.offsets.data() + 1, MpiTag::VERT_BEG);
     }
 
     // Получить данные граней
     RequestsList faces_recv; faces_recv.reserve(16);
-    faces_recv += m_face_router.irecv(m_aliens.faces.adjacent.rank, MpiTag::ADJ_RANK);
-    faces_recv += m_face_router.irecv(m_aliens.faces.adjacent.index, MpiTag::ADJ_INDEX);
-    faces_recv += m_face_router.irecv(m_aliens.faces.adjacent.alien, MpiTag::ADJ_ALIEN);
-    faces_recv += m_face_router.irecv(m_aliens.faces.adjacent.basic, MpiTag::ADJ_BASIC);
-    faces_recv += m_face_router.irecv(m_aliens.faces.adjacent.rotation, MpiTag::ADJ_ROTATION);
-    faces_recv += m_face_router.irecv(m_aliens.faces.boundary, MpiTag::BOUNDARY);
-    faces_recv += m_face_router.irecv(m_aliens.faces.normal, MpiTag::NORMAL);
-    faces_recv += m_face_router.irecv(m_aliens.faces.center, MpiTag::FACE_CENTER);
-    faces_recv += m_face_router.irecv(m_aliens.faces.area, MpiTag::AREA);
+    faces_recv += face_router_.irecv(ghosts_.faces.adjacent.rank, MpiTag::ADJ_RANK);
+    faces_recv += face_router_.irecv(ghosts_.faces.adjacent.index, MpiTag::ADJ_INDEX);
+    faces_recv += face_router_.irecv(ghosts_.faces.adjacent.ghost, MpiTag::ADJ_GHOST);
+    faces_recv += face_router_.irecv(ghosts_.faces.adjacent.basic, MpiTag::ADJ_BASIC);
+    faces_recv += face_router_.irecv(ghosts_.faces.adjacent.rotation, MpiTag::ADJ_ROTATION);
+    faces_recv += face_router_.irecv(ghosts_.faces.boundary, MpiTag::BOUNDARY);
+    faces_recv += face_router_.irecv(ghosts_.faces.normal, MpiTag::NORMAL);
+    faces_recv += face_router_.irecv(ghosts_.faces.center, MpiTag::FACE_CENTER);
+    faces_recv += face_router_.irecv(ghosts_.faces.area, MpiTag::AREA);
     if (axial) {
-        faces_recv += m_face_router.irecv(m_aliens.faces.area_alt, MpiTag::AREA_ALT);
+        faces_recv += face_router_.irecv(ghosts_.faces.area_alt, MpiTag::AREA_ALT);
     }
-    faces_recv += m_face_router.irecv(m_aliens.faces.vertices, MpiTag::FACE_VERTS);
+    faces_recv += face_router_.irecv(ghosts_.faces.vertices, MpiTag::FACE_VERTS);
 
     // Получить вершины
     RequestsList verts_recv; verts_recv.reserve(3);
-    verts_recv += m_node_router.irecv(m_aliens.verts.coords, MpiTag::VERT_COORD);
-    if (m_aliens.verts.unique()) {
-        verts_recv += m_node_router.irecv(m_aliens.verts.index, MpiTag::VERT_INDEX);
-        verts_recv += m_node_router.irecv(m_aliens.verts.ghost, MpiTag::VERT_GHOST);
+    verts_recv += vert_router_.irecv(ghosts_.verts.coords, MpiTag::VERT_COORD);
+    if (ghosts_.verts.unique()) {
+        verts_recv += vert_router_.irecv(ghosts_.verts.index, MpiTag::VERT_INDEX);
+        verts_recv += vert_router_.irecv(ghosts_.verts.ghost, MpiTag::VERT_GHOST);
     }
 
     // =========================== WAIT ISEND =================================
@@ -676,17 +676,17 @@ void Tourism::sync_geometry() {
 
     if (!amr) {
         // Восстановить индексацию граней
-        unpack_aliens_indices();
+        unpack_ghost_indices();
 
         // Поддерживать индексацию граней в border массиве не обязательно
         // unpack_border_indices();
     }
     else {
-        if (m_border.dim() == 2) {
-            set_amr_indices<2>(m_aliens.faces.offsets, m_aliens.verts.offsets);
+        if (border_.dim() == 2) {
+            set_amr_indices<2>(ghosts_.faces.offsets, ghosts_.verts.offsets);
         }
         else {
-            set_amr_indices<3>(m_aliens.faces.offsets, m_aliens.verts.offsets);
+            set_amr_indices<3>(ghosts_.faces.offsets, ghosts_.verts.offsets);
         }
     }
 }

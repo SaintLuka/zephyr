@@ -220,24 +220,24 @@ void EuMesh::apply_flags() {
     static size_t pvd_counter = 0;
 
     static PvdFile locals_before("app_bef_locals", "debug");
-    static PvdFile aliens_before("app_bef_aliens", "debug");
+    static PvdFile ghosts_before("app_bef_ghosts", "debug");
     static PvdFile border_before("app_bef_border", "debug");
     static PvdFile locals_after("app_aft_locals", "debug");
-    static PvdFile aliens_after("app_aft_aliens", "debug");
+    static PvdFile ghosts_after("app_aft_ghosts", "debug");
     static PvdFile border_after("app_aft_border", "debug");
 
     if (pvd_counter == 0) {
         Variables vars = {"rank", "index", "next", "level", "flag", "faces2D"};
         locals_before.variables = vars;
-        aliens_before.variables = vars;
+        ghosts_before.variables = vars;
         border_before.variables = vars;
         locals_after.variables = vars;
-        aliens_after.variables = vars;
+        ghosts_after.variables = vars;
         border_after.variables = vars;
     }
     //locals_before.save(m_locals, pvd_counter);
-    //aliens_before.save(m_aliens, pvd_counter);
-    //border_before.save(m_tourists.m_border, pvd_counter);
+    //ghosts_before.save(ghosts_, pvd_counter);
+    //border_before.save(m_tourists.border_, pvd_counter);
     mpi::barrier();
 #endif
 
@@ -252,8 +252,8 @@ void EuMesh::apply_flags() {
 
 #if SCRUTINY
     //locals_after.save(m_locals, pvd_counter);
-    //aliens_after.save(m_aliens, pvd_counter);
-    //border_after.save(m_tourists.m_border, pvd_counter);
+    //ghosts_after.save(ghosts_, pvd_counter);
+    //border_after.save(m_tourists.border_, pvd_counter);
     mpi::barrier();
     ++pvd_counter;
 
@@ -703,11 +703,10 @@ int EuMesh::check_base() const {
         if (res < 0) return res;
 
         // Проверка смежности
-#ifdef ZEPHYR_MPI
-        res = m_locals.check_connectivity(ic, m_tourists.aliens());
+#ifndef ZEPHYR_MPI
+        res = m_locals.check_connectivity(ic);
 #else
-        AmrCells aliens = m_locals.same();
-        res = m_locals.check_connectivity(ic, aliens);
+        res = m_locals.check_connectivity(ic, m_tourists.ghosts());
 #endif
         if (res < 0) return res;
     }
@@ -721,12 +720,11 @@ int EuMesh::check_base() const {
         return 0;
     }
 
-#ifdef ZEPHYR_MPI
-    res = m_local_nodes.check_nodes(m_locals,
-        m_tourists.aliens(), m_tourists.ghost_nodes());
+#ifndef ZEPHYR_MPI
+    res = m_local_nodes.check_nodes(m_locals);
 #else
-    AmrCells aliens = m_locals.same();
-    res = m_local_nodes.check_nodes(m_locals, aliens);
+    res = m_local_nodes.check_nodes(m_locals,
+        m_tourists.ghosts(), m_tourists.ghosts_nodes());
 #endif
     if (res < 0) return res;
 
@@ -805,11 +803,10 @@ int EuMesh::check_refined() const {
         if (res < 0) return res;
 
         // Проверка смежности
-#ifdef ZEPHYR_MPI
-        res = m_locals.check_connectivity(ic, m_tourists.aliens());
+#ifndef ZEPHYR_MPI
+        res = m_locals.check_connectivity(ic);
 #else
-        AmrCells aliens = m_locals.same();
-        res = m_locals.check_connectivity(ic, aliens);
+        res = m_locals.check_connectivity(ic, m_tourists.ghosts());
 #endif
         if (res < 0) return res;
     }
@@ -823,12 +820,11 @@ int EuMesh::check_refined() const {
         return 0;
     }
 
-#ifdef ZEPHYR_MPI
-    res = m_local_nodes.check_nodes(m_locals,
-        m_tourists.aliens(), m_tourists.ghost_nodes());
+#ifndef ZEPHYR_MPI
+    res = m_local_nodes.check_nodes(m_locals);
 #else
-    AmrCells aliens = m_locals.same();
-    res = m_local_nodes.check_nodes(m_locals, aliens);
+    res = m_local_nodes.check_nodes(m_locals,
+        m_tourists.ghosts(), m_tourists.ghosts_nodes());
 #endif
     if (res < 0) return res;
 
@@ -884,17 +880,17 @@ void EuMesh::add_marker(const geom::Vector3d& pos, double size) {
 
 EuCell_Iter EuMesh::begin() {
     return {&m_locals, 0,
-        mpi_cond(&m_tourists.aliens(), nullptr) };
+        mpi_cond(&m_tourists.ghosts(), nullptr) };
 }
 
 EuCell_Iter EuMesh::end() {
     return {&m_locals, m_locals.size(),
-        mpi_cond(&m_tourists.aliens(), nullptr) };
+        mpi_cond(&m_tourists.ghosts(), nullptr) };
 }
 
 EuCell EuMesh::operator[](index_t idx) {
     return {&m_locals, idx,
-        mpi_cond(&m_tourists.aliens(), nullptr) };
+        mpi_cond(&m_tourists.ghosts(), nullptr) };
 }
 
 EuCell EuMesh::operator()(int i, int j) {

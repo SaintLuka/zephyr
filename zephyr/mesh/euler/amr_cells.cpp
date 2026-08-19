@@ -447,7 +447,7 @@ void AmrCells::move_item(index_t from, index_t to) {
 
         faces.adjacent.rank [jface] = faces.adjacent.rank[iface];
         faces.adjacent.index[jface] = faces.adjacent.index[iface];
-        faces.adjacent.alien[jface] = faces.adjacent.alien[iface];
+        faces.adjacent.ghost[jface] = faces.adjacent.ghost[iface];
         faces.adjacent.basic[jface] = to;
         faces.adjacent.rotation[jface] = faces.adjacent.rotation[iface];
     }
@@ -502,7 +502,7 @@ void AmrCells::copy_geom(index_t ic, AmrCells& cells,
 
         cells.faces.adjacent.rank [jface] = faces.adjacent.rank [iface];
         cells.faces.adjacent.index[jface] = faces.adjacent.index[iface];
-        cells.faces.adjacent.alien[jface] = faces.adjacent.alien[iface];
+        cells.faces.adjacent.ghost[jface] = faces.adjacent.ghost[iface];
         cells.faces.adjacent.basic[jface] = index[ic];
         cells.faces.adjacent.rotation[jface] = faces.adjacent.rotation[iface];
     }
@@ -534,7 +534,7 @@ void AmrCells::copy_geom_basic(index_t ic, AmrCells& cells,
 
         cells.faces.adjacent.rank [jface] = faces.adjacent.rank [iface];
         cells.faces.adjacent.index[jface] = faces.adjacent.index[iface];
-        cells.faces.adjacent.alien[jface] = faces.adjacent.alien[iface];
+        cells.faces.adjacent.ghost[jface] = faces.adjacent.ghost[iface];
         cells.faces.adjacent.rotation[jface] = faces.adjacent.rotation[iface];
     }
 
@@ -1123,7 +1123,7 @@ void AmrCells::backup(const std::filesystem::path& root, std::ofstream& file,
 
     save_vector(root, file, "cells/faces/adjacent", tab3, "rank", faces.adjacent.rank, ",\n");
     save_vector(root, file, "cells/faces/adjacent", tab3, "index", faces.adjacent.index, ",\n");
-    save_vector(root, file, "cells/faces/adjacent", tab3, "alien", faces.adjacent.alien, ",\n");
+    save_vector(root, file, "cells/faces/adjacent", tab3, "ghost", faces.adjacent.ghost, ",\n");
     save_vector(root, file, "cells/faces/adjacent", tab3, "basic", faces.adjacent.basic, "\n");
 
     if (mpi::master()) {

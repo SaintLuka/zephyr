@@ -18,11 +18,11 @@ inline std::ostream &operator<<(std::ostream &os, const std::vector<index_t> &ar
 }
 
 void Migration::clear() {
-    migrants.clear();
+    cell_buffer_.clear();
 }
 
 void Migration::shrink_to_fit() {
-    migrants.shrink_to_fit();
+    cell_buffer_.shrink_to_fit();
 }
 
 void Migration::fill_router(AmrCells& locals) {
@@ -42,14 +42,14 @@ void Migration::fill_router(AmrCells& locals) {
     }
 
     // Установить число ячеек на отправку
-    m_cell_router.set_send_count(cell_send_count);
-    m_face_router.set_send_count(face_send_count);
-    m_node_router.set_send_count(node_send_count);
+    cell_router_.set_send_count(cell_send_count);
+    face_router_.set_send_count(face_send_count);
+    vert_router_.set_send_count(node_send_count);
 
     // Получение полной матрицы пересылок (all to all)
-    m_cell_router.fill_complete();
-    m_face_router.fill_complete();
-    m_node_router.fill_complete();
+    cell_router_.fill_complete();
+    face_router_.fill_complete();
+    vert_router_.fill_complete();
 
     /*
     // Количество разных штук на отправку и получение
@@ -65,7 +65,7 @@ void Migration::fill_router(AmrCells& locals) {
      */
 }
 
-void Migration::reindexing(Tourism& tourism, AmrCells& locals, AmrCells& aliens) {
+void Migration::reindexing(Tourism& tourism, AmrCells& locals, AmrCells& ghosts) {
     // Отправим новые ранги ячеек
     tourism.prepare<MpiTag::RANK>(locals);
     auto send_rnk_1 = tourism.isend<MpiTag::RANK>();
@@ -79,9 +79,9 @@ void Migration::reindexing(Tourism& tourism, AmrCells& locals, AmrCells& aliens)
     std::vector<index_t> node_index(mpi::size(), 0);
     for (int r = 0; r < mpi::size(); ++r) {
         for (int i = 0; i < mpi::rank(); ++i) {
-            cell_index[r] += m_cell_router(i, r);
-            face_index[r] += m_face_router(i, r);
-            node_index[r] += m_node_router(i, r);
+            cell_index[r] += cell_router_(i, r);
+            face_index[r] += face_router_(i, r);
+            node_index[r] += vert_router_(i, r);
         }
     }
 
@@ -112,8 +112,8 @@ void Migration::reindexing(Tourism& tourism, AmrCells& locals, AmrCells& aliens)
                 faces.adjacent.rank [iface] = locals.rank [faces.adjacent.index[iface]];
                 faces.adjacent.index[iface] = locals.index[faces.adjacent.index[iface]];
             } else {
-                faces.adjacent.rank [iface] = aliens.rank [faces.adjacent.alien[iface]];
-                faces.adjacent.index[iface] = aliens.index[faces.adjacent.alien[iface]];
+                faces.adjacent.rank [iface] = ghosts.rank [faces.adjacent.ghost[iface]];
+                faces.adjacent.index[iface] = ghosts.index[faces.adjacent.ghost[iface]];
             }
             faces.adjacent.basic[iface] = locals.index[ic];
         }

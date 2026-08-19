@@ -59,7 +59,7 @@ void base_restrictions(AmrCells &locals, int max_level) {
 /// огрубиться тоже вместе. Уровни смежных ячеек после адаптации не должны
 /// отличаться более, чем на один уровень.
 /// Функция вызывается только при включенной тщательной проверке.
-inline void check_flags(AmrCells& locals, AmrCells& aliens, int max_level) {
+inline void check_flags(AmrCells& locals, AmrCells& ghosts, int max_level) {
     for (index_t ic = 0; ic < locals.size(); ++ic) {
         int cell_wanted_lvl = locals.level[ic] + locals.flag[ic];
 
@@ -77,7 +77,7 @@ inline void check_flags(AmrCells& locals, AmrCells& aliens, int max_level) {
             }
 
             // Индекс соседа и хранилище соседа
-            auto [neibs, jc] = locals.faces.adjacent.get_neib(iface, locals, aliens);
+            auto [neibs, jc] = locals.faces.adjacent.get_neib(iface, locals, ghosts);
 
             int neib_wanted_lvl = neibs.level[jc] + neibs.flag[jc];
             if (std::abs(cell_wanted_lvl - neib_wanted_lvl) > 1) {
@@ -106,8 +106,8 @@ inline void check_flags(AmrCells& locals, AmrCells& aliens, int max_level) {
 }
 
 inline void check_flags(AmrCells& cells, int max_level) {
-    AmrCells aliens;
-    check_flags(cells, aliens, max_level);
+    AmrCells ghosts;
+    check_flags(cells, ghosts, max_level);
 }
 
 } // namespace zephyr::mesh::amr

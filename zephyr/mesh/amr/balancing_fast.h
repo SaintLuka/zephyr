@@ -105,7 +105,7 @@ struct CellsByLevel {
 #ifdef ZEPHYR_MPI
     CellsByLevel(Tourism& tourism, AmrCells &locals, int max_level) {
         AmrCells& border = tourism.border();
-        const AmrCells& aliens = tourism.aliens();
+        const AmrCells& ghosts = tourism.ghosts();
         const auto& router = tourism.cell_router();
         const auto& border_indices = tourism.border_indices();
 
@@ -150,14 +150,14 @@ struct CellsByLevel {
         for (int r = 0; r < mpi::size(); ++r) {
             // Индексы на получение
             for (index_t ic: router.recv_indices(r)) {
-                if (aliens.level[ic] == max_level || aliens.flag[ic] > 0) {
+                if (ghosts.level[ic] == max_level || ghosts.flag[ic] > 0) {
                     continue;
                 }
-                if (aliens.flag[ic] == 0) {
-                    retain_to_recv[aliens.level[ic]][r].push_back(ic);
+                if (ghosts.flag[ic] == 0) {
+                    retain_to_recv[ghosts.level[ic]][r].push_back(ic);
                 }
                 else {
-                    coarse_to_recv[aliens.level[ic]][r].push_back(ic);
+                    coarse_to_recv[ghosts.level[ic]][r].push_back(ic);
                 }
             }
         }
@@ -170,24 +170,24 @@ struct CellsByLevel {
         recv_requests.resize(mpi::size(), MPI_REQUEST_NULL);
     }
 
-    void send_retain(AmrCells &locals, AmrCells &aliens, int lvl, int mpi_tag) {
-        send_flags_impl(mpi_tag, locals.flag, retain_to_send[lvl], aliens.flag, retain_to_recv[lvl]);
+    void send_retain(AmrCells &locals, AmrCells &ghosts, int lvl, int mpi_tag) {
+        send_flags_impl(mpi_tag, locals.flag, retain_to_send[lvl], ghosts.flag, retain_to_recv[lvl]);
     }
 
-    void send_coarse(AmrCells& locals, AmrCells& aliens, int lvl, int mpi_tag) {
-        send_flags_impl(mpi_tag, locals.flag, coarse_to_send[lvl], aliens.flag, coarse_to_recv[lvl]);
+    void send_coarse(AmrCells& locals, AmrCells& ghosts, int lvl, int mpi_tag) {
+        send_flags_impl(mpi_tag, locals.flag, coarse_to_send[lvl], ghosts.flag, coarse_to_recv[lvl]);
     }
 
-    /// @brief Отправить только часть флагов из массива local_flags в массив alien_flags
+    /// @brief Отправить только часть флагов из массива local_flags в массив ghost_flags
     /// @param local_flags Ссылка на массив локальных флагов адаптации
-    /// @param alien_flags Ссылка на массив флагов адаптации с других процессов
+    /// @param ghost_flags Ссылка на массив флагов адаптации с других процессов
     /// @param send_indices Индексы флагов из массива local_flags, которые необходимо отправить
     /// другим процессам, send_indices[rank] нужно отправить на rank.
-    /// @param recv_indices Индексы флагов из массива alien_flags, которые мы получаем с других
+    /// @param recv_indices Индексы флагов из массива ghost_flags, которые мы получаем с других
     /// процессов, recv_indices[rank] получаем с других процессов
     void send_flags_impl(int mpi_tag,
         const std::vector<int>& local_flags, const std::vector<std::vector<index_t>>& send_indices,
-              std::vector<int>& alien_flags, const std::vector<std::vector<index_t>>& recv_indices) {
+              std::vector<int>& ghost_flags, const std::vector<std::vector<index_t>>& recv_indices) {
 
         for (int r = 0; r < mpi::size(); ++r) {
             send_requests[r] = MPI_REQUEST_NULL;
@@ -225,10 +225,10 @@ struct CellsByLevel {
             }
         }
 
-        // Переносим флаги в alien массив
+        // Переносим флаги в ghost массив
         for (int r = 0; r < mpi::size(); ++r) {
             for (index_t i = 0; i < recv_indices[r].size(); ++i) {
-                alien_flags[recv_indices[r][i]] = recv_flags_buf[r][i];
+                ghost_flags[recv_indices[r][i]] = recv_flags_buf[r][i];
             }
         }
     }
@@ -250,7 +250,7 @@ private:
     std::vector<std::vector<std::vector<int>>> coarse_to_send;
     std::vector<std::vector<std::vector<int>>> retain_to_send;
 
-    /// @brief Массив индексов alien ячеек, флаги которых retain / coarse,
+    /// @brief Массив индексов ghost ячеек, флаги которых retain / coarse,
     /// и уровень меньше максимального coarse_to_recv[lvl][rank]
     std::vector<std::vector<std::vector<int>>> coarse_to_recv;
     std::vector<std::vector<std::vector<int>>> retain_to_recv;
@@ -270,7 +270,7 @@ private:
 
 /// @brief Обновляет флаг ячейки под индексом index, которая имеет флаг 0.
 /// Повышает флаг адаптации, если один из соседей хочет уровень на два выше
-inline void retain_update_flag(index_t ic, AmrCells &locals, AmrCells& aliens) {
+inline void retain_update_flag(index_t ic, AmrCells &locals, AmrCells& ghosts) {
     scrutiny_check(ic < locals.size(), "round_1: cell_idx >= cells.size()")
     scrutiny_check(locals.flag[ic] == 0, "retain_update_flag: cell.flag != 0")
 
@@ -279,7 +279,7 @@ inline void retain_update_flag(index_t ic, AmrCells &locals, AmrCells& aliens) {
             continue;
         }
 
-        auto [neibs, jc] = locals.faces.adjacent.get_neib(iface, locals, aliens);
+        auto [neibs, jc] = locals.faces.adjacent.get_neib(iface, locals, ghosts);
         scrutiny_check(jc < neibs.size(), "retain_update_flag: neib_idx >= cells.n_cells()")
 
         int neib_wanted = neibs.level[jc] + neibs.flag[jc];
@@ -294,7 +294,7 @@ inline void retain_update_flag(index_t ic, AmrCells &locals, AmrCells& aliens) {
 /// Ставит флаг адаптации 0, если сосед хочет уровень на 1 выше,
 /// ставит флаг адаптации 1, если сосед хочет уровень на 2 выше,
 /// флаги сиблингов не рассматриваются.
-inline void coarse_update_flag(index_t ic, AmrCells &locals, AmrCells& aliens) {
+inline void coarse_update_flag(index_t ic, AmrCells &locals, AmrCells& ghosts) {
     scrutiny_check(ic < locals.size(), "round_2/3: cell_idx >= cells.size()")
 
     if (locals.flag[ic] >= 0) {
@@ -306,7 +306,7 @@ inline void coarse_update_flag(index_t ic, AmrCells &locals, AmrCells& aliens) {
             continue;
         }
 
-        auto [neibs, jc] = locals.faces.adjacent.get_neib(iface, locals, aliens);
+        auto [neibs, jc] = locals.faces.adjacent.get_neib(iface, locals, ghosts);
         scrutiny_check(jc < neibs.size(), "coarse_update_flag: neib_idx >= cells.n_cells()")
 
         int neib_wanted = neibs.level[jc] + neibs.flag[jc];
@@ -348,9 +348,9 @@ void coarse_update_flag_by_sibs(index_t ic, AmrCells &locals) {
 /// уровень ячеек больше не меняется
 /// @param indices Индексы ячеек с флагом = 0 в хранилище
 /// @param locals Ссылка на хранилище
-inline void round_1(const std::vector<index_t> &indices, AmrCells &locals, AmrCells &aliens) {
+inline void round_1(const std::vector<index_t> &indices, AmrCells &locals, AmrCells &ghosts) {
     threads::for_each(indices.begin(), indices.end(),
-                      retain_update_flag, std::ref(locals), std::ref(aliens));
+                      retain_update_flag, std::ref(locals), std::ref(ghosts));
 }
 
 /// @brief Обход диапазона ячеек с флагом = -1, данные ячейки могут повысить
@@ -360,9 +360,9 @@ inline void round_1(const std::vector<index_t> &indices, AmrCells &locals, AmrCe
 /// флаги на данном обходе (сохранили флаг -1).
 /// @param indices Индексы ячеек с флагом = -1 в хранилище
 /// @param cells Ссылка на хранилище
-inline void round_2(const std::vector<index_t> &indices, AmrCells &cells, AmrCells& aliens) {
+inline void round_2(const std::vector<index_t> &indices, AmrCells &cells, AmrCells& ghosts) {
     threads::for_each(indices.begin(), indices.end(),
-                      coarse_update_flag, std::ref(cells), std::ref(aliens));
+                      coarse_update_flag, std::ref(cells), std::ref(ghosts));
 }
 
 /// @brief Обход диапазона ячеек с изначальным флагом = -1, данные ячейки могут
@@ -371,9 +371,9 @@ inline void round_2(const std::vector<index_t> &indices, AmrCells &cells, AmrCel
 /// обхода флаги ячеек ещё могут измениться (@see round_4).
 /// @param indices Индексы ячеек с исходным флагом = -1 в хранилище
 /// @param cells Ссылка на хранилище
-inline void round_3(const std::vector<index_t> &indices, AmrCells &cells, AmrCells& aliens) {
+inline void round_3(const std::vector<index_t> &indices, AmrCells &cells, AmrCells& ghosts) {
     threads::for_each(indices.begin(), indices.end(),
-                      coarse_update_flag, std::ref(cells), std::ref(aliens));
+                      coarse_update_flag, std::ref(cells), std::ref(ghosts));
 }
 
 /// @brief Заключительный обход диапазона ячеек, у которых после базовых
@@ -420,7 +420,7 @@ void balance_flags_fast(AmrCells& locals, int max_level) {
     static int n_total_retain = 0;
     static int n_total_coarse = 0;
 
-    static AmrCells aliens;
+    static AmrCells ghosts;
 
     restriction_timer.resume();
     base_restrictions<dim>(locals, max_level);
@@ -433,15 +433,15 @@ void balance_flags_fast(AmrCells& locals, int max_level) {
 
     for (int lvl = max_level - 1; lvl >= 0; --lvl) {
         round_timer_1.resume();
-        round_1(sorted.retain[lvl], locals, aliens);
+        round_1(sorted.retain[lvl], locals, ghosts);
         round_timer_1.stop();
 
         round_timer_2.resume();
-        round_2(sorted.coarse[lvl], locals, aliens);
+        round_2(sorted.coarse[lvl], locals, ghosts);
         round_timer_2.stop();
 
         round_timer_3.resume();
-        round_3(sorted.coarse[lvl], locals, aliens);
+        round_3(sorted.coarse[lvl], locals, ghosts);
         round_timer_3.stop();
 
         round_timer_4.resume();
@@ -484,7 +484,7 @@ void balance_flags_fast(AmrCells &locals, int max_level, Tourism& tourism) {
     static int n_total_retain = 0;
     static int n_total_coarse = 0;
 
-    AmrCells& aliens = tourism.aliens();
+    AmrCells& ghosts = tourism.ghosts();
 
     restriction_timer.resume();
     base_restrictions<dim>(locals, max_level);
@@ -496,22 +496,22 @@ void balance_flags_fast(AmrCells &locals, int max_level, Tourism& tourism) {
 
     for (int lvl = max_level - 1; lvl >= 0; --lvl) {
         round_timer_1.resume();
-        round_1(sorted.retain[lvl], locals, aliens);
-        sorted.send_retain(locals, aliens, lvl, 1000 + lvl);
+        round_1(sorted.retain[lvl], locals, ghosts);
+        sorted.send_retain(locals, ghosts, lvl, 1000 + lvl);
         round_timer_1.stop();
 
         round_timer_2.resume();
-        round_2(sorted.coarse[lvl], locals, aliens);
-        sorted.send_coarse(locals, aliens, lvl, 2000 + lvl);
+        round_2(sorted.coarse[lvl], locals, ghosts);
+        sorted.send_coarse(locals, ghosts, lvl, 2000 + lvl);
         round_timer_2.stop();
 
         round_timer_3.resume();
-        round_3(sorted.coarse[lvl], locals, aliens);
+        round_3(sorted.coarse[lvl], locals, ghosts);
         round_timer_3.stop();
 
         round_timer_4.resume();
         round_4<dim>(sorted.coarse[lvl], locals);
-        sorted.send_coarse(locals, aliens, lvl, 3000 + lvl);
+        sorted.send_coarse(locals, ghosts, lvl, 3000 + lvl);
         round_timer_4.stop();
     }
 

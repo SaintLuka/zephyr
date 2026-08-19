@@ -25,7 +25,7 @@ void setup_faces_topo(AmrFaces& faces, index_t face_beg) {
     faces.boundary[subface_1] = faces.boundary[orig_face];
     faces.adjacent.rank [subface_1] = faces.adjacent.rank [orig_face];
     faces.adjacent.index[subface_1] = faces.adjacent.index[orig_face];
-    faces.adjacent.alien[subface_1] = faces.adjacent.alien[orig_face];
+    faces.adjacent.ghost[subface_1] = faces.adjacent.ghost[orig_face];
     faces.adjacent.basic[subface_1] = faces.adjacent.basic[orig_face];
     faces.adjacent.rotation[subface_1] = faces.adjacent.rotation[orig_face];
 
@@ -35,7 +35,7 @@ void setup_faces_topo(AmrFaces& faces, index_t face_beg) {
         faces.boundary[subface_2] = faces.boundary[orig_face];
         faces.adjacent.rank [subface_2] = faces.adjacent.rank [orig_face];
         faces.adjacent.index[subface_2] = faces.adjacent.index[orig_face];
-        faces.adjacent.alien[subface_2] = faces.adjacent.alien[orig_face];
+        faces.adjacent.ghost[subface_2] = faces.adjacent.ghost[orig_face];
         faces.adjacent.basic[subface_2] = faces.adjacent.basic[orig_face];
         faces.adjacent.rotation[subface_2] = faces.adjacent.rotation[orig_face];
 
@@ -44,7 +44,7 @@ void setup_faces_topo(AmrFaces& faces, index_t face_beg) {
         faces.boundary[subface_3] = faces.boundary[orig_face];
         faces.adjacent.rank [subface_3] = faces.adjacent.rank [orig_face];
         faces.adjacent.index[subface_3] = faces.adjacent.index[orig_face];
-        faces.adjacent.alien[subface_3] = faces.adjacent.alien[orig_face];
+        faces.adjacent.ghost[subface_3] = faces.adjacent.ghost[orig_face];
         faces.adjacent.basic[subface_3] = faces.adjacent.basic[orig_face];
         faces.adjacent.rotation[subface_3] = faces.adjacent.rotation[orig_face];
     }

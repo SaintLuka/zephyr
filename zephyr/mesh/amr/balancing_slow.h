@@ -44,8 +44,8 @@ public:
     /// @brief Заполнение списков соседей для ячейки
     /// @param ic Целевая ячейка, для которой определяется окрестность
     /// @param locals Ссылка на локальное хранилище
-    /// @param aliens Ссылка на хранилище ячеек с других процессов
-    void setup(index_t ic, AmrCells &locals, AmrCells& aliens) {
+    /// @param ghosts Ссылка на хранилище ячеек с других процессов
+    void setup(index_t ic, AmrCells &locals, AmrCells& ghosts) {
         scrutiny_check(ic < locals.size(), "setup: ic >= locals.size()")
 
         neib_count = 0;
@@ -74,12 +74,12 @@ public:
                     throw std::runtime_error("Vicinity::setup error #11");
                 }
             } else {
-                if (adj.alien[iface] >= aliens.size()) {
+                if (adj.ghost[iface] >= ghosts.size()) {
                     throw std::runtime_error("Vicinity::setup error #2");
                 }
             }
 #endif
-            auto [neibs, jc] = adj.get_neib(iface, locals, aliens);
+            auto [neibs, jc] = adj.get_neib(iface, locals, ghosts);
 
             neib_levels[neib_count] = neibs.level[jc];
             neib_flags[neib_count] = &neibs.flag[jc];
@@ -147,12 +147,12 @@ struct VicinityList {
 
     /// @brief Конструктор построения окружения
     /// @param locals Ссылка на локальное хранилище
-    /// @param aliens Ссылка на хранилище ячеек с других процессов
-    void fill(AmrCells& locals, AmrCells& aliens) {
+    /// @param ghosts Ссылка на хранилище ячеек с других процессов
+    void fill(AmrCells& locals, AmrCells& ghosts) {
         m_list.resize(locals.size());
         threads::parallel_for(index_t{0}, index_t{locals.size()},
-                [this, &locals, &aliens](index_t ic) {
-                    m_list[ic].setup(ic, locals, aliens);
+                [this, &locals, &ghosts](index_t ic) {
+                    m_list[ic].setup(ic, locals, ghosts);
                 });
     }
 
@@ -256,7 +256,7 @@ void balance_flags_slow(AmrCells& locals, int max_level) {
     static Stopwatch setup_vicinity_timer;
     static Stopwatch flag_balancing_timer;
 
-    static AmrCells aliens;
+    static AmrCells ghosts;
 
     restriction_timer.resume();
     base_restrictions<dim>(locals, max_level);
@@ -266,7 +266,7 @@ void balance_flags_slow(AmrCells& locals, int max_level) {
     static VicinityList<dim> vicinity_list;
 
     setup_vicinity_timer.resume();
-    vicinity_list.fill(locals, aliens);
+    vicinity_list.fill(locals, ghosts);
     setup_vicinity_timer.stop();
 
     flag_balancing_timer.resume();
@@ -298,7 +298,7 @@ void balance_flags_slow(AmrCells &locals, int max_level, Tourism& tourism) {
     static Stopwatch setup_vicinity_timer;
     static Stopwatch flag_balancing_timer;
 
-    AmrCells &aliens = tourism.aliens();
+    AmrCells &ghosts = tourism.ghosts();
 
     // Делаем статическим, чтобы не выделять каждый раз память (гениально)
     static VicinityList<dim> vicinity_list;
@@ -308,13 +308,13 @@ void balance_flags_slow(AmrCells &locals, int max_level, Tourism& tourism) {
     restrictions_timer.stop();
 
     setup_vicinity_timer.resume();
-    vicinity_list.fill(locals, aliens);
+    vicinity_list.fill(locals, ghosts);
     setup_vicinity_timer.stop();
 
     flag_balancing_timer.resume();
     int changed = 1;
     while (changed) {
-        // Синхронизация флагов адаптации в alien-ячейках
+        // Синхронизация флагов адаптации в ghost-ячейках
         tourism.sync<MpiTag::FLAG>(locals);
 
         vicinity_list.update();

@@ -25,13 +25,12 @@ enum class MpiTag : int {
     CENTER,
     VOLUME,
     VOLUME_ALT,
-    FACE_BEG,
-    NODE_BEG,
 
     // Данные граней
+    FACE_BEG,
     ADJ_RANK,
     ADJ_INDEX,
-    ADJ_ALIEN,
+    ADJ_GHOST,
     ADJ_BASIC,
     ADJ_ROTATION,
     BOUNDARY,
@@ -42,6 +41,7 @@ enum class MpiTag : int {
     FACE_VERTS,
 
     // Данные вершин
+    VERT_BEG,
     VERT_COORD,
     VERT_INDEX,
     VERT_GHOST
@@ -60,15 +60,18 @@ public:
     explicit Requests(int size);
 
     /// @brief Получить запрос по номеру ранга
-    MPI_Request& operator[](int r) { return m_requests[r]; }
+    MPI_Request& operator[](int r) { return requests_[r]; }
 
     /// @brief Дождаться завершения всех запросов
     void wait() const;
 
 private:
-    int m_size;
-    // Фактически запрет копирования
-    std::unique_ptr<MPI_Request[]> m_requests;
+    /// @brief Число MPI-процессов
+    int size_;
+
+    /// @brief Массив запросов для каждого процесса
+    /// (фактически запрет копирования)
+    std::unique_ptr<MPI_Request[]> requests_;
 };
 
 class RequestsList {
@@ -82,7 +85,7 @@ public:
     void wait() const;
 
 private:
-    std::vector<Requests> m_requests;
+    std::vector<Requests> requests_;
 };
 
 /// @brief Управляет обменными операциями
@@ -105,10 +108,10 @@ public:
     void fill_complete();
 
     /// @brief Число процессов (== mpi::size())
-    int size() const { return m_size; }
+    int size() const { return size_; }
 
     /// @brief Есть полная матрица пересылок?
-    bool complete() const { return !m_send_recv.empty(); }
+    bool complete() const { return !send_recv_.empty(); }
 
 
     /// @brief Количество пересылок с i-го процесса на j-ый
@@ -123,26 +126,26 @@ public:
     /// @brief Необходимый размер буфера для получения сообщений
     index_t recv_buffer_size() const;
 
-    const std::vector<index_t>& send_count() const { return m_send_count; }
-    const std::vector<index_t>& recv_count() const { return m_recv_count; }
+    const std::vector<index_t>& send_count() const { return send_count_; }
+    const std::vector<index_t>& recv_count() const { return recv_count_; }
 
-    const std::vector<index_t>& send_offset() const { return m_send_offset; }
-    const std::vector<index_t>& recv_offset() const { return m_recv_offset; }
+    const std::vector<index_t>& send_offset() const { return send_offset_; }
+    const std::vector<index_t>& recv_offset() const { return recv_offset_; }
 
-    index_t send_count(int r) const { return m_send_count[r]; }
-    index_t recv_count(int r) const { return m_recv_count[r]; }
+    index_t send_count(int r) const { return send_count_[r]; }
+    index_t recv_count(int r) const { return recv_count_[r]; }
 
-    index_t send_offset(int r) const { return m_send_offset[r]; }
-    index_t recv_offset(int r) const { return m_recv_offset[r]; }
+    index_t send_offset(int r) const { return send_offset_[r]; }
+    index_t recv_offset(int r) const { return recv_offset_[r]; }
 
-    /// @brief Индексы из массива m_border_indices
+    /// @brief Индексы из массива border_indices_
     range_t<index_t> send_indices(int r) const {
-        return range(m_send_offset[r], m_send_offset[r] + m_send_count[r]);
+        return range(send_offset_[r], send_offset_[r] + send_count_[r]);
     }
 
-    /// @brief Индексы из массива aliens при получении
+    /// @brief Индексы из массива ghosts при получении
     range_t<index_t> recv_indices(int r) const {
-        return range(m_recv_offset[r], m_recv_offset[r] + m_recv_count[r]);
+        return range(recv_offset_[r], recv_offset_[r] + recv_count_[r]);
     }
 
     /// @brief Вывести информацию о пересылках
@@ -189,24 +192,24 @@ protected:
     void print_complete() const;
 
 
-    int m_size;  ///< Число процессов (== mpi::size())
+    int size_;  ///< Число процессов (== mpi::size())
 
-    std::vector<index_t> m_send_count;   ///< Число элементов на отправку
-    std::vector<index_t> m_recv_count;   ///< Число элементов на получение
-    std::vector<index_t> m_send_offset;  ///< Смещения в массиве на отправку
-    std::vector<index_t> m_recv_offset;  ///< Смещения в массиве на получение
+    std::vector<index_t> send_count_;   ///< Число элементов на отправку
+    std::vector<index_t> recv_count_;   ///< Число элементов на получение
+    std::vector<index_t> send_offset_;  ///< Смещения в массиве на отправку
+    std::vector<index_t> recv_offset_;  ///< Смещения в массиве на получение
 
     /// @brief Полная матрица пересылок (опционально)
-    std::vector<index_t> m_send_recv;
+    std::vector<index_t> send_recv_;
 };
 
 
 template<typename T>
 Requests Router::isend(const T* src, MpiTag tag, MPI_Datatype dtype) {
-    Requests send_req(m_size);
-    for (int r = 0; r < m_size; ++r) {
-        if (m_send_count[r] > 0) {
-            MPI_Isend(src + m_send_offset[r], m_send_count[r],
+    Requests send_req(size_);
+    for (int r = 0; r < size_; ++r) {
+        if (send_count_[r] > 0) {
+            MPI_Isend(src + send_offset_[r], send_count_[r],
                       dtype, r, int(tag), utils::mpi::comm(), &send_req[r]);
         }
     }
@@ -230,10 +233,10 @@ Requests Router::isend(const std::vector<T>& src, MpiTag tag, MPI_Datatype dtype
 
 template<typename T>
 Requests Router::irecv(T* dst, MpiTag tag, MPI_Datatype dtype) {
-    Requests recv_req(m_size);
-    for (int r = 0; r < m_size; ++r) {
-        if (m_recv_count[r] > 0) {
-            MPI_Irecv(dst + m_recv_offset[r], m_recv_count[r],
+    Requests recv_req(size_);
+    for (int r = 0; r < size_; ++r) {
+        if (recv_count_[r] > 0) {
+            MPI_Irecv(dst + recv_offset_[r], recv_count_[r],
                       dtype, r, int(tag), utils::mpi::comm(), &recv_req[r]);
         }
     }

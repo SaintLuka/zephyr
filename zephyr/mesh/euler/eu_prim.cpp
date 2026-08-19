@@ -6,8 +6,8 @@ namespace zephyr::mesh {
 
 EuFace_Iter::EuFace_Iter(
         AmrCells *cells, index_t face_idx, index_t face_end,
-        AmrCells *aliens, Direction dir)
-        : m_eu_face{cells, face_idx, aliens},
+        AmrCells *ghosts, Direction dir)
+        : m_eu_face{cells, face_idx, ghosts},
           m_face_end(face_end),
           m_dir(dir) {
 
@@ -34,17 +34,17 @@ bool EuFace_Iter::to_skip(Direction dir) const {
 EuFaces::EuFaces(
         AmrCells *cells,
         index_t cell_idx,
-        AmrCells *aliens,
+        AmrCells *ghosts,
         Direction dir)
         :
         m_begin(cells,
                 cells->faces.offsets[cell_idx],
                 cells->faces.offsets[cell_idx + 1],
-                aliens, dir),
+                ghosts, dir),
         m_end(cells,
               cells->faces.offsets[cell_idx + 1],
               cells->faces.offsets[cell_idx + 1],
-              aliens, dir) { }
+              ghosts, dir) { }
 
 geom::Box EuCell::bbox() const {
     return m_cells->bbox(m_index);
@@ -59,15 +59,15 @@ geom::Polyhedron EuCell::polyhedron() const {
 }
 
 void EuCell::replace(int loc_face) {
-    // Переход от alien-ячейки невозможен
-    z_assert(m_cells != m_aliens, "Not a local cell #1")
+    // Переход от ghost-ячейки невозможен
+    z_assert(m_cells != m_ghosts, "Not a local cell #1")
     z_assert(m_cells->rank[m_index] == utils::mpi::rank(), "Not a local cell #2");
 
     // Индекс правой грани
     index_t iface = m_cells->faces.offsets[m_index] + loc_face;
 
     // Массив, в котором находится правая ячейка, индекс ячейки в этом массиве
-    std::tie(m_cells, m_index) = m_cells->faces.adjacent.get_neib(iface, m_cells, m_aliens);
+    std::tie(m_cells, m_index) = m_cells->faces.adjacent.get_neib(iface, m_cells, m_ghosts);
 }
 
 EuCell EuCell::neib(index_t i, index_t j) const {

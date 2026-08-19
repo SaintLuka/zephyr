@@ -12,33 +12,33 @@ namespace zephyr::mesh::amr {
 
 /// @brief Вызывает для ячейки соответствующий метод адаптации
 /// @param locals Локальные ячейки
-/// @param aliens Удаленные ячейки
+/// @param ghosts Удаленные ячейки
 /// @param rank Ранг текущего процесса
 /// @param op Оператор распределения данных при огрублении и разбиении
 template<int dim>
-void setup_geometry_one(index_t ic, AmrCells &locals, AmrCells& aliens, const Distributor& op, int rank) {
+void setup_geometry_one(index_t ic, AmrCells &locals, AmrCells& ghosts, const Distributor& op, int rank) {
     if (locals.flag[ic] == 0) {
-        retain_cell<dim>(locals, aliens, ic);
+        retain_cell<dim>(locals, ghosts, ic);
         return;
     }
 
     if (locals.flag[ic] > 0) {
-        refine_cell<dim>(locals, aliens, ic, op);
+        refine_cell<dim>(locals, ghosts, ic, op);
         return;
     }
 
-    coarse_cell<dim>(locals, aliens, ic, op, rank);
+    coarse_cell<dim>(locals, ghosts, ic, op, rank);
 }
 
 /// @brief Осуществляет проход по ячейкам и вызывает для них
 /// соответствующие методы адаптации (без MPI)
 template<int dim>
 void setup_geometry(AmrCells &locals, const Statistics &count, const Distributor& op) {
-    static AmrCells aliens;
+    static AmrCells ghosts;
     threads::parallel_for(
             index_t{0}, index_t{count.n_cells},
             setup_geometry_one<dim>,
-            std::ref(locals), std::ref(aliens), std::ref(op), 0);
+            std::ref(locals), std::ref(ghosts), std::ref(op), 0);
 }
 
 #ifdef ZEPHYR_MPI
@@ -47,11 +47,11 @@ void setup_geometry(AmrCells &locals, const Statistics &count, const Distributor
 template<int dim>
 void setup_geometry(AmrCells &locals, Tourism& tourism, const Statistics &count, const Distributor& op) {
     int rank = mpi::rank();
-    AmrCells& aliens = tourism.aliens();
+    AmrCells& ghosts = tourism.ghosts();
     threads::parallel_for(
             index_t{0}, index_t{count.n_cells},
             setup_geometry_one<dim>,
-            std::ref(locals), std::ref(aliens), std::ref(op), rank);
+            std::ref(locals), std::ref(ghosts), std::ref(op), rank);
 }
 #endif
 

@@ -259,7 +259,7 @@ void Strip::initialize(AmrCells& cells) const {
         for (auto side: {Side2D::LEFT, Side2D::RIGHT}) {
             cells.faces.adjacent.rank[iface + side] = 0;
             cells.faces.adjacent.index[iface + side] = neib_index(ic, side);
-            cells.faces.adjacent.alien[iface + side] = -1;
+            cells.faces.adjacent.ghost[iface + side] = -1;
             cells.faces.adjacent.basic[iface + side] = ic;
             cells.faces.vertices[iface + side].fill(-1);
         }
@@ -267,7 +267,7 @@ void Strip::initialize(AmrCells& cells) const {
         for (auto side: {Side2D::BOTTOM, Side2D::TOP}) {
             cells.faces.adjacent.rank[iface + side] = 0;
             cells.faces.adjacent.index[iface + side] = ic;
-            cells.faces.adjacent.alien[iface + side] = -1;
+            cells.faces.adjacent.ghost[iface + side] = -1;
             cells.faces.adjacent.basic[iface + side] = ic;
             cells.faces.vertices[iface + side].fill(-1);
         }

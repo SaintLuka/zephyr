@@ -11,10 +11,10 @@ namespace zephyr::mesh::amr {
 /// не разбивается и не огрубляется, у неё может измениться набор граней:
 /// какие-то грани могут объединиться, а какие-то разбиться.
 /// @param locals Хранилище локальных ячеек
-/// @param aliens Хранилище ячеек с других процессов
+/// @param ghosts Хранилище ячеек с других процессов
 /// @param ic Индекс целевой ячейки в locals
 template<int dim>
-void retain_cell(AmrCells &locals, AmrCells& aliens, index_t ic) {
+void retain_cell(AmrCells &locals, AmrCells& ghosts, index_t ic) {
     // Ячейка не требует разбиения, необходимо пройти по граням,
     // возможно, необходимо разбить грань или собрать
     auto lvl_c = locals.level[ic];
@@ -43,16 +43,16 @@ void retain_cell(AmrCells &locals, AmrCells& aliens, index_t ic) {
             throw std::runtime_error("AmrCell has no local neighbor (retain_cell)");
         }
         if (adj.rank[iface] != rank &&
-            (adj.alien[iface] < 0 || adj.alien[iface] >= aliens.size())) {
+            (adj.ghost[iface] < 0 || adj.ghost[iface] >= ghosts.size())) {
             std::cout << "AmrCell has no remote neighbor through the " <<
-                side_to_string(side, dim) << " side; aliens size: " << aliens.size() << "\n";
+                side_to_string(side, dim) << " side; ghosts size: " << ghosts.size() << "\n";
             locals.print_info(ic);
             throw std::runtime_error("AmrCell has no remote neighbor (retain_cell)");
         }
 #endif
         // Хранилище и индекс соседа, если соседи более высокого уровня,
         // то это какой-то из соседей
-        auto [neibs, jc] = adj.get_neib(iface, locals, aliens);
+        auto [neibs, jc] = adj.get_neib(iface, locals, ghosts);
 
         auto lvl_n = neibs.level[jc];
 
@@ -82,12 +82,12 @@ void retain_cell(AmrCells &locals, AmrCells& aliens, index_t ic) {
                     index_t sface = face_beg + subface;
                     adj.basic[sface] = locals.next[ic];
                     int symm = adj.rotation[sface];
-                    if (adj.alien[iface] < 0) {
+                    if (adj.ghost[iface] < 0) {
                         adj.index[sface] = locals.next[neib_next + indexing::neib_child(subface, symm)];
                     }
                     else {
                         int zch = indexing::neib_child(subface, symm);
-                        adj.alien[sface] = child_next(aliens.next[jc], zch);
+                        adj.ghost[sface] = child_next(ghosts.next[jc], zch);
                     }
                 }
             }
@@ -96,20 +96,20 @@ void retain_cell(AmrCells &locals, AmrCells& aliens, index_t ic) {
 
                 if (neibs.flag[jc] == 0) {
                     // Сосед ничего не делает, но может переехать
-                    if (adj.alien[iface] < 0) {
+                    if (adj.ghost[iface] < 0) {
                         adj.index[iface] = neib_next;
                     }
                     else {
-                        adj.alien[iface] = neib_next;
+                        adj.ghost[iface] = neib_next;
                     }
                 }
                 else {
                     // Сосед огрубляется (neib_flag < 0)
-                    if (adj.alien[iface] < 0) {
+                    if (adj.ghost[iface] < 0) {
                         adj.index[iface] = locals.next[neib_next];
                     }
                     else {
-                        adj.alien[iface] = neib_next;
+                        adj.ghost[iface] = neib_next;
                     }
                 }
             }
@@ -146,11 +146,11 @@ void retain_cell(AmrCells &locals, AmrCells& aliens, index_t ic) {
                 merge_faces<dim>(locals, ic, side);
 
                 adj.basic[iface] = locals.next[ic];
-                if (adj.alien[iface] < 0) {
+                if (adj.ghost[iface] < 0) {
                     adj.index[iface] = locals.next[neibs.next[jc]];
                 }
                 else {
-                    adj.alien[iface] = aliens.next[jc];
+                    adj.ghost[iface] = ghosts.next[jc];
                 }
             }
             else {
@@ -158,15 +158,15 @@ void retain_cell(AmrCells &locals, AmrCells& aliens, index_t ic) {
                 for (auto subface: side.subfaces()) {
                     index_t jface = face_beg + subface;
                     // Хранилище и индекс соседа
-                    auto [neibs2, kc] = adj.get_neib(jface, locals, aliens);
+                    auto [neibs2, kc] = adj.get_neib(jface, locals, ghosts);
 
                     adj.basic[jface] = locals.next[ic];
 
-                    if (adj.alien[jface] < 0) {
+                    if (adj.ghost[jface] < 0) {
                         adj.index[jface] = neibs2.next[kc];
                     }
                     else {
-                        adj.alien[jface] = neibs2.next[kc];
+                        adj.ghost[jface] = neibs2.next[kc];
                     }
                 }
             }
@@ -190,11 +190,11 @@ void retain_cell(AmrCells &locals, AmrCells& aliens, index_t ic) {
                 // Сосед ничего не делает, но может переехать
                 adj.basic[iface] = locals.next[ic];
 
-                if (adj.alien[iface] < 0) {
+                if (adj.ghost[iface] < 0) {
                     adj.index[iface] = neibs.next[jc];
                 }
                 else {
-                    adj.alien[iface] = neibs.next[jc];
+                    adj.ghost[iface] = neibs.next[jc];
                 }
             }
             else {
@@ -203,12 +203,12 @@ void retain_cell(AmrCells &locals, AmrCells& aliens, index_t ic) {
                 int symm = adj.rotation[iface];
 
                 int zch = indexing::adjacent_child(side, symm, locals.z_idx[ic] % CpC(dim));
-                if (adj.alien[iface] < 0) {
+                if (adj.ghost[iface] < 0) {
                     index_t neib_next = neibs.next[jc] + zch;
                     adj.index[iface] = locals.next[neib_next];
                 }
                 else {
-                    adj.alien[iface] = child_next(aliens.next[jc], zch);
+                    adj.ghost[iface] = child_next(ghosts.next[jc], zch);
                 }
             }
         }

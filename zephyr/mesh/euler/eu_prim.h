@@ -27,12 +27,12 @@ private:
 
     /// @brief Нулевое значение допускается, но не проверяется в целях
     /// оптимизации, поэтому ловите segfaults.
-    AmrCells* m_aliens = nullptr;
+    AmrCells* m_ghosts = nullptr;
 
 public:
     /// @brief Основной конструктор
-    EuFace(AmrCells* cells, index_t face_idx, AmrCells* aliens = nullptr)
-        : m_cells(cells), m_face_idx(face_idx), m_aliens(aliens) { }
+    EuFace(AmrCells* cells, index_t face_idx, AmrCells* ghosts = nullptr)
+        : m_cells(cells), m_face_idx(face_idx), m_ghosts(ghosts) { }
 
     /// @{ @name Тип грани
 
@@ -117,8 +117,8 @@ public:
     /// @brief Индекс соседней ячейки в массиве locals
     index_t adj_index() const;
 
-    /// @brief Индекс соседней ячейки в массиве aliens
-    index_t adj_alien() const;
+    /// @brief Индекс соседней ячейки в массиве ghosts
+    index_t adj_ghost() const;
 
     /// @brief Индекс родительской ячейки в массиве locals
     index_t adj_basic() const;
@@ -165,7 +165,7 @@ public:
     /// @brief Изолированная грань на стороне side,
     /// не позволяет обходить грани
     EuFace_Iter(AmrCells* cells, index_t face_idx, index_t face_end,
-                AmrCells* aliens, Direction dir = Direction::ANY);
+                AmrCells* ghosts, Direction dir = Direction::ANY);
 
     /// @brief Ссылка на грань при разыменовании
     EuFace &operator*() { return m_eu_face; }
@@ -192,7 +192,7 @@ class EuFaces final {
 
 public:
     EuFaces(AmrCells *cells, index_t cell_idx,
-            AmrCells *aliens = nullptr,
+            AmrCells *ghosts = nullptr,
             Direction dir = Direction::ANY);
 
     EuFace_Iter begin() const { return m_begin; }
@@ -222,14 +222,14 @@ private:
 
     /// @brief Нулевое значение допускается, но не проверяется в целях
     /// оптимизации, поэтому ловите segfaults.
-    AmrCells* m_aliens{nullptr};
+    AmrCells* m_ghosts{nullptr};
 
 public:
     /// @brief Конструктор по умолчанию (иногда требует TBB)
     EuCell() = default;    
 
-    EuCell(AmrCells* cells, index_t index, AmrCells* aliens = nullptr)
-        : m_cells(cells), m_index(index), m_aliens(aliens) { }
+    EuCell(AmrCells* cells, index_t index, AmrCells* ghosts = nullptr)
+        : m_cells(cells), m_index(index), m_ghosts(ghosts) { }
 
     /// @{ @name Характеристики ячейки
 
@@ -470,8 +470,8 @@ public:
     EuCell_Iter() = default;
 
     /// @brief Конструктор как у ячейки
-    EuCell_Iter(AmrCells *cells, index_t index, AmrCells *aliens = nullptr)
-            : m_eu_cell{cells, index, aliens} { }
+    EuCell_Iter(AmrCells *cells, index_t index, AmrCells *ghosts = nullptr)
+            : m_eu_cell{cells, index, ghosts} { }
 
     /// @brief Ссылка на ячейку при разыменовании
     EuCell &operator*() { return m_eu_cell; }
@@ -501,14 +501,14 @@ public:
     EuCell_Iter operator+(index_t step) const {
         return {m_eu_cell.m_cells,
                 m_eu_cell.m_index + step,
-                m_eu_cell.m_aliens};
+                m_eu_cell.m_ghosts};
     }
 
     /// @brief Оператор доступа как для указателя (random access iterator)
     EuCell operator[](index_t offset) const {
         return {m_eu_cell.m_cells,
                 m_eu_cell.m_index + offset,
-                m_eu_cell.m_aliens};
+                m_eu_cell.m_ghosts};
     }
 
     /// @brief Расстояние между двумя ячейками
@@ -532,13 +532,13 @@ public:
     }
 };
 
-/// @brief Для итераций по AmrCells, aliens = nullptr,
+/// @brief Для итераций по AmrCells, ghosts = nullptr,
 /// поэтому проход по соседям не всегда возможен
 inline EuCell_Iter begin(AmrCells& cells) {
     return {&cells, 0, nullptr};
 }
 
-/// @brief Для итераций по AmrCells, aliens = nullptr,
+/// @brief Для итераций по AmrCells, ghosts = nullptr,
 /// поэтому проход по соседям не всегда возможен
 inline EuCell_Iter end(AmrCells& cells) {
     return {&cells, cells.n_cells(), nullptr};
@@ -617,7 +617,7 @@ inline void EuFace::set_boundary(Boundary flag) const {
         m_cells->faces.boundary[m_face_idx] = flag;
         m_cells->faces.adjacent.rank[m_face_idx] = m_cells->rank[basic];
         m_cells->faces.adjacent.index[m_face_idx] = basic;
-        m_cells->faces.adjacent.alien[m_face_idx] = -1;
+        m_cells->faces.adjacent.ghost[m_face_idx] = -1;
     }
 }
 
@@ -660,7 +660,7 @@ inline int EuFace::adj_rank() const { return m_cells->faces.adjacent.rank[m_face
 
 inline index_t EuFace::adj_index() const { return m_cells->faces.adjacent.index[m_face_idx]; }
 
-inline index_t EuFace::adj_alien() const { return m_cells->faces.adjacent.alien[m_face_idx]; }
+inline index_t EuFace::adj_ghost() const { return m_cells->faces.adjacent.ghost[m_face_idx]; }
 
 inline index_t EuFace::adj_basic() const { return m_cells->faces.adjacent.basic[m_face_idx]; }
 
@@ -670,9 +670,9 @@ inline bool EuFace::local_neib() const {
 
 inline EuCell EuFace::neib() const {
     if (utils::mpi::single() || local_neib()) {
-        return {m_cells, adj_index(), m_aliens};
+        return {m_cells, adj_index(), m_ghosts};
     }
-    return {m_aliens, adj_alien(), m_aliens};
+    return {m_ghosts, adj_ghost(), m_ghosts};
 }
 
 template <typename T>
@@ -680,7 +680,7 @@ const T& EuFace::neib(Storable<T> type) const {
     if (utils::mpi::single() || local_neib()) {
         return m_cells->data.get_val(type, adj_index());
     }
-    return m_aliens->data.get_val(type, adj_alien());
+    return m_ghosts->data.get_val(type, adj_ghost());
 }
 
 template <typename T>
@@ -688,7 +688,7 @@ std::span<const T> EuFace::neib(Storable<T[]> type) const {
     if (utils::mpi::single() || local_neib()) {
         return m_cells->data.get_val(type, adj_index());
     }
-    return m_aliens->data.get_val(type, adj_alien());
+    return m_ghosts->data.get_val(type, adj_ghost());
 }
 
 template <typename T, size_t N>
@@ -696,28 +696,28 @@ std::span<const T, N> EuFace::neib(Storable<T[N]> type) const {
     if (utils::mpi::single() || local_neib()) {
         return m_cells->data.get_val(type, adj_index());
     }
-    return m_aliens->data.get_val(type, adj_alien());
+    return m_ghosts->data.get_val(type, adj_ghost());
 }
 
 inline int EuFace::neib_flag() const {
     if (utils::mpi::single() || local_neib()) {
         return m_cells->flag[adj_index()];
     }
-    return m_aliens->flag[adj_alien()];
+    return m_ghosts->flag[adj_ghost()];
 }
 
 inline geom::Vector3d EuFace::neib_center() const {
     if (utils::mpi::single() || local_neib()) {
         return m_cells->center[adj_index()];
     }
-    return m_aliens->center[adj_alien()];
+    return m_ghosts->center[adj_ghost()];
 }
 
 inline double EuFace::neib_volume() const {
     if (utils::mpi::single() || local_neib()) {
         return m_cells->volume[adj_index()];
     }
-    return m_aliens->volume[adj_alien()];
+    return m_ghosts->volume[adj_ghost()];
 }
 
 inline double EuFace::neib_volume(bool axial) const {
@@ -725,7 +725,7 @@ inline double EuFace::neib_volume(bool axial) const {
         if (utils::mpi::single() || local_neib()) {
             return m_cells->volume_alt[adj_index()];
         }
-        return m_aliens->volume_alt[adj_alien()];
+        return m_ghosts->volume_alt[adj_ghost()];
     }
     return neib_volume();
 }
@@ -799,15 +799,15 @@ inline void EuCell::copy_data_to(EuCell &dst_cell) const {
 inline int EuCell::face_count() const { return m_cells->face_count(m_index); }
 
 inline EuFace EuCell::face(int idx) const {
-    return {m_cells, m_cells->faces.offsets[m_index] + idx, m_aliens};
+    return {m_cells, m_cells->faces.offsets[m_index] + idx, m_ghosts};
 }
 
 inline EuFace EuCell::face(Side2D s) const {
-    return {m_cells, m_cells->faces.offsets[m_index] + s, m_aliens};
+    return {m_cells, m_cells->faces.offsets[m_index] + s, m_ghosts};
 }
 
 inline EuFace EuCell::face(Side3D s) const {
-    return {m_cells, m_cells->faces.offsets[m_index] + s, m_aliens};
+    return {m_cells, m_cells->faces.offsets[m_index] + s, m_ghosts};
 }
 
 inline bool EuCell::simple_face(Side2D s) const { return m_cells->faces.is_simple(m_index, s); }
@@ -818,7 +818,7 @@ inline bool EuCell::complex_face(Side2D s) const { return m_cells->faces.is_comp
 
 inline bool EuCell::complex_face(Side3D s) const { return m_cells->faces.is_complex(m_index, s); }
 
-inline EuFaces EuCell::faces(Direction dir) const { return {m_cells, m_index, m_aliens, dir}; }
+inline EuFaces EuCell::faces(Direction dir) const { return {m_cells, m_index, m_ghosts, dir}; }
 
 inline int EuCell::node_count() const { return m_cells->verts.count(m_index); }
 

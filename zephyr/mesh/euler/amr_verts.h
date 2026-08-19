@@ -28,7 +28,7 @@ class AmrVerts final {
     using Vector3d = geom::Vector3d;
 
     /// @brief Используются уникальные узлы? Если unique = false, тогда массивы
-    /// index и alien пустые. В обратном случае все массивы одного размера.
+    /// index и ghost пустые. В обратном случае все массивы одного размера.
     bool m_unique = false;
 
 public:

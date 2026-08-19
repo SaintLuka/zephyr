@@ -55,7 +55,7 @@ bool can_coarse(AmrCells& cells, int ic) {
             return false;
         }
 
-        scrutiny_check(adj.alien[jface] < 0, "can coarse, bad adjacent #1")
+        scrutiny_check(adj.ghost[jface] < 0, "can coarse, bad adjacent #1")
         scrutiny_check(adj.index[jface] >= 0, "can coarse, bad adjacent #2")
         scrutiny_check(adj.index[jface] < cells.size(), "can coarse, bad adjacent #3")
 

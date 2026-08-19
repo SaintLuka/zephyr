@@ -160,7 +160,7 @@ NodeOwners find_owners(const AmrCells& cells, index_t ic0, role_t loc_iv0) {
             if (cells.faces.is_undefined(iface) ||
                 cells.faces.is_boundary(iface) ||
                 cells.faces.boundary[iface] == Boundary::PERIODIC ||
-                cells.faces.adjacent.is_alien(iface)) {
+                cells.faces.adjacent.is_ghost(iface)) {
                 continue;
             }
 
@@ -284,7 +284,7 @@ memory_t AmrNodes::memory_usage() const {
 }
 
 int AmrNodes::check_nodes(const AmrCells& locals) const {
-    AmrCells ghosts;
+    AmrCells ghosts = locals.same();
     AmrNodes ghost_nodes;
     return check_nodes(locals, ghosts, ghost_nodes);
 }

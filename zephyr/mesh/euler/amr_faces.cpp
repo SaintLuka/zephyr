@@ -10,7 +10,7 @@ namespace indexing = geom::indexing;
 void AmrAdjacent::resize(index_t n_faces) {
     rank.resize(n_faces, -1);
     index.resize(n_faces, -1);
-    alien.resize(n_faces, -1);
+    ghost.resize(n_faces, -1);
     basic.resize(n_faces, -1);
     rotation.resize(n_faces, -1);
 }
@@ -18,7 +18,7 @@ void AmrAdjacent::resize(index_t n_faces) {
 void AmrAdjacent::reserve(index_t n_faces) {
     rank.reserve(n_faces);
     index.reserve(n_faces);
-    alien.reserve(n_faces);
+    ghost.reserve(n_faces);
     basic.reserve(n_faces);
     rotation.reserve(n_faces);
 }
@@ -26,7 +26,7 @@ void AmrAdjacent::reserve(index_t n_faces) {
 void AmrAdjacent::shrink_to_fit() {
     rank.shrink_to_fit();
     index.shrink_to_fit();
-    alien.shrink_to_fit();
+    ghost.shrink_to_fit();
     basic.shrink_to_fit();
     rotation.shrink_to_fit();
 }
@@ -35,7 +35,7 @@ memory_t AmrAdjacent::memory_usage() const {
     memory_t mem;
     mem.add(rank);
     mem.add(index);
-    mem.add(alien);
+    mem.add(ghost);
     mem.add(basic);
     mem.add(rotation);
     return mem;
@@ -209,7 +209,7 @@ void reorder(std::vector<T>& field, index_t iface) {
 void AmrFaces::reorder_quad_faces(index_t iface) {
     reorder(adjacent.rank, iface);
     reorder(adjacent.index, iface);
-    reorder(adjacent.alien, iface);
+    reorder(adjacent.ghost, iface);
 
     reorder(boundary, iface);
     reorder(normal, iface);

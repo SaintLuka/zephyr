@@ -102,14 +102,14 @@ Variable::Variable(const char* name)
             }
         };
     }
-    else if (!std::strcmp(name, "face2D.alien") || !std::strcmp(name, "face3D.alien")) {
+    else if (!std::strcmp(name, "face2D.ghost") || !std::strcmp(name, "face3D.ghost")) {
         m_type = VtkType::Int32;
-        m_n_components = !std::strcmp(name, "face2D.alien") ? 8 : 24;
+        m_n_components = !std::strcmp(name, "face2D.ghost") ? 8 : 24;
         m_write = [max_faces=m_n_components](const EuCell& cell, void *arg) {
             const int n_faces = cell.adaptive() ? max_faces : std::min(max_faces, cell.face_count());
             const auto out = static_cast<int32_t *>(arg);
             for (int i = 0; i < n_faces; ++i) {
-                out[i] = cell.face(i).adj_alien();
+                out[i] = cell.face(i).adj_ghost();
             }
             for (int i = n_faces; i < max_faces; ++i) {
                 out[i] = int32_t{-13};

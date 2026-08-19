@@ -40,7 +40,7 @@ void Variables::append(const char* name) {
     if (!std::strcmp(name, "faces")) {
         // Здесь добавляются сложные типы данных
         m_list.emplace_back("face.rank");
-        m_list.emplace_back("face.alien");
+        m_list.emplace_back("face.ghost");
         m_list.emplace_back("face.index");
         m_list.emplace_back("face.boundary");
     }
@@ -48,7 +48,7 @@ void Variables::append(const char* name) {
         // Для EuMesh
         m_list.emplace_back("face2D.rank");
         m_list.emplace_back("face2D.index");
-        m_list.emplace_back("face2D.alien");
+        m_list.emplace_back("face2D.ghost");
         m_list.emplace_back("face2D.boundary");
         m_list.emplace_back("face2D.rotation");
     }
@@ -56,7 +56,7 @@ void Variables::append(const char* name) {
         // Для EuMesh
         m_list.emplace_back("face3D.rank");
         m_list.emplace_back("face3D.index");
-        m_list.emplace_back("face3D.alien");
+        m_list.emplace_back("face3D.ghost");
         m_list.emplace_back("face3D.boundary");
         m_list.emplace_back("face3D.rotation");
     }

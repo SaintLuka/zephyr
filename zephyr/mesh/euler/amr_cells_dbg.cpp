@@ -48,7 +48,7 @@ void AmrCells::print_info(index_t ic) const {
         std::cout << "\t\t\t\tcenter:     " << faces.center[iface].transpose() << "\n";
         std::cout << "\t\t\t\tadj.rank:   " << faces.adjacent.rank[iface] << "\n";
         std::cout << "\t\t\t\tadj.index:  " << faces.adjacent.index[iface] << "\n";
-        std::cout << "\t\t\t\tadj.alien:  " << faces.adjacent.alien[iface] << "\n";
+        std::cout << "\t\t\t\tadj.ghost:  " << faces.adjacent.ghost[iface] << "\n";
         std::cout << "\t\t\t\tadj.basic:  " << faces.adjacent.basic[iface] << "\n";
         std::cout << "\t\t\t\tadj.rotat:  " << int(faces.adjacent.rotation[iface]) << "\n";
     }
@@ -535,11 +535,11 @@ int AmrCells::check_complex_faces(index_t ic) const {
 }
 
 int AmrCells::check_connectivity(index_t ic) const {
-    AmrCells aliens;
-    return check_connectivity(ic, aliens);
+    AmrCells ghosts = same();
+    return check_connectivity(ic, ghosts);
 }
 
-int AmrCells::check_connectivity(index_t ic, const AmrCells& aliens) const {
+int AmrCells::check_connectivity(index_t ic, const AmrCells& ghosts) const {
     if (ic >= m_size) {
         throw std::runtime_error("Данная проверка только для локальных ячеек!");
     }
@@ -560,8 +560,8 @@ int AmrCells::check_connectivity(index_t ic, const AmrCells& aliens) const {
                 print_info(ic);
                 return -1;
             }
-            if (faces.adjacent.alien[iface] >= 0) {
-                std::cout << "\tUndefined face, adjacent.alien >= 0\n";
+            if (faces.adjacent.ghost[iface] >= 0) {
+                std::cout << "\tUndefined face, adjacent.ghost >= 0\n";
                 print_info(ic);
                 return -1;
             }
@@ -583,7 +583,7 @@ int AmrCells::check_connectivity(index_t ic, const AmrCells& aliens) const {
         // Простая граничная грань
         if (faces.is_boundary(iface)) {
             // Грань должна ссылаться на саму ячейку
-            if (adj.rank[iface] != rank[ic] || adj.index[iface] != ic || adj.alien[iface] >= 0) {
+            if (adj.rank[iface] != rank[ic] || adj.index[iface] != ic || adj.ghost[iface] >= 0) {
                 std::cout << "\tBoundary face should point to origin cell\n";
                 print_info(ic);
                 return -1;
@@ -623,8 +623,8 @@ int AmrCells::check_connectivity(index_t ic, const AmrCells& aliens) const {
                 print_info(ic);
                 return -1;
             }
-            if (adj.alien[iface] >= 0) {
-                std::cout << "\tadjacent.alien >= 0 for local cell\n";
+            if (adj.ghost[iface] >= 0) {
+                std::cout << "\tadjacent.ghost >= 0 for local cell\n";
                 print_info(ic);
                 return -1;
             }
@@ -636,16 +636,16 @@ int AmrCells::check_connectivity(index_t ic, const AmrCells& aliens) const {
         }
         else {
             // Удаленная ячейка
-            if (adj.alien[iface] < 0 || adj.alien[iface] >= aliens.size()) {
-                std::cout << "\t" + f_name + ": adjacent.alien out of range for remote cell\n";
-                std::cout << "\t\taliens.size: " << aliens.size() << "\n";
+            if (adj.ghost[iface] < 0 || adj.ghost[iface] >= ghosts.size()) {
+                std::cout << "\t" + f_name + ": adjacent.ghost out of range for remote cell\n";
+                std::cout << "\t\tghosts.size: " << ghosts.size() << "\n";
                 print_info(ic);
                 return -1;
             }
         }
 
-        // Сосед может быть из aliens
-        auto [neibs, jc] = adj.get_neib(iface, *this, aliens);
+        // Сосед может быть из ghosts
+        auto [neibs, jc] = adj.get_neib(iface, *this, ghosts);
 
         Vector3d fc = faces.center[iface];
 
@@ -690,7 +690,7 @@ int AmrCells::check_connectivity(index_t ic, const AmrCells& aliens) const {
                 return -1;
             }
             // Указывает на исходную ячейку
-            if (neibs.faces.adjacent.alien[jface] < 0 &&
+            if (neibs.faces.adjacent.ghost[jface] < 0 &&
                 neibs.faces.adjacent.index[jface] != ic) {
                 std::cout << "\tWrong connection (index != ic). " << f_name << " face\n";
                 std::cout << "\tCurrent cell:\n";

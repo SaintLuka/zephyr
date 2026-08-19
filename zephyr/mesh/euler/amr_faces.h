@@ -19,7 +19,7 @@ using geom::Side3D;
 ///             с этого процесса  |  с другого процесса
 ///    rank  :    == this.rank    |    != this.rank
 ///    index :    < locals.size   |    < decomposition(rank).locals.size
-///    alien :    < 0             |    < aliens.size
+///    ghost :    < 0             |    < ghosts.size
 class AmrAdjacent final {
 public:
     /// @brief Ранг процесса, на котором находится смежная ячейка
@@ -30,9 +30,9 @@ public:
     /// хранилище или в удаленном)
     std::vector<index_t> index;
 
-    /// @brief Индекс смежной ячейки в массиве aliens (или -1, если соседняя
+    /// @brief Индекс смежной ячейки в массиве ghosts (или -1, если соседняя
     /// ячейка с данного процесса).
-    std::vector<index_t> alien;
+    std::vector<index_t> ghost;
 
     /// @brief Индекс базовой ячейки, которая содержит грань
     std::vector<index_t> basic;
@@ -53,20 +53,20 @@ public:
     void shrink_to_fit();
 
     /// @brief Локальная соседняя ячейка?
-    bool is_local(index_t iface) const { return alien[iface] < 0; }
+    bool is_local(index_t iface) const { return ghost[iface] < 0; }
 
     /// @brief Удаленная соседняя ячейка?
-    bool is_alien(index_t iface) const { return alien[iface] >= 0; }
+    bool is_ghost(index_t iface) const { return ghost[iface] >= 0; }
 
     /// @brief Получить хранилище ячеек, в котором находится сосед, а также
     /// индекс соседа в данном хранилище
     template <class SomeArray>
     std::tuple<const SomeArray &, index_t> get_neib(index_t iface,
-            const SomeArray &locals, const SomeArray &aliens) const {
-        if (alien[iface] < 0) {
+            const SomeArray &locals, const SomeArray &ghosts) const {
+        if (ghost[iface] < 0) {
             return {locals, index[iface]};
         } else {
-            return {aliens, alien[iface]};
+            return {ghosts, ghost[iface]};
         }
     }
 
@@ -202,7 +202,7 @@ inline void AmrFaces::set_undefined(index_t iface) {
     boundary[iface] = Boundary::UNDEFINED;
     adjacent.rank[iface]  = -1;
     adjacent.index[iface] = -1;
-    adjacent.alien[iface] = -1;
+    adjacent.ghost[iface] = -1;
     adjacent.basic[iface] = -1;
 }
 

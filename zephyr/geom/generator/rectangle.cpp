@@ -565,7 +565,7 @@ void Rectangle::initialize(AmrCells& cells) const {
         for (auto side: Side2D::items()) {
             cells.faces.adjacent.rank[iface + side] = 0;
             cells.faces.adjacent.index[iface + side] = neib_index(i, j, side);
-            cells.faces.adjacent.alien[iface + side] = -1;
+            cells.faces.adjacent.ghost[iface + side] = -1;
             cells.faces.adjacent.basic[iface + side] = ic;
             cells.faces.vertices[iface + side].fill(-1);
         }

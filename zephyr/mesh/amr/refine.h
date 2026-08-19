@@ -14,7 +14,7 @@ void make_link_2D(AmrCells& cells, index_t main_child, int rank) {
     cells.faces.boundary[iface] = Boundary::INNER;
     cells.faces.adjacent.rank[iface] = rank;
     cells.faces.adjacent.index[iface] = cells.next[main_child + Quad::iss<i + 2 * x, j + 2 * y>()];
-    cells.faces.adjacent.alien[iface] = -1;
+    cells.faces.adjacent.ghost[iface] = -1;
     cells.faces.adjacent.rotation[iface] = 0;
 }
 
@@ -25,7 +25,7 @@ void make_link_3D(AmrCells& cells, index_t main_child, int rank) {
     cells.faces.boundary[iface] = Boundary::INNER;
     cells.faces.adjacent.rank[iface] = rank;
     cells.faces.adjacent.index[iface] = cells.next[main_child + Cube::iss<i + 2 * x, j + 2 * y, k + 2 * z>()];
-    cells.faces.adjacent.alien[iface] = -1;
+    cells.faces.adjacent.ghost[iface] = -1;
     cells.faces.adjacent.rotation[iface] = 0;
 }
 
@@ -150,13 +150,13 @@ void check_link(AmrCells& cells, index_t ip, index_t main_child) {
 
 /// @brief Создать дочерние ячейки на выделенном месте по порядку
 /// @param locals Локальное хранилище ячеек
-/// @param aliens Хранилище ячеек с других процессов
+/// @param ghosts Хранилище ячеек с других процессов
 /// @param ip Индекс родительской ячейки
 /// @return Индекс первой дочерней ячейки, все они располагаются по порядку.
 /// Дочерние ячейки имеют законченный вид (необходимое число граней, правильные
 /// связи друг на друга, кроме одного случая правильные связи на соседей)
 template<int dim>
-index_t make_children(AmrCells &locals, AmrCells& aliens, index_t ip) {
+index_t make_children(AmrCells &locals, AmrCells& ghosts, index_t ip) {
     const index_t main_child = locals.next[ip];
 
     // Установить только геометрию
@@ -241,7 +241,7 @@ index_t make_children(AmrCells &locals, AmrCells& aliens, index_t ip) {
                 index_t ch_face = locals.faces.offsets[ich] + side;
                 adj.rank [ch_face] = rank;
                 adj.index[ch_face] = locals.next[ich];
-                adj.alien[ch_face] = -1;
+                adj.ghost[ch_face] = -1;
                 adj.rotation[ch_face] = 0;
             }
             continue;
@@ -250,7 +250,7 @@ index_t make_children(AmrCells &locals, AmrCells& aliens, index_t ip) {
         // Родительская ячейка имела простую грань по стороне
         if (locals.faces.is_simple(ip, side)) {
             index_t p_face = face_beg + side;
-            auto [neibs, jc] = adj.get_neib(p_face, locals, aliens);
+            auto [neibs, jc] = adj.get_neib(p_face, locals, ghosts);
             scrutiny_check(0 <= jc && jc < neibs.size(), "Out fo bounds make children #1");
 
             scrutiny_check(
@@ -271,31 +271,31 @@ index_t make_children(AmrCells &locals, AmrCells& aliens, index_t ip) {
                 if (locals.level[ip] > neibs.level[jc]) {
                     // case: lvl_c > lvl_n & flag_n == 1
                     int zch = indexing::adjacent_child(side, symm, locals.z_idx[ip] % CpC(dim));
-                    if (adj.alien[p_face] < 0) {
+                    if (adj.ghost[p_face] < 0) {
                         adj.index[ch_face] = locals.next[neibs.next[jc] + zch];
                     }
                     else {
-                        adj.alien[ch_face] = child_next(aliens.next[jc], zch);
+                        adj.ghost[ch_face] = child_next(ghosts.next[jc], zch);
                     }
                 }
                 else {
                     if (neibs.flag[jc] == 0) {
                         // case: lvl_c == lvl_n & flag_n == 0
-                        if (adj.alien[p_face] < 0) {
+                        if (adj.ghost[p_face] < 0) {
                             adj.index[ch_face] = locals.next[jc];
                         }
                         else {
-                            adj.alien[ch_face] = aliens.next[jc];
+                            adj.ghost[ch_face] = ghosts.next[jc];
                         }
                     }
                     else {
                         // case: lvl_c == lvl_n & flag_n == 1
                         int zch = indexing::adjacent_child(side, symm, i);
-                        if (adj.alien[p_face] < 0) {
+                        if (adj.ghost[p_face] < 0) {
                             adj.index[ch_face] = locals.next[neibs.next[jc] + zch];
                         }
                         else {
-                            adj.alien[ch_face] = child_next(aliens.next[jc], zch);
+                            adj.ghost[ch_face] = child_next(ghosts.next[jc], zch);
                         }
                     }
                 }
@@ -308,37 +308,37 @@ index_t make_children(AmrCells &locals, AmrCells& aliens, index_t ip) {
 
                 Side<dim> subface = indexing::subface_by_child(side, i);
                 index_t p_face = face_beg + subface;
-                auto [neibs, jc] = adj.get_neib(p_face, locals, aliens);
+                auto [neibs, jc] = adj.get_neib(p_face, locals, ghosts);
                 scrutiny_check(0 <= jc && jc < neibs.size(), "Out fo bounds make children #2");
 
                 adj.rank[ch_face] = adj.rank[p_face];
                 adj.rotation[ch_face] = adj.rotation[p_face];
 
                 if (neibs.flag[jc] == 0) {
-                    if (adj.alien[p_face] < 0) {
+                    if (adj.ghost[p_face] < 0) {
                         adj.index[ch_face] = locals.next[jc];
                     }
                     else {
-                        adj.alien[ch_face] = aliens.next[jc];
+                        adj.ghost[ch_face] = ghosts.next[jc];
                     }
                 }
                 else if (neibs.flag[jc] < 0) {
-                    if (adj.alien[p_face] < 0) {
+                    if (adj.ghost[p_face] < 0) {
                         adj.index[ch_face] = locals.next[neibs.next[jc]];
                     }
                     else {
-                        adj.alien[ch_face] = aliens.next[jc];
+                        adj.ghost[ch_face] = ghosts.next[jc];
                     }
                 }
                 else {
                     // Здесь остался возможный случай, когда сосед ещё разобьется,
                     // тогда у новой дочерней ячейки ещё придется бить грань
                     // Пока что она указывает на устаревший индекс.
-                    if (adj.alien[p_face] < 0) {
+                    if (adj.ghost[p_face] < 0) {
                         adj.index[ch_face] = jc;
                     }
                     else {
-                        adj.alien[ch_face] = jc;
+                        adj.ghost[ch_face] = jc;
                     }
                 }
             }
@@ -352,12 +352,12 @@ index_t make_children(AmrCells &locals, AmrCells& aliens, index_t ip) {
 /// по порядку. Дочерние ячейки правильно ссылаются друг на друга, на гранях
 /// adjacent указан правильно на новые позиции соседей.
 /// @param locals Локальное хранилище ячеек
-/// @param aliens Хранилище ячеек с других процессов
+/// @param ghosts Хранилище ячеек с других процессов
 /// @param ip Индекс родительской ячейки
 /// @param op Оператор разделения данных
 template<int dim>
-void refine_cell(AmrCells &locals, AmrCells& aliens, index_t ip, const Distributor& op) {
-    auto main_child = make_children<dim>(locals, aliens, ip);
+void refine_cell(AmrCells &locals, AmrCells& ghosts, index_t ip, const Distributor& op) {
+    auto main_child = make_children<dim>(locals, ghosts, ip);
 
     auto& adj = locals.faces.adjacent;
 
@@ -389,22 +389,22 @@ void refine_cell(AmrCells &locals, AmrCells& aliens, index_t ip, const Distribut
             int rank = mpi::rank();
             if (adj.rank[iface] == rank) {
                 // Локальная ячейка
-                if (adj.alien[iface] >= 0 || adj.index[iface] < 0 || adj.index[iface] >= locals.size()) {
+                if (adj.ghost[iface] >= 0 || adj.index[iface] < 0 || adj.index[iface] >= locals.size()) {
                     throw std::runtime_error("adjacent.index out of range (refine_cell)");
                 }
             }
             else {
                 // Удаленная ячейка
-                if (adj.alien[iface] < 0 || adj.alien[iface] >= aliens.size()) {
+                if (adj.ghost[iface] < 0 || adj.ghost[iface] >= ghosts.size()) {
                     locals.print_info(ip);
                     locals.print_info(ich);
-                    throw std::runtime_error("adjacent.alien out of range (refine_cell)");
+                    throw std::runtime_error("adjacent.ghost out of range (refine_cell)");
                 }
             }
 #endif
             // Ссылка на соседнюю ячейку
             index_t p_face = locals.faces.offsets[ip] + indexing::subface_by_child(side, i);
-            auto [neibs, jc] = adj.get_neib(p_face, locals, aliens);
+            auto [neibs, jc] = adj.get_neib(p_face, locals, ghosts);
 
             // Желаемый уровень соседней ячейки
             int neib_wanted_lvl = neibs.level[jc] + neibs.flag[jc];
@@ -421,12 +421,12 @@ void refine_cell(AmrCells &locals, AmrCells& aliens, index_t ip, const Distribut
                     int symm = adj.rotation[ch_face];
 
                     int zch = indexing::neib_child(subface, symm);
-                    if (adj.alien[p_face] < 0) {
+                    if (adj.ghost[p_face] < 0) {
                         adj.index[ch_face] = locals.next[neib_next + zch];
-                        adj.alien[ch_face] = -1;
+                        adj.ghost[ch_face] = -1;
                     }
                     else {
-                        adj.alien[ch_face] = child_next(aliens.next[jc], zch);
+                        adj.ghost[ch_face] = child_next(ghosts.next[jc], zch);
                     }
                 }
             }

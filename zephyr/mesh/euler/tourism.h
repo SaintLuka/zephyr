@@ -26,11 +26,11 @@ public:
     /// @brief Сжать массивы до актуальных размеров
     void shrink_to_fit();
 
-    /// @brief Добавить тип данных в border/aliens
+    /// @brief Добавить тип данных в border/ghosts
     template <typename T>
     Storable<T> add(const std::string& name);
 
-    /// @brief Добавить векторный тип данных в border/aliens
+    /// @brief Добавить векторный тип данных в border/ghosts
     template<typename T>
     Storable<T> add(const std::string& name, int count);
 
@@ -38,10 +38,10 @@ public:
     template<typename T>
     void swap(Storable<T> var1, Storable<T> var2);
 
-    /// @brief Построить обменные слои (border и aliens).
+    /// @brief Построить обменные слои (border и ghosts).
     /// @param locals Локальное хранилище ячеек, на гранях должны быть корректно
     /// указаны индексы смежности (adjacent.rank, adjacent.index).
-    /// В хранилище locals изменяются индексы смежности adjacent.alien.
+    /// В хранилище locals изменяются индексы смежности adjacent.ghost.
     void update(AmrCells& locals);
 
     /// @}
@@ -57,7 +57,7 @@ public:
     template <MpiTag tag>
     void sync(const AmrCells& locals);
 
-    /// @brief Перенести сеточные данные из locals в m_border
+    /// @brief Перенести сеточные данные из locals в border_
     template <MpiTag tag>
     void prepare(const AmrCells& locals) {
         throw std::runtime_error("prepare<" + to_string(tag) + "> is not implemented");
@@ -80,29 +80,29 @@ public:
     /// @{ @name get-функции
 
     /// @brief Ссылка на ghost-слой ячеек
-    AmrCells& aliens() { return m_aliens; }
+    AmrCells& ghosts() { return ghosts_; }
 
     /// @brief Ссылка на ghost-слой ячеек
-    const AmrCells& aliens() const { return m_aliens; }
+    const AmrCells& ghosts() const { return ghosts_; }
 
     /// @brief Ссылка на ghost-слой узлов
-    AmrNodes& ghost_nodes() { return ghost_nodes_; }
+    AmrNodes& ghosts_nodes() { return ghosts_nodes_; }
 
     /// @brief Ссылка на ghost-слой узлов
-    const AmrNodes& ghost_nodes() const { return ghost_nodes_; }
+    const AmrNodes& ghosts_nodes() const { return ghosts_nodes_; }
 
     /// @brief Ссылка на border-слой
-    AmrCells& border() { return m_border; }
+    AmrCells& border() { return border_; }
 
     /// @brief Ссылка на border-слой
-    const AmrCells& borders() const { return m_border; }
+    const AmrCells& border() const { return border_; }
 
     /// @brief Маршрутизатор при обмене ячейками
-    const Router& cell_router() const { return m_cell_router; }
+    const Router& cell_router() const { return cell_router_; }
 
     /// @brief Индексы ячеек для отправки (из locals)
     const std::vector<index_t>& border_indices() const {
-        return m_border_indices;
+        return border_indices_;
     }
 
     /// @}
@@ -110,10 +110,10 @@ public:
     /// @{ @name Специальные функции
 
     /// @brief Долго объяснять...
-    // Выставляет next у border и aliens (получает после отправки),
+    // Выставляет next у border и ghosts (получает после отправки),
     // расширяет все массивы. Делает корректные router для пересылок,
     // но сами слои не заполняет, только resize.
-    // Также выставляет m_border_indices для полностью адаптированной
+    // Также выставляет border_indices_ для полностью адаптированной
     // сетки, это делается по массиву next внутри расширенного locals.
     // Портит index у border-ячеек, там кодируются дочерние ячейки.
     // На border слое должны быть предварительно выставлены флаги.
@@ -121,7 +121,7 @@ public:
     template<int dim>
     void setup_positions(const std::vector<index_t>& locals_next);
 
-    /// @brief Переслать геометрию ячеек locals -> aliens
+    /// @brief Переслать геометрию ячеек locals -> ghosts
     void send_geometry(const AmrCells& locals);
 
     /// @brief Восстановить индексы adj.index для локальных ячеек
@@ -130,16 +130,16 @@ public:
     /// @brief Изменить border хранилище под текущий Router
     void resize_border();
 
-    /// @brief Изменить aliens хранилище под текущий Router
-    void resize_aliens();
+    /// @brief Изменить ghosts хранилище под текущий Router
+    void resize_ghosts();
 
     /// @brief Расширить border хранилище под текущий Router
     /// (может только увеличить размеры)
     void extend_border();
 
-    /// @brief Расширить aliens хранилище под текущий Router
+    /// @brief Расширить ghosts хранилище под текущий Router
     /// (может только увеличить размеры)
-    void extend_aliens();
+    void extend_ghosts();
 
     /// @}
 
@@ -171,10 +171,10 @@ private:
 
     void find_connections(AmrCells& locals, int rank) const;
 
-    void unpack_aliens_indices();
+    void unpack_ghost_indices();
 
     // ========================================================================
-    //            Выставить финальные значения m_border_indices
+    //            Выставить финальные значения border_indices_
     // ========================================================================
     template<int dim>
     void update_border_indices(const std::vector<index_t>& locals_next);
@@ -186,24 +186,34 @@ private:
     void prepare(const AmrCells& locals, Storable<T> var);
 
     // Уникальные индексы border-ячеек по возрастанию
-    // std::vector<index_t> m_unique_border_indices;
+    // std::vector<index_t> unique_border_indices_;
 
-    // Индексы ячеек, которые составляют хранилище m_border
-    std::vector<index_t> m_border_indices;
+    // Индексы ячеек, которые составляют хранилище border_
+    std::vector<index_t> border_indices_;
 
     // Хранилище для ячеек на отправку. Ячейки, которые отправляются на один
     // процесс, располагаются сплошным блоком. Ячейка может быть включена
     // в массив дважды, если отправляется нескольким процессам.
-    AmrCells m_border;
-    AmrCells m_aliens;
+    AmrCells border_;
+    AmrCells ghosts_;
 
+    // Маршрутизаторы для отправки примитивов из border
+    Router cell_router_;
+    Router face_router_;
+    Router vert_router_;
+
+    // Индексы уникальных узлов, которые составляют border_nodes.
+    std::vector<index_t> border_nodes_indices_;
+
+    // Хранилище уникальных узлов на отправку. Узлы, которые отправляются
+    // на один процесс, располагаются сплошным блоком. Узел может быть включен
+    // в массив дважды, если отправляется нескольким процессам.
     AmrNodes border_nodes_;
-    AmrNodes ghost_nodes_;
+    AmrNodes ghosts_nodes_;
 
-    // Маршрутизаторы для отправки примитивов из m_border
-    Router m_cell_router;
-    Router m_face_router;
-    Router m_node_router;
+    // Маршрутизаторы для отправки примитивов из border_nodes
+    Router node_router_;
+    Router inct_router_;
 };
 
 // ============================================================================
@@ -212,8 +222,8 @@ private:
 
 template<typename T>
 Storable<T> Tourism::add(const std::string& name) {
-    auto res1 = m_border.data.add<T>(name);
-    auto res2 = m_aliens.data.add<T>(name);
+    auto res1 = border_.data.add<T>(name);
+    auto res2 = ghosts_.data.add<T>(name);
     if (res1 != res2) {
         throw std::runtime_error("EuMesh error: bad add<T> #1");
     }
@@ -222,8 +232,8 @@ Storable<T> Tourism::add(const std::string& name) {
 
 template<typename T>
 Storable<T> Tourism::add(const std::string& name, int count) {
-    auto res1 = m_border.data.add<T>(name, count);
-    auto res2 = m_aliens.data.add<T>(name, count);
+    auto res1 = border_.data.add<T>(name, count);
+    auto res2 = ghosts_.data.add<T>(name, count);
     if (res1 != res2) {
         throw std::runtime_error("EuMesh error: bad add<T> #1");
     }
@@ -232,17 +242,17 @@ Storable<T> Tourism::add(const std::string& name, int count) {
 
 template<typename T>
 void Tourism::swap(Storable<T> var1, Storable<T> var2) {
-    m_border.data.swap<T>(var1, var2);
-    m_aliens.data.swap<T>(var1, var2);
+    border_.data.swap<T>(var1, var2);
+    ghosts_.data.swap<T>(var1, var2);
 }
 
 template <typename T>
 void Tourism::prepare(const AmrCells& locals, Storable<T> var) {
-    const utils::Buffer& src = locals  .data[var];
-          utils::Buffer& dst = m_border.data[var];
+    const utils::Buffer& src = locals .data[var];
+          utils::Buffer& dst = border_.data[var];
 
-    for (size_t ic = 0; ic < m_border_indices.size(); ++ic) {
-        src.copy_data(m_border_indices[ic], dst, ic);
+    for (size_t ic = 0; ic < border_indices_.size(); ++ic) {
+        src.copy_data(border_indices_[ic], dst, ic);
     }
 }
 
@@ -254,11 +264,11 @@ void Tourism::sync(const AmrCells& locals, Args&&... vars) {
     // Отправить и дождаться одну переменную
     auto sync_one = [&](auto&& var) {
         prepare(locals, var);
-        const utils::Buffer& src = m_border.data[var];
-        auto send_req = m_cell_router.isend(src, static_cast<MpiTag>(var.tag()));
+        const utils::Buffer& src = border_.data[var];
+        auto send_req = cell_router_.isend(src, static_cast<MpiTag>(var.tag()));
 
-        utils::Buffer& dst = m_aliens.data[var];
-        auto recv_req = m_cell_router.irecv(dst, static_cast<MpiTag>(var.tag()));
+        utils::Buffer& dst = ghosts_.data[var];
+        auto recv_req = cell_router_.irecv(dst, static_cast<MpiTag>(var.tag()));
 
         send_req.wait();
         recv_req.wait();
@@ -272,64 +282,64 @@ void Tourism::sync(const AmrCells& locals, Args&&... vars) {
 
 template <> inline
 void Tourism::prepare<MpiTag::RANK>(const AmrCells& locals) {
-    for (size_t ic = 0; ic < m_border_indices.size(); ++ic) {
-        m_border.rank[ic] = locals.rank[m_border_indices[ic]];
+    for (size_t ic = 0; ic < border_indices_.size(); ++ic) {
+        border_.rank[ic] = locals.rank[border_indices_[ic]];
     }
 }
 
 template <> inline
 void Tourism::prepare<MpiTag::NEXT>(const AmrCells& locals) {
-    for (size_t ic = 0; ic < m_border_indices.size(); ++ic) {
-        m_border.next[ic] = locals.next[m_border_indices[ic]];
+    for (size_t ic = 0; ic < border_indices_.size(); ++ic) {
+        border_.next[ic] = locals.next[border_indices_[ic]];
     }
 }
 
 template <> inline
 void Tourism::prepare<MpiTag::INDEX>(const AmrCells& locals) {
-    for (size_t ic = 0; ic < m_border_indices.size(); ++ic) {
-        m_border.index[ic] = locals.index[m_border_indices[ic]];
+    for (size_t ic = 0; ic < border_indices_.size(); ++ic) {
+        border_.index[ic] = locals.index[border_indices_[ic]];
     }
 }
 
 template <> inline
 void Tourism::prepare<MpiTag::FLAG>(const AmrCells& locals) {
-    for (size_t ic = 0; ic < m_border_indices.size(); ++ic) {
-        m_border.flag[ic] = locals.flag[m_border_indices[ic]];
+    for (size_t ic = 0; ic < border_indices_.size(); ++ic) {
+        border_.flag[ic] = locals.flag[border_indices_[ic]];
     }
 }
 
 template <> inline
 Requests Tourism::isend<MpiTag::RANK>() {
-    return m_cell_router.isend(m_border.rank, MpiTag::RANK);
+    return cell_router_.isend(border_.rank, MpiTag::RANK);
 }
 template <> inline
 Requests Tourism::isend<MpiTag::NEXT>() {
-    return m_cell_router.isend(m_border.next, MpiTag::NEXT);
+    return cell_router_.isend(border_.next, MpiTag::NEXT);
 }
 template <> inline
 Requests Tourism::isend<MpiTag::INDEX>() {
-    return m_cell_router.isend(m_border.index, MpiTag::INDEX);
+    return cell_router_.isend(border_.index, MpiTag::INDEX);
 }
 template <> inline
 Requests Tourism::isend<MpiTag::FLAG>() {
-    return m_cell_router.isend(m_border.flag, MpiTag::FLAG);
+    return cell_router_.isend(border_.flag, MpiTag::FLAG);
 }
 
 template <> inline
 Requests Tourism::irecv<MpiTag::RANK>() {
-    return m_cell_router.irecv(m_aliens.rank, MpiTag::RANK);
+    return cell_router_.irecv(ghosts_.rank, MpiTag::RANK);
 }
 template <> inline
 Requests Tourism::irecv<MpiTag::NEXT>() {
-    return m_cell_router.irecv(m_aliens.next, MpiTag::NEXT);
+    return cell_router_.irecv(ghosts_.next, MpiTag::NEXT);
 }
 template <> inline
 Requests Tourism::irecv<MpiTag::INDEX>() {
-    return m_cell_router.irecv(m_aliens.index, MpiTag::INDEX);
+    return cell_router_.irecv(ghosts_.index, MpiTag::INDEX);
 }
 template <> inline
 Requests Tourism::irecv<MpiTag::FLAG>() {
-    return m_cell_router.irecv(m_aliens.flag, MpiTag::FLAG);
+    return cell_router_.irecv(ghosts_.flag, MpiTag::FLAG);
 }
 
 template <MpiTag tag>
