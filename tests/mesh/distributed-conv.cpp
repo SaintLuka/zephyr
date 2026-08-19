@@ -61,6 +61,7 @@ int main(int argc, char** argv) {
     ORB orb(domain, "XY", mpi::size());
     //ORB orb(domain, "YX", 13);
     //ORB orb(domain, "YX", 13, 3);
+    orb.use_exact(false);
 
     // Установить декомпозицию (+ делает redistribute)
     mesh.set_decomposition(orb);

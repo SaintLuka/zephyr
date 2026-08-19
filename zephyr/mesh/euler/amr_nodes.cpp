@@ -285,7 +285,8 @@ memory_t AmrNodes::memory_usage() const {
 
 int AmrNodes::check_nodes(const AmrCells& locals) const {
     AmrCells ghosts;
-    return check_nodes(locals, ghosts);
+    AmrNodes ghost_nodes;
+    return check_nodes(locals, ghosts, ghost_nodes);
 }
 
 int AmrNodes::check_sizes() const {
@@ -317,7 +318,7 @@ int AmrNodes::check_sizes() const {
     return 0;
 }
 
-int AmrNodes::check_nodes(const AmrCells& locals, const AmrCells& ghosts) const {
+int AmrNodes::check_nodes(const AmrCells& locals, const AmrCells& ghosts, const AmrNodes& ghost_nodes) const {
     int res = check_sizes();
     if (res < 0) return res;
 
@@ -369,7 +370,7 @@ int AmrNodes::check_nodes(const AmrCells& locals, const AmrCells& ghosts) const 
         }
         else {
             // ghost node
-#ifndef ZEPHYR_ENABLE_MPI
+#ifndef ZEPHYR_MPI
             std::cout << "\tGhost index >= 0 but mpi is not enabled\n";
             return -1;
 #else
@@ -385,7 +386,7 @@ int AmrNodes::check_nodes(const AmrCells& locals, const AmrCells& ghosts) const 
                 std::cout << "\tGhost vertex index out of range " << gst << "\n";
                 return -1;
             }
-            v2 = m_ghost_nodes[gst];
+            v2 = ghost_nodes.coords[gst];
 #endif
         }
         if (v1 != v2) {
@@ -440,7 +441,7 @@ int AmrNodes::check_nodes(const AmrCells& locals, const AmrCells& ghosts) const 
             }
             else {
                 // ghost node
-#ifndef ZEPHYR_ENABLE_MPI
+#ifndef ZEPHYR_MPI
                 std::cout << "\tGhost incident cell index >= 0 but mpi is not enabled\n";
                 return -1;
 #else

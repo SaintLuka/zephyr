@@ -42,7 +42,9 @@ enum class MpiTag : int {
     FACE_VERTS,
 
     // Данные вершин
-    VERTICES
+    VERT_COORD,
+    VERT_INDEX,
+    VERT_GHOST
 };
 
 inline std::string to_string(MpiTag tag) {

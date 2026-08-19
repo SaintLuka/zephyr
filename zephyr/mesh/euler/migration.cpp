@@ -37,8 +37,8 @@ void Migration::fill_router(AmrCells& locals) {
 
         // Число ячеек, граней и вершин, которые нужно переслать с данного процесса на другие
         cell_send_count[new_rank] += 1;
-        face_send_count[new_rank] += locals.max_face_count(ic);
-        node_send_count[new_rank] += locals.max_node_count(ic);
+        face_send_count[new_rank] += locals.faces.max_count(ic);
+        node_send_count[new_rank] += locals.verts.max_count(ic);
     }
 
     // Установить число ячеек на отправку
@@ -104,7 +104,7 @@ void Migration::reindexing(Tourism& tourism, AmrCells& locals, AmrCells& aliens)
     // Переиндексируем грани
     auto& faces = locals.faces;
     for (index_t ic = 0; ic < locals.size(); ++ic) {
-        for(auto iface: locals.faces.faces_range(ic)){
+        for(auto iface: locals.faces.range(ic)){
             if (faces.is_undefined(iface))
                 continue;
 

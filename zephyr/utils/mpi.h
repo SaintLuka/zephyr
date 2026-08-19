@@ -56,6 +56,9 @@ public:
     /// данного вызова.
     static void barrier();
 
+    /// @brief Мастер-процесс выводит сообщение (есть коллективный барьер и flush)
+    static void message(const std::string& line);
+
     /// @brief Выполнить функцию поочередно (!) на каждом процессе
     template <class F>
     static void for_each(F&& func);

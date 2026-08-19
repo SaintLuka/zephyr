@@ -79,7 +79,7 @@ void Tourism::fill_send_count(const AmrCells& locals) {
         // Для сетки с неактуальными ячейками
         if (locals.is_undefined(ic)) continue;
 
-        for (index_t iface: locals.faces.faces_range(ic)) {
+        for (index_t iface: locals.faces.range(ic)) {
             if (locals.faces.is_undefined(iface)) {
                 continue;
             }
@@ -88,8 +88,8 @@ void Tourism::fill_send_count(const AmrCells& locals) {
             if (neib_rank != rank && last_append[neib_rank] != ic) {
                 last_append[neib_rank] = ic;
                 cell_send_count[neib_rank] += 1;
-                face_send_count[neib_rank] += locals.max_face_count(ic);
-                node_send_count[neib_rank] += locals.max_node_count(ic);
+                face_send_count[neib_rank] += locals.faces.max_count(ic);
+                node_send_count[neib_rank] += locals.verts.max_count(ic);
             }
         }
     }
@@ -117,7 +117,7 @@ void Tourism::fill_indices(const AmrCells& locals) {
         // Для сетки с неактуальными ячейками
         if (locals.is_undefined(ic)) continue;
 
-        for (index_t iface: locals.faces.faces_range(ic)) {
+        for (index_t iface: locals.faces.range(ic)) {
             if (locals.faces.is_undefined(iface)) {
                 continue;
             }
@@ -143,8 +143,8 @@ void Tourism::prepare_geometry(const AmrCells& locals) {
     for (index_t ic = 0; ic < m_border_indices.size(); ++ic) {
         locals.copy_geom(m_border_indices[ic], m_border, ic, face_idx, node_idx);
 
-        face_idx += locals.max_face_count(m_border_indices[ic]);
-        node_idx += locals.max_node_count(m_border_indices[ic]);
+        face_idx += locals.faces.max_count(m_border_indices[ic]);
+        node_idx += locals.verts.max_count(m_border_indices[ic]);
     }
 }
 
@@ -167,7 +167,7 @@ void set_undef_aliens(AmrCells& locals, int rank) {
     threads::parallel_for(
         index_t{0}, locals.n_cells(),
         [&locals, rank](index_t ic) {
-            for (index_t iface: locals.faces.faces_range(ic)) {
+            for (index_t iface: locals.faces.range(ic)) {
                 if (locals.faces.is_actual(iface) &&
                     locals.faces.adjacent.rank[iface] == rank) {
                     locals.faces.adjacent.alien[iface] = -1;
@@ -179,7 +179,7 @@ void set_undef_aliens(AmrCells& locals, int rank) {
 // Обходим ячейки в alien и ищем связи
 void Tourism::find_connections(AmrCells& locals, int rank) const {
     for (index_t ic = 0; ic < m_aliens.n_cells(); ++ic) {
-        for (index_t iface: m_aliens.faces.faces_range(ic)) {
+        for (index_t iface: m_aliens.faces.range(ic)) {
             if (m_aliens.faces.is_undefined(iface)) {
                 continue;
             }
@@ -189,13 +189,13 @@ void Tourism::find_connections(AmrCells& locals, int rank) const {
                 // Индекс соседа
                 index_t jc = m_aliens.faces.adjacent.index[iface];
 
-                for (index_t l_face: locals.faces.faces_range(jc)) {
+                for (index_t l_face: locals.faces.range(jc)) {
                     if (locals.faces.adjacent.rank [l_face] == m_aliens.rank [ic] &&
                         locals.faces.adjacent.index[l_face] == m_aliens.index[ic]) {
 
                         locals.faces.adjacent.alien[l_face] = ic;
                         break;
-                        }
+                    }
                 }
             }
         }
@@ -552,7 +552,7 @@ void Tourism::send_geometry(const AmrCells& locals) {
 
 void Tourism::restore_indices(AmrCells& locals) const {
     for (index_t ic: m_border_indices) {
-        for (index_t iface: locals.faces.faces_range(ic)) {
+        for (index_t iface: locals.faces.range(ic)) {
             index_t alien_index = locals.faces.adjacent.alien[iface];
             if (alien_index >= 0) {
                 locals.faces.adjacent.index[iface] = m_aliens.index[alien_index];
@@ -608,7 +608,12 @@ void Tourism::sync_geometry() {
     faces_send += m_face_router.isend(m_border.faces.vertices, MpiTag::FACE_VERTS);
 
     // Отправить вершины
-    auto nodes_send = m_node_router.isend(m_border.verts, MpiTag::VERTICES);
+    RequestsList verts_send; verts_send.reserve(3);
+    verts_send += m_node_router.isend(m_border.verts.coords, MpiTag::VERT_COORD);
+    if (m_border.verts.unique()) {
+        verts_send += m_node_router.isend(m_border.verts.index, MpiTag::VERT_INDEX);
+        verts_send += m_node_router.isend(m_border.verts.ghost, MpiTag::VERT_GHOST);
+    }
 
     // ============================= IRECV ====================================
 
@@ -650,19 +655,24 @@ void Tourism::sync_geometry() {
     faces_recv += m_face_router.irecv(m_aliens.faces.vertices, MpiTag::FACE_VERTS);
 
     // Получить вершины
-    auto nodes_recv = m_node_router.irecv(m_aliens.verts, MpiTag::VERTICES);
+    RequestsList verts_recv; verts_recv.reserve(3);
+    verts_recv += m_node_router.irecv(m_aliens.verts.coords, MpiTag::VERT_COORD);
+    if (m_aliens.verts.unique()) {
+        verts_recv += m_node_router.irecv(m_aliens.verts.index, MpiTag::VERT_INDEX);
+        verts_recv += m_node_router.irecv(m_aliens.verts.ghost, MpiTag::VERT_GHOST);
+    }
 
     // =========================== WAIT ISEND =================================
 
     cells_send.wait();  // Завершить отправку ячеек
     faces_send.wait();  // Завершить отправку граней
-    nodes_send.wait();  // Завершить отправку вершин
+    verts_send.wait();  // Завершить отправку вершин
 
     // =========================== WAIT IRECV =================================
 
     cells_recv.wait();  // Завершить получение ячеек
     faces_recv.wait();  // Завершить получение граней
-    nodes_recv.wait();  // Завершить получение вершин
+    verts_recv.wait();  // Завершить получение вершин
 
     if (!amr) {
         // Восстановить индексацию граней

@@ -8,6 +8,7 @@
 
 #include <zephyr/mesh/euler/router.h>
 #include <zephyr/mesh/euler/amr_cells.h>
+#include <zephyr/mesh/euler/amr_nodes.h>
 
 namespace zephyr::mesh {
 
@@ -78,11 +79,17 @@ public:
 
     /// @{ @name get-функции
 
-    /// @brief Ссылка на alien-слой
+    /// @brief Ссылка на ghost-слой ячеек
     AmrCells& aliens() { return m_aliens; }
 
-    /// @brief Ссылка на alien-слой
+    /// @brief Ссылка на ghost-слой ячеек
     const AmrCells& aliens() const { return m_aliens; }
+
+    /// @brief Ссылка на ghost-слой узлов
+    AmrNodes& ghost_nodes() { return ghost_nodes_; }
+
+    /// @brief Ссылка на ghost-слой узлов
+    const AmrNodes& ghost_nodes() const { return ghost_nodes_; }
 
     /// @brief Ссылка на border-слой
     AmrCells& border() { return m_border; }
@@ -189,6 +196,9 @@ private:
     // в массив дважды, если отправляется нескольким процессам.
     AmrCells m_border;
     AmrCells m_aliens;
+
+    AmrNodes border_nodes_;
+    AmrNodes ghost_nodes_;
 
     // Маршрутизаторы для отправки примитивов из m_border
     Router m_cell_router;

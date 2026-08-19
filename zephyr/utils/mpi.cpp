@@ -119,6 +119,15 @@ void mpi::barrier() {
     MPI_Barrier(MPI_COMM_WORLD);
 }
 
+void mpi::message(const std::string& line) {
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (g_rank == 0) {
+        std::cout << line << "\n";
+        std::cout.flush();
+    }
+    MPI_Barrier(MPI_COMM_WORLD);
+}
+
 // Собирает уникальные имена процессоров/узлов
 std::vector<std::string> proc_names() {
     const int max_length = MPI_MAX_PROCESSOR_NAME;

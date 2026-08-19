@@ -124,7 +124,7 @@ public:
     int check_nodes(const AmrCells& locals) const;
 
     /// @brief Проверка уникальных узлов в MPI версии
-    int check_nodes(const AmrCells& locals, const AmrCells& ghosts) const;
+    int check_nodes(const AmrCells& locals, const AmrCells& ghosts, const AmrNodes& ghost_nodes) const;
 };
 
 } // namespace zephyr::mesh

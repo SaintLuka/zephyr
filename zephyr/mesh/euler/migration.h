@@ -76,7 +76,7 @@ void Migration::fill_migrants(AmrCells& locals,
     migrants.resize(
             locals.n_cells(),
             locals.n_faces(),
-            locals.n_nodes());
+            locals.n_verts());
 
     // Сортировка migrants по rank, получается нормальный AmrCells
     // стартовые индексы (?)
@@ -102,8 +102,8 @@ void Migration::fill_migrants(AmrCells& locals,
         }
 
         cell_index[r] += 1;
-        face_index[r] += locals.max_face_count(ic);
-        node_index[r] += locals.max_node_count(ic);
+        face_index[r] += locals.faces.max_count(ic);
+        node_index[r] += locals.verts.max_count(ic);
     }
 
     /*
@@ -207,7 +207,12 @@ void Migration::migrate(Tourism& tourists, AmrCells& locals, Vars&&... vars) {
     faces_send += m_face_router.isend(migrants.faces.vertices, MpiTag::FACE_VERTS);
 
     // Отправить вершины
-    auto nodes_send = m_node_router.isend(migrants.verts, MpiTag::VERTICES);
+    RequestsList verts_send; verts_send.reserve(3);
+    verts_send += m_node_router.isend(migrants.verts.coords, MpiTag::VERT_COORD);
+    if (migrants.verts.unique()) {
+        verts_send += m_node_router.isend(migrants.verts.index, MpiTag::VERT_INDEX);
+        verts_send += m_node_router.isend(migrants.verts.ghost, MpiTag::VERT_GHOST);
+    }
 
     // ============================= IRECV ====================================
 
@@ -249,21 +254,26 @@ void Migration::migrate(Tourism& tourists, AmrCells& locals, Vars&&... vars) {
     faces_recv += m_face_router.irecv(locals.faces.vertices, MpiTag::FACE_VERTS);
 
     // Получить вершины
-    auto nodes_recv = m_node_router.irecv(locals.verts, MpiTag::VERTICES);
+    RequestsList verts_recv; verts_recv.reserve(3);
+    verts_recv += m_node_router.irecv(locals.verts.coords, MpiTag::VERT_COORD);
+    if (migrants.verts.unique()) {
+        verts_recv += m_node_router.irecv(locals.verts.index, MpiTag::VERT_INDEX);
+        verts_recv += m_node_router.irecv(locals.verts.ghost, MpiTag::VERT_GHOST);
+    }
 
     // =========================== WAIT ISEND =================================
 
     cells_send.wait();  // Завершить отправку ячеек
     data_send.wait();   // Завершить отправку данных ячеек
     faces_send.wait();  // Завершить отправку граней
-    nodes_send.wait();  // Завершить отправку вершин
+    verts_send.wait();  // Завершить отправку вершин
 
     // =========================== WAIT IRECV =================================
 
     cells_recv.wait();  // Завершить получение ячеек
     data_recv.wait();   // Завершить получение данных ячеек
     faces_recv.wait();  // Завершить получение граней
-    nodes_recv.wait();  // Завершить получение вершин
+    verts_recv.wait();  // Завершить получение вершин
 
     // Восстановить индексацию граней
     locals.faces.offsets[0] = 0;

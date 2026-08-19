@@ -722,7 +722,8 @@ int EuMesh::check_base() const {
     }
 
 #ifdef ZEPHYR_MPI
-    res = m_local_nodes.check_nodes(m_locals, m_tourism.ghosts);
+    res = m_local_nodes.check_nodes(m_locals,
+        m_tourists.aliens(), m_tourists.ghost_nodes());
 #else
     AmrCells aliens = m_locals.same();
     res = m_local_nodes.check_nodes(m_locals, aliens);
@@ -823,7 +824,8 @@ int EuMesh::check_refined() const {
     }
 
 #ifdef ZEPHYR_MPI
-    res = m_local_nodes.check_nodes(m_locals, m_tourism.ghosts);
+    res = m_local_nodes.check_nodes(m_locals,
+        m_tourists.aliens(), m_tourists.ghost_nodes());
 #else
     AmrCells aliens = m_locals.same();
     res = m_local_nodes.check_nodes(m_locals, aliens);
