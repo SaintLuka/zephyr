@@ -2,11 +2,6 @@
 
 #include <zephyr/geom/vector.h>
 
-namespace zephyr::math {
-class Random2D;
-class QuasiRandom2D;
-}
-
 namespace zephyr::geom {
 
 /// @brief Ограничивающий кубоид (bounding box).
@@ -79,13 +74,6 @@ struct Box {
 
     /// @brief Расширить границы на долю margin по каждой координате
     void extend(double margin_x, double margin_y, double margin_z = 0.0);
-
-    /// @brief Создать генератор случайных чисел внутри прямоугольника
-    math::Random2D random2D(int seed = 0) const;
-
-    /// @brief Создать генератор квазислучайной последовательности внутри
-    /// прямоугольника
-    math::QuasiRandom2D quasiRandom2D() const;
 };
 
 /// @brief Вывод ящика в консоль

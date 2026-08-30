@@ -138,6 +138,9 @@ public:
     /// @brief Используются линейные AMR-ячейки (или квадратичные)
     bool linear() const { return m_linear; }
 
+    /// @brief Сетка хранит уникальные узлы?
+    bool unique_nodes() const { return verts.unique_nodes(); }
+
     /// @brief Изменить размерность
     void set_dimension(int dim);
 

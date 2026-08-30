@@ -23,6 +23,9 @@ AmrCells::AmrCells(int dim, bool adaptive, bool axial) {
 AmrCells AmrCells::same() const {
     AmrCells cells(m_dim, m_adaptive, m_axial);
     cells.data = data.same();
+    if (unique_nodes()) {
+        cells.verts.init_unique();
+    }
     return cells;
 }
 
@@ -510,10 +513,18 @@ void AmrCells::copy_geom(index_t ic, AmrCells& cells,
     cells.verts.offsets[jc] = node_beg;
     cells.verts.offsets[jc + 1] = node_beg + verts.max_count(ic);
 
+    z_assert(cells.unique_nodes() == unique_nodes(), "Different style cells");
+
+    bool unique_nodes = cells.verts.unique_nodes();
     for (index_t i = 0; i < verts.max_count(ic); ++i) {
         index_t iv = verts.offsets[ic] + i;
         index_t jv = cells.verts.offsets[jc] + i;
         cells.verts[jv] = verts[iv];
+        if (unique_nodes) {
+            cells.verts.rank [jv] = verts.rank [iv];
+            cells.verts.index[jv] = verts.index[iv];
+            cells.verts.ghost[jv] = verts.ghost[iv];
+        }
     }
 }
 

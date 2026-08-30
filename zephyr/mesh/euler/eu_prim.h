@@ -248,6 +248,9 @@ public:
     /// @brief Индекс ячейки на z-кривой
     index_t z_idx() const;
 
+    /// @brief Реальное положение в массиве
+    index_t id() const;
+
     /// @brief Текущий индекс ячейки в массиве
     index_t index() const;
 
@@ -268,6 +271,9 @@ public:
     ///   flag =  0: ничего не делать;
     ///   flag = +1: разбиение ячейки.
     void set_flag(int flag) const;
+
+    /// @brief Хранилище, которому принадлежит ячейка
+    const AmrCells& cells() const { return *m_cells; }
 
     /// @}
 
@@ -747,6 +753,8 @@ inline int EuCell::level() const { return m_cells->level[m_index]; }
 inline index_t EuCell::b_idx() const { return m_cells->b_idx[m_index]; }
 
 inline index_t EuCell::z_idx() const { return m_cells->z_idx[m_index]; }
+
+inline index_t EuCell::id() const { return m_index; }
 
 inline index_t EuCell::index() const { return m_cells->index[m_index]; }
 

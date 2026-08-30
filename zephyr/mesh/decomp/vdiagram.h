@@ -1,6 +1,5 @@
 #pragma once
 
-#include <memory>
 #include <set>
 #include <vector>
 
@@ -17,7 +16,7 @@ using zephyr::geom::Box;
 /// Нет быстрых функций поиска разбиения, но есть пара функций
 /// для графического отображения.
 /// @details Написано плохо и неэффективно. Переписать надо,
-/// или найти говорую библиотеку, может поручить студенту?
+/// или найти готовую библиотеку, может поручить студенту?
 class VDiagram {
 public:
     // Характеристики балансировки
@@ -26,7 +25,7 @@ public:
     double growth_rate = 0.02;  // Скорость изменения весов
     double centroidal  = 0.05;  // Влияние смещения к центру масс
 
-    /// Фукнции инициализации
+    /// Функции инициализации
 
     /// @brief Конструктор по умолчанию
     VDiagram() = default;
@@ -43,7 +42,7 @@ public:
     /// @return Число ячеек диаграммы
     int size() const;
 
-    /// @return Центр ячейки Воронного
+    /// @return Центр ячейки Вороного
     const Vector3d& coords(int idx) const;
 
     /// @return Координаты центра масс ячейки
@@ -62,7 +61,7 @@ public:
     /// @return Веса генераторов
     std::vector<double> weights() const;
 
-    /// @return Степень вершин графа из генераторов ячеек Воронного и связей
+    /// @return Степень вершин графа из генераторов ячеек Вороного и связей
     std::vector<int> degrees();
 
     /// @return Хроматическое число диаграммы
@@ -79,11 +78,11 @@ public:
     /// @return Список координат y границ ячеек
     std::vector<std::vector<double>> lines_y();
 
-    /// @return Соедининения смежных генераторов
+    /// @return Соединения смежных генераторов
     std::vector<std::vector<double>> connections_x();
     std::vector<std::vector<double>> connections_y();
 
-    /// @return Список радиусов вписаных окружностей
+    /// @return Список радиусов вписанных окружностей
     const std::vector<double>& search_radii();
 
     double search_radius(int iGen) const;
@@ -100,16 +99,21 @@ public:
     /// @brief Установить генератор
     void set_coords(int iGen, double x, double y);
 
+    /// @brief Установить генератор
+    void set_coords(int iGen, const Vector3d& p);
+
     /// @brief Установить вес генератора
     void set_weight(int iGen, double w);
 
     /// @brief Получить вес генератора
-    double get_weight(int iGen);
+    double get_weight(int iGen) const;
 
-    /// @brief Получить коодинату генератора
-    double get_coord_x(int iGen);
-    double get_coord_y(int iGen);
-    double get_coord_z(int iGen);
+    /// @brief Получить координату генератора
+    double get_coord_x(int iGen) const;
+    double get_coord_y(int iGen) const;
+    double get_coord_z(int iGen) const;
+
+    Vector3d get_coord(int iGen) const;
 
     /// @brief Установить новые положения генераторов
     void set_coords(const std::vector<Vector3d>& coords);
@@ -118,7 +122,6 @@ public:
     void set_weights(const std::vector<double>& ws);
 
     /// @brief Раскрасить диаграмму
-    /// @param K Количество цветов
     void paint();
 
 
@@ -132,12 +135,12 @@ public:
 
     /// @brief Расстояние от точки p до генератора iGen
     /// @param p точка
-    /// @param iGen номер генератора
+    /// @param iGen Номер генератора
     double wdistance(const Vector3d& p, int iGen) const;
 
     /// @brief Расстояние от генератора i до генератора j
-    /// @param i номер первого генератора
-    /// @param j номер второго генератора
+    /// @param i Номер первого генератора
+    /// @param j Номер второго генератора
     double distance_gen(int i, int j);
 
     /// @brief Функция возвращает 0 на границе ячейки, положительное значение
@@ -156,7 +159,7 @@ public:
     void balancing(const std::vector<double>& loads);
 
 private:
-    /// @brief Перевести диаграму в неактуальное состояние. Функция вызывается
+    /// @brief Перевести диаграмму в неактуальное состояние. Функция вызывается
     /// после смещения генераторов или изменения весов диаграммы.
     void changed();
 
@@ -169,33 +172,33 @@ private:
     void build();
 
     /// @brief Ограничивающий прямоугольник
-    Box m_domain;
+    Box domain_;
 
-    /// @brief Координаты генераторов диаграммы Воронного
-    std::vector<Vector3d> m_coords;
+    /// @brief Координаты генераторов диаграммы Вороного
+    std::vector<Vector3d> coords_;
 
     /// @brief Веса генераторов
-    std::vector<double> m_weights;
+    std::vector<double> weights_;
 
 
 
     /// @brief Истинно, если диаграмма полностью построена
-    bool m_actual;
+    bool actual_;
 
     /// @brief Координаты центров масс ячеек
-    std::vector<Vector3d> m_centers;
+    std::vector<Vector3d> centers_;
 
-    /// @brief Границы ячеек Воронного
-    std::vector<std::vector<Vector3d>> m_lines;
+    /// @brief Границы ячеек Вороного
+    std::vector<std::vector<Vector3d>> lines_;
 
     /// @brief Радиусы вписанных в ячейки окружностей с центрами в генераторах
-    std::vector<double> m_search_radii;
+    std::vector<double> search_radii_;
 
     /// @brief Список смежных подобластей
-    std::vector<std::set<int>> m_adjacency;
+    std::vector<std::set<int>> adjacency_;
 
     /// @brief Цвета ячеек (для красивого отображения)
-    std::vector<int> m_colors;
+    std::vector<int> colors_;
 };
 
 } // namespace zephyr::mesh::decomp

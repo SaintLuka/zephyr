@@ -24,6 +24,10 @@ public:
     static constexpr int max_amr_count_2D = 5;
     static constexpr int max_amr_count_3D = 10;
 
+    static constexpr int max_amr_count(int dim) {
+        return dim < 3 ? max_amr_count_2D : max_amr_count_3D;
+    }
+
 
     /// @brief Эта структура имеет формат CSR, даны смещения
     std::vector<index_t> offsets = {0};
@@ -46,6 +50,9 @@ public:
 
     /// @brief Пустые массивы по умолчанию
     AmrIncident() = default;
+
+    /// @brief Количество значений/записей
+    index_t n_values() const { return rank.size(); }
 
     /// @brief Очистить массивы
     void clear();
@@ -77,6 +84,33 @@ public:
         return std::views::iota(offsets[inode], offsets[inode + 1]);
     }
 
+    /// @brief Является ли грань актуальной?
+    bool is_actual(index_t inc) const { return role[inc] >= 0; }
+
+    /// @return 'true', если грань не актуальна
+    bool is_undefined(index_t inc) const { return role[inc] < 0; }
+
+    /// @brief Установить неопределенную грань
+    void set_undefined(index_t inc) { role[inc] = -1; }
+
+    /// @brief Локальная соседняя ячейка?
+    bool is_local(index_t inc) const { return ghost[inc] < 0; }
+
+    /// @brief Удаленная соседняя ячейка?
+    bool is_ghost(index_t inc) const { return ghost[inc] >= 0; }
+
+    /// @brief Получить хранилище ячеек, в котором находится сосед, а также
+    /// индекс соседа в данном хранилище
+    template <class SomeArray>
+    std::tuple<const SomeArray &, index_t> get_neib(index_t inc,
+            const SomeArray &locals, const SomeArray &ghosts) const {
+        if (ghost[inc] < 0) {
+            return {locals, index[inc]};
+        } else {
+            return {ghosts, ghost[inc]};
+        }
+    }
+
     /// @brief Расход памяти
     memory_t memory_usage() const;
 };
@@ -93,26 +127,55 @@ public:
                                   /// (< 0 для неопределенных узлов, узлов на удаление)
 
     /// @brief Координаты узлов
-    std::vector<Vector3d> coords;
+    std::vector<Vector3d> coord;
 
     /// @brief Списки инцидентных ячеек
     AmrIncident incident;
 
 
     /// @brief Пустое хранилище узлов?
-    bool empty() const { return coords.empty(); }
+    bool empty() const { return coord.empty(); }
 
     /// @brief Число уникальных узлов
-    index_t size() const { return coords.size(); }
+    index_t size() const { return coord.size(); }
 
     /// @brief Число уникальных узлов
-    index_t n_nodes() const { return coords.size(); }
+    index_t n_nodes() const { return coord.size(); }
+
+    /// @brief Размер списка инцидентных
+    index_t n_incident() const { return incident.n_values(); }
 
     void clear();
+
+    /// @brief Расширить массивы по числу узлов
+    void resize(index_t n_nodes, index_t n_incident);
+
+    /// @brief Расширить массивы по числу узлов
+    void reserve(index_t n_nodes, index_t n_incident);
+
+    /// @brief Увеличить размер под массив для AMR узлов
+    void resize_amr(index_t n_nodes, int dim);
 
     void shrink_to_fit();
 
     void setup_for(AmrCells& cells);
+
+    /// @{ @name Топологические свойства узлов
+
+    /// @brief Актуальный узел?
+    bool is_actual(index_t in) const { return index[in] >= 0; }
+
+    /// @brief Узел к удалению
+    bool is_undefined(index_t in) const { return index[in] < 0; }
+
+    /// @brief Устанавливает index = -1 (узел вне сетки)
+    void set_undefined(index_t in) { index[in] = -1; }
+
+    /// @}
+
+
+    void copy_geom(index_t ic, AmrNodes& nodes,
+        index_t jc, index_t inc_offset) const;
 
     /// @brief Расход памяти
     memory_t memory_usage() const;

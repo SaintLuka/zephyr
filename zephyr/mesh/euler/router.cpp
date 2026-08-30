@@ -67,6 +67,34 @@ Router::Router() {
     recv_offset_ = std::vector<index_t>(size_, 0);
 }
 
+void Router::set_zero_send_count() {
+    send_count_.resize(size_);
+    std::ranges::fill(send_count_, 0);
+    send_offset_.resize(size_);
+    std::ranges::fill(send_offset_, 0);
+}
+
+void Router::set_zero_recv_count() {
+    recv_count_.resize(size_);
+    std::ranges::fill(recv_count_, 0);
+    recv_offset_.resize(size_);
+    std::ranges::fill(recv_offset_, 0);
+}
+
+void Router::set_zero_complete() {
+    send_count_.resize(size_);
+    std::ranges::fill(send_count_, 0);
+    recv_count_.resize(size_);
+    std::ranges::fill(recv_count_, 0);
+    send_offset_.resize(size_);
+    std::ranges::fill(send_offset_, 0);
+    recv_offset_.resize(size_);
+    std::ranges::fill(recv_offset_, 0);
+
+    send_recv_.resize(size_ * size_);
+    std::ranges::fill(send_recv_, 0);
+}
+
 void Router::set_send_count(const std::vector<index_t> &send_count) {
     assert(size_ == send_count.size());
 

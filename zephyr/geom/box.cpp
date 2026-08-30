@@ -128,12 +128,4 @@ std::ostream& operator<<(std::ostream& os, const Box& box) {
     return os;
 }
 
-math::Random2D Box::random2D(int seed) const {
-    return math::Random2D(vmin, vmax, seed);
-}
-
-math::QuasiRandom2D Box::quasiRandom2D() const {
-    return math::QuasiRandom2D(vmin, sizes());
-}
-
 } // namespace zephyr::geom

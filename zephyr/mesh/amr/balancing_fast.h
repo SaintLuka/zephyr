@@ -104,8 +104,8 @@ struct CellsByLevel {
 
 #ifdef ZEPHYR_MPI
     CellsByLevel(Tourism& tourism, AmrCells &locals, int max_level) {
-        AmrCells& border = tourism.border();
-        const AmrCells& ghosts = tourism.ghosts();
+        AmrCells& border = tourism.border_cells();
+        const AmrCells& ghosts = tourism.ghost_cells();
         const auto& router = tourism.cell_router();
         const auto& border_indices = tourism.border_indices();
 
@@ -484,7 +484,7 @@ void balance_flags_fast(AmrCells &locals, int max_level, Tourism& tourism) {
     static int n_total_retain = 0;
     static int n_total_coarse = 0;
 
-    AmrCells& ghosts = tourism.ghosts();
+    AmrCells& ghosts = tourism.ghost_cells();
 
     restriction_timer.resume();
     base_restrictions<dim>(locals, max_level);

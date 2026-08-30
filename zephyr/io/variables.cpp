@@ -60,6 +60,18 @@ void Variables::append(const char* name) {
         m_list.emplace_back("face3D.boundary");
         m_list.emplace_back("face3D.rotation");
     }
+    else if (!std::strcmp(name, "verts2D")) {
+        // Для EuMesh
+        m_list.emplace_back("vert2D.rank");
+        m_list.emplace_back("vert2D.ghost");
+        m_list.emplace_back("vert2D.index");
+    }
+    else if (!std::strcmp(name, "verts3D")) {
+        // Для EuMesh
+        m_list.emplace_back("vert3D.rank");
+        m_list.emplace_back("vert3D.ghost");
+        m_list.emplace_back("vert3D.index");
+    }
     else {
         m_list.emplace_back(name);
     }

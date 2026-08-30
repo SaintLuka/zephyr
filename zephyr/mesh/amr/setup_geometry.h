@@ -47,7 +47,7 @@ void setup_geometry(AmrCells &locals, const Statistics &count, const Distributor
 template<int dim>
 void setup_geometry(AmrCells &locals, Tourism& tourism, const Statistics &count, const Distributor& op) {
     int rank = mpi::rank();
-    AmrCells& ghosts = tourism.ghosts();
+    AmrCells& ghosts = tourism.ghost_cells();
     threads::parallel_for(
             index_t{0}, index_t{count.n_cells},
             setup_geometry_one<dim>,

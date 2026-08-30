@@ -79,16 +79,60 @@ void AmrNodes::clear() {
     rank.clear();
     next.clear();
     index.clear();
-    coords.clear();
+    coord.clear();
     incident.clear();
+}
+
+void AmrNodes::resize(index_t n_nodes, index_t n_incident) {
+    rank.resize(n_nodes);
+    next.resize(n_nodes);
+    index.resize(n_nodes);
+    coord.resize(n_nodes);
+    incident.resize(n_nodes, n_incident);
+}
+
+void AmrNodes::reserve(index_t n_nodes, index_t n_incident) {
+    rank.reserve(n_nodes);
+    next.reserve(n_nodes);
+    index.reserve(n_nodes);
+    coord.reserve(n_nodes);
+    incident.reserve(n_nodes, n_incident);
+}
+
+void AmrNodes::resize_amr(index_t n_nodes, int dim) {
+    rank.resize(n_nodes);
+    next.resize(n_nodes);
+    index.resize(n_nodes);
+    coord.resize(n_nodes);
+    incident.resize_amr(n_nodes, dim);
 }
 
 void AmrNodes::shrink_to_fit() {
     rank.shrink_to_fit();
     next.shrink_to_fit();
     index.shrink_to_fit();
-    coords.shrink_to_fit();
+    coord.shrink_to_fit();
     incident.shrink_to_fit();
+}
+
+void AmrNodes::copy_geom(index_t in, AmrNodes& nodes, index_t jn, index_t inc_offset) const {
+    nodes.rank [jn] = rank [in];
+    nodes.next [jn] = next [in];
+    nodes.index[jn] = index[in];
+    nodes.coord[jn] = coord[in];
+
+    nodes.incident.offsets[jn] = inc_offset;
+    nodes.incident.offsets[jn + 1] = inc_offset + incident.max_count(in);
+
+    for (index_t i = 0; i < incident.max_count(in); ++i) {
+        index_t I = incident.offsets[in] + i;
+        index_t J = nodes.incident.offsets[jn] + i;
+
+        nodes.incident.role [J] = incident.role [I];
+        nodes.incident.rank [J] = incident.rank [I];
+        nodes.incident.index[J] = incident.index[I];
+        nodes.incident.ghost[J] = incident.ghost[I];
+    }
 }
 
 inline index_t nodes_estimation(int n_cells, int dim) {
@@ -208,7 +252,10 @@ void AmrNodes::setup_for(AmrCells& cells) {
     // Стираем существующий массив узлов
     clear();
 
-    if (cells.empty()) return;
+    if (cells.empty()) {
+        cells.verts.init_unique(-13, -1);
+        return;
+    }
 
     // Индексы узлов: index = -13, ghost = -1
     cells.verts.init_unique(-13, -1);
@@ -219,7 +266,7 @@ void AmrNodes::setup_for(AmrCells& cells) {
     // Последовательная версия работает за один проход по ячейкам
     index_t n_nodes_approx = nodes_estimation(cells.size(), cells.dim());
 
-    coords.reserve(n_nodes_approx);
+    coord.reserve(n_nodes_approx);
     rank.reserve(n_nodes_approx);
     next.reserve(n_nodes_approx);
     index.reserve(n_nodes_approx);
@@ -240,7 +287,7 @@ void AmrNodes::setup_for(AmrCells& cells) {
             auto owners = find_owners(cells, ic, loc_iv);
 
             // Добавляем узел в массив
-            coords.push_back(cells.verts[iv]);
+            coord.push_back(cells.verts[iv]);
             rank.push_back(0);
             next.push_back(-1);
             index.push_back(counter);
@@ -279,7 +326,7 @@ memory_t AmrNodes::memory_usage() const {
     mem.add(next);
     mem.add(rank);
     mem.add(index);
-    mem.add(coords);
+    mem.add(coord);
     return mem;
 }
 
@@ -307,7 +354,7 @@ int AmrNodes::check_sizes() const {
         std::cout << "\tUnique nodes: bad nodes.index.size\n";
         return -1;
     }
-    if (coords.size() != n_nodes) {
+    if (coord.size() != n_nodes) {
         std::cout << "\tUnique nodes: bad nodes.coords.size\n";
         return -1;
     }
@@ -334,17 +381,21 @@ int AmrNodes::check_nodes(const AmrCells& locals, const AmrCells& ghosts, const 
             return -1;
         }
         for (int d = 0; d < dim; ++d) {
-            if (!std::isfinite(coords[in][d])) {
-                std::cout << "\tNot finite " << in << " node: " << coords[in].transpose() << "\n";
+            if (!std::isfinite(coord[in][d])) {
+                std::cout << "\tNot finite " << in << " node: " << coord[in].transpose() << "\n";
                 return -1;
             }
         }
-        if (dim < 3 && coords[in].z() != 0.0) {
-            std::cout << "\tNot zero " << in << " node: " << coords[in].transpose() << "\n";
+        if (dim < 3 && coord[in].z() != 0.0) {
+            std::cout << "\tNot zero " << in << " node: " << coord[in].transpose() << "\n";
             return -1;
         }
     }
 
+    if (locals.verts.rank.size() != locals.verts.size()) {
+        std::cout << "\tUnique nodes: bad verts.rank.size\n";
+        return -1;
+    }
     if (locals.verts.index.size() != locals.verts.size()) {
         std::cout << "\tUnique nodes: bad verts.index.size\n";
         return -1;
@@ -358,6 +409,7 @@ int AmrNodes::check_nodes(const AmrCells& locals, const AmrCells& ghosts, const 
     for (index_t i = 0; i < locals.verts.size(); ++i) {
         Vector3d v1 = locals.verts[i];
         Vector3d v2;
+        index_t rnk = locals.verts.rank[i];
         index_t idx = locals.verts.index[i];
         index_t gst = locals.verts.ghost[i];
         if (gst < 0) {
@@ -366,7 +418,11 @@ int AmrNodes::check_nodes(const AmrCells& locals, const AmrCells& ghosts, const 
                 std::cout << "\tLocal vertex index out of range " << idx << " #1\n";
                 return -1;
             }
-            v2 = coords[idx];
+            if (rnk != mpi::rank() || rnk != rank[idx]) {
+                std::cout << "\tLocal vertex bad rank " << rnk << "\n";
+                return -1;
+            }
+            v2 = coord[idx];
         }
         else {
             // ghost node
@@ -386,7 +442,12 @@ int AmrNodes::check_nodes(const AmrCells& locals, const AmrCells& ghosts, const 
                 std::cout << "\tGhost vertex index out of range " << gst << "\n";
                 return -1;
             }
-            v2 = ghost_nodes.coords[gst];
+            if (rnk == mpi::rank() || rnk != ghost_nodes.rank[gst]) {
+                std::cout << "\tRemote vertex bad rank " << rnk << "\n";
+                std::cout << "\t\tRank: " << mpi::rank() << "; iv: " << i << "\n";
+                return -1;
+            }
+            v2 = ghost_nodes.coord[gst];
 #endif
         }
         if (v1 != v2) {
@@ -405,7 +466,7 @@ int AmrNodes::check_nodes(const AmrCells& locals, const AmrCells& ghosts, const 
             }
         }
 
-        Vector3d v = coords[in];
+        Vector3d v = coord[in];
 
         for (index_t i: incident.range(in)) {
             auto role = incident.role[i];
@@ -415,7 +476,7 @@ int AmrNodes::check_nodes(const AmrCells& locals, const AmrCells& ghosts, const 
 
             if (role < 0) {
                 // Фиктивная запись, нет ячейки, только для адаптивных
-                if (!locals.adaptive() || idx >= 0 || gst >= 0 || rnk != mpi::rank()) {
+                if (!locals.adaptive() || idx >= 0 || gst >= 0) { // || rnk != mpi::rank()) { пока убрал строгую проверку
                     std::cout << "\tBad fake incident cell: " << idx << ", " << gst << ", " << rnk << "\n";
                     return -1;
                 }

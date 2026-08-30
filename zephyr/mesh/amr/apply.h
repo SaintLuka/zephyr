@@ -195,8 +195,8 @@ void apply_impl(AmrCells &locals, const Distributor& op, Tourism& tourism) {
     remove_timer.resume();
     swap_list.move_elements(locals);
     locals.resize_amr(count.n_cells_short);
-    tourism.resize_border();
-    tourism.resize_ghosts();
+    tourism.resize_border_cells();
+    tourism.resize_ghost_cells();
     remove_timer.stop();
 
     // Этап 6. Пересылка геометрии locals -> ghosts

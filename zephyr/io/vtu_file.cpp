@@ -115,7 +115,7 @@ VtuStructure::VtuStructure(const AmrCells &cells, const AmrNodes& nodes, bool po
     if (nodes.empty()) {
         throw std::runtime_error("VtuStructure error: AmrNodes is empty");
     }
-    if (!cells.verts.unique()) {
+    if (!cells.verts.unique_nodes()) {
         throw std::runtime_error("VtuStructure error: AmrCells.verts is not filled #1");
     }
     if (cells.verts.index.size() != cells.verts.size()) {
@@ -176,7 +176,7 @@ void VtuStructure::fill_adaptive_hex_2D(const AmrCells& cells, const AmrNodes& n
         connectivity = arange(n_points);
     }
     else {
-        points = nodes.coords;
+        points = nodes.coord;
         connectivity.resize(n_points);
         const auto& node_idx = cells.verts.index;
         for (mesh::index_t ic = 0; ic < n_cells; ++ic) {
@@ -230,7 +230,7 @@ void VtuStructure::fill_adaptive_poly_2D(const AmrCells& cells, const AmrNodes& 
         connectivity = arange(n_points);
     }
     else {
-        points = nodes.coords;
+        points = nodes.coord;
 
         index_t iv = 0;
         connectivity.resize(n_points);
@@ -275,7 +275,7 @@ void VtuStructure::fill_adaptive_hex_3D(const AmrCells& cells, const AmrNodes& n
         connectivity = arange(n_points);
     }
     else {
-        points = nodes.coords;
+        points = nodes.coord;
         connectivity.resize(n_points);
         const auto& node_idx = cells.verts.index;
         for (mesh::index_t ic = 0; ic < n_cells; ++ic) {
@@ -314,7 +314,7 @@ void VtuStructure::fill_poly_classic(const AmrCells& cells, const AmrNodes& node
         connectivity = arange(n_points);
     }
     else {
-        points = nodes.coords;
+        points = nodes.coord;
         connectivity.resize(n_points);
         index_t offset = 0;
         for (mesh::index_t ic = 0; ic < n_cells; ++ic) {
@@ -348,7 +348,7 @@ void VtuStructure::fill_polyfaces_3D(const AmrCells& cells, const AmrNodes& node
         connectivity = arange(n_points);
     }
     else {
-        points = nodes.coords;
+        points = nodes.coord;
         connectivity.resize(n_points);
         index_t offset = 0;
         for (mesh::index_t ic = 0; ic < n_cells; ++ic) {

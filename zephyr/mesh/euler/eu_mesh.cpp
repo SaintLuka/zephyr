@@ -236,8 +236,8 @@ void EuMesh::apply_flags() {
         border_after.variables = vars;
     }
     //locals_before.save(m_locals, pvd_counter);
-    //ghosts_before.save(ghosts_, pvd_counter);
-    //border_before.save(m_tourists.border_, pvd_counter);
+    //ghosts_before.save(ghost_cells_, pvd_counter);
+    //border_before.save(m_tourists.border_cells_, pvd_counter);
     mpi::barrier();
 #endif
 
@@ -252,8 +252,8 @@ void EuMesh::apply_flags() {
 
 #if SCRUTINY
     //locals_after.save(m_locals, pvd_counter);
-    //ghosts_after.save(ghosts_, pvd_counter);
-    //border_after.save(m_tourists.border_, pvd_counter);
+    //ghosts_after.save(ghost_cells_, pvd_counter);
+    //border_after.save(m_tourists.border_cells_, pvd_counter);
     mpi::barrier();
     ++pvd_counter;
 
@@ -706,13 +706,13 @@ int EuMesh::check_base() const {
 #ifndef ZEPHYR_MPI
         res = m_locals.check_connectivity(ic);
 #else
-        res = m_locals.check_connectivity(ic, m_tourists.ghosts());
+        res = m_locals.check_connectivity(ic, m_tourists.ghost_cells());
 #endif
         if (res < 0) return res;
     }
 
     // Если уникальные узлы не построены, то завершаем
-    if (!m_locals.verts.unique()) {
+    if (!m_locals.verts.unique_nodes()) {
         if (!m_locals.verts.index.empty() || !m_locals.verts.ghost.empty()) {
             std::cout << "\tUnique nodes: not empty verts arrays\n";
             return -1;
@@ -724,7 +724,7 @@ int EuMesh::check_base() const {
     res = m_local_nodes.check_nodes(m_locals);
 #else
     res = m_local_nodes.check_nodes(m_locals,
-        m_tourists.ghosts(), m_tourists.ghosts_nodes());
+        m_tourists.ghost_cells(), m_tourists.ghost_nodes());
 #endif
     if (res < 0) return res;
 
@@ -806,13 +806,13 @@ int EuMesh::check_refined() const {
 #ifndef ZEPHYR_MPI
         res = m_locals.check_connectivity(ic);
 #else
-        res = m_locals.check_connectivity(ic, m_tourists.ghosts());
+        res = m_locals.check_connectivity(ic, m_tourists.ghost_cells());
 #endif
         if (res < 0) return res;
     }
 
     // Если уникальные узлы не построены, то завершаем
-    if (!m_locals.verts.unique()) {
+    if (!m_locals.verts.unique_nodes()) {
         if (!m_locals.verts.index.empty() || !m_locals.verts.ghost.empty()) {
             std::cout << "\tUnique nodes: not empty verts arrays\n";
             return -1;
@@ -824,7 +824,7 @@ int EuMesh::check_refined() const {
     res = m_local_nodes.check_nodes(m_locals);
 #else
     res = m_local_nodes.check_nodes(m_locals,
-        m_tourists.ghosts(), m_tourists.ghosts_nodes());
+        m_tourists.ghost_cells(), m_tourists.ghost_nodes());
 #endif
     if (res < 0) return res;
 
@@ -833,7 +833,7 @@ int EuMesh::check_refined() const {
 
 Box EuMesh::bbox() const {
     Box box1 = Box::Empty(3);
-    for (auto& v: m_locals.verts.coords) {
+    for (auto& v: m_locals.verts.coord) {
         box1.capture(v);
     }
 
@@ -880,17 +880,17 @@ void EuMesh::add_marker(const geom::Vector3d& pos, double size) {
 
 EuCell_Iter EuMesh::begin() {
     return {&m_locals, 0,
-        mpi_cond(&m_tourists.ghosts(), nullptr) };
+        mpi_cond(&m_tourists.ghost_cells(), nullptr) };
 }
 
 EuCell_Iter EuMesh::end() {
     return {&m_locals, m_locals.size(),
-        mpi_cond(&m_tourists.ghosts(), nullptr) };
+        mpi_cond(&m_tourists.ghost_cells(), nullptr) };
 }
 
 EuCell EuMesh::operator[](index_t idx) {
     return {&m_locals, idx,
-        mpi_cond(&m_tourists.ghosts(), nullptr) };
+        mpi_cond(&m_tourists.ghost_cells(), nullptr) };
 }
 
 EuCell EuMesh::operator()(int i, int j) {

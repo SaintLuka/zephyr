@@ -227,10 +227,10 @@ public:
 
 #ifdef ZEPHYR_MPI
     /// @brief Слой обменных ячеек (с других процессов)
-    AmrCells& ghosts() { return m_tourists.ghosts(); }
+    AmrCells& ghosts() { return m_tourists.ghost_cells(); }
 
     /// @brief Слой обменных ячеек (с других процессов)
-    const AmrCells& ghosts() const { return m_tourists.ghosts(); }
+    const AmrCells& ghosts() const { return m_tourists.ghost_cells(); }
 #endif
 
     /// @}
@@ -324,6 +324,9 @@ public:
     /// @brief Ссылка на массив уникальных узлов
     const AmrNodes& nodes() const { return m_local_nodes; }
 
+    /// @brief Ссылка на массив уникальных узлов
+    const AmrNodes& ghost_nodes() const;
+
     /// @brief Собрать массивы уникальных узлов
     void make_unique_nodes();
 
@@ -397,9 +400,9 @@ template <typename T>
 Storable<T> EuMesh::add(const std::string& name) {
     auto res1 = m_locals.data.add<T>(name);
 #ifdef ZEPHYR_MPI
-    auto res2 = m_tourists.add<T>(name);
+    auto res2 = m_tourists.add_cell_data<T>(name);
     if (res1 != res2) {
-        throw std::runtime_error("EuMesh error: bad add<T> #2");
+        throw std::runtime_error("EuMesh error: bad add_cell_data<T> #2");
     }
 #endif
     return res1;
@@ -409,9 +412,9 @@ template <typename T>
 Storable<T> EuMesh::add(const std::string& name, int count) {
     auto res1 = m_locals.data.add<T>(name, count);
 #ifdef ZEPHYR_MPI
-    auto res2 = m_tourists.add<T>(name, count);
+    auto res2 = m_tourists.add_cell_data<T>(name, count);
     if (res1 != res2) {
-        throw std::runtime_error("EuMesh error: bad add<T> #2");
+        throw std::runtime_error("EuMesh error: bad add_cell_data<T> #2");
     }
 #endif
     return res1;
@@ -421,7 +424,7 @@ template <typename T>
 void EuMesh::swap(Storable<T> var1, Storable<T> var2) {
     m_locals.data.swap<T>(var1, var2);
 #ifdef ZEPHYR_MPI
-    m_tourists.swap<T>(var1, var2);
+    m_tourists.swap_cell_data<T>(var1, var2);
 #endif
 }
 
@@ -440,7 +443,7 @@ void EuMesh::redistribute(Args&&... vars) {
 
     setup_ranks();
     m_migrants.migrate(
-        m_tourists, m_locals,
+        m_tourists, m_locals, m_local_nodes,
         std::forward<Args>(vars)...);
 #endif
 }

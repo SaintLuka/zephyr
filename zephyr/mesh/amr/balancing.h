@@ -58,7 +58,7 @@ inline void balance_flags(AmrCells &locals, int max_level, Tourism& tourism) {
 #endif
 
 #if SCRUTINY
-    amr::check_flags(locals, tourism.ghosts(), max_level);
+    amr::check_flags(locals, tourism.ghost_cells(), max_level);
 #endif
 }
 

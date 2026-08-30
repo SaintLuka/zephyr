@@ -16,6 +16,9 @@
 #include <zephyr/mesh/euler/eu_prim.h>
 #include <zephyr/mesh/euler/eu_mesh.h>
 
+#include <zephyr/mesh/decomp/ORB.h>
+#include <zephyr/mesh/decomp/rwalk.h>
+
 using namespace zephyr::geom;
 using namespace zephyr::mesh;
 using namespace zephyr::io;
@@ -23,6 +26,8 @@ using namespace zephyr::geom::generator;
 
 using zephyr::mesh::EuMesh;
 using zephyr::mesh::EuCell;
+using zephyr::mesh::decomp::ORB;
+using zephyr::mesh::decomp::RWalk;
 using zephyr::utils::mpi;
 using zephyr::utils::threads;
 
@@ -127,6 +132,48 @@ EuMesh test10() {
 // redistribute
 // check_base() for all
 
+void check_mesh(const EuMesh& mesh) {
+    mpi::for_each([&]() {
+        int res = mesh.check_base();
+        if (res < 0) {
+            std::cout << "  rank " << mpi::rank() << ": check mesh failed!\n";
+        }
+        else {
+            std::cout << "  rank " << mpi::rank() << ": mesh is fine!\n";
+        }
+    });
+}
+
+void save_markers(const AmrNodes& nodes, std::string filename) {
+    EuMesh points(2, false);
+    for (int in = 0; in < nodes.n_nodes(); ++in) {
+        points.add_marker(nodes.coord[in], 0.02);
+    }
+    auto st_rnk = points.add<int>("rank");
+    auto st_idx = points.add<int>("index");
+    auto st_min_rank = points.add<int>("min.rank");
+    auto st_max_rank = points.add<int>("max.rank");
+    for (int in = 0; in < nodes.n_nodes(); ++in) {
+        points[in][st_rnk] = nodes.rank[in];
+        points[in][st_idx] = nodes.index[in];
+        int min_rank = 100000;
+        int max_rank = -1000000;
+        for (auto inc: nodes.incident.range(in)) {
+            int r = nodes.incident.rank[inc];
+            min_rank = std::min(min_rank, r);
+            max_rank = std::max(max_rank, r);
+        }
+        points[in][st_min_rank] = min_rank;
+        points[in][st_max_rank] = max_rank;
+    }
+    PvdFile pvd(filename);
+    pvd.variables.append("rank", st_rnk);
+    pvd.variables.append("index", st_idx);
+    pvd.variables.append("min_rank", st_min_rank);
+    pvd.variables.append("max_rank", st_max_rank);
+    pvd.save(points, 0);
+}
+
 int main(int argc, char** argv) {
     mpi::handler handler(argc, argv);
     threads::init(argc, argv);
@@ -134,10 +181,13 @@ int main(int argc, char** argv) {
     threads::off();
 
     // Создать сетку
-    EuMesh mesh = test2();
+    EuMesh mesh = test9();
 
     // Сетка с уникальными узлами
     mesh.make_unique_nodes();
+
+    std::cout << "Single process:\n";
+    check_mesh(mesh);
 
     // Файл для записи
     PvdFile pvd("mesh", "output");
@@ -149,17 +199,37 @@ int main(int argc, char** argv) {
     }
 
     // Переменные для сохранения
-    pvd.variables = {"level"};
+    pvd.variables = {"level", "verts2D"};
     pvd.variables += {"u",  [u](EuCell& cell) -> double { return cell[u]; }};
+    pvd.unique_nodes = false;
     pvd.save(mesh, 0.0);
 
+    // Bounding Box для сетки
+    Box domain = mesh.bbox();
 
-    int res = mesh.check_base();
-    if (res < 0) {
-        std::cout << "\nCheck base failed!\n";
-    }
-    else {
-        std::cout << "\nBase mesh is fine!\n";
-    }
+    // Варианты инициализации ORB декомпозиции
+    //ORB orb(domain, "XY", mpi::size());
+    //ORB orb(domain, "YX", 13);
+    //ORB orb(domain, "YX", 13, 3);
+    //orb.use_exact(false);
+    RWalk::Ptr orb = RWalk::create(domain, mpi::size());
+
+    // Установить декомпозицию (+ делает redistribute)
+    mesh.set_decomposition(orb);
+
+    pvd.save(mesh.locals(), 1.0);
+
+    /*
+    PvdFile pvdf("ghosts", "output");
+    pvdf.variables = pvd.variables;
+    pvdf.save(mesh.ghosts(), 1.0);
+
+    save_markers(mesh.nodes(), "nodes_aft");
+    save_markers(mesh.ghost_nodes(), "nodes_aft");
+    */
+
+    std::cout << "Distributed:\n";
+    check_mesh(mesh);
+
     return 0;
 }

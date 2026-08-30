@@ -25,9 +25,10 @@ enum class MpiTag : int {
     CENTER,
     VOLUME,
     VOLUME_ALT,
+    FACE_BEG,
+    VERT_BEG,
 
     // Данные граней
-    FACE_BEG,
     ADJ_RANK,
     ADJ_INDEX,
     ADJ_GHOST,
@@ -41,10 +42,23 @@ enum class MpiTag : int {
     FACE_VERTS,
 
     // Данные вершин
-    VERT_BEG,
     VERT_COORD,
+    VERT_RANK,
     VERT_INDEX,
-    VERT_GHOST
+    VERT_GHOST,
+
+    // Данные узлов
+    NODE_RANK,
+    NODE_NEXT,
+    NODE_INDEX,
+    NODE_COORD,
+    INCT_BEG,
+
+    // Данные инцидентных ячеек
+    INCT_ROLE,
+    INCT_RANK,
+    INCT_INDEX,
+    INCT_GHOST
 };
 
 inline std::string to_string(MpiTag tag) {
@@ -95,6 +109,15 @@ public:
     /// Массивы инициализируются нулями
     Router();
 
+    /// @brief Установить нулевое число на отправку
+    void set_zero_send_count();
+
+    /// @brief Установить нулевое число на отправку
+    void set_zero_recv_count();
+
+    /// @brief Заполнить нулями полную матрицу пересылок
+    void set_zero_complete();
+
     /// @brief Установить число элементов для отправки
     void set_send_count(const std::vector<index_t>& send_count);
 
@@ -138,7 +161,7 @@ public:
     index_t send_offset(int r) const { return send_offset_[r]; }
     index_t recv_offset(int r) const { return recv_offset_[r]; }
 
-    /// @brief Индексы из массива border_indices_
+    /// @brief Индексы из массива border при отправке
     range_t<index_t> send_indices(int r) const {
         return range(send_offset_[r], send_offset_[r] + send_count_[r]);
     }

@@ -37,7 +37,7 @@ public:
     /// @brief Создание дескриптора по имени.
     /// @name Имя переменной
     /// @details Функция актуальна для некоторых предопределенных имен:
-    /// "coords", "center", "volume"...
+    /// "coord", "center", "volume"...
     explicit Variable(const char *name);
 
     /// @brief Аналогично конструктору Variable(const char* )

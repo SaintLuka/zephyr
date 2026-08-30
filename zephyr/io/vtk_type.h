@@ -109,13 +109,13 @@ public:
     /// Пример. VtkType type = VtkType::get<int>();
     template <class T>
     static VtkType get() {
-        if (!std::is_arithmetic<T>::value) {
+        if (!std::is_arithmetic_v<T>) {
             return VtkType::Undefined;
         }
-        if (std::is_floating_point<T>::value) {
+        if (std::is_floating_point_v<T>) {
             return get_floating(sizeof(T));
         }
-        if (std::is_signed<T>::value) {
+        if (std::is_signed_v<T>) {
             return get_signed(sizeof(T));
         }
         return get_unsigned(sizeof(T));

@@ -298,7 +298,7 @@ void balance_flags_slow(AmrCells &locals, int max_level, Tourism& tourism) {
     static Stopwatch setup_vicinity_timer;
     static Stopwatch flag_balancing_timer;
 
-    AmrCells &ghosts = tourism.ghosts();
+    AmrCells &ghosts = tourism.ghost_cells();
 
     // Делаем статическим, чтобы не выделять каждый раз память (гениально)
     static VicinityList<dim> vicinity_list;

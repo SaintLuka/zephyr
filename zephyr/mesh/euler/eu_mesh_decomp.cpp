@@ -16,7 +16,7 @@ void EuMesh::set_decomposition(Decomposition::Ref decmp, bool update) {
     m_decomp = decmp;
     if (update) {
         // вызываю, чтобы инициализировать m_tourists
-        m_tourists.update(m_locals);
+        m_tourists.update(m_locals, m_local_nodes);
         redistribute();
 
         // Вероятно, первый (и единственный) redistribute, почистим память
@@ -52,6 +52,15 @@ void EuMesh::set_decomposition(const std::string& type, bool update) {
 #endif
 }
 
+const AmrNodes& EuMesh::ghost_nodes() const {
+#ifndef ZEPHYR_MPI
+    static AmrNodes ghost_nodes;
+    return ghost_nodes;
+#else
+    return m_tourists.ghost_nodes();
+#endif
+}
+
 void EuMesh::balancing() {
 #ifdef ZEPHYR_MPI
     if (mpi::single()) { return; }
@@ -64,7 +73,7 @@ void EuMesh::balancing() {
 #endif
 }
 
-void EuMesh::balancing(double load){
+void EuMesh::balancing(double load) {
 #ifdef ZEPHYR_MPI
     if (mpi::single()) { return; }
 

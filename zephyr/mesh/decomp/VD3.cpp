@@ -7,20 +7,19 @@ VD3::VD3(const Box &domain, int size)
     : Decomposition(size) {
     std::vector<Vector3d> gs(size);
 
-    auto gen = domain.random2D(0);
+    auto gen = math::Random::Uniform(domain);
     for (int i = 0; i < size; ++i) {
-        gs[i] = gen.get();
+        gs[i] = gen->next();
     }
-
-    m_diagram = VDiagram(domain, gs);
+    diagram_ = VDiagram(domain, gs);
 }
 
 int VD3::rank(const EuCell &elem) const {
-    return m_diagram.rank(elem.center());
+    return diagram_.rank(elem.center());
 }
 
 void VD3::balancing(const std::vector<double> &w) {
-    m_diagram.balancing(w);
+    diagram_.balancing(w);
 }
 
 } // namespace zephyr::mesh::decomp

@@ -303,6 +303,7 @@ public:
 };
 
 
+template <> inline MPI_Datatype mpi::type<int8_t>() { return MPI_INT8_T; }
 template <> inline MPI_Datatype mpi::type<int>()    { return MPI_INT;    }
 template <> inline MPI_Datatype mpi::type<double>() { return MPI_DOUBLE; }
 template <> inline MPI_Datatype mpi::type<float>()  { return MPI_FLOAT;  }

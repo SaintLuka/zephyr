@@ -8,20 +8,20 @@ using zephyr::geom::Vector3d;
 namespace zephyr::mesh::decomp {
 
 RWalk::RWalk(const Box &domain, int size)
-    : Decomposition(size), m_domain(domain) {
-    const int multiplier = 10;
+    : Decomposition(size), domain_(domain) {
+    constexpr int multiplier = 10;
 
-    m_diagram = VDiagram(domain, multiplier * size);
+    diagram_ = VDiagram(domain, multiplier * size);
 
-    if (m_domain.is_2D()) {
-        m_step = 0.3 * std::sqrt(m_domain.area() / m_diagram.size());
+    if (domain_.is_2D()) {
+        step_ = 0.3 * std::sqrt(domain_.area() / diagram_.size());
     } else {
-        m_step = 0.3 * std::cbrt(m_domain.volume() / m_diagram.size());
+        step_ = 0.3 * std::cbrt(domain_.volume() / diagram_.size());
     }
 }
 
 int RWalk::rank(const EuCell &elem) const {
-    return m_diagram.rank(elem.center()) % m_size;
+    return diagram_.rank(elem.center()) % m_size;
 }
 
 void RWalk::balancing(const std::vector<double> &w) {
@@ -29,21 +29,14 @@ void RWalk::balancing(const std::vector<double> &w) {
 
     std::uniform_real_distribution<double> uniform(0.0, 1.0);
 
-    for (int i = 0; i < m_diagram.size(); ++i) {
-        double x = m_diagram.get_coord_x(i);
-        double y = m_diagram.get_coord_y(i);
+    for (int i = 0; i < diagram_.size(); ++i) {
+        Vector3d p = diagram_.get_coord(i);
 
-        x += 2.0 * m_step * (uniform(gen) - 0.5);
-        y += 2.0 * m_step * (uniform(gen) - 0.5);
+        p.x() += 2.0 * step_ * (uniform(gen) - 0.5);
+        p.y() += 2.0 * step_ * (uniform(gen) - 0.5);
+        p.z() += 2.0 * step_ * (uniform(gen) - 0.5);
 
-        if (x < m_domain.vmin.x() || x > m_domain.vmax.x()) {
-            x = m_domain.vmin.x() + m_domain.sizes().x() * uniform(gen);
-        }
-        if (y < m_domain.vmin.y() || y > m_domain.vmax.y()) {
-            y = m_domain.vmin.y() + m_domain.sizes().y() * uniform(gen);
-        }
-
-        m_diagram.set_coords(i, x, y);
+        diagram_.set_coords(i, p);
     }
 }
 

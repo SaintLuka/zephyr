@@ -29,14 +29,17 @@ class AmrVerts final {
 
     /// @brief Используются уникальные узлы? Если unique = false, тогда массивы
     /// index и ghost пустые. В обратном случае все массивы одного размера.
-    bool m_unique = false;
+    bool unique_ = false;
 
 public:
     /// @brief Индексы первых вершин ячеек (CSR-структура)
     std::vector<index_t>  offsets = {0};
 
     /// @brief Координаты вершин (с дубликатами)
-    std::vector<Vector3d> coords;
+    std::vector<Vector3d> coord;
+
+    /// @brief Ранг процесса владельца (< 0 -- ошибка, не используется)
+    std::vector<index_t> rank;
 
     /// @brief Индекс узла в массиве local_nodes (в реальном локальном
     /// хранилище или в удаленном)
@@ -51,10 +54,10 @@ public:
     AmrVerts() = default;
 
     /// @brief Используются уникальные узлы?
-    bool unique() const { return m_unique; }
+    bool unique_nodes() const { return unique_; }
 
     /// @brief Число вершин
-    index_t size() const { return coords.size(); }
+    index_t size() const { return coord.size(); }
 
     /// @brief Изменить размер под число вершин
     void resize(index_t n_verts);
@@ -66,16 +69,16 @@ public:
     void shrink_to_fit();
 
     /// @brief Оператор доступа к координате
-    Vector3d& operator[](index_t idx) { return coords[idx]; }
+    Vector3d& operator[](index_t idx) { return coord[idx]; }
 
     /// @brief Оператор доступа к координате
-    const Vector3d& operator[](index_t idx) const { return coords[idx]; }
+    const Vector3d& operator[](index_t idx) const { return coord[idx]; }
 
     /// @brief Забыть об уникальных узлах
     void clear_unique();
 
     /// @brief Инициализировать массивы для уникальных узлов
-    void init_unique(index_t idx, index_t gst);
+    void init_unique(index_t idx = -13, index_t gst = -1);
 
     /// @brief Расход памяти
     memory_t memory_usage() const;
@@ -99,12 +102,12 @@ public:
 
     /// @brief Указатель на первую вершину ячейки
     Vector3d* coords_data(index_t ic) {
-        return coords.data() + offsets[ic];
+        return coord.data() + offsets[ic];
     }
 
     /// @brief Константный указатель на первую вершину
     const Vector3d* coords_data(index_t ic) const {
-        return coords.data() + offsets[ic];
+        return coord.data() + offsets[ic];
     }
 
     /// @brief Ссылка на вершины в форме набора узлов квадратичного отображения

@@ -155,6 +155,60 @@ Variable::Variable(const char* name)
             out[2] = static_cast<float>(cell.center().z());
         };
     }
+    else if (!std::strcmp(name, "vert2D.rank") || !std::strcmp(name, "vert3D.rank")) {
+        m_type = VtkType::Int8;
+        m_n_components = !std::strcmp(name, "vert2D.rank") ? 9 : 27;
+        m_write = [max_verts=m_n_components](const EuCell& cell, void *arg) {
+            const mesh::AmrCells& cells = cell.cells();
+            int n_nodes = cell.adaptive() ? max_verts : std::min(max_verts, cell.node_count());
+            if (!cells.unique_nodes()) {
+                n_nodes = 0;
+            }
+            const auto out = static_cast<int8_t *>(arg);
+            for (int i = 0; i < n_nodes; ++i) {
+                out[i] = static_cast<int8_t>(cells.verts.rank[cells.verts.offsets[cell.index()] + i]);
+            }
+            for (int i = n_nodes; i < max_verts; ++i) {
+                out[i] = int8_t{-13};
+            }
+        };
+    }
+    else if (!std::strcmp(name, "vert2D.index") || !std::strcmp(name, "vert3D.index")) {
+        m_type = VtkType::Int32;
+        m_n_components = !std::strcmp(name, "vert2D.index") ? 9 : 27;
+        m_write = [max_verts=m_n_components](const EuCell& cell, void *arg) {
+            const mesh::AmrCells& cells = cell.cells();
+            int n_nodes = cell.adaptive() ? max_verts : std::min(max_verts, cell.node_count());
+            if (!cells.unique_nodes()) {
+                n_nodes = 0;
+            }
+            const auto out = static_cast<int32_t*>(arg);
+            for (int i = 0; i < n_nodes; ++i) {
+                out[i] = int32_t{cells.verts.index[cells.verts.offsets[cell.id()] + i]};
+            }
+            for (int i = n_nodes; i < max_verts; ++i) {
+                out[i] = int32_t{-13};
+            }
+        };
+    }
+    else if (!std::strcmp(name, "vert2D.ghost") || !std::strcmp(name, "vert3D.ghost")) {
+        m_type = VtkType::Int32;
+        m_n_components = !std::strcmp(name, "vert2D.ghost") ? 9 : 27;
+        m_write = [max_verts=m_n_components](const EuCell& cell, void *arg) {
+            const mesh::AmrCells& cells = cell.cells();
+            int n_nodes = cell.adaptive() ? max_verts : std::min(max_verts, cell.node_count());
+            if (!cells.unique_nodes()) {
+                n_nodes = 0;
+            }
+            const auto out = static_cast<int32_t*>(arg);
+            for (int i = 0; i < n_nodes; ++i) {
+                out[i] = int32_t{cells.verts.ghost[cells.verts.offsets[cell.id()] + i]};
+            }
+            for (int i = n_nodes; i < max_verts; ++i) {
+                out[i] = int32_t{-13};
+            }
+        };
+    }
     else {
         throw std::runtime_error("Unknown variable '" + std::string(name) + "'");
     }
