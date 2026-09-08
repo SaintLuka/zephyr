@@ -30,13 +30,25 @@ public:
     template <typename T>
     Storable<T> add_cell_data(const std::string& name);
 
+    /// @brief Добавить тип данных в border/ghosts
+    template <typename T>
+    Storable<T> add_node_data(const std::string& name);
+
     /// @brief Добавить векторный тип данных в border/ghosts
     template<typename T>
     Storable<T> add_cell_data(const std::string& name, int count);
 
+    /// @brief Добавить векторный тип данных в border/ghosts
+    template<typename T>
+    Storable<T> add_node_data(const std::string& name, int count);
+
     /// @brief Поменять местами два типа в хранилище
     template<typename T>
     void swap_cell_data(Storable<T> var1, Storable<T> var2);
+
+    /// @brief Поменять местами два типа в хранилище
+    template<typename T>
+    void swap_node_data(Storable<T> var1, Storable<T> var2);
 
     /// @brief Построить обменные слои (border и ghosts).
     /// @param cells
@@ -319,6 +331,16 @@ Storable<T> Tourism::add_cell_data(const std::string& name) {
 }
 
 template<typename T>
+Storable<T> Tourism::add_node_data(const std::string& name) {
+    auto res1 = border_nodes_.data.add<T>(name);
+    auto res2 = ghost_nodes_.data.add<T>(name);
+    if (res1 != res2) {
+        throw std::runtime_error("Tourism error: different types in border and ghost nodes #1");
+    }
+    return res1;
+}
+
+template<typename T>
 Storable<T> Tourism::add_cell_data(const std::string& name, int count) {
     auto res1 = border_cells_.data.add<T>(name, count);
     auto res2 = ghost_cells_.data.add<T>(name, count);
@@ -329,9 +351,25 @@ Storable<T> Tourism::add_cell_data(const std::string& name, int count) {
 }
 
 template<typename T>
+Storable<T> Tourism::add_node_data(const std::string& name, int count) {
+    auto res1 = border_nodes_.data.add<T>(name, count);
+    auto res2 = ghost_nodes_.data.add<T>(name, count);
+    if (res1 != res2) {
+        throw std::runtime_error("Tourism error: different types in border and ghost nodes #2");
+    }
+    return res1;
+}
+
+template<typename T>
 void Tourism::swap_cell_data(Storable<T> var1, Storable<T> var2) {
     border_cells_.data.swap<T>(var1, var2);
     ghost_cells_.data.swap<T>(var1, var2);
+}
+
+template<typename T>
+void Tourism::swap_node_data(Storable<T> var1, Storable<T> var2) {
+    border_nodes_.data.swap<T>(var1, var2);
+    ghost_nodes_.data.swap<T>(var1, var2);
 }
 
 template <typename T>

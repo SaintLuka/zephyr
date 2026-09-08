@@ -95,15 +95,15 @@ public:
     void info() const;
 
 private:
-    /// @brief Проинициализировать массивы m_nx, m_ny, m_nz
+    /// @brief Проинициализировать массивы nx_, ny_, nz_
     /// @details Одномерная декомпозиция
     void init_sizes_1D(int nx);
 
-    /// @brief Проинициализировать массивы m_nx, m_ny, m_nz
+    /// @brief Проинициализировать массивы nx_, ny_, nz_
     /// @details Двумерная декомпозиция
     void init_sizes_2D(const std::vector<int>& ny);
 
-    /// @brief Проинициализировать массивы m_nx, m_ny, m_nz
+    /// @brief Проинициализировать массивы nx_, ny_, nz_
     /// @details Трехмерная декомпозиция
     void init_sizes_3D(const std::vector<std::vector<int>>& nz);
 

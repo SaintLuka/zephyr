@@ -13,19 +13,19 @@ void EuMesh::set_decomposition(Decomposition::Ref decmp, bool update) {
 #ifdef ZEPHYR_MPI
     if (mpi::single()) return;
 
-    m_decomp = decmp;
+    decomp_ = decmp;
     if (update) {
-        // вызываю, чтобы инициализировать m_tourists
-        m_tourists.update(m_locals, m_local_nodes);
+        // вызываю, чтобы инициализировать tourists_
+        tourists_.update(local_cells_, local_nodes_);
         redistribute();
 
         // Вероятно, первый (и единственный) redistribute, почистим память
-        m_locals.shrink_to_fit();
+        local_cells_.shrink_to_fit();
 
-        m_tourists.shrink_to_fit();
+        tourists_.shrink_to_fit();
 
-        m_migrants.clear();
-        m_migrants.shrink_to_fit();
+        migrants_.clear();
+        migrants_.shrink_to_fit();
     }
 #endif
 }
@@ -46,9 +46,9 @@ void EuMesh::set_decomposition(const std::string& type, bool update) {
     if (mpi::single()) return;
 
     auto domain = bbox();
-    m_decomp = ORB::create(domain, type, mpi::size());
+    decomp_ = ORB::create(domain, type, mpi::size());
 
-    set_decomposition(m_decomp, update);
+    set_decomposition(decomp_, update);
 #endif
 }
 
@@ -57,7 +57,7 @@ const AmrNodes& EuMesh::ghost_nodes() const {
     static AmrNodes ghost_nodes;
     return ghost_nodes;
 #else
-    return m_tourists.ghost_nodes();
+    return tourists_.ghost_nodes();
 #endif
 }
 
@@ -65,10 +65,10 @@ void EuMesh::balancing() {
 #ifdef ZEPHYR_MPI
     if (mpi::single()) { return; }
 
-    bool done = m_decomp->exact_balancing(m_locals.center);
+    bool done = decomp_->exact_balancing(local_cells_.center);
     if (done) return;
 
-    double load = m_locals.size();
+    double load = local_cells_.size();
     balancing(load);
 #endif
 }
@@ -77,11 +77,11 @@ void EuMesh::balancing(double load) {
 #ifdef ZEPHYR_MPI
     if (mpi::single()) { return; }
 
-    bool done = m_decomp->exact_balancing(m_locals.center);
+    bool done = decomp_->exact_balancing(local_cells_.center);
     if (done) return;
 
     auto ws = mpi::all_gather(load);
-    m_decomp->balancing(ws);
+    decomp_->balancing(ws);
 #endif
 }
 
@@ -89,7 +89,7 @@ void EuMesh::prebalancing(int n_iters) {
 #ifdef ZEPHYR_MPI
     if (mpi::single()) return;
 
-    bool done = m_decomp->exact_balancing(m_locals.center);
+    bool done = decomp_->exact_balancing(local_cells_.center);
     if (done) {
         redistribute();
         return;
@@ -103,7 +103,7 @@ void EuMesh::prebalancing(int n_iters) {
 
 void EuMesh::setup_ranks() {
     // Определим новый rank для всех ячеек из locals
-    for_each([decomp=m_decomp](const EuCell &cell) {
+    for_each([decomp=decomp_](const EuCell &cell) {
         cell.set_rank(decomp->rank(cell));
     });
 }

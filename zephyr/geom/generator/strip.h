@@ -28,8 +28,9 @@ public:
     explicit Strip(const Json& config);
 
     /// @brief Конструктор класса
-    /// @param xmin, xmax Границы прямоугольника по оси x
-    Strip(double xmin, double xmax, Type nodes = Type::UNIFORM);
+    /// @param x_min, x_max Границы прямоугольника по оси x
+    /// @param nodes Тип генерации узлов
+    Strip(double x_min, double x_max, Type nodes = Type::UNIFORM);
 
     /// @brief Создать указатель на класс
     template <class... Args>
@@ -47,10 +48,10 @@ public:
     void set_boundaries(Boundaries bounds);
 
     /// @brief Осевая симметрия странно
-    void set_axial(bool) override { m_axial = false; }
+    void set_axial(bool) override { axial_ = false; }
 
     /// @brief Нелинейная сетка странно
-    void set_linear(bool) override { m_linear = true; }
+    void set_linear(bool) override { linear_ = true; }
 
     /// @brief Ограничивающий объем
     Box bbox() const override;
@@ -59,10 +60,10 @@ public:
     Grid make() const override;
 
     /// @brief Может инициализировать хранилище
-    bool can_initialize() const override { return true; }
+    bool can_make_cells() const override { return true; }
 
     /// @brief Инициализация SoA-хранилища сетки
-    void initialize(mesh::AmrCells& cells) const override;
+    mesh::AmrCells make_cells(bool unique_nodes) const override;
 
     // Далее не самые полезные get-функции
 
@@ -82,7 +83,7 @@ public:
     int nx() const;
 
     /// @brief Граничные условия
-    Boundaries bounds() const { return m_bounds; }
+    Boundaries bounds() const { return bounds_; }
 
     /// @brief Есть ли периодичность по оси X?
     bool periodic_along_x() const;
@@ -98,13 +99,13 @@ private:
     Type m_type;
 
     /// @brief Число ячеек сетки
-    int m_nx{0};
+    int nx_{0};
 
     /// @brief Левая и правая граница полосы
-    double m_xmin, m_xmax;
+    double x_min_, x_max_;
 
     /// @brief Граничные условия слева и справа
-    Boundaries m_bounds;
+    Boundaries bounds_;
 };
 
 } // namespace zephyr::geom::generator

@@ -14,7 +14,7 @@ void plot_sections(
         const std::string& figname) {
 
     PvdFile pvd(figname, "output/" + figname);
-    pvd.polyhedral = true;
+    pvd.options.polyhedral = true;
 
     double p_min = +1.0e100;
     double p_max = -1.0e100;
@@ -111,7 +111,7 @@ void plot_sections(
         if (max_epsilon_fsb < epsilon_fsb)
             max_epsilon_fsb = epsilon_fsb;
 
-        EuMesh mesh(3, false);
+        EuMesh mesh = EuMesh::PolySet(3);
         mesh.push_back(clip);
 
         pvd.save(mesh, i / (N - 1.0));

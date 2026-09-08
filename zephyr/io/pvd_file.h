@@ -14,20 +14,8 @@ public:
     // Переменные класса имеют публичный доступ, сохранение можно выполнить
     // после настройки всех параметров
 
-    Variables variables;   ///< Список переменных на запись
-
-    /// @brief Для адаптивных сеток: записывать ячейки как полигоны? В обратном
-    /// случае ячейки пишутся как простые четырехугольники/шестигранники,
-    /// то есть с "висящими" узлами.
-    ///
-    /// Для трёхмерных сеток: интерпретировать ячейки как многогранники общего вида.
-    /// Сохраняет отдельно грани. Работает долго, включать при необходимости.
-    /// Необходимо использовать при записи сетки с многогранниками.
-    bool polyhedral = false;
-
-    /// @brief Сохранять уникальные вершины, актуально для EuMesh. Если сетка
-    /// часто перестраивается, то функция выполняется достаточно долго.
-    bool unique_nodes = false;
+    Variables variables;  ///< Список переменных на запись
+    VtuOptions options;   ///< Опции записи
 
     /// @brief Пустой конструктор, не создает PVD файл, после создания
     /// экземпляра класса требуется вызов функции PvdFile::open.
@@ -41,15 +29,10 @@ public:
     /// пустую строку, по умолчанию directory = "output".
     /// @param distributed Один PVD на несколько процессов? При использовании
     /// MPI по умолчанию ставится distributed = true.
-    void open(const char* filename);
-    void open(const char* filename, bool distributed);
-    void open(const char* filename, const char* directory);
-    void open(const char* filename, const char* directory, bool distributed);
-
-    void open(const std::string& filename);
-    void open(const std::string& filename, bool distributed);
-    void open(const std::string& filename, const std::string& directory);
-    void open(const std::string& filename, const std::string& directory, bool distributed);
+    void open(std::string_view filename);
+    void open(std::string_view filename, bool distributed);
+    void open(std::string_view filename, std::string_view directory);
+    void open(std::string_view filename, std::string_view directory, bool distributed);
 
     /// @brief Открывает PVD файл для записи, записывает заголовок.
     /// @details Заполняет приватные поля класса. Вызов функции требуется,
@@ -79,12 +62,12 @@ private:
 
     void update_pvd(double timestep);
 
-    bool           m_open;         ///< Открыт ли PVD файл?
-    bool           m_distributed;  ///< Общий PVD при использовании MPI?
-    std::string    m_filename;     ///< Имя файла без расширения
-    std::string    m_fullname;     ///< Абсолютное имя файла без расширения
-    std::streamoff m_pos;          ///< Указатель на позицию в файле
-    std::size_t    m_counter;      ///< Счетчик записанных временных шагов
+    bool           open_;         ///< Открыт ли PVD файл?
+    bool           distributed_;  ///< Общий PVD при использовании MPI?
+    std::string    filename_;     ///< Имя файла без расширения
+    std::string    fullname_;     ///< Абсолютное имя файла без расширения
+    std::streamoff pos_;          ///< Указатель на позицию в файле
+    std::size_t    counter_;      ///< Счетчик записанных временных шагов
 };
 
 } // namespace zephyr::io

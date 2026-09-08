@@ -1599,7 +1599,7 @@ Grid BlockStructured::make() const {
     auto sizes = wanted_block_sizes();
 
     // Нелинейная адаптивная сетка (в 4 раза больше ячеек)
-    if (m_adaptive && !m_linear) {
+    if (adaptive_ && !linear_) {
         for (auto& size: sizes) {
             size[Axis::X] *= 2;
             size[Axis::Y] *= 2;
@@ -1670,7 +1670,7 @@ Grid BlockStructured::make() const {
 
         const auto& verts = vertices[b1];
         // Не адаптивная или адаптивная линейная
-        if (!m_adaptive || (m_adaptive && m_linear)) {
+        if (!adaptive_ || (adaptive_ && linear_)) {
             int Nx = verts.size(Axis::X) - 1;
             int Ny = verts.size(Axis::Y) - 1;
 
@@ -1693,7 +1693,7 @@ Grid BlockStructured::make() const {
                 }
             }
         }
-        else if (m_adaptive && !m_linear) {
+        else if (adaptive_ && !linear_) {
             // Адаптивная и нелинейная
             // AMR-ячейка, Z-порядок вершин
             int Nx = (verts.size(Axis::X) - 1) / 2;
@@ -1722,7 +1722,7 @@ Grid BlockStructured::make() const {
     }
 
     // Сделать адаптивную из простой сетки
-    if (m_adaptive && m_linear) {
+    if (adaptive_ && linear_) {
         grid.make_amr();
     }
 

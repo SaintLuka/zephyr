@@ -25,10 +25,10 @@ public:
     explicit Cuboid(const Json& config);
 
     /// @brief Конструктор класса
-    /// @param xmin, xmax Границы прямоугольника по оси x
-    /// @param ymin, ymax Границы прямоугольника по оси y
-    /// @param zmin, zmax Границы прямоугольника по оси z
-    Cuboid(double xmin, double xmax, double ymin, double ymax, double zmin, double zmax);
+    /// @param x_min, x_max Границы прямоугольника по оси x
+    /// @param y_min, y_max Границы прямоугольника по оси y
+    /// @param z_min, z_max Границы прямоугольника по оси z
+    Cuboid(double x_min, double x_max, double y_min, double y_max, double z_min, double z_max);
 
     /// @brief Создать указатель на класс
     template <class... Args>
@@ -66,10 +66,10 @@ public:
     void set_boundaries(Boundaries bounds);
 
     /// @brief Нельзя использовать осевую симметрию
-    void set_axial(bool) override { m_axial = false; }
+    void set_axial(bool) override { axial_ = false; }
 
     /// @brief Всегда использовать линейную адаптацию
-    void set_linear(bool) override { m_linear = true; }
+    void set_linear(bool) override { linear_ = true; }
 
     /// @brief Ограничивающий объем
     Box bbox() const override;
@@ -78,10 +78,10 @@ public:
     Grid make() const override;
 
     /// @brief Может инициализировать хранилище
-    bool can_initialize() const override { return m_adaptive; }
+    bool can_make_cells() const override { return adaptive_; }
 
     /// @brief Инициализация SoA-хранилища сетки
-    void initialize(mesh::AmrCells& cells) const override;
+    mesh::AmrCells make_cells(bool cells) const override;
 
     // Далее не самые полезные get-функции
 
@@ -125,13 +125,13 @@ private:
     /// @brief Обновить число ячеек
     void compute_size();
 
-    int m_nx{0}, m_ny{0}, m_nz{0};
-    int m_size{0};
-    double m_xmin, m_xmax;
-    double m_ymin, m_ymax;
-    double m_zmin, m_zmax;
+    int nx_{0}, ny_{0}, nz_{0};
+    int size_{0};
+    double x_min_, x_max_;
+    double y_min_, y_max_;
+    double z_min_, z_max_;
 
-    Boundaries m_bounds;
+    Boundaries bounds_;
 };
 
 } // namespace zephyr::geom::generator

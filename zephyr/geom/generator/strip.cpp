@@ -17,20 +17,20 @@ namespace zephyr::geom::generator {
 using namespace zephyr::mesh;
 
 Strip::Strip(const Json& config)
-    : Generator("strip"), m_xmin(0.0), m_xmax(1.0) {
+    : Generator("strip"), x_min_(0.0), x_max_(1.0) {
 
     if (!config["geometry"]) {
         throw std::runtime_error("Strip config doesn't contain key 'geometry'");
     }
 
-    m_xmin = config["geometry"]["x_min"].as<double>();
-    m_xmax = config["geometry"]["x_max"].as<double>();
+    x_min_ = config["geometry"]["x_min"].as<double>();
+    x_max_ = config["geometry"]["x_max"].as<double>();
     
     if (!config["bounds"]) {
         throw std::runtime_error("Strip config doesn't contain key 'bounds'");
     }
-    m_bounds.left  = boundary_from_string(config["bounds"]["left"].as<std::string>());
-    m_bounds.right = boundary_from_string(config["bounds"]["right"].as<std::string>());
+    bounds_.left  = boundary_from_string(config["bounds"]["left"].as<std::string>());
+    bounds_.right = boundary_from_string(config["bounds"]["right"].as<std::string>());
 
     if (!config["size"] || !config["size"].is_number()) {
         throw std::runtime_error("Strip config doesn't contain key 'size'");
@@ -39,11 +39,11 @@ Strip::Strip(const Json& config)
     set_size(config["cells"].as<int>());
 }
 
-Strip::Strip(double xmin, double xmax, Type type) :
+Strip::Strip(double x_min, double x_max, Type type) :
         Generator("strip"),
         m_type(type),
-        m_xmin(xmin),
-        m_xmax(xmax) {
+        x_min_(x_min),
+        x_max_(x_max) {
     check_params();
 }
 
@@ -67,22 +67,22 @@ void Strip::set_size(int N) {
         throw std::runtime_error("Attempt to create mesh with more than 1 billion cells");
     }
 
-    m_nx = N;
+    nx_ = N;
 }
 
 void Strip::set_boundaries(Boundaries bounds) {
-    m_bounds = bounds;
+    bounds_ = bounds;
     if (periodic_along_x()) {
-        m_bounds.left = m_bounds.right = Boundary::PERIODIC;
+        bounds_.left = bounds_.right = Boundary::PERIODIC;
     }
 }
 
 double Strip::x_min() const {
-    return m_xmin;
+    return x_min_;
 }
 
 double Strip::x_max() const {
-    return m_xmax;
+    return x_max_;
 }
 
 double Strip::y_min() const {
@@ -94,15 +94,15 @@ double Strip::y_max() const {
 }
 
 int Strip::nx() const {
-    return m_nx;
+    return nx_;
 }
 
 bool Strip::periodic_along_x() const {
-    return m_bounds.left == Boundary::PERIODIC || m_bounds.right == Boundary::PERIODIC;
+    return bounds_.left == Boundary::PERIODIC || bounds_.right == Boundary::PERIODIC;
 }
 
 void Strip::check_params() const {
-    if (m_xmin >= m_xmax) {
+    if (x_min_ >= x_max_) {
         std::cerr << "Strip Error: x_min >= x_max\n";
         throw std::runtime_error("Strip Error: x_min >= x_max");
     }
@@ -145,32 +145,32 @@ std::vector<double> get_nodes(Strip::Type type, double xmin, double xmax, int si
 }
 
 Grid Strip::make() const {
-    check_size(m_nx);
+    check_size(nx_);
 
-    auto nodes1D = get_nodes(m_type, m_xmin, m_xmax, m_nx);
+    auto nodes1D = get_nodes(m_type, x_min_, x_max_, nx_);
 
     double y1 = y_min();
     double y2 = y_max();
 
-    std::vector nodes(2, std::vector<Node::Ptr>(m_nx + 1, nullptr));
+    std::vector nodes(2, std::vector<Node::Ptr>(nx_ + 1, nullptr));
 
     Grid grid;
 
-    grid.reserve_nodes(m_nx + 1);
-    for (int i = 0; i <= m_nx; ++i) {
+    grid.reserve_nodes(nx_ + 1);
+    for (int i = 0; i <= nx_; ++i) {
         nodes[0][i] = Node::create({nodes1D[i], y1, 0.0});
         grid.add_node(nodes[0][i]);
 
         nodes[1][i] = Node::create({nodes1D[i], y2, 0.0});
         grid.add_node(nodes[1][i]);
     }
-    nodes[0][0]->bc = m_bounds.left;
-    nodes[1][0]->bc = m_bounds.left;
-    nodes[0][m_nx]->bc = m_bounds.right;
-    nodes[1][m_nx]->bc = m_bounds.right;
+    nodes[0][0]->bc = bounds_.left;
+    nodes[1][0]->bc = bounds_.left;
+    nodes[0][nx_]->bc = bounds_.right;
+    nodes[1][nx_]->bc = bounds_.right;
 
-    grid.reserve_cells(m_nx);
-    for (int i = 0; i < m_nx; ++i) {
+    grid.reserve_cells(nx_);
+    for (int i = 0; i < nx_; ++i) {
         grid.add_cell(
             CellType::QUAD, {
                 nodes[0][i], nodes[0][i + 1],
@@ -181,46 +181,49 @@ Grid Strip::make() const {
     return grid;
 }
 
-void Strip::initialize(AmrCells& cells) const {
+AmrCells Strip::make_cells(bool unique_nodes) const {
     bool x_period = periodic_along_x();
 
-    double m_ymin = y_min();
-    double m_ymax = y_max();
+    double y_min_ = y_min();
+    double y_max_ = y_max();
 
-    index_t m_ny = 1;
+    index_t ny_ = 1;
 
-    double hx = (m_xmax - m_xmin) / m_nx;
-    double hy = (m_ymax - m_ymin) / m_ny;
+    double hx = (x_max_ - x_min_) / nx_;
+    double hy = (y_max_ - y_min_) / ny_;
 
     auto get_vertex = [=, this](index_t i, index_t j) -> Vector3d {
         return {
-                m_xmin + ((m_xmax - m_xmin) * i) / m_nx,
-                m_ymin + ((m_ymax - m_ymin) * j) / m_ny,
+                x_min_ + ((x_max_ - x_min_) * i) / nx_,
+                y_min_ + ((y_max_ - y_min_) * j) / ny_,
                 0.0
         };
     };
 
     auto neib_index = [=, this](index_t i, Side2D side) -> index_t {
         if (side == Side2D::LEFT) {
-            return i == 0 && !x_period ?  i : (i - 1 + m_nx) % m_nx;
+            return i == 0 && !x_period ?  i : (i - 1 + nx_) % nx_;
         }
         if (side == Side2D::RIGHT) {
-            return i == m_nx - 1 && !x_period ? i : (i + 1 + m_nx) % m_nx;
+            return i == nx_ - 1 && !x_period ? i : (i + 1 + nx_) % nx_;
         }
         throw std::runtime_error("Strange side #153");
     };
 
-    cells.set_dimension(2);
-    cells.set_adaptive(true);
-    cells.set_linear(true);
-    cells.set_axial(false);
+    AmrCells cells({
+        .dim = 2,
+        .adaptive = true,
+        .linear = true,
+        .axial = false,
+        .nodes = unique_nodes
+    });
 
-    cells.resize_amr(m_nx);
+    cells.resize_amr(nx_);
 
-    int n_faces = 8;
-    int n_nodes = 9;
+    static constexpr int n_faces = 8;
+    static constexpr int n_nodes = 9;
 
-    for (index_t ic = 0; ic < m_nx; ++ic) {
+    for (index_t ic = 0; ic < nx_; ++ic) {
         cells.next[ic] = ic;
         cells.rank[ic] = 0;
         cells.index[ic] = ic;
@@ -253,8 +256,8 @@ void Strip::initialize(AmrCells& cells) const {
 
         index_t iface = ic * n_faces;
 
-        cells.faces.boundary[iface + Side2D::L] = ic > 0 ? Boundary::INNER : m_bounds.left;
-        cells.faces.boundary[iface + Side2D::R] = ic < m_nx - 1 ? Boundary::INNER : m_bounds.right;
+        cells.faces.boundary[iface + Side2D::L] = ic > 0 ? Boundary::INNER : bounds_.left;
+        cells.faces.boundary[iface + Side2D::R] = ic < nx_ - 1 ? Boundary::INNER : bounds_.right;
 
         for (auto side: {Side2D::LEFT, Side2D::RIGHT}) {
             cells.faces.adjacent.rank[iface + side] = 0;
@@ -296,6 +299,7 @@ void Strip::initialize(AmrCells& cells) const {
             cells.verts[ic * n_nodes + jn] = quad[jn];
         }
     }
+    return cells;
 }
 
 } // namespace zephyr::geom::generator

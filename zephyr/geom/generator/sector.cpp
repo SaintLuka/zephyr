@@ -13,9 +13,9 @@ namespace zephyr::geom::generator {
 Sector::Sector(const Json& config)
         : Generator("sector"), m_r2(-1.0), m_r1(-1.0), m_angle(-1.0), m_hole(false) {
 
-    m_axial = false;
+    axial_ = false;
     if (config["axial"]) {
-        m_axial = config["axial"].as<bool>();
+        axial_ = config["axial"].as<bool>();
     }
 
     if (!config["geometry"]) {

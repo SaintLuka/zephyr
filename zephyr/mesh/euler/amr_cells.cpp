@@ -13,65 +13,33 @@ using zephyr::utils::mpi;
 
 namespace zephyr::mesh {
 
-AmrCells::AmrCells(int dim, bool adaptive, bool axial) {
-    set_dimension(dim);
-    set_adaptive(adaptive);
-    set_axial(axial);
-    set_linear(true);
+AmrCells::AmrCells(MeshOpts options) :
+    dim_(options.dim),
+    adaptive_(options.adaptive),
+    linear_(options.linear),
+    axial_(options.axial),
+    verts(options.nodes) {
+
 }
 
 AmrCells AmrCells::same() const {
-    AmrCells cells(m_dim, m_adaptive, m_axial);
+    AmrCells cells(options());
     cells.data = data.same();
-    if (unique_nodes()) {
-        cells.verts.init_unique();
-    }
     return cells;
 }
 
-void AmrCells::set_dimension(int dim) {
-    if (!empty() && dim != m_dim) {
-        throw std::runtime_error("Can't change dimension. Mesh is not empty.");
-    }
-
-    if (dim == 2) {
-        m_dim = 2;
-    }
-    else if (dim == 3) {
-        m_dim = 3;
-        m_axial = false;
-        m_linear = true;
-    }
-    else {
-        throw std::runtime_error("Mesh dimension should be equal 2 or 3");
-    }
-}
-
-void AmrCells::set_adaptive(bool adaptive) {
-    if (!empty() && adaptive != m_adaptive) {
-        throw std::runtime_error("Can't change 'adaptive'. Mesh is not empty.");
-    }
-
-    m_adaptive = adaptive;
-}
-
-void AmrCells::set_axial(bool axial) {
-    if (!empty() && axial != m_axial) {
-        throw std::runtime_error("Can't change symmetry. Mesh is not empty.");
-    }
-
-    m_axial = axial;
-    if (axial) {
-        m_dim = 2;
-    }
-}
-
-void AmrCells::set_linear(bool linear) {
-    m_linear = linear;
+MeshOpts AmrCells::options() const {
+    return MeshOpts {
+        .dim      = dim_,
+        .adaptive = adaptive_,
+        .linear   = linear_,
+        .axial    = axial_,
+        .nodes    = verts.has_nodes()
+    };
 }
 
 int AmrCells::face_count(index_t ic) const {
-    if (m_adaptive) {
+    if (adaptive_) {
         int count = 0;
         for (index_t iface: faces.range(ic)) {
             if (faces.is_actual(iface)) {
@@ -86,24 +54,24 @@ int AmrCells::face_count(index_t ic) const {
 }
 
 double AmrCells::hx(index_t ic) const {
-    z_assert(m_adaptive, "Not adaptive mesh, can't get 'hx' for cell");
+    z_assert(adaptive_, "Not adaptive mesh, can't get 'hx' for cell");
     return (verts.mapping<2>(ic).vs<+1, 0>() - verts.mapping<2>(ic).vs<-1, 0>()).norm();
 }
 
 double AmrCells::hy(index_t ic) const {
-    z_assert(m_adaptive, "Not adaptive mesh, can't get 'hy' for cell");
+    z_assert(adaptive_, "Not adaptive mesh, can't get 'hy' for cell");
     return (verts.mapping<2>(ic).vs<0, +1>() - verts.mapping<2>(ic).vs<0, -1>()).norm();
 }
 
 double AmrCells::hz(index_t ic) const {
-    z_assert(m_adaptive, "Not adaptive mesh, can't get 'hz' for cell");
-    z_assert(m_dim == 3, "Two dimensional mesh, can't get 'hz' for cell");
+    z_assert(adaptive_, "Not adaptive mesh, can't get 'hz' for cell");
+    z_assert(dim_ == 3, "Two dimensional mesh, can't get 'hz' for cell");
     return (verts.mapping<3>(ic).vs<0, 0, +1>() - verts.mapping<3>(ic).vs<0, 0, -1>()).norm();
 }
 
 double AmrCells::incircle_diameter(index_t ic) const {
-    if (m_adaptive) {
-        if (m_dim == 2) {
+    if (adaptive_) {
+        if (dim_ == 2) {
             const SqQuad &vertices = verts.mapping<2>(ic);
             return std::sqrt(std::min(
                     (vertices.vs<+1, 0>() - vertices.vs<-1, 0>()).squaredNorm(),
@@ -116,7 +84,7 @@ double AmrCells::incircle_diameter(index_t ic) const {
                     (vertices.vs<0, 0, +1>() - vertices.vs<0, 0, -1>()).squaredNorm()));
         }
     } else {
-        if (m_dim == 2) {
+        if (dim_ == 2) {
             int n = verts.count(ic);
             // Диаметр вписанной окружности внутрь правильного многоугольника
             // с площадью volume.
@@ -136,7 +104,7 @@ double AmrCells::incircle_diameter(index_t ic) const {
 
 Box AmrCells::bbox(index_t ic) const {
     // TODO: Сделать оптимальный код для декартовых сеток, и не только здесь
-    Box box = Box::Empty(m_dim);
+    Box box = Box::Empty(dim_);
     for (index_t iv: verts.range(ic)) {
         box.capture(verts[iv]);
     }
@@ -144,33 +112,33 @@ Box AmrCells::bbox(index_t ic) const {
 }
 
 Polygon AmrCells::polygon(index_t ic) const {
-    if (m_dim > 2) {
+    if (dim_ > 2) {
         throw std::runtime_error("AmrCell::polygon() error #1");
     }
 
-    if (m_adaptive) {
+    if (adaptive_) {
         std::vector<Vector3d> poly;
         poly.reserve(8);
 
         const SqQuad& vertices = verts.mapping<2>(ic);
 
         poly.push_back(vertices.vs<-1, -1>());
-        if (!m_linear && faces.is_complex(ic, Side2D::BOTTOM)) {
+        if (!linear_ && faces.is_complex(ic, Side2D::BOTTOM)) {
             poly.push_back(vertices.vs<0, -1>());
         }
 
         poly.push_back(vertices.vs<+1, -1>());
-        if (!m_linear && faces.is_complex(ic, Side2D::RIGHT)) {
+        if (!linear_ && faces.is_complex(ic, Side2D::RIGHT)) {
             poly.push_back(vertices.vs<+1, 0>());
         }
 
         poly.push_back(vertices.vs<+1, +1>());
-        if (!m_linear && faces.is_complex(ic, Side2D::TOP)) {
+        if (!linear_ && faces.is_complex(ic, Side2D::TOP)) {
             poly.push_back( vertices.vs<0, +1>());
         }
 
         poly .push_back(vertices.vs<-1, +1>());
-        if (!m_linear && faces.is_complex(ic, Side2D::LEFT)) {
+        if (!linear_ && faces.is_complex(ic, Side2D::LEFT)) {
             poly.push_back(vertices.vs<-1, 0>());
         }
 
@@ -180,11 +148,11 @@ Polygon AmrCells::polygon(index_t ic) const {
 }
 
 Polyhedron AmrCells::polyhedron(index_t ic) const {
-    if (m_dim < 3) {
+    if (dim_ < 3) {
         throw std::runtime_error("AmrCell::polyhedron() error #1");
     }
 
-    if (m_adaptive && m_linear) {
+    if (adaptive_ && linear_) {
         // Пока я умею делать только кубы
         const auto& map = verts.mapping<3>(ic);
         std::vector<Vector3d> vs = {
@@ -204,8 +172,8 @@ Polyhedron AmrCells::polyhedron(index_t ic) const {
 }
 
 double AmrCells::approx_vol_fraction(index_t ic, const InFunction &inside) const {
-    if (m_dim < 3) {
-        if (m_adaptive) {
+    if (dim_ < 3) {
+        if (adaptive_) {
             const SqQuad& vertices = verts.mapping<2>(ic);
 
             int sum = 0;
@@ -254,7 +222,7 @@ double AmrCells::approx_vol_fraction(index_t ic, const InFunction &inside) const
     }
     else {
         // Трехмерная ячейка
-        if (m_adaptive) {
+        if (adaptive_) {
             const SqCube& vertices = verts.mapping<3>(ic);
 
             int sum = 0;
@@ -310,9 +278,9 @@ double AmrCells::approx_vol_fraction(index_t ic, const InFunction &inside) const
 }
 
 double AmrCells::volume_fraction(index_t ic, const InFunction &inside, int n_points) const {
-    if (m_dim < 3) {
-        if (m_adaptive) {
-            if (m_linear) {
+    if (dim_ < 3) {
+        if (adaptive_) {
+            if (linear_) {
                 return verts.mapping<2>(ic).reduce().volume_fraction(inside, n_points);
             }
             else {
@@ -339,7 +307,7 @@ double AmrCells::volume_fraction(index_t ic, const InFunction &inside, int n_poi
         }
     }
     else {
-        if (m_adaptive) {
+        if (adaptive_) {
             return verts.mapping<3>(ic).reduce().volume_fraction(inside, n_points);
         }
         // Трехмерный многогранник
@@ -349,8 +317,8 @@ double AmrCells::volume_fraction(index_t ic, const InFunction &inside, int n_poi
 
 bool AmrCells::const_function(index_t ic, const SpFunction& func) const {
     double value = func(center[ic]);
-    if (m_dim < 3) {
-        if (m_adaptive) {
+    if (dim_ < 3) {
+        if (adaptive_) {
             const SqQuad& vertices = verts.mapping<2>(ic);
 
             // Угловые точки
@@ -385,9 +353,9 @@ bool AmrCells::const_function(index_t ic, const SpFunction& func) const {
 }
 
 double AmrCells::integrate_low(index_t ic, const SpFunction& func, int n_points) const {
-    if (m_dim < 3) {
-        if (m_adaptive) {
-            if (m_linear) {
+    if (dim_ < 3) {
+        if (adaptive_) {
+            if (linear_) {
                 return verts.mapping<2>(ic).reduce().integrate_low(func, n_points);
             }
             else {
@@ -415,7 +383,7 @@ double AmrCells::integrate_low(index_t ic, const SpFunction& func, int n_points)
     }
     else {
         // Трехмерная ячейка
-        if (m_adaptive) {
+        if (adaptive_) {
             return verts.mapping<3>(ic).reduce().integrate_low(func, n_points);
         }
         throw std::runtime_error("AmrCell::volume_fraction #1");
@@ -513,9 +481,9 @@ void AmrCells::copy_geom(index_t ic, AmrCells& cells,
     cells.verts.offsets[jc] = node_beg;
     cells.verts.offsets[jc + 1] = node_beg + verts.max_count(ic);
 
-    z_assert(cells.unique_nodes() == unique_nodes(), "Different style cells");
+    z_assert(cells.has_nodes() == has_nodes(), "Different style cells");
 
-    bool unique_nodes = cells.verts.unique_nodes();
+    bool unique_nodes = cells.verts.has_nodes();
     for (index_t i = 0; i < verts.max_count(ic); ++i) {
         index_t iv = verts.offsets[ic] + i;
         index_t jv = cells.verts.offsets[jc] + i;
@@ -558,23 +526,23 @@ void AmrCells::clear() {
 }
 
 void AmrCells::resize_amr(index_t n_cells) {
-    if (!m_adaptive) {
+    if (!adaptive_) {
         throw std::runtime_error("Resize of unstructured mesh");
     }
 
-    index_t n_faces = n_cells * (m_dim == 2 ? 8 : 24);
-    index_t n_nodes = n_cells * (m_dim == 2 ? 9 : 27);
+    index_t n_faces = n_cells * (dim_ == 2 ? 8 : 24);
+    index_t n_nodes = n_cells * (dim_ == 2 ? 9 : 27);
     
     resize(n_cells, n_faces, n_nodes);
 }
 
 void AmrCells::reserve_amr(index_t n_cells) {
-    if (!m_adaptive) {
+    if (!adaptive_) {
         throw std::runtime_error("Resize of unstructured mesh");
     }
 
-    index_t n_faces = n_cells * (m_dim == 2 ? 8 : 24);
-    index_t n_nodes = n_cells * (m_dim == 2 ? 9 : 27);
+    index_t n_faces = n_cells * (dim_ == 2 ? 8 : 24);
+    index_t n_nodes = n_cells * (dim_ == 2 ? 9 : 27);
 
     reserve(n_cells, n_faces, n_nodes);
 }
@@ -651,19 +619,19 @@ void AmrCells::shrink_to_fit_cells() {
 }
 
 void AmrCells::resize(index_t n_cells, index_t n_faces, index_t n_nodes) {
-    if_debug(m_adaptive) {
-        z_assert(n_faces == (m_dim < 3 ? 8 : 24) * n_cells, "bad sizes");
-        z_assert(n_nodes == (m_dim < 3 ? 9 : 27) * n_cells, "bad sizes");
+    if_debug(adaptive_) {
+        z_assert(n_faces == (dim_ < 3 ? 8 : 24) * n_cells, "bad sizes");
+        z_assert(n_nodes == (dim_ < 3 ? 9 : 27) * n_cells, "bad sizes");
     }
     resize_cells(n_cells);
     faces.resize(n_faces);
-    verts.resize(n_nodes);
+    verts.resize(n_cells, n_nodes);
 }
 
 void AmrCells::reserve(index_t n_cells, index_t n_faces, index_t n_nodes) {
     reserve_cells(n_cells);
     faces.reserve(n_faces);
-    verts.reserve(n_nodes);
+    verts.reserve(n_cells, n_nodes);
 }
 
 void AmrCells::shrink_to_fit() {
@@ -688,10 +656,10 @@ memory_t AmrCells::memory_usage() const {
 }
 
 void AmrCells::set_cell(index_t ic, const Quad& quad) {
-    assert(m_dim == 2);
-    assert(m_adaptive);
-    assert(m_linear);
-    assert(!m_axial);
+    assert(dim_ == 2);
+    assert(adaptive_);
+    assert(linear_);
+    assert(!axial_);
 
     rank[ic] = -1;
     index[ic] = -1;
@@ -726,10 +694,10 @@ void AmrCells::set_cell(index_t ic, const Quad& quad) {
 }
 
 void AmrCells::set_cell(index_t ic, const Quad& quad, bool axial) {
-    assert(m_dim == 2);
-    assert(m_adaptive);
-    assert(m_linear);
-    assert(m_axial == axial);
+    assert(dim_ == 2);
+    assert(adaptive_);
+    assert(linear_);
+    assert(axial_ == axial);
 
     rank[ic] = -1;
     index[ic] = -1;
@@ -797,10 +765,10 @@ void AmrCells::set_cell(index_t ic, const SqQuad& quad, bool axial) {
 }
 
 void AmrCells::set_cell(index_t ic, const Cube& cube) {
-    assert(m_dim == 3);
-    assert(m_adaptive);
-    assert(m_linear);
-    assert(!m_axial);
+    assert(dim_ == 3);
+    assert(adaptive_);
+    assert(linear_);
+    assert(!axial_);
 
     rank[ic] = -1;
     index[ic] = -1;
@@ -845,9 +813,9 @@ void AmrCells::push_back(const geom::Line &line) {
 }
 
 void AmrCells::push_back(const Polygon& poly) {
-    assert(m_dim == 2);
-    assert(!m_adaptive);
-    assert(m_linear);
+    assert(dim_ == 2);
+    assert(!adaptive_);
+    assert(linear_);
 
     index_t ic = size();
 
@@ -864,7 +832,7 @@ void AmrCells::push_back(const Polygon& poly) {
     volume[ic] = poly.area();
     center[ic] = poly.centroid(volume[ic]);
 
-    if (m_axial) {
+    if (axial_) {
         volume_alt[ic] = poly.volume_as();
     }
 
@@ -872,7 +840,7 @@ void AmrCells::push_back(const Polygon& poly) {
     int n_faces = poly.size();
 
     faces.resize(faces.size() + n_faces);
-    verts.resize(verts.size() + n_nodes);
+    verts.resize(ic + 1, verts.n_verts() + n_nodes);
 
     faces.offsets[ic + 1] = faces.offsets[ic] + n_faces;
     faces.insert(faces.offsets[ic], CellType::POLYGON, n_faces);
@@ -893,7 +861,7 @@ void AmrCells::push_back(const Polygon& poly) {
         faces.normal[iface]   = vs.normal(center[ic]);
         faces.boundary[iface] = Boundary::INNER;
 
-        if (m_axial) {
+        if (axial_) {
             faces.area_alt[iface] = vs.area_as();
         }
     }
@@ -911,10 +879,10 @@ void AmrCells::push_back(const Polyhedron& poly) {
 }
 
 void AmrCells::push_back_impl(const Polyhedron& poly) {
-    assert(m_dim == 3);
-    assert(!m_adaptive);
-    assert(m_linear);
-    assert(!m_axial);
+    assert(dim_ == 3);
+    assert(!adaptive_);
+    assert(linear_);
+    assert(!axial_);
 
     index_t ic = size();
 
@@ -935,7 +903,7 @@ void AmrCells::push_back_impl(const Polyhedron& poly) {
 
     // Зададим вершины многогранника
     int n_nodes = poly.n_verts();
-    verts.resize(verts.size() + n_nodes);
+    verts.resize(ic + 1, verts.n_verts() + n_nodes);
 
     verts.offsets[ic + 1] = verts.offsets[ic] + n_nodes;
     for (int i = 0; i < n_nodes; ++i) {
@@ -1089,10 +1057,10 @@ void AmrCells::backup(const std::filesystem::path& root, std::ofstream& file,
 
     if (mpi::master()) {
         file << std::boolalpha;
-        file << tab << "\"dim\":      " << m_dim << ",\n";
-        file << tab << "\"adaptive\": " << m_adaptive << ",\n";
-        file << tab << "\"axial\":    " << m_axial << ",\n";
-        file << tab << "\"linear\":   " << m_linear << ",\n";
+        file << tab << "\"dim\":      " << dim_ << ",\n";
+        file << tab << "\"adaptive\": " << adaptive_ << ",\n";
+        file << tab << "\"axial\":    " << axial_ << ",\n";
+        file << tab << "\"linear\":   " << linear_ << ",\n";
     }
 
     if (mpi::single()) {

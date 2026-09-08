@@ -117,7 +117,7 @@ int main() {
     // Files for output
     PvdFile pvd("mesh", "output");
     PvdFile pvd_body("body", "output");
-    pvd_body.polyhedral = true;
+    pvd_body.options.polyhedral = true;
 
     // Variables to save
     pvd.variables = {"level"};

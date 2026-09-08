@@ -194,7 +194,7 @@ void calc_errors(EuMesh& mesh, InFunction func, int nx) {
 }
 
 EuMesh body(EuMesh& mesh, int k) {
-    EuMesh clipped(2, false);
+    EuMesh clipped = EuMesh::PolySet(2);
     for (auto cell: mesh) {
         if (cell[a] <= 0.0 || (cell[a] < 0.5 && cell[ns][k].isZero())) {
             continue;

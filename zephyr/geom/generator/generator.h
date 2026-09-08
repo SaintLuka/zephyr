@@ -2,6 +2,7 @@
 
 #include <string>
 #include <memory>
+#include <zephyr/mesh/euler/amr_cells.h>
 
 namespace zephyr::utils { class Json; }
 namespace zephyr::mesh { class AmrCells; }
@@ -29,7 +30,7 @@ public:
     /// @brief Виртуальный деструктор (для наследования)
     virtual ~Generator() = default;
 
-    /// @brief Создать умный указатель по кофигу
+    /// @brief Создать умный указатель по конфигу
     static Generator::Ptr create(const Json& config);
 
     /// @brief Проверить, что можно преобразовать к наследнику
@@ -54,13 +55,13 @@ public:
     virtual bool structured() const { return false; }
 
     /// @brief Сетка с осевой симметрией?
-    bool axial() const { return m_axial; }
+    bool axial() const { return axial_; }
 
     /// @brief Адаптивная сетка?
-    bool adaptive() const { return m_adaptive; }
+    bool adaptive() const { return adaptive_; }
 
     /// @brief Линейная адаптивная сетка?
-    bool linear() const { return m_linear; }
+    bool linear() const { return linear_; }
 
     /// @brief Использовать осевую симметрию
     virtual void set_axial(bool axial);
@@ -79,21 +80,21 @@ public:
     virtual Grid make() const = 0;
 
     /// @brief Некоторые генераторы могут напрямую инициализировать хранилище
-    virtual bool can_initialize() const { return false; }
+    virtual bool can_make_cells() const { return false; }
 
     /// @brief Инициализация SoA-хранилища сетки
-    virtual void initialize(mesh::AmrCells& cells) const {
-        throw std::runtime_error("Generator::initialize: not implemented");
+    virtual mesh::AmrCells make_cells(bool unique_nodes) const {
+        throw std::runtime_error("Generator::make_cells: not implemented");
     }
 
 protected:
     /// @brief Проверить размеры сетки перед созданием
     virtual void check_size(size_t size) const;
 
-    std::string m_name;     ///< Название сеточного генератора
-    bool m_axial{false};    ///< Сетка с осевой симметрией
-    bool m_adaptive{false}; ///< Адаптивная сета
-    bool m_linear{true};    ///< Простая адаптивная сетка
+    std::string name_;     ///< Название сеточного генератора
+    bool axial_{false};    ///< Сетка с осевой симметрией
+    bool adaptive_{false}; ///< Адаптивная сета
+    bool linear_{true};    ///< Простая адаптивная сетка
 };
 
 } // namespace zephyr::mesh

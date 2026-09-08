@@ -41,7 +41,7 @@ EuMesh test1() {
     gen.set_boundaries({.left=WALL, .right=WALL, .bottom=WALL, .top=WALL});
     gen.set_nx(20);
     gen.set_adaptive(false);
-    return EuMesh(gen);
+    return EuMesh(gen, true);
 }
 
 // Простой квадрат с адаптивной декартовой сеткой
@@ -49,7 +49,7 @@ EuMesh test2() {
     Rectangle gen(-1.0, 1.0, -1.0, 1.0);
     gen.set_boundaries({.left=WALL, .right=WALL, .bottom=WALL, .top=WALL});
     gen.set_nx(20);
-    return EuMesh(gen);
+    return EuMesh(gen, true);
 }
 
 // Ячейки Вороного в прямоугольнике
@@ -57,7 +57,7 @@ EuMesh test3() {
     Rectangle gen(-1.0, 1.0, -1.0, 1.0, true);
     gen.set_boundaries({.left=WALL, .right=WALL, .bottom=WALL, .top=WALL});
     gen.set_nx(20);
-    return EuMesh(gen);
+    return EuMesh(gen, true);
 }
 
 // Декартова сетка в кубе
@@ -66,7 +66,7 @@ EuMesh test4() {
     gen.set_boundaries({.left=WALL, .right=WALL, .bottom=WALL, .top=WALL, .back=WALL, .front=WALL});
     gen.set_nx(20);
     gen.set_adaptive(false);
-    return EuMesh(gen);
+    return EuMesh(gen, true);
 }
 
 // Декартова адаптивная сетка в кубе
@@ -74,7 +74,7 @@ EuMesh test5() {
     Cuboid gen(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
     gen.set_boundaries({.left=WALL, .right=WALL, .bottom=WALL, .top=WALL, .back=WALL, .front=WALL});
     gen.set_nx(20);
-    return EuMesh(gen);
+    return EuMesh(gen, true);
 }
 
 // Extrude сетки из многоугольников
@@ -84,7 +84,7 @@ EuMesh test6() {
     gen.set_nx(20);
     Grid grid = gen.make();
     grid.extrude(Vector3d{0.0, 0.0, 1.0}, 12, WALL, WALL);
-    return EuMesh(std::move(grid));
+    return EuMesh(std::move(grid), true);
 }
 
 // Простая BlockStructured сетка
@@ -92,7 +92,7 @@ EuMesh test7() {
     collection::PlaneWithHole gen(0.0, 2.0, 0.0, 1.0, 0.6, 0.2, 0.1);
     gen.set_boundaries({.left=ZOE, .right=ZOE, .bottom=WALL, .top=WALL});
     gen.set_ny(40);
-    return EuMesh(gen);
+    return EuMesh(gen, true);
 }
 
 // BlockStructured с extrude
@@ -102,7 +102,7 @@ EuMesh test8() {
     gen.set_ny(40);
     Grid grid = gen.make();
     grid.extrude(Vector3d::UnitZ(), 20, ZOE, ZOE);
-    return EuMesh(std::move(grid));
+    return EuMesh(std::move(grid), true);
 }
 
 // BlockStructured, затем make_amr
@@ -112,7 +112,7 @@ EuMesh test9() {
     gen.set_ny(40);
     Grid grid = gen.make();
     grid.make_amr();
-    return EuMesh(std::move(grid));
+    return EuMesh(std::move(grid), true);
 }
 
 // BlockStructured, затем extrude и make_amr
@@ -123,7 +123,7 @@ EuMesh test10() {
     Grid grid = gen.make();
     grid.extrude(Vector3d::UnitZ()/5, 4, ZOE, ZOE);
     grid.make_amr();
-    return EuMesh(std::move(grid));
+    return EuMesh(std::move(grid), true);
 }
 
 // План.
@@ -145,7 +145,7 @@ void check_mesh(const EuMesh& mesh) {
 }
 
 void save_markers(const AmrNodes& nodes, std::string filename) {
-    EuMesh points(2, false);
+    EuMesh points = EuMesh::PolySet(2);
     for (int in = 0; in < nodes.n_nodes(); ++in) {
         points.add_marker(nodes.coord[in], 0.02);
     }
@@ -181,27 +181,25 @@ int main(int argc, char** argv) {
     threads::off();
 
     // Создать сетку
-    EuMesh mesh = test9();
+    EuMesh mesh = test2();
 
-    // Сетка с уникальными узлами
-    mesh.make_unique_nodes();
-
-    std::cout << "Single process:\n";
+    mpi::cout << "Single process:\n";
     check_mesh(mesh);
 
     // Файл для записи
     PvdFile pvd("mesh", "output");
-    pvd.polyhedral = true;
+    pvd.options.polyhedral = true;
 
-    auto u = mesh.add<double>("u");
+    auto u = mesh.add_cell_data<double>("u");
     for (auto cell: mesh) {
-        cell[u] = cell.center().norm();
+        double r = cell.center().norm();
+        cell[u] = std::cos(10.0 / (r * r + 0.2));
     }
 
     // Переменные для сохранения
     pvd.variables = {"level", "verts2D"};
     pvd.variables += {"u",  [u](EuCell& cell) -> double { return cell[u]; }};
-    pvd.unique_nodes = false;
+    pvd.options.unique_nodes = false;
     pvd.save(mesh, 0.0);
 
     // Bounding Box для сетки
@@ -216,8 +214,14 @@ int main(int argc, char** argv) {
 
     // Установить декомпозицию (+ делает redistribute)
     mesh.set_decomposition(orb);
+    for (auto cell: mesh) {
+        double r = cell.center().norm();
+        cell[u] = std::cos(10.0 / (r * r + 0.2));
+    }
 
-    pvd.save(mesh.locals(), 1.0);
+    pvd.options.unique_nodes = true;
+
+    pvd.save(mesh, 1.0);
 
     /*
     PvdFile pvdf("ghosts", "output");
@@ -228,7 +232,7 @@ int main(int argc, char** argv) {
     save_markers(mesh.ghost_nodes(), "nodes_aft");
     */
 
-    std::cout << "Distributed:\n";
+    mpi::cout << "Distributed:\n";
     check_mesh(mesh);
 
     return 0;

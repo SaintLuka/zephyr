@@ -174,7 +174,7 @@ int main() {
     mesh.set_distributor(solver.distributor());
 
     PvdFile pvd("tube", "output");
-    //pvd.unique_nodes = true;
+    //pvd.options.unique_nodes = true;
 
     // Переменные для сохранения
     pvd.variables = {"level", "faces2D"};

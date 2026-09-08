@@ -36,9 +36,9 @@ void AmrCells::print_info(index_t ic) const {
     for (index_t iface: faces.range(ic)) {
         if (faces.is_undefined(iface)) continue;
 
-        std::cout << "\t\t\t" << side_to_string(iface - faces.offsets[ic], m_dim) << ":\n";
+        std::cout << "\t\t\t" << side_to_string(iface - faces.offsets[ic], dim_) << ":\n";
         std::cout << "\t\t\t\tvertices:";
-        for (int j = 0; j < (m_dim < 3 ? 2 : 4); ++j) {
+        for (int j = 0; j < (dim_ < 3 ? 2 : 4); ++j) {
             std::cout << " " << faces.vertices[iface][j];
         }
         std::cout << "\n";
@@ -97,7 +97,7 @@ void AmrCells::visualize(index_t ic, std::string filename) const {
 
     file << "ax.plot([" << center[ic].x() << "], [" << center[ic].y() << "], color='black', marker='x')\n\n";
 
-    if (m_dim != 2) {
+    if (dim_ != 2) {
         throw std::runtime_error("Can't visualize 3D cell, sorry");
     }
 
@@ -160,10 +160,10 @@ int AmrCells::check_geometry(index_t ic) const {
         if (faces.is_undefined(iface)) continue;
 
         Vector3d fc(0.0, 0.0, 0.0);
-        for (int iv = 0; iv < indexing::VpF(m_dim); ++iv) {
+        for (int iv = 0; iv < indexing::VpF(dim_); ++iv) {
             fc += verts[verts.offsets[ic] + faces.vertices[iface][iv]];
         }
-        fc /= indexing::VpF(m_dim);
+        fc /= indexing::VpF(dim_);
 
         // Нормаль внешняя
         if (faces.normal[iface].dot(fc - center[ic]) < 0.0) {
@@ -184,7 +184,7 @@ int AmrCells::check_geometry(index_t ic) const {
                 return -1;
             }
         }
-        if (n_verts_per_face < m_dim) {
+        if (n_verts_per_face < dim_) {
             std::cout << "\tWrong number of vertices in face\n";
             print_info(ic);
             return -1;
@@ -199,15 +199,15 @@ int AmrCells::check_geometry(index_t ic) const {
         }
 
         // Число вершин адаптивной ячейки фиксированно
-        if (m_adaptive && n_verts_per_face != indexing::VpF(m_dim)) {
+        if (adaptive_ && n_verts_per_face != indexing::VpF(dim_)) {
             std::cout << "\tWrong number of vertices in face\n";
             print_info(ic);
             return -1;
         }
 
         // Вершины грани перечислены в правильном порядке
-        if (m_dim > 2) {
-            if (m_adaptive) {
+        if (dim_ > 2) {
+            if (adaptive_) {
                 // Обход по кривой Мортона (вроде как)
                 Vector3d v0 = verts[verts.offsets[ic] + faces.vertices[iface][0]];
                 Vector3d v1 = verts[verts.offsets[ic] + faces.vertices[iface][1]];
@@ -250,9 +250,9 @@ int AmrCells::check_geometry(index_t ic) const {
 
 int AmrCells::check_base_face_orientation(index_t ic) const {
     // Для обычных сеток проверять нечего
-    if (!m_adaptive) return 0;
+    if (!adaptive_) return 0;
 
-    if (m_dim == 2) {
+    if (dim_ == 2) {
         Vector3d nx1 = faces.normal[faces.offsets[ic] + Side3D::L];
         Vector3d nx2 = faces.normal[faces.offsets[ic] + Side3D::R];
         Vector3d ny1 = faces.normal[faces.offsets[ic] + Side3D::B];
@@ -317,14 +317,14 @@ int AmrCells::check_base_face_orientation(index_t ic) const {
 
 int AmrCells::check_base_vertices_order(index_t ic) const {
     // Для обычных сеток проверять нечего
-    if (!m_adaptive) return 0;
+    if (!adaptive_) return 0;
 
     const double h = linear_size(ic);
     auto close = [h](Vector3d& x, Vector3d& y) -> bool {
         return (x - y).norm() < 1.0e-6 * h;
     };
 
-    if (m_dim == 2) {
+    if (dim_ == 2) {
         SqQuad quad = verts.mapping<2>(ic);
 
         bool bad = false;
@@ -477,7 +477,7 @@ int AmrCells::check_base_vertices_order(index_t ic) const {
 }
 
 int AmrCells::check_complex_faces(index_t ic) const {
-    if (m_dim == 2) {
+    if (dim_ == 2) {
         for (Side2D side: Side2D::items()) {
             auto iface1 = faces.offsets[ic] + side;
             auto iface2 = faces.offsets[ic] + side[1];
@@ -486,7 +486,7 @@ int AmrCells::check_complex_faces(index_t ic) const {
             }
 
             if (std::abs(faces.normal[iface1].dot(faces.normal[iface2]) - 1.0) > 1.0e-2) {
-                std::cout << "\tSubfaces are not co-directed (" << side_to_string(side, m_dim) << ")\n";
+                std::cout << "\tSubfaces are not co-directed (" << side_to_string(side, dim_) << ")\n";
                 print_info(ic);
                 return -1;
             }
@@ -515,7 +515,7 @@ int AmrCells::check_complex_faces(index_t ic) const {
             auto iface3 = faces.offsets[ic] + side[2];
             auto iface4 = faces.offsets[ic] + side[3];
             if (faces.is_undefined(iface3) || faces.is_undefined(iface4)) {
-                std::cout << "\tComplex 3D face (" + side_to_string(side, m_dim) + " side) has less than 4 subfaces\n";
+                std::cout << "\tComplex 3D face (" + side_to_string(side, dim_) + " side) has less than 4 subfaces\n";
                 print_info(ic);
                 return -1;
             }
@@ -524,7 +524,7 @@ int AmrCells::check_complex_faces(index_t ic) const {
             double d2 = std::abs(faces.normal[iface1].dot(faces.normal[iface3]) - 1.0);
             double d3 = std::abs(faces.normal[iface1].dot(faces.normal[iface4]) - 1.0);
             if (d1 + d2 + d3 > 1.0e-5) {
-                std::cout << "\tSubfaces are not co-directed (" + side_to_string(side, m_dim) << ")\n";
+                std::cout << "\tSubfaces are not co-directed (" + side_to_string(side, dim_) << ")\n";
                 print_info(ic);
                 return -1;
             }
@@ -609,7 +609,7 @@ int AmrCells::check_connectivity(index_t ic, const AmrCells& ghosts) const {
             return -1;
         }
 
-        int n_symmetries = m_dim == 2 ? 8 : 48;
+        int n_symmetries = dim_ == 2 ? 8 : 48;
         if (adj.rotation[iface] > n_symmetries) {
             std::cout << "\tadjacent.rotation out of range\n";
             print_info(ic);

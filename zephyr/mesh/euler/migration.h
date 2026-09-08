@@ -10,6 +10,9 @@ namespace zephyr::mesh {
 
 class Migration {
 public:
+    /// @brief Инициализирует буфер с теми же опциями
+    void init_types(const AmrCells& cells);
+
     /// @brief Очистить буферы
     void clear();
 
@@ -102,9 +105,7 @@ void Migration::fill_migrant_cells(
     // cell_offsets[i] показывает с какого индекса в migrants ставить i-ранковую ячейку.
 
     // Заполняем migrants, сортируем по rank
-    if (cells.unique_nodes()) {
-        cell_buffer_.verts.init_unique();
-    }
+    z_assert(cells.has_nodes() == cell_buffer_.has_nodes(), "Migration: buffer and cells options mismatch");
     cell_buffer_.resize(
             cells.n_cells(),
             cells.n_faces(),
@@ -226,9 +227,9 @@ void Migration::migrate(Tourism& tourism, AmrCells& cells, AmrNodes& nodes, Vars
 
     // Составим полные матрицы пересылок (совпадают на всех процессах).
     // То есть заполним node_router, inct_router.
-    fill_node_routers(nodes, cells.unique_nodes());
+    fill_node_routers(nodes, cells.has_nodes());
 
-    if (cells.unique_nodes()) {
+    if (cells.has_nodes()) {
         // Переиндексировать узлы, отправить новые индексы и ранги в ghost-узлы
         nodes_reindexing(tourism, nodes);
 
@@ -239,7 +240,7 @@ void Migration::migrate(Tourism& tourism, AmrCells& cells, AmrNodes& nodes, Vars
     // Перенести ячейки из cells в migrants в нужном порядке
     fill_migrant_cells(cells, loc_vars, mig_vars);
 
-    if (cells.unique_nodes()) {
+    if (cells.has_nodes()) {
         fill_migrant_nodes(nodes, {}, {});
     }
 
@@ -264,7 +265,7 @@ void Migration::migrate(Tourism& tourism, AmrCells& cells, AmrNodes& nodes, Vars
         cell_buffer_.verts.offsets[ic] = cell_buffer_.verts.offsets[ic + 1] - cell_buffer_.verts.offsets[ic];
     }
 
-    if (cells.unique_nodes()) {
+    if (cells.has_nodes()) {
         for (index_t in = 0; in < node_buffer_.size(); ++in) {
             node_buffer_.incident.offsets[in] = node_buffer_.incident.offsets[in + 1] - node_buffer_.incident.offsets[in];
         }
@@ -310,7 +311,7 @@ void Migration::migrate(Tourism& tourism, AmrCells& cells, AmrNodes& nodes, Vars
     // Отправить вершины
     RequestsList verts_send; verts_send.reserve(3);
     verts_send += vert_router_.isend(cell_buffer_.verts.coord, MpiTag::VERT_COORD);
-    if (cell_buffer_.verts.unique_nodes()) {
+    if (cell_buffer_.verts.has_nodes()) {
         verts_send += vert_router_.isend(cell_buffer_.verts.rank,  MpiTag::VERT_RANK);
         verts_send += vert_router_.isend(cell_buffer_.verts.index, MpiTag::VERT_INDEX);
         verts_send += vert_router_.isend(cell_buffer_.verts.ghost, MpiTag::VERT_GHOST);
@@ -319,7 +320,7 @@ void Migration::migrate(Tourism& tourism, AmrCells& cells, AmrNodes& nodes, Vars
     // Отправить данные узлов
     RequestsList nodes_send;
     RequestsList incident_send;
-    if (cells.unique_nodes()) {
+    if (cells.has_nodes()) {
         nodes_send.reserve(5);
         nodes_send += node_router_.isend(node_buffer_.rank,  MpiTag::NODE_RANK);
         nodes_send += node_router_.isend(node_buffer_.next,  MpiTag::NODE_NEXT);
@@ -377,7 +378,7 @@ void Migration::migrate(Tourism& tourism, AmrCells& cells, AmrNodes& nodes, Vars
     // Получить вершины
     RequestsList verts_recv; verts_recv.reserve(3);
     verts_recv += vert_router_.irecv(cells.verts.coord, MpiTag::VERT_COORD);
-    if (cell_buffer_.verts.unique_nodes()) {
+    if (cell_buffer_.verts.has_nodes()) {
         verts_recv += vert_router_.irecv(cells.verts.rank,  MpiTag::VERT_RANK);
         verts_recv += vert_router_.irecv(cells.verts.index, MpiTag::VERT_INDEX);
         verts_recv += vert_router_.irecv(cells.verts.ghost, MpiTag::VERT_GHOST);
@@ -386,7 +387,7 @@ void Migration::migrate(Tourism& tourism, AmrCells& cells, AmrNodes& nodes, Vars
     // Получить данные узлов
     RequestsList nodes_recv;
     RequestsList incident_recv;
-    if (cells.unique_nodes()) {
+    if (cells.has_nodes()) {
         nodes_recv.reserve(5);
         nodes_recv += node_router_.irecv(nodes.rank,  MpiTag::NODE_RANK);
         nodes_recv += node_router_.irecv(nodes.next,  MpiTag::NODE_NEXT);
@@ -410,7 +411,7 @@ void Migration::migrate(Tourism& tourism, AmrCells& cells, AmrNodes& nodes, Vars
     data_send.wait();   // Завершить отправку данных ячеек
     faces_send.wait();  // Завершить отправку граней
     verts_send.wait();  // Завершить отправку вершин
-    if (cells.unique_nodes()) {
+    if (cells.has_nodes()) {
         nodes_send.wait();
         incident_send.wait();
     }
@@ -421,7 +422,7 @@ void Migration::migrate(Tourism& tourism, AmrCells& cells, AmrNodes& nodes, Vars
     data_recv.wait();   // Завершить получение данных ячеек
     faces_recv.wait();  // Завершить получение граней
     verts_recv.wait();  // Завершить получение вершин
-    if (cells.unique_nodes()) {
+    if (cells.has_nodes()) {
         nodes_recv.wait();
         incident_recv.wait();
     }
@@ -434,7 +435,7 @@ void Migration::migrate(Tourism& tourism, AmrCells& cells, AmrNodes& nodes, Vars
         cells.verts.offsets[ic + 1] += cells.verts.offsets[ic];
     }
 
-    if (cells.unique_nodes()) {
+    if (cells.has_nodes()) {
         for (index_t in = 0; in < nodes.n_nodes(); ++in) {
             nodes.incident.offsets[in + 1] += nodes.incident.offsets[in];
         }

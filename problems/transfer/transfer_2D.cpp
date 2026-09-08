@@ -54,7 +54,7 @@ public:
         }
 
         auto vs = body.outline(100);
-        EuMesh cells(2, false);
+        EuMesh cells = EuMesh::PolySet(2);
         for (size_t i = 0; i < vs.size(); ++i) {
             size_t j = (i + 1) % vs.size();
             Line line = {vs[i], vs[j]};

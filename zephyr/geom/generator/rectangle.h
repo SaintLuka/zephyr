@@ -28,10 +28,10 @@ public:
     explicit Rectangle(const Json& config);
 
     /// @brief Конструктор класса
-    /// @param xmin, xmax Границы прямоугольника по оси x
-    /// @param ymin, ymax Границы прямоугольника по оси y
+    /// @param x_min, x_max Границы прямоугольника по оси x
+    /// @param y_min, y_max Границы прямоугольника по оси y
     /// @param voronoi Использовать ячейки Вороного
-    Rectangle(double xmin, double xmax, double ymin, double ymax, bool voronoi = false);
+    Rectangle(double x_min, double x_max, double y_min, double y_max, bool voronoi = false);
 
     /// @brief Создать указатель на класс
     template <class... Args>
@@ -40,7 +40,7 @@ public:
     }
 
     /// @brief Структурированная сетка?
-    bool structured() const override { return !m_voronoi; }
+    bool structured() const override { return !voronoi_; }
 
     /// @brief Установить желаемое число ячеек сетки по оси Ox
     /// @details Число ячеек по оси Oy подбирается так, чтобы aspect ячеек
@@ -70,7 +70,7 @@ public:
     void set_adaptive(bool adaptive) override;
 
     /// @brief Использовать линейную адаптацию
-    void set_linear(bool) override { m_linear = true; }
+    void set_linear(bool) override { linear_ = true; }
 
     /// @brief Ограничивающий объем
     Box bbox() const override;
@@ -79,10 +79,10 @@ public:
     Grid make() const override;
 
     /// @brief Может инициализировать хранилище (для адаптивной декартовой сетки)
-    bool can_initialize() const override { return m_adaptive && !m_voronoi; }
+    bool can_make_cells() const override { return adaptive_ && !voronoi_; }
 
     /// @brief Инициализация SoA-хранилища сетки
-    void initialize(mesh::AmrCells& cells) const override;
+    mesh::AmrCells make_cells(bool unique_nodes) const override;
 
     // Далее не самые полезные get-функции
 
@@ -135,12 +135,12 @@ private:
     /// @brief Создать сетку из шестиугольников
     void initialize_voronoi(mesh::AmrCells& cells);
 
-    int m_nx{0}, m_ny{0};   ///< Число ячеек по осям
-    int m_size{0};          ///< Суммарное число ячеек
-    double m_xmin, m_xmax;  ///< Границы области по оси X
-    double m_ymin, m_ymax;  ///< Границы области по оси Y
-    Boundaries m_bounds;    ///< Граничные условия
-    bool m_voronoi = false; ///< Использовать ячейки Вороного
+    int nx_{0}, ny_{0};     ///< Число ячеек по осям
+    int size_{0};           ///< Суммарное число ячеек
+    double x_min_, x_max_;  ///< Границы области по оси X
+    double y_min_, y_max_;  ///< Границы области по оси Y
+    Boundaries bounds_;    ///< Граничные условия
+    bool voronoi_ = false; ///< Использовать ячейки Вороного
 };
 
 } // namespace zephyr::geom::generator

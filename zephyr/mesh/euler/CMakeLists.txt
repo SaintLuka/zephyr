@@ -1,11 +1,11 @@
 set(ZEPHYR_MESH_EULER_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/amr_cells.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/amr_cells_dbg.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/amr_cells_gen.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/amr_faces.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/amr_nodes.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/amr_verts.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/distributor.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/eu_node.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/eu_prim.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/eu_mesh.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/eu_mesh_decomp.cpp
@@ -20,6 +20,7 @@ install(FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/amr_nodes.h
     ${CMAKE_CURRENT_SOURCE_DIR}/amr_verts.h
     ${CMAKE_CURRENT_SOURCE_DIR}/distributor.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/eu_node.h
     ${CMAKE_CURRENT_SOURCE_DIR}/eu_prim.h
     ${CMAKE_CURRENT_SOURCE_DIR}/eu_mesh.h
     ${CMAKE_CURRENT_SOURCE_DIR}/migration.h

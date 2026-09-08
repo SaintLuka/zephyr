@@ -57,7 +57,7 @@ public:
         auto triangles = body.triangulation(400);
         int n_triangles = triangles.size();
 
-        EuMesh cells(2, false);
+        EuMesh cells = EuMesh::PolySet(2);
         cells.locals().reserve(n_triangles, 3 * n_triangles, 3 * n_triangles);
         for (const auto& tri: triangles) {
             Polygon poly(tri);
@@ -92,7 +92,7 @@ int main() {
     PvdFile pvd("mesh", "output");
     PvdFile pvd_body("body", "output");
     PvdFile pvd_exact("exact", "output");
-    pvd_body.polyhedral = true;
+    pvd_body.options.polyhedral = true;
 
     // Геометрия области
     Cuboid gen(0.0, 1.0, 0.0, 0.7, 0.0, 0.6);

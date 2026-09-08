@@ -30,7 +30,7 @@ void save_origin() {
     poly2.move(Vector3d::UnitX());
     poly3.move(Vector3d::UnitY());
 
-    EuMesh orig(3, false);
+    EuMesh orig = EuMesh::PolySet(3);
     orig.push_back(poly1);
     orig.push_back(poly2);
     orig.push_back(poly3);
@@ -48,7 +48,7 @@ void save_history(const std::vector<double>& ps, const std::vector<Vector3d>& ns
     poly3.move(Vector3d::UnitY());
 
     PvdFile pvd("clipped", "out");
-    pvd.polyhedral = true;
+    pvd.options.polyhedral = true;
 
     for (int i = 0; i < ps.size(); ++i) {
         Vector3d p = ps[i] * ns[i];
@@ -57,7 +57,7 @@ void save_history(const std::vector<double>& ps, const std::vector<Vector3d>& ns
         auto clip2 = poly2.clip(p, ns[i]);
         auto clip3 = poly3.clip(p, ns[i]);
 
-        EuMesh clipped(3, false);
+        EuMesh clipped = EuMesh::PolySet(3);
         clipped.push_back(clip1);
         clipped.push_back(clip2);
         clipped.push_back(clip3);

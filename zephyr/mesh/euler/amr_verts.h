@@ -22,14 +22,13 @@ template <int dim>
 using SqMap = std::conditional_t<dim < 3, geom::SqQuad, geom::SqCube>;
 
 /// @brief Набор дублирующихся вершин ячеек в форме Structure of Arrays (набор массивов).
-///
 class AmrVerts final {
     // aliases inside class
     using Vector3d = geom::Vector3d;
 
     /// @brief Используются уникальные узлы? Если unique = false, тогда массивы
-    /// index и ghost пустые. В обратном случае все массивы одного размера.
-    bool unique_ = false;
+    /// rank, index и ghost пустые. Иначе все массивы одного размера.
+    bool has_nodes_ = false;
 
 public:
     /// @brief Индексы первых вершин ячеек (CSR-структура)
@@ -51,19 +50,32 @@ public:
 
 
     /// @brief Пустые массивы по умолчанию
-    AmrVerts() = default;
+    /// @param unique_nodes Нужны уникальные узлы?
+    explicit AmrVerts(bool unique_nodes = false);
 
     /// @brief Используются уникальные узлы?
-    bool unique_nodes() const { return unique_; }
+    bool has_nodes() const { return has_nodes_; }
+
+    /// @brief Пустой массив вершин?
+    bool empty() const { return coord.empty(); }
+
+    /// @brief Число ячеек
+    index_t n_cells() const { return offsets.size() - 1; }
 
     /// @brief Число вершин
-    index_t size() const { return coord.size(); }
+    index_t n_verts() const { return coord.size(); }
 
     /// @brief Изменить размер под число вершин
-    void resize(index_t n_verts);
+    void resize(index_t n_cells, index_t n_verts);
+
+    /// @brief Изменить размер под AMR-ячейки
+    void resize_amr(index_t n_cells, int dim);
 
     /// @brief Расширить буфер под число вершин
-    void reserve(index_t n_verts);
+    void reserve(index_t n_cells, index_t n_verts);
+
+    /// @brief Расширить буфер под AMR-ячейки
+    void reserve_amr(index_t n_cells, int dim);
 
     /// @brief Сжать до актуальных размеров
     void shrink_to_fit();
@@ -73,15 +85,6 @@ public:
 
     /// @brief Оператор доступа к координате
     const Vector3d& operator[](index_t idx) const { return coord[idx]; }
-
-    /// @brief Забыть об уникальных узлах
-    void clear_unique();
-
-    /// @brief Инициализировать массивы для уникальных узлов
-    void init_unique(index_t idx = -13, index_t gst = -1);
-
-    /// @brief Расход памяти
-    memory_t memory_usage() const;
 
     /// @brief Число вершин, оно же максимальное, хранение неактуальных вершин
     /// не допускается.
@@ -121,6 +124,9 @@ public:
     const SqMap<dim>& mapping(index_t ic) const {
         return *reinterpret_cast<const SqMap<dim>*>(coords_data(ic));
     }
+
+    /// @brief Расход памяти
+    memory_t memory_usage() const;
 };
 
 } // namespace zephyr::mesh

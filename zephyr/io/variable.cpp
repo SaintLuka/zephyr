@@ -161,7 +161,7 @@ Variable::Variable(const char* name)
         m_write = [max_verts=m_n_components](const EuCell& cell, void *arg) {
             const mesh::AmrCells& cells = cell.cells();
             int n_nodes = cell.adaptive() ? max_verts : std::min(max_verts, cell.node_count());
-            if (!cells.unique_nodes()) {
+            if (!cells.has_nodes()) {
                 n_nodes = 0;
             }
             const auto out = static_cast<int8_t *>(arg);
@@ -179,7 +179,7 @@ Variable::Variable(const char* name)
         m_write = [max_verts=m_n_components](const EuCell& cell, void *arg) {
             const mesh::AmrCells& cells = cell.cells();
             int n_nodes = cell.adaptive() ? max_verts : std::min(max_verts, cell.node_count());
-            if (!cells.unique_nodes()) {
+            if (!cells.has_nodes()) {
                 n_nodes = 0;
             }
             const auto out = static_cast<int32_t*>(arg);
@@ -197,7 +197,7 @@ Variable::Variable(const char* name)
         m_write = [max_verts=m_n_components](const EuCell& cell, void *arg) {
             const mesh::AmrCells& cells = cell.cells();
             int n_nodes = cell.adaptive() ? max_verts : std::min(max_verts, cell.node_count());
-            if (!cells.unique_nodes()) {
+            if (!cells.has_nodes()) {
                 n_nodes = 0;
             }
             const auto out = static_cast<int32_t*>(arg);

@@ -11,6 +11,8 @@
 #include <zephyr/mesh/euler/migration.h>
 #include <zephyr/mesh/decomp/ORB.h>
 
+#include "zephyr/geom/generator/array2d.h"
+
 // forward declaration
 namespace zephyr::geom {
 class Line;
@@ -42,17 +44,18 @@ class EuMesh {
 public:
     /// @{ @name Создание сетки
 
-    /// @brief Создание сетки с помощью сеточного генератора
-    explicit EuMesh(geom::Generator& gen);
-
-    /// @brief Конструируемая сетка, можно добавлять полигоны, но связи
-    /// с соседями не восстанавливаются, используется для визуализации.
-    EuMesh(int dim, bool adaptive, bool axial = false);
-
     /// @brief Инициализация сетки из json-конфига
     explicit EuMesh(const utils::Json& config);
 
-    explicit EuMesh(geom::Grid&& grid);
+    /// @brief Создание сетки с помощью сеточного генератора
+    explicit EuMesh(geom::Generator& gen, bool unique_nodes = false);
+
+    explicit EuMesh(geom::Grid&& grid, bool unique_nodes = false);
+
+    /// @brief Сетка для заполнения ячейками через push_back;
+    /// Можно добавлять полигоны и многогранники, но связи с соседями
+    /// не восстанавливаются, используется для визуализации.
+    static EuMesh PolySet(int dim);
 
     /// @brief Добавить на неструктурированную сетку ячейку в виде отрезка
     /// (сплюснутая четырехугольная ячейка)
@@ -74,16 +77,16 @@ public:
     /// @{ @name Общие свойства
 
     /// @brief Размерность сетки (= 2 для сеток с осевой симметрией)
-    int dim() const { return m_locals.dim(); }
+    int dim() const { return local_cells_.dim(); }
 
     /// @brief Сетка с осевой симметрией?
-    bool axial() const { return m_locals.axial(); }
+    bool axial() const { return local_cells_.axial(); }
 
     /// @brief Отсутствуют ячейки на данном процессе?
     bool empty() const { return n_cells() == 0; }
 
     /// @brief Число ячеек на данном процессе
-    index_t n_cells() const { return m_locals.size(); }
+    index_t n_cells() const { return local_cells_.size(); }
 
     /// @brief Ограничивающий прямоугольник (кубоид) области
     geom::Box bbox() const;
@@ -92,16 +95,42 @@ public:
 
     /// @{ @name Массивы данных
 
-    /// @brief Добавить тип данных на сетку
+    /// @brief Добавить данные к ячейкам сетки
     /// @param name Имя массива данных
     template <typename T>
-    Storable<T> add(const std::string& name);
+    Storable<T> add(const std::string& name) {
+        return add_cell_data<T>(name);
+    }
 
-    /// @brief Добавить векторный тип данных на сетку
+    /// @brief Добавить данные к ячейкам сетки
+    /// @param name Имя массива данных
+    template <typename T>
+    Storable<T> add_cell_data(const std::string& name);
+
+    /// @brief Добавить данные к узлам сетки
+    /// @param name Имя массива данных
+    template <typename T>
+    Storable<T> add_node_data(const std::string& name);
+
+    /// @brief Добавить векторный тип данных к ячейкам сетки
     /// @param name Имя поля данных должно быть уникальным
     /// @param count Число компонент
     template<typename T>
-    Storable<T> add(const std::string &name, int count);
+    Storable<T> add(const std::string &name, int count) {
+        return add_cell_data<T>(name, count);
+    }
+
+    /// @brief Добавить векторный тип данных к ячейкам сетки
+    /// @param name Имя поля данных должно быть уникальным
+    /// @param count Число компонент
+    template<typename T>
+    Storable<T> add_cell_data(const std::string &name, int count);
+
+    /// @brief Добавить векторный тип данных к узлам сетки
+    /// @param name Имя поля данных должно быть уникальным
+    /// @param count Число компонент
+    template<typename T>
+    Storable<T> add_node_data(const std::string &name, int count);
 
     /// @brief Добавить несколько одинаковых **скалярных** полей
     /// @param names Имена полей данных, должны быть уникальными
@@ -220,17 +249,23 @@ public:
     operator AmrCells&() { return locals(); }
 
     /// @brief Локальные ячейки (принадлежат данному процессу)
-    AmrCells& locals() { return m_locals; }
+    AmrCells& locals() { return local_cells_; }
 
     /// @brief Локальные ячейки (принадлежат данному процессу)
-    const AmrCells& locals() const { return m_locals; }
+    AmrCells& local_cells() { return local_cells_; }
+
+    /// @brief Локальные ячейки (принадлежат данному процессу)
+    const AmrCells& locals() const { return local_cells_; }
+
+    /// @brief Локальные ячейки (принадлежат данному процессу)
+    const AmrCells& local_cells() const { return local_cells_; }
 
 #ifdef ZEPHYR_MPI
     /// @brief Слой обменных ячеек (с других процессов)
-    AmrCells& ghosts() { return m_tourists.ghost_cells(); }
+    AmrCells& ghosts() { return tourists_.ghost_cells(); }
 
     /// @brief Слой обменных ячеек (с других процессов)
-    const AmrCells& ghosts() const { return m_tourists.ghost_cells(); }
+    const AmrCells& ghosts() const { return tourists_.ghost_cells(); }
 #endif
 
     /// @}
@@ -245,7 +280,7 @@ public:
     void sync(Args&&... vars);
 
     /// @brief Ссылка на декомпозицию
-    const Decomposition& decomp() const { return *m_decomp; }
+    const Decomposition& decomp() const { return *decomp_; }
 
     /// @brief Добавить декомпозицию сетки, основная функция
     /// @param decmp Умный указатель на декомпозицию
@@ -274,7 +309,7 @@ public:
     void prebalancing(int n_iters);
 
     /// @brief Перераспределить ячейки между процессами в соответствии с
-    /// рангом, который возвращает функция m_decomp::rank().
+    /// рангом, который возвращает функция decomp_::rank().
     ///
     /// До вызова redistribute распределенная сетка должна быть согласована
     /// и после вызова остается согласованной (массивы locals и ghosts
@@ -288,19 +323,19 @@ public:
     /// @{ @name Функции структурированной сетки
 
     /// @brief Структурированная сетка (распределенная = false)
-    bool structured() const { return m_structured; }
+    bool structured() const { return structured_; }
 
     /// @brief Число ячеек по оси x для структурированных сеток,
     /// число всех ячеек для сеток общего вида
-    int nx() const { return m_nx; };
+    int nx() const { return nx_; };
 
     /// @brief Число ячеек по оси y для структурированных сеток,
     /// единица для сеток общего вида
-    int ny() const { return m_ny; };
+    int ny() const { return ny_; };
 
     /// @brief Число ячеек по оси z для структурированных сеток,
     /// единица для сеток общего вида
-    int nz() const { return m_nz; };
+    int nz() const { return nz_; };
 
     /// @brief Получить ячейку по нескольким индексам подразумевая, что сетка
     /// является структурированной. Индексы периодически замкнуты (допускаются
@@ -319,16 +354,16 @@ public:
     /// @{ @name Работа с уникальными узлами
     ///
     /// @brief Заполнен ли массив с уникальными узлами?
-    bool unique_nodes() const { return !m_local_nodes.empty(); }
+    bool has_nodes() const { return !local_nodes_.empty(); }
 
     /// @brief Ссылка на массив уникальных узлов
-    const AmrNodes& nodes() const { return m_local_nodes; }
+    const AmrNodes& nodes() const { return local_nodes_; }
+
+    /// @brief Ссылка на массив уникальных узлов
+    const AmrNodes& local_nodes() const { return local_nodes_; }
 
     /// @brief Ссылка на массив уникальных узлов
     const AmrNodes& ghost_nodes() const;
-
-    /// @brief Собрать массивы уникальных узлов
-    void make_unique_nodes();
 
     /// @}
 
@@ -351,8 +386,11 @@ public:
     /// @}
 
 private:
+    /// @brief Конструктор пустой сетки
+    EuMesh() = default;
+
     /// @brief Реальный конструктор сетки
-    void build_(geom::Generator& gen);
+    void build_(geom::Generator& gen, bool unique_nodes);
 
     /// @brief Синхронизовать общие параметры сетки
     void sync_params_();
@@ -370,25 +408,25 @@ private:
     void setup_ranks();
 
     /// @brief Максимальный уровень адаптации для адаптивной сетки
-    int m_max_level = 0;
+    int max_level_ = 0;
 
     /// @brief Процедуры слияния и огрубления данных при адаптации
-    Distributor m_distributor;
+    Distributor distributor_;
 
-    AmrCells m_locals;       ///< Ячейки, которые принадлежат данному процессу
-    AmrNodes m_local_nodes;  ///< Узлы, которые принадлежат данному процессу
+    AmrCells local_cells_;  ///< Ячейки, которые принадлежат данному процессу
+    AmrNodes local_nodes_;  ///< Узлы, которые принадлежат данному процессу
 
     /// @brief Метод декомпозиции
-    Decomposition::Ptr m_decomp = nullptr;
+    Decomposition::Ptr decomp_ = nullptr;
 
 #ifdef ZEPHYR_MPI
-    Tourism   m_tourists;  ///< Построение обменных слоев и обмены
-    Migration m_migrants;  ///< Пересылка ячеек при изменении декомпозиции
+    Tourism   tourists_;  ///< Построение обменных слоев и обмены
+    Migration migrants_;  ///< Пересылка ячеек при изменении декомпозиции
 #endif
 
     /// @brief Структурированная сетка? (только для однопроцессорных)
-    bool m_structured{false};
-    int m_nx{1}, m_ny{1}, m_nz{1};  ///< Размеры структурированной сетки
+    bool structured_{false};
+    int nx_{1}, ny_{1}, nz_{1};  ///< Размеры структурированной сетки
 };
 
 
@@ -397,10 +435,10 @@ private:
 // ============================================================================
 
 template <typename T>
-Storable<T> EuMesh::add(const std::string& name) {
-    auto res1 = m_locals.data.add<T>(name);
+Storable<T> EuMesh::add_cell_data(const std::string& name) {
+    auto res1 = local_cells_.data.add<T>(name);
 #ifdef ZEPHYR_MPI
-    auto res2 = m_tourists.add_cell_data<T>(name);
+    auto res2 = tourists_.add_cell_data<T>(name);
     if (res1 != res2) {
         throw std::runtime_error("EuMesh error: bad add_cell_data<T> #2");
     }
@@ -409,12 +447,36 @@ Storable<T> EuMesh::add(const std::string& name) {
 }
 
 template <typename T>
-Storable<T> EuMesh::add(const std::string& name, int count) {
-    auto res1 = m_locals.data.add<T>(name, count);
+Storable<T> EuMesh::add_node_data(const std::string& name) {
+    auto res1 = local_nodes_.data.add<T>(name);
 #ifdef ZEPHYR_MPI
-    auto res2 = m_tourists.add_cell_data<T>(name, count);
+    auto res2 = tourists_.add_node_data<T>(name);
+    if (res1 != res2) {
+        throw std::runtime_error("EuMesh error: bad add_node_data<T> #2");
+    }
+#endif
+    return res1;
+}
+
+template <typename T>
+Storable<T> EuMesh::add_cell_data(const std::string& name, int count) {
+    auto res1 = local_cells_.data.add<T>(name, count);
+#ifdef ZEPHYR_MPI
+    auto res2 = tourists_.add_cell_data<T>(name, count);
     if (res1 != res2) {
         throw std::runtime_error("EuMesh error: bad add_cell_data<T> #2");
+    }
+#endif
+    return res1;
+}
+
+template <typename T>
+Storable<T> EuMesh::add_node_data(const std::string& name, int count) {
+    auto res1 = local_nodes_.data.add<T>(name, count);
+#ifdef ZEPHYR_MPI
+    auto res2 = tourists_.add_node_data<T>(name, count);
+    if (res1 != res2) {
+        throw std::runtime_error("EuMesh error: bad add_node_data<T> #2");
     }
 #endif
     return res1;
@@ -422,9 +484,9 @@ Storable<T> EuMesh::add(const std::string& name, int count) {
 
 template <typename T>
 void EuMesh::swap(Storable<T> var1, Storable<T> var2) {
-    m_locals.data.swap<T>(var1, var2);
+    local_cells_.data.swap<T>(var1, var2);
 #ifdef ZEPHYR_MPI
-    m_tourists.swap_cell_data<T>(var1, var2);
+    tourists_.swap_cell_data<T>(var1, var2);
 #endif
 }
 
@@ -432,7 +494,7 @@ template <typename... Args, typename >
 void EuMesh::sync(Args&&... vars) {
 #ifdef ZEPHYR_MPI
     if (mpi::single()) return;
-    m_tourists.sync(m_locals, std::forward<Args>(vars)...);
+    tourists_.sync(local_cells_, std::forward<Args>(vars)...);
 #endif
 }
 
@@ -442,8 +504,8 @@ void EuMesh::redistribute(Args&&... vars) {
     if (mpi::single()) return;
 
     setup_ranks();
-    m_migrants.migrate(
-        m_tourists, m_locals, m_local_nodes,
+    migrants_.migrate(
+        tourists_, local_cells_, local_nodes_,
         std::forward<Args>(vars)...);
 #endif
 }

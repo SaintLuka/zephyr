@@ -18,6 +18,10 @@ inline std::ostream &operator<<(std::ostream &os, const std::vector<index_t> &ar
     return os;
 }
 
+void Migration::init_types(const AmrCells& cells) {
+    cell_buffer_ = AmrCells(cells.options());
+}
+
 void Migration::clear() {
     cell_buffer_.clear();
     node_buffer_.clear();
@@ -227,7 +231,7 @@ void Migration::update_face_adjacent(AmrCells& locals, const AmrCells& ghosts) {
     }
 }
 void Migration::update_cell_verts(AmrVerts& verts, const AmrNodes& locals, const AmrNodes& ghosts) {
-    for (index_t inode = 0; inode < verts.size(); ++inode) {
+    for (index_t inode = 0; inode < verts.n_verts(); ++inode) {
         index_t idx = verts.index[inode];
         index_t gst = verts.ghost[inode];
 

@@ -18,33 +18,33 @@ using namespace mesh;
 
 Cuboid::Cuboid(const Json& config)
     : Generator("cuboid"),
-      m_xmin(0.0), m_xmax(1.0),
-      m_ymin(0.0), m_ymax(1.0),
-      m_zmin(0.0), m_zmax(1.0) {
+      x_min_(0.0), x_max_(1.0),
+      y_min_(0.0), y_max_(1.0),
+      z_min_(0.0), z_max_(1.0) {
 
     // Адаптивная по умолчанию
-    m_adaptive = true;
+    adaptive_ = true;
 
     if (!config["geometry"]) {
         throw std::runtime_error("Cuboid config doesn't contain key 'geometry'");
     }
 
-    m_xmin = config["geometry"]["x_min"].as<double>();
-    m_xmax = config["geometry"]["x_max"].as<double>();
-    m_ymin = config["geometry"]["y_min"].as<double>();
-    m_ymax = config["geometry"]["y_max"].as<double>();
-    m_zmin = config["geometry"]["z_min"].as<double>();
-    m_zmax = config["geometry"]["z_max"].as<double>();
+    x_min_ = config["geometry"]["x_min"].as<double>();
+    x_max_ = config["geometry"]["x_max"].as<double>();
+    y_min_ = config["geometry"]["y_min"].as<double>();
+    y_max_ = config["geometry"]["y_max"].as<double>();
+    z_min_ = config["geometry"]["z_min"].as<double>();
+    z_max_ = config["geometry"]["z_max"].as<double>();
 
     if (!config["bounds"]) {
         throw std::runtime_error("Cuboid config doesn't contain key 'bounds'");
     }
-    m_bounds.left   = boundary_from_string(config["bounds"]["left"].as<std::string>());
-    m_bounds.right  = boundary_from_string(config["bounds"]["right"].as<std::string>());
-    m_bounds.bottom = boundary_from_string(config["bounds"]["bottom"].as<std::string>());
-    m_bounds.top    = boundary_from_string(config["bounds"]["top"].as<std::string>());
-    m_bounds.back   = boundary_from_string(config["bounds"]["back"].as<std::string>());
-    m_bounds.front  = boundary_from_string(config["bounds"]["front"].as<std::string>());
+    bounds_.left   = boundary_from_string(config["bounds"]["left"].as<std::string>());
+    bounds_.right  = boundary_from_string(config["bounds"]["right"].as<std::string>());
+    bounds_.bottom = boundary_from_string(config["bounds"]["bottom"].as<std::string>());
+    bounds_.top    = boundary_from_string(config["bounds"]["top"].as<std::string>());
+    bounds_.back   = boundary_from_string(config["bounds"]["back"].as<std::string>());
+    bounds_.front  = boundary_from_string(config["bounds"]["front"].as<std::string>());
 
     if (!config["size"]) {
         throw std::runtime_error("Cuboid config doesn't contain key 'size'");
@@ -82,19 +82,19 @@ Cuboid::Cuboid(const Json& config)
     }
 }
 
-Cuboid::Cuboid(double xmin, double xmax, double ymin, double ymax, double zmin, double zmax) :
+Cuboid::Cuboid(double x_min, double x_max, double y_min, double y_max, double z_min, double z_max) :
         Generator("cuboid"),
-        m_xmin(xmin), m_xmax(xmax),
-        m_ymin(ymin), m_ymax(ymax),
-        m_zmin(zmin), m_zmax(zmax) {
+        x_min_(x_min), x_max_(x_max),
+        y_min_(y_min), y_max_(y_max),
+        z_min_(z_min), z_max_(z_max) {
     // Адаптивная по умолчанию
-    m_adaptive = true;
+    adaptive_ = true;
     check_params();
 }
 
 Box Cuboid::bbox() const {
-    Vector3d vmin(m_xmin, m_ymin, m_zmin);
-    Vector3d vmax(m_xmax, m_ymax, m_zmax);
+    Vector3d vmin(x_min_, y_min_, z_min_);
+    Vector3d vmax(x_max_, y_max_, z_max_);
 
     return {vmin, vmax};
 }
@@ -103,9 +103,9 @@ void Cuboid::set_nx(int nx) {
     if (nx < 1) {
         throw std::runtime_error("Cuboid::set_nx: Nx < 1");
     }
-    m_nx = nx;
-    m_ny = int(round(nx * (m_ymax - m_ymin) / (m_xmax - m_xmin)));
-    m_nz = int(round(nx * (m_zmax - m_zmin) / (m_xmax - m_xmin)));
+    nx_ = nx;
+    ny_ = int(round(nx * (y_max_ - y_min_) / (x_max_ - x_min_)));
+    nz_ = int(round(nx * (z_max_ - z_min_) / (x_max_ - x_min_)));
     compute_size();
 }
 
@@ -113,9 +113,9 @@ void Cuboid::set_ny(int ny) {
     if (ny < 1) {
         throw std::runtime_error("Cuboid::set_ny: Ny < 1");
     }
-    m_ny = ny;
-    m_nx = int(round(ny * (m_xmax - m_xmin) / (m_ymax - m_ymin)));
-    m_nz = int(round(ny * (m_zmax - m_zmin) / (m_ymax - m_ymin)));
+    ny_ = ny;
+    nx_ = int(round(ny * (x_max_ - x_min_) / (y_max_ - y_min_)));
+    nz_ = int(round(ny * (z_max_ - z_min_) / (y_max_ - y_min_)));
     compute_size();
 }
 
@@ -123,9 +123,9 @@ void Cuboid::set_nz(int nz) {
     if (nz < 1) {
         throw std::runtime_error("Cuboid::set_nz: Nz < 1");
     }
-    m_nz = nz;
-    m_nx = int(round(nz * (m_xmax - m_xmin) / (m_zmax - m_zmin)));
-    m_ny = int(round(nz * (m_ymax - m_ymin) / (m_zmax - m_zmin)));
+    nz_ = nz;
+    nx_ = int(round(nz * (x_max_ - x_min_) / (z_max_ - z_min_)));
+    ny_ = int(round(nz * (y_max_ - y_min_) / (z_max_ - z_min_)));
     compute_size();
 }
 
@@ -133,14 +133,14 @@ void Cuboid::set_sizes(int nx, int ny, int nz) {
     if (nx < 1 || ny < 1 || nz < 1) {
         throw std::runtime_error("Cuboid::set_sizes: Nx < 1 or Ny < 1 or Nz < 1");
     }
-    m_nx = nx;
-    m_ny = ny;
-    m_nz = nz;
+    nx_ = nx;
+    ny_ = ny;
+    nz_ = nz;
     compute_size();
 
-    double dx = (m_xmax - m_xmin) / m_nx;
-    double dy = (m_ymax - m_ymin) / m_ny;
-    double dz = (m_zmax - m_zmin) / m_nz;
+    double dx = (x_max_ - x_min_) / nx_;
+    double dy = (y_max_ - y_min_) / ny_;
+    double dz = (z_max_ - z_min_) / nz_;
 
     double dmax = std::max(dx, std::max(dy, dz));
     double dmin = std::min(dx, std::min(dy, dz));
@@ -153,92 +153,92 @@ void Cuboid::set_sizes(int nx, int ny, int nz) {
 }
 
 void Cuboid::set_size(int N) {
-    double d = std::cbrt((m_xmax - m_xmin) * (m_ymax - m_ymin) * (m_zmax - m_zmin) / N);
-    m_nx = int(round((m_xmax - m_xmin) / d));
-    m_ny = int(round((m_ymax - m_ymin) / d));
-    m_nz = int(round((m_zmax - m_zmin) / d));
+    double d = std::cbrt((x_max_ - x_min_) * (y_max_ - y_min_) * (z_max_ - z_min_) / N);
+    nx_ = int(round((x_max_ - x_min_) / d));
+    ny_ = int(round((y_max_ - y_min_) / d));
+    nz_ = int(round((z_max_ - z_min_) / d));
     compute_size();
 }
 
 void Cuboid::set_boundaries(Boundaries bounds) {
-    m_bounds = bounds;
+    bounds_ = bounds;
 
     if (periodic_along_x()) {
-        m_bounds.left = m_bounds.right = Boundary::PERIODIC;
+        bounds_.left = bounds_.right = Boundary::PERIODIC;
     }
     if (periodic_along_y()) {
-        m_bounds.bottom = m_bounds.top = Boundary::PERIODIC;
+        bounds_.bottom = bounds_.top = Boundary::PERIODIC;
     }
     if (periodic_along_z()) {
-        m_bounds.back = m_bounds.front = Boundary::PERIODIC;
+        bounds_.back = bounds_.front = Boundary::PERIODIC;
     }
 }
 
 double Cuboid::x_min() const {
-    return m_xmin;
+    return x_min_;
 }
 
 double Cuboid::x_max() const {
-    return m_xmax;
+    return x_max_;
 }
 
 double Cuboid::y_min() const {
-    return m_ymin;
+    return y_min_;
 }
 
 double Cuboid::y_max() const {
-    return m_ymax;
+    return y_max_;
 }
 
 double Cuboid::z_min() const {
-    return m_ymin;
+    return y_min_;
 }
 
 double Cuboid::z_max() const {
-    return m_ymax;
+    return y_max_;
 }
 
 int Cuboid::nx() const {
-    return m_nx;
+    return nx_;
 }
 
 int Cuboid::ny() const {
-    return m_ny;
+    return ny_;
 }
 
 int Cuboid::nz() const {
-    return m_ny;
+    return ny_;
 }
 
 Cuboid::Boundaries Cuboid::bounds() const {
-    return m_bounds;
+    return bounds_;
 }
 
 bool Cuboid::periodic_along_x() const {
-    return m_bounds.left == Boundary::PERIODIC || m_bounds.right == Boundary::PERIODIC;
+    return bounds_.left == Boundary::PERIODIC || bounds_.right == Boundary::PERIODIC;
 }
 
 bool Cuboid::periodic_along_y() const {
-    return m_bounds.bottom == Boundary::PERIODIC || m_bounds.top == Boundary::PERIODIC;
+    return bounds_.bottom == Boundary::PERIODIC || bounds_.top == Boundary::PERIODIC;
 }
 
 bool Cuboid::periodic_along_z() const {
-    return m_bounds.back == Boundary::PERIODIC || m_bounds.front == Boundary::PERIODIC;
+    return bounds_.back == Boundary::PERIODIC || bounds_.front == Boundary::PERIODIC;
 }
 
 void Cuboid::check_params() const {
-    if (m_xmin >= m_xmax) {
+    if (x_min_ >= x_max_) {
         throw std::runtime_error("Cuboid::check_params: x_min >= x_max");
     }
-    if (m_ymin >= m_ymax) {
+    if (y_min_ >= y_max_) {
         throw std::runtime_error("Cuboid::check_params: y_min >= y_max");
     }
-    if (m_zmin >= m_zmax) {
+    if (z_min_ >= z_max_) {
         throw std::runtime_error("Cuboid::check_params: z_min >= z_max");
     }
-    double dx = (m_xmax - m_xmin) / m_nx;
-    double dy = (m_ymax - m_ymin) / m_ny;
-    double dz = (m_ymax - m_ymin) / m_ny;
+    double dx = (x_max_ - x_min_) / nx_;
+    double dy = (y_max_ - y_min_) / ny_;
+    double dz = (y_max_ - y_min_) / ny_;
 
     double dmax = std::max(dx, std::max(dy, dz));
     double dmin = std::min(dx, std::min(dy, dz));
@@ -248,27 +248,27 @@ void Cuboid::check_params() const {
 }
 
 void Cuboid::compute_size() {
-    m_size = m_nx * m_ny * m_nz;
+    size_ = nx_ * ny_ * nz_;
 }
 
 Grid Cuboid::make() const {
-    check_size(m_size);
+    check_size(size_);
 
-    double dx = (m_xmax - m_xmin) / m_nx;
-    double dy = (m_ymax - m_ymin) / m_ny;
-    double dz = (m_zmax - m_zmin) / m_nz;
+    double dx = (x_max_ - x_min_) / nx_;
+    double dy = (y_max_ - y_min_) / ny_;
+    double dz = (z_max_ - z_min_) / nz_;
 
     Grid grid;
-    grid.reserve_nodes((m_nx + 1) * (m_ny + 1) * (m_nz + 1));
-    grid.reserve_cells(m_nx * m_ny * m_nz);
+    grid.reserve_nodes((nx_ + 1) * (ny_ + 1) * (nz_ + 1));
+    grid.reserve_cells(nx_ * ny_ * nz_);
 
-    std::vector nodes(m_nx + 1, std::vector(m_ny + 1, std::vector<Node::Ptr>(m_nz + 1)));
-    for (int i = 0; i <= m_nx; ++i) {
-        for (int j = 0; j <= m_ny; ++j) {
-            for (int k = 0; k <= m_nz; ++k) {
-                double x = m_xmin + i * dx;
-                double y = m_ymin + j * dy;
-                double z = m_zmin + k * dz;
+    std::vector nodes(nx_ + 1, std::vector(ny_ + 1, std::vector<Node::Ptr>(nz_ + 1)));
+    for (int i = 0; i <= nx_; ++i) {
+        for (int j = 0; j <= ny_; ++j) {
+            for (int k = 0; k <= nz_; ++k) {
+                double x = x_min_ + i * dx;
+                double y = y_min_ + j * dy;
+                double z = z_min_ + k * dz;
                 nodes[i][j][k] = Node::create({x, y, z});
             }
         }
@@ -276,15 +276,15 @@ Grid Cuboid::make() const {
 
     std::vector<Boundary> bc(6);
     std::vector<Node::Ptr> cube_nodes(8);
-    for (int i = 0; i < m_nx; ++i) {
-        bc[Side3D::L] = i == 0 ?      m_bounds.left :  Boundary::INNER;
-        bc[Side3D::R] = i == m_nx-1 ? m_bounds.right : Boundary::INNER;
-        for (int j = 0; j < m_ny; ++j) {
-            bc[Side3D::B] = j == 0 ?      m_bounds.bottom : Boundary::INNER;
-            bc[Side3D::T] = j == m_ny-1 ? m_bounds.top : Boundary::INNER;
-            for (int k = 0; k < m_nz; ++k) {
-                bc[Side3D::Z] = k == 0 ? m_bounds.back : Boundary::INNER;
-                bc[Side3D::F] = k == m_nz-1 ? m_bounds.front : Boundary::INNER;
+    for (int i = 0; i < nx_; ++i) {
+        bc[Side3D::L] = i == 0 ?      bounds_.left :  Boundary::INNER;
+        bc[Side3D::R] = i == nx_-1 ? bounds_.right : Boundary::INNER;
+        for (int j = 0; j < ny_; ++j) {
+            bc[Side3D::B] = j == 0 ?      bounds_.bottom : Boundary::INNER;
+            bc[Side3D::T] = j == ny_-1 ? bounds_.top : Boundary::INNER;
+            for (int k = 0; k < nz_; ++k) {
+                bc[Side3D::Z] = k == 0 ? bounds_.back : Boundary::INNER;
+                bc[Side3D::F] = k == nz_-1 ? bounds_.front : Boundary::INNER;
 
                 using indexing::hex::vs;
                 cube_nodes[vs<0,0,0>()] = nodes[i][j][k];
@@ -302,68 +302,71 @@ Grid Cuboid::make() const {
     return grid;
 }
 
-void Cuboid::initialize(AmrCells& cells) const {
-    if (!m_adaptive) {
-        throw std::runtime_error("Cuboid::initialize: can initialize only AMR cartesian mesh");
+AmrCells Cuboid::make_cells(bool unique_nodes) const {
+    if (!adaptive_) {
+        throw std::runtime_error("Cuboid::make_cells: can make_cells only AMR cartesian mesh");
     }
 
     bool x_period = periodic_along_x();
     bool y_period = periodic_along_y();
     bool z_period = periodic_along_z();
 
-    double hx = (m_xmax - m_xmin) / m_nx;
-    double hy = (m_ymax - m_ymin) / m_ny;
-    double hz = (m_zmax - m_zmin) / m_nz;
+    double hx = (x_max_ - x_min_) / nx_;
+    double hy = (y_max_ - y_min_) / ny_;
+    double hz = (z_max_ - z_min_) / nz_;
 
     auto get_index = [=, this](index_t i, index_t j, index_t k) -> index_t {
-        return m_nz * (m_ny * i + j) + k;
+        return nz_ * (ny_ * i + j) + k;
     };
 
     auto get_index_pair = [=, this](index_t n) -> std::array<index_t, 3> {
-        return {(n / m_nz) / m_ny, (n / m_nz) % m_ny, n % m_nz};
+        return {(n / nz_) / ny_, (n / nz_) % ny_, n % nz_};
     };
 
     auto get_vertex = [=, this](index_t i, index_t j, index_t k) -> Vector3d {
         return {
-                m_xmin + ((m_xmax - m_xmin) * i) / m_nx,
-                m_ymin + ((m_ymax - m_ymin) * j) / m_ny,
-                m_zmin + ((m_zmax - m_zmin) * k) / m_nz
+                x_min_ + ((x_max_ - x_min_) * i) / nx_,
+                y_min_ + ((y_max_ - y_min_) * j) / ny_,
+                z_min_ + ((z_max_ - z_min_) * k) / nz_
         };
     };
 
     auto neib_index = [=, this](index_t i, index_t j, index_t k, Side3D side) -> index_t {
         if (side == Side3D::LEFT) {
-            return i == 0 && !x_period ?  get_index(i, j, k) : get_index((i - 1 + m_nx) % m_nx, j, k);
+            return i == 0 && !x_period ?  get_index(i, j, k) : get_index((i - 1 + nx_) % nx_, j, k);
         }
         if (side == Side3D::RIGHT) {
-            return i == m_nx - 1 && !x_period ? get_index(i, j, k) : get_index((i + 1) % m_nx, j, k);
+            return i == nx_ - 1 && !x_period ? get_index(i, j, k) : get_index((i + 1) % nx_, j, k);
         }
         if (side == Side3D::BOTTOM) {
-            return j == 0 && !y_period ? get_index(i, j, k) : get_index(i, (j - 1 + m_ny) % m_ny, k);
+            return j == 0 && !y_period ? get_index(i, j, k) : get_index(i, (j - 1 + ny_) % ny_, k);
         }
         if (side == Side3D::TOP) {
-            return j == m_ny - 1 && !y_period ? get_index(i, j, k): get_index(i, (j + 1) % m_ny, k);
+            return j == ny_ - 1 && !y_period ? get_index(i, j, k): get_index(i, (j + 1) % ny_, k);
         }
         if (side == Side3D::BACK) {
-            return k == 0 && !z_period ? get_index(i, j, k) : get_index(i, j, (k - 1 + m_nz) % m_nz);
+            return k == 0 && !z_period ? get_index(i, j, k) : get_index(i, j, (k - 1 + nz_) % nz_);
         }
         if (side == Side3D::FRONT) {
-            return k == m_nz - 1 && !z_period ? get_index(i, j, k): get_index(i, j, (k + 1) % m_nz);
+            return k == nz_ - 1 && !z_period ? get_index(i, j, k): get_index(i, j, (k + 1) % nz_);
         }
         throw std::runtime_error("Strange side #265");
     };
 
-    cells.set_dimension(3);
-    cells.set_adaptive(true);
-    cells.set_linear(true);
-    cells.set_axial(false);
+    AmrCells cells({
+        .dim = 3,
+        .adaptive = true,
+        .linear = true,
+        .axial = false,
+        .nodes = unique_nodes
+    });
 
-    cells.resize_amr(m_size);
+    cells.resize_amr(size_);
 
-    int n_faces = 24;
-    int n_nodes = 27;
+    static constexpr int n_faces = 24;
+    static constexpr int n_nodes = 27;
 
-    for (index_t ic = 0; ic < m_size; ++ic) {
+    for (index_t ic = 0; ic < size_; ++ic) {
         auto[i, j, k] = get_index_pair(ic);
 
         cells.next[ic] = ic;
@@ -401,12 +404,12 @@ void Cuboid::initialize(AmrCells& cells) const {
 
         index_t iface = ic * n_faces;
 
-        cells.faces.boundary[iface + Side3D::L] = i > 0 ? Boundary::INNER : m_bounds.left;
-        cells.faces.boundary[iface + Side3D::R] = i < m_nx - 1 ? Boundary::INNER : m_bounds.right;
-        cells.faces.boundary[iface + Side3D::B] = j > 0 ? Boundary::INNER : m_bounds.bottom;
-        cells.faces.boundary[iface + Side3D::T] = j < m_ny - 1 ? Boundary::INNER : m_bounds.top;
-        cells.faces.boundary[iface + Side3D::Z] = k > 0 ? Boundary::INNER : m_bounds.back;
-        cells.faces.boundary[iface + Side3D::F] = k < m_nz - 1 ? Boundary::INNER : m_bounds.front;
+        cells.faces.boundary[iface + Side3D::L] = i > 0 ? Boundary::INNER : bounds_.left;
+        cells.faces.boundary[iface + Side3D::R] = i < nx_ - 1 ? Boundary::INNER : bounds_.right;
+        cells.faces.boundary[iface + Side3D::B] = j > 0 ? Boundary::INNER : bounds_.bottom;
+        cells.faces.boundary[iface + Side3D::T] = j < ny_ - 1 ? Boundary::INNER : bounds_.top;
+        cells.faces.boundary[iface + Side3D::Z] = k > 0 ? Boundary::INNER : bounds_.back;
+        cells.faces.boundary[iface + Side3D::F] = k < nz_ - 1 ? Boundary::INNER : bounds_.front;
 
         for (auto side: Side3D::items()) {
             cells.faces.adjacent.rank[iface + side] = 0;
@@ -448,6 +451,7 @@ void Cuboid::initialize(AmrCells& cells) const {
             cells.verts[ic * n_nodes + jn] = cube[jn];
         }
     }
+    return cells;
 }
 
 } // namespace zephyr::geom::generator

@@ -16,7 +16,7 @@ namespace zephyr::io {
 using utils::mpi;
 
 PvdFile::PvdFile()
-    : m_open(false), m_counter(0)
+    : open_(false), counter_(0)
 {
 }
 
@@ -37,53 +37,37 @@ PvdFile::PvdFile(const utils::Json& config) : PvdFile() {
     std::string filename = config["filename"].as<std::string>();
 
     if (config["polyhedral"]) {
-        polyhedral = config["polyhedral"].as<bool>();
+        options.polyhedral = config["polyhedral"].as<bool>();
     }
     if (config["unique_nodes"]) {
-        unique_nodes = config["unique_nodes"].as<bool>();
+        options.unique_nodes = config["unique_nodes"].as<bool>();
     }
 
     open(filename, directory);
 }
 
-void PvdFile::open(const char* filename) {
+void PvdFile::open(std::string_view filename) {
     open(std::string(filename), default_dir, !mpi::single());
 }
 
-void PvdFile::open(const char* filename, bool distributed) {
+void PvdFile::open(std::string_view filename, bool distributed) {
     open(std::string(filename), default_dir, mpi::single() ? false : distributed);
 }
 
-void PvdFile::open(const char* filename, const char* directory) {
+void PvdFile::open(std::string_view filename, std::string_view directory) {
     open(std::string(filename), std::string(directory), !mpi::single());
 }
 
-void PvdFile::open(const char* filename, const char* directory, bool distributed) {
-    open(std::string(filename), std::string(directory), distributed);
-}
-
-void PvdFile::open(const std::string& filename) {
-    open(filename, default_dir, !mpi::single());
-}
-
-void PvdFile::open(const std::string& filename, bool distributed) {
-    open(filename, default_dir, mpi::single() ? false : distributed);
-}
-
-void PvdFile::open(const std::string& filename, const std::string& directory) {
-    open(filename, directory, !mpi::single());
-}
-
-void PvdFile::open(const std::string& filename, const std::string& _directory, bool distributed) {
+void PvdFile::open(std::string_view filename, std::string_view input_dir, bool distributed) {
     namespace fs = std::filesystem;
 
-    if (m_open) {
+    if (open_) {
         return;
     }
 
     fs::path directory = fs::current_path();
-    if (!_directory.empty()) {
-        fs::path dir = _directory;
+    if (!input_dir.empty()) {
+        fs::path dir = input_dir;
         if (dir.is_relative()) {
             directory /= dir;
         } else {
@@ -98,26 +82,26 @@ void PvdFile::open(const std::string& filename, const std::string& _directory, b
         }
     }
 
-    m_filename = filename;
+    filename_ = filename;
     if (filename.size() > 4) {
         if (filename.substr(filename.size() - 4) == ".pvd") {
-            m_filename = filename.substr(filename.size() - 4);
+            filename_ = filename.substr(filename.size() - 4);
         }
     }
-    m_fullname = (directory / filename).string();
+    fullname_ = (directory / filename).string();
 
     // Мастер-процесс пишет заголовок PVD
-    m_distributed = mpi::single() ? false : distributed;
-    if (m_distributed && !mpi::master()) {
+    distributed_ = mpi::single() ? false : distributed;
+    if (distributed_ && !mpi::master()) {
         return;
     }
 
     /// Откроем файл и запишем заголовок
     std::ofstream ofs;
-    ofs.open(m_fullname + ".pvd");
+    ofs.open(fullname_ + ".pvd");
 
     if (!ofs.is_open()) {
-        std::cerr << "Warning: Cannot open .pvd file " << m_fullname << ".pvd\n";
+        std::cerr << "Warning: Cannot open .pvd file " << fullname_ << ".pvd\n";
         return;
     }
 
@@ -125,38 +109,30 @@ void PvdFile::open(const std::string& filename, const std::string& _directory, b
     ofs << "<VTKFile type=\"Collection\" version=\"0.1\" byte_order=\"" + byteorder() + "\">\n";
     ofs << "    <Collection>" << std::endl;
 
-    m_pos = ofs.tellp();
+    pos_ = ofs.tellp();
 
     ofs << "    </Collection>\n";
     ofs << "</VTKFile>\n";
 
     ofs.close();
 
-    m_open = true;
+    open_ = true;
 }
 
 void PvdFile::save(mesh::EuMesh& mesh, double timestep) {
-    if (unique_nodes) {
-        mesh.make_unique_nodes();
-    }
-    if (mesh.unique_nodes()) {
-        VtuFile::save(get_filename(), mesh.locals(), mesh.nodes(), variables, polyhedral);
-    }
-    else {
-        VtuFile::save(get_filename(), mesh.locals(), variables, polyhedral);
-    }
+    VtuFile::save(get_filename(), mesh, variables, options);
     update_pvd(timestep);
 }
 
 void PvdFile::save(mesh::AmrCells& elements, double timestep) {
-    VtuFile::save(get_filename(), elements, variables, polyhedral);
+    VtuFile::save(get_filename(), elements, variables, options);
     update_pvd(timestep);
 }
 
 std::string PvdFile::get_filename() const {
-    std::string filename = m_fullname + "_" + std::to_string(m_counter);
+    std::string filename = fullname_ + "_" + std::to_string(counter_);
 
-    if (m_distributed) {
+    if (distributed_) {
         filename += ".pt" + mpi::srank();
     }
 
@@ -166,47 +142,47 @@ std::string PvdFile::get_filename() const {
 
 void PvdFile::update_pvd(double timestep) {
     // Мастер-процесс пишет PVD
-    if (m_distributed && !mpi::master()) {
-        ++m_counter;
+    if (distributed_ && !mpi::master()) {
+        ++counter_;
         return;
     }
 
-    if (!m_open) {
+    if (!open_) {
         std::string message = "PvdFile::save() error: You need to open PvdFile";
         std::cerr << message << "\n";
         throw std::runtime_error(message);
     }
 
     std::fstream ofs;
-    ofs.open(m_fullname + ".pvd");
+    ofs.open(fullname_ + ".pvd");
 
     if (!ofs.is_open()) {
-        std::cerr << "Cannot open file " << m_fullname << ".pvd\n";
+        std::cerr << "Cannot open file " << fullname_ << ".pvd\n";
     }
 
-    ofs.seekg(m_pos, std::ios::beg);
+    ofs.seekg(pos_, std::ios::beg);
 
     ofs << std::scientific << std::setprecision(15);
 
-    if (m_distributed) {
+    if (distributed_) {
         for (int r = 0; r < mpi::size(); ++r) {
             ofs << "        <DataSet timestep=\"" << timestep << "\" part=\"" << r << "\" file=\""
-                << m_filename << "_" << m_counter << ".pt" << r << ".vtu" << "\"/>\n";
+                << filename_ << "_" << counter_ << ".pt" << r << ".vtu" << "\"/>\n";
         }
     }
     else {
         ofs << "        <DataSet timestep=\"" << timestep << "\" part=\"0\" file=\""
-            << m_filename << "_" << m_counter << ".vtu" << "\"/>\n";
+            << filename_ << "_" << counter_ << ".vtu" << "\"/>\n";
     }
 
-    m_pos = ofs.tellg();
+    pos_ = ofs.tellg();
 
     ofs << "    </Collection>\n";
     ofs << "</VTKFile>\n";
 
     ofs.close();
 
-    ++m_counter;
+    ++counter_;
 }
 
 } // namespace zephyr::io

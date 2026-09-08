@@ -75,10 +75,10 @@ int main(int argc, char** argv) {
 
     // Создать решатель
     SmFluid solver(eos);
-    solver.set_accuracy(1);
-    solver.set_CFL(0.8);
-    solver.set_limiter("minmod");
-    solver.set_method(Fluxes::HLLC);
+    solver.set_accuracy(2);
+    solver.set_CFL(0.5);
+    solver.set_limiter("MC");
+    solver.set_method(Fluxes::HLLC_M);
 
     // Добавляем типы на сетку, выбираем основной слой
     auto data = solver.add_types(mesh);
@@ -86,7 +86,7 @@ int main(int argc, char** argv) {
 
     // Настройка сетки
     mesh.set_decomposition("XYZ");
-    mesh.set_max_level(3);
+    mesh.set_max_level(4);
     mesh.set_distributor(solver.distributor());
 
     // Начальные данные
@@ -102,7 +102,7 @@ int main(int argc, char** argv) {
 
     // Файл для записи
     PvdFile pvd("Sedov", "output");
-    pvd.unique_nodes = true;
+    pvd.options.unique_nodes = true;
 
     size_t n_step = 0;
     double curr_time = test.init_time;
@@ -150,8 +150,10 @@ int main(int argc, char** argv) {
     Stopwatch elapsed(true);
     while (curr_time < test.max_time()) {
         sw_write.resume();
-        mpi::cout << "\tStep: " << std::setw(6) << n_step << ";"
-                  << "\tTime: " << std::setw(10) << std::setprecision(5) << curr_time << "\n";
+        if (n_step % 10 == 0) {
+            mpi::cout << "\tStep: " << std::setw(6) << n_step << ";"
+                      << "\tTime: " << std::setw(10) << std::setprecision(5) << curr_time << "\n";
+        }
         if (curr_time >= next_write) {
             pvd.save(mesh, curr_time);
             next_write += test.max_time() / 50;

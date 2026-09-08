@@ -31,14 +31,119 @@ using namespace geom::indexing;
 
 namespace {
 
-AmrCells make_locals(geom::Grid&& grid) {
+// Генерация локальной сетки из grid
+AmrCells make_locals(geom::Grid&& grid, bool unique_nodes) {
     // Опции генерации сетки
     constexpr Grid::BuildOptions options{
         .build_faces=true
     };
 
     grid.finalize(options);
-    return AmrCells(grid);
+
+    if (!grid.has_faces()) {
+        throw std::runtime_error("Grid was built with wrong options, need faces per cell");
+    }
+
+    AmrCells locals({
+        .dim = grid.dimension(),
+        .adaptive = grid.adaptive(),
+        .linear = true,
+        .axial = false,
+        .nodes = unique_nodes
+    });
+
+    if (!locals.adaptive()) {
+        locals.resize(grid.n_cells(), grid.total_faces_per_cell(), grid.total_nodes_per_cell());
+    }
+    else {
+        locals.resize_amr(grid.n_cells());
+    }
+
+    const auto& nodes = grid.nodes();
+    const auto& cells = grid.cells();
+
+    locals.faces.offsets[0] = 0;
+    locals.verts.offsets[0] = 0;
+    for (index_t ic = 0; ic < locals.n_cells(); ++ic) {
+        locals.rank[ic] = 0;
+        locals.index[ic] = ic;
+
+        locals.flag[ic] = 0;
+        locals.b_idx[ic] = ic;
+        locals.z_idx[ic] = 0;
+        locals.level[ic] = 0;
+
+        locals.volume[ic] = cells[ic].volume();
+        locals.center[ic] = cells[ic].centroid();
+
+        if (locals.axial()) {
+            // locals.volume_alt[ic] = geom.cell_volumes_alt[ic];
+        }
+
+        // Число узлов и граней ячейки
+        int n_nodes = cells[ic].n_nodes();
+        int n_faces = cells[ic].n_faces();
+        int max_faces = n_faces;
+        if (locals.adaptive()) {
+            max_faces = locals.dim() < 3 ? Side2D::n_subfaces() : Side3D::n_subfaces();
+        }
+
+        // Выставить индексы грани
+        locals.faces.offsets[ic + 1] = locals.faces.offsets[ic] + max_faces;
+        if (cells[ic].type() != CellType::POLYHEDRON) {
+            locals.faces.insert(locals.faces.offsets[ic], cells[ic].type(), max_faces);
+        }
+        else {
+            auto iface = locals.faces.offsets[ic];
+            for (int i = 0; i < n_faces; ++i) {
+                const auto& face = cells[ic].get_face(i);
+                locals.faces.vertices[iface + i].fill(-1);
+                for (int j = 0; j < face.n_nodes(); ++j) {
+                    locals.faces.vertices[iface + i][j] = face.node_idx(j);
+                }
+                locals.faces.set_undefined(iface + i);
+            }
+        }
+        const auto& node_ids = cells[ic].nodes();
+
+        locals.verts.offsets[ic + 1] = locals.verts.offsets[ic] + n_nodes;
+        for (int i = 0; i < n_nodes; ++i) {
+            locals.verts[locals.verts.offsets[ic] + i] = nodes[node_ids[i]].pos;
+        }
+
+        // Геометрия
+        for (int i = 0; i < n_faces; ++i) {
+            const auto& face = cells[ic].get_face(i);
+
+            int iface = locals.faces.offsets[ic] + i;
+            locals.faces.boundary[iface] = face.bc();
+            locals.faces.area[iface]     = face.area();
+            locals.faces.center[iface]   = face.center();
+            locals.faces.normal[iface]   = face.normal();
+
+            if (locals.axial()) {
+                //locals.faces.area_alt[iface] = grid_geom.face_areas_alt[jface];
+            }
+        }
+
+        // Смежность
+        for (int i = 0; i < n_faces; ++i) {
+            const auto& face = cells[ic].get_face(i);
+
+            auto iface = locals.faces.offsets[ic] + i;
+
+            locals.faces.adjacent.rank[iface]  = 0;
+            locals.faces.adjacent.index[iface] = face.neib();
+            locals.faces.adjacent.ghost[iface] = -1;
+            locals.faces.adjacent.basic[iface] = ic;
+            locals.faces.adjacent.rotation[iface] = 0;
+
+            if (locals.faces.is_boundary(iface)) {
+                locals.faces.adjacent.index[iface] = ic;
+            }
+        }
+    }
+    return locals;
 }
 
 } // anonymous namespace
@@ -46,37 +151,47 @@ AmrCells make_locals(geom::Grid&& grid) {
 void EuMesh::sync_params_() {
 #ifdef ZEPHYR_MPI
     if (!mpi::single()) {
-        int dim = m_locals.dim();
-        int adapt = m_locals.adaptive();
-        int axial = m_locals.axial();
+        int dim = local_cells_.dim();
+        int adapt = local_cells_.adaptive();
+        int axial = local_cells_.axial();
+        int nodes = local_cells_.verts.has_nodes();
 
         // Соберем базовые характеристики сетки с master-процесса
         mpi::broadcast(0, dim);
         mpi::broadcast(0, adapt);
         mpi::broadcast(0, axial);
+        mpi::broadcast(0, nodes);
 
         if (!mpi::master()) {
-            m_locals.set_dimension(dim);
-            m_locals.set_adaptive(adapt);
-            m_locals.set_axial(axial);
+            MeshOpts opts {
+                .dim      = dim,
+                .adaptive = bool(adapt),
+                .axial    = bool(axial),
+                .nodes    = bool(nodes)
+            };
+            local_cells_ = AmrCells(opts);
         }
     }
 
-    // установить dim/adapt/axial
-    m_tourists.init_types(m_locals);
+    // установить опции
+    tourists_.init_types(local_cells_);
+    migrants_.init_types(local_cells_);
 #endif
 }
 
-void EuMesh::build_(Generator& gen) {
+void EuMesh::build_(Generator& gen, bool unique_nodes) {
     if (mpi::master()) {
-        if (gen.can_initialize()) {
-            gen.initialize(m_locals);
+        if (gen.can_make_cells()) {
+            local_cells_ = gen.make_cells(unique_nodes);
         }
         else {
             Grid grid = gen.make();
-            m_locals = make_locals(std::move(grid));
+            local_cells_ = make_locals(std::move(grid), unique_nodes);
         }
         init_amr();
+        if (unique_nodes) {
+            local_nodes_.setup_for(local_cells_);
+        }
     }
     sync_params_();
 
@@ -86,56 +201,62 @@ void EuMesh::build_(Generator& gen) {
         if (gen.can_cast<Rectangle>()) {
             Rectangle& rect = gen.cast<Rectangle>();
             if (rect.structured()) {
-                m_structured = true;
-                m_nx = rect.nx();
-                m_ny = rect.ny();
-                m_nz = 1;
+                structured_ = true;
+                nx_ = rect.nx();
+                ny_ = rect.ny();
+                nz_ = 1;
             }
         } else if (gen.can_cast<Cuboid>()) {
             Cuboid& cuboid = gen.cast<Cuboid>();
-            m_structured = true;
-            m_nx = cuboid.nx();
-            m_ny = cuboid.ny();
-            m_nz = cuboid.nz();
+            structured_ = true;
+            nx_ = cuboid.nx();
+            ny_ = cuboid.ny();
+            nz_ = cuboid.nz();
         }
     }
 }
 
-EuMesh::EuMesh(Grid&& grid) {
+EuMesh::EuMesh(Grid&& grid, bool unique_nodes) {
     if (mpi::master()) {
-        m_locals = make_locals(std::move(grid));
+        local_cells_ = make_locals(std::move(grid), unique_nodes);
         init_amr();
+        if (unique_nodes) {
+            local_nodes_.setup_for(local_cells_);
+        }
     }
     sync_params_();
 }
 
-EuMesh::EuMesh(Generator& gen) {
-    build_(gen);
-}
-
-EuMesh::EuMesh(int dim, bool adaptive, bool axial)
-    : m_locals(dim, adaptive, axial) {
+EuMesh::EuMesh(Generator& gen, bool unique_nodes) {
+    build_(gen, unique_nodes);
 }
 
 EuMesh::EuMesh(const Json& config) {
     // Создать сетку на master-процессе
     auto gen = Generator::create(config);
-    build_(*gen);
 
-    m_max_level = 0;
-    if (config["max_level"]) {
-        m_max_level = std::max(0, config["max_level"].as<int>());
-        if (m_max_level > 15) {
-            std::cerr << "Max level set up to " << m_max_level << ", decreased to 15\n";
-            m_max_level = 15;
-        }
-    }
+    bool adaptive = false;
     if (config["adaptive"]) {
+        adaptive = config["adaptive"].as<bool>();
+    }
+    bool unique_nodes = false;
+    if (config["nodes"]) {
+        unique_nodes = config["nodes"].as<bool>();
+    }
+    max_level_ = 0;
+    if (config["max_level"]) {
+        max_level_ = std::max(0, config["max_level"].as<int>());
+        if (max_level_ > 15) {
+            std::cerr << "Max level set up to " << max_level_ << ", decreased to 15\n";
+            max_level_ = 15;
+        }
         // Есть ключевое слово adaptive, выставлено на false
-        if (!config["adaptive"].as<bool>()) {
-            m_max_level = 0;
+        if (!adaptive) {
+            max_level_ = 0;
         }
     }
+
+    build_(*gen, unique_nodes);
 
     // Если есть декомпозиция, то использовать
     if (!mpi::single()) {
@@ -143,14 +264,14 @@ EuMesh::EuMesh(const Json& config) {
 
         if (config["decomp"]) {
             // Там все свойства декомпозиции автоматически ставятся
-            m_decomp = Decomposition::create(domain, config["decomp"]);
+            decomp_ = Decomposition::create(domain, config["decomp"]);
 
             //set_decomposition("XY");
-            set_decomposition(m_decomp, true);
+            set_decomposition(decomp_, true);
         }
         else {
             // Определяем размерность сетки
-            int dim = m_locals.empty() ? 0 : m_locals.dim();
+            int dim = local_cells_.empty() ? 0 : local_cells_.dim();
             dim = mpi::max(dim);
 
             z_assert((dim == 2 || dim == 3), "Strange dimension, EuMesh constructed by json");
@@ -161,38 +282,45 @@ EuMesh::EuMesh(const Json& config) {
     }
 }
 
-void EuMesh::init_amr() {
-    if (!m_locals.adaptive()) return;
+EuMesh EuMesh::PolySet(int dim) {
+    EuMesh mesh;
+    MeshOpts opts{.dim=dim, .adaptive=false, .nodes=false};
+    mesh.local_cells_ = AmrCells(opts);
+    return mesh;
+}
 
-    amr::find_rotations(m_locals);
+void EuMesh::init_amr() {
+    if (!local_cells_.adaptive()) return;
+
+    amr::find_rotations(local_cells_);
 }
 
 bool EuMesh::adaptive() const {
-    return m_max_level > 0;
+    return max_level_ > 0;
 }
 
 int EuMesh::max_level() const {
-    return m_max_level;
+    return max_level_;
 }
 
 void EuMesh::set_max_level(int max_level) {
-    if (!m_locals.adaptive()) {
-        m_max_level = 0;
+    if (!local_cells_.adaptive()) {
+        max_level_ = 0;
     } else {
-        m_max_level = std::max(0, std::min(max_level, 15));
+        max_level_ = std::max(0, std::min(max_level, 15));
     }
 }
 
 void EuMesh::set_distributor(const std::string& name) {
     if (name == "empty") {
-        m_distributor = Distributor::empty();
+        distributor_ = Distributor::empty();
     } else {
-        m_distributor = Distributor::simple();
+        distributor_ = Distributor::simple();
     }
 }
 
 void EuMesh::set_distributor(Distributor distr) {
-    m_distributor = std::move(distr);
+    distributor_ = std::move(distr);
 }
 
 void EuMesh::balance_flags() {
@@ -206,11 +334,11 @@ void EuMesh::balance_flags() {
     }
 #endif
     if (mpi::single()) {
-        amr::balance_flags(m_locals, m_max_level);
+        amr::balance_flags(local_cells_, max_level_);
     }
 #ifdef ZEPHYR_MPI
     else {
-        amr::balance_flags(m_locals, m_max_level, m_tourists);
+        amr::balance_flags(local_cells_, max_level_, tourists_);
     }
 #endif
 }
@@ -235,25 +363,25 @@ void EuMesh::apply_flags() {
         ghosts_after.variables = vars;
         border_after.variables = vars;
     }
-    //locals_before.save(m_locals, pvd_counter);
+    //locals_before.save(local_cells_, pvd_counter);
     //ghosts_before.save(ghost_cells_, pvd_counter);
-    //border_before.save(m_tourists.border_cells_, pvd_counter);
+    //border_before.save(tourists_.border_cells_, pvd_counter);
     mpi::barrier();
 #endif
 
     if (mpi::single()) {
-        amr::apply(m_locals, m_distributor);
+        amr::apply(local_cells_, distributor_);
     }
 #ifdef ZEPHYR_MPI
     else {
-        amr::apply(m_locals, m_distributor, m_tourists);
+        amr::apply(local_cells_, distributor_, tourists_);
     }
 #endif
 
 #if SCRUTINY
-    //locals_after.save(m_locals, pvd_counter);
+    //locals_after.save(local_cells_, pvd_counter);
     //ghosts_after.save(ghost_cells_, pvd_counter);
-    //border_after.save(m_tourists.border_cells_, pvd_counter);
+    //border_after.save(tourists_.border_cells_, pvd_counter);
     mpi::barrier();
     ++pvd_counter;
 
@@ -272,7 +400,7 @@ void EuMesh::make_shuba(int count) {
     for (int i = 1; i <= count; i++) {
 #ifdef ZEPHYR_MPI
         if (!mpi::single()) {
-            m_tourists.sync<MpiTag::FLAG>(m_locals);
+            tourists_.sync<MpiTag::FLAG>(local_cells_);
         }
 #endif
         for_each([&](EuCell& cell) {
@@ -289,19 +417,20 @@ void EuMesh::make_shuba(int count) {
 
 void EuMesh::refine() {
     if (!adaptive()) { return; }
-    m_structured = false;
+    structured_ = false;
 
     static Stopwatch balance;
     static Stopwatch apply;
     static Stopwatch full;
 
     // Для однопроцессорной версии при пустой сетке сразу выход
-    if (mpi::single() && m_locals.empty()) {
-        throw std::runtime_error("EuMesh::refine() error: Empty mesh");
+    if (mpi::single() && local_cells_.empty()) {
+        throw std::runtime_error("EuMesh::refine(): Empty mesh");
     }
 
-    m_local_nodes.clear();
-    m_locals.verts.clear_unique();
+    if (local_cells_.has_nodes()) {
+        throw std::runtime_error("EuMesh::refine(): Unique nodes are not supported");
+    }
 
     full.resume();
 
@@ -317,8 +446,8 @@ void EuMesh::refine() {
 
 
     /*//R version
-    threads::parallel_for(0, m_locals.size(),
-        [&locals=m_locals](index_t ic) {
+    threads::parallel_for(0, local_cells_.size(),
+        [&locals=local_cells_](index_t ic) {
             index_t iface = locals.faces.offsets[ic];
             std::array<double, 4> areas;
             for (Side2D side: Side2D::items()) {
@@ -360,8 +489,8 @@ void EuMesh::refine() {
 }
 
 void EuMesh::refine_full(int level) {
-    if (level < 0 || level > m_max_level) {
-        level = m_max_level;
+    if (level < 0 || level > max_level_) {
+        level = max_level_;
     }
     if (level == 0) {
         return;
@@ -382,12 +511,12 @@ void EuMesh::check_reference(bool fix) {
     double ymin = box.vmin.y();
     double ymax = box.vmax.y();
 
-    if (m_locals.empty()) return;
+    if (local_cells_.empty()) return;
 
-    int level = m_locals.level[0];
+    int level = local_cells_.level[0];
 
-    int nx = m_nx * std::pow(2, level);
-    int ny = m_ny * std::pow(2, level);
+    int nx = nx_ * std::pow(2, level);
+    int ny = ny_ * std::pow(2, level);
 
     double hx = (xmax - xmin) / nx;
     double hy = (ymax - ymin) / ny;
@@ -426,7 +555,7 @@ void EuMesh::check_reference(bool fix) {
     double face_center_error = 0.0;
     double vertices_error = 0.0;
 
-    for (auto& cell: m_locals) {
+    for (auto& cell: local_cells_) {
         int i = std::round((cell.x() - 0.5 * hx - xmin) / hx);
         int j = std::round((cell.y() - 0.5 * hy - ymin) / hy);
 
@@ -500,33 +629,33 @@ void EuMesh::check_reference(bool fix) {
 
     // Исправить сетку, если необходимо
     if (fix) {
-        for (auto& cell: m_locals) {
+        for (auto& cell: local_cells_) {
             index_t ic = cell.index();
 
             int i = std::round((cell.x() - 0.5 * hx - xmin) / hx);
             int j = std::round((cell.y() - 0.5 * hy - ymin) / hy);
 
-            m_locals.volume[ic] = volume;
-            m_locals.center[ic] = get_center(i, j);
+            local_cells_.volume[ic] = volume;
+            local_cells_.center[ic] = get_center(i, j);
 
-            index_t iface = m_locals.faces.offsets[ic];
+            index_t iface = local_cells_.faces.offsets[ic];
 
-            m_locals.faces.area[iface + Side2D::L] = hy;
-            m_locals.faces.area[iface + Side2D::R] = hy;
-            m_locals.faces.area[iface + Side2D::B] = hx;
-            m_locals.faces.area[iface + Side2D::T] = hx;
+            local_cells_.faces.area[iface + Side2D::L] = hy;
+            local_cells_.faces.area[iface + Side2D::R] = hy;
+            local_cells_.faces.area[iface + Side2D::B] = hx;
+            local_cells_.faces.area[iface + Side2D::T] = hx;
 
-            m_locals.faces.normal[iface + Side2D::L] = -Vector3d::UnitX();
-            m_locals.faces.normal[iface + Side2D::R] =  Vector3d::UnitX();
-            m_locals.faces.normal[iface + Side2D::B] = -Vector3d::UnitY();
-            m_locals.faces.normal[iface + Side2D::T] =  Vector3d::UnitY();
+            local_cells_.faces.normal[iface + Side2D::L] = -Vector3d::UnitX();
+            local_cells_.faces.normal[iface + Side2D::R] =  Vector3d::UnitX();
+            local_cells_.faces.normal[iface + Side2D::B] = -Vector3d::UnitY();
+            local_cells_.faces.normal[iface + Side2D::T] =  Vector3d::UnitY();
 
-            m_locals.faces.center[iface + Side2D::L] = lface_center(i, j);
-            m_locals.faces.center[iface + Side2D::R] = rface_center(i, j);
-            m_locals.faces.center[iface + Side2D::B] = bface_center(i, j);
-            m_locals.faces.center[iface + Side2D::T] = tface_center(i, j);
+            local_cells_.faces.center[iface + Side2D::L] = lface_center(i, j);
+            local_cells_.faces.center[iface + Side2D::R] = rface_center(i, j);
+            local_cells_.faces.center[iface + Side2D::B] = bface_center(i, j);
+            local_cells_.faces.center[iface + Side2D::T] = tface_center(i, j);
 
-            SqQuad& quad = m_locals.verts.mapping<2>(ic);
+            SqQuad& quad = local_cells_.verts.mapping<2>(ic);
             quad.vs<-1, -1>() = get_vertex(i + 0.0, j + 0.0);
             quad.vs< 0, -1>() = get_vertex(i + 0.5, j + 0.0);
             quad.vs<+1, -1>() = get_vertex(i + 1.0, j + 0.0);
@@ -554,26 +683,26 @@ std::string bytes(size_t n_bytes) {
 }
 
 void EuMesh::memory_usage() const {
-    memory_t geom_size = m_locals.memory_usage();
-    memory_t face_size = m_locals.faces.memory_usage();
-    memory_t adj_size = m_locals.faces.adjacent.memory_usage();
-    memory_t vert_size = m_locals.verts.memory_usage();
-    memory_t node_size = m_local_nodes.memory_usage();
-    memory_t inc_size = m_local_nodes.incident.memory_usage();
+    memory_t geom_size = local_cells_.memory_usage();
+    memory_t face_size = local_cells_.faces.memory_usage();
+    memory_t adj_size = local_cells_.faces.adjacent.memory_usage();
+    memory_t vert_size = local_cells_.verts.memory_usage();
+    memory_t node_size = local_nodes_.memory_usage();
+    memory_t inc_size = local_nodes_.incident.memory_usage();
 
     memory_t cells_size;
     cells_size.needed = geom_size.needed + face_size.needed + adj_size.needed + vert_size.needed;
     cells_size.actual = geom_size.actual + face_size.actual + adj_size.actual + vert_size.actual;
 
-    size_t geom_per_cell = cells_size.needed / m_locals.n_cells();
+    size_t geom_per_cell = cells_size.needed / local_cells_.n_cells();
 
     memory_t nodes_size;
     nodes_size.needed = node_size.needed + inc_size.needed;
     nodes_size.actual = node_size.actual + inc_size.actual;
 
-    size_t geom_per_node = nodes_size.needed / m_local_nodes.n_nodes();
+    size_t geom_per_node = nodes_size.needed / local_nodes_.n_nodes();
 
-    std::cout << "Local cells: " << m_locals.n_cells() << "\n";
+    std::cout << "Local cells: " << local_cells_.n_cells() << "\n";
     std::cout << "  Cells:   " << bytes(cells_size.needed)  << " / " << bytes(cells_size.actual);
     std::cout << " (avg" << bytes(geom_per_cell) << " per cell)\n";
     std::cout << "    Geom:  " << bytes(geom_size.needed) << " / " << bytes(geom_size.actual) << "\n";
@@ -585,8 +714,8 @@ void EuMesh::memory_usage() const {
     std::cout << "    Geom:  " << bytes(node_size.needed) << " / " << bytes(node_size.actual) << "\n";
     std::cout << "    Inc:   " << bytes(inc_size.needed) << " / " << bytes(inc_size.actual) << "\n";
 
-    memory_t data_size = m_locals.data.memory_usage();
-    size_t data_per_cell = data_size.needed / m_locals.n_cells();
+    memory_t data_size = local_cells_.data.memory_usage();
+    size_t data_per_cell = data_size.needed / local_cells_.n_cells();
     std::cout << "  Data:    " << bytes(data_size.needed) << " / " << bytes(data_size.actual);
     std::cout << " (avg" << bytes(data_per_cell) << " per cell)\n";
 
@@ -595,7 +724,7 @@ void EuMesh::memory_usage() const {
 }
 
 int EuMesh::check_base() const {
-    if (m_locals.empty()) {
+    if (local_cells_.empty()) {
         if (mpi::single()) {
             std::cout << "\tEmpty storage\n";
             return -1;
@@ -604,7 +733,7 @@ int EuMesh::check_base() const {
         }
     }
 
-    auto dim = m_locals.dim();
+    auto dim = local_cells_.dim();
 
     if (dim != 2 && dim != 3) {
         std::cout << "\tDimension is not 2 or 3\n";
@@ -612,108 +741,108 @@ int EuMesh::check_base() const {
     }
 
     int res = 0;
-    for (index_t ic = 0; ic < m_locals.size(); ++ic) {
-        if (m_locals.index[ic] < 0 || m_locals.index[ic] != ic) {
+    for (index_t ic = 0; ic < local_cells_.size(); ++ic) {
+        if (local_cells_.index[ic] < 0 || local_cells_.index[ic] != ic) {
             std::cout << "\tWrong cell index\n";
             return -1;
         }
 
-        if (m_locals.rank[ic] < 0 || m_locals.rank[ic] != mpi::rank()) {
+        if (local_cells_.rank[ic] < 0 || local_cells_.rank[ic] != mpi::rank()) {
             std::cout << "\tWrong cell rank\n";
             return -1;
         }
 
         // Проверим число вершин
-        int n_nodes = m_locals.verts.count(ic);
-        int n_max_nodes = m_locals.verts.max_count(ic);
-        if (m_locals.adaptive()) {
+        int n_nodes = local_cells_.verts.count(ic);
+        int n_max_nodes = local_cells_.verts.max_count(ic);
+        if (local_cells_.adaptive()) {
             if ((dim == 2 && n_nodes == n_max_nodes && n_max_nodes != 9) ||
                 (dim == 3 && n_nodes == n_max_nodes && n_max_nodes != 27)) {
                 std::cout << "\tCell has wrong node count " << n_nodes << " " << n_max_nodes << "\n";
-                m_locals.print_info(ic);
+                local_cells_.print_info(ic);
                 return -1;
             }
         }
         else {
             if (n_nodes != n_max_nodes) {
                 std::cout << "\tCell has strange number of nodes (" << n_nodes << ")\n";
-                m_locals.print_info(ic);
+                local_cells_.print_info(ic);
                 return -1;
             }
             if (n_nodes < dim + 1) {
                 std::cout << "\tCell has too little nodes (" << n_nodes << ")\n";
-                m_locals.print_info(ic);
+                local_cells_.print_info(ic);
                 return -1;
             }
         }
 
         // Проверим число граней
-        int n_faces = m_locals.face_count(ic);
-        int n_max_faces = m_locals.faces.max_count(ic);
-        if (m_locals.adaptive()) {
+        int n_faces = local_cells_.face_count(ic);
+        int n_max_faces = local_cells_.faces.max_count(ic);
+        if (local_cells_.adaptive()) {
             for (int i = 0; i < FpC(dim); ++i) {
-                if (m_locals.faces.is_undefined(m_locals.faces.offsets[ic] + i)) {
+                if (local_cells_.faces.is_undefined(local_cells_.faces.offsets[ic] + i)) {
                     std::cout << "\tCell has no one of main faces\n";
-                    m_locals.print_info(ic);
+                    local_cells_.print_info(ic);
                     return -1;
                 }
             }
             if (n_faces > FpC(dim)) {
-                std::cout << "\tCell has too much faces (" << m_locals.face_count(ic) << ")\n";
-                m_locals.print_info(ic);
+                std::cout << "\tCell has too much faces (" << local_cells_.face_count(ic) << ")\n";
+                local_cells_.print_info(ic);
                 return -1;
             }
             if ((dim == 2 && (n_faces > n_max_faces || n_max_faces != 8)) ||
                 (dim == 3 && (n_faces > n_max_faces || n_max_faces != 24))) {
                 std::cout << "\tCell has wrong face count " << n_faces << " " << n_max_faces << "\n";
-                m_locals.print_info(ic);
+                local_cells_.print_info(ic);
                 return -1;
             }
         }
         else {
             if (n_faces != n_max_faces) {
                 std::cout << "\tCell has strange number of faces (" << n_faces << ")\n";
-                m_locals.print_info(ic);
+                local_cells_.print_info(ic);
                 return -1;
             }
             if (n_faces < dim + 1) {
                 std::cout << "\tCell has too little faces (" << n_max_faces << ")\n";
-                m_locals.print_info(ic);
+                local_cells_.print_info(ic);
                 return -1;
             }
             for (int i = 0; i < n_faces; ++i) {
-                if (m_locals.faces.is_undefined(m_locals.faces.offsets[ic] + i)) {
+                if (local_cells_.faces.is_undefined(local_cells_.faces.offsets[ic] + i)) {
                     std::cout << "\tCell has undefined face\n";
-                    m_locals.print_info(ic);
+                    local_cells_.print_info(ic);
                     return -1;
                 }
             }
         }
 
         // Правильное задание геометрии
-        res = m_locals.check_geometry(ic);
+        res = local_cells_.check_geometry(ic);
         if (res < 0) return res;
 
         // Грани правильно ориентированы
-        res = m_locals.check_base_face_orientation(ic);
+        res = local_cells_.check_base_face_orientation(ic);
         if (res < 0) return res;
 
         // Порядок основных вершин
-        res = m_locals.check_base_vertices_order(ic);
+        res = local_cells_.check_base_vertices_order(ic);
         if (res < 0) return res;
 
         // Проверка смежности
 #ifndef ZEPHYR_MPI
-        res = m_locals.check_connectivity(ic);
+        res = local_cells_.check_connectivity(ic);
 #else
-        res = m_locals.check_connectivity(ic, m_tourists.ghost_cells());
+        res = local_cells_.check_connectivity(ic, tourists_.ghost_cells());
 #endif
         if (res < 0) return res;
     }
 
     // Если уникальные узлы не построены, то завершаем
-    if (!m_locals.verts.unique_nodes()) {
-        if (!m_locals.verts.index.empty() || !m_locals.verts.ghost.empty()) {
+    if (!local_cells_.verts.has_nodes()) {
+        if (!local_cells_.verts.index.empty() || !local_cells_.verts.ghost.empty()) {
             std::cout << "\tUnique nodes: not empty verts arrays\n";
             return -1;
         }
@@ -721,10 +850,10 @@ int EuMesh::check_base() const {
     }
 
 #ifndef ZEPHYR_MPI
-    res = m_local_nodes.check_nodes(m_locals);
+    res = local_nodes_.check_nodes(local_cells_);
 #else
-    res = m_local_nodes.check_nodes(m_locals,
-        m_tourists.ghost_cells(), m_tourists.ghost_nodes());
+    res = local_nodes_.check_nodes(local_cells_,
+        tourists_.ghost_cells(), tourists_.ghost_nodes());
 #endif
     if (res < 0) return res;
 
@@ -732,7 +861,7 @@ int EuMesh::check_base() const {
 }
 
 int EuMesh::check_refined() const {
-    if (m_locals.empty()) {
+    if (local_cells_.empty()) {
         if (mpi::single()) {
             std::cout << "\tEmpty storage\n";
             return -1;
@@ -741,7 +870,7 @@ int EuMesh::check_refined() const {
         }
     }
 
-    auto dim = m_locals.dim();
+    auto dim = local_cells_.dim();
 
     if (dim != 2 && dim != 3) {
         std::cout << "\tDimension is not 2 or 3\n";
@@ -749,71 +878,71 @@ int EuMesh::check_refined() const {
     }
 
     int res = 0;
-    for (index_t ic = 0; ic < m_locals.size(); ++ic) {
-        if (m_locals.is_undefined(ic)) {
+    for (index_t ic = 0; ic < local_cells_.size(); ++ic) {
+        if (local_cells_.is_undefined(ic)) {
             std::cout << "\tUndefined cell\n";
             return -1;
         }
 
-        if (m_locals.index[ic] < 0 || m_locals.index[ic] != ic) {
+        if (local_cells_.index[ic] < 0 || local_cells_.index[ic] != ic) {
             std::cout << "\tWrong cell index\n";
             return -1;
         }
 
-        if (m_locals.rank[ic] < 0 || m_locals.rank[ic] != mpi::rank()) {
+        if (local_cells_.rank[ic] < 0 || local_cells_.rank[ic] != mpi::rank()) {
             std::cout << "\tWrong cell rank\n";
             return -1;
         }
 
         // Число граней
         for (int i = 0; i < FpC(dim); ++i) {
-            if (m_locals.faces.is_undefined(m_locals.faces.offsets[ic] + i)) {
+            if (local_cells_.faces.is_undefined(local_cells_.faces.offsets[ic] + i)) {
                 std::cout << "\tCell has no one of main faces\n";
-                m_locals.print_info(ic);
+                local_cells_.print_info(ic);
                 return -1;
             }
         }
 
         // Вершины дублируются
-        for (int i = m_locals.verts.offsets[ic]; i < m_locals.verts.offsets[ic + 1]; ++i) {
-            for (int j = i + 1; j < m_locals.verts.offsets[ic + 1]; ++j) {
-                double dist = (m_locals.verts[i] - m_locals.verts[j]).norm();
-                if (dist < 1.0e-5 * m_locals.linear_size(ic)) {
+        for (int i = local_cells_.verts.offsets[ic]; i < local_cells_.verts.offsets[ic + 1]; ++i) {
+            for (int j = i + 1; j < local_cells_.verts.offsets[ic + 1]; ++j) {
+                double dist = (local_cells_.verts[i] - local_cells_.verts[j]).norm();
+                if (dist < 1.0e-5 * local_cells_.linear_size(ic)) {
                     std::cout << "\tIdentical vertices\n";
-                    m_locals.print_info(ic);
+                    local_cells_.print_info(ic);
                     return -1;
                 }
             }
         }
 
         // Правильное задание геометрии
-        res = m_locals.check_geometry(ic);
+        res = local_cells_.check_geometry(ic);
         if (res < 0) return res;
 
         // Грани правильно ориентированы
-        res = m_locals.check_base_face_orientation(ic);
+        res = local_cells_.check_base_face_orientation(ic);
         if (res < 0) return res;
 
         // Порядок основных вершин
-        res = m_locals.check_base_vertices_order(ic);
+        res = local_cells_.check_base_vertices_order(ic);
         if (res < 0) return res;
 
         // Проверка сложных граней
-        res = m_locals.check_complex_faces(ic);
+        res = local_cells_.check_complex_faces(ic);
         if (res < 0) return res;
 
         // Проверка смежности
 #ifndef ZEPHYR_MPI
-        res = m_locals.check_connectivity(ic);
+        res = local_cells_.check_connectivity(ic);
 #else
-        res = m_locals.check_connectivity(ic, m_tourists.ghost_cells());
+        res = local_cells_.check_connectivity(ic, tourists_.ghost_cells());
 #endif
         if (res < 0) return res;
     }
 
     // Если уникальные узлы не построены, то завершаем
-    if (!m_locals.verts.unique_nodes()) {
-        if (!m_locals.verts.index.empty() || !m_locals.verts.ghost.empty()) {
+    if (!local_cells_.verts.has_nodes()) {
+        if (!local_cells_.verts.index.empty() || !local_cells_.verts.ghost.empty()) {
             std::cout << "\tUnique nodes: not empty verts arrays\n";
             return -1;
         }
@@ -821,10 +950,10 @@ int EuMesh::check_refined() const {
     }
 
 #ifndef ZEPHYR_MPI
-    res = m_local_nodes.check_nodes(m_locals);
+    res = local_nodes_.check_nodes(local_cells_);
 #else
-    res = m_local_nodes.check_nodes(m_locals,
-        m_tourists.ghost_cells(), m_tourists.ghost_nodes());
+    res = local_nodes_.check_nodes(local_cells_,
+        tourists_.ghost_cells(), tourists_.ghost_nodes());
 #endif
     if (res < 0) return res;
 
@@ -833,7 +962,7 @@ int EuMesh::check_refined() const {
 
 Box EuMesh::bbox() const {
     Box box1 = Box::Empty(3);
-    for (auto& v: m_locals.verts.coord) {
+    for (auto& v: local_cells_.verts.coord) {
         box1.capture(v);
     }
 
@@ -852,15 +981,15 @@ Box EuMesh::bbox() const {
 
 void EuMesh::push_back(const geom::Line& line) {
     geom::Polygon poly = {line[0], line[1], line[1], line[0]};
-    m_locals.push_back(poly);
+    local_cells_.push_back(poly);
 }
 
 void EuMesh::push_back(const geom::Polygon& poly) {
-    m_locals.push_back(poly);
+    local_cells_.push_back(poly);
 }
 
 void EuMesh::push_back(const geom::Polyhedron& poly) {
-    m_locals.push_back(poly);
+    local_cells_.push_back(poly);
 }
 
 void EuMesh::add_marker(const geom::Vector3d& pos, double size) {
@@ -879,36 +1008,31 @@ void EuMesh::add_marker(const geom::Vector3d& pos, double size) {
 }
 
 EuCell_Iter EuMesh::begin() {
-    return {&m_locals, 0,
-        mpi_cond(&m_tourists.ghost_cells(), nullptr) };
+    return {&local_cells_, 0,
+        mpi_cond(&tourists_.ghost_cells(), nullptr) };
 }
 
 EuCell_Iter EuMesh::end() {
-    return {&m_locals, m_locals.size(),
-        mpi_cond(&m_tourists.ghost_cells(), nullptr) };
+    return {&local_cells_, local_cells_.size(),
+        mpi_cond(&tourists_.ghost_cells(), nullptr) };
 }
 
 EuCell EuMesh::operator[](index_t idx) {
-    return {&m_locals, idx,
-        mpi_cond(&m_tourists.ghost_cells(), nullptr) };
+    return {&local_cells_, idx,
+        mpi_cond(&tourists_.ghost_cells(), nullptr) };
 }
 
 EuCell EuMesh::operator()(int i, int j) {
-    i = (i + m_nx) % m_nx;
-    j = (j + m_ny) % m_ny;
-    return operator[](m_ny * i + j);
+    i = (i + nx_) % nx_;
+    j = (j + ny_) % ny_;
+    return operator[](ny_ * i + j);
 }
 
 EuCell EuMesh::operator()(int i, int j, int k) {
-    i = (i + m_nx) % m_nx;
-    j = (j + m_ny) % m_ny;
-    k = (k + m_nz) % m_nz;
-    return operator[](m_nz * (m_ny * i + j) + k);
-}
-
-void EuMesh::make_unique_nodes() {
-    if (unique_nodes()) return;
-    m_local_nodes.setup_for(m_locals);
+    i = (i + nx_) % nx_;
+    j = (j + ny_) % ny_;
+    k = (k + nz_) % nz_;
+    return operator[](nz_ * (ny_ * i + j) + k);
 }
 
 void EuMesh::backup(const std::string& sroot, const std::vector<std::string>& variables) const {
@@ -933,12 +1057,12 @@ void EuMesh::backup(const std::string& sroot, const std::vector<std::string>& va
 
     if (mpi::master()) {
         file << std::boolalpha;
-        file << "    \"max_level\":  " << m_max_level << ",\n";
-        file << "    \"structured\": " << m_structured << ",\n";
-        if (m_structured) {
-            file << "    \"nx\": " << m_nx << ",\n";
-            file << "    \"ny\": " << m_ny << ",\n";
-            file << "    \"nz\": " << m_nz << ",\n";
+        file << "    \"max_level\":  " << max_level_ << ",\n";
+        file << "    \"structured\": " << structured_ << ",\n";
+        if (structured_) {
+            file << "    \"nx\": " << nx_ << ",\n";
+            file << "    \"ny\": " << ny_ << ",\n";
+            file << "    \"nz\": " << nz_ << ",\n";
         }
     }
 
@@ -947,7 +1071,7 @@ void EuMesh::backup(const std::string& sroot, const std::vector<std::string>& va
         file << "    \"cells\": {\n";
     }
 
-    m_locals.backup(root, file, "      ", variables);
+    local_cells_.backup(root, file, "      ", variables);
 
     if (mpi::master()) {
         file << "    }\n"; // mesh.cells

@@ -17,6 +17,64 @@ using namespace zephyr::mesh;
 
 namespace {
 
+class DistNodes {
+    bool has_no_ghosts_{true};
+    mesh::index_t n_local_nodes_{0};
+    mesh::index_t n_nodes_{0};
+    std::span<const mesh::index_t> vert_index_{}; // по классике verts.index
+    std::span<const mesh::index_t> vert_ghost_{}; // по классике verts.ghost
+    std::span<const Vector3d> local_nodes_{};
+    std::span<const Vector3d> ghost_nodes_{};
+
+public:
+    DistNodes() = default;
+
+    DistNodes(
+        std::span<const mesh::index_t> vert_index,
+        std::span<const mesh::index_t> vert_ghost,
+        std::span<const Vector3d> local_nodes = {},
+        std::span<const Vector3d> ghost_nodes = {}) :
+            vert_index_(vert_index),
+            vert_ghost_(vert_ghost),
+            local_nodes_(local_nodes),
+            ghost_nodes_(ghost_nodes) {
+
+        n_local_nodes_ = local_nodes_.size();
+        n_nodes_ = n_local_nodes_ + ghost_nodes_.size();
+        has_no_ghosts_ = vert_ghost_.empty() || ghost_nodes_.empty();
+
+        z_assert(!vert_index_.empty(), "DistNodes empty vert_index");
+    }
+
+    bool empty() const { return n_nodes_ == 0; }
+
+    Vector3d coord(index_t vert_idx) const {
+        if (has_no_ghosts_ || vert_ghost_[vert_idx] < 0) {
+            return local_nodes_[vert_index_[vert_idx]];
+        }
+        else {
+            return ghost_nodes_[vert_ghost_[vert_idx]];
+        }
+    }
+
+    index_t index(index_t vert_idx) const {
+        if (has_no_ghosts_ || vert_ghost_[vert_idx] < 0) {
+            return vert_index_[vert_idx];
+        }
+        else {
+            return n_local_nodes_ + vert_ghost_[vert_idx];
+        }
+    }
+
+    std::vector<Vector3d> points() const {
+        std::vector<Vector3d> res;
+        res.reserve(n_nodes_);
+        std::ranges::copy(local_nodes_, std::back_inserter(res));
+        std::ranges::copy(ghost_nodes_, std::back_inserter(res));
+        return res;
+    }
+};
+
 // ====================================================================================================================
 //                                                        VTU FORMAT
 // ====================================================================================================================
@@ -26,29 +84,29 @@ class VtuStructure {
 public:
     VtuStructure(const AmrCells &cells, bool polyhedral);
 
-    VtuStructure(const AmrCells &cells, const AmrNodes& nodes, bool polyhedral);
+    VtuStructure(const AmrCells &cells, const DistNodes& nodes, bool polyhedral);
 
     void write_header(std::ofstream &file, const Variables &variables) const;
 
     void write_primitives(std::ofstream &file) const;
 
 private:
-    void fill(const AmrCells& cells, const AmrNodes& nodes, bool polyhedral);
+    void fill(const AmrCells& cells, const DistNodes &nodes, bool polyhedral);
 
     // Двумерная адаптивная сетка в виде простых квадратов
-    void fill_adaptive_hex_2D(const AmrCells& cells, const AmrNodes& nodes = {});
+    void fill_adaptive_hex_2D(const AmrCells& cells, const DistNodes &nodes = {});
 
     // Двумерная адаптивная сетка в виде полигонов
-    void fill_adaptive_poly_2D(const AmrCells& cells, const AmrNodes& nodes = {});
+    void fill_adaptive_poly_2D(const AmrCells& cells, const DistNodes& nodes = {});
 
     // Трёхмерная адаптивная сетка в виде простых шестигранников
-    void fill_adaptive_hex_3D(const AmrCells& cells, const AmrNodes& nodes = {});
+    void fill_adaptive_hex_3D(const AmrCells& cells, const DistNodes &nodes = {});
 
     // Двумерная полигональная сетка или трёхмерная сетка из базовых примитивов
-    void fill_poly_classic(const AmrCells& cells, const AmrNodes& nodes = {});
+    void fill_poly_classic(const AmrCells& cells, const DistNodes &nodes = {});
 
     // Трёхмерная сетка из нестандартных многогранников
-    void fill_polyfaces_3D(const AmrCells& cells, const AmrNodes& nodes = {});
+    void fill_polyfaces_3D(const AmrCells& cells, const DistNodes &nodes = {});
 
     // Массивы данных для VTU
     std::vector<Vector3d> points;
@@ -107,24 +165,15 @@ std::vector<Vector3d> collect_points(const AmrCells& cells, index_t n_points) {
 }
 
 VtuStructure::VtuStructure(const AmrCells &cells, bool polyhedral) {
-    static const AmrNodes nodes;
+    static constexpr DistNodes nodes;
     fill(cells, nodes, polyhedral);
 }
 
-VtuStructure::VtuStructure(const AmrCells &cells, const AmrNodes& nodes, bool polyhedral) {
-    if (nodes.empty()) {
-        throw std::runtime_error("VtuStructure error: AmrNodes is empty");
-    }
-    if (!cells.verts.unique_nodes()) {
-        throw std::runtime_error("VtuStructure error: AmrCells.verts is not filled #1");
-    }
-    if (cells.verts.index.size() != cells.verts.size()) {
-        throw std::runtime_error("VtuStructure error: AmrCells.verts is not filled #2");
-    }
+VtuStructure::VtuStructure(const AmrCells &cells, const DistNodes& nodes, bool polyhedral) {
     fill(cells, nodes, polyhedral);
 }
 
-void VtuStructure::fill(const AmrCells& cells, const AmrNodes& nodes, bool polyhedral) {
+void VtuStructure::fill(const AmrCells& cells, const DistNodes &nodes, bool polyhedral) {
     if (cells.adaptive()) {
         if (cells.dim() < 3) {
             if (!polyhedral) {
@@ -159,7 +208,7 @@ void VtuStructure::fill(const AmrCells& cells, const AmrNodes& nodes, bool polyh
     }
 }
 
-void VtuStructure::fill_adaptive_hex_2D(const AmrCells& cells, const AmrNodes& nodes) {
+void VtuStructure::fill_adaptive_hex_2D(const AmrCells& cells, const DistNodes &nodes) {
     index_t n_cells = cells.n_cells();
     index_t n_points = 4 * cells.size();
 
@@ -176,21 +225,20 @@ void VtuStructure::fill_adaptive_hex_2D(const AmrCells& cells, const AmrNodes& n
         connectivity = arange(n_points);
     }
     else {
-        points = nodes.coord;
+        points = nodes.points();
         connectivity.resize(n_points);
-        const auto& node_idx = cells.verts.index;
         for (mesh::index_t ic = 0; ic < n_cells; ++ic) {
             index_t beg = cells.verts.offsets[ic];
-            connectivity[4 * ic + 0] = node_idx[beg + SqQuad::iss<-1, -1>()];
-            connectivity[4 * ic + 1] = node_idx[beg + SqQuad::iss<+1, -1>()];
-            connectivity[4 * ic + 2] = node_idx[beg + SqQuad::iss<+1, +1>()];
-            connectivity[4 * ic + 3] = node_idx[beg + SqQuad::iss<-1, +1>()];
+            connectivity[4 * ic + 0] = nodes.index(beg + SqQuad::iss<-1, -1>());
+            connectivity[4 * ic + 1] = nodes.index(beg + SqQuad::iss<+1, -1>());
+            connectivity[4 * ic + 2] = nodes.index(beg + SqQuad::iss<+1, +1>());
+            connectivity[4 * ic + 3] = nodes.index(beg + SqQuad::iss<-1, +1>());
         }
     }
     offsets = uniform_offsets(n_cells, 4);
 }
 
-void VtuStructure::fill_adaptive_poly_2D(const AmrCells& cells, const AmrNodes& nodes) {
+void VtuStructure::fill_adaptive_poly_2D(const AmrCells& cells, const DistNodes& nodes) {
     index_t n_cells = cells.n_cells();
     types.resize(n_cells);
     offsets.resize(n_cells);
@@ -230,30 +278,29 @@ void VtuStructure::fill_adaptive_poly_2D(const AmrCells& cells, const AmrNodes& 
         connectivity = arange(n_points);
     }
     else {
-        points = nodes.coord;
+        points = nodes.points();
 
         index_t iv = 0;
         connectivity.resize(n_points);
-        const auto& node_idx = cells.verts.index;
         for (mesh::index_t ic = 0; ic < n_cells; ++ic) {
             index_t beg = cells.verts.offsets[ic];
 
-            connectivity[iv++] = node_idx[beg + SqQuad::iss<-1, -1>()];
-            if (cells.faces.is_complex(ic, Side2D::B)) { connectivity[iv++] = node_idx[beg + SqQuad::iss<0, -1>()]; }
+            connectivity[iv++] = nodes.index(beg + SqQuad::iss<-1, -1>());
+            if (cells.faces.is_complex(ic, Side2D::B)) { connectivity[iv++] = nodes.index(beg + SqQuad::iss<0, -1>()); }
 
-            connectivity[iv++] = node_idx[beg + SqQuad::iss<+1, -1>()];
-            if (cells.faces.is_complex(ic, Side2D::R)) { connectivity[iv++] = node_idx[beg + SqQuad::iss<+1, 0>()]; }
+            connectivity[iv++] = nodes.index(beg + SqQuad::iss<+1, -1>());
+            if (cells.faces.is_complex(ic, Side2D::R)) { connectivity[iv++] = nodes.index(beg + SqQuad::iss<+1, 0>()); }
 
-            connectivity[iv++] = node_idx[beg + SqQuad::iss<+1, +1>()];
-            if (cells.faces.is_complex(ic, Side2D::T)) { connectivity[iv++] = node_idx[beg + SqQuad::iss<0, +1>()]; }
+            connectivity[iv++] = nodes.index(beg + SqQuad::iss<+1, +1>());
+            if (cells.faces.is_complex(ic, Side2D::T)) { connectivity[iv++] = nodes.index(beg + SqQuad::iss<0, +1>()); }
 
-            connectivity[iv++] = node_idx[beg + SqQuad::iss<-1, +1>()];
-            if (cells.faces.is_complex(ic, Side2D::L)) { connectivity[iv++] = node_idx[beg + SqQuad::iss<-1, 0>()]; }
+            connectivity[iv++] = nodes.index(beg + SqQuad::iss<-1, +1>());
+            if (cells.faces.is_complex(ic, Side2D::L)) { connectivity[iv++] = nodes.index(beg + SqQuad::iss<-1, 0>()); }
         }
     }
 }
 
-void VtuStructure::fill_adaptive_hex_3D(const AmrCells& cells, const AmrNodes& nodes) {
+void VtuStructure::fill_adaptive_hex_3D(const AmrCells& cells, const DistNodes &nodes) {
     index_t n_cells = cells.n_cells();
     index_t n_points = 8 * cells.size();
 
@@ -275,25 +322,24 @@ void VtuStructure::fill_adaptive_hex_3D(const AmrCells& cells, const AmrNodes& n
         connectivity = arange(n_points);
     }
     else {
-        points = nodes.coord;
+        points = nodes.points();
         connectivity.resize(n_points);
-        const auto& node_idx = cells.verts.index;
         for (mesh::index_t ic = 0; ic < n_cells; ++ic) {
             index_t beg = cells.verts.offsets[ic];
-            connectivity[8 * ic + 0] = node_idx[beg + SqCube::iss<-1, -1, -1>()];
-            connectivity[8 * ic + 1] = node_idx[beg + SqCube::iss<+1, -1, -1>()];
-            connectivity[8 * ic + 2] = node_idx[beg + SqCube::iss<+1, +1, -1>()];
-            connectivity[8 * ic + 3] = node_idx[beg + SqCube::iss<-1, +1, -1>()];
-            connectivity[8 * ic + 4] = node_idx[beg + SqCube::iss<-1, -1, +1>()];
-            connectivity[8 * ic + 5] = node_idx[beg + SqCube::iss<+1, -1, +1>()];
-            connectivity[8 * ic + 6] = node_idx[beg + SqCube::iss<+1, +1, +1>()];
-            connectivity[8 * ic + 7] = node_idx[beg + SqCube::iss<-1, +1, +1>()];
+            connectivity[8 * ic + 0] = nodes.index(beg + SqCube::iss<-1, -1, -1>());
+            connectivity[8 * ic + 1] = nodes.index(beg + SqCube::iss<+1, -1, -1>());
+            connectivity[8 * ic + 2] = nodes.index(beg + SqCube::iss<+1, +1, -1>());
+            connectivity[8 * ic + 3] = nodes.index(beg + SqCube::iss<-1, +1, -1>());
+            connectivity[8 * ic + 4] = nodes.index(beg + SqCube::iss<-1, -1, +1>());
+            connectivity[8 * ic + 5] = nodes.index(beg + SqCube::iss<+1, -1, +1>());
+            connectivity[8 * ic + 6] = nodes.index(beg + SqCube::iss<+1, +1, +1>());
+            connectivity[8 * ic + 7] = nodes.index(beg + SqCube::iss<-1, +1, +1>());
         }
     }
     offsets = uniform_offsets(n_cells, 8);
 }
 
-void VtuStructure::fill_poly_classic(const AmrCells& cells, const AmrNodes& nodes) {
+void VtuStructure::fill_poly_classic(const AmrCells& cells, const DistNodes &nodes) {
     index_t n_cells = cells.n_cells();
 
     auto nv_to_type = cells.dim() == 2 ? nv_to_type2D : nv_to_type3D;
@@ -314,20 +360,20 @@ void VtuStructure::fill_poly_classic(const AmrCells& cells, const AmrNodes& node
         connectivity = arange(n_points);
     }
     else {
-        points = nodes.coord;
+        points = nodes.points();
         connectivity.resize(n_points);
         index_t offset = 0;
         for (mesh::index_t ic = 0; ic < n_cells; ++ic) {
             index_t beg = cells.verts.offsets[ic];
             for (int j = 0; j < offsets[ic] - offset; ++j) {
-                connectivity[offset + j] = cells.verts.index[beg + j];
+                connectivity[offset + j] = nodes.index(beg + j);
             }
             offset = offsets[ic];
         }
     }
 }
 
-void VtuStructure::fill_polyfaces_3D(const AmrCells& cells, const AmrNodes& nodes) {
+void VtuStructure::fill_polyfaces_3D(const AmrCells& cells, const DistNodes &nodes) {
     // Данные многогранников
     index_t n_cells = cells.n_cells();
 
@@ -348,13 +394,13 @@ void VtuStructure::fill_polyfaces_3D(const AmrCells& cells, const AmrNodes& node
         connectivity = arange(n_points);
     }
     else {
-        points = nodes.coord;
+        points = nodes.points();
         connectivity.resize(n_points);
         index_t offset = 0;
         for (mesh::index_t ic = 0; ic < n_cells; ++ic) {
             index_t beg = cells.verts.offsets[ic];
             for (int j = 0; j < offsets[ic] - offset; ++j) {
-                connectivity[offset + j] = cells.verts.index[beg + j];
+                connectivity[offset + j] = nodes.index(beg + j);
             }
             offset = offsets[ic];
         }
@@ -377,7 +423,7 @@ void VtuStructure::fill_polyfaces_3D(const AmrCells& cells, const AmrNodes& node
                 auto loc_i = cells.faces.vertices[iface][j];
                 index_t node_idx = cells.verts.offsets[ic] + loc_i;
                 if (unique) {
-                    node_idx = cells.verts.index[node_idx];
+                    node_idx = nodes.index(node_idx);
                 }
                 faces.push_back(node_idx);
             }
@@ -499,47 +545,30 @@ void write_cells_data(std::ofstream &file, AmrCells &cells, const Variables &var
 //                                                       VTU FILE
 // ====================================================================================================================
 
-VtuFile::VtuFile(const std::string &filename, const Variables &variables, bool polyhedral, bool unique_nodes) :
-    filename(filename), variables(variables), polyhedral(polyhedral), unique_nodes(unique_nodes) {
-
+VtuFile::VtuFile(std::string_view filename, const Variables &variables, const VtuOptions& options) :
+    filename(filename), variables(variables), options(options) {
 }
 
 void VtuFile::save(EuMesh &mesh) const {
-    save(filename, mesh, variables, polyhedral, unique_nodes);
+    save(filename, mesh, variables, options);
 }
 
 void VtuFile::save(AmrCells &cells) const {
-    save(filename, cells, variables, polyhedral);
+    save(filename, cells, variables, options);
 }
 
-void VtuFile::save(AmrCells &cells, const AmrNodes& nodes) const {
-    save(filename, cells, nodes, variables, polyhedral);
-}
+void save_with_nodes(std::string_view filename, AmrCells &locals,
+    const DistNodes& nodes, const Variables &variables, const VtuOptions& options) {
+    std::string fullname = add_extension(filename, ".vtu");
+    create_directories(fullname);
 
-void VtuFile::save(const std::string& filename, EuMesh& mesh,
-    const Variables &variables, bool polyhedral, bool unique_nodes) {
-    if (unique_nodes) {
-        mesh.make_unique_nodes();
-    }
-    if (mesh.unique_nodes()) {
-        save(filename, mesh.locals(), mesh.nodes(), variables, polyhedral);
-    }
-    else {
-        save(filename, mesh.locals(), variables, polyhedral);
-    }
-}
-
-void VtuFile::save(const std::string &filename, AmrCells &locals,
-    const Variables &variables, bool polyhedral) {
-    create_directories(filename);
-
-    std::ofstream file(filename, std::ios::out | std::ios::binary);
+    std::ofstream file(fullname, std::ios::out | std::ios::binary);
     if (!file.is_open()) {
-        std::cerr << "Warning: Cannot open file '" << filename << "'\n";
+        std::cerr << "Warning: Cannot open file '" << fullname << "'\n";
         return;
     }
 
-    VtuStructure formatter(locals, polyhedral);
+    VtuStructure formatter(locals, nodes, options.polyhedral);
     formatter.write_header(file, variables);
     formatter.write_primitives(file);
     write_cells_data(file, locals, variables);
@@ -547,22 +576,45 @@ void VtuFile::save(const std::string &filename, AmrCells &locals,
     file.close();
 }
 
-void VtuFile::save(const std::string &filename, AmrCells &locals,
-    const AmrNodes& nodes, const Variables &variables, bool polyhedral) {
-    create_directories(filename);
+void VtuFile::save(std::string_view filename, AmrCells &locals,
+                   const Variables &variables, const VtuOptions& options) {
 
-    std::ofstream file(filename, std::ios::out | std::ios::binary);
-    if (!file.is_open()) {
-        std::cerr << "Warning: Cannot open file '" << filename << "'\n";
-        return;
+    DistNodes nodes;
+    if (options.unique_nodes) {
+        auto [inc_verts, inc_nodes] = AmrNodes::generate<false>(locals);
+        nodes = DistNodes(
+            inc_verts.index,
+            inc_verts.ghost,
+            inc_nodes.coord
+        );
     }
+    save_with_nodes(filename, locals, nodes, variables, options);
+}
 
-    VtuStructure formatter(locals, nodes, polyhedral);
-    formatter.write_header(file, variables);
-    formatter.write_primitives(file);
-    write_cells_data(file, locals, variables);
+void VtuFile::save(std::string_view filename, EuMesh &mesh,
+                   const Variables &variables, const VtuOptions& options) {
 
-    file.close();
+    DistNodes nodes;
+    // Буферы снаружи, иначе span с UB
+    AmrVerts inc_verts;
+    AmrNodes inc_nodes;
+    if (options.unique_nodes) {
+        if (mesh.has_nodes()) {
+            nodes = DistNodes(
+                mesh.local_cells().verts.index,
+                mesh.local_cells().verts.ghost,
+                mesh.local_nodes().coord,
+                mesh.ghost_nodes().coord);
+        }
+        else {
+            std::tie(inc_verts, inc_nodes) = AmrNodes::generate<false>(mesh.local_cells());
+            nodes = DistNodes(
+                inc_verts.index, {},
+                inc_nodes.coord, {}
+            );
+        }
+    }
+    save_with_nodes(filename, mesh.local_cells(), nodes, variables, options);
 }
 
 } // namespace zephyr::io

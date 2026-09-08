@@ -20,7 +20,7 @@ double get_vol_as(EuCell& cell) { return cell.volume(true); }
 
 // Массив центров ячеек и граней
 EuMesh centers(EuMesh& mesh) {
-    EuMesh markers(2, false);
+    EuMesh markers = EuMesh::PolySet(2);
 
     // Добавляем точки в виде маркеров
     for (auto& cell: mesh) {
@@ -76,8 +76,8 @@ int main() {
     EuMesh centers_pl = centers(mesh_plain);
     EuMesh centers_ax = centers(mesh_axial);
 
-    VtuFile::save("out/mesh_plain.vtu", mesh_plain, vars, true);
-    VtuFile::save("out/mesh_axial.vtu", mesh_axial, vars, true);
+    VtuFile::save("out/mesh_plain.vtu", mesh_plain, vars, {.polyhedral = true});
+    VtuFile::save("out/mesh_axial.vtu", mesh_axial, vars, {.polyhedral = true});
 
     VtuFile::save("out/centers_pl.vtu", centers_pl);
     VtuFile::save("out/centers_ax.vtu", centers_ax);

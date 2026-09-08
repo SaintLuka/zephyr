@@ -17,6 +17,12 @@ using type_t     = std::uint8_t;   ///< VTK тип примитива/ячейк
 /// @return "BigEndian" или "LittleEndian"
 std::string byteorder();
 
+/// @brief Проверить наличие расширения в имени файла
+/// @param filename Входное имя файла
+/// @param ext Расширение файла с точкой, к примеру ".vtu"
+/// @return Имя файла с добавленным расширением
+std::string add_extension(std::string_view filename, const std::string& ext);
+
 /// @brief Создать директории, если указано сложное имя filename
 void create_directories(const std::string& filename);
 

@@ -29,6 +29,15 @@ class Cuboid;
 
 namespace zephyr::mesh {
 
+/// @brief Опции сетки
+struct MeshOpts {
+    int  dim      = -1;    ///< Размерность сетки
+    bool adaptive = true;  ///< Адаптивная сетка?
+    bool linear   = true;  ///< Линейная адаптивная сетка?
+    bool axial    = false; ///< Осевая симметрия
+    bool nodes    = false; ///< Уникальные узлы
+};
+
 /// @brief Набор ячеек в форме Structure of Arrays (набор массивов).
 ///
 /// Поддерживается три типа сеток:
@@ -56,10 +65,10 @@ class AmrCells final {
 
     index_t m_size  = 0;      ///< Число ячеек
 
-    int  m_dim      = -1;     ///< Размерность ячейки
-    bool m_adaptive = false;  ///< Адаптивная ячейка?
-    bool m_linear   = true;   ///< Линейная ячейка?
-    bool m_axial    = false;  ///< Осевая симметрия?
+    int  dim_      = -1;     ///< Размерность ячейки
+    bool adaptive_ = false;  ///< Адаптивная ячейка?
+    bool linear_   = true;   ///< Линейная ячейка?
+    bool axial_    = false;  ///< Осевая симметрия?
 
     /// @}
 
@@ -98,60 +107,34 @@ public:
 public:
     /// @{ @name Конструкторы
 
-    /// @brief Конструктор по умолчанию.
-    AmrCells() = default;
-
     /// @brief Базовый конструктор
-    /// @param dim Размерность сетки (2 для осевой симметрии)
-    /// @param adaptive Использовать возможность адаптации?
-    /// @param axial Сетка с осевой симметрией?
-    explicit AmrCells(int dim, bool adaptive = false, bool axial = false);
+    /// @param options Настройки сетки
+    explicit AmrCells(MeshOpts options = {});
 
-    /// @brief Создать пустой набор ячеек с таким же набором типов
+    /// @brief Пустое множество ячеек с таким же набором опций и типов
     AmrCells same() const;
-
-    /// @brief Простой встроенный генератор квази-одномерной сетки
-    AmrCells(const geom::generator::Strip& rect);
-
-    /// @brief Простой встроенный генератор прямоугольной декартовой сетки
-    AmrCells(const geom::generator::Rectangle& rect);
-
-    /// @brief Простой встроенный генератор трёхмерной декартовой сетки
-    AmrCells(const geom::generator::Cuboid& rect);
-
-    /// @brief Построение сетки общего вида, grid - finalized.
-    AmrCells(const geom::Grid& grid);
 
     /// @}
 
     /// @{ @name Общие характеристики ячеек
 
     /// @brief Размерность сетки
-    int dim() const { return m_dim; }
+    int dim() const { return dim_; }
 
     /// @brief Сетка допускает адаптацию?
-    bool adaptive() const { return m_adaptive; }
+    bool adaptive() const { return adaptive_; }
 
     /// @brief Сетка с осевой симметрией?
-    bool axial() const { return m_axial; }
+    bool axial() const { return axial_; }
 
     /// @brief Используются линейные AMR-ячейки (или квадратичные)
-    bool linear() const { return m_linear; }
+    bool linear() const { return linear_; }
 
     /// @brief Сетка хранит уникальные узлы?
-    bool unique_nodes() const { return verts.unique_nodes(); }
+    bool has_nodes() const { return verts.has_nodes(); }
 
-    /// @brief Изменить размерность
-    void set_dimension(int dim);
-
-    /// @brief Использовать адаптивные ячейки
-    void set_adaptive(bool adaptive = true);
-
-    /// @brief Использовать осевую симметрию
-    void set_axial(bool axial = true);
-
-    /// @brief Использовать линейные отображения
-    void set_linear(bool linear);
+    /// @brief Настройки сетки
+    MeshOpts options() const;
 
     /// @}
 
@@ -170,7 +153,7 @@ public:
     index_t n_faces() const { return faces.size(); }
 
     /// @brief Полное число вершин с дубликатами
-    index_t n_verts() const { return verts.size(); }
+    index_t n_verts() const { return verts.n_verts(); }
 
     /// @brief Очистить хранилище
     void clear();
@@ -219,7 +202,7 @@ public:
 
     /// @brief Название грани AMR-ячейки
     std::string face_name(index_t ic, index_t iface) const {
-        return geom::side_to_string(iface - faces.offsets[ic], m_dim);
+        return geom::side_to_string(iface - faces.offsets[ic], dim_);
     }
 
     /// @}
@@ -237,7 +220,7 @@ public:
 
     /// @brief Линейный размер ячейки
     double linear_size(index_t ic) const {
-        return m_dim < 3 ? std::sqrt(volume[ic]) : std::cbrt(volume[ic]);
+        return dim_ < 3 ? std::sqrt(volume[ic]) : std::cbrt(volume[ic]);
     }
 
     /// @brief Обычный объем или объем осесимметичной ячейки

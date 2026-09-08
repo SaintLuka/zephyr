@@ -18,37 +18,37 @@ using namespace mesh;
 
 Rectangle::Rectangle(const Json& config)
     : Generator("rectangle"),
-      m_xmin(0.0), m_xmax(1.0),
-      m_ymin(0.0), m_ymax(1.0) {
+      x_min_(0.0), x_max_(1.0),
+      y_min_(0.0), y_max_(1.0) {
 
-    m_axial = false;
+    axial_ = false;
     if (config["axial"]) {
-        m_axial = config["axial"].as<bool>();
+        axial_ = config["axial"].as<bool>();
     }
 
     if (!config["geometry"]) {
         throw std::runtime_error("Rectangle config doesn't contain key 'geometry'");
     }
 
-    m_xmin = config["geometry"]["x_min"].as<double>();
-    m_xmax = config["geometry"]["x_max"].as<double>();
-    m_ymin = config["geometry"]["y_min"].as<double>();
-    m_ymax = config["geometry"]["y_max"].as<double>();
+    x_min_ = config["geometry"]["x_min"].as<double>();
+    x_max_ = config["geometry"]["x_max"].as<double>();
+    y_min_ = config["geometry"]["y_min"].as<double>();
+    y_max_ = config["geometry"]["y_max"].as<double>();
 
     if (!config["bounds"]) {
         throw std::runtime_error("Rectangle config doesn't contain key 'bounds'");
     }
-    m_bounds.left   = boundary_from_string(config["bounds"]["left"].as<std::string>());
-    m_bounds.right  = boundary_from_string(config["bounds"]["right"].as<std::string>());
-    m_bounds.bottom = boundary_from_string(config["bounds"]["bottom"].as<std::string>());
-    m_bounds.top    = boundary_from_string(config["bounds"]["top"].as<std::string>());
+    bounds_.left   = boundary_from_string(config["bounds"]["left"].as<std::string>());
+    bounds_.right  = boundary_from_string(config["bounds"]["right"].as<std::string>());
+    bounds_.bottom = boundary_from_string(config["bounds"]["bottom"].as<std::string>());
+    bounds_.top    = boundary_from_string(config["bounds"]["top"].as<std::string>());
 
     if (config["voronoi"]) {
-        m_voronoi = config["voronoi"].as<bool>();
+        voronoi_ = config["voronoi"].as<bool>();
     }
 
     // Адаптивная по умолчанию
-    m_adaptive = !m_voronoi;
+    adaptive_ = !voronoi_;
 
     if (!config["size"]) {
         throw std::runtime_error("Rectangle config doesn't contain key 'size'");
@@ -82,11 +82,11 @@ Rectangle::Rectangle()
     set_boundaries(Boundaries{});
 }
 
-Rectangle::Rectangle(double xmin, double xmax, double ymin, double ymax, bool voronoi) :
+Rectangle::Rectangle(double x_min, double x_max, double y_min, double y_max, bool voronoi) :
         Generator("rectangle"),
-        m_xmin(xmin), m_xmax(xmax),
-        m_ymin(ymin), m_ymax(ymax),
-        m_voronoi(voronoi) {
+        x_min_(x_min), x_max_(x_max),
+        y_min_(y_min), y_max_(y_max),
+        voronoi_(voronoi) {
     if (!voronoi) {
         set_adaptive(true);
     }
@@ -94,17 +94,17 @@ Rectangle::Rectangle(double xmin, double xmax, double ymin, double ymax, bool vo
 }
 
 Box Rectangle::bbox() const {
-    Vector3d vmin(m_xmin, m_ymin, 0.0);
-    Vector3d vmax(m_xmax, m_ymax, 0.0);
+    Vector3d v_min(x_min_, y_min_, 0.0);
+    Vector3d v_max(x_max_, y_max_, 0.0);
 
-    return {vmin, vmax};
+    return {v_min, v_max};
 }
 
 void Rectangle::set_axial(bool axial) {
-    m_axial = axial;
+    axial_ = axial;
 
-    if (m_axial && m_ymin == 0.0) {
-        m_bounds.bottom = Boundary::WALL;
+    if (axial_ && y_min_ == 0.0) {
+        bounds_.bottom = Boundary::WALL;
     }
 }
 
@@ -112,13 +112,13 @@ void Rectangle::set_nx(int nx) {
     if (nx < 1) {
         throw std::runtime_error("Rectangle: Nx < 1");
     }
-    if (!m_voronoi) {
-        m_nx = nx;
-        m_ny = std::max(int(std::round(m_nx * (m_ymax - m_ymin) / (m_xmax - m_xmin))), 1);
+    if (!voronoi_) {
+        nx_ = nx;
+        ny_ = std::max(int(std::round(nx_ * (y_max_ - y_min_) / (x_max_ - x_min_))), 1);
     }
     else {
-        m_nx = std::max(int(std::round(nx * std::pow(3.0, 0.25)) / std::sqrt(2.0)), 1);
-        m_ny = std::max(int(std::round(m_nx * (m_ymax - m_ymin) / (m_xmax - m_xmin) / std::sqrt(3.0))), 1);
+        nx_ = std::max(int(std::round(nx * std::pow(3.0, 0.25)) / std::sqrt(2.0)), 1);
+        ny_ = std::max(int(std::round(nx_ * (y_max_ - y_min_) / (x_max_ - x_min_) / std::sqrt(3.0))), 1);
     }
     compute_size();
 }
@@ -127,13 +127,13 @@ void Rectangle::set_ny(int ny) {
     if (ny < 1) {
         throw std::runtime_error("Rectangle: Ny < 1");
     }
-    if (!m_voronoi) {
-        m_ny = ny;
-        m_nx = std::max(int(std::round(ny * (m_xmax - m_xmin) / (m_ymax - m_ymin))), 1);
+    if (!voronoi_) {
+        ny_ = ny;
+        nx_ = std::max(int(std::round(ny * (x_max_ - x_min_) / (y_max_ - y_min_))), 1);
     }
     else {
-        m_ny = std::max(int(std::round(ny / std::pow(3.0, 0.25)) / std::sqrt(2.0)), 1);
-        m_nx = std::max(int(std::round(m_ny * (m_xmax - m_xmin) / (m_ymax - m_ymin) * std::sqrt(3.0))), 1);
+        ny_ = std::max(int(std::round(ny / std::pow(3.0, 0.25)) / std::sqrt(2.0)), 1);
+        nx_ = std::max(int(std::round(ny_ * (x_max_ - x_min_) / (y_max_ - y_min_) * std::sqrt(3.0))), 1);
     }
     compute_size();
 }
@@ -142,18 +142,18 @@ void Rectangle::set_sizes(int nx, int ny) {
     if (nx < 1 || ny < 1) {
         throw std::runtime_error("Rectangle: Nx < 1 or Ny < 1");
     }
-    if (!m_voronoi) {
-        m_nx = nx;
-        m_ny = ny;
+    if (!voronoi_) {
+        nx_ = nx;
+        ny_ = ny;
     }
     else {
-        m_nx = std::max(int(std::round(nx * std::pow(3.0, 0.25)) / std::sqrt(2.0)), 1);
-        m_ny = std::max(int(std::round(ny / std::pow(3.0, 0.25)) / std::sqrt(2.0)), 1);
+        nx_ = std::max(int(std::round(nx * std::pow(3.0, 0.25)) / std::sqrt(2.0)), 1);
+        ny_ = std::max(int(std::round(ny / std::pow(3.0, 0.25)) / std::sqrt(2.0)), 1);
     }
     compute_size();
 
-    double dx = (m_xmax - m_xmin) / m_nx;
-    double dy = (m_ymax - m_ymin) / m_ny;
+    double dx = (x_max_ - x_min_) / nx_;
+    double dy = (y_max_ - y_min_) / ny_;
 
     double dmax = std::max(dx, dy);
     double dmin = std::min(dx, dy);
@@ -171,125 +171,125 @@ void Rectangle::set_size(int N) {
         throw std::runtime_error("Rectangle Error: N < 1");
     }
 
-    if (!m_voronoi) {
-        double d = std::sqrt((m_xmax - m_xmin) * (m_ymax - m_ymin) / N);
-        m_nx = std::max(int(std::round((m_xmax - m_xmin) / d)), 1);
-        m_ny = std::max(int(std::round((m_ymax - m_ymin) / d)), 1);
+    if (!voronoi_) {
+        double d = std::sqrt((x_max_ - x_min_) * (y_max_ - y_min_) / N);
+        nx_ = std::max(int(std::round((x_max_ - x_min_) / d)), 1);
+        ny_ = std::max(int(std::round((y_max_ - y_min_) / d)), 1);
     }
     else {
-        double a = std::sqrt(2 * (m_xmax - m_xmin) * (m_ymax - m_ymin) / (std::sqrt(3.0) * N));
+        double a = std::sqrt(2 * (x_max_ - x_min_) * (y_max_ - y_min_) / (std::sqrt(3.0) * N));
         double h = std::sqrt(3.0) * a;
 
-        m_nx = std::max(int(std::round((m_xmax - m_xmin) / a)), 1);
-        m_ny = std::max(int(std::round((m_ymax - m_ymin) / h)), 1);
+        nx_ = std::max(int(std::round((x_max_ - x_min_) / a)), 1);
+        ny_ = std::max(int(std::round((y_max_ - y_min_) / h)), 1);
     }
     compute_size();
 }
 
 void Rectangle::set_boundaries(Boundaries bounds) {
-    m_bounds = bounds;
+    bounds_ = bounds;
     if (periodic_along_x()) {
-        m_bounds.left = m_bounds.right = Boundary::PERIODIC;
+        bounds_.left = bounds_.right = Boundary::PERIODIC;
     }
     if (periodic_along_y()) {
-        m_bounds.bottom = m_bounds.top = Boundary::PERIODIC;
+        bounds_.bottom = bounds_.top = Boundary::PERIODIC;
     }
-    if (m_axial && m_ymin == 0.0) {
-        m_bounds.bottom = Boundary::WALL;
+    if (axial_ && y_min_ == 0.0) {
+        bounds_.bottom = Boundary::WALL;
     }
 }
 
 void Rectangle::set_adaptive(bool adaptive) {
-    if (!m_voronoi) {
-        m_adaptive = adaptive;
+    if (!voronoi_) {
+        adaptive_ = adaptive;
     }
     else {
-        m_adaptive = false;
+        adaptive_ = false;
     }
 }
 
 double Rectangle::x_min() const {
-    return m_xmin;
+    return x_min_;
 }
 
 double Rectangle::x_max() const {
-    return m_xmax;
+    return x_max_;
 }
 
 double Rectangle::y_min() const {
-    return m_ymin;
+    return y_min_;
 }
 
 double Rectangle::y_max() const {
-    return m_ymax;
+    return y_max_;
 }
 
 int Rectangle::nx() const {
-    return m_nx;
+    return nx_;
 }
 
 int Rectangle::ny() const {
-    return m_ny;
+    return ny_;
 }
 
 Rectangle::Boundaries Rectangle::bounds() const {
-    return m_bounds;
+    return bounds_;
 }
 
 bool Rectangle::periodic_along_x() const {
-    return m_bounds.left == Boundary::PERIODIC || m_bounds.right == Boundary::PERIODIC;
+    return bounds_.left == Boundary::PERIODIC || bounds_.right == Boundary::PERIODIC;
 }
 
 bool Rectangle::periodic_along_y() const {
-    return m_bounds.bottom == Boundary::PERIODIC || m_bounds.top == Boundary::PERIODIC;
+    return bounds_.bottom == Boundary::PERIODIC || bounds_.top == Boundary::PERIODIC;
 }
 
 void Rectangle::check_params() const {
-    if (m_xmin >= m_xmax) {
+    if (x_min_ >= x_max_) {
         throw std::runtime_error("Rectangle::check_params: x_min >= x_max");
     }
-    if (m_ymin >= m_ymax) {
+    if (y_min_ >= y_max_) {
         throw std::runtime_error("Rectangle::check_params: y_min >= y_max");
     }
 }
 
 void Rectangle::compute_size() {
-    if (!m_voronoi) {
-        m_size = m_nx * m_ny;
+    if (!voronoi_) {
+        size_ = nx_ * ny_;
     } else {
-        m_size = 2 * m_nx * m_ny;
+        size_ = 2 * nx_ * ny_;
     }
-    if (m_size > max_grid_size) {
+    if (size_ > max_grid_size) {
         throw std::runtime_error(std::format("Generator::check_size: attempt to create mesh "
                                              "that contains more than {} elements", max_grid_size));
     }
 }
 
 Grid Rectangle::make() const {
-    if (m_voronoi) {
+    if (voronoi_) {
         return create_voronoi();
     }
-    if (m_adaptive) {
+    if (adaptive_) {
         return create_classic_amr();
     }
     return create_classic();
 }
 
 Grid Rectangle::create_classic() const {
-    check_size(m_size);
+    check_size(size_);
 
-    double dx = (m_xmax - m_xmin) / m_nx;
-    double dy = (m_ymax - m_ymin) / m_ny;
+    double dx = (x_max_ - x_min_) / nx_;
+    double dy = (y_max_ - y_min_) / ny_;
 
     Grid grid;
-    grid.reserve_nodes((m_nx + 1) * (m_ny + 1));
-    grid.reserve_cells(m_nx * m_ny);
+    grid.reserve_nodes((nx_ + 1) * (ny_ + 1));
+    grid.reserve_cells(nx_ * ny_);
 
-    std::vector nodes(m_nx + 1, std::vector<Node::Ptr>(m_ny + 1));
-    for (int i = 0; i <= m_nx; ++i) {
-        for (int j = 0; j <= m_ny; ++j) {
-            double x = m_xmin + i * dx;
-            double y = m_ymin + j * dy;
+    std::vector nodes(nx_ + 1, std::vector<Node::Ptr>(ny_ + 1));
+    for (int i = 0; i <= nx_; ++i) {
+        for (int j = 0; j <= ny_; ++j) {
+            double x = x_min_ + i * dx;
+            double y = y_min_ + j * dy;
             nodes[i][j] = Node::create({x, y, 0.0});
         }
     }
@@ -298,12 +298,12 @@ Grid Rectangle::create_classic() const {
     // стрелки, начиная с нижней левой вершины (нижней грани)
     std::vector<Boundary> bc(4);
     std::vector<Node::Ptr> quad_nodes(4);
-    for (int i = 0; i < m_nx; ++i) {
-        bc[Side2D::L] = i == 0      ? m_bounds.left   : Boundary::INNER;
-        bc[Side2D::R] = i == m_nx-1 ? m_bounds.right  : Boundary::INNER;
-        for (int j = 0; j < m_ny; ++j) {
-            bc[Side2D::B] = j == 0      ? m_bounds.bottom : Boundary::INNER;
-            bc[Side2D::T] = j == m_ny-1 ? m_bounds.top    : Boundary::INNER;
+    for (int i = 0; i < nx_; ++i) {
+        bc[Side2D::L] = i == 0      ? bounds_.left   : Boundary::INNER;
+        bc[Side2D::R] = i == nx_-1 ? bounds_.right  : Boundary::INNER;
+        for (int j = 0; j < ny_; ++j) {
+            bc[Side2D::B] = j == 0      ? bounds_.bottom : Boundary::INNER;
+            bc[Side2D::T] = j == ny_-1 ? bounds_.top    : Boundary::INNER;
 
             using indexing::quad::vs;
             quad_nodes[vs<0, 0>()] = nodes[i][j];
@@ -318,32 +318,32 @@ Grid Rectangle::create_classic() const {
 }
 
 Grid Rectangle::create_classic_amr() const {
-    check_size(m_size);
+    check_size(size_);
 
-    double dx = (m_xmax - m_xmin) / m_nx;
-    double dy = (m_ymax - m_ymin) / m_ny;
+    double dx = (x_max_ - x_min_) / nx_;
+    double dy = (y_max_ - y_min_) / ny_;
 
     Grid grid;
-    grid.reserve_nodes((2 * m_nx + 1) * (2 * m_ny + 1));
-    grid.reserve_cells(m_nx * m_ny);
+    grid.reserve_nodes((2 * nx_ + 1) * (2 * ny_ + 1));
+    grid.reserve_cells(nx_ * ny_);
 
-    std::vector nodes(2 * m_nx + 1, std::vector<Node::Ptr>(2 * m_ny + 1));
-    for (int i = 0; i <= 2 * m_nx; ++i) {
-        for (int j = 0; j <= 2 * m_ny; ++j) {
-            double x = m_xmin + 0.5 * i * dx;
-            double y = m_ymin + 0.5 * j * dy;
+    std::vector nodes(2 * nx_ + 1, std::vector<Node::Ptr>(2 * ny_ + 1));
+    for (int i = 0; i <= 2 * nx_; ++i) {
+        for (int j = 0; j <= 2 * ny_; ++j) {
+            double x = x_min_ + 0.5 * i * dx;
+            double y = y_min_ + 0.5 * j * dy;
             nodes[i][j] = Node::create({x, y, 0.0});
         }
     }
 
     // AMR-ячейки, обход граней как в Side2D, вершины в Z-порядке
     std::vector<Boundary> bc(4);
-    for (int i = 0; i < m_nx; ++i) {
-        bc[Side2D::L] = i == 0      ? m_bounds.left   : Boundary::INNER;
-        bc[Side2D::R] = i == m_nx-1 ? m_bounds.right  : Boundary::INNER;
-        for (int j = 0; j < m_ny; ++j) {
-            bc[Side2D::B] = j == 0      ? m_bounds.bottom : Boundary::INNER;
-            bc[Side2D::T] = j == m_ny-1 ? m_bounds.top    : Boundary::INNER;
+    for (int i = 0; i < nx_; ++i) {
+        bc[Side2D::L] = i == 0      ? bounds_.left   : Boundary::INNER;
+        bc[Side2D::R] = i == nx_-1 ? bounds_.right  : Boundary::INNER;
+        for (int j = 0; j < ny_; ++j) {
+            bc[Side2D::B] = j == 0      ? bounds_.bottom : Boundary::INNER;
+            bc[Side2D::T] = j == ny_-1 ? bounds_.top    : Boundary::INNER;
             grid.add_cell(
                 CellType::AMR2D, {
                     nodes[2*i][2*j + 0], nodes[2*i + 1][2*j + 0], nodes[2*i + 2][2*j + 0],
@@ -356,19 +356,19 @@ Grid Rectangle::create_classic_amr() const {
 }
 
 Grid Rectangle::create_voronoi() const {
-    check_size(m_size);
+    check_size(size_);
 
-    size_t Nb = m_nx * m_ny;
-    double DX = m_xmax - m_xmin;
-    double DY = m_ymax - m_ymin;
+    size_t Nb = nx_ * ny_;
+    double DX = x_max_ - x_min_;
+    double DY = y_max_ - y_min_;
     size_t Ny = size_t(std::floor(std::sqrt(std::sqrt(3.0) * DY * Nb / 2.0 / DX))) + 1;
     double h = DY / 2.0 / Ny;
     double D = h / std::sqrt(0.75);
 
     size_t Nx = size_t(std::floor(DX / 1.5 / D));
 
-    double x_shift = m_xmin + (DX - Nx * 1.5 * D) / 2.0 - 0.5 * D;
-    double y_shift = m_ymin;
+    double x_shift = x_min_ + (DX - Nx * 1.5 * D) / 2.0 - 0.5 * D;
+    double y_shift = y_min_;
 
     // Вершины в виде таблицы
     std::vector vertices(Nx + 2, std::vector<Node::Ptr>(2 * Ny + 1, nullptr));
@@ -378,8 +378,8 @@ Grid Rectangle::create_voronoi() const {
 
         // Часть вершин на левой границе пропускаем
         if (j % 2 == 0) {
-            vertices[0][j] = Node::create({m_xmin, y, 0.0});
-            vertices[0][j]->bc = m_bounds.left;
+            vertices[0][j] = Node::create({x_min_, y, 0.0});
+            vertices[0][j]->bc = bounds_.left;
         }
 
         for (size_t i = 1; i <= Nx; ++i) {
@@ -387,16 +387,16 @@ Grid Rectangle::create_voronoi() const {
             vertices[i][j] = Node::create({x, y, 0.0});
 
             if (j == 0) {
-                vertices[i][j]->bc = m_bounds.bottom;
+                vertices[i][j]->bc = bounds_.bottom;
             } else if (j == 2 * Ny) {
-                vertices[i][j]->bc = m_bounds.top;
+                vertices[i][j]->bc = bounds_.top;
             }
         }
 
         // Часть вершин на правой границе пропускаем
         if (j == 0 || j == 2 * Ny || j % 2 == Nx % 2) {
-            vertices[Nx + 1][j] = Node::create({m_xmax, y, 0.0});
-            vertices[Nx + 1][j]->bc = m_bounds.right;
+            vertices[Nx + 1][j] = Node::create({x_max_, y, 0.0});
+            vertices[Nx + 1][j]->bc = bounds_.right;
         }
     }
 
@@ -416,17 +416,17 @@ Grid Rectangle::create_voronoi() const {
             int j = (i + 1) % vlist.size();
             Vector3d v1 = vlist[i]->pos;
             Vector3d v2 = vlist[j]->pos;
-            if (std::max(v1.x(), v2.x()) <= m_xmin + eps) { bounds[i] = m_bounds.left; }
-            if (std::min(v1.x(), v2.x()) >= m_xmax - eps) { bounds[i] = m_bounds.right; }
-            if (std::max(v1.y(), v2.y()) <= m_ymin + eps) { bounds[i] = m_bounds.bottom; }
-            if (std::min(v1.y(), v2.y()) >= m_ymax - eps) { bounds[i] = m_bounds.top; }
+            if (std::max(v1.x(), v2.x()) <= x_min_ + eps) { bounds[i] = bounds_.left; }
+            if (std::min(v1.x(), v2.x()) >= x_max_ - eps) { bounds[i] = bounds_.right; }
+            if (std::max(v1.y(), v2.y()) <= y_min_ + eps) { bounds[i] = bounds_.bottom; }
+            if (std::min(v1.y(), v2.y()) >= y_max_ - eps) { bounds[i] = bounds_.top; }
         }
         return bounds;
     };
 
     Grid grid;
     grid.reserve_nodes((Nx + 2)*(2 * Ny + 1));
-    grid.reserve_cells(m_size);
+    grid.reserve_cells(size_);
     for (size_t i = 0; i <= Nx; ++i) {
         if (i % 2 == 0) {
             for (size_t j = 0; j < 2 * Ny - 1; j += 2) {
@@ -468,61 +468,64 @@ Grid Rectangle::create_voronoi() const {
     return grid;
 }
 
-void Rectangle::initialize(AmrCells& cells) const {
-    if (m_voronoi && !m_adaptive) {
+AmrCells Rectangle::make_cells(bool unique_nodes) const {
+    if (voronoi_ && !adaptive_) {
         throw std::runtime_error("Rectangle::initialize: can't initialize voronoi grid and classic cartesian");
     }
-    check_size(m_size);
+    check_size(size_);
 
     bool x_period = periodic_along_x();
     bool y_period = periodic_along_y();
 
-    double hx = (m_xmax - m_xmin) / m_nx;
-    double hy = (m_ymax - m_ymin) / m_ny;
+    double hx = (x_max_ - x_min_) / nx_;
+    double hy = (y_max_ - y_min_) / ny_;
 
     auto get_index = [this](index_t i, index_t j) -> index_t {
-        return i * m_ny + j;
+        return i * ny_ + j;
     };
 
     auto get_index_pair = [this](index_t n) -> std::array<index_t, 2> {
-        return {n / m_ny, n % m_ny};
+        return {n / ny_, n % ny_};
     };
 
     auto get_vertex = [=, this](index_t i, index_t j) -> Vector3d {
         return {
-                m_xmin + ((m_xmax - m_xmin) * i) / m_nx,
-                m_ymin + ((m_ymax - m_ymin) * j) / m_ny,
+                x_min_ + ((x_max_ - x_min_) * i) / nx_,
+                y_min_ + ((y_max_ - y_min_) * j) / ny_,
                 0.0
         };
     };
 
     auto neib_index = [=, this](index_t i, index_t j, Side2D side) -> index_t {
         if (side == Side2D::LEFT) {
-            return i == 0 && !x_period ?  get_index(i, j) : get_index((i - 1 + m_nx) % m_nx, j);
+            return i == 0 && !x_period ?  get_index(i, j) : get_index((i - 1 + nx_) % nx_, j);
         }
         if (side == Side2D::RIGHT) {
-            return i == m_nx - 1 && !x_period ? get_index(i, j) : get_index((i + 1 + m_nx) % m_nx, j);
+            return i == nx_ - 1 && !x_period ? get_index(i, j) : get_index((i + 1 + nx_) % nx_, j);
         }
         if (side == Side2D::BOTTOM) {
-            return j == 0 && !y_period ? get_index(i, j) : get_index(i, (j - 1 + m_ny) % m_ny);
+            return j == 0 && !y_period ? get_index(i, j) : get_index(i, (j - 1 + ny_) % ny_);
         }
         if (side == Side2D::TOP) {
-            return j == m_ny - 1 && !y_period ? get_index(i, j): get_index(i, (j + 1 + m_ny) % m_ny);
+            return j == ny_ - 1 && !y_period ? get_index(i, j): get_index(i, (j + 1 + ny_) % ny_);
         }
         throw std::runtime_error("Strange side #142");
     };
 
-    cells.set_dimension(2);
-    cells.set_adaptive(true);
-    cells.set_linear(true);
-    cells.set_axial(m_axial);
+    AmrCells cells({
+        .dim = 2,
+        .adaptive = true,
+        .linear = true,
+        .axial = axial_,
+        .nodes = unique_nodes
+    });
 
-    cells.resize_amr(m_size);
+    cells.resize_amr(size_);
 
-    int n_faces = 8;
-    int n_nodes = 9;
+    static constexpr int n_faces = 8;
+    static constexpr int n_nodes = 9;
 
-    for (index_t ic = 0; ic < m_size; ++ic) {
+    for (index_t ic = 0; ic < size_; ++ic) {
         auto[i, j] = get_index_pair(ic);
 
         cells.next[ic] = ic;
@@ -557,10 +560,10 @@ void Rectangle::initialize(AmrCells& cells) const {
 
         index_t iface = ic * n_faces;
 
-        cells.faces.boundary[iface + Side2D::L] = i > 0 ? Boundary::INNER : m_bounds.left;
-        cells.faces.boundary[iface + Side2D::R] = i < m_nx - 1 ? Boundary::INNER : m_bounds.right;
-        cells.faces.boundary[iface + Side2D::B] = j > 0 ? Boundary::INNER : m_bounds.bottom;
-        cells.faces.boundary[iface + Side2D::T] = j < m_ny - 1 ? Boundary::INNER : m_bounds.top;
+        cells.faces.boundary[iface + Side2D::L] = i > 0 ? Boundary::INNER : bounds_.left;
+        cells.faces.boundary[iface + Side2D::R] = i < nx_ - 1 ? Boundary::INNER : bounds_.right;
+        cells.faces.boundary[iface + Side2D::B] = j > 0 ? Boundary::INNER : bounds_.bottom;
+        cells.faces.boundary[iface + Side2D::T] = j < ny_ - 1 ? Boundary::INNER : bounds_.top;
 
         for (auto side: Side2D::items()) {
             cells.faces.adjacent.rank[iface + side] = 0;
@@ -594,7 +597,7 @@ void Rectangle::initialize(AmrCells& cells) const {
             cells.verts[ic * n_nodes + jn] = quad[jn];
         }
 
-        if (m_axial) {
+        if (axial_) {
             // "Альтернативный" объем ячейки и площади граней
             cells.volume_alt[ic] = hx * hy * quad.vs<0, 0>().y();
             cells.faces.area_alt[iface + Side2D::L] = hy * quad.vs<-1, 0>().y();
@@ -608,6 +611,7 @@ void Rectangle::initialize(AmrCells& cells) const {
             cells.faces.center[iface + Side2D::R].y() += hy*hy / (12.0 * quad.vs<+1, 0>().y());
         }
     }
+    return cells;
 }
 
 } // namespace zephyr::geom::generator

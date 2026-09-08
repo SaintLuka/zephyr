@@ -816,7 +816,7 @@ EuMesh MmFluid::domain(EuMesh& mesh, int idx) const {
     int n_faces = count[1];
     int n_nodes = count[2];
 
-    EuMesh clipped(mesh.dim(), false);
+    EuMesh clipped = EuMesh::PolySet(2);
     clipped.locals().reserve(n_cells, n_faces, n_nodes);
 
     if (mesh.dim() == 2) {

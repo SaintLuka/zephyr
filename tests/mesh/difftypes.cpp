@@ -231,8 +231,8 @@ int main(int argc, char** argv) {
 
     // Файл для записи
     PvdFile pvd("mesh", "output");
-    //pvd.unique_nodes = true;
-    pvd.polyhedral = polyhedral;
+    //pvd.options.unique_nodes = true;
+    pvd.options.polyhedral = polyhedral;
 
     // Переменные для сохранения
     pvd.variables = {"level"};

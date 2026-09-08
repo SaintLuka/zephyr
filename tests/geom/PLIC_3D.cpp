@@ -179,7 +179,7 @@ void calc_errors(EuMesh& mesh, InFunction func, int nx) {
 }
 
 EuMesh body(EuMesh& mesh, int k) {
-    EuMesh clipped(3, false);
+    EuMesh clipped = EuMesh::PolySet(3);
 
     for (auto& cell: mesh) {
         if (boundary(cell)) continue;
@@ -221,19 +221,19 @@ void save_mesh(EuMesh& mesh) {
     VtuFile::save("output/mesh.vtu", mesh, vars);
 
     auto body_central = body(mesh, 0);
-    VtuFile::save("output/body(central).vtu", body_central, {}, true);
+    VtuFile::save("output/body(central).vtu", body_central, {}, {.polyhedral = true});
 
     auto body_youngs = body(mesh, 1);
-    VtuFile::save("output/body(youngs).vtu", body_youngs, {}, true);
+    VtuFile::save("output/body(youngs).vtu", body_youngs, {}, {.polyhedral = true});
 
     auto body_elvira = body(mesh, 2);
-    VtuFile::save("output/body(elvira).vtu", body_elvira, {}, true);
+    VtuFile::save("output/body(elvira).vtu", body_elvira, {}, {.polyhedral = true});
 
     auto body_csir_2D = body(mesh, 3);
-    VtuFile::save("output/body(csir_2D).vtu", body_csir_2D, {}, true);
+    VtuFile::save("output/body(csir_2D).vtu", body_csir_2D, {}, {.polyhedral = true});
 
     auto body_csir_3D = body(mesh, 4);
-    VtuFile::save("output/body(csir_3D).vtu", body_csir_3D, {}, true);
+    VtuFile::save("output/body(csir_3D).vtu", body_csir_3D, {}, {.polyhedral = true});
 }
 
 // Адаптировать, если ячейка или сосед смешанные

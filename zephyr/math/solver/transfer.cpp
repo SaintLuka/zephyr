@@ -745,7 +745,7 @@ EuMesh Transfer::body(EuMesh& mesh) const {
     int n_faces = count[1];
     int n_nodes = count[2];
 
-    EuMesh clipped(mesh.dim(), false);
+    EuMesh clipped = EuMesh::PolySet(mesh.dim());
     clipped.locals().reserve(n_cells, n_faces, n_nodes);
 
     if (mesh.dim() == 2) {

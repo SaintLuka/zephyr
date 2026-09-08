@@ -499,10 +499,9 @@ void Tourism::fill_border_cells_indices(const AmrCells& cells, const AmrNodes& n
 }
 
 void Tourism::prepare_cells_geometry(const AmrCells& cells) {
-    if (cells.unique_nodes()) {
-        border_cells_.verts.init_unique();
-        ghost_cells_.verts.init_unique();
-    }
+    z_assert(border_cells_.has_nodes() == cells.has_nodes(), "Has no nodes");
+    z_assert(ghost_cells_. has_nodes() == cells.has_nodes(), "Has no nodes");
+
     index_t face_idx = 0;
     index_t vert_idx = 0;
     for (index_t ic = 0; ic < border_cells_indices_.size(); ++ic) {
@@ -537,7 +536,7 @@ void Tourism::build_border_nodes(const AmrNodes& nodes) {
 }
 
 void Tourism::build_border_cells(const AmrCells& cells, const AmrNodes& nodes) {
-    if (!cells.unique_nodes()) {
+    if (!cells.has_nodes()) {
         // Нет уникальных узлов - окрестность Неймана
 
         // Заполнить router.send_count
@@ -600,7 +599,7 @@ index_t Tourism::find_ghost_cell(int rank, index_t index) const {
 
 // выставить index/ghost в verts
 void Tourism::find_connections_verts(AmrVerts &verts, int rank) const {
-    for (index_t iv = 0; iv < verts.size(); ++iv) {
+    for (index_t iv = 0; iv < verts.n_verts(); ++iv) {
         index_t rnk = verts.rank[iv];
         if (rnk < 0 || rnk >= mpi::size()) {
             throw std::runtime_error("Bad rank");
@@ -732,13 +731,13 @@ void Tourism::build_ghost_nodes(const AmrNodes &nodes) {
 }
 
 void Tourism::update(AmrCells& cells, AmrNodes& nodes) {
-    if (cells.unique_nodes()) {
+    if (cells.has_nodes()) {
         build_ghost_nodes(nodes);
         find_connections_verts(cells.verts, mpi::rank());
     }
     build_ghost_cells(cells, nodes);
 
-    if (!cells.unique_nodes()) {
+    if (!cells.has_nodes()) {
         find_connections_neumann(cells, mpi::rank());
     }
     else {
@@ -1180,7 +1179,7 @@ void Tourism::sync_cells_geometry() {
     // Отправить вершины
     RequestsList verts_send; verts_send.reserve(3);
     verts_send += vert_router_.isend(border_cells_.verts.coord, MpiTag::VERT_COORD);
-    if (border_cells_.verts.unique_nodes()) {
+    if (border_cells_.verts.has_nodes()) {
         verts_send += vert_router_.isend(border_cells_.verts.rank,  MpiTag::VERT_RANK);
         verts_send += vert_router_.isend(border_cells_.verts.index, MpiTag::VERT_INDEX);
         verts_send += vert_router_.isend(border_cells_.verts.ghost, MpiTag::VERT_GHOST);
@@ -1228,7 +1227,7 @@ void Tourism::sync_cells_geometry() {
     // Получить вершины
     RequestsList verts_recv; verts_recv.reserve(3);
     verts_recv += vert_router_.irecv(ghost_cells_.verts.coord, MpiTag::VERT_COORD);
-    if (ghost_cells_.verts.unique_nodes()) {
+    if (ghost_cells_.verts.has_nodes()) {
         verts_recv += vert_router_.irecv(ghost_cells_.verts.rank,  MpiTag::VERT_RANK);
         verts_recv += vert_router_.irecv(ghost_cells_.verts.index, MpiTag::VERT_INDEX);
         verts_recv += vert_router_.irecv(ghost_cells_.verts.ghost, MpiTag::VERT_GHOST);

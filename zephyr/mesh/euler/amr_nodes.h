@@ -10,6 +10,7 @@
 namespace zephyr::mesh {
 
 class AmrCells;
+class AmrVerts;
 
 using role_t = std::int8_t;
 
@@ -132,6 +133,12 @@ public:
     /// @brief Списки инцидентных ячеек
     AmrIncident incident;
 
+    /// @brief Данные узлов
+    Storage data;
+
+
+    /// @brief Конструктор по умолчанию
+    AmrNodes() = default;
 
     /// @brief Пустое хранилище узлов?
     bool empty() const { return coord.empty(); }
@@ -145,6 +152,7 @@ public:
     /// @brief Размер списка инцидентных
     index_t n_incident() const { return incident.n_values(); }
 
+    /// @brief Очистить массивы
     void clear();
 
     /// @brief Расширить массивы по числу узлов
@@ -157,6 +165,12 @@ public:
     void resize_amr(index_t n_nodes, int dim);
 
     void shrink_to_fit();
+
+    // {vert.index, nodes}
+    using Incomplete = std::tuple<AmrVerts, AmrNodes>;
+
+    template <bool complete>
+    static Incomplete generate(const AmrCells& cells);
 
     void setup_for(AmrCells& cells);
 
@@ -173,6 +187,12 @@ public:
 
     /// @}
 
+    /// @brief Скопировать все данные с индекса from на индекс to.
+    void copy_data(index_t from, index_t to);
+
+    /// @brief Скопировать все данные целиком с индекса from,
+    /// в хранилище dst на индекс to
+    void copy_data(index_t from, AmrNodes* dst, index_t to) const;
 
     void copy_geom(index_t ic, AmrNodes& nodes,
         index_t jc, index_t inc_offset) const;
@@ -189,5 +209,8 @@ public:
     /// @brief Проверка уникальных узлов в MPI версии
     int check_nodes(const AmrCells& locals, const AmrCells& ghosts, const AmrNodes& ghost_nodes) const;
 };
+
+extern template AmrNodes::Incomplete AmrNodes::generate<true> (const AmrCells& cells);
+extern template AmrNodes::Incomplete AmrNodes::generate<false>(const AmrCells& cells);
 
 } // namespace zephyr::mesh
