@@ -1,211 +1,218 @@
-#include <cstring>
 #include <cassert>
+#include <charconv>
 
 #include <zephyr/io/variable.h>
 #include <zephyr/mesh/euler/eu_prim.h>
+#include <zephyr/mesh/euler/eu_node.h>
 
 namespace zephyr::io {
 
 using mesh::EuCell;
+using mesh::EuNode;
 
-Variable::Variable(const char* name)
-    : m_name(name) {
+template <typename T>
+T& buffer(void* buff, int idx = 0) {
+    return static_cast<T*>(buff)[idx];
+}
 
-    if (!std::strcmp(name, "rank")) {
-        m_type = VtkType::Int32;
-        m_n_components = 1;
+inline bool contain(std::string_view name, const char* substr) {
+    return name.find(substr) != std::string_view::npos;
+}
 
-        m_write = [](EuCell& cell, void *arg) {
-            auto out = static_cast<int32_t *>(arg);
-            out[0] = cell.rank();
+inline int get_count(std::string_view sv) {
+    auto beg = sv.find('[');
+    auto end = sv.find(']', beg);
+    if (beg != std::string_view::npos &&
+        end != std::string_view::npos &&
+        end > beg) {
+
+        std::string_view str_num = sv.substr(beg + 1, end - beg - 1);
+
+        int value = 0;
+        auto [ptr, ec] = std::from_chars(str_num.data(), str_num.data() + str_num.size(), value);
+
+        if (ec == std::errc()) {
+            return value;
+        }
+    }
+    return -1;
+}
+
+Variable::Variable(std::string_view name)
+    : name_(name), n_components_(1) {
+
+    // Ищет число в подстроке по типу "faces[4]"
+    int n_comp = get_count(name_);
+
+    if (name == "rank") {
+        type_ = VtkType::Int32;
+        write_ = [](const EuCell& cell, void *out) {
+            buffer<int32_t>(out) = cell.rank();
         };
     }
-    else if (!std::strcmp(name, "index")) {
-        m_type = VtkType::Int32;
-        m_n_components = 1;
-
-        m_write = [](EuCell& cell, void *arg) {
-            auto out = static_cast<int32_t *>(arg);
-            out[0] = cell.index();
+    else if (name == "index") {
+        type_ = VtkType::Int32;
+        write_ = [](const EuCell& cell, void *out) {
+            buffer<int32_t>(out) = cell.index();
         };
     }
-    else if (!std::strcmp(name, "level")) {
-        m_type = VtkType::Int8;
-        m_n_components = 1;
-
-        m_write = [](EuCell& cell, void *arg) {
-            auto out = static_cast<int8_t *>(arg);
-            out[0] = static_cast<int8_t>(cell.level());
+    else if (name == "level") {
+        type_ = VtkType::Int8;
+        write_ = [](const EuCell& cell, void *out) {
+            buffer<int8_t>(out) = cell.level();
         };
     }
-    else if (!std::strcmp(name, "next")) {
-        m_type = VtkType::Int32;
-        m_n_components = 1;
-
-        m_write = [](EuCell& cell, void *arg) {
-            auto out = static_cast<int32_t *>(arg);
-            out[0] = cell.next();
+    else if (name == "next") {
+        type_ = VtkType::Int32;
+        write_ = [](const EuCell& cell, void *out) {
+            buffer<int32_t>(out) = cell.next();
         };
     }
-    else if (!std::strcmp(name, "flag")) {
-        m_type = VtkType::Int8;
-        m_n_components = 1;
-
-        m_write = [](EuCell& cell, void *arg) {
-            auto out = static_cast<int8_t *>(arg);
-            out[0] = static_cast<int8_t>(cell.flag());
+    else if (name == "flag") {
+        type_ = VtkType::Int8;
+        write_ = [](const EuCell& cell, void *out) {
+            buffer<int8_t>(out) = cell.flag();
         };
     }
-    else if (!std::strcmp(name, "b_idx")) {
-        m_type = VtkType::Int32;
-        m_n_components = 1;
-
-        m_write = [](EuCell& cell, void *arg) {
-            auto out = static_cast<int32_t *>(arg);
-            out[0] = cell.b_idx();
+    else if (name == "b_idx") {
+        type_ = VtkType::Int32;
+        write_ = [](const EuCell& cell, void *out) {
+            buffer<int32_t>(out) = cell.b_idx();
         };
     }
-    else if (!std::strcmp(name, "z_idx")) {
-        m_type = VtkType::Int32;
-        m_n_components = 1;
-
-        m_write = [](EuCell& cell, void *arg) {
-            const auto out = static_cast<int32_t *>(arg);
-            out[0] = cell.z_idx();
+    else if (name == "z_idx") {
+        type_ = VtkType::Int32;
+        write_ = [](const EuCell& cell, void *out) {
+            buffer<int32_t>(out) = cell.z_idx();
         };
     }
-    else if (!std::strcmp(name, "face2D.rank") || !std::strcmp(name, "face3D.rank")) {
-        m_type = VtkType::Int8;
-        m_n_components = !std::strcmp(name, "face2D.rank") ? 8 : 24;
-        m_write = [max_faces=m_n_components](const EuCell& cell, void *arg) {
-            const int n_faces = cell.adaptive() ? max_faces : std::min(max_faces, cell.face_count());
-            const auto out = static_cast<int8_t *>(arg);
+    else if (contain(name, "face.rank") && n_comp > 0) {
+        name_ = "face.rank";
+        type_ = VtkType::Int8;
+        n_components_ = n_comp;
+        write_ = [n_comp](const EuCell& cell, void *out) {
+            const int n_faces = std::min(n_comp, cell.face_count());
             for (int i = 0; i < n_faces; ++i) {
-                out[i] = static_cast<int8_t>(cell.face(i).adj_rank());
+                buffer<int8_t>(out, i) = cell.face(i).adj_rank();
             }
-            for (int i = n_faces; i < max_faces; ++i) {
-                out[i] = int8_t{-13};
+            for (int i = n_faces; i < n_comp; ++i) {
+                buffer<int8_t>(out, i) = int8_t{-42};
             }
         };
     }
-    else if (!std::strcmp(name, "face2D.index") || !std::strcmp(name, "face3D.index")) {
-        m_type = VtkType::Int32;
-        m_n_components = !std::strcmp(name, "face2D.index") ? 8 : 24;
-        m_write = [max_faces=m_n_components](const EuCell& cell, void *arg) {
-            const int n_faces = cell.adaptive() ? max_faces : std::min(max_faces, cell.face_count());
-            const auto out = static_cast<int32_t *>(arg);
+    else if (contain(name, "face.index") && n_comp > 0) {
+        name_ = "face.index";
+        type_ = VtkType::Int32;
+        n_components_ = n_comp;
+        write_ = [n_comp](const EuCell& cell, void *out) {
+            const int n_faces = std::min(n_comp, cell.face_count());
             for (int i = 0; i < n_faces; ++i) {
-                out[i] = cell.face(i).adj_index();
+                buffer<int32_t>(out, i) = cell.face(i).adj_index();
             }
-            for (int i = n_faces; i < max_faces; ++i) {
-                out[i] = int32_t{-13};
+            for (int i = n_faces; i < n_comp; ++i) {
+                buffer<int32_t>(out, i) = int32_t{-42};
             }
         };
     }
-    else if (!std::strcmp(name, "face2D.ghost") || !std::strcmp(name, "face3D.ghost")) {
-        m_type = VtkType::Int32;
-        m_n_components = !std::strcmp(name, "face2D.ghost") ? 8 : 24;
-        m_write = [max_faces=m_n_components](const EuCell& cell, void *arg) {
-            const int n_faces = cell.adaptive() ? max_faces : std::min(max_faces, cell.face_count());
-            const auto out = static_cast<int32_t *>(arg);
+    else if (contain(name, "face.ghost") && n_comp > 0) {
+        name_ = "face.ghost";
+        type_ = VtkType::Int32;
+        n_components_ = n_comp;
+        write_ = [n_comp](const EuCell& cell, void *out) {
+            const int n_faces = std::min(n_comp, cell.face_count());
             for (int i = 0; i < n_faces; ++i) {
-                out[i] = cell.face(i).adj_ghost();
+                buffer<int32_t>(out, i) = cell.face(i).adj_ghost();
             }
-            for (int i = n_faces; i < max_faces; ++i) {
-                out[i] = int32_t{-13};
+            for (int i = n_faces; i < n_comp; ++i) {
+                buffer<int32_t>(out, i) = int32_t{-42};
             }
         };
     }
-    else if (!std::strcmp(name, "face2D.boundary") || !std::strcmp(name, "face3D.boundary")) {
-        m_type = VtkType::Int8;
-        m_n_components = !std::strcmp(name, "face2D.boundary") ? 8 : 24;
-        m_write = [max_faces=m_n_components](const EuCell& cell, void *arg) {
-            const int n_faces = cell.adaptive() ? max_faces : std::min(max_faces, cell.face_count());
-            const auto out = static_cast<int8_t *>(arg);
+    else if (contain(name, "face.boundary") && n_comp > 0) {
+        name_ = "face.boundary";
+        type_ = VtkType::Int8;
+        n_components_ = n_comp;
+        write_ = [n_comp](const EuCell& cell, void *out) {
+            const int n_faces = std::min(n_comp, cell.face_count());
             for (int i = 0; i < n_faces; ++i) {
-                out[i] = static_cast<int8_t>(cell.face(i).flag());
+                buffer<int8_t>(out, i) = static_cast<int8_t>(cell.face(i).flag());
             }
-            for (int i = n_faces; i < max_faces; ++i) {
-                out[i] = int8_t{-13};
+            for (int i = n_faces; i < n_comp; ++i) {
+                buffer<int8_t>(out, i) = int8_t{-42};
             }
         };
     }
-    else if (!std::strcmp(name, "face2D.rotation") || !std::strcmp(name, "face3D.rotation")) {
-        m_type = VtkType::Int8;
-        m_n_components = !std::strcmp(name, "face2D.rotation") ? 8 : 24;
-        m_write = [max_faces=m_n_components](const EuCell& cell, void *arg) {
-            const auto out = static_cast<int8_t*>(arg);
-            const int n_faces = cell.adaptive() ? max_faces : std::min(max_faces, cell.face_count());
+    else if (contain(name, "face.rotation") && n_comp > 0) {
+        name_ = "face.rotation";
+        type_ = VtkType::Int8;
+        n_components_ = n_comp;
+        write_ = [n_comp](const EuCell& cell, void *out) {
+            const int n_faces = std::min(n_comp, cell.face_count());
             for (int i = 0; i < n_faces; ++i) {
-                out[i] = static_cast<int8_t>(cell.face(i).rotation());
+                buffer<int8_t>(out, i) = static_cast<int8_t>(cell.face(i).rotation());
             }
-            for (int i = n_faces; i < max_faces; ++i) {
-                out[i] = int8_t{-13};
+            for (int i = n_faces; i < n_comp; ++i) {
+                buffer<int8_t>(out, i) = int8_t{-42};
             }
         };
     }
-    else if (!std::strcmp(name, "coords") || !std::strcmp(name, "center")) {
-        m_type = VtkType::Float32;
-        m_n_components = 3;
-
-        m_write = [](const EuCell& cell, void *arg) {
-            const auto out = static_cast<float *>(arg);
-            out[0] = static_cast<float>(cell.center().x());
-            out[1] = static_cast<float>(cell.center().y());
-            out[2] = static_cast<float>(cell.center().z());
+    else if (name == "coords" || name == "center") {
+        type_ = VtkType::Float32;
+        n_components_ = 3;
+        write_ = [](const EuCell& cell, void *out) {
+            buffer<float>(out, 0) = static_cast<float>(cell.center().x());
+            buffer<float>(out, 1) = static_cast<float>(cell.center().y());
+            buffer<float>(out, 2) = static_cast<float>(cell.center().z());
         };
     }
-    else if (!std::strcmp(name, "vert2D.rank") || !std::strcmp(name, "vert3D.rank")) {
-        m_type = VtkType::Int8;
-        m_n_components = !std::strcmp(name, "vert2D.rank") ? 9 : 27;
-        m_write = [max_verts=m_n_components](const EuCell& cell, void *arg) {
+    else if (contain(name, "vert.rank") && n_comp > 0) {
+        name_ = "vert.rank";
+        type_ = VtkType::Int8;
+        n_components_ = n_comp;
+        write_ = [n_comp](const EuCell& cell, void *out) {
             const mesh::AmrCells& cells = cell.cells();
-            int n_nodes = cell.adaptive() ? max_verts : std::min(max_verts, cell.node_count());
-            if (!cells.has_nodes()) {
-                n_nodes = 0;
-            }
-            const auto out = static_cast<int8_t *>(arg);
+            int n_nodes = std::min(n_comp, cell.node_count());
+            if (!cells.has_nodes()) n_nodes = 0;
+
             for (int i = 0; i < n_nodes; ++i) {
-                out[i] = static_cast<int8_t>(cells.verts.rank[cells.verts.offsets[cell.index()] + i]);
+                buffer<int8_t>(out, i) = static_cast<int8_t>(cell.node_rank(i));
             }
-            for (int i = n_nodes; i < max_verts; ++i) {
-                out[i] = int8_t{-13};
+            for (int i = n_nodes; i < n_comp; ++i) {
+                buffer<int8_t>(out, i) = int8_t{-42};
             }
         };
     }
-    else if (!std::strcmp(name, "vert2D.index") || !std::strcmp(name, "vert3D.index")) {
-        m_type = VtkType::Int32;
-        m_n_components = !std::strcmp(name, "vert2D.index") ? 9 : 27;
-        m_write = [max_verts=m_n_components](const EuCell& cell, void *arg) {
+    else if (contain(name, "vert.index") && n_comp > 0) {
+        name_ = "vert.index";
+        type_ = VtkType::Int32;
+        n_components_ = n_comp;
+        write_ = [n_comp](const EuCell& cell, void *out) {
             const mesh::AmrCells& cells = cell.cells();
-            int n_nodes = cell.adaptive() ? max_verts : std::min(max_verts, cell.node_count());
-            if (!cells.has_nodes()) {
-                n_nodes = 0;
-            }
-            const auto out = static_cast<int32_t*>(arg);
+            int n_nodes = std::min(n_comp, cell.node_count());
+            if (!cells.has_nodes()) n_nodes = 0;
+
             for (int i = 0; i < n_nodes; ++i) {
-                out[i] = int32_t{cells.verts.index[cells.verts.offsets[cell.id()] + i]};
+                buffer<int32_t>(out, i) = cell.node_index(i);
             }
-            for (int i = n_nodes; i < max_verts; ++i) {
-                out[i] = int32_t{-13};
+            for (int i = n_nodes; i < n_comp; ++i) {
+                buffer<int32_t>(out, i) = int32_t{-42};
             }
         };
     }
-    else if (!std::strcmp(name, "vert2D.ghost") || !std::strcmp(name, "vert3D.ghost")) {
-        m_type = VtkType::Int32;
-        m_n_components = !std::strcmp(name, "vert2D.ghost") ? 9 : 27;
-        m_write = [max_verts=m_n_components](const EuCell& cell, void *arg) {
+    else if (contain(name, "vert.ghost") && n_comp > 0) {
+        name_ = "vert.ghost";
+        type_ = VtkType::Int32;
+        n_components_ = n_comp;
+        write_ = [n_comp](const EuCell& cell, void *out) {
             const mesh::AmrCells& cells = cell.cells();
-            int n_nodes = cell.adaptive() ? max_verts : std::min(max_verts, cell.node_count());
-            if (!cells.has_nodes()) {
-                n_nodes = 0;
-            }
-            const auto out = static_cast<int32_t*>(arg);
+            int n_nodes = std::min(n_comp, cell.node_count());
+            if (!cells.has_nodes()) n_nodes = 0;
+
             for (int i = 0; i < n_nodes; ++i) {
-                out[i] = int32_t{cells.verts.ghost[cells.verts.offsets[cell.id()] + i]};
+                buffer<int32_t>(out, i) = cell.node_ghost(i);
             }
-            for (int i = n_nodes; i < max_verts; ++i) {
-                out[i] = int32_t{-13};
+            for (int i = n_nodes; i < n_comp; ++i) {
+                buffer<int32_t>(out, i) = int32_t{-42};
             }
         };
     }
@@ -214,14 +221,22 @@ Variable::Variable(const char* name)
     }
 }
 
-Variable::Variable(const std::string& name)
-    : Variable(name.c_str()) {
+bool Variable::cell_data() const {
+    return std::holds_alternative<WriteCell<void>>(write_);
+}
 
+bool Variable::node_data() const {
+    return std::holds_alternative<WriteNode<void>>(write_);
 }
 
 void Variable::write(EuCell& cell, void* out) const {
-    assert(m_write != nullptr);
-    m_write(cell, out);
+    z_assert(std::get<WriteCell<void>>(write_) != nullptr, "Variable::write: nullptr function");
+    std::get<WriteCell<void>>(write_)(cell, out);
+}
+
+void Variable::write(EuNode& node, void* out) const {
+    z_assert(std::get<WriteNode<void>>(write_) != nullptr, "Variable::write: nullptr function");
+    std::get<WriteNode<void>>(write_)(node, out);
 }
 
 } // namespace zephyr::io

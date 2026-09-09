@@ -109,7 +109,7 @@ int main() {
     PvdFile pvd("mesh", "output");
 
     pvd.variables = {"rank", "level"};
-    pvd.variables.append("u", u1);
+    pvd.variables.add_cell_data("u", u1);
 
     // Число Куранта
     double CFL = 0.5;

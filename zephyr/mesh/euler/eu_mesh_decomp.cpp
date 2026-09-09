@@ -52,6 +52,15 @@ void EuMesh::set_decomposition(const std::string& type, bool update) {
 #endif
 }
 
+AmrNodes& EuMesh::ghost_nodes() {
+#ifndef ZEPHYR_MPI
+    static AmrNodes ghost_nodes;
+    return ghost_nodes;
+#else
+    return tourists_.ghost_nodes();
+#endif
+}
+
 const AmrNodes& EuMesh::ghost_nodes() const {
 #ifndef ZEPHYR_MPI
     static AmrNodes ghost_nodes;

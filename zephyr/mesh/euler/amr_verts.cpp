@@ -20,7 +20,7 @@ void AmrVerts::resize(index_t n_cells, index_t n_verts) {
 }
 
 void AmrVerts::resize_amr(index_t n_cells, int dim) {
-    int verts_per_cell = (dim < 3 ? 9 : 27);
+    int verts_per_cell = dim < 3 ? 9 : 27;
     resize(n_cells, verts_per_cell * n_cells);
 }
 

@@ -9,9 +9,7 @@
 
 // forward declaration для классов из geom
 namespace zephyr::geom {
-class Quad;
 class SqQuad;
-class Cube;
 class SqCube;
 }
 
@@ -60,10 +58,10 @@ public:
     bool empty() const { return coord.empty(); }
 
     /// @brief Число ячеек
-    index_t n_cells() const { return offsets.size() - 1; }
+    index_t n_cells() const { return static_cast<index_t>(offsets.size()) - 1; }
 
     /// @brief Число вершин
-    index_t n_verts() const { return coord.size(); }
+    index_t n_verts() const { return static_cast<index_t>(coord.size()); }
 
     /// @brief Изменить размер под число вершин
     void resize(index_t n_cells, index_t n_verts);
@@ -86,14 +84,14 @@ public:
     /// @brief Оператор доступа к координате
     const Vector3d& operator[](index_t idx) const { return coord[idx]; }
 
-    /// @brief Число вершин, оно же максимальное, хранение неактуальных вершин
-    /// не допускается.
+    /// @brief Число вершин у ячейки, оно же максимальное, хранение
+    /// неактуальных вершин сейчас не допускается.
     int count(index_t ic) const {
         return offsets[ic + 1] - offsets[ic];
     }
 
-    /// @brief Число вершин, оно же максимальное, хранение неактуальных вершин
-    /// сейчас не допускается.
+    /// @brief Число вершин у ячейки, оно же максимальное, хранение
+    /// неактуальных вершин сейчас не допускается.
     int max_count(index_t ic) const {
         return offsets[ic + 1] - offsets[ic];
     }

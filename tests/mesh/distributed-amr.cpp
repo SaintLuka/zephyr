@@ -164,8 +164,8 @@ int main() {
     PvdFile pvd("mesh", "output");
 
     pvd.variables = {"rank", "index", "faces2D"};
-    pvd.variables.append("u", u);
-    pvd.variables.append("wflag", wflag);
+    pvd.variables.add_cell_data("u", u);
+    pvd.variables.add_cell_data("wflag", wflag);
 
     // Bounding Box для сетки
     Box domain = gen.bbox();

@@ -30,23 +30,6 @@ void AmrIncident::resize(index_t n_nodes, index_t n_values) {
     ghost.resize(n_values, -1);
 }
 
-void AmrIncident::reserve(index_t n_nodes, index_t n_values) {
-    offsets.reserve(n_nodes + 1);
-
-    role.reserve(n_values);
-    rank.reserve(n_values);
-    index.reserve(n_values);
-    ghost.reserve(n_values);
-}
-
-void AmrIncident::shrink_to_fit() {
-    offsets.shrink_to_fit();
-    role.shrink_to_fit();
-    rank.shrink_to_fit();
-    index.shrink_to_fit();
-    ghost.shrink_to_fit();
-}
-
 void AmrIncident::resize_amr(index_t n_nodes, int dim) {
     z_assert(dim == 2 || dim == 3, "AmrIncident::resize: bad dimension");
 
@@ -56,6 +39,30 @@ void AmrIncident::resize_amr(index_t n_nodes, int dim) {
     for (index_t i = prev_size; i < role.size(); ++i) {
         offsets[i + 1] = offsets[i] + inc_per_node;
     }
+}
+
+void AmrIncident::reserve(index_t n_nodes, index_t n_values) {
+    offsets.reserve(n_nodes + 1);
+
+    role.reserve(n_values);
+    rank.reserve(n_values);
+    index.reserve(n_values);
+    ghost.reserve(n_values);
+}
+
+void AmrIncident::reserve_amr(index_t n_nodes, int dim) {
+    z_assert(dim == 2 || dim == 3, "AmrIncident::reserve: bad dimension");
+
+    int inc_per_node = max_amr_count(dim);
+    reserve(n_nodes, inc_per_node * n_nodes);
+}
+
+void AmrIncident::shrink_to_fit() {
+    offsets.shrink_to_fit();
+    role.shrink_to_fit();
+    rank.shrink_to_fit();
+    index.shrink_to_fit();
+    ghost.shrink_to_fit();
 }
 
 int AmrIncident::count(index_t inode) const {
@@ -84,6 +91,7 @@ void AmrNodes::clear() {
 }
 
 void AmrNodes::resize(index_t n_nodes, index_t n_incident) {
+    data.resize(n_nodes);
     rank.resize(n_nodes);
     next.resize(n_nodes);
     index.resize(n_nodes);
@@ -91,15 +99,8 @@ void AmrNodes::resize(index_t n_nodes, index_t n_incident) {
     incident.resize(n_nodes, n_incident);
 }
 
-void AmrNodes::reserve(index_t n_nodes, index_t n_incident) {
-    rank.reserve(n_nodes);
-    next.reserve(n_nodes);
-    index.reserve(n_nodes);
-    coord.reserve(n_nodes);
-    incident.reserve(n_nodes, n_incident);
-}
-
 void AmrNodes::resize_amr(index_t n_nodes, int dim) {
+    data.resize(n_nodes);
     rank.resize(n_nodes);
     next.resize(n_nodes);
     index.resize(n_nodes);
@@ -107,7 +108,26 @@ void AmrNodes::resize_amr(index_t n_nodes, int dim) {
     incident.resize_amr(n_nodes, dim);
 }
 
+void AmrNodes::reserve(index_t n_nodes, index_t n_incident) {
+    data.reserve(n_nodes);
+    rank.reserve(n_nodes);
+    next.reserve(n_nodes);
+    index.reserve(n_nodes);
+    coord.reserve(n_nodes);
+    incident.reserve(n_nodes, n_incident);
+}
+
+void AmrNodes::reserve_amr(index_t n_nodes, int dim) {
+    data.reserve(n_nodes);
+    rank.reserve(n_nodes);
+    next.reserve(n_nodes);
+    index.reserve(n_nodes);
+    coord.reserve(n_nodes);
+    incident.reserve_amr(n_nodes, dim);
+}
+
 void AmrNodes::shrink_to_fit() {
+    data.shrink_to_fit();
     rank.shrink_to_fit();
     next.shrink_to_fit();
     index.shrink_to_fit();
@@ -278,6 +298,7 @@ AmrNodes::Incomplete AmrNodes::generate(const AmrCells& cells) {
 
     nodes.coord.reserve(n_nodes_approx);
     if constexpr (complete) {
+        nodes.data.reserve(n_nodes_approx);
         nodes.rank.reserve(n_nodes_approx);
         nodes.next.reserve(n_nodes_approx);
         nodes.index.reserve(n_nodes_approx);
@@ -308,6 +329,7 @@ AmrNodes::Incomplete AmrNodes::generate(const AmrCells& cells) {
             }
 
             if constexpr (complete) {
+                nodes.data.resize(nodes.data.size() + 1);
                 nodes.rank.push_back(0);
                 nodes.next.push_back(-1);
                 nodes.index.push_back(counter);

@@ -88,7 +88,7 @@ int main(int argc, char** argv) {
     };
 
     // Файл для записи
-    PvdFile pvd("test2D", "output");
+    PvdFile pvd("mesh", "output");
 
     // Переменные для сохранения
     pvd.variables = {"level", "faces2D"};

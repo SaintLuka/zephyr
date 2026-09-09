@@ -89,8 +89,8 @@ int main(int argc, char** argv) {
 
     PvdFile pvd("mesh", "output");
     pvd.variables = {"rank", "index", "next", "level", "flag", "faces2D"};
-    pvd.variables.append("idx", idx);
-    pvd.variables.append("bit", bit);
+    pvd.variables.add_cell_data("idx", idx);
+    pvd.variables.add_cell_data("bit", bit);
 
     if (mesh.check_base() < 0) {
         mpi::cout << "Bad init mesh\n";

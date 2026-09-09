@@ -74,8 +74,6 @@ public:
     int size() const { return inc_end_ - inc_begin_; }
 };
 
-class EuNode_Iter;
-
 /// @brief Узел сетки
 /// @ingroup euler-mesh
 class EuNode final {
@@ -270,6 +268,26 @@ inline EuNode_Iter begin(AmrNodes& nodes) {
 inline EuNode_Iter end(AmrNodes& nodes) {
     return {&nodes, nodes.n_nodes(), nullptr, nullptr};
 }
+
+class EuNodeRange {
+private:
+    AmrNodes* nodes_;
+    AmrCells* local_cells_{nullptr};
+    AmrCells* ghost_cells_{nullptr};
+
+public:
+    EuNodeRange(AmrNodes* nodes, AmrCells* local_cells, AmrCells* ghost_cells)
+        : nodes_{nodes}, local_cells_{local_cells}, ghost_cells_{ghost_cells} {
+    }
+
+    EuNode_Iter begin() const {
+        return EuNode_Iter(nodes_, 0, local_cells_, ghost_cells_);
+    }
+
+    EuNode_Iter end() const {
+        return EuNode_Iter(nodes_, nodes_->n_nodes(), local_cells_, ghost_cells_);
+    }
+};
 
 // ================================================================================================
 //                                     inline функции итераторов

@@ -99,7 +99,7 @@ int main(int argc, char** argv) {
     mesh.set_distributor(solver.distributor());
 
     // Files for output
-    PvdFile pvd("flow", "output");
+    PvdFile pvd("mesh", "output");
 
     // Variables to save
     pvd.variables = {"level"};

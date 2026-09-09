@@ -51,7 +51,7 @@ int main() {
     double curr_time = 0.0;
 
     // Files for output
-    PvdFile pvd("test1D", "output");
+    PvdFile pvd("mesh", "output");
 
     // Variables to save
     pvd.variables += {"cln", [z](EuCell cell) -> double { return cell[z].mass_frac.index(); }};

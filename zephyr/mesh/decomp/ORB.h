@@ -14,16 +14,16 @@ public:
     /// @brief Параметры декомпозиции
     struct params {
         bool   newton = false;  ///< Использовать метод Ньютона
-        double mobility = 0.1;  ///< Скорость смещения генераторов (0, 0.5)
+        double mobility = 0.2;  ///< Скорость смещения генераторов (0, 0.5)
     };
 
-    /// @brief Декомопозиция для прямоугольной области
+    /// @brief Декомпозиция для прямоугольной области
     /// @param domain Прямоугольная/кубическая область
-    /// @param type Тип декомопозиции: X, XY, YX, XYZ, ...
+    /// @param type Тип декомпозиции: X, XY, YX, XYZ, ...
     /// @param size Количество блоков
     /// @param p Опции балансировки
     ORB(Box domain, const std::string& type, int size,
-        const params& p = {.newton = false, .mobility = 0.1});
+        const params& p = {.newton = false, .mobility = 0.2});
 
     /// @brief Конструктор с автоматической декомпозицией по размерам области
     /// @param domain Домен
@@ -31,7 +31,7 @@ public:
     /// @param size Число блоков
     /// @param nx Число блоков по первой координате
     ORB(Box domain, const std::string& type, int size,
-        int nx, const params& p = {.newton = false, .mobility = 0.1});
+        int nx, const params& p = {.newton = false, .mobility = 0.2});
 
     /// @brief Конструктор с автоматической декомпозицией по размерам области
     /// @param domain Домен
@@ -40,7 +40,7 @@ public:
     /// @param ny Число блоков по второй координате, для двумерной декомпозиции
     /// это полное описание декомпозиции
     ORB(Box domain, const std::string& type, int size, const std::vector<int>& ny,
-        const params& p = {.newton = false, .mobility = 0.1});
+        const params& p = {.newton = false, .mobility = 0.2});
 
     /// @brief Задать декомпозицию по файлу конфигурации
     ORB(Box domain, const utils::Json& config);
@@ -101,13 +101,13 @@ public:
 
 private:
     /// @brief Использовать точный метод
-    bool m_exact;
+    bool m_exact = false;
 
     /// @brief Использовать метод Ньютона
-    bool m_newton;
+    bool m_newton = false;
 
     /// @brief Скорость сдвига (0, 0.5)
-    double m_mobility;
+    double m_mobility = 0.2;
 
     /// @brief Блочная структура
     Blocks m_blocks;

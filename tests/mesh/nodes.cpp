@@ -167,10 +167,10 @@ void save_markers(const AmrNodes& nodes, std::string filename) {
         points[in][st_max_rank] = max_rank;
     }
     PvdFile pvd(filename);
-    pvd.variables.append("rank", st_rnk);
-    pvd.variables.append("index", st_idx);
-    pvd.variables.append("min_rank", st_min_rank);
-    pvd.variables.append("max_rank", st_max_rank);
+    pvd.variables.add_cell_data("rank", st_rnk);
+    pvd.variables.add_cell_data("index", st_idx);
+    pvd.variables.add_cell_data("min_rank", st_min_rank);
+    pvd.variables.add_cell_data("max_rank", st_max_rank);
     pvd.save(points, 0);
 }
 

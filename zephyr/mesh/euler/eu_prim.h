@@ -394,13 +394,13 @@ public:
     template <int dim>
     const SqMap<dim>& mapping() const { return m_cells->verts.mapping<dim>(m_index); }
 
+    int node_rank(int iv) const;
+    int node_index(int iv) const;
+    int node_ghost(int iv) const;
+
     /// @}
 
     /// @{ @name Соседние ячейки
-
-    /// @brief Помещает на место текущей ячейки соседнюю ячейку, которая
-    /// находится со стороны loc_face.
-    void replace(int loc_face);
 
     /// @brief Получить соседнюю ячейку на двумерной сетке, заданы смещения
     /// относительно ячейки по осям. Функция работает, если вокруг ячейки можно
@@ -829,6 +829,27 @@ inline bool EuCell::complex_face(Side3D s) const { return m_cells->faces.is_comp
 inline EuFaces EuCell::faces(Direction dir) const { return {m_cells, m_index, m_ghosts, dir}; }
 
 inline int EuCell::node_count() const { return m_cells->verts.count(m_index); }
+
+inline int EuCell::node_rank(int iv) const {
+    if (m_cells->verts.has_nodes()) {
+        return m_cells->verts.rank[m_cells->verts.offsets[m_index] + iv];
+    }
+    return utils::mpi::rank();
+}
+
+inline int EuCell::node_index(int iv) const {
+    if (m_cells->verts.has_nodes()) {
+        return m_cells->verts.index[m_cells->verts.offsets[m_index] + iv];
+    }
+    return -13;
+}
+
+inline int EuCell::node_ghost(int iv) const {
+    if (m_cells->verts.has_nodes()) {
+        return m_cells->verts.ghost[m_cells->verts.offsets[m_index] + iv];
+    }
+    return -1;
+}
 
 inline const geom::Vector3d* EuCell::vertices_data() const { return m_cells->verts.coords_data(m_index); }
 

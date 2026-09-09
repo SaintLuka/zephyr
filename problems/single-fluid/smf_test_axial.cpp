@@ -101,7 +101,7 @@ int main(int argc, char** argv) {
     };
 
     // Файл для записи
-    PvdFile pvd("Sedov", "output");
+    PvdFile pvd("mesh", "output");
 
     size_t n_step = 0;
     double curr_time = test.init_time;

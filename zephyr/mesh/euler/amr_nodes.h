@@ -33,7 +33,8 @@ public:
     /// @brief Эта структура имеет формат CSR, даны смещения
     std::vector<index_t> offsets = {0};
 
-    /// @brief Роль узла внутри ячейки (индекс внутри ячейки)
+    /// @brief Роль узла внутри ячейки (индекс внутри ячейки).
+    /// Значение role = -1, для неактуальных записей.
     std::vector<role_t> role;
 
     /// @brief Ранг процесса, на котором находится смежная ячейка
@@ -44,8 +45,8 @@ public:
     /// хранилище или в удаленном)
     std::vector<index_t> index;
 
-    /// @brief Индекс смежной ячейки в массиве ghosts (или -1, если соседняя
-    /// ячейка с данного процесса).
+    /// @brief Индекс смежной ячейки в массиве ghosts (или -1, если
+    /// соседняя ячейка с данного процесса).
     std::vector<index_t> ghost;
 
 
@@ -53,22 +54,25 @@ public:
     AmrIncident() = default;
 
     /// @brief Количество значений/записей
-    index_t n_values() const { return rank.size(); }
+    index_t n_values() const { return static_cast<index_t>(rank.size()); }
 
     /// @brief Очистить массивы
     void clear();
 
-    /// @brief Расширить массивы по числу граней
+    /// @brief Расширить массивы
     void resize(index_t n_nodes, index_t n_values);
-
-    /// @brief Расширить массивы по числу граней
-    void reserve(index_t n_nodes, index_t n_values);
-
-    /// @brief Сжать массивы до актуальных размеров
-    void shrink_to_fit();
 
     /// @brief Увеличить размер под массив для AMR узлов
     void resize_amr(index_t n_nodes, int dim);
+
+    /// @brief Расширить буферы массивов
+    void reserve(index_t n_nodes, index_t n_values);
+
+    /// @brief Увеличить размер под массив для AMR узлов
+    void reserve_amr(index_t n_nodes, int dim);
+
+    /// @brief Сжать буферы массивов до актуальных размеров
+    void shrink_to_fit();
 
     /// @brief Число инцидентных ячеек, для адаптивной ячейки может быть меньше
     /// max_count, для неструктурированной ячейки (полигон или многогранник
@@ -85,19 +89,19 @@ public:
         return std::views::iota(offsets[inode], offsets[inode + 1]);
     }
 
-    /// @brief Является ли грань актуальной?
+    /// @brief Является ли запись актуальной?
     bool is_actual(index_t inc) const { return role[inc] >= 0; }
 
-    /// @return 'true', если грань не актуальна
+    /// @return 'true', если запись не актуальна
     bool is_undefined(index_t inc) const { return role[inc] < 0; }
 
-    /// @brief Установить неопределенную грань
+    /// @brief Установить неопределенную инцидентную
     void set_undefined(index_t inc) { role[inc] = -1; }
 
-    /// @brief Локальная соседняя ячейка?
+    /// @brief Локальная инцидентная ячейка?
     bool is_local(index_t inc) const { return ghost[inc] < 0; }
 
-    /// @brief Удаленная соседняя ячейка?
+    /// @brief Удаленная инцидентная ячейка?
     bool is_ghost(index_t inc) const { return ghost[inc] >= 0; }
 
     /// @brief Получить хранилище ячеек, в котором находится сосед, а также
@@ -144,12 +148,12 @@ public:
     bool empty() const { return coord.empty(); }
 
     /// @brief Число уникальных узлов
-    index_t size() const { return coord.size(); }
+    index_t size() const { return static_cast<index_t>(coord.size()); }
 
     /// @brief Число уникальных узлов
-    index_t n_nodes() const { return coord.size(); }
+    index_t n_nodes() const { return static_cast<index_t>(coord.size()); }
 
-    /// @brief Размер списка инцидентных
+    /// @brief Размер списка инцидентных ячеек
     index_t n_incident() const { return incident.n_values(); }
 
     /// @brief Очистить массивы
@@ -158,21 +162,17 @@ public:
     /// @brief Расширить массивы по числу узлов
     void resize(index_t n_nodes, index_t n_incident);
 
+    /// @brief Увеличить размер под массив для AMR узлов
+    void resize_amr(index_t n_nodes, int dim);
+
     /// @brief Расширить массивы по числу узлов
     void reserve(index_t n_nodes, index_t n_incident);
 
     /// @brief Увеличить размер под массив для AMR узлов
-    void resize_amr(index_t n_nodes, int dim);
+    void reserve_amr(index_t n_nodes, int dim);
 
+    /// @brief Сжать буферы массивов под актуальные размеры
     void shrink_to_fit();
-
-    // {vert.index, nodes}
-    using Incomplete = std::tuple<AmrVerts, AmrNodes>;
-
-    template <bool complete>
-    static Incomplete generate(const AmrCells& cells);
-
-    void setup_for(AmrCells& cells);
 
     /// @{ @name Топологические свойства узлов
 
@@ -195,7 +195,17 @@ public:
     void copy_data(index_t from, AmrNodes* dst, index_t to) const;
 
     void copy_geom(index_t ic, AmrNodes& nodes,
-        index_t jc, index_t inc_offset) const;
+                   index_t jc, index_t inc_offset) const;
+
+    /// @brief Кортеж {vert.index, nodes}
+    using Incomplete = std::tuple<AmrVerts, AmrNodes>;
+
+    /// @brief Сгенерировать уникальные узлы для множества ячеек
+    template <bool complete>
+    static Incomplete generate(const AmrCells& cells);
+
+    /// @brief Установить уникальные узлы для множества ячеек
+    void setup_for(AmrCells& cells);
 
     /// @brief Расход памяти
     memory_t memory_usage() const;

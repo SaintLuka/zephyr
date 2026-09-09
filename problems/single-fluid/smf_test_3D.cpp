@@ -101,7 +101,7 @@ int main(int argc, char** argv) {
     };
 
     // Файл для записи
-    PvdFile pvd("Sedov", "output");
+    PvdFile pvd("mesh", "output");
     pvd.options.unique_nodes = true;
 
     size_t n_step = 0;

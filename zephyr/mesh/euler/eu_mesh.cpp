@@ -1035,6 +1035,17 @@ EuCell EuMesh::operator()(int i, int j, int k) {
     return operator[](nz_ * (ny_ * i + j) + k);
 }
 
+EuNodeRange EuMesh::nodes() {
+    if (!has_nodes()) {
+        throw std::runtime_error("EuMesh::nodes: has no unique nodes");
+    }
+#ifndef ZEPHYR_MPI
+    return EuNodeRange(&local_nodes_, &local_cells_, nullptr);
+#else
+    return EuNodeRange(&local_nodes_, &local_cells_, &tourists_.ghost_cells());
+#endif
+}
+
 void EuMesh::backup(const std::string& sroot, const std::vector<std::string>& variables) const {
     namespace fs = std::filesystem;
 

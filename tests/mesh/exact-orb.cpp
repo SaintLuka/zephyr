@@ -81,7 +81,7 @@ int main() {
     // Файл для записи
     PvdFile pvd("mesh", "output");
     pvd.variables = {"rank"};
-    pvd.variables.append("u", u);
+    pvd.variables.add_cell_data("u", u);
 
     pvd.save(mesh, 0.0);
     Stopwatch elapsed(true);

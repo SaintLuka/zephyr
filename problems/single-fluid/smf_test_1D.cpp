@@ -73,7 +73,7 @@ int main(int argc, char** argv) {
     auto z = data.init;
 
     // Файл для записи
-    PvdFile pvd("test1D", "output");
+    PvdFile pvd("mesh", "output");
 
     double curr_time = 0.0;
 

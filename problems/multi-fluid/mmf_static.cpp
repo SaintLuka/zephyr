@@ -77,6 +77,7 @@ int main() {
     gen.set_sizes(nx, ny);
     gen.set_boundaries({.left=Boundary::ZOE, .right=Boundary::ZOE,
                         .bottom=Boundary::WALL, .top=Boundary::WALL});
+    gen.set_adaptive(false);
 
     Grid grid = gen.make();
 

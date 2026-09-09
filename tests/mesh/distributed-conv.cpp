@@ -79,8 +79,8 @@ int main(int argc, char** argv) {
     PvdFile pvd("mesh", "output");
 
     pvd.variables = {"rank", "index"};
-    pvd.variables.append("u", u1);
-    pvd.variables.append("load", load);
+    pvd.variables.add_cell_data("u", u1);
+    pvd.variables.add_cell_data("load", load);
 
     // Число Куранта
     double CFL = 0.5;

@@ -27,7 +27,7 @@ int main() {
 
     // Files for output
     PvdFile pvd("wave", "output");
-    pvd.variables.append("u", u_curr);
+    pvd.variables.add_cell_data("u", u_curr);
 
     // Initial conditions, assuming zero velocity
     for (auto cell: mesh) {

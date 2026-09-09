@@ -80,8 +80,8 @@ int main() {
     // Файл для записи
     PvdFile pvd("mesh", "output");
 
-    pvd.variables.append("rank", data.rank);
-    pvd.variables.append("load", data.load);
+    pvd.variables.add_cell_data("rank", data.rank);
+    pvd.variables.add_cell_data("load", data.load);
 
     // Заполняем данные о нагрузке ячеек
     for (auto cell: mesh) {

@@ -136,11 +136,11 @@ int main() {
 
     // Переменные для сохранения
     pvd.variables = {"level"};
-    pvd.variables.append("u", solver.u_curr);
-    pvd.variables.append("u2", solver.u_next);
-    pvd.variables.append("uh", solver.u_half);
-    pvd.variables.append("dx", solver.du_dx);
-    pvd.variables.append("dy", solver.du_dy);
+    pvd.variables.add_cell_data("u", solver.u_curr);
+    pvd.variables.add_cell_data("u2", solver.u_next);
+    pvd.variables.add_cell_data("uh", solver.u_half);
+    pvd.variables.add_cell_data("dx", solver.du_dx);
+    pvd.variables.add_cell_data("dy", solver.du_dy);
     pvd.variables += {"v.x", [&solver](EuCell& cell) { return solver.velocity(cell.center()).x(); } };
     pvd.variables += {"v.y", [&solver](EuCell& cell) { return solver.velocity(cell.center()).y(); } };
 

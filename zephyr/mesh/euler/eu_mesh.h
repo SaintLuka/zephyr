@@ -5,6 +5,7 @@
 #include <zephyr/utils/threads.h>
 #include <zephyr/utils/mpi.h>
 
+#include <zephyr/mesh/euler/eu_node.h>
 #include <zephyr/mesh/euler/eu_prim.h>
 #include <zephyr/mesh/euler/distributor.h>
 #include <zephyr/mesh/euler/tourism.h>
@@ -277,7 +278,15 @@ public:
     /// @param vars Положительное количество параметров типа Storable<T>, для
     /// которых осуществляется обмен.
     template <typename... Args, typename = std::enable_if_t<(sizeof...(Args) > 0)> >
-    void sync(Args&&... vars);
+    void sync(Args&&... vars) {
+        sync_cells(std::forward<Args>(vars)...);
+    }
+
+    template <typename... Args, typename = std::enable_if_t<(sizeof...(Args) > 0)> >
+    void sync_cells(Args&&... vars);
+
+    template <typename... Args, typename = std::enable_if_t<(sizeof...(Args) > 0)> >
+    void sync_nodes(Args&&... vars);
 
     /// @brief Ссылка на декомпозицию
     const Decomposition& decomp() const { return *decomp_; }
@@ -357,10 +366,16 @@ public:
     bool has_nodes() const { return !local_nodes_.empty(); }
 
     /// @brief Ссылка на массив уникальных узлов
-    const AmrNodes& nodes() const { return local_nodes_; }
+    EuNodeRange nodes() ;
+
+    /// @brief Ссылка на массив уникальных узлов
+    AmrNodes& local_nodes() { return local_nodes_; }
 
     /// @brief Ссылка на массив уникальных узлов
     const AmrNodes& local_nodes() const { return local_nodes_; }
+
+    /// @brief Ссылка на массив уникальных узлов
+    AmrNodes& ghost_nodes();
 
     /// @brief Ссылка на массив уникальных узлов
     const AmrNodes& ghost_nodes() const;
@@ -491,10 +506,18 @@ void EuMesh::swap(Storable<T> var1, Storable<T> var2) {
 }
 
 template <typename... Args, typename >
-void EuMesh::sync(Args&&... vars) {
+void EuMesh::sync_cells(Args&&... vars) {
 #ifdef ZEPHYR_MPI
     if (mpi::single()) return;
     tourists_.sync(local_cells_, std::forward<Args>(vars)...);
+#endif
+}
+
+template <typename... Args, typename >
+void EuMesh::sync_nodes(Args&&... vars) {
+#ifdef ZEPHYR_MPI
+    if (mpi::single()) return;
+    tourists_.sync(local_nodes_, std::forward<Args>(vars)...);
 #endif
 }
 

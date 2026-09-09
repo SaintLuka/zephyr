@@ -58,82 +58,88 @@ geom::Polyhedron EuCell::polyhedron() const {
     return m_cells->polyhedron(m_index);
 }
 
-void EuCell::replace(int loc_face) {
-    // Переход от ghost-ячейки невозможен
-    z_assert(m_cells != m_ghosts, "Not a local cell #1")
-    z_assert(m_cells->rank[m_index] == utils::mpi::rank(), "Not a local cell #2");
-
-    // Индекс правой грани
-    index_t iface = m_cells->faces.offsets[m_index] + loc_face;
-
-    // Массив, в котором находится правая ячейка, индекс ячейки в этом массиве
-    std::tie(m_cells, m_index) = m_cells->faces.adjacent.get_neib(iface, m_cells, m_ghosts);
-}
-
 EuCell EuCell::neib(index_t i, index_t j) const {
     z_assert(m_cells->dim() == 2, "neib(i, j) error: not 2D mesh");
+    z_assert(m_cells != m_ghosts, "neib(i, j) error: assuming start from local cell");
+    z_assert(utils::mpi::single() || m_cells->has_nodes(), "neib(i, j) error: set nodes for distributed mesh");
 
-    EuCell neighbor(*this);
+    bool A = i;
+    bool B = j;
+    if (A || (!A && B)) {
+
+    }
+
+    // Начинаем с самой ячейки
+    AmrCells* cells = m_cells;
+    index_t idx = m_index;
+
+    // Сдвинуться на соседа со стороны side
+    auto moves = [&, this](Side2D side) {
+        z_assert(cells->faces.is_simple(idx, side), "Not structured stencil (Side " + side.to_string() + ")");
+        index_t iface = cells->faces.offsets[idx] + side;
+        std::tie(cells, idx) = cells->faces.adjacent.get_neib(iface, m_cells, m_ghosts);
+    };
 
     // Переходы направо (ничего не делает при i < 0)
     for (int c = 0; c < i; ++c) {
-        z_assert(neighbor.simple_face(Side2D::R), "Not structured stencil (R)");
-        neighbor.replace(Side2D::R);
+        moves(Side2D::R);
     }
     // Переходы налево (ничего не делает при i > 0)
     for (int c = 0; c > i; --c) {
-        z_assert(neighbor.simple_face(Side2D::L), "Not structured stencil (L)");
-        neighbor.replace(Side2D::L);
+        moves(Side2D::L);
     }
     // Переходы вверх (ничего не делает при j < 0)
     for (int c = 0; c < j; ++c) {
-        z_assert(neighbor.simple_face(Side2D::T), "Not structured stencil (T)");
-        neighbor.replace(Side2D::T);
+        moves(Side2D::T);
     }
     // Переходы вниз (ничего не делает при j > 0)
     for (int c = 0; c > j; --c) {
-        z_assert(neighbor.simple_face(Side2D::B), "Not structured stencil (B)");
-        neighbor.replace(Side2D::B);
+        moves(Side2D::B);
     }
-    return neighbor;
+    return EuCell(cells, idx);
 }
 
 EuCell EuCell::neib(index_t i, index_t j, index_t k) const {
     z_assert(m_cells->dim() == 3, "neib(i, j, k) error: not 3D mesh");
+    z_assert(m_cells != m_ghosts, "neib(i, j, k) error: assuming start from local cell");
+    z_assert(utils::mpi::single() || m_cells->has_nodes(), "neib(i, j, k) error: set nodes for distributed mesh");
 
-    EuCell neighbor(*this);
+    // Начинаем с самой ячейки
+    AmrCells* cells = m_cells;
+    index_t idx = m_index;
+
+    // Сдвинуться на соседа со стороны side
+    auto moves = [&, this](Side3D side) {
+        z_assert(cells->faces.is_simple(idx, side), "Not structured stencil (Side " + side.to_string() + ")");
+        index_t iface = cells->faces.offsets[idx] + side;
+        std::tie(cells, idx) = cells->faces.adjacent.get_neib(iface, m_cells, m_ghosts);
+    };
 
     // Переходы направо (ничего не делает при i < 0)
     for (int c = 0; c < i; ++c) {
-        z_assert(neighbor.simple_face(Side3D::R), "Not structured stencil (R)");
-        neighbor.replace(Side3D::R);
+        moves(Side3D::R);
     }
     // Переходы налево (ничего не делает при i > 0)
     for (int c = 0; c > i; --c) {
-        z_assert(neighbor.simple_face(Side3D::L), "Not structured stencil (L)");
-        neighbor.replace(Side3D::L);
+        moves(Side3D::L);
     }
     // Переходы вверх (ничего не делает при j < 0)
     for (int c = 0; c < j; ++c) {
-        z_assert(neighbor.simple_face(Side3D::T), "Not structured stencil (T)");
-        neighbor.replace(Side3D::T);
+        moves(Side3D::T);
     }
     // Переходы вниз (ничего не делает при j > 0)
     for (int c = 0; c > j; --c) {
-        z_assert(neighbor.simple_face(Side3D::B), "Not structured stencil (B)");
-        neighbor.replace(Side3D::B);
+        moves(Side3D::B);
     }
     // Переходы вверх (ничего не делает при k < 0)
     for (int c = 0; c < k; ++c) {
-        z_assert(neighbor.simple_face(Side3D::F), "Not structured stencil (F)");
-        neighbor.replace(Side3D::F);
+        moves(Side3D::F);
     }
     // Переходы вниз (ничего не делает при k > 0)
     for (int c = 0; c > k; --c) {
-        z_assert(neighbor.simple_face(Side3D::Z), "Not structured stencil (Z)");
-        neighbor.replace(Side3D::Z);
+        moves(Side3D::Z);
     }
-    return neighbor;
+    return EuCell(cells, idx);
 }
 
 } // namespace zephyr::mesh

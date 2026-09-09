@@ -129,11 +129,11 @@ int main() {
 
     // Переменные для сохранения
     pvd.variables = {"level"};
-    pvd.variables.append("u", data.u1);
-    pvd.variables.append("u2", data.u2);
-    pvd.variables.append("n", data.n);
-    pvd.variables.append("p", data.p);
-    pvd.variables.append("grad", data.grad);
+    pvd.variables.add_cell_data("u", data.u1);
+    pvd.variables.add_cell_data("u2", data.u2);
+    pvd.variables.add_cell_data("n", data.n);
+    pvd.variables.add_cell_data("p", data.p);
+    pvd.variables.add_cell_data("grad", data.grad);
     pvd.variables += {"over", [](EuCell& cell) -> double {
         double u = cell[data.u1];
         return u < 0.0 ? u : (u <= 1.0 ? NAN : u - 1.0);

@@ -1,8 +1,8 @@
 #pragma once
 
 #include <string>
-#include <iostream>
 #include <functional>
+#include <variant>
 
 #include <zephyr/io/vtk_type.h>
 
@@ -11,6 +11,7 @@ namespace zephyr::mesh {
 template<typename T>
 class Storable;
 class EuCell;
+class EuNode;
 }
 
 namespace zephyr::io {
@@ -27,6 +28,10 @@ namespace zephyr::io {
 template <typename T>
 using WriteCell = std::function<void(mesh::EuCell&, T*)>;
 
+/// @brief Тип функции для записи переменных из узлов
+template <typename T>
+using WriteNode = std::function<void(mesh::EuNode&, T*)>;
+
 /// @brief Класс для записи переменных в VTU файл, каждой переменной для
 /// записи должен соответствовать экземпляр Variable.
 class Variable {
@@ -38,10 +43,7 @@ public:
     /// @name Имя переменной
     /// @details Функция актуальна для некоторых предопределенных имен:
     /// "coord", "center", "volume"...
-    explicit Variable(const char *name);
-
-    /// @brief Аналогично конструктору Variable(const char* )
-    explicit Variable(const std::string &name);
+    explicit Variable(std::string_view name);
 
     /// @brief Создать переменную с полным описанием
     /// @param name Имя переменной
@@ -59,44 +61,59 @@ public:
     ///     }));
     /// @endcode
     template<class T>
-    Variable(const char *name, int n_components, const WriteCell<T> &func) {
-        m_name = name;
-        m_type = VtkType::get<T>();
-        m_n_components = n_components;
-        m_write = [func](mesh::EuCell &cell, void *out) {
+    Variable(std::string_view name, int n_components, const WriteCell<T> &func) {
+        name_ = name;
+        type_ = VtkType::get<T>();
+        n_components_ = n_components;
+        write_ = [func](mesh::EuCell &cell, void *out) {
             func(cell, static_cast<T *>(out));
         };
     }
 
-    /// Тип VtkType выводится из T.
     template<class T>
-    Variable(const std::string &name, int n_components, const WriteCell<T> &func)
-            : Variable(name.c_str(), n_components, func) { }
+    Variable(std::string_view name, int n_components, const WriteNode<T> &func) {
+        name_ = name;
+        type_ = VtkType::get<T>();
+        n_components_ = n_components;
+        write_ = [func](mesh::EuNode &node, void *out) {
+            func(node, static_cast<T *>(out));
+        };
+    }
 
     /// @brief Имя переменной
-    std::string name() const { return m_name; }
+    std::string name() const { return name_; }
 
     /// @brief Тип переменной
-    VtkType type() const { return m_type; }
+    VtkType type() const { return type_; }
 
     /// @brief Число компонент для векторной переменной
-    int n_components() const { return m_n_components; }
+    int n_components() const { return n_components_; }
 
     /// @brief Является ли переменная скаляром
-    bool is_scalar() const { return m_n_components < 2; }
+    bool is_scalar() const { return n_components_ < 2; }
 
     /// @brief Размер переменной в байтах (аналог sizeof)
-    size_t size() const { return m_n_components * m_type.size(); }
+    size_t size() const { return n_components_ * type_.size(); }
 
-    /// @brief Основная функция класса. Запись переменной из ячейки в поток.
+    /// @brief Переменная для записи сеточных данных?
+    bool cell_data() const;
+
+    /// @brief Переменная для записи сеточных данных?
+    bool node_data() const;
+
+    /// @brief Основная функция класса. Запись переменной из ячейки в буфер.
     void write(mesh::EuCell &cell, void *out) const;
 
-private:
-    std::string m_name;  ///< Имя переменной
-    VtkType m_type;      ///< Тип переменной
-    int m_n_components;  ///< Число компонент (для вектора)
+    /// @brief Основная функция класса. Запись переменной из узла в буфер.
+    void write(mesh::EuNode &node, void *out) const;
 
-    WriteCell<void> m_write = nullptr; ///< Функция записи
+private:
+    std::string name_;  ///< Имя переменной
+    VtkType type_;      ///< Тип переменной
+    int n_components_;  ///< Число компонент (для вектора)
+
+    /// @brief Функция записи
+    std::variant<WriteCell<void>, WriteNode<void>> write_ = {};
 };
 
 } // namespace zephyr::io

@@ -6,6 +6,7 @@
 #include <zephyr/geom/primitives/cube.h>
 
 #include <zephyr/mesh/euler/eu_prim.h>
+#include <zephyr/mesh/euler/eu_node.h>
 #include <zephyr/mesh/euler/eu_mesh.h>
 
 #include <zephyr/io/vtu_file.h>
@@ -18,42 +19,81 @@ using namespace zephyr::mesh;
 namespace {
 
 class DistNodes {
+    // Могут быть указатели на реальные узлы
+    AmrNodes* local_nodes_ = nullptr;
+    AmrNodes* ghost_nodes_ = nullptr;
+
+    // Или буферы данных
+    std::optional<std::vector<mesh::index_t>> vert_index_buffer_ = std::nullopt;
+    std::optional<std::vector<Vector3d>> local_coords_buffer_ = std::nullopt;
+
     bool has_no_ghosts_{true};
-    mesh::index_t n_local_nodes_{0};
     mesh::index_t n_nodes_{0};
+    mesh::index_t n_local_nodes_{0};
+    mesh::index_t n_ghost_nodes_{0};
+
     std::span<const mesh::index_t> vert_index_{}; // по классике verts.index
     std::span<const mesh::index_t> vert_ghost_{}; // по классике verts.ghost
-    std::span<const Vector3d> local_nodes_{};
-    std::span<const Vector3d> ghost_nodes_{};
+    std::span<const Vector3d> local_coords_{};
+    std::span<const Vector3d> ghost_coords_{};
 
 public:
     DistNodes() = default;
 
-    DistNodes(
-        std::span<const mesh::index_t> vert_index,
-        std::span<const mesh::index_t> vert_ghost,
-        std::span<const Vector3d> local_nodes = {},
-        std::span<const Vector3d> ghost_nodes = {}) :
-            vert_index_(vert_index),
-            vert_ghost_(vert_ghost),
-            local_nodes_(local_nodes),
-            ghost_nodes_(ghost_nodes) {
+    // Конструктор из реальных узлов
+    DistNodes(const AmrCells& cells, AmrNodes& local_nodes, AmrNodes& ghost_nodes)
+            : local_nodes_(&local_nodes), ghost_nodes_(&ghost_nodes) {
 
-        n_local_nodes_ = local_nodes_.size();
-        n_nodes_ = n_local_nodes_ + ghost_nodes_.size();
-        has_no_ghosts_ = vert_ghost_.empty() || ghost_nodes_.empty();
+        vert_index_ = cells.verts.index;
+        vert_ghost_ = cells.verts.ghost;
+        local_coords_ = local_nodes_->coord;
+        ghost_coords_ = ghost_nodes_->coord;
 
-        z_assert(!vert_index_.empty(), "DistNodes empty vert_index");
+        n_local_nodes_ = local_coords_.size();
+        n_ghost_nodes_ = ghost_coords_.size();
+        n_nodes_ = n_local_nodes_ + n_ghost_nodes_;
+        has_no_ghosts_ = vert_ghost_.empty() || ghost_coords_.empty();
+
+        z_assert(!vert_index_.empty(), "DistNodes empty vert_index #1");
+    }
+
+    // Конструктор из вспомогательных массивов
+    DistNodes(std::vector<mesh::index_t>&& vert_index, std::vector<Vector3d>&& local_coords)
+        : vert_index_buffer_(vert_index), local_coords_buffer_(local_coords) {
+
+        vert_index_ = *vert_index_buffer_;
+        vert_ghost_ = {};
+        local_coords_ = *local_coords_buffer_;
+        ghost_coords_ = {};
+
+        n_local_nodes_ = local_coords_.size();
+        n_ghost_nodes_ = ghost_coords_.size();
+        n_nodes_ = n_local_nodes_ + n_ghost_nodes_;
+        has_no_ghosts_ = vert_ghost_.empty() || ghost_coords_.empty();
+
+        z_assert(!vert_index_.empty(), "DistNodes empty vert_index #2");
     }
 
     bool empty() const { return n_nodes_ == 0; }
 
+    bool true_nodes() const { return local_nodes_ != nullptr && ghost_nodes_ != nullptr; }
+
+    AmrNodes& local_nodes() const { return *local_nodes_; }
+
+    AmrNodes& ghost_nodes() const { return *ghost_nodes_; }
+
+    index_t n_nodes() const { return n_nodes_; }
+
+    index_t n_local_nodes() const { return n_local_nodes_; }
+
+    index_t n_ghost_nodes() const { return n_ghost_nodes_; }
+
     Vector3d coord(index_t vert_idx) const {
         if (has_no_ghosts_ || vert_ghost_[vert_idx] < 0) {
-            return local_nodes_[vert_index_[vert_idx]];
+            return local_coords_[vert_index_[vert_idx]];
         }
         else {
-            return ghost_nodes_[vert_ghost_[vert_idx]];
+            return ghost_coords_[vert_ghost_[vert_idx]];
         }
     }
 
@@ -69,8 +109,8 @@ public:
     std::vector<Vector3d> points() const {
         std::vector<Vector3d> res;
         res.reserve(n_nodes_);
-        std::ranges::copy(local_nodes_, std::back_inserter(res));
-        std::ranges::copy(ghost_nodes_, std::back_inserter(res));
+        std::ranges::copy(local_coords_, std::back_inserter(res));
+        std::ranges::copy(ghost_coords_, std::back_inserter(res));
         return res;
     }
 };
@@ -86,7 +126,7 @@ public:
 
     VtuStructure(const AmrCells &cells, const DistNodes& nodes, bool polyhedral);
 
-    void write_header(std::ofstream &file, const Variables &variables) const;
+    void write_header(std::ofstream &file, bool node_data, const Variables &variables) const;
 
     void write_primitives(std::ofstream &file) const;
 
@@ -446,12 +486,13 @@ void VtuStructure::fill_polyfaces_3D(const AmrCells& cells, const DistNodes &nod
     }
 }
 
-void VtuStructure::write_header(std::ofstream &file, const Variables &variables) const {
+void VtuStructure::write_header(std::ofstream &file, bool node_data, const Variables &variables) const {
     index_t n_cells = types.size();
+    index_t n_nodes = points.size();
 
     file << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" byte_order=\"" + byteorder() + "\">\n";
     file << "  <UnstructuredGrid>" << '\n';
-    file << "    <Piece NumberOfPoints=\"" << points.size() << "\" NumberOfCells=\"" << n_cells << "\">\n";
+    file << "    <Piece NumberOfPoints=\"" << n_nodes << "\" NumberOfCells=\"" << n_cells << "\">\n";
 
     // Points
     offset_t byte_offset = 0;
@@ -483,8 +524,9 @@ void VtuStructure::write_header(std::ofstream &file, const Variables &variables)
 
     // CellData
     file << "      <CellData>\n";
-
     for (auto &field: variables.list()) {
+        if (!field.cell_data()) continue;
+
         file << "        <DataArray type=\"" << field.type() << "\" Name=\"" << field.name();
         if (!field.is_scalar()) {
             file << "\" NumberOfComponents=\"" << field.n_components();
@@ -493,8 +535,25 @@ void VtuStructure::write_header(std::ofstream &file, const Variables &variables)
 
         byte_offset += sizeof(datasize_t) + n_cells * field.size();
     }
-
     file << "      </CellData>\n";
+
+    // PointData
+    if (node_data) {
+        file << "      <PointData>\n";
+        for (auto &field: variables.list()) {
+            if (!field.node_data()) continue;
+
+            file << "        <DataArray type=\"" << field.type() << "\" Name=\"" << field.name();
+            if (!field.is_scalar()) {
+                file << "\" NumberOfComponents=\"" << field.n_components();
+            }
+            file << "\" format=\"appended\" offset=\"" << byte_offset << "\"/>\n";
+
+            byte_offset += sizeof(datasize_t) + n_nodes * field.size();
+        }
+        file << "      </PointData>\n";
+    }
+
     file << "    </Piece>\n";
     file << "  </UnstructuredGrid>\n";
 }
@@ -522,6 +581,8 @@ void write_cells_data(std::ofstream &file, AmrCells &cells, const Variables &var
     const index_t n_cells = cells.n_cells();
 
     for (auto &field: variables.list()) {
+        if (!field.cell_data()) continue;
+
         index_t field_size = field.size();
         datasize_t data_size = n_cells * field_size;
 
@@ -532,6 +593,39 @@ void write_cells_data(std::ofstream &file, AmrCells &cells, const Variables &var
         index_t counter = 0;
         for (auto& cell: cells) {
             field.write(cell, temp.data() + counter * field_size);
+            ++counter;
+        }
+
+        file.write(temp.data(), data_size);
+    }
+}
+
+void write_nodes_data(std::ofstream &file, const DistNodes &nodes, const Variables &variables) {
+    if (!nodes.true_nodes()) return;
+
+    std::vector<char> temp;
+
+    const index_t n_nodes = nodes.n_nodes();
+
+    for (auto &field: variables.list()) {
+        if (!field.node_data()) continue;
+
+        index_t field_size = field.size();
+        datasize_t data_size = n_nodes * field_size;
+
+        file.write((char*) &data_size, sizeof(datasize_t));
+
+        temp.resize(data_size);
+
+        index_t counter = 0;
+        for (index_t i = 0; i < nodes.n_local_nodes(); ++i) {
+            EuNode node(&nodes.local_nodes(), i);
+            field.write(node, temp.data() + counter * field_size);
+            ++counter;
+        }
+        for (index_t i = 0; i < nodes.n_ghost_nodes(); ++i) {
+            EuNode node(&nodes.ghost_nodes(), i);
+            field.write(node, temp.data() + counter * field_size);
             ++counter;
         }
 
@@ -569,9 +663,10 @@ void save_with_nodes(std::string_view filename, AmrCells &locals,
     }
 
     VtuStructure formatter(locals, nodes, options.polyhedral);
-    formatter.write_header(file, variables);
+    formatter.write_header(file, nodes.true_nodes(), variables);
     formatter.write_primitives(file);
     write_cells_data(file, locals, variables);
+    write_nodes_data(file, nodes, variables);
 
     file.close();
 }
@@ -583,10 +678,8 @@ void VtuFile::save(std::string_view filename, AmrCells &locals,
     if (options.unique_nodes) {
         auto [inc_verts, inc_nodes] = AmrNodes::generate<false>(locals);
         nodes = DistNodes(
-            inc_verts.index,
-            inc_verts.ghost,
-            inc_nodes.coord
-        );
+            std::move(inc_verts.index),
+            std::move(inc_nodes.coord));
     }
     save_with_nodes(filename, locals, nodes, variables, options);
 }
@@ -595,23 +688,18 @@ void VtuFile::save(std::string_view filename, EuMesh &mesh,
                    const Variables &variables, const VtuOptions& options) {
 
     DistNodes nodes;
-    // Буферы снаружи, иначе span с UB
-    AmrVerts inc_verts;
-    AmrNodes inc_nodes;
     if (options.unique_nodes) {
         if (mesh.has_nodes()) {
             nodes = DistNodes(
-                mesh.local_cells().verts.index,
-                mesh.local_cells().verts.ghost,
-                mesh.local_nodes().coord,
-                mesh.ghost_nodes().coord);
+                mesh.local_cells(),
+                mesh.local_nodes(),
+                mesh.ghost_nodes());
         }
         else {
-            std::tie(inc_verts, inc_nodes) = AmrNodes::generate<false>(mesh.local_cells());
+            auto [inc_verts, inc_nodes] = AmrNodes::generate<false>(mesh.local_cells());
             nodes = DistNodes(
-                inc_verts.index, {},
-                inc_nodes.coord, {}
-            );
+                std::move(inc_verts.index),
+                std::move(inc_nodes.coord));
         }
     }
     save_with_nodes(filename, mesh.local_cells(), nodes, variables, options);

@@ -56,10 +56,10 @@ int main() {
     PvdFile pvd("mesh", "output");
 
     // Переменные для сохранения
-    pvd.variables.append("rho", rho1);
+    pvd.variables.add_cell_data("rho", rho1);
     pvd.variables += {"velocity", [v1](EuCell& cell) -> double { return cell[v1].x(); }};
-    pvd.variables.append("pressure", p1);
-    pvd.variables.append("energy", e1);
+    pvd.variables.add_cell_data("pressure", p1);
+    pvd.variables.add_cell_data("energy", e1);
 
     // Заполняем начальные данные
     for (auto cell: mesh) {

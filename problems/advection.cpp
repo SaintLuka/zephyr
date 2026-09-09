@@ -41,7 +41,7 @@ int main() {
     PvdFile pvd("mesh", "output");
 
     // Variables to save
-    pvd.variables.append("u", u1);
+    pvd.variables.add_cell_data("u", u1);
     pvd.variables += {"vx", [](EuCell cell) -> double { return velocity(cell.center()).x(); } };
     pvd.variables += {"vy", [](EuCell cell) -> double { return velocity(cell.center()).y(); } };
 

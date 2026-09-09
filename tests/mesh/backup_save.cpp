@@ -82,8 +82,8 @@ int main() {
     // Save mesh for ParaView
     PvdFile pvd("backup_save", "output");
     pvd.variables = {"level"};
-    pvd.variables.append("density", density);
-    pvd.variables.append("velocity", velocity);
+    pvd.variables.add_cell_data("density", density);
+    pvd.variables.add_cell_data("velocity", velocity);
     for (int i = 0; i < 4; ++i) {
         pvd.variables.append<Vector3d>(
             "normals[" + std::to_string(i) + "]",

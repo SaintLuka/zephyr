@@ -34,7 +34,7 @@ int main(int argc, char** argv) {
 
     // Переменная для записи
     Variables vars;
-    vars.append("u", u);
+    vars.add_cell_data("u", u);
 
     if (mpi::single()) {
         // Базовое сохранение сетки

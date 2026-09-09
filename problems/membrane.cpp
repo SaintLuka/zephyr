@@ -66,9 +66,9 @@ int main() {
     PvdFile pvd("mesh", "output");
 
     // Переменные для сохранения
-    pvd.variables.append("rho", rho1);
-    pvd.variables.append("pressure", p1);
-    pvd.variables.append("velocity", v1);
+    pvd.variables.add_cell_data("rho", rho1);
+    pvd.variables.add_cell_data("pressure", p1);
+    pvd.variables.add_cell_data("velocity", v1);
     pvd.variables += {"|velocity|", [v=v1](EuCell& cell) -> double { return cell[v].norm(); }};
     pvd.variables += {"SPL", [p1](EuCell& cell) -> double {
         // Уровень звукового давления в дБ

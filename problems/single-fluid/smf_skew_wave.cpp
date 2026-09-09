@@ -68,7 +68,7 @@ int main(int argc, char** argv) {
 	double v2x = 3.145830462176495_km; // Скорость в ЛабСО из MatLab
 	double v1x = 5.0_km; //Х-скорость налёта среды на УВ
 	double vy = 6.0_km; //У-скорость в ЛабСО, изменяемый параметр
-	double v2 = sqrt(pow(v2x,2)+pow(vy,2)); // Модуль скорсоти перед фронтом УВ в ЛабСО
+	double v2 = sqrt(pow(v2x,2)+pow(vy,2)); // Модуль скорости перед фронтом УВ в ЛабСО
 	double alpha1 = atan(vy/v1x); //Угол между v1 и осью Х в ЛабСО
 	double alpha2 = atan(vy/v2x); //Угол между v2 и осью Х в ЛабСО
 	double nx = -cos(alpha1); // Х-компонента нормали фронта УВ в СО, сонаправленной с v1

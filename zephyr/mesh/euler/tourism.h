@@ -73,6 +73,12 @@ public:
     void sync(const AmrCells& cells, Args&&... vars);
 
     /// @brief Отправка/получение сеточных данных
+    /// @param nodes Локальное хранилище узлов
+    /// @param vars Набор переменных типа Storable<T>
+    template <typename... Args>
+    void sync(const AmrNodes& nodes, Args&&... vars);
+
+    /// @brief Отправка/получение сеточных данных
     /// @param cells Локальное хранилище ячеек
     template <MpiTag tag>
     void sync(const AmrCells& cells);
@@ -188,6 +194,10 @@ private:
     // Копирует данные из local_cells_ в border_cells_
     template <typename T>
     void prepare(const AmrCells& cells, Storable<T> var);
+
+    // Копирует данные из local_nodes_ в border_nodes_
+    template <typename T>
+    void prepare(const AmrNodes& nodes, Storable<T> var);
 
     // ------------------------------------------------------------------------
     //                             Функция update()
@@ -382,6 +392,16 @@ void Tourism::prepare(const AmrCells& cells, Storable<T> var) {
     }
 }
 
+template <typename T>
+void Tourism::prepare(const AmrNodes& nodes, Storable<T> var) {
+    const utils::Buffer& src = nodes.data[var];
+    utils::Buffer& dst = border_nodes_.data[var];
+
+    for (size_t ic = 0; ic < border_nodes_indices_.size(); ++ic) {
+        src.copy_data(border_nodes_indices_[ic], dst, ic);
+    }
+}
+
 template <typename... Args>
 void Tourism::sync(const AmrCells& cells, Args&&... vars) {
     static_assert(sizeof...(Args) > 0, "Tourism::sync, zero arguments");
@@ -395,6 +415,27 @@ void Tourism::sync(const AmrCells& cells, Args&&... vars) {
 
         utils::Buffer& dst = ghost_cells_.data[var];
         auto recv_req = cell_router_.irecv(dst, static_cast<MpiTag>(var.tag()));
+
+        send_req.wait();
+        recv_req.wait();
+    };
+
+    ( sync_one(vars), ... );
+}
+
+template <typename... Args>
+void Tourism::sync(const AmrNodes& nodes, Args&&... vars) {
+    static_assert(sizeof...(Args) > 0, "Tourism::sync, zero arguments");
+    soa::assert_storable<Args...>();
+
+    // Отправить и дождаться одну переменную
+    auto sync_one = [&](auto&& var) {
+        prepare(nodes, var);
+        const utils::Buffer& src = border_nodes_.data[var];
+        auto send_req = node_router_.isend(src, static_cast<MpiTag>(var.tag()));
+
+        utils::Buffer& dst = ghost_nodes_.data[var];
+        auto recv_req = node_router_.irecv(dst, static_cast<MpiTag>(var.tag()));
 
         send_req.wait();
         recv_req.wait();

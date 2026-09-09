@@ -213,7 +213,7 @@ EuMesh body(EuMesh& mesh, int k) {
 
 void save_mesh(EuMesh& mesh) {
     Variables vars = {"level", "flag"};
-    vars.append("a", a);
+    vars.add_cell_data("a", a);
     //vars.append("ns", ns);
     //vars.append("ps", ps);
     //vars.append("es", es);
