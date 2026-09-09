@@ -121,7 +121,7 @@ void Migration::fill_migrant_cells(
     std::array<Buffer*, n_vars> data_src = cells.data[loc_vars];
     std::array<Buffer*, n_vars> data_dst = cell_buffer_.data[mig_vars];
 
-    for (index_t ic = 0; ic < cell_buffer_.size(); ++ic) {
+    for (index_t ic = 0; ic < cell_buffer_.n_cells(); ++ic) {
         int r = cells.rank[ic];
 
         index_t jc = cell_index[r];
@@ -183,7 +183,7 @@ void Migration::fill_migrant_nodes(
     auto node_index = node_router_.send_offset();
     auto inc_offset = inct_router_.send_offset();
 
-    for (index_t in = 0; in < node_buffer_.size(); ++in) {
+    for (index_t in = 0; in < node_buffer_.n_nodes(); ++in) {
         int r = nodes.rank[in];
         index_t jn = node_index[r];
 
@@ -260,13 +260,13 @@ void Migration::migrate(Tourism& tourism, AmrCells& cells, AmrNodes& nodes, Vars
 
     // Оптимизируем использование памяти, используем повторно массивы.
     // Запишем в faces.offsets и verts.offsets количество элементов на ячейку
-    for (index_t ic = 0; ic < cell_buffer_.size(); ++ic) {
+    for (index_t ic = 0; ic < cell_buffer_.n_cells(); ++ic) {
         cell_buffer_.faces.offsets[ic] = cell_buffer_.faces.offsets[ic + 1] - cell_buffer_.faces.offsets[ic];
         cell_buffer_.verts.offsets[ic] = cell_buffer_.verts.offsets[ic + 1] - cell_buffer_.verts.offsets[ic];
     }
 
     if (cells.has_nodes()) {
-        for (index_t in = 0; in < node_buffer_.size(); ++in) {
+        for (index_t in = 0; in < node_buffer_.n_nodes(); ++in) {
             node_buffer_.incident.offsets[in] = node_buffer_.incident.offsets[in + 1] - node_buffer_.incident.offsets[in];
         }
     }

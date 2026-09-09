@@ -741,7 +741,7 @@ int EuMesh::check_base() const {
     }
 
     int res = 0;
-    for (index_t ic = 0; ic < local_cells_.size(); ++ic) {
+    for (index_t ic = 0; ic < local_cells_.n_cells(); ++ic) {
         if (local_cells_.index[ic] < 0 || local_cells_.index[ic] != ic) {
             std::cout << "\tWrong cell index\n";
             return -1;
@@ -878,7 +878,7 @@ int EuMesh::check_refined() const {
     }
 
     int res = 0;
-    for (index_t ic = 0; ic < local_cells_.size(); ++ic) {
+    for (index_t ic = 0; ic < local_cells_.n_cells(); ++ic) {
         if (local_cells_.is_undefined(ic)) {
             std::cout << "\tUndefined cell\n";
             return -1;
@@ -1013,7 +1013,7 @@ EuCell_Iter EuMesh::begin() {
 }
 
 EuCell_Iter EuMesh::end() {
-    return {&local_cells_, local_cells_.size(),
+    return {&local_cells_, local_cells_.n_cells(),
         mpi_cond(&tourists_.ghost_cells(), nullptr) };
 }
 

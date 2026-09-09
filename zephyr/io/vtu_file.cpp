@@ -193,7 +193,7 @@ type_t nv_to_type3D(int nv) {
 std::vector<Vector3d> collect_points(const AmrCells& cells, index_t n_points) {
     std::vector<Vector3d> points(n_points);
     index_t iv = 0;
-    for (mesh::index_t ic = 0; ic < cells.size(); ++ic) {
+    for (mesh::index_t ic = 0; ic < cells.n_cells(); ++ic) {
         const Vector3d* vertices = cells.verts.coords_data(ic);
 
         int nv = cells.verts.count(ic);
@@ -250,7 +250,7 @@ void VtuStructure::fill(const AmrCells& cells, const DistNodes &nodes, bool poly
 
 void VtuStructure::fill_adaptive_hex_2D(const AmrCells& cells, const DistNodes &nodes) {
     index_t n_cells = cells.n_cells();
-    index_t n_points = 4 * cells.size();
+    index_t n_points = 4 * cells.n_cells();
 
     types.resize(n_cells, VTK_QUAD);
     if (nodes.empty()) {
@@ -342,7 +342,7 @@ void VtuStructure::fill_adaptive_poly_2D(const AmrCells& cells, const DistNodes&
 
 void VtuStructure::fill_adaptive_hex_3D(const AmrCells& cells, const DistNodes &nodes) {
     index_t n_cells = cells.n_cells();
-    index_t n_points = 8 * cells.size();
+    index_t n_points = 8 * cells.n_cells();
 
     types.resize(n_cells, VTK_HEXAHEDRON);
 

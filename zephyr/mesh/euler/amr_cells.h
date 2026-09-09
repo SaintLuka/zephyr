@@ -143,14 +143,11 @@ public:
     /// @brief Пустое хранилище?
     bool empty() const { return m_size == 0; }
 
-    /// @brief Число ячеек (не очевидно, что речь о ячейках)
-    index_t size() const { return m_size; }
-
     /// @brief Число ячеек (синоним)
     index_t n_cells() const { return m_size; }
 
     /// @brief Полное число граней
-    index_t n_faces() const { return faces.size(); }
+    index_t n_faces() const { return faces.n_faces(); }
 
     /// @brief Полное число вершин с дубликатами
     index_t n_verts() const { return verts.n_verts(); }

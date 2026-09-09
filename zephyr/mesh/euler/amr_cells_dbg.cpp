@@ -636,9 +636,9 @@ int AmrCells::check_connectivity(index_t ic, const AmrCells& ghosts) const {
         }
         else {
             // Удаленная ячейка
-            if (adj.ghost[iface] < 0 || adj.ghost[iface] >= ghosts.size()) {
+            if (adj.ghost[iface] < 0 || adj.ghost[iface] >= ghosts.n_cells()) {
                 std::cout << "\t" + f_name + ": adjacent.ghost out of range for remote cell\n";
-                std::cout << "\t\tghosts.size: " << ghosts.size() << "\n";
+                std::cout << "\t\tghosts.size: " << ghosts.n_cells() << "\n";
                 print_info(ic);
                 return -1;
             }

@@ -149,8 +149,8 @@ struct VicinityList {
     /// @param locals Ссылка на локальное хранилище
     /// @param ghosts Ссылка на хранилище ячеек с других процессов
     void fill(AmrCells& locals, AmrCells& ghosts) {
-        m_list.resize(locals.size());
-        threads::parallel_for(index_t{0}, index_t{locals.size()},
+        m_list.resize(locals.n_cells());
+        threads::parallel_for(index_t{0}, index_t{locals.n_cells()},
                 [this, &locals, &ghosts](index_t ic) {
                     m_list[ic].setup(ic, locals, ghosts);
                 });
@@ -226,7 +226,7 @@ bool update_flag(index_t ic, AmrCells& locals, const VicinityList<dim>& vicinity
 template <int dim>
 bool flag_balancing_step(AmrCells& locals, const VicinityList<dim>& vicinity_list) {
     // Функция max в данном контексте заменяет логическое "И"
-    range_t<index_t> range(0, locals.size());
+    range_t<index_t> range(0, locals.n_cells());
     return threads::max(
             range.begin(), range.end(),
             update_flag<dim>, std::ref(locals), std::ref(vicinity_list)

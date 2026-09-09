@@ -59,7 +59,6 @@ public:
     ///
     /// Супер важное замечание, в cells.verts.index должны быть индексы
     /// только локальные! Никаких глобальных.
-
     void update(AmrCells& cells, AmrNodes& nodes);
 
     /// @}

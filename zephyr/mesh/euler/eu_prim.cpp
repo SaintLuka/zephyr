@@ -7,28 +7,28 @@ namespace zephyr::mesh {
 EuFace_Iter::EuFace_Iter(
         AmrCells *cells, index_t face_idx, index_t face_end,
         AmrCells *ghosts, Direction dir)
-        : m_eu_face{cells, face_idx, ghosts},
-          m_face_end(face_end),
-          m_dir(dir) {
+        : face_{cells, face_idx, ghosts},
+          face_end_(face_end),
+          dir_(dir) {
 
-    while (m_eu_face.m_face_idx < m_face_end && to_skip(m_dir)) {
-        m_eu_face.m_face_idx += 1;
+    while (face_.face_idx_ < face_end_ && to_skip(dir_)) {
+        face_.face_idx_ += 1;
     }
 }
 
 EuFace_Iter &EuFace_Iter::operator++() {
     do {
-        m_eu_face.m_face_idx += 1;
-    } while (m_eu_face.m_face_idx < m_face_end && to_skip(m_dir));
+        face_.face_idx_ += 1;
+    } while (face_.face_idx_ < face_end_ && to_skip(dir_));
     return *this;
 }
 
 bool EuFace_Iter::operator!=(const EuFace_Iter &face) const {
-    return m_eu_face.m_face_idx != face.m_eu_face.m_face_idx;
+    return face_.face_idx_ != face.face_.face_idx_;
 }
 
 bool EuFace_Iter::to_skip(Direction dir) const {
-    return m_eu_face.m_cells->faces.to_skip(m_eu_face.m_face_idx, dir);
+    return face_.cells_->faces.to_skip(face_.face_idx_, dir);
 }
 
 EuFaces::EuFaces(
@@ -37,47 +37,41 @@ EuFaces::EuFaces(
         AmrCells *ghosts,
         Direction dir)
         :
-        m_begin(cells,
+        begin_(cells,
                 cells->faces.offsets[cell_idx],
                 cells->faces.offsets[cell_idx + 1],
                 ghosts, dir),
-        m_end(cells,
+        end_(cells,
               cells->faces.offsets[cell_idx + 1],
               cells->faces.offsets[cell_idx + 1],
               ghosts, dir) { }
 
 geom::Box EuCell::bbox() const {
-    return m_cells->bbox(m_index);
+    return cells_->bbox(index_);
 }
 
 geom::Polygon EuCell::polygon() const {
-    return m_cells->polygon(m_index);
+    return cells_->polygon(index_);
 }
 
 geom::Polyhedron EuCell::polyhedron() const {
-    return m_cells->polyhedron(m_index);
+    return cells_->polyhedron(index_);
 }
 
 EuCell EuCell::neib(index_t i, index_t j) const {
-    z_assert(m_cells->dim() == 2, "neib(i, j) error: not 2D mesh");
-    z_assert(m_cells != m_ghosts, "neib(i, j) error: assuming start from local cell");
-    z_assert(utils::mpi::single() || m_cells->has_nodes(), "neib(i, j) error: set nodes for distributed mesh");
-
-    bool A = i;
-    bool B = j;
-    if (A || (!A && B)) {
-
-    }
+    z_assert(cells_->dim() == 2, "neib(i, j) error: not 2D mesh");
+    z_assert(cells_ != ghosts_, "neib(i, j) error: assuming start from local cell");
+    z_assert(utils::mpi::single() || cells_->has_nodes(), "neib(i, j) error: set nodes for distributed mesh");
 
     // Начинаем с самой ячейки
-    AmrCells* cells = m_cells;
-    index_t idx = m_index;
+    AmrCells* cells = cells_;
+    index_t idx = index_;
 
     // Сдвинуться на соседа со стороны side
     auto moves = [&, this](Side2D side) {
         z_assert(cells->faces.is_simple(idx, side), "Not structured stencil (Side " + side.to_string() + ")");
         index_t iface = cells->faces.offsets[idx] + side;
-        std::tie(cells, idx) = cells->faces.adjacent.get_neib(iface, m_cells, m_ghosts);
+        std::tie(cells, idx) = cells->faces.adjacent.get_neib(iface, cells_, ghosts_);
     };
 
     // Переходы направо (ничего не делает при i < 0)
@@ -100,19 +94,19 @@ EuCell EuCell::neib(index_t i, index_t j) const {
 }
 
 EuCell EuCell::neib(index_t i, index_t j, index_t k) const {
-    z_assert(m_cells->dim() == 3, "neib(i, j, k) error: not 3D mesh");
-    z_assert(m_cells != m_ghosts, "neib(i, j, k) error: assuming start from local cell");
-    z_assert(utils::mpi::single() || m_cells->has_nodes(), "neib(i, j, k) error: set nodes for distributed mesh");
+    z_assert(cells_->dim() == 3, "neib(i, j, k) error: not 3D mesh");
+    z_assert(cells_ != ghosts_, "neib(i, j, k) error: assuming start from local cell");
+    z_assert(utils::mpi::single() || cells_->has_nodes(), "neib(i, j, k) error: set nodes for distributed mesh");
 
     // Начинаем с самой ячейки
-    AmrCells* cells = m_cells;
-    index_t idx = m_index;
+    AmrCells* cells = cells_;
+    index_t idx = index_;
 
     // Сдвинуться на соседа со стороны side
     auto moves = [&, this](Side3D side) {
         z_assert(cells->faces.is_simple(idx, side), "Not structured stencil (Side " + side.to_string() + ")");
         index_t iface = cells->faces.offsets[idx] + side;
-        std::tie(cells, idx) = cells->faces.adjacent.get_neib(iface, m_cells, m_ghosts);
+        std::tie(cells, idx) = cells->faces.adjacent.get_neib(iface, cells_, ghosts_);
     };
 
     // Переходы направо (ничего не делает при i < 0)

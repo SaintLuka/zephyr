@@ -31,10 +31,10 @@ void AmrIncident::resize(index_t n_nodes, index_t n_values) {
 }
 
 void AmrIncident::resize_amr(index_t n_nodes, int dim) {
-    z_assert(dim == 2 || dim == 3, "AmrIncident::resize: bad dimension");
+    z_assert(dim == 2 || dim == 3, "AmrIncident::resize_amr: bad dimension");
 
     index_t prev_size = role.size();
-    int inc_per_node = dim < 3 ? max_amr_count_2D : max_amr_count_3D;
+    int inc_per_node = max_incident_amr(dim);
     resize(n_nodes, n_nodes * inc_per_node);
     for (index_t i = prev_size; i < role.size(); ++i) {
         offsets[i + 1] = offsets[i] + inc_per_node;
@@ -53,7 +53,7 @@ void AmrIncident::reserve(index_t n_nodes, index_t n_values) {
 void AmrIncident::reserve_amr(index_t n_nodes, int dim) {
     z_assert(dim == 2 || dim == 3, "AmrIncident::reserve: bad dimension");
 
-    int inc_per_node = max_amr_count(dim);
+    int inc_per_node = max_incident_amr(dim);
     reserve(n_nodes, inc_per_node * n_nodes);
 }
 
@@ -245,7 +245,7 @@ NodeOwners find_owners(const AmrCells& cells, index_t ic0, role_t loc_iv0) {
 
             // Индекс соседа через грань
             index_t ic_n = cells.faces.adjacent.index[iface];
-            z_assert(ic_n < cells.size(), "Find owners: Out of range");
+            z_assert(ic_n < cells.n_cells(), "Find owners: Out of range");
 
             // Сосед уже есть в массиве
             if (owners.contains(ic_n)) continue;
@@ -294,7 +294,7 @@ AmrNodes::Incomplete AmrNodes::generate(const AmrCells& cells) {
     // TODO: Есть только наметки, как это сделать параллельно
 
     // Последовательная версия работает за один проход по ячейкам
-    index_t n_nodes_approx = nodes_estimation(cells.size(), cells.dim());
+    index_t n_nodes_approx = nodes_estimation(cells.n_cells(), cells.dim());
 
     nodes.coord.reserve(n_nodes_approx);
     if constexpr (complete) {
@@ -325,7 +325,7 @@ AmrNodes::Incomplete AmrNodes::generate(const AmrCells& cells) {
             int n_incident = owners.size();
             if (cells.adaptive()) {
                 // Для адаптивных строго фиксируется число инцидентных
-                n_incident = cells.dim() == 2 ? AmrIncident::max_amr_count_2D : AmrIncident::max_amr_count_3D;
+                n_incident = AmrIncident::max_incident_amr(cells.dim());
             }
 
             if constexpr (complete) {
@@ -392,7 +392,7 @@ int AmrNodes::check_nodes(const AmrCells& locals) const {
 }
 
 int AmrNodes::check_sizes() const {
-    int n_nodes = size();
+    int n_nodes = this->n_nodes();
     if (n_nodes < 1) {
         std::cout << "\tHas no unique nodes\n";
         return -1;
@@ -493,7 +493,7 @@ int AmrNodes::check_nodes(const AmrCells& locals, const AmrCells& ghosts, const 
                 std::cout << "\tGhost index >= 0 for single mpi run\n";
                 return -1;
             }
-            if (gst < 0 || gst >= ghost_nodes.size()) {
+            if (gst < 0 || gst >= ghost_nodes.n_nodes()) {
                 std::cout << "\tGhost vertex index out of range " << gst << "\n";
                 return -1;
             }
@@ -514,8 +514,7 @@ int AmrNodes::check_nodes(const AmrCells& locals, const AmrCells& ghosts, const 
     // Проверяем смежность
     for (index_t in = 0; in < n_nodes(); ++in) {
         if (locals.adaptive()) {
-            if ((locals.dim() == 2 && incident.max_count(in) != AmrIncident::max_amr_count_2D) ||
-                (locals.dim() == 3 && incident.max_count(in) != AmrIncident::max_amr_count_3D)) {
+            if (incident.max_count(in) != AmrIncident::max_incident_amr(locals.dim())) {
                 std::cout << "Wrong max count of incident cells: " << incident.max_count(in) << "\n";
                 return -1;
             }
@@ -538,7 +537,7 @@ int AmrNodes::check_nodes(const AmrCells& locals, const AmrCells& ghosts, const 
             }
             else if (gst < 0) {
                 // local incident cell
-                if (idx < 0 || idx >= locals.size()) {
+                if (idx < 0 || idx >= locals.n_cells()) {
                     std::cout << "\tLocal incident cell index out of range " << idx << " #1\n";
                     return -1;
                 }
@@ -569,7 +568,7 @@ int AmrNodes::check_nodes(const AmrCells& locals, const AmrCells& ghosts, const 
                     std::cout << "\tGhost incident cell index >= 0 for single mpi run\n";
                     return -1;
                 }
-                if (gst < 0 || gst >= ghosts.size()) {
+                if (gst < 0 || gst >= ghosts.n_cells()) {
                     std::cout << "\tGhost incident cell index out of range " << gst << "\n";
                     return -1;
                 }

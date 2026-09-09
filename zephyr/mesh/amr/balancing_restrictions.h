@@ -50,7 +50,7 @@ void base_restriction(index_t ic, AmrCells &locals, int max_level) {
 /// @param max_level Максимальный уровень адаптации
 template <int dim>
 void base_restrictions(AmrCells &locals, int max_level) {
-    threads::parallel_for(index_t{0}, index_t{locals.size()},
+    threads::parallel_for(index_t{0}, index_t{locals.n_cells()},
             base_restriction<dim>, std::ref(locals), max_level);
 }
 
@@ -60,7 +60,7 @@ void base_restrictions(AmrCells &locals, int max_level) {
 /// отличаться более, чем на один уровень.
 /// Функция вызывается только при включенной тщательной проверке.
 inline void check_flags(AmrCells& locals, AmrCells& ghosts, int max_level) {
-    for (index_t ic = 0; ic < locals.size(); ++ic) {
+    for (index_t ic = 0; ic < locals.n_cells(); ++ic) {
         int cell_wanted_lvl = locals.level[ic] + locals.flag[ic];
 
         if (cell_wanted_lvl < 0 || cell_wanted_lvl > max_level) {

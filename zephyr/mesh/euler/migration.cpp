@@ -66,7 +66,7 @@ void Migration::fill_cell_routers(const AmrCells& cells) {
     std::vector<index_t> cell_send_count(mpi::size(), 0);
     std::vector<index_t> face_send_count(mpi::size(), 0);
     std::vector<index_t> vert_send_count(mpi::size(), 0);
-    for (index_t ic = 0; ic < cells.size(); ++ic) {
+    for (index_t ic = 0; ic < cells.n_cells(); ++ic) {
         int new_rank = cells.rank[ic];
 
         // Число ячеек, граней и вершин, которые нужно переслать с данного процесса на другие
@@ -160,7 +160,7 @@ void Migration::cells_reindexing(Tourism& tourism, AmrCells& cells) const {
     }
 
     // Новые индексы ячеек (получатся после миграции)
-    for (index_t ic = 0; ic < cells.size(); ++ic) {
+    for (index_t ic = 0; ic < cells.n_cells(); ++ic) {
         cells.index[ic] = cell_index[cells.rank[ic]]++;
     }
 
@@ -194,7 +194,7 @@ void Migration::nodes_reindexing(Tourism& tourism, AmrNodes& nodes) const {
     }
 
     // Новые индексы узлов (получатся после миграции)
-    for (index_t in = 0; in < nodes.size(); ++in) {
+    for (index_t in = 0; in < nodes.n_nodes(); ++in) {
         nodes.index[in] = node_index[nodes.rank[in]]++;
     }
 
@@ -211,7 +211,7 @@ void Migration::nodes_reindexing(Tourism& tourism, AmrNodes& nodes) const {
 
 void Migration::update_face_adjacent(AmrCells& locals, const AmrCells& ghosts) {
     auto& faces = locals.faces;
-    for (index_t ic = 0; ic < locals.size(); ++ic) {
+    for (index_t ic = 0; ic < locals.n_cells(); ++ic) {
         for(auto iface: locals.faces.range(ic)){
             if (faces.is_undefined(iface))
                 continue;

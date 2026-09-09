@@ -22,17 +22,17 @@ class EuFace final {
     using Boundary = geom::Boundary;
 
 private:
-    AmrCells* m_cells;     //< Указатель на сетку (обычно locals)
-    index_t   m_face_idx;  //< Индекс первой грани
+    AmrCells* cells_;     //< Указатель на сетку (обычно locals)
+    index_t   face_idx_;  //< Индекс первой грани
 
     /// @brief Нулевое значение допускается, но не проверяется в целях
     /// оптимизации, поэтому ловите segfaults.
-    AmrCells* m_ghosts = nullptr;
+    AmrCells* ghosts_ = nullptr;
 
 public:
     /// @brief Основной конструктор
     EuFace(AmrCells* cells, index_t face_idx, AmrCells* ghosts = nullptr)
-        : m_cells(cells), m_face_idx(face_idx), m_ghosts(ghosts) { }
+        : cells_(cells), face_idx_(face_idx), ghosts_(ghosts) { }
 
     /// @{ @name Тип грани
 
@@ -157,9 +157,9 @@ public:
 
 /// @brief Итератор по граням ячейки
 class EuFace_Iter final {
-    EuFace    m_eu_face;   //< Действительная грань
-    index_t   m_face_end;  //< Индекс за последней гранью
-    Direction m_dir;       //< Выбранное направление граней
+    EuFace    face_;      //< Текущая грань
+    index_t   face_end_;  //< Индекс за последней гранью
+    Direction dir_;       //< Выбранное направление граней
 
 public:
     /// @brief Изолированная грань на стороне side,
@@ -168,10 +168,10 @@ public:
                 AmrCells* ghosts, Direction dir = Direction::ANY);
 
     /// @brief Ссылка на грань при разыменовании
-    EuFace &operator*() { return m_eu_face; }
+    EuFace &operator*() { return face_; }
 
     /// @brief Ссылка на грань при разыменовании
-    const EuFace &operator*() const { return m_eu_face; }
+    const EuFace &operator*() const { return face_; }
 
     /// @brief Перейти к следующей определенной грани
     EuFace_Iter &operator++();
@@ -187,17 +187,17 @@ public:
 
 /// @brief Интерфейс для итераций по граням ячейки
 class EuFaces final {
-    EuFace_Iter m_begin;
-    EuFace_Iter m_end;
+    EuFace_Iter begin_;
+    EuFace_Iter end_;
 
 public:
     EuFaces(AmrCells *cells, index_t cell_idx,
             AmrCells *ghosts = nullptr,
             Direction dir = Direction::ANY);
 
-    EuFace_Iter begin() const { return m_begin; }
+    EuFace_Iter begin() const { return begin_; }
 
-    EuFace_Iter end() const { return m_end; }
+    EuFace_Iter end() const { return end_; }
 };
 
 
@@ -217,19 +217,19 @@ class EuCell final {
     using SpFunction = std::function<double(const Vector3d &)>;
 
 private:
-    AmrCells* m_cells{nullptr};  //< Указатель на сетку (обычно locals)
-    index_t   m_index{-1};       //< Индекс ячейки
+    AmrCells* cells_{nullptr};  //< Указатель на сетку (обычно locals)
+    index_t   index_{-1};       //< Индекс ячейки
 
     /// @brief Нулевое значение допускается, но не проверяется в целях
     /// оптимизации, поэтому ловите segfaults.
-    AmrCells* m_ghosts{nullptr};
+    AmrCells* ghosts_{nullptr};
 
 public:
     /// @brief Конструктор по умолчанию (иногда требует TBB)
-    EuCell() = default;    
+    EuCell() = default;
 
     EuCell(AmrCells* cells, index_t index, AmrCells* ghosts = nullptr)
-        : m_cells(cells), m_index(index), m_ghosts(ghosts) { }
+        : cells_(cells), index_(index), ghosts_(ghosts) { }
 
     /// @{ @name Характеристики ячейки
 
@@ -273,7 +273,7 @@ public:
     void set_flag(int flag) const;
 
     /// @brief Хранилище, которому принадлежит ячейка
-    const AmrCells& cells() const { return *m_cells; }
+    const AmrCells& cells() const { return *cells_; }
 
     /// @}
 
@@ -281,9 +281,9 @@ public:
 
     /// @brief Центр ячейки
     const Vector3d& center() const;
-    double x() const { return m_cells->center[m_index].x(); }
-    double y() const { return m_cells->center[m_index].y(); }
-    double z() const { return m_cells->center[m_index].z(); }
+    double x() const { return cells_->center[index_].x(); }
+    double y() const { return cells_->center[index_].y(); }
+    double z() const { return cells_->center[index_].z(); }
 
     /// @brief Объем ячейки (площадь в двумерном случае)
     double volume() const;
@@ -392,7 +392,7 @@ public:
 
     /// @brief Вершины как набор узлов квадратичного отображения
     template <int dim>
-    const SqMap<dim>& mapping() const { return m_cells->verts.mapping<dim>(m_index); }
+    const SqMap<dim>& mapping() const { return cells_->verts.mapping<dim>(index_); }
 
     int node_rank(int iv) const;
     int node_index(int iv) const;
@@ -463,7 +463,7 @@ public:
 /// @brief Итератор по ячейкам из EuMesh или AmrCells
 class EuCell_Iter final {
 private:
-    EuCell m_eu_cell{};  ///< Реальная ячейка
+    EuCell cell_{};  ///< Реальная ячейка
 
 public:
     using iterator_category = std::random_access_iterator_tag;
@@ -477,64 +477,64 @@ public:
 
     /// @brief Конструктор как у ячейки
     EuCell_Iter(AmrCells *cells, index_t index, AmrCells *ghosts = nullptr)
-            : m_eu_cell{cells, index, ghosts} { }
+            : cell_{cells, index, ghosts} { }
 
     /// @brief Ссылка на ячейку при разыменовании
-    EuCell &operator*() { return m_eu_cell; }
+    EuCell &operator*() { return cell_; }
 
     /// @brief Ссылка на ячейку при разыменовании
-    const EuCell &operator*() const { return m_eu_cell; }
+    const EuCell &operator*() const { return cell_; }
 
     /// @brief Инкремент
     EuCell_Iter &operator++() {
-        ++m_eu_cell.m_index;
+        ++cell_.index_;
         return *this;
     }
 
     /// @brief Декремент
     EuCell_Iter &operator--() {
-        --m_eu_cell.m_index;
+        --cell_.index_;
         return *this;
     }
 
     /// @brief Итератор через step
     EuCell_Iter &operator+=(index_t step) {
-        m_eu_cell.m_index += step;
+        cell_.index_ += step;
         return *this;
     }
 
     /// @brief Итератор через step
     EuCell_Iter operator+(index_t step) const {
-        return {m_eu_cell.m_cells,
-                m_eu_cell.m_index + step,
-                m_eu_cell.m_ghosts};
+        return {cell_.cells_,
+                cell_.index_ + step,
+                cell_.ghosts_};
     }
 
     /// @brief Оператор доступа как для указателя (random access iterator)
     EuCell operator[](index_t offset) const {
-        return {m_eu_cell.m_cells,
-                m_eu_cell.m_index + offset,
-                m_eu_cell.m_ghosts};
+        return {cell_.cells_,
+                cell_.index_ + offset,
+                cell_.ghosts_};
     }
 
     /// @brief Расстояние между двумя ячейками
     index_t operator-(const EuCell_Iter &cell) const {
-        return m_eu_cell.m_index - cell.m_eu_cell.m_index;
+        return cell_.index_ - cell.cell_.index_;
     }
 
     /// @brief Оператор сравнения
     bool operator<(const EuCell_Iter &cell) const {
-        return m_eu_cell.m_index < cell.m_eu_cell.m_index;
+        return cell_.index_ < cell.cell_.index_;
     }
 
     /// @brief Оператор сравнения
     bool operator!=(const EuCell_Iter &cell) const {
-        return m_eu_cell.m_index != cell.m_eu_cell.m_index;
+        return cell_.index_ != cell.cell_.index_;
     }
 
     /// @brief Оператор сравнения
     bool operator==(const EuCell_Iter &cell) const {
-        return m_eu_cell.m_index == cell.m_eu_cell.m_index;
+        return cell_.index_ == cell.cell_.index_;
     }
 };
 
@@ -562,7 +562,7 @@ public:
     std::array<index_t, 8> index = {-1, -1, -1, -1, -1, -1, -1, -1};
 
     /// @brief Обязательная инициализация локального хранилища
-    explicit Children(AmrCells* locals) : m_locals(locals) { }
+    explicit Children(AmrCells* locals) : locals_(locals) { }
 
     /// @brief Размерность определяется по числу дочерних ячеек
     int dim() const { return index[4] < 0 ? 2 : 3; }
@@ -571,7 +571,7 @@ public:
     int count() const { return index[4] < 0 ? 4 : 8; }
 
     /// @brief Получить дочернюю ячейку по индексу
-    EuCell operator[](int idx) const { return {m_locals, index[idx], nullptr}; };
+    EuCell operator[](int idx) const { return {locals_, index[idx], nullptr}; };
 
     /// @brief Итератор по дочерним ячейкам
     struct iterator {
@@ -597,141 +597,141 @@ public:
     iterator end() const { return {*this, count()}; }
 
 private:
-    AmrCells* m_locals;  ///< Локальное хранилище с ячейками
+    AmrCells* locals_;  ///< Локальное хранилище с ячейками
 };
 
 // ================================================================================================
 //                                     inline функции EuFace
 // ================================================================================================
 
-inline geom::Boundary EuFace::flag() const { return m_cells->faces.boundary[m_face_idx]; }
+inline geom::Boundary EuFace::flag() const { return cells_->faces.boundary[face_idx_]; }
 
-inline bool EuFace::is_boundary() const { return m_cells->faces.is_boundary(m_face_idx); }
+inline bool EuFace::is_boundary() const { return cells_->faces.is_boundary(face_idx_); }
 
-inline bool EuFace::is_actual() const { return m_cells->faces.is_actual(m_face_idx); }
+inline bool EuFace::is_actual() const { return cells_->faces.is_actual(face_idx_); }
 
-inline bool EuFace::is_undefined() const { return m_cells->faces.is_undefined(m_face_idx); }
+inline bool EuFace::is_undefined() const { return cells_->faces.is_undefined(face_idx_); }
 
-inline void EuFace::set_undefined() const { m_cells->faces.set_undefined(m_face_idx); }
+inline void EuFace::set_undefined() const { cells_->faces.set_undefined(face_idx_); }
 
 inline void EuFace::set_boundary(Boundary flag) const {
     if (flag == Boundary::INNER || flag == Boundary::PERIODIC) {
         std::cerr << "You can't just set Ordinary or Periodic boundary flag\n";
     }
     else {
-        index_t basic = m_cells->faces.adjacent.basic[m_face_idx];
-        m_cells->faces.boundary[m_face_idx] = flag;
-        m_cells->faces.adjacent.rank[m_face_idx] = m_cells->rank[basic];
-        m_cells->faces.adjacent.index[m_face_idx] = basic;
-        m_cells->faces.adjacent.ghost[m_face_idx] = -1;
+        index_t basic = cells_->faces.adjacent.basic[face_idx_];
+        cells_->faces.boundary[face_idx_] = flag;
+        cells_->faces.adjacent.rank[face_idx_] = cells_->rank[basic];
+        cells_->faces.adjacent.index[face_idx_] = basic;
+        cells_->faces.adjacent.ghost[face_idx_] = -1;
     }
 }
 
-inline int EuFace::rotation() const { return m_cells->faces.adjacent.rotation[m_face_idx]; }
+inline int EuFace::rotation() const { return cells_->faces.adjacent.rotation[face_idx_]; }
 
-inline const geom::Vector3d &EuFace::normal() const { return m_cells->faces.normal[m_face_idx]; }
+inline const geom::Vector3d &EuFace::normal() const { return cells_->faces.normal[face_idx_]; }
 
-inline const geom::Vector3d &EuFace::center() const { return m_cells->faces.center[m_face_idx]; }
+inline const geom::Vector3d &EuFace::center() const { return cells_->faces.center[face_idx_]; }
 
 template <int dim >
 Side<dim> EuFace::side() const {
-    index_t cell_idx = m_cells->faces.adjacent.basic[m_face_idx];
-    return m_face_idx - m_cells->faces.offsets[cell_idx];
+    index_t cell_idx = cells_->faces.adjacent.basic[face_idx_];
+    return face_idx_ - cells_->faces.offsets[cell_idx];
 }
 
-inline double EuFace::area() const { return m_cells->faces.area[m_face_idx]; }
+inline double EuFace::area() const { return cells_->faces.area[face_idx_]; }
 
-inline geom::Vector3d EuFace::area_n() const { return m_cells->faces.area[m_face_idx] * m_cells->faces.normal[m_face_idx]; }
+inline geom::Vector3d EuFace::area_n() const { return cells_->faces.area[face_idx_] * cells_->faces.normal[face_idx_]; }
 
-inline double EuFace::area(bool axial) const { return m_cells->faces.get_area(m_face_idx, axial); }
+inline double EuFace::area(bool axial) const { return cells_->faces.get_area(face_idx_, axial); }
 
-inline double EuFace::area_as() const { return m_cells->faces.area_alt[m_face_idx]; }
+inline double EuFace::area_as() const { return cells_->faces.area_alt[face_idx_]; }
 
-inline int EuFace::n_vertices() const { return m_cells->faces.n_vertices(m_face_idx); }
+inline int EuFace::n_vertices() const { return cells_->faces.n_vertices(face_idx_); }
 
-inline index_t EuFace::vertex_index(int idx) const { return m_cells->faces.vertices[m_face_idx][idx]; }
+inline index_t EuFace::vertex_index(int idx) const { return cells_->faces.vertices[face_idx_][idx]; }
 
 inline index_t EuFace::node_index(int idx) const {
-    index_t cell_idx = m_cells->faces.adjacent.basic[m_face_idx];
-    return m_cells->verts.offsets[cell_idx] + static_cast<int>(m_cells->faces.vertices[m_face_idx][idx]);
+    index_t cell_idx = cells_->faces.adjacent.basic[face_idx_];
+    return cells_->verts.offsets[cell_idx] + static_cast<int>(cells_->faces.vertices[face_idx_][idx]);
 }
 
-inline geom::Vector3d EuFace::vs(int idx) const { return m_cells->verts[node_index(idx)]; }
+inline geom::Vector3d EuFace::vs(int idx) const { return cells_->verts[node_index(idx)]; }
 
 inline geom::Vector3d EuFace::symm_point(const Vector3d &p) const {
-    return m_cells->faces.symm_point(m_face_idx, p);
+    return cells_->faces.symm_point(face_idx_, p);
 }
 
-inline int EuFace::adj_rank() const { return m_cells->faces.adjacent.rank[m_face_idx]; }
+inline int EuFace::adj_rank() const { return cells_->faces.adjacent.rank[face_idx_]; }
 
-inline index_t EuFace::adj_index() const { return m_cells->faces.adjacent.index[m_face_idx]; }
+inline index_t EuFace::adj_index() const { return cells_->faces.adjacent.index[face_idx_]; }
 
-inline index_t EuFace::adj_ghost() const { return m_cells->faces.adjacent.ghost[m_face_idx]; }
+inline index_t EuFace::adj_ghost() const { return cells_->faces.adjacent.ghost[face_idx_]; }
 
-inline index_t EuFace::adj_basic() const { return m_cells->faces.adjacent.basic[m_face_idx]; }
+inline index_t EuFace::adj_basic() const { return cells_->faces.adjacent.basic[face_idx_]; }
 
 inline bool EuFace::local_neib() const {
-    return m_cells->faces.adjacent.is_local(m_face_idx);
+    return cells_->faces.adjacent.is_local(face_idx_);
 }
 
 inline EuCell EuFace::neib() const {
     if (utils::mpi::single() || local_neib()) {
-        return {m_cells, adj_index(), m_ghosts};
+        return {cells_, adj_index(), ghosts_};
     }
-    return {m_ghosts, adj_ghost(), m_ghosts};
+    return {ghosts_, adj_ghost(), ghosts_};
 }
 
 template <typename T>
 const T& EuFace::neib(Storable<T> type) const {
     if (utils::mpi::single() || local_neib()) {
-        return m_cells->data.get_val(type, adj_index());
+        return cells_->data.get_val(type, adj_index());
     }
-    return m_ghosts->data.get_val(type, adj_ghost());
+    return ghosts_->data.get_val(type, adj_ghost());
 }
 
 template <typename T>
 std::span<const T> EuFace::neib(Storable<T[]> type) const {
     if (utils::mpi::single() || local_neib()) {
-        return m_cells->data.get_val(type, adj_index());
+        return cells_->data.get_val(type, adj_index());
     }
-    return m_ghosts->data.get_val(type, adj_ghost());
+    return ghosts_->data.get_val(type, adj_ghost());
 }
 
 template <typename T, size_t N>
 std::span<const T, N> EuFace::neib(Storable<T[N]> type) const {
     if (utils::mpi::single() || local_neib()) {
-        return m_cells->data.get_val(type, adj_index());
+        return cells_->data.get_val(type, adj_index());
     }
-    return m_ghosts->data.get_val(type, adj_ghost());
+    return ghosts_->data.get_val(type, adj_ghost());
 }
 
 inline int EuFace::neib_flag() const {
     if (utils::mpi::single() || local_neib()) {
-        return m_cells->flag[adj_index()];
+        return cells_->flag[adj_index()];
     }
-    return m_ghosts->flag[adj_ghost()];
+    return ghosts_->flag[adj_ghost()];
 }
 
 inline geom::Vector3d EuFace::neib_center() const {
     if (utils::mpi::single() || local_neib()) {
-        return m_cells->center[adj_index()];
+        return cells_->center[adj_index()];
     }
-    return m_ghosts->center[adj_ghost()];
+    return ghosts_->center[adj_ghost()];
 }
 
 inline double EuFace::neib_volume() const {
     if (utils::mpi::single() || local_neib()) {
-        return m_cells->volume[adj_index()];
+        return cells_->volume[adj_index()];
     }
-    return m_ghosts->volume[adj_ghost()];
+    return ghosts_->volume[adj_ghost()];
 }
 
 inline double EuFace::neib_volume(bool axial) const {
     if (axial) {
         if (utils::mpi::single() || local_neib()) {
-            return m_cells->volume_alt[adj_index()];
+            return cells_->volume_alt[adj_index()];
         }
-        return m_ghosts->volume_alt[adj_ghost()];
+        return ghosts_->volume_alt[adj_ghost()];
     }
     return neib_volume();
 }
@@ -740,133 +740,133 @@ inline double EuFace::neib_volume(bool axial) const {
 //                                     inline функции EuCell
 // ================================================================================================
 
-inline int EuCell::dim() const { return m_cells->dim(); }
+inline int EuCell::dim() const { return cells_->dim(); }
 
-inline bool EuCell::adaptive() const { return m_cells->adaptive(); }
+inline bool EuCell::adaptive() const { return cells_->adaptive(); }
 
-inline int EuCell::rank() const { return m_cells->rank[m_index]; }
+inline int EuCell::rank() const { return cells_->rank[index_]; }
 
-inline int EuCell::flag() const { return m_cells->flag[m_index]; }
+inline int EuCell::flag() const { return cells_->flag[index_]; }
 
-inline int EuCell::level() const { return m_cells->level[m_index]; }
+inline int EuCell::level() const { return cells_->level[index_]; }
 
-inline index_t EuCell::b_idx() const { return m_cells->b_idx[m_index]; }
+inline index_t EuCell::b_idx() const { return cells_->b_idx[index_]; }
 
-inline index_t EuCell::z_idx() const { return m_cells->z_idx[m_index]; }
+inline index_t EuCell::z_idx() const { return cells_->z_idx[index_]; }
 
-inline index_t EuCell::id() const { return m_index; }
+inline index_t EuCell::id() const { return index_; }
 
-inline index_t EuCell::index() const { return m_cells->index[m_index]; }
+inline index_t EuCell::index() const { return cells_->index[index_]; }
 
-inline index_t EuCell::next() const { return m_cells->next[m_index]; }
+inline index_t EuCell::next() const { return cells_->next[index_]; }
 
-inline void EuCell::set_rank(int rank) const { m_cells->rank[m_index] = rank; }
+inline void EuCell::set_rank(int rank) const { cells_->rank[index_] = rank; }
 
-inline void EuCell::set_flag(int flag) const { m_cells->flag[m_index] = flag; }
+inline void EuCell::set_flag(int flag) const { cells_->flag[index_] = flag; }
 
-inline const geom::Vector3d& EuCell::center() const { return m_cells->center[m_index]; }
+inline const geom::Vector3d& EuCell::center() const { return cells_->center[index_]; }
 
-inline double EuCell::volume() const { return m_cells->volume[m_index]; }
+inline double EuCell::volume() const { return cells_->volume[index_]; }
 
-inline double EuCell::volume(bool axial) const { return m_cells->get_volume(m_index, axial); }
+inline double EuCell::volume(bool axial) const { return cells_->get_volume(index_, axial); }
 
-inline double EuCell::volume_as() const { return m_cells->volume_alt[m_index]; }
+inline double EuCell::volume_as() const { return cells_->volume_alt[index_]; }
 
-inline double EuCell::hx() const { return m_cells->hx(m_index); }
+inline double EuCell::hx() const { return cells_->hx(index_); }
 
-inline double EuCell::hy() const { return m_cells->hy(m_index); }
+inline double EuCell::hy() const { return cells_->hy(index_); }
 
-inline double EuCell::hz() const { return m_cells->hz(m_index); }
+inline double EuCell::hz() const { return cells_->hz(index_); }
 
-inline double EuCell::linear_size() const { return m_cells->linear_size(m_index); }
+inline double EuCell::linear_size() const { return cells_->linear_size(index_); }
 
-inline double EuCell::incircle_diameter() const { return m_cells->incircle_diameter(m_index); }
-
-template <typename T>
-T& EuCell::operator[](Storable<T> var) { return m_cells->data.get_val<T>(var, m_index); }
+inline double EuCell::incircle_diameter() const { return cells_->incircle_diameter(index_); }
 
 template <typename T>
-std::span<T> EuCell::operator[](Storable<T[]> var) { return m_cells->data.get_val<T>(var, m_index); }
+T& EuCell::operator[](Storable<T> var) { return cells_->data.get_val<T>(var, index_); }
+
+template <typename T>
+std::span<T> EuCell::operator[](Storable<T[]> var) { return cells_->data.get_val<T>(var, index_); }
 
 template <typename T, size_t N>
-std::span<T, N> EuCell::operator[](Storable<T[N]> var) { return m_cells->data.get_val<T>(var, m_index); }
+std::span<T, N> EuCell::operator[](Storable<T[N]> var) { return cells_->data.get_val<T>(var, index_); }
 
 template <typename T>
-const T& EuCell::operator[](Storable<T> var) const { return m_cells->data.get_val<T>(var, m_index); }
+const T& EuCell::operator[](Storable<T> var) const { return cells_->data.get_val<T>(var, index_); }
 
 template <typename T>
-std::span<const T> EuCell::operator[](Storable<T[]> var) const { return m_cells->data.get_val<T>(var, m_index); }
+std::span<const T> EuCell::operator[](Storable<T[]> var) const { return cells_->data.get_val<T>(var, index_); }
 
 template <typename T, size_t N>
-std::span<const T, N> EuCell::operator[](Storable<T[N]> var) const { return m_cells->data.get_val<T>(var, m_index); }
+std::span<const T, N> EuCell::operator[](Storable<T[N]> var) const { return cells_->data.get_val<T>(var, index_); }
 
 inline void EuCell::copy_data_to(EuCell &dst_cell) const {
-    m_cells->copy_data(m_index, dst_cell.m_cells, dst_cell.m_index);
+    cells_->copy_data(index_, dst_cell.cells_, dst_cell.index_);
 }
 
-inline int EuCell::face_count() const { return m_cells->face_count(m_index); }
+inline int EuCell::face_count() const { return cells_->face_count(index_); }
 
 inline EuFace EuCell::face(int idx) const {
-    return {m_cells, m_cells->faces.offsets[m_index] + idx, m_ghosts};
+    return {cells_, cells_->faces.offsets[index_] + idx, ghosts_};
 }
 
 inline EuFace EuCell::face(Side2D s) const {
-    return {m_cells, m_cells->faces.offsets[m_index] + s, m_ghosts};
+    return {cells_, cells_->faces.offsets[index_] + s, ghosts_};
 }
 
 inline EuFace EuCell::face(Side3D s) const {
-    return {m_cells, m_cells->faces.offsets[m_index] + s, m_ghosts};
+    return {cells_, cells_->faces.offsets[index_] + s, ghosts_};
 }
 
-inline bool EuCell::simple_face(Side2D s) const { return m_cells->faces.is_simple(m_index, s); }
+inline bool EuCell::simple_face(Side2D s) const { return cells_->faces.is_simple(index_, s); }
 
-inline bool EuCell::simple_face(Side3D s) const { return m_cells->faces.is_simple(m_index, s); }
+inline bool EuCell::simple_face(Side3D s) const { return cells_->faces.is_simple(index_, s); }
 
-inline bool EuCell::complex_face(Side2D s) const { return m_cells->faces.is_complex(m_index, s); }
+inline bool EuCell::complex_face(Side2D s) const { return cells_->faces.is_complex(index_, s); }
 
-inline bool EuCell::complex_face(Side3D s) const { return m_cells->faces.is_complex(m_index, s); }
+inline bool EuCell::complex_face(Side3D s) const { return cells_->faces.is_complex(index_, s); }
 
-inline EuFaces EuCell::faces(Direction dir) const { return {m_cells, m_index, m_ghosts, dir}; }
+inline EuFaces EuCell::faces(Direction dir) const { return {cells_, index_, ghosts_, dir}; }
 
-inline int EuCell::node_count() const { return m_cells->verts.count(m_index); }
+inline int EuCell::node_count() const { return cells_->verts.count(index_); }
 
 inline int EuCell::node_rank(int iv) const {
-    if (m_cells->verts.has_nodes()) {
-        return m_cells->verts.rank[m_cells->verts.offsets[m_index] + iv];
+    if (cells_->verts.has_nodes()) {
+        return cells_->verts.rank[cells_->verts.offsets[index_] + iv];
     }
     return utils::mpi::rank();
 }
 
 inline int EuCell::node_index(int iv) const {
-    if (m_cells->verts.has_nodes()) {
-        return m_cells->verts.index[m_cells->verts.offsets[m_index] + iv];
+    if (cells_->verts.has_nodes()) {
+        return cells_->verts.index[cells_->verts.offsets[index_] + iv];
     }
     return -13;
 }
 
 inline int EuCell::node_ghost(int iv) const {
-    if (m_cells->verts.has_nodes()) {
-        return m_cells->verts.ghost[m_cells->verts.offsets[m_index] + iv];
+    if (cells_->verts.has_nodes()) {
+        return cells_->verts.ghost[cells_->verts.offsets[index_] + iv];
     }
     return -1;
 }
 
-inline const geom::Vector3d* EuCell::vertices_data() const { return m_cells->verts.coords_data(m_index); }
+inline const geom::Vector3d* EuCell::vertices_data() const { return cells_->verts.coords_data(index_); }
 
 inline double EuCell::approx_vol_fraction(const SpFunction& inside) const {
-    return m_cells->approx_vol_fraction(m_index, inside);
+    return cells_->approx_vol_fraction(index_, inside);
 }
 
 inline double EuCell::volume_fraction(const SpFunction& inside, int n_points) const {
-    return m_cells->volume_fraction(m_index, inside, n_points);
+    return cells_->volume_fraction(index_, inside, n_points);
 }
 
 inline bool EuCell::const_function(const SpFunction& func) const {
-    return m_cells->const_function(m_index, func);
+    return cells_->const_function(index_, func);
 }
 
 inline double EuCell::integrate_low(const SpFunction& func, int n_points) const {
-    return m_cells->integrate_low(m_index, func, n_points);
+    return cells_->integrate_low(index_, func, n_points);
 }
 
 } // namespace zephyr::mesh

@@ -199,7 +199,7 @@ int main() {
     for (int n_step = 0; n_step <= 1000; ++n_step) {
         // redistribute на каждом 10-ом шаге
         if (n_step % 10 == 0) {
-            mesh.balancing(mesh.locals().size());
+            mesh.balancing(mesh.n_cells());
             mesh.redistribute();
         }
 

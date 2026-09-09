@@ -94,7 +94,7 @@ struct SwapLists {
     void set_mapping(AmrCells& locals) const {
         // Устанавливает тождественную перестановку для всех ячеек
         threads::parallel_for(
-            index_t{0}, index_t{locals.size()},
+            index_t{0}, index_t{locals.n_cells()},
             [&locals](index_t ic) {
                 locals.next[ic] = ic;
             });

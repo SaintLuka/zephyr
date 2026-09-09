@@ -624,13 +624,13 @@ void AmrCells::resize(index_t n_cells, index_t n_faces, index_t n_nodes) {
         z_assert(n_nodes == (dim_ < 3 ? 9 : 27) * n_cells, "bad sizes");
     }
     resize_cells(n_cells);
-    faces.resize(n_faces);
+    faces.resize(n_cells, n_faces);
     verts.resize(n_cells, n_nodes);
 }
 
 void AmrCells::reserve(index_t n_cells, index_t n_faces, index_t n_nodes) {
     reserve_cells(n_cells);
-    faces.reserve(n_faces);
+    faces.reserve(n_cells, n_faces);
     verts.reserve(n_cells, n_nodes);
 }
 
@@ -817,7 +817,7 @@ void AmrCells::push_back(const Polygon& poly) {
     assert(!adaptive_);
     assert(linear_);
 
-    index_t ic = size();
+    index_t ic = n_cells();
 
     resize_cells(ic + 1);
 
@@ -839,7 +839,7 @@ void AmrCells::push_back(const Polygon& poly) {
     int n_nodes = poly.size();
     int n_faces = poly.size();
 
-    faces.resize(faces.size() + n_faces);
+    faces.resize(ic + 1, faces.n_faces() + n_faces);
     verts.resize(ic + 1, verts.n_verts() + n_nodes);
 
     faces.offsets[ic + 1] = faces.offsets[ic] + n_faces;
@@ -884,7 +884,7 @@ void AmrCells::push_back_impl(const Polyhedron& poly) {
     assert(linear_);
     assert(!axial_);
 
-    index_t ic = size();
+    index_t ic = n_cells();
 
     resize_cells(ic + 1);
 
@@ -912,7 +912,7 @@ void AmrCells::push_back_impl(const Polyhedron& poly) {
 
     // Определим грани многогранника
     int n_faces = poly.n_faces();
-    faces.resize(faces.size() + n_faces);
+    faces.resize(ic + 1, faces.n_faces() + n_faces);
 
     faces.offsets[ic + 1] = faces.offsets[ic] + n_faces;
     for (int i = 0; i < poly.n_faces(); ++i) {
@@ -1064,10 +1064,10 @@ void AmrCells::backup(const std::filesystem::path& root, std::ofstream& file,
     }
 
     if (mpi::single()) {
-        file << tab << "\"size\":     " << size() << ",\n";
+        file << tab << "\"size\":     " << n_cells() << ",\n";
     }
     else {
-        auto sizes = mpi::all_gather(size());
+        auto sizes = mpi::all_gather(n_cells());
         if (mpi::master()) {
             file << tab << "\"sizes\": [";
             for (int i = 0; i < sizes.size() - 1; ++i) {

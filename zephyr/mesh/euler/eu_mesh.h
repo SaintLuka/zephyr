@@ -87,7 +87,7 @@ public:
     bool empty() const { return n_cells() == 0; }
 
     /// @brief Число ячеек на данном процессе
-    index_t n_cells() const { return local_cells_.size(); }
+    index_t n_cells() const { return local_cells_.n_cells(); }
 
     /// @brief Ограничивающий прямоугольник (кубоид) области
     geom::Box bbox() const;

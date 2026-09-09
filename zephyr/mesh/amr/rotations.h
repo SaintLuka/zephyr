@@ -375,7 +375,7 @@ using Map = std::conditional_t<dim == 2, Quad, Cube>;
 template <int dim>
 void find_rotations_impl(AmrCells& locals, const AmrCells& ghosts) {
     z_assert(locals.adaptive(), "find_rotations: not adaptive mesh");
-    for (index_t ic = 0; ic < locals.size(); ++ic) {
+    for (index_t ic = 0; ic < locals.n_cells(); ++ic) {
         Map<dim> map1 = locals.verts.mapping<dim>(ic).reduce();
 
         for (Side<dim> side: Side<dim>::items()) {

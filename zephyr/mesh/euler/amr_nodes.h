@@ -22,14 +22,6 @@ using role_t = std::int8_t;
 ///    ghost :    < 0             |    < ghosts.size
 class AmrIncident final {
 public:
-    static constexpr int max_amr_count_2D = 5;
-    static constexpr int max_amr_count_3D = 10;
-
-    static constexpr int max_amr_count(int dim) {
-        return dim < 3 ? max_amr_count_2D : max_amr_count_3D;
-    }
-
-
     /// @brief Эта структура имеет формат CSR, даны смещения
     std::vector<index_t> offsets = {0};
 
@@ -73,6 +65,11 @@ public:
 
     /// @brief Сжать буферы массивов до актуальных размеров
     void shrink_to_fit();
+
+    /// @brief Максимальное число инцидентных ячеек для AMR-сетки
+    static constexpr int max_incident_amr(int dim) {
+        return dim < 3 ? 5 : 10;
+    }
 
     /// @brief Число инцидентных ячеек, для адаптивной ячейки может быть меньше
     /// max_count, для неструктурированной ячейки (полигон или многогранник
@@ -148,9 +145,6 @@ public:
     bool empty() const { return coord.empty(); }
 
     /// @brief Число уникальных узлов
-    index_t size() const { return static_cast<index_t>(coord.size()); }
-
-    /// @brief Число уникальных узлов
     index_t n_nodes() const { return static_cast<index_t>(coord.size()); }
 
     /// @brief Размер списка инцидентных ячеек
@@ -177,13 +171,13 @@ public:
     /// @{ @name Топологические свойства узлов
 
     /// @brief Актуальный узел?
-    bool is_actual(index_t in) const { return index[in] >= 0; }
+    bool is_actual(index_t inode) const { return index[inode] >= 0; }
 
     /// @brief Узел к удалению
-    bool is_undefined(index_t in) const { return index[in] < 0; }
+    bool is_undefined(index_t inode) const { return index[inode] < 0; }
 
     /// @brief Устанавливает index = -1 (узел вне сетки)
-    void set_undefined(index_t in) { index[in] = -1; }
+    void set_undefined(index_t inode) { index[inode] = -1; }
 
     /// @}
 

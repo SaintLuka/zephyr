@@ -77,7 +77,7 @@ void EuMesh::balancing() {
     bool done = decomp_->exact_balancing(local_cells_.center);
     if (done) return;
 
-    double load = local_cells_.size();
+    double load = local_cells_.n_cells();
     balancing(load);
 #endif
 }

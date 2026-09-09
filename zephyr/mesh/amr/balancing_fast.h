@@ -237,7 +237,7 @@ struct CellsByLevel {
 private:
     /// @brief Однопоточный конструктор класса
     void serial_constructor(AmrCells& cells, int max_level) {
-        CellsByLevelPartial part(cells, max_level, 0, cells.size());
+        CellsByLevelPartial part(cells, max_level, 0, cells.n_cells());
         n_coarse = std::move(part.n_coarse);
         n_retain = std::move(part.n_retain);
         coarse = std::move(part.coarse);

@@ -109,14 +109,23 @@ public:
     /// @brief Пустые массивы по умолчанию
     AmrFaces() = default;
 
+    /// @brief Число ячеек
+    index_t n_cells() const { return static_cast<index_t>(offsets.size()) - 1; }
+
     /// @brief Число граней
-    index_t size() const { return boundary.size(); }
+    index_t n_faces() const { return boundary.size(); }
 
     /// @brief Изменить размер под число граней
-    void resize(index_t n_faces);
+    void resize(index_t n_cells, index_t n_faces);
+
+    /// @brief Изменить размер под число граней
+    void resize_amr(index_t n_cells, int dim);
 
     /// @brief Расширить буфер под число граней
-    void reserve(index_t n_faces);
+    void reserve(index_t n_cells, index_t n_faces);
+
+    /// @brief Расширить буфер под число граней
+    void reserve_amr(index_t n_cells, int dim);
 
     /// @brief Сжать до актуальных размеров
     void shrink_to_fit();

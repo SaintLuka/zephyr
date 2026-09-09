@@ -41,7 +41,8 @@ memory_t AmrAdjacent::memory_usage() const {
     return mem;
 }
 
-void AmrFaces::resize(index_t n_faces) {
+void AmrFaces::resize(index_t n_cells, index_t n_faces) {
+    offsets.resize(n_cells + 1, offsets.back());
     boundary.resize(n_faces);
     adjacent.resize(n_faces);
     normal.resize(n_faces);
@@ -51,7 +52,14 @@ void AmrFaces::resize(index_t n_faces) {
     vertices.resize(n_faces);
 }
 
-void AmrFaces::reserve(index_t n_faces) {
+void AmrFaces::resize_amr(index_t n_cells, int dim) {
+    z_assert(dim == 2 || dim == 3, "AmrFaces::resize_amr: bad dimension");
+    int n_faces = dim < 3 ? 8 : 24;
+    resize(n_cells, n_faces * n_cells);
+}
+
+void AmrFaces::reserve(index_t n_cells, index_t n_faces) {
+    offsets.reserve(n_cells + 1);
     boundary.reserve(n_faces);
     adjacent.reserve(n_faces);
     normal.reserve(n_faces);
@@ -61,7 +69,14 @@ void AmrFaces::reserve(index_t n_faces) {
     vertices.reserve(n_faces);
 }
 
+void AmrFaces::reserve_amr(index_t n_cells, int dim) {
+    z_assert(dim == 2 || dim == 3, "AmrFaces::resize_amr: bad dimension");
+    int n_faces = dim < 3 ? 8 : 24;
+    reserve(n_cells, n_faces * n_cells);
+}
+
 void AmrFaces::shrink_to_fit() {
+    offsets.shrink_to_fit();
     boundary.shrink_to_fit();
     adjacent.shrink_to_fit();
     normal.shrink_to_fit();

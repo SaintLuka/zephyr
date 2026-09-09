@@ -135,7 +135,7 @@ void Tourism::extend_border_cells() {
     index_t n_border_faces = face_router_.send_buffer_size();
     index_t n_border_verts = vert_router_.send_buffer_size();
 
-    if (n_border_cells > border_cells_.size()) {
+    if (n_border_cells > border_cells_.n_cells()) {
         border_cells_.resize(n_border_cells, n_border_faces, n_border_verts);
     }
 }
@@ -170,7 +170,7 @@ void Tourism::extend_ghost_cells() {
     int n_ghost_faces = face_router_.recv_buffer_size();
     int n_ghost_verts = vert_router_.recv_buffer_size();
 
-    if (n_ghost_cells > ghost_cells_.size()) {
+    if (n_ghost_cells > ghost_cells_.n_cells()) {
         ghost_cells_.resize(n_ghost_cells, n_ghost_faces, n_ghost_verts);
     }
 }
@@ -621,7 +621,7 @@ void Tourism::find_connections_verts(AmrVerts &verts, int rank) const {
                     std::cout << "Bad rank " << mpi::rank() << ", " << rnk << ", " << iv << ", " << idx << ", " << gst << "\n";
                     std::cout << "  v1: " << v1.transpose() << "; v2: " << v2.transpose() << "\n";
 
-                    for (int i = 0; i < ghost_nodes_.size(); ++i) {
+                    for (int i = 0; i < ghost_nodes_.n_nodes(); ++i) {
                         std::cout << "\t" << ghost_nodes_.rank[i] << "; " << ghost_nodes_.index[i] << "; " << ghost_nodes_.coord[i].transpose() << "\n";
                     }
                 }
@@ -1029,7 +1029,7 @@ void set_amr_indices(std::vector<index_t>& faces_beg, std::vector<index_t>& vert
 
 template <int dim>
 void set_amr_incident(std::vector<index_t>& offsets) {
-    constexpr int n_inc = AmrIncident::max_amr_count(dim);
+    constexpr int n_inc = AmrIncident::max_incident_amr(dim);
     threads::parallel_for(
         index_t{0}, index_t(offsets.size()),
         [&offsets](index_t ic) {
