@@ -5,7 +5,7 @@
 #include <iomanip>
 
 #include <zephyr/geom/generator/strip.h>
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/mesh.h>
 
 #include <zephyr/phys/tests/test_1D.h>
 #include <zephyr/math/solver/mm_fluid.h>
@@ -33,7 +33,7 @@ int main() {
     gen.set_size(1000);
 
     // Create mesh
-    EuMesh mesh(gen);
+    Mesh mesh(gen);
 
     // Test class provides materials
     MixturePT mixture = test.mixture_PT();
@@ -54,38 +54,38 @@ int main() {
     PvdFile pvd("mesh", "output");
 
     // Variables to save
-    pvd.variables += {"cln", [z](EuCell cell) -> double { return cell[z].mass_frac.index(); }};
-    pvd.variables += {"rho", [z](EuCell cell) -> double { return cell[z].density; }};
-    pvd.variables += {"u",   [z](EuCell cell) -> double { return cell[z].velocity.x(); }};
-    pvd.variables += {"e",   [z](EuCell cell) -> double { return cell[z].energy; }};
-    pvd.variables += {"P",   [z](EuCell cell) -> double { return cell[z].pressure; }};
-    pvd.variables += {"T",   [z](EuCell cell) -> double { return cell[z].temperature; }};
-    pvd.variables += {"b0",  [z](EuCell cell) -> double { return cell[z].mass_frac[0]; }};
-    pvd.variables += {"a0",  [z](EuCell cell) -> double { return cell[z].alpha(0); }};
+    pvd.variables += {"cln", [z](Cell cell) -> double { return cell[z].mass_frac.index(); }};
+    pvd.variables += {"rho", [z](Cell cell) -> double { return cell[z].density; }};
+    pvd.variables += {"u",   [z](Cell cell) -> double { return cell[z].velocity.x(); }};
+    pvd.variables += {"e",   [z](Cell cell) -> double { return cell[z].energy; }};
+    pvd.variables += {"P",   [z](Cell cell) -> double { return cell[z].pressure; }};
+    pvd.variables += {"T",   [z](Cell cell) -> double { return cell[z].temperature; }};
+    pvd.variables += {"b0",  [z](Cell cell) -> double { return cell[z].mass_frac[0]; }};
+    pvd.variables += {"a0",  [z](Cell cell) -> double { return cell[z].alpha(0); }};
 
     // Variables to save (exact solution)
     pvd.variables += {"rho.exact",
-                      [&test, &curr_time](EuCell cell) -> double {
+                      [&test, &curr_time](Cell cell) -> double {
                           return test.density_t(cell.center(), curr_time);
                       }};
     pvd.variables += {"u.exact",
-                      [&test, &curr_time](EuCell cell) -> double {
+                      [&test, &curr_time](Cell cell) -> double {
                           return test.velocity_t(cell.center(), curr_time).x();
                       }};
     pvd.variables += {"P.exact",
-                      [&test, &curr_time](EuCell cell) -> double {
+                      [&test, &curr_time](Cell cell) -> double {
                           return test.pressure_t(cell.center(), curr_time);
                       }};
     pvd.variables += {"e.exact",
-                      [&test, &curr_time](EuCell cell) -> double {
+                      [&test, &curr_time](Cell cell) -> double {
                           return test.energy_t(cell.center(), curr_time);
                       }};
     pvd.variables += {"T.exact",
-                      [&test, &curr_time](EuCell cell) -> double {
+                      [&test, &curr_time](Cell cell) -> double {
                           return test.temperature_t(cell.center(), curr_time);
                       }};
     pvd.variables += {"b0.exact",
-                      [&test, &curr_time](EuCell cell) -> double {
+                      [&test, &curr_time](Cell cell) -> double {
                           return test.fractions_t(cell.center(), curr_time)[0];
                       }};
 

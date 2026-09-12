@@ -20,7 +20,7 @@ constexpr int FpC(int dim) { return dim < 3 ? 4 : 6; }
 /// @brief Количество дочерних ячеек.
 constexpr int CpC(int dim) { return dim < 3 ? 4 : 8; }
 
-// Как хранится в AmrCells
+// Как хранится в RawCells
 using node_array = std::array<short, 8>;
 
 template <int size, typename container>

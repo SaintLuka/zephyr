@@ -2,8 +2,8 @@
 
 #include <boost/format.hpp>
 
-#include <zephyr/mesh/euler/eu_prim.h>
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/cell.h>
+#include <zephyr/mesh/mesh.h>
 #include <zephyr/math/cfd/limiter.h>
 #include <zephyr/phys/matter/eos/eos.h>
 #include <zephyr/math/cfd/fluxes.h>
@@ -12,8 +12,8 @@
 namespace zephyr::math {
 
 using geom::Vector3d;
-using mesh::EuCell;
-using mesh::EuMesh;
+using mesh::Cell;
+using mesh::Mesh;
 using mesh::Storable;
 using mesh::Direction;
 using mesh::Distributor;
@@ -67,7 +67,7 @@ public:
     ~MmFluid() = default;
 
     /// @brief Добавить типы на сетку
-    Parts add_types(EuMesh& mesh);
+    Parts add_types(Mesh& mesh);
 
     /// @brief Установить число Куранта
     void set_CFL(double CFL);
@@ -100,13 +100,13 @@ public:
     void set_max_dt(double dt);
 
     /// @brief Основная функция решателя, сделать шаг
-    void update(EuMesh &mesh);
+    void update(Mesh &mesh);
 
     /// @brief Сделать отсечение, построить поверхность
-    EuMesh domain(EuMesh& mesh, int idx) const;
+    Mesh domain(Mesh& mesh, int idx) const;
 
     /// @brief Установить флаги адаптации
-    void set_flags(EuMesh &mesh);
+    void set_flags(Mesh &mesh);
 
     /// @brief Распределитель данных при адаптации
     Distributor distributor() const;
@@ -115,41 +115,41 @@ public:
 
     /// @brief Посчитать шаг интегрирования по времени с учетом
     /// условия Куранта
-    void compute_dt(EuMesh &mesh);
+    void compute_dt(Mesh &mesh);
 
     /// @brief Проинтегрировать на шаг dt, вдоль направления dir
-    void integrate(EuMesh &mesh, double dt, Direction dir = Direction::ANY);
+    void integrate(Mesh &mesh, double dt, Direction dir = Direction::ANY);
 
     /// @brief Лимитированный градиент вектора состояния
-    void compute_grad(EuMesh &mesh, Storable<PState> U);
+    void compute_grad(Mesh &mesh, Storable<PState> U);
 
     /// @brief Лимитированный градиент объемных долей
-    void fractions_grad(EuMesh &mesh, Storable<PState> U);
+    void fractions_grad(Mesh &mesh, Storable<PState> U);
 
     /// @brief Подсеточная линейная реконструкция интерфейса
-    void interface_recovery(EuMesh &mesh);
+    void interface_recovery(Mesh &mesh);
 
     /// @brief Реконструкция PLIC для 2D/3D сеток из квадратов/кубов
-    void interface_recovery_CSIR_2D(EuMesh &mesh) const;
+    void interface_recovery_CSIR_2D(Mesh &mesh) const;
 
     /// @brief Реконструкция PLIC для 3D сеток из кубов
-    void interface_recovery_CSIR_3D(EuMesh &mesh) const;
+    void interface_recovery_CSIR_3D(Mesh &mesh) const;
 
     /// @brief Расчёт потоков с первым порядком
-    void fluxes(EuMesh &mesh, double dt, Direction dir = Direction::ANY);
+    void fluxes(Mesh &mesh, double dt, Direction dir = Direction::ANY);
 
     /// @brief Стадия предиктора при расчете со вторым порядком
-    void fluxes_stage1(EuMesh &mesh, double dt, Direction dir = Direction::ANY);
+    void fluxes_stage1(Mesh &mesh, double dt, Direction dir = Direction::ANY);
 
     /// @brief Стадия корректора при расчете со вторым порядком
-    void fluxes_stage2(EuMesh &mesh, double dt, Direction dir = Direction::ANY);
+    void fluxes_stage2(Mesh &mesh, double dt, Direction dir = Direction::ANY);
 
     /// @brief Обмен слоев
-    void swap(EuMesh &mesh);
+    void swap(Mesh &mesh);
 
     Flux calc_crp_flux(const PState& zL, const PState& zR, double hL, double hR, int iA, double a_sig, double dt);
 
-    Flux calc_flux(mesh::EuCell& cell, mesh::EuFace& face,
+    Flux calc_flux(mesh::Cell& cell, mesh::Face& face,
                    const PState& z_L, const PState& z_R,
                    double h_L, double h_R, double dt);
 

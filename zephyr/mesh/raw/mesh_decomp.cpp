@@ -2,14 +2,14 @@
 
 #include <zephyr/utils/mpi.h>
 #include <zephyr/geom/box.h>
-#include <zephyr/mesh/euler/eu_prim.h>
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/cell.h>
+#include <zephyr/mesh/mesh.h>
 
 namespace zephyr::mesh {
 
 using namespace zephyr::utils;
 
-void EuMesh::set_decomposition(Decomposition::Ref decmp, bool update) {
+void Mesh::set_decomposition(Decomposition::Ref decmp, bool update) {
 #ifdef ZEPHYR_MPI
     if (mpi::single()) return;
 
@@ -30,7 +30,7 @@ void EuMesh::set_decomposition(Decomposition::Ref decmp, bool update) {
 #endif
 }
 
-void EuMesh::set_decomposition(ORB& orb, bool update) {
+void Mesh::set_decomposition(ORB& orb, bool update) {
 #ifdef ZEPHYR_MPI
     if (mpi::single()) return;
 
@@ -41,7 +41,7 @@ void EuMesh::set_decomposition(ORB& orb, bool update) {
 #endif
 }
 
-void EuMesh::set_decomposition(const std::string& type, bool update) {
+void Mesh::set_decomposition(const std::string& type, bool update) {
 #ifdef ZEPHYR_MPI
     if (mpi::single()) return;
 
@@ -52,25 +52,25 @@ void EuMesh::set_decomposition(const std::string& type, bool update) {
 #endif
 }
 
-AmrNodes& EuMesh::ghost_nodes() {
+RawNodes& Mesh::ghost_nodes() {
 #ifndef ZEPHYR_MPI
-    static AmrNodes ghost_nodes;
+    static RawNodes ghost_nodes;
     return ghost_nodes;
 #else
     return tourists_.ghost_nodes();
 #endif
 }
 
-const AmrNodes& EuMesh::ghost_nodes() const {
+const RawNodes& Mesh::ghost_nodes() const {
 #ifndef ZEPHYR_MPI
-    static AmrNodes ghost_nodes;
+    static RawNodes ghost_nodes;
     return ghost_nodes;
 #else
     return tourists_.ghost_nodes();
 #endif
 }
 
-void EuMesh::balancing() {
+void Mesh::balancing() {
 #ifdef ZEPHYR_MPI
     if (mpi::single()) { return; }
 
@@ -82,7 +82,7 @@ void EuMesh::balancing() {
 #endif
 }
 
-void EuMesh::balancing(double load) {
+void Mesh::balancing(double load) {
 #ifdef ZEPHYR_MPI
     if (mpi::single()) { return; }
 
@@ -94,7 +94,7 @@ void EuMesh::balancing(double load) {
 #endif
 }
 
-void EuMesh::prebalancing(int n_iters) {
+void Mesh::prebalancing(int n_iters) {
 #ifdef ZEPHYR_MPI
     if (mpi::single()) return;
 
@@ -110,9 +110,9 @@ void EuMesh::prebalancing(int n_iters) {
 #endif
 }
 
-void EuMesh::setup_ranks() {
+void Mesh::setup_ranks() {
     // Определим новый rank для всех ячеек из locals
-    for_each([decomp=decomp_](const EuCell &cell) {
+    for_each([decomp=decomp_](const Cell &cell) {
         cell.set_rank(decomp->rank(cell));
     });
 }

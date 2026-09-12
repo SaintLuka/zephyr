@@ -20,7 +20,7 @@ RWalk::RWalk(const Box &domain, int size)
     }
 }
 
-int RWalk::rank(const EuCell &elem) const {
+int RWalk::rank(const Cell &elem) const {
     return diagram_.rank(elem.center()) % m_size;
 }
 

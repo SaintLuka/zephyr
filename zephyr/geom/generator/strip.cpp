@@ -10,7 +10,7 @@
 #include <zephyr/geom/primitives/quad.h>
 #include <zephyr/geom/generator/strip.h>
 #include <zephyr/utils/json.h>
-#include <zephyr/mesh/euler/amr_cells.h>
+#include <zephyr/mesh/raw/raw_cells.h>
 
 namespace zephyr::geom::generator {
 
@@ -152,16 +152,16 @@ Grid Strip::make() const {
     double y1 = y_min();
     double y2 = y_max();
 
-    std::vector nodes(2, std::vector<Node::Ptr>(nx_ + 1, nullptr));
+    std::vector nodes(2, std::vector<GNode::Ptr>(nx_ + 1, nullptr));
 
     Grid grid;
 
     grid.reserve_nodes(nx_ + 1);
     for (int i = 0; i <= nx_; ++i) {
-        nodes[0][i] = Node::create({nodes1D[i], y1, 0.0});
+        nodes[0][i] = GNode::create({nodes1D[i], y1, 0.0});
         grid.add_node(nodes[0][i]);
 
-        nodes[1][i] = Node::create({nodes1D[i], y2, 0.0});
+        nodes[1][i] = GNode::create({nodes1D[i], y2, 0.0});
         grid.add_node(nodes[1][i]);
     }
     nodes[0][0]->bc = bounds_.left;
@@ -181,7 +181,7 @@ Grid Strip::make() const {
     return grid;
 }
 
-AmrCells Strip::make_cells(bool unique_nodes) const {
+RawCells Strip::make_cells(bool unique_nodes) const {
     bool x_period = periodic_along_x();
 
     double y_min_ = y_min();
@@ -210,7 +210,7 @@ AmrCells Strip::make_cells(bool unique_nodes) const {
         throw std::runtime_error("Strange side #153");
     };
 
-    AmrCells cells({
+    RawCells cells({
         .dim = 2,
         .adaptive = true,
         .linear = true,

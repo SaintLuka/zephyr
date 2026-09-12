@@ -21,8 +21,8 @@ using namespace zephyr::math::smf;
 
 using zephyr::geom::generator::Strip;
 using zephyr::math::RiemannSolver;
-using zephyr::mesh::EuMesh;
-using zephyr::mesh::EuCell;
+using zephyr::mesh::Mesh;
+using zephyr::mesh::Cell;
 using zephyr::math::SmFluid;
 using zephyr::utils::threads;
 using zephyr::utils::mpi;
@@ -59,7 +59,7 @@ int main(int argc, char** argv) {
 #endif
 
     // Создать сетку
-    EuMesh mesh(gen);
+    Mesh mesh(gen);
 
     // Создать решатель
     SmFluid solver(eos);
@@ -79,41 +79,41 @@ int main(int argc, char** argv) {
 
     // Переменные для сохранения
     pvd.variables = {"level"};
-    pvd.variables += {"density",  [z](EuCell& cell) -> double { return cell[z].density; }};
-    pvd.variables += {"vel.x",    [z](EuCell& cell) -> double { return cell[z].velocity.x(); }};
-    pvd.variables += {"vel.y",    [z](EuCell& cell) -> double { return cell[z].velocity.y(); }};
-    pvd.variables += {"pressure", [z](EuCell& cell) -> double { return cell[z].pressure; }};
-    pvd.variables += {"energy",   [z](EuCell& cell) -> double { return cell[z].energy; }};
+    pvd.variables += {"density",  [z](Cell& cell) -> double { return cell[z].density; }};
+    pvd.variables += {"vel.x",    [z](Cell& cell) -> double { return cell[z].velocity.x(); }};
+    pvd.variables += {"vel.y",    [z](Cell& cell) -> double { return cell[z].velocity.y(); }};
+    pvd.variables += {"pressure", [z](Cell& cell) -> double { return cell[z].pressure; }};
+    pvd.variables += {"energy",   [z](Cell& cell) -> double { return cell[z].energy; }};
 
     pvd.variables += {"exact.dens",
-                      [&test, &curr_time](const EuCell &cell) -> double {
+                      [&test, &curr_time](const Cell &cell) -> double {
                           return test.density_t(cell.center(), curr_time);
                       }};
     pvd.variables += {"exact.velocity",
-                      [&test, &curr_time](const EuCell &cell) -> double {
+                      [&test, &curr_time](const Cell &cell) -> double {
                           return test.velocity_t(cell.center(), curr_time).x();
                       }};
     pvd.variables += {"exact.pres",
-                      [&test, &curr_time](const EuCell &cell) -> double {
+                      [&test, &curr_time](const Cell &cell) -> double {
                           return test.pressure_t(cell.center(), curr_time);
                       }};
     pvd.variables += {"exact.energy",
-                      [&test, &curr_time](const EuCell &cell) -> double {
+                      [&test, &curr_time](const Cell &cell) -> double {
                           return test.energy_t(cell.center(), curr_time);
                       }};
     pvd.variables += {"sound_speed",
-                      [&eos, z](const EuCell & cell) -> double {
+                      [&eos, z](const Cell & cell) -> double {
                           return eos->sound_speed_rP(cell[z].density, cell[z].pressure);
                       }};
     pvd.variables += {"exact.sound",
-                      [&eos, &test, &curr_time](const EuCell &cell) -> double {
+                      [&eos, &test, &curr_time](const Cell &cell) -> double {
                           double rho = test.density_t(cell.center(), curr_time);
                           double P = test.pressure_t(cell.center(), curr_time);
                           return eos->sound_speed_rP(rho, P);
                       }};
 
     // Начальные данные
-    auto init_cells = [&test, z](EuMesh& mesh) {
+    auto init_cells = [&test, z](Mesh& mesh) {
         for (auto cell: mesh) {
             cell[z].density  = test.density (cell.center());
             cell[z].velocity = test.velocity(cell.center());

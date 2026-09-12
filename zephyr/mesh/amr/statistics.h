@@ -59,7 +59,7 @@ struct Statistics {
     Statistics(const std::vector<int>& flags, int dim) {
         n_cells = flags.size();
 
-        scrutiny_check(n_cells >= 0, "Empty AmrStorage statistics");
+        scrutiny_check(n_cells >= 0, "Empty RawCells statistics");
 
         PartStatistics ps = threads::sum(
             flags.cbegin(), flags.cend(),

@@ -10,8 +10,8 @@
 namespace zephyr::mesh {
 template<typename T>
 class Storable;
-class EuCell;
-class EuNode;
+class Cell;
+class Node;
 }
 
 namespace zephyr::io {
@@ -21,16 +21,16 @@ namespace zephyr::io {
 /// Позволяет сократить размер выходного файла.
 /// @code
 /// WriteFunction<float> ev_energy =
-///     [](EuCell& cell, float* out) {
+///     [](Cell& cell, float* out) {
 ///         out[0] = static_cast<float>(cell.energy / 1.6e-19);
 ///     };
 /// @endcode
 template <typename T>
-using WriteCell = std::function<void(mesh::EuCell&, T*)>;
+using WriteCell = std::function<void(mesh::Cell&, T*)>;
 
 /// @brief Тип функции для записи переменных из узлов
 template <typename T>
-using WriteNode = std::function<void(mesh::EuNode&, T*)>;
+using WriteNode = std::function<void(mesh::Node&, T*)>;
 
 /// @brief Класс для записи переменных в VTU файл, каждой переменной для
 /// записи должен соответствовать экземпляр Variable.
@@ -55,7 +55,7 @@ public:
     /// позволяет записывать две компоненты импульса в формате Float32.
     /// @code
     /// Variable fd("momentum", 2,
-    ///     WriteFunction<float>([](EuCell& cell, float* out) {
+    ///     WriteFunction<float>([](Cell& cell, float* out) {
     ///         out[0] = static_cast<float>(cell.mass * cell.velocity.x);
     ///         out[1] = static_cast<float>(cell.mass * cell.velocity.y);
     ///     }));
@@ -65,7 +65,7 @@ public:
         name_ = name;
         type_ = VtkType::get<T>();
         n_components_ = n_components;
-        write_ = [func](mesh::EuCell &cell, void *out) {
+        write_ = [func](mesh::Cell &cell, void *out) {
             func(cell, static_cast<T *>(out));
         };
     }
@@ -75,7 +75,7 @@ public:
         name_ = name;
         type_ = VtkType::get<T>();
         n_components_ = n_components;
-        write_ = [func](mesh::EuNode &node, void *out) {
+        write_ = [func](mesh::Node &node, void *out) {
             func(node, static_cast<T *>(out));
         };
     }
@@ -102,10 +102,10 @@ public:
     bool node_data() const;
 
     /// @brief Основная функция класса. Запись переменной из ячейки в буфер.
-    void write(mesh::EuCell &cell, void *out) const;
+    void write(mesh::Cell &cell, void *out) const;
 
     /// @brief Основная функция класса. Запись переменной из узла в буфер.
-    void write(mesh::EuNode &node, void *out) const;
+    void write(mesh::Node &node, void *out) const;
 
 private:
     std::string name_;  ///< Имя переменной

@@ -8,8 +8,8 @@
 #include <zephyr/io/pvd_file.h>
 #include <zephyr/io/vtu_file.h>
 
-#include <zephyr/mesh/euler/eu_prim.h>
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/cell.h>
+#include <zephyr/mesh/mesh.h>
 
 namespace zephyr::io {
 
@@ -119,12 +119,12 @@ void PvdFile::open(std::string_view filename, std::string_view input_dir, bool d
     open_ = true;
 }
 
-void PvdFile::save(mesh::EuMesh& mesh, double timestep) {
+void PvdFile::save(mesh::Mesh& mesh, double timestep) {
     VtuFile::save(get_filename(), mesh, variables, options);
     update_pvd(timestep);
 }
 
-void PvdFile::save(mesh::AmrCells& elements, double timestep) {
+void PvdFile::save(mesh::RawCells& elements, double timestep) {
     VtuFile::save(get_filename(), elements, variables, options);
     update_pvd(timestep);
 }

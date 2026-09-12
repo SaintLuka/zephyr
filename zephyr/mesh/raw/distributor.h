@@ -4,18 +4,18 @@
 
 namespace zephyr::mesh {
 
-class EuCell;
+class Cell;
 class Children;
 
 /// @brief Функции для огрубления и распределения (физических) данных в ячейках
 /// при адаптации. Задаются пользователем.
-/// @ingroup euler-mesh
+/// @ingroup raw-mesh
 struct Distributor {
     /// @brief Тип функции, распределяющей данные между дочерними ячейками
-    using split_function = std::function<void(const EuCell&, Children&)>;
+    using split_function = std::function<void(const Cell&, Children&)>;
 
     /// @brief Тип функции, объединяющей данные дочерних ячеек
-    using merge_function = std::function<void(const Children&, EuCell&)>;
+    using merge_function = std::function<void(const Children&, Cell&)>;
 
     split_function split;  ///< Распределение данным между дочерними
     merge_function merge;  ///< Объединение данных дочерних ячеек
@@ -35,7 +35,7 @@ struct Distributor {
 
     /// @brief Создает дистрибутор, который использует функцию func для
     /// инициализации ячеек. Удобно для задания начальных данных
-    static Distributor initializer(std::function<void(EuCell&)> func);
+    static Distributor initializer(std::function<void(Cell&)> func);
 };
 
 } // namespace zephyr::mesh

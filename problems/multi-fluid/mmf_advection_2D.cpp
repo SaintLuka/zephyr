@@ -5,7 +5,7 @@
 #include <iomanip>
 
 #include <zephyr/geom/generator/rectangle.h>
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/mesh.h>
 
 #include <zephyr/phys/matter/eos/ideal_gas.h>
 #include <zephyr/phys/matter/eos/stiffened_gas.h>
@@ -66,7 +66,7 @@ int main() {
     gen.set_boundaries({Boundary::ZOE, Boundary::ZOE, Boundary::ZOE, Boundary::ZOE});
 
     // Create mesh
-    EuMesh mesh(gen);
+    Mesh mesh(gen);
 
     // Add data fields, choose main data layer
     auto data = solver.add_types(mesh);
@@ -78,23 +78,23 @@ int main() {
 
     // Variables to save
     pvd.variables = {"level"};
-    pvd.variables += {"cln", [z](EuCell cell) -> double { return cell[z].mass_frac.index(); }};
-    pvd.variables += {"rho", [z](EuCell cell) -> double { return cell[z].density; }};
-    pvd.variables += {"vx",  [z](EuCell cell) -> double { return cell[z].velocity.x(); }};
-    pvd.variables += {"vy",  [z](EuCell cell) -> double { return cell[z].velocity.y(); }};
-    pvd.variables += {"e",   [z](EuCell cell) -> double { return cell[z].energy; }};
-    pvd.variables += {"P",   [z](EuCell cell) -> double { return cell[z].pressure; }};
-    pvd.variables += {"T",   [z](EuCell cell) -> double { return cell[z].temperature; }};
-    pvd.variables += {"b0",  [z](EuCell cell) -> double { return cell[z].mass_frac[0]; }};
-    pvd.variables += {"b1",  [z](EuCell cell) -> double { return cell[z].mass_frac[1]; }};
-    pvd.variables += {"a0",  [z](EuCell cell) -> double { return cell[z].alpha(0); }};
-    pvd.variables += {"a1",  [z](EuCell cell) -> double { return cell[z].alpha(1); }};
-    pvd.variables += {"rho0",[z](EuCell cell) -> double { return cell[z].densities[0]; }};
-    pvd.variables += {"rho1",[z](EuCell cell) -> double { return cell[z].densities[1]; }};
-    pvd.variables += {"n.x", [n=data.n](EuCell cell) -> double { return cell[n][0].x(); }};
-    pvd.variables += {"n.y", [n=data.n](EuCell cell) -> double { return cell[n][0].y(); }};
+    pvd.variables += {"cln", [z](Cell cell) -> double { return cell[z].mass_frac.index(); }};
+    pvd.variables += {"rho", [z](Cell cell) -> double { return cell[z].density; }};
+    pvd.variables += {"vx",  [z](Cell cell) -> double { return cell[z].velocity.x(); }};
+    pvd.variables += {"vy",  [z](Cell cell) -> double { return cell[z].velocity.y(); }};
+    pvd.variables += {"e",   [z](Cell cell) -> double { return cell[z].energy; }};
+    pvd.variables += {"P",   [z](Cell cell) -> double { return cell[z].pressure; }};
+    pvd.variables += {"T",   [z](Cell cell) -> double { return cell[z].temperature; }};
+    pvd.variables += {"b0",  [z](Cell cell) -> double { return cell[z].mass_frac[0]; }};
+    pvd.variables += {"b1",  [z](Cell cell) -> double { return cell[z].mass_frac[1]; }};
+    pvd.variables += {"a0",  [z](Cell cell) -> double { return cell[z].alpha(0); }};
+    pvd.variables += {"a1",  [z](Cell cell) -> double { return cell[z].alpha(1); }};
+    pvd.variables += {"rho0",[z](Cell cell) -> double { return cell[z].densities[0]; }};
+    pvd.variables += {"rho1",[z](Cell cell) -> double { return cell[z].densities[1]; }};
+    pvd.variables += {"n.x", [n=data.n](Cell cell) -> double { return cell[n][0].x(); }};
+    pvd.variables += {"n.y", [n=data.n](Cell cell) -> double { return cell[n][0].y(); }};
 
-    mesh.for_each([&](EuCell &cell) {
+    mesh.for_each([&](Cell &cell) {
         const Vector3d V0 = {70.0, -35.0, 0.0};
 
         const PState z1(

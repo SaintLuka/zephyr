@@ -3,7 +3,7 @@
 #include <zephyr/geom/generator/block_structured.h>
 #include <zephyr/geom/grid.h>
 
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/mesh.h>
 #include <zephyr/io/vtu_file.h>
 
 #include <zephyr/geom/generator/sector.h>
@@ -298,7 +298,7 @@ int main() {
     //grid.make_amr();
 
 
-    EuMesh mesh(std::move(grid));
+    Mesh mesh(std::move(grid));
     VtuFile::save("mesh.vtu", mesh, Variables{"faces2D"});
 
     return 0;

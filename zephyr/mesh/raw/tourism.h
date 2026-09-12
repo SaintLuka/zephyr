@@ -6,9 +6,9 @@
 
 #include <vector>
 
-#include <zephyr/mesh/euler/router.h>
-#include <zephyr/mesh/euler/amr_cells.h>
-#include <zephyr/mesh/euler/amr_nodes.h>
+#include <zephyr/mesh/raw/router.h>
+#include <zephyr/mesh/raw/raw_cells.h>
+#include <zephyr/mesh/raw/raw_nodes.h>
 
 namespace zephyr::mesh {
 
@@ -21,7 +21,7 @@ public:
     Tourism() = default;
 
     /// @brief Синхронизует тип сетки и данных с основным хранилищем
-    void init_types(const AmrCells& cells);
+    void init_types(const RawCells& cells);
 
     /// @brief Сжать массивы до актуальных размеров
     void shrink_to_fit();
@@ -59,7 +59,7 @@ public:
     ///
     /// Супер важное замечание, в cells.verts.index должны быть индексы
     /// только локальные! Никаких глобальных.
-    void update(AmrCells& cells, AmrNodes& nodes);
+    void update(RawCells& cells, RawNodes& nodes);
 
     /// @}
 
@@ -69,33 +69,33 @@ public:
     /// @param cells Локальное хранилище ячеек
     /// @param vars Набор переменных типа Storable<T>
     template <typename... Args>
-    void sync(const AmrCells& cells, Args&&... vars);
+    void sync(const RawCells& cells, Args&&... vars);
 
     /// @brief Отправка/получение сеточных данных
     /// @param nodes Локальное хранилище узлов
     /// @param vars Набор переменных типа Storable<T>
     template <typename... Args>
-    void sync(const AmrNodes& nodes, Args&&... vars);
+    void sync(const RawNodes& nodes, Args&&... vars);
 
     /// @brief Отправка/получение сеточных данных
     /// @param cells Локальное хранилище ячеек
     template <MpiTag tag>
-    void sync(const AmrCells& cells);
+    void sync(const RawCells& cells);
 
     /// @brief Отправка/получение сеточных данных
     /// @param nodes Локальное хранилище узлов
     template <MpiTag tag>
-    void sync(const AmrNodes& nodes);
+    void sync(const RawNodes& nodes);
 
     /// @brief Скопировать данные из cells в border_cells_ (индексы, геометрия, ...)
     template <MpiTag tag>
-    void prepare(const AmrCells& cells) {
+    void prepare(const RawCells& cells) {
         throw std::runtime_error("prepare<" + to_string(tag) + "> is not implemented");
     }
 
     /// @brief Скопировать данные из nodes в border_nodes_ (индексы, геометрия, ...)
     template <MpiTag tag>
-    void prepare(const AmrNodes& nodes) {
+    void prepare(const RawNodes& nodes) {
         throw std::runtime_error("prepare<" + to_string(tag) + "> is not implemented");
     }
 
@@ -116,28 +116,28 @@ public:
     /// @{ @name get-функции
 
     /// @brief Ссылка на ghost-слой ячеек
-    AmrCells& ghost_cells() { return ghost_cells_; }
+    RawCells& ghost_cells() { return ghost_cells_; }
 
     /// @brief Ссылка на ghost-слой ячеек
-    const AmrCells& ghost_cells() const { return ghost_cells_; }
+    const RawCells& ghost_cells() const { return ghost_cells_; }
 
     /// @brief Ссылка на ghost-слой узлов
-    AmrNodes& ghost_nodes() { return ghost_nodes_; }
+    RawNodes& ghost_nodes() { return ghost_nodes_; }
 
     /// @brief Ссылка на ghost-слой узлов
-    const AmrNodes& ghost_nodes() const { return ghost_nodes_; }
+    const RawNodes& ghost_nodes() const { return ghost_nodes_; }
 
     /// @brief Ссылка на border-слой ячеек
-    AmrCells& border_cells() { return border_cells_; }
+    RawCells& border_cells() { return border_cells_; }
 
     /// @brief Ссылка на border-слой ячеек
-    const AmrCells& border_cells() const { return border_cells_; }
+    const RawCells& border_cells() const { return border_cells_; }
 
     /// @brief Ссылка на border-слой ячеек
-    AmrNodes& border_nodes() { return border_nodes_; }
+    RawNodes& border_nodes() { return border_nodes_; }
 
     /// @brief Ссылка на border-слой ячеек
-    const AmrNodes& border_nodes() const { return border_nodes_; }
+    const RawNodes& border_nodes() const { return border_nodes_; }
 
     /// @brief Маршрутизатор при обмене ячейками
     const Router& cell_router() const { return cell_router_; }
@@ -164,10 +164,10 @@ public:
     void setup_positions(const std::vector<index_t>& locals_next);
 
     /// @brief Переслать геометрию ячеек locals -> ghosts
-    void send_geometry(const AmrCells& cells);
+    void send_geometry(const RawCells& cells);
 
     /// @brief Восстановить индексы adj.index для локальных ячеек
-    void restore_indices(AmrCells& cells) const;
+    void restore_indices(RawCells& cells) const;
 
     /// @brief Изменить border хранилище под текущий Router
     void resize_border_cells();
@@ -192,11 +192,11 @@ public:
 private:
     // Копирует данные из local_cells_ в border_cells_
     template <typename T>
-    void prepare(const AmrCells& cells, Storable<T> var);
+    void prepare(const RawCells& cells, Storable<T> var);
 
     // Копирует данные из local_nodes_ в border_nodes_
     template <typename T>
-    void prepare(const AmrNodes& nodes, Storable<T> var);
+    void prepare(const RawNodes& nodes, Storable<T> var);
 
     // ------------------------------------------------------------------------
     //                             Функция update()
@@ -204,45 +204,45 @@ private:
 
     // Создает border-слой узлов, считает количество пересылаемых элементов,
     // копирует геометрию узлов из nodes в созданный border-слой узлов.
-    void build_border_nodes(const AmrNodes& nodes);
+    void build_border_nodes(const RawNodes& nodes);
 
     // Создает border-слой ячеек, считает количество пересылаемых элементов,
     // копирует геометрию ячеек из cells в созданный border-слой ячеек.
-    void build_border_cells(const AmrCells& cells, const AmrNodes& nodes);
+    void build_border_cells(const RawCells& cells, const RawNodes& nodes);
 
     // Считает количество примитивов для пересылки, заполняет величины
     // send_count в роутерах для узлов.
     // Требует выставленные nodes.incident.rank.
-    void fill_nodes_send_count(const AmrNodes& nodes);
+    void fill_nodes_send_count(const RawNodes& nodes);
 
     // Заполняет массивы индексов пересылаемых узлов.
     // Соответствует функции fill_nodes_send_count(nodes).
-    void fill_border_nodes_indices(const AmrNodes& nodes);
+    void fill_border_nodes_indices(const RawNodes& nodes);
 
     // Считает количество примитивов для пересылки, заполняет величины
     // send_count в роутерах для ячеек. Рассматривается окрестность Неймана.
     // Требует выставленные faces.adjacent.rank.
-    void fill_cells_send_count(const AmrCells& cells);
+    void fill_cells_send_count(const RawCells& cells);
 
     // Заполняет массивы индексов пересылаемых ячеек.
     // Соответствует функции fill_cells_send_count(cells).
-    void fill_border_cells_indices(const AmrCells& cells);
+    void fill_border_cells_indices(const RawCells& cells);
 
     // Считает количество примитивов для пересылки, заполняет величины
     // send_count в роутерах для ячеек. Рассматривается окрестность Мура.
     // Требует построенные ghost_nodes_, в них incident.rank, также
     // у cells.verts должны быть выставлены индексы (ghost, index).
-    void fill_cells_send_count(const AmrCells& cells, const AmrNodes& nodes);
+    void fill_cells_send_count(const RawCells& cells, const RawNodes& nodes);
 
     // Заполняет массивы индексов пересылаемых ячеек.
     // Соответствует функции fill_cells_send_count(cells, nodes).
-    void fill_border_cells_indices(const AmrCells& cells, const AmrNodes& nodes);
+    void fill_border_cells_indices(const RawCells& cells, const RawNodes& nodes);
 
     // Скопировать геометрию из nodes в border-узлы
-    void prepare_nodes_geometry(const AmrNodes& nodes);
+    void prepare_nodes_geometry(const RawNodes& nodes);
 
     // Скопировать геометрию из cells в border-ячейки
-    void prepare_cells_geometry(const AmrCells& cells);
+    void prepare_cells_geometry(const RawCells& cells);
 
     // Запаковать и отправить геометрию узлов
     void sync_nodes_geometry();
@@ -251,10 +251,10 @@ private:
     void sync_cells_geometry();
 
     // Построить с нуля border-слой, ghost-слой и выполнить обмен
-    void build_ghost_nodes(const AmrNodes &nodes);
+    void build_ghost_nodes(const RawNodes &nodes);
 
     // Построить с нуля border-слой, ghost-слой и выполнить обмен
-    void build_ghost_cells(const AmrCells& cells, const AmrNodes& nodes);
+    void build_ghost_cells(const RawCells& cells, const RawNodes& nodes);
 
     // Найти индекс ячейки в массиве ghost_cells_ со значениями (rank, index).
     // Предполагается, что ghost_cells_ упорядочены по rank и index.
@@ -266,17 +266,17 @@ private:
 
     // Найти окрестность Неймана. Выставляет на гранях индекс adjacent.ghost
     // для ячеек, у которых есть ghost-сосед.
-    void find_connections_neumann(AmrCells& cells, int rank) const;
+    void find_connections_neumann(RawCells& cells, int rank) const;
 
     // Выставляет у дублирующихся вершин правильные индексы verts.ghost
-    void find_connections_verts(AmrVerts &verts, int rank) const;
+    void find_connections_verts(RawVerts &verts, int rank) const;
 
     // Найти окрестность Мура. Выставляет индексы incident.ghost у узлов и
     // adjacent.ghost у ячеек. В отличие от окрестности Неймана выставляет
     // данные индексы также у узлов и ячеек, которые сами находятся
     // в ghost-слоях. Это позволяет в дальнейшем переходить от ghost-ячеек
     // ко всем соседям, которые есть на данном процессе.
-    void find_connections_moore(AmrCells& cells, AmrNodes& nodes, int rank);
+    void find_connections_moore(RawCells& cells, RawNodes& nodes, int rank);
 
     // ------------------------------------------------------------------------
     //                          AMR-приколы
@@ -300,8 +300,8 @@ private:
     // Хранилище для ячеек на отправку. Ячейки, которые отправляются на один
     // процесс, располагаются сплошным блоком. Ячейка может быть включена
     // в массив дважды, если отправляется нескольким процессам.
-    AmrCells border_cells_;
-    AmrCells ghost_cells_;
+    RawCells border_cells_;
+    RawCells ghost_cells_;
 
     // Маршрутизаторы для отправки примитивов из border_cells_.
     Router cell_router_;
@@ -314,11 +314,11 @@ private:
     // Хранилище уникальных узлов на отправку. Узлы, которые отправляются
     // на один процесс, располагаются сплошным блоком. Узел может быть включен
     // в массив дважды, если отправляется нескольким процессам.
-    AmrNodes border_nodes_;
+    RawNodes border_nodes_;
 
     // Хранилище для уникальных узлов, получаемых с других процессов.
     // Узлы упорядочены по рангу, а затем по возрастанию index (всегда ?).
-    AmrNodes ghost_nodes_;
+    RawNodes ghost_nodes_;
 
     // Маршрутизаторы для отправки примитивов из border_nodes
     Router node_router_;
@@ -382,7 +382,7 @@ void Tourism::swap_node_data(Storable<T> var1, Storable<T> var2) {
 }
 
 template <typename T>
-void Tourism::prepare(const AmrCells& cells, Storable<T> var) {
+void Tourism::prepare(const RawCells& cells, Storable<T> var) {
     const utils::Buffer& src = cells.data[var];
           utils::Buffer& dst = border_cells_.data[var];
 
@@ -392,7 +392,7 @@ void Tourism::prepare(const AmrCells& cells, Storable<T> var) {
 }
 
 template <typename T>
-void Tourism::prepare(const AmrNodes& nodes, Storable<T> var) {
+void Tourism::prepare(const RawNodes& nodes, Storable<T> var) {
     const utils::Buffer& src = nodes.data[var];
     utils::Buffer& dst = border_nodes_.data[var];
 
@@ -402,7 +402,7 @@ void Tourism::prepare(const AmrNodes& nodes, Storable<T> var) {
 }
 
 template <typename... Args>
-void Tourism::sync(const AmrCells& cells, Args&&... vars) {
+void Tourism::sync(const RawCells& cells, Args&&... vars) {
     static_assert(sizeof...(Args) > 0, "Tourism::sync, zero arguments");
     soa::assert_storable<Args...>();
     
@@ -423,7 +423,7 @@ void Tourism::sync(const AmrCells& cells, Args&&... vars) {
 }
 
 template <typename... Args>
-void Tourism::sync(const AmrNodes& nodes, Args&&... vars) {
+void Tourism::sync(const RawNodes& nodes, Args&&... vars) {
     static_assert(sizeof...(Args) > 0, "Tourism::sync, zero arguments");
     soa::assert_storable<Args...>();
 
@@ -447,42 +447,42 @@ void Tourism::sync(const AmrNodes& nodes, Args&&... vars) {
 
 
 template <> inline
-void Tourism::prepare<MpiTag::RANK>(const AmrCells& locals) {
+void Tourism::prepare<MpiTag::RANK>(const RawCells& locals) {
     for (size_t ic = 0; ic < border_cells_indices_.size(); ++ic) {
         border_cells_.rank[ic] = locals.rank[border_cells_indices_[ic]];
     }
 }
 
 template <> inline
-void Tourism::prepare<MpiTag::NEXT>(const AmrCells& locals) {
+void Tourism::prepare<MpiTag::NEXT>(const RawCells& locals) {
     for (size_t ic = 0; ic < border_cells_indices_.size(); ++ic) {
         border_cells_.next[ic] = locals.next[border_cells_indices_[ic]];
     }
 }
 
 template <> inline
-void Tourism::prepare<MpiTag::INDEX>(const AmrCells& locals) {
+void Tourism::prepare<MpiTag::INDEX>(const RawCells& locals) {
     for (size_t ic = 0; ic < border_cells_indices_.size(); ++ic) {
         border_cells_.index[ic] = locals.index[border_cells_indices_[ic]];
     }
 }
 
 template <> inline
-void Tourism::prepare<MpiTag::FLAG>(const AmrCells& locals) {
+void Tourism::prepare<MpiTag::FLAG>(const RawCells& locals) {
     for (size_t ic = 0; ic < border_cells_indices_.size(); ++ic) {
         border_cells_.flag[ic] = locals.flag[border_cells_indices_[ic]];
     }
 }
 
 template <> inline
-void Tourism::prepare<MpiTag::NODE_RANK>(const AmrNodes& locals) {
+void Tourism::prepare<MpiTag::NODE_RANK>(const RawNodes& locals) {
     for (size_t in = 0; in < border_nodes_indices_.size(); ++in) {
         border_nodes_.rank[in] = locals.rank[border_nodes_indices_[in]];
     }
 }
 
 template <> inline
-void Tourism::prepare<MpiTag::NODE_INDEX>(const AmrNodes& locals) {
+void Tourism::prepare<MpiTag::NODE_INDEX>(const RawNodes& locals) {
     for (size_t in = 0; in < border_nodes_indices_.size(); ++in) {
         border_nodes_.index[in] = locals.index[border_nodes_indices_[in]];
     }
@@ -539,7 +539,7 @@ Requests Tourism::irecv<MpiTag::NODE_INDEX>() {
 }
 
 template <MpiTag tag>
-void Tourism::sync(const AmrCells& cells) {
+void Tourism::sync(const RawCells& cells) {
     prepare<tag>(cells);
     auto send_req = isend<tag>();
     auto recv_req = irecv<tag>();
@@ -549,7 +549,7 @@ void Tourism::sync(const AmrCells& cells) {
 }
 
 template <MpiTag tag>
-void Tourism::sync(const AmrNodes& nodes) {
+void Tourism::sync(const RawNodes& nodes) {
     prepare<tag>(nodes);
     auto send_req = isend<tag>();
     auto recv_req = irecv<tag>();

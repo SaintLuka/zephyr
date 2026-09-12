@@ -53,7 +53,7 @@ void Transfer::set_dim(int dim) {
     m_dim = std::max(2, std::min(dim, 3));
 }
 
-Transfer::State Transfer::add_types(EuMesh& mesh) {
+Transfer::State Transfer::add_types(Mesh& mesh) {
     data.u1 = mesh.add<double>("u1");
     data.u2 = mesh.add<double>("u2");
     data.n = mesh.add<Vector3d>("n");
@@ -84,7 +84,7 @@ void Transfer::set_plic_type(Plic::Type type) {
     }
 
     m_plic = Plic(m_dim, true, type,
-        [&u=data.u1](const EuCell& cell, int idx) -> double {
+        [&u=data.u1](const Cell& cell, int idx) -> double {
             return cell[u];
         });
 }
@@ -105,7 +105,7 @@ Vector3d Transfer::velocity(const Vector3d &c) const {
     return Vector3d::UnitX();
 }
 
-double Transfer::compute_dt(EuCell &cell) const {
+double Transfer::compute_dt(Cell &cell) const {
     double max_area = 0.0;
     for (auto &face: cell.faces()) {
         max_area = std::max(max_area, face.area());
@@ -114,7 +114,7 @@ double Transfer::compute_dt(EuCell &cell) const {
     return dx / velocity(cell.center()).norm();
 }
 
-double Transfer::compute_dt(EuMesh &mesh) const {
+double Transfer::compute_dt(Mesh &mesh) const {
     double tau = std::numeric_limits<double>::max();
     for (auto &cell: mesh) {
         tau = std::min(tau, compute_dt(cell));
@@ -140,7 +140,7 @@ double flux_2D(double a1, double a2, double S, double V1, double V2, double as, 
 }
 
 // Точная доля отсечения от грани для заданной плоскости
-double face_fraction_n1(EuCell& cell, EuCell& neib, EuFace& face, double vn, const Transfer::State& data) {
+double face_fraction_n1(Cell& cell, Cell& neib, Face& face, double vn, const Transfer::State& data) {
     // Реконструкция в ячейке
     obj::plane plane{
         .p = vn > 0.0 ? cell[data.p] + cell.center().dot(cell[data.n]) : neib[data.p] + neib.center().dot(neib[data.n]),
@@ -207,7 +207,7 @@ double best_face_fraction(double a1, double a2, double S, double vn, double dt, 
     return between(Flux / (dt * vn * S), a_min, a_max);
 }
 
-double flux_CRP(EuCell& cell, EuCell& neib, EuFace& face, double vn, double dt, double Flux, const Transfer::State& data) {
+double flux_CRP(Cell& cell, Cell& neib, Face& face, double vn, double dt, double Flux, const Transfer::State& data) {
     double a1 = cell[data.u1];
     double a2 = neib[data.u1];
 
@@ -221,7 +221,7 @@ double flux_CRP(EuCell& cell, EuCell& neib, EuFace& face, double vn, double dt, 
     return flux_2D(a1, a2, S, vol1, vol2, a_sig, vn, dt);
 }
 
-void Transfer::fluxes_CRP(EuCell &cell, Direction dir) const {
+void Transfer::fluxes_CRP(Cell &cell, Direction dir) const {
     double a1 = cell[data.u1];
     Vector3d n1 = cell[data.n];
 
@@ -275,7 +275,7 @@ void Transfer::fluxes_CRP(EuCell &cell, Direction dir) const {
 // V1, V2 -- скорость в узлах грани
 // fn -- нормаль к грани
 // Предполагаем (V1 + V2).dot(fn) > 0.0
-double flux_VOF(EuCell &cell, EuFace &face,
+double flux_VOF(Cell &cell, Face &face,
         const Vector3d& V1, const Vector3d& V2,
         double dt, const Vector3d& fn, const Transfer::State& data) {
 
@@ -316,7 +316,7 @@ double flux_VOF(EuCell &cell, EuFace &face,
     }
 }
 
-void Transfer::fluxes_VOF(EuCell &cell, Direction dir) const {
+void Transfer::fluxes_VOF(Cell &cell, Direction dir) const {
     double fluxes = 0.0;
     for (auto &face: cell.faces(dir)) {
         if (face.is_boundary()) {
@@ -364,7 +364,7 @@ void Transfer::fluxes_VOF(EuCell &cell, Direction dir) const {
     cell[data.u2] = cell[data.u1] - fluxes / cell.volume();
 }
 
-void Transfer::fluxes_MUSCL(EuCell &cell, Direction dir) const {
+void Transfer::fluxes_MUSCL(Cell &cell, Direction dir) const {
     double fluxes = 0.0;
     for (auto &face: cell.faces(dir)) {
         if (face.is_boundary()) {
@@ -423,7 +423,7 @@ void Transfer::fluxes_MUSCL(EuCell &cell, Direction dir) const {
     cell[data.u2] = cell[data.u1] - fluxes / cell.volume();
 }
 
-void Transfer::compute_slopes(EuMesh& mesh) const {
+void Transfer::compute_slopes(Mesh& mesh) const {
     if (m_method == Method::MUSCLn ||
         m_method == Method::MUSCLn_CRP) {
         for (auto cell: mesh) {
@@ -449,7 +449,7 @@ void Transfer::compute_slopes(EuMesh& mesh) const {
     }
 
     auto u1 = data.u1;
-    auto get_state = [u1](EuCell& cell) -> double {
+    auto get_state = [u1](Cell& cell) -> double {
         return cell[u1];
     };
     auto boundary_value = [](double u, const Vector3d& n, Boundary b) -> double {
@@ -469,7 +469,7 @@ void Transfer::compute_slopes(EuMesh& mesh) const {
     }
 }
 
-void Transfer::update(EuMesh &mesh, Direction dir) {
+void Transfer::update(Mesh &mesh, Direction dir) {
     if (CRP_type(m_method)) {
         update_CRP(mesh, dir);
     }
@@ -487,14 +487,14 @@ void Transfer::update(EuMesh &mesh, Direction dir) {
     }
 }
 
-void Transfer::update_CRP(EuMesh& mesh, Direction dir) const {
+void Transfer::update_CRP(Mesh& mesh, Direction dir) const {
     // Считаем потоки
-    mesh.for_each([&](EuCell& cell) {
+    mesh.for_each([&](Cell& cell) {
         fluxes_CRP(cell, dir);
     });
 
     // Обновляем слои
-    mesh.for_each([this](EuCell& cell) {
+    mesh.for_each([this](Cell& cell) {
         cell[data.u1] = between(cell[data.u2], 0.0, 1.0);
         cell[data.u2] = 0.0;
     });
@@ -503,7 +503,7 @@ void Transfer::update_CRP(EuMesh& mesh, Direction dir) const {
     update_interface(mesh, 0);
 }
 
-void Transfer::update_VOF(EuMesh& mesh, Direction dir) {
+void Transfer::update_VOF(Mesh& mesh, Direction dir) {
     // Считаем потоки
     for (auto cell: mesh) {
         fluxes_VOF(cell, dir);
@@ -518,7 +518,7 @@ void Transfer::update_VOF(EuMesh& mesh, Direction dir) {
     update_interface(mesh);
 }
 
-void Transfer::update_MUSCL(EuMesh& mesh, Direction dir) const {
+void Transfer::update_MUSCL(Mesh& mesh, Direction dir) const {
     compute_slopes(mesh);
 
     // Считаем потоки
@@ -535,7 +535,7 @@ void Transfer::update_MUSCL(EuMesh& mesh, Direction dir) const {
     update_interface(mesh);
 }
 
-void Transfer::update_WENO(EuMesh& mesh, Direction dir) const {
+void Transfer::update_WENO(Mesh& mesh, Direction dir) const {
     if (mesh.dim() == 3) {
         throw std::runtime_error("NO WENO");
     }
@@ -666,16 +666,16 @@ void Transfer::update_WENO(EuMesh& mesh, Direction dir) const {
     update_interface(mesh);
 }
 
-void Transfer::update_interface(EuMesh& mesh, int smoothing) const {
-    mesh.for_each([this](EuCell& cell) {
+void Transfer::update_interface(Mesh& mesh, int smoothing) const {
+    mesh.for_each([this](Cell& cell) {
         auto [p, n] = m_plic.plane(cell, 0);
         cell[data.p] = p;
         cell[data.n] = n;
     });
 }
 
-void Transfer::set_flags(EuMesh& mesh) const {
-    mesh.for_each([this](EuCell& cell) {
+void Transfer::set_flags(Mesh& mesh) const {
+    mesh.for_each([this](Cell& cell) {
         double min_val = cell[data.u1];
         double max_val = cell[data.u1];
 
@@ -704,13 +704,13 @@ Distributor Transfer::distributor() const {
 
     auto u1 = data.u1;
 
-    distr.split = [u1](const EuCell& parent, Children &children) {
+    distr.split = [u1](const Cell& parent, Children &children) {
         for (auto child: children) {
             child[u1] = parent[u1];
         }
     };
 
-    distr.merge = [u1](const Children &children, EuCell& parent) {
+    distr.merge = [u1](const Children &children, Cell& parent) {
         double sum = 0.0;
         for (auto child: children) {
             sum += child[u1] * child.volume();
@@ -727,14 +727,14 @@ Distributor Transfer::distributor() const {
     return distr;
 }
 
-EuMesh Transfer::body(EuMesh& mesh) const {
-    auto empty_cell = [this](EuCell& cell) -> bool {
+Mesh Transfer::body(Mesh& mesh) const {
+    auto empty_cell = [this](Cell& cell) -> bool {
         return cell[data.u1] <= 1.0e-12 || (cell[data.u1] < 0.5 && cell[data.n].isZero());
     };
 
     using Eigen::Vector3i;
 
-    Vector3i count = mesh.sum([&empty_cell](EuCell& cell) -> Vector3i {
+    Vector3i count = mesh.sum([&empty_cell](Cell& cell) -> Vector3i {
         if (empty_cell(cell)) {
             return {0, 0, 0};
         }
@@ -745,7 +745,7 @@ EuMesh Transfer::body(EuMesh& mesh) const {
     int n_faces = count[1];
     int n_nodes = count[2];
 
-    EuMesh clipped = EuMesh::PolySet(mesh.dim());
+    Mesh clipped = Mesh::PolySet(mesh.dim());
     clipped.locals().reserve(n_cells, n_faces, n_nodes);
 
     if (mesh.dim() == 2) {

@@ -18,7 +18,7 @@ namespace zephyr::mesh::amr {
 //   locals    -- Локальное хранилище ячеек
 //   max_level -- Максимальный уровень адаптации
 template<int dim>
-void base_restriction(index_t ic, AmrCells &locals, int max_level) {
+void base_restriction(index_t ic, RawCells &locals, int max_level) {
     scrutiny_check(ic < locals.size(), "base_restrictions: ic >= cells.size()")
 
     int flag = locals.flag[ic];
@@ -49,7 +49,7 @@ void base_restriction(index_t ic, AmrCells &locals, int max_level) {
 /// @brief Выполняет функцию base_restriction для всех ячеек хранилища
 /// @param max_level Максимальный уровень адаптации
 template <int dim>
-void base_restrictions(AmrCells &locals, int max_level) {
+void base_restrictions(RawCells &locals, int max_level) {
     threads::parallel_for(index_t{0}, index_t{locals.n_cells()},
             base_restriction<dim>, std::ref(locals), max_level);
 }
@@ -59,7 +59,7 @@ void base_restrictions(AmrCells &locals, int max_level) {
 /// огрубиться тоже вместе. Уровни смежных ячеек после адаптации не должны
 /// отличаться более, чем на один уровень.
 /// Функция вызывается только при включенной тщательной проверке.
-inline void check_flags(AmrCells& locals, AmrCells& ghosts, int max_level) {
+inline void check_flags(RawCells& locals, RawCells& ghosts, int max_level) {
     for (index_t ic = 0; ic < locals.n_cells(); ++ic) {
         int cell_wanted_lvl = locals.level[ic] + locals.flag[ic];
 
@@ -105,8 +105,8 @@ inline void check_flags(AmrCells& locals, AmrCells& ghosts, int max_level) {
     }
 }
 
-inline void check_flags(AmrCells& cells, int max_level) {
-    AmrCells ghosts;
+inline void check_flags(RawCells& cells, int max_level) {
+    RawCells ghosts;
     check_flags(cells, ghosts, max_level);
 }
 

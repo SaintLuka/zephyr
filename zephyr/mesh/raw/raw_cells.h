@@ -5,8 +5,8 @@
 
 #include <zephyr/geom/side.h>
 #include <zephyr/mesh/storage.h>
-#include <zephyr/mesh/euler/amr_verts.h>
-#include <zephyr/mesh/euler/amr_faces.h>
+#include <zephyr/mesh/raw/raw_verts.h>
+#include <zephyr/mesh/raw/raw_faces.h>
 
 // forward declaration для классов из geom
 namespace zephyr::geom {
@@ -51,7 +51,7 @@ struct MeshOpts {
 /// исключением базовых) помечены как public. Доступ к ним открыт, как
 /// если бы это была обычная структура. Сеточные данные обрабатываются
 /// специальными методами.
-class AmrCells final {
+class RawCells final {
     // aliases inside class
     using Vector3d = geom::Vector3d;
 
@@ -97,8 +97,8 @@ public:
     /// @}
     /// @{ @name Грани и вершины ячеек
 
-    AmrFaces faces;  ///< Массив граней ячеек
-    AmrVerts verts;  ///< Массив вершин ячеек
+    RawFaces faces;  ///< Массив граней ячеек
+    RawVerts verts;  ///< Массив вершин ячеек
 
     /// @}
 
@@ -109,10 +109,10 @@ public:
 
     /// @brief Базовый конструктор
     /// @param options Настройки сетки
-    explicit AmrCells(MeshOpts options = {});
+    explicit RawCells(MeshOpts options = {});
 
     /// @brief Пустое множество ячеек с таким же набором опций и типов
-    AmrCells same() const;
+    RawCells same() const;
 
     /// @}
 
@@ -290,14 +290,14 @@ public:
 
     /// @brief Скопировать все данные целиком с индекса from,
     /// в хранилище dst на индекс to
-    void copy_data(index_t from, AmrCells* dst, index_t to) const;
+    void copy_data(index_t from, RawCells* dst, index_t to) const;
 
     /// @brief Скопировать ячейку с позиции ic в хранилище cells на индекс jc,
     /// грани на позицию iface, вершины на позицию inode.
-    void copy_geom(index_t ic, AmrCells& cells,
+    void copy_geom(index_t ic, RawCells& cells,
             index_t jc, index_t face_beg, index_t node_beg) const;
 
-    void copy_geom_basic(index_t ic, AmrCells& cells,
+    void copy_geom_basic(index_t ic, RawCells& cells,
             index_t jc, index_t face_beg, index_t node_beg) const;
 
     /// @}
@@ -367,7 +367,7 @@ public:
     int check_connectivity(index_t ic) const;
 
     /// @brief Проверка связности ячеек в MPI версии
-    int check_connectivity(index_t ic, const AmrCells& ghosts) const;
+    int check_connectivity(index_t ic, const RawCells& ghosts) const;
 
     /// @brief Полное сохранение сетки
     /// @param root Корневая директория для бэкапа (существует и пустая)

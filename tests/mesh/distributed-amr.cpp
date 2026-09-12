@@ -10,7 +10,7 @@
 
 #include <zephyr/io/pvd_file.h>
 
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/mesh.h>
 #include <zephyr/mesh/decomp/rwalk.h>
 
 #include <zephyr/geom/generator/cuboid.h>
@@ -83,7 +83,7 @@ struct Membrane {
 
 // Поле cell[u] задается из Membrane, функция
 // Поле cell[wflag] задается по процентилям от cell[u]
-void setup_values(EuMesh& mesh, double t,
+void setup_values(Mesh& mesh, double t,
         Storable<double> var, Storable<double> wflag) {
     static Membrane func_u(1);
 
@@ -133,7 +133,7 @@ void setup_values(EuMesh& mesh, double t,
 }
 
 // Флаги выставляются по процентилям в wflag
-void set_flags(EuMesh& mesh, Storable<double> wflag) {
+void set_flags(Mesh& mesh, Storable<double> wflag) {
     for (auto cell: mesh) {
         if (cell[wflag] < 0.5) {
             cell.set_flag(-1);
@@ -154,7 +154,7 @@ int main() {
     gen.set_nx(50);
 
     // Создаем сетку
-    EuMesh mesh(gen);
+    Mesh mesh(gen);
     mesh.set_max_level(3);
 
     // Добавить переменные на сетку

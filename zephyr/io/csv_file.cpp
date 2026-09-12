@@ -2,10 +2,10 @@
 #include <iomanip>
 
 #include <zephyr/io/csv_file.h>
-#include <zephyr/mesh/euler/eu_prim.h>
+#include <zephyr/mesh/cell.h>
 
-using zephyr::mesh::EuCell;
-using zephyr::mesh::AmrCells;
+using zephyr::mesh::Cell;
+using zephyr::mesh::RawCells;
 
 namespace zephyr::io {
 
@@ -25,7 +25,7 @@ void write_name(const Variable& var, std::ofstream& file) {
     }
 }
 
-void write_variable(const Variable& var, EuCell& cell, std::ofstream& file) {
+void write_variable(const Variable& var, Cell& cell, std::ofstream& file) {
     if (!var.is_scalar()) {
         throw std::runtime_error("CsvFile doesn't support vector variables");
     }
@@ -57,12 +57,12 @@ CsvFile::CsvFile(
     variables(variables) {
 }
 
-void CsvFile::save(AmrCells &cells) const {
+void CsvFile::save(RawCells &cells) const {
     save(filename, cells, precision, variables);
 }
 
 void CsvFile::save(
-    const std::string &filename, AmrCells &cells,
+    const std::string &filename, RawCells &cells,
     int precision, const Variables &variables
 ) {
     size_t n_cells = cells.n_cells();

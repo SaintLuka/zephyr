@@ -9,7 +9,7 @@
 
 #include <zephyr/io/pvd_file.h>
 
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/mesh.h>
 #include <zephyr/geom/generator/rectangle.h>
 
 using namespace zephyr::mesh;
@@ -26,7 +26,7 @@ int main() {
     Rectangle rect(-1.0, 1.0, -1.0, 1.0);
     rect.set_nx(50);
 
-    EuMesh mesh(rect);
+    Mesh mesh(rect);
     mesh.set_decomposition("XY");
     mesh.set_max_level(3);
 
@@ -87,13 +87,13 @@ int main() {
     for (int i = 0; i < 4; ++i) {
         pvd.variables.append<Vector3d>(
             "normals[" + std::to_string(i) + "]",
-            [normals, i](EuCell& cell) -> Vector3d { return cell[normals][i]; }
+            [normals, i](Cell& cell) -> Vector3d { return cell[normals][i]; }
         );
     }
     for (int i = 0; i < 5; ++i) {
         pvd.variables.append<double>(
             "fractions[" + std::to_string(i) + "]",
-            [fractions, i](EuCell& cell) -> double { return cell[fractions][i]; }
+            [fractions, i](Cell& cell) -> double { return cell[fractions][i]; }
         );
     }
     pvd.save(mesh, 0.0);

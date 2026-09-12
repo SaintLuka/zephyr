@@ -1,7 +1,7 @@
 #include <numeric>
 #include <iomanip>
 
-#include <zephyr/mesh/euler/router.h>
+#include <zephyr/mesh/raw/router.h>
 
 namespace zephyr::mesh {
 

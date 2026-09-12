@@ -6,8 +6,8 @@
 
 namespace zephyr::geom::generator {
 
-/// @brief Простой класс для создания AmrStorage для хранения
-/// квазиодномерной сетки (прямоугольная сетка шириной в одну ячейку).
+/// @brief Простой класс для создания квазиодномерной сетки
+/// (прямоугольная сетка шириной в одну ячейку).
 class Strip final : public Generator {
 public:
     using Ptr = std::shared_ptr<Strip>;
@@ -63,7 +63,7 @@ public:
     bool can_make_cells() const override { return true; }
 
     /// @brief Инициализация SoA-хранилища сетки
-    mesh::AmrCells make_cells(bool unique_nodes) const override;
+    mesh::RawCells make_cells(bool unique_nodes) const override;
 
     // Далее не самые полезные get-функции
 

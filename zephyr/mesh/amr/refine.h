@@ -9,7 +9,7 @@ namespace zephyr::mesh::amr {
 
 /// @brief Добавить связь, (i, j) - координаты дочерней ячейки, (x, y) - вектор направления
 template<int i, int j, int x, int y>
-void make_link_2D(AmrCells& cells, index_t main_child, int rank) {
+void make_link_2D(RawCells& cells, index_t main_child, int rank) {
     index_t iface = cells.faces.offsets[main_child + Quad::iss<i, j>()] + Side2D::by_dir<x, y>();
     cells.faces.boundary[iface] = Boundary::INNER;
     cells.faces.adjacent.rank[iface] = rank;
@@ -20,7 +20,7 @@ void make_link_2D(AmrCells& cells, index_t main_child, int rank) {
 
 /// @brief Добавить связь, (i, j, k) - координаты дочерней ячейки, (x, y, z) - вектор направления
 template<int i, int j, int k, int x, int y, int z>
-void make_link_3D(AmrCells& cells, index_t main_child, int rank) {
+void make_link_3D(RawCells& cells, index_t main_child, int rank) {
     index_t iface = cells.faces.offsets[main_child + Cube::iss<i, j, k>()] +  + Side3D::by_dir<x, y, z>();
     cells.faces.boundary[iface] = Boundary::INNER;
     cells.faces.adjacent.rank[iface] = rank;
@@ -34,7 +34,7 @@ void make_link_3D(AmrCells& cells, index_t main_child, int rank) {
 /// @param cells Локальное хранилище ячеек
 /// @param ic Индекс первой (главной) ячейки
 template <int dim>
-void link_siblings(AmrCells& cells, index_t ic, int rank) {
+void link_siblings(RawCells& cells, index_t ic, int rank) {
     if constexpr (dim == 2) {
         make_link_2D<-1, -1, +1, 0>(cells, ic, rank);
         make_link_2D<-1, -1, 0, +1>(cells, ic, rank);
@@ -85,7 +85,7 @@ void link_siblings(AmrCells& cells, index_t ic, int rank) {
 
 /// @brief Проверить связи между дочерними ячейками
 template <int dim>
-void check_link(AmrCells& cells, index_t ip, index_t main_child) {
+void check_link(RawCells& cells, index_t ip, index_t main_child) {
     // Проверяем, что внутренние ячейки связаны верно
     for (int z1 = 0; z1 < CpC(dim); ++z1) {
         index_t c1 = main_child + z1;
@@ -156,7 +156,7 @@ void check_link(AmrCells& cells, index_t ip, index_t main_child) {
 /// Дочерние ячейки имеют законченный вид (необходимое число граней, правильные
 /// связи друг на друга, кроме одного случая правильные связи на соседей)
 template<int dim>
-index_t make_children(AmrCells &locals, AmrCells& ghosts, index_t ip) {
+index_t make_children(RawCells &locals, RawCells& ghosts, index_t ip) {
     const index_t main_child = locals.next[ip];
 
     // Установить только геометрию
@@ -356,7 +356,7 @@ index_t make_children(AmrCells &locals, AmrCells& ghosts, index_t ip) {
 /// @param ip Индекс родительской ячейки
 /// @param op Оператор разделения данных
 template<int dim>
-void refine_cell(AmrCells &locals, AmrCells& ghosts, index_t ip, const Distributor& op) {
+void refine_cell(RawCells &locals, RawCells& ghosts, index_t ip, const Distributor& op) {
     auto main_child = make_children<dim>(locals, ghosts, ip);
 
     auto& adj = locals.faces.adjacent;
@@ -437,7 +437,7 @@ void refine_cell(AmrCells &locals, AmrCells& ghosts, index_t ip, const Distribut
     for (int i = 0; i < CpC(dim); ++i) {
         children.index[i] = main_child + i;
     }
-    EuCell parent(&locals, ip);
+    Cell parent(&locals, ip);
     op.split(parent, children);
 
     locals.set_undefined(ip);

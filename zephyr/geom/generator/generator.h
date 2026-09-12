@@ -2,10 +2,10 @@
 
 #include <string>
 #include <memory>
-#include <zephyr/mesh/euler/amr_cells.h>
+#include <zephyr/mesh/raw/raw_cells.h>
 
 namespace zephyr::utils { class Json; }
-namespace zephyr::mesh { class AmrCells; }
+namespace zephyr::mesh { class RawCells; }
 
 namespace zephyr::geom {
 
@@ -83,7 +83,7 @@ public:
     virtual bool can_make_cells() const { return false; }
 
     /// @brief Инициализация SoA-хранилища сетки
-    virtual mesh::AmrCells make_cells(bool unique_nodes) const {
+    virtual mesh::RawCells make_cells(bool unique_nodes) const {
         throw std::runtime_error("Generator::make_cells: not implemented");
     }
 

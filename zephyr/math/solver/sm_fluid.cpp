@@ -22,7 +22,7 @@ SmFluid::SmFluid(Eos::Ptr eos) : m_eos(eos) {
     m_max_dt = std::numeric_limits<double>::max();
 }
 
-SmFluid::Parts SmFluid::add_types(EuMesh& mesh) {
+SmFluid::Parts SmFluid::add_types(Mesh& mesh) {
     part.init = mesh.add<PState>("init");
     part.d_dx = mesh.add<PState>("d_dx");
     part.d_dy = mesh.add<PState>("d_dy");
@@ -30,7 +30,7 @@ SmFluid::Parts SmFluid::add_types(EuMesh& mesh) {
     part.half = mesh.add<PState>("half");
     part.next = mesh.add<PState>("next");
     part.wait = mesh.add<int>("wait");
-    mesh.for_each([wait=part.wait](EuCell& cell) { cell[wait] = 0; });
+    mesh.for_each([wait=part.wait](Cell& cell) { cell[wait] = 0; });
     return part;
 }
 
@@ -78,7 +78,7 @@ PState boundary_value(const PState &zc, const Vector3d &normal, Boundary flag) {
     return zn;
 }
 
-void SmFluid::update(EuMesh &mesh) {
+void SmFluid::update(Mesh &mesh) {
     // Определяем dt
     compute_dt(mesh);
 
@@ -101,8 +101,8 @@ void SmFluid::update(EuMesh &mesh) {
     swap(mesh);
 }
 
-void SmFluid::compute_dt(EuMesh &mesh) {
-    double dt = mesh.min([this](EuCell cell) -> double {
+void SmFluid::compute_dt(Mesh &mesh) {
+    double dt = mesh.min([this](Cell cell) -> double {
         //double c = m_eos->sound_speed_rP(cell(part.density), cell(part.pressure));
         //return cell.incircle_diameter() / (cell(part.velocity).norm() + c);
         double c = m_eos->sound_speed_rP(cell[part.init].density, cell[part.init].pressure);
@@ -113,8 +113,8 @@ void SmFluid::compute_dt(EuMesh &mesh) {
     m_dt = mpi::min(dt);
 }
 
-void SmFluid::compute_grad(EuMesh &mesh) const {
-    mesh.for_each([this](EuCell &cell) {
+void SmFluid::compute_grad(Mesh &mesh) const {
+    mesh.for_each([this](Cell &cell) {
         auto grad = gradient::LSM<PState>(cell, part.init, boundary_value);
         grad = gradient::limiting<PState>(cell, m_limiter, grad, part.init, boundary_value);
 
@@ -124,8 +124,8 @@ void SmFluid::compute_grad(EuMesh &mesh) const {
     });
 }
 
-void SmFluid::fluxes(EuMesh &mesh) const {
-    mesh.for_each([this](EuCell &cell) {
+void SmFluid::fluxes(Mesh &mesh) const {
+    mesh.for_each([this](Cell &cell) {
         // Примитивный вектор в ячейке
         PState z_c = cell[part.init];
 
@@ -173,8 +173,8 @@ void SmFluid::fluxes(EuMesh &mesh) const {
     });
 }
 
-void SmFluid::fluxes_stage1(EuMesh &mesh) const {
-    mesh.for_each([this](EuCell &cell) {
+void SmFluid::fluxes_stage1(Mesh &mesh) const {
+    mesh.for_each([this](Cell &cell) {
         // Ячейка в изоляции
         if (cell[part.wait] > 0) {
             cell[part.half] = cell[part.init];
@@ -252,8 +252,8 @@ void SmFluid::fluxes_stage1(EuMesh &mesh) const {
     });
 }
 
-void SmFluid::fluxes_stage2(EuMesh &mesh) const {
-    mesh.for_each([this](EuCell &cell) {
+void SmFluid::fluxes_stage2(Mesh &mesh) const {
+    mesh.for_each([this](Cell &cell) {
         // Центр ячейки
         Vector3d cell_c = cell.center();
 
@@ -365,7 +365,7 @@ void SmFluid::fluxes_stage2(EuMesh &mesh) const {
     });
 }
 
-void SmFluid::swap(EuMesh &mesh) const {
+void SmFluid::swap(Mesh &mesh) const {
     mesh.swap(part.init, part.next);
 }
 
@@ -379,7 +379,7 @@ Distributor SmFluid::distributor(const std::string& type) const {
     Distributor distr;
 
     // Консервативное суммирование
-    distr.merge = [this](const Children &children, EuCell &parent) {
+    distr.merge = [this](const Children &children, Cell &parent) {
         QState q_p;
         for (auto child: children) {
             QState q_ch(child[part.init]);
@@ -392,7 +392,7 @@ Distributor SmFluid::distributor(const std::string& type) const {
     };
 
     // Снос копированием
-    auto split_const = [this](const EuCell &parent, Children &children) {
+    auto split_const = [this](const Cell &parent, Children &children) {
         const PState& z_p = parent[part.init];
         for (auto child: children) {
             child[part.init] = z_p;
@@ -401,7 +401,7 @@ Distributor SmFluid::distributor(const std::string& type) const {
     };
     
     // Снос по градиентам
-    auto split_slope = [this](const EuCell &parent, Children &children) {
+    auto split_slope = [this](const Cell &parent, Children &children) {
         const PState& z_p  = parent[part.init];
         const PState& d_dx = parent[part.d_dx];
         const PState& d_dy = parent[part.d_dy];
@@ -514,7 +514,7 @@ void SmFluid::set_flags(EuMesh &mesh) const {
 }
 #endif
 
-void SmFluid::set_flags(EuMesh &mesh) const {
+void SmFluid::set_flags(Mesh &mesh) const {
     if (!mesh.adaptive()) { return; }
 
     mesh.sync(part.init);

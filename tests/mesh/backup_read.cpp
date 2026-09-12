@@ -9,7 +9,7 @@
 
 #include <zephyr/io/pvd_file.h>
 
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/mesh.h>
 #include <zephyr/geom/generator/rectangle.h>
 
 using namespace zephyr::mesh;
@@ -26,7 +26,7 @@ int main(int argc, char** argv) {
     Rectangle rect(0.0, 1.0, 0.0, 1.0);
     rect.set_nx(20);
 
-    EuMesh mesh(rect);
+    Mesh mesh(rect);
 
     auto dens = mesh.add<double>("density");
 

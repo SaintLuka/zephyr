@@ -14,7 +14,7 @@ namespace zephyr::mesh::amr {
 /// @param ghosts Хранилище ячеек с других процессов
 /// @param ic Индекс целевой ячейки в locals
 template<int dim>
-void retain_cell(AmrCells &locals, AmrCells& ghosts, index_t ic) {
+void retain_cell(RawCells &locals, RawCells& ghosts, index_t ic) {
     // Ячейка не требует разбиения, необходимо пройти по граням,
     // возможно, необходимо разбить грань или собрать
     auto lvl_c = locals.level[ic];
@@ -37,17 +37,17 @@ void retain_cell(AmrCells &locals, AmrCells& ghosts, index_t ic) {
 #if SCRUTINY
         int rank = mpi::rank();
         if (adj.rank[iface] == rank && adj.index[iface] >= locals.size()) {
-            std::cout << "AmrCell has no local neighbor through the " <<
+            std::cout << "RawCell has no local neighbor through the " <<
                       side_to_string(side, dim) << " side\n";
             locals.print_info(ic);
-            throw std::runtime_error("AmrCell has no local neighbor (retain_cell)");
+            throw std::runtime_error("RawCell has no local neighbor (retain_cell)");
         }
         if (adj.rank[iface] != rank &&
             (adj.ghost[iface] < 0 || adj.ghost[iface] >= ghosts.size())) {
-            std::cout << "AmrCell has no remote neighbor through the " <<
+            std::cout << "RawCell has no remote neighbor through the " <<
                 side_to_string(side, dim) << " side; ghosts size: " << ghosts.size() << "\n";
             locals.print_info(ic);
-            throw std::runtime_error("AmrCell has no remote neighbor (retain_cell)");
+            throw std::runtime_error("RawCell has no remote neighbor (retain_cell)");
         }
 #endif
         // Хранилище и индекс соседа, если соседи более высокого уровня,

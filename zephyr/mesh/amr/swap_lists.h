@@ -25,7 +25,7 @@ struct SwapLists {
     /// @brief Конструктор
     /// @param count Статистика адаптации
     /// @param flag Массив флагов ячеек (можно расширенный или нет, то есть flag.size() >= n_cells)
-    SwapLists(const Statistics& count, const std::vector<int> flag) {
+    SwapLists(const Statistics& count, const std::span<const int> flag) {
         index_t max_swap_count = count.n_cells_large - count.n_cells_short;
         if (max_swap_count < 1) { return; }
 
@@ -61,7 +61,7 @@ struct SwapLists {
     /// транспозиций пар элементов, при этом один элемент в паре должен быть
     /// актуальным, а один неопределенным, после перестановки актуальный элемент
     /// всегда должен оказываться ближе к началу списка, чем неопределенный
-    static void check_mapping(AmrCells& locals) {
+    static void check_mapping(RawCells& locals) {
         for (index_t i = 0; i < locals.size(); ++i) {
             auto j = locals.next[i];
             if (i != locals.next[j]) {
@@ -91,7 +91,7 @@ struct SwapLists {
     /// @brief Устанавливает следующие позиции ячеек в однопоточном режиме
     /// @details После выполнения операции поле element.next у ячеек указывает
     /// на следующее положение ячейки в хранилище
-    void set_mapping(AmrCells& locals) const {
+    void set_mapping(RawCells& locals) const {
         // Устанавливает тождественную перестановку для всех ячеек
         threads::parallel_for(
             index_t{0}, index_t{locals.n_cells()},
@@ -126,7 +126,7 @@ struct SwapLists {
     /// @brief Выполняет перестановку элементов в соответствии с next.
     /// @details Данные актуальной ячейки перемещаются на место неактуальной
     /// ячейки, индексы смежности должны быть выставлены ранее.
-    void move_elements(AmrCells &cells) const {
+    void move_elements(RawCells &cells) const {
         /// @brief Выполняет перемещение элемента в соответствии с индексом
         /// в поле element.next для одной ячейки.
         /// @details Данные актуальной ячейки перемещаются на место неактуальной

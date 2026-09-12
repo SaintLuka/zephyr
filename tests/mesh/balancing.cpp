@@ -5,7 +5,7 @@
 
 #include <zephyr/io/pvd_file.h>
 
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/mesh.h>
 #include <zephyr/mesh/decomp/ORB.h>
 #include <zephyr/mesh/decomp/VD3.h>
 #include <zephyr/mesh/decomp/rwalk.h>
@@ -49,7 +49,7 @@ double foo(const Vector3d& v) {
 }
 
 // Посчитать фиктивную нагрузку
-std::vector<double> calc_loads(EuMesh& mesh, int size, Data data) {
+std::vector<double> calc_loads(Mesh& mesh, int size, Data data) {
     std::vector<double> ws(size, 1.0e-3);
     for (auto cell: mesh) {
         if (cell[data.rank] < 0 || cell[data.rank] > size) {
@@ -70,7 +70,7 @@ int main() {
     Box domain = gen.bbox();
 
     // Создаем сетку
-    EuMesh mesh(gen);
+    Mesh mesh(gen);
 
     // Добавить переменные на сетку
     Data data;

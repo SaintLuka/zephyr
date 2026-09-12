@@ -5,7 +5,7 @@
 
 #include <zephyr/geom/generator/rectangle.h>
 
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/mesh.h>
 
 #include <zephyr/io/pvd_file.h>
 
@@ -21,8 +21,8 @@ using zephyr::geom::Box;
 using zephyr::geom::Boundary;
 using zephyr::geom::Vector3d;
 using zephyr::geom::generator::Rectangle;
-using zephyr::mesh::EuMesh;
-using zephyr::mesh::EuCell;
+using zephyr::mesh::Mesh;
+using zephyr::mesh::Cell;
 using zephyr::io::PvdFile;
 using zephyr::utils::Stopwatch;
 using zephyr::utils::threads;
@@ -49,7 +49,7 @@ int main() {
         .bottom = Boundary::WALL, .top   = Boundary::WALL});
 
     // Создать сетку
-    EuMesh mesh(rect);
+    Mesh mesh(rect);
 
     // Переменные для хранения на сетке
     auto rho1 = mesh.add<double>("rho1");
@@ -69,8 +69,8 @@ int main() {
     pvd.variables.add_cell_data("rho", rho1);
     pvd.variables.add_cell_data("pressure", p1);
     pvd.variables.add_cell_data("velocity", v1);
-    pvd.variables += {"|velocity|", [v=v1](EuCell& cell) -> double { return cell[v].norm(); }};
-    pvd.variables += {"SPL", [p1](EuCell& cell) -> double {
+    pvd.variables += {"|velocity|", [v=v1](Cell& cell) -> double { return cell[v].norm(); }};
+    pvd.variables += {"SPL", [p1](Cell& cell) -> double {
         // Уровень звукового давления в дБ
         return 20.0 * std::log(1.0 + std::abs(cell[p1] - 1.0_bar) / 20.0e-6_Pa) / std::log(10.0);
     }};
@@ -113,7 +113,7 @@ int main() {
 
         // Определяем dt
         sw_dt.resume();
-        double dt = mesh.min([&](EuCell cell) -> double {
+        double dt = mesh.min([&](Cell cell) -> double {
             double dt = 1.0e300;
 
             // скорость звука
@@ -136,7 +136,7 @@ int main() {
 
         // Расчет по схеме CIR
         sw_flux.resume();
-        mesh.for_each([&](EuCell cell) {
+        mesh.for_each([&](Cell cell) {
             // Примитивный вектор в ячейке
             PState zc(cell[rho1], cell[v1], cell[p1], cell[e1]);
 

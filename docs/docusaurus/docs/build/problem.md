@@ -37,11 +37,11 @@ list(APPEND PROBLEMS wave)
 Подключим основные заголовочные файлы:
 ```cpp
 #include <zephyr/geom/generator/rectangle.h>
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/euler/mesh.h>
 #include <zephyr/io/pvd_file.h>
 ```
 Файл `generator/rectangle.h` включает сеточный генератор,
-`euler/eu_mesh.h` содержит класс для работы с эйлеровыми сетками,
+`euler/mesh.h` содержит класс для работы с эйлеровыми сетками,
 `io/pvd_file.h` содержит функции для сохранения расчетных данных.
 
 Разрешим использовать все пространства имен:

@@ -13,7 +13,7 @@ namespace zephyr::mesh::amr {
 /// @param ic Индекс главной из дочерних ячеек (z_loc = 0)
 /// @return Массив итераторов дочерних ячеек
 template <int dim>
-Children select_children(AmrCells& locals, index_t ic) {
+Children select_children(RawCells& locals, index_t ic) {
     auto sibs = get_siblings<dim>(locals, ic);
 
     // Дочерние ячейки, упорядоченные по локальному z-индексу
@@ -55,7 +55,7 @@ Children select_children(AmrCells& locals, index_t ic) {
 
 /// @brief Вершины родительской ячейки (2D или 3D)
 template <int dim>
-SqMap<dim> parent_vs(const AmrCells& cells, Children& children) {
+SqMap<dim> parent_vs(const RawCells& cells, Children& children) {
 #define subs_vertex_3D(i, j, k) (cells.verts[cells.verts.offsets[children.index[Cube::iss<i, j, k>()]] + SqCube::iss<i, j, k>()])
     if constexpr (dim == 2) {
         return {
@@ -92,7 +92,7 @@ SqMap<dim> parent_vs(const AmrCells& cells, Children& children) {
 /// @param ip Индекс в хранилище locals, по которому следует разместить родительскую ячейку
 /// @param rank Ранг текущего процесса
 template<int dim>
-void make_parent(AmrCells& locals, AmrCells& ghosts, Children& children, index_t ip, int rank) {
+void make_parent(RawCells& locals, RawCells& ghosts, Children& children, index_t ip, int rank) {
     if constexpr (dim == 2) {
         locals.set_cell(ip, parent_vs<dim>(locals, children), locals.axial());
     }
@@ -385,7 +385,7 @@ void make_parent(AmrCells& locals, AmrCells& ghosts, Children& children, index_t
 /// @param op Оператор огрубления данных
 /// @param rank Ранг текущего процесса
 template<int dim>
-void coarse_cell(AmrCells& locals, AmrCells& ghosts, index_t ich, const Distributor& op, int rank) {
+void coarse_cell(RawCells& locals, RawCells& ghosts, index_t ich, const Distributor& op, int rank) {
     // Функцию выполняет главный ребенок, остальные выставляются на undefined и отдыхают
     if (locals.z_idx[ich] % CpC(dim) != 0) {
         locals.set_undefined(ich);
@@ -397,7 +397,7 @@ void coarse_cell(AmrCells& locals, AmrCells& ghosts, index_t ich, const Distribu
     index_t ip = locals.next[ich];
     make_parent<dim>(locals, ghosts, children, ip, rank);
 
-    EuCell parent(&locals, ip);
+    Cell parent(&locals, ip);
     op.merge(children, parent);
 
     locals.set_undefined(ich);

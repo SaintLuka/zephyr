@@ -21,15 +21,15 @@ using namespace zephyr::phys;
 using namespace zephyr::math;
 using namespace zephyr::math::smf;
 
-using zephyr::mesh::EuMesh;
-using zephyr::mesh::EuCell;
+using zephyr::mesh::Mesh;
+using zephyr::mesh::Cell;
 using zephyr::math::SmFluid;
 using zephyr::utils::mpi;
 using zephyr::utils::threads;
 using zephyr::utils::Stopwatch;
 
 // Усредненный консервативный вектор состояния в ячейке
-QState mean(EuCell& cell, const std::function<QState(const Vector3d&)>& get_state, int n) {
+QState mean(Cell& cell, const std::function<QState(const Vector3d&)>& get_state, int n) {
 	auto density    = [&get_state](const Vector3d& r) -> double { return get_state(r).density; };
 	auto momentum_x = [&get_state](const Vector3d& r) -> double { return get_state(r).momentum.x(); };
 	auto momentum_y = [&get_state](const Vector3d& r) -> double { return get_state(r).momentum.y(); };
@@ -84,7 +84,7 @@ int main(int argc, char** argv) {
     gen.set_nx(1000);
 
     // Создать сетку
-    EuMesh mesh(gen);
+    Mesh mesh(gen);
 
     MieGruneisen::Ptr eos = MieGruneisen::create("Fe");
 
@@ -109,11 +109,11 @@ int main(int argc, char** argv) {
 
     // Переменные для сохранения
     pvd.variables = {"level"};
-    pvd.variables += {"density",  [z](EuCell& cell) -> double { return cell[z].density; }};
-    pvd.variables += {"vel.x",    [z](EuCell& cell) -> double { return cell[z].velocity.x(); }};
-    pvd.variables += {"vel.y",    [z](EuCell& cell) -> double { return cell[z].velocity.y(); }};
-    pvd.variables += {"pressure", [z](EuCell& cell) -> double { return cell[z].pressure; }};
-    pvd.variables += {"energy",   [z](EuCell& cell) -> double { return cell[z].energy; }};
+    pvd.variables += {"density",  [z](Cell& cell) -> double { return cell[z].density; }};
+    pvd.variables += {"vel.x",    [z](Cell& cell) -> double { return cell[z].velocity.x(); }};
+    pvd.variables += {"vel.y",    [z](Cell& cell) -> double { return cell[z].velocity.y(); }};
+    pvd.variables += {"pressure", [z](Cell& cell) -> double { return cell[z].pressure; }};
+    pvd.variables += {"energy",   [z](Cell& cell) -> double { return cell[z].energy; }};
 
 	// Выдает консервативный вектор состояния
 	auto get_state = [&](const Vector3d& r) -> QState {
@@ -142,7 +142,7 @@ int main(int argc, char** argv) {
 
 	// Задание начальных данных
 	auto init_cells=[&]() {
-		mesh.for_each([&](EuCell& cell) {
+		mesh.for_each([&](Cell& cell) {
 			QState q = mean(cell, get_state, 5);
 			cell[z] = PState(q, *eos);
 	    });

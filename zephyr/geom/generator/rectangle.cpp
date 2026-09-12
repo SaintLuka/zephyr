@@ -10,7 +10,7 @@
 #include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/geom/primitives/quad.h>
 #include <zephyr/utils/json.h>
-#include <zephyr/mesh/euler/amr_cells.h>
+#include <zephyr/mesh/raw/raw_cells.h>
 
 namespace zephyr::geom::generator {
 
@@ -285,19 +285,19 @@ Grid Rectangle::create_classic() const {
     grid.reserve_nodes((nx_ + 1) * (ny_ + 1));
     grid.reserve_cells(nx_ * ny_);
 
-    std::vector nodes(nx_ + 1, std::vector<Node::Ptr>(ny_ + 1));
+    std::vector nodes(nx_ + 1, std::vector<GNode::Ptr>(ny_ + 1));
     for (int i = 0; i <= nx_; ++i) {
         for (int j = 0; j <= ny_; ++j) {
             double x = x_min_ + i * dx;
             double y = y_min_ + j * dy;
-            nodes[i][j] = Node::create({x, y, 0.0});
+            nodes[i][j] = GNode::create({x, y, 0.0});
         }
     }
 
     // Ячейки как полигоны, обход граней и вершин против часовой
     // стрелки, начиная с нижней левой вершины (нижней грани)
     std::vector<Boundary> bc(4);
-    std::vector<Node::Ptr> quad_nodes(4);
+    std::vector<GNode::Ptr> quad_nodes(4);
     for (int i = 0; i < nx_; ++i) {
         bc[Side2D::L] = i == 0      ? bounds_.left   : Boundary::INNER;
         bc[Side2D::R] = i == nx_-1 ? bounds_.right  : Boundary::INNER;
@@ -327,12 +327,12 @@ Grid Rectangle::create_classic_amr() const {
     grid.reserve_nodes((2 * nx_ + 1) * (2 * ny_ + 1));
     grid.reserve_cells(nx_ * ny_);
 
-    std::vector nodes(2 * nx_ + 1, std::vector<Node::Ptr>(2 * ny_ + 1));
+    std::vector nodes(2 * nx_ + 1, std::vector<GNode::Ptr>(2 * ny_ + 1));
     for (int i = 0; i <= 2 * nx_; ++i) {
         for (int j = 0; j <= 2 * ny_; ++j) {
             double x = x_min_ + 0.5 * i * dx;
             double y = y_min_ + 0.5 * j * dy;
-            nodes[i][j] = Node::create({x, y, 0.0});
+            nodes[i][j] = GNode::create({x, y, 0.0});
         }
     }
 
@@ -371,20 +371,20 @@ Grid Rectangle::create_voronoi() const {
     double y_shift = y_min_;
 
     // Вершины в виде таблицы
-    std::vector vertices(Nx + 2, std::vector<Node::Ptr>(2 * Ny + 1, nullptr));
+    std::vector vertices(Nx + 2, std::vector<GNode::Ptr>(2 * Ny + 1, nullptr));
 
     for (size_t j = 0; j <= 2 * Ny; ++j) {
         double y = y_shift + h * j;
 
         // Часть вершин на левой границе пропускаем
         if (j % 2 == 0) {
-            vertices[0][j] = Node::create({x_min_, y, 0.0});
+            vertices[0][j] = GNode::create({x_min_, y, 0.0});
             vertices[0][j]->bc = bounds_.left;
         }
 
         for (size_t i = 1; i <= Nx; ++i) {
             double x = x_shift + double(3 * i - (i + j) % 2) * 0.5 * D;
-            vertices[i][j] = Node::create({x, y, 0.0});
+            vertices[i][j] = GNode::create({x, y, 0.0});
 
             if (j == 0) {
                 vertices[i][j]->bc = bounds_.bottom;
@@ -395,16 +395,16 @@ Grid Rectangle::create_voronoi() const {
 
         // Часть вершин на правой границе пропускаем
         if (j == 0 || j == 2 * Ny || j % 2 == Nx % 2) {
-            vertices[Nx + 1][j] = Node::create({x_max_, y, 0.0});
+            vertices[Nx + 1][j] = GNode::create({x_max_, y, 0.0});
             vertices[Nx + 1][j]->bc = bounds_.right;
         }
     }
 
-    using VList = std::vector<Node::Ptr>;
+    using VList = std::vector<GNode::Ptr>;
 
     auto erase_nans = [](VList& vlist) {
         const auto to_remove = std::ranges::remove_if(vlist,
-            [](Node::Ref v) -> bool { return !v; }).begin();
+            [](GNode::Ref v) -> bool { return !v; }).begin();
         vlist.erase(to_remove, vlist.end());
     };
 
@@ -468,7 +468,7 @@ Grid Rectangle::create_voronoi() const {
     return grid;
 }
 
-AmrCells Rectangle::make_cells(bool unique_nodes) const {
+RawCells Rectangle::make_cells(bool unique_nodes) const {
     if (voronoi_ && !adaptive_) {
         throw std::runtime_error("Rectangle::initialize: can't initialize voronoi grid and classic cartesian");
     }
@@ -512,7 +512,7 @@ AmrCells Rectangle::make_cells(bool unique_nodes) const {
         throw std::runtime_error("Strange side #142");
     };
 
-    AmrCells cells({
+    RawCells cells({
         .dim = 2,
         .adaptive = true,
         .linear = true,

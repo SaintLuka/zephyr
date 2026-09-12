@@ -10,7 +10,7 @@
 #include <zephyr/geom/primitives/cube.h>
 #include <zephyr/geom/generator/cuboid.h>
 #include <zephyr/utils/json.h>
-#include <zephyr/mesh/euler/amr_cells.h>
+#include <zephyr/mesh/raw/raw_cells.h>
 
 namespace zephyr::geom::generator {
 
@@ -262,20 +262,20 @@ Grid Cuboid::make() const {
     grid.reserve_nodes((nx_ + 1) * (ny_ + 1) * (nz_ + 1));
     grid.reserve_cells(nx_ * ny_ * nz_);
 
-    std::vector nodes(nx_ + 1, std::vector(ny_ + 1, std::vector<Node::Ptr>(nz_ + 1)));
+    std::vector nodes(nx_ + 1, std::vector(ny_ + 1, std::vector<GNode::Ptr>(nz_ + 1)));
     for (int i = 0; i <= nx_; ++i) {
         for (int j = 0; j <= ny_; ++j) {
             for (int k = 0; k <= nz_; ++k) {
                 double x = x_min_ + i * dx;
                 double y = y_min_ + j * dy;
                 double z = z_min_ + k * dz;
-                nodes[i][j][k] = Node::create({x, y, z});
+                nodes[i][j][k] = GNode::create({x, y, z});
             }
         }
     }
 
     std::vector<Boundary> bc(6);
-    std::vector<Node::Ptr> cube_nodes(8);
+    std::vector<GNode::Ptr> cube_nodes(8);
     for (int i = 0; i < nx_; ++i) {
         bc[Side3D::L] = i == 0 ?      bounds_.left :  Boundary::INNER;
         bc[Side3D::R] = i == nx_-1 ? bounds_.right : Boundary::INNER;
@@ -302,7 +302,7 @@ Grid Cuboid::make() const {
     return grid;
 }
 
-AmrCells Cuboid::make_cells(bool unique_nodes) const {
+RawCells Cuboid::make_cells(bool unique_nodes) const {
     if (!adaptive_) {
         throw std::runtime_error("Cuboid::make_cells: can make_cells only AMR cartesian mesh");
     }
@@ -353,7 +353,7 @@ AmrCells Cuboid::make_cells(bool unique_nodes) const {
         throw std::runtime_error("Strange side #265");
     };
 
-    AmrCells cells({
+    RawCells cells({
         .dim = 3,
         .adaptive = true,
         .linear = true,

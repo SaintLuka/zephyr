@@ -1,7 +1,7 @@
 #include <iostream>
 #include <zephyr/geom/geom.h>
 #include <zephyr/geom/sections.h>
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/mesh.h>
 
 #include <zephyr/math/calc/roots.h>
 #include <zephyr/utils/numpy.h>

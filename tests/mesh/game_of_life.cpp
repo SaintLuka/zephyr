@@ -5,7 +5,7 @@
 #include <set>
 
 #include <zephyr/geom/generator/rectangle.h>
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/mesh.h>
 #include <zephyr/io/pvd_file.h>
 
 using namespace zephyr::io;
@@ -18,9 +18,9 @@ using generator::Rectangle;
 static Storable<int> u1;
 static Storable<int> u2;
 
-void update(EuMesh& mesh) {
+void update(Mesh& mesh) {
     mesh.sync_cells(u1);
-    mesh.for_each([](EuCell& cell) {
+    mesh.for_each([](Cell& cell) {
         int s = cell.neib(+1,  0)[u1] +
                 cell.neib(-1,  0)[u1] +
                 cell.neib( 0, +1)[u1] +
@@ -40,13 +40,13 @@ void update(EuMesh& mesh) {
     mesh.swap(u1, u2);
 }
 
-void set_zero(EuMesh& mesh) {
+void set_zero(Mesh& mesh) {
     for (auto cell: mesh) {
         cell[u1] = 0;
     }
 }
 
-void set_random(EuMesh& mesh) {
+void set_random(Mesh& mesh) {
     for (auto cell: mesh) {
         cell[u1] = rand() % 2;
     }
@@ -76,7 +76,7 @@ void add_spaceship(field_t& field, int i, int j, bool inv = false) {
     field.insert({i+1*sgn, j + 3});
 }
 
-void set_flottila(EuMesh& mesh) {
+void set_flottila(Mesh& mesh) {
     field_t field;
     for (int k = 1; k < 7; ++k) {
         int i1 = 35 + 2 * k;
@@ -109,7 +109,7 @@ int main(int argc, char** argv) {
     Rectangle rect(0.0, 100.0, 0.0, 100.0);
     rect.set_nx(100);
 
-    EuMesh mesh(rect, true);
+    Mesh mesh(rect, true);
     mesh.set_decomposition("XY");
 
     u1 = mesh.add<int>("u1");

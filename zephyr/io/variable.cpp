@@ -2,13 +2,13 @@
 #include <charconv>
 
 #include <zephyr/io/variable.h>
-#include <zephyr/mesh/euler/eu_prim.h>
-#include <zephyr/mesh/euler/eu_node.h>
+#include <zephyr/mesh/cell.h>
+#include <zephyr/mesh/node.h>
 
 namespace zephyr::io {
 
-using mesh::EuCell;
-using mesh::EuNode;
+using mesh::Cell;
+using mesh::Node;
 
 template <typename T>
 T& buffer(void* buff, int idx = 0) {
@@ -46,43 +46,43 @@ Variable::Variable(std::string_view name)
 
     if (name == "rank") {
         type_ = VtkType::Int32;
-        write_ = [](const EuCell& cell, void *out) {
+        write_ = [](const Cell& cell, void *out) {
             buffer<int32_t>(out) = cell.rank();
         };
     }
     else if (name == "index") {
         type_ = VtkType::Int32;
-        write_ = [](const EuCell& cell, void *out) {
+        write_ = [](const Cell& cell, void *out) {
             buffer<int32_t>(out) = cell.index();
         };
     }
     else if (name == "level") {
         type_ = VtkType::Int8;
-        write_ = [](const EuCell& cell, void *out) {
+        write_ = [](const Cell& cell, void *out) {
             buffer<int8_t>(out) = cell.level();
         };
     }
     else if (name == "next") {
         type_ = VtkType::Int32;
-        write_ = [](const EuCell& cell, void *out) {
+        write_ = [](const Cell& cell, void *out) {
             buffer<int32_t>(out) = cell.next();
         };
     }
     else if (name == "flag") {
         type_ = VtkType::Int8;
-        write_ = [](const EuCell& cell, void *out) {
+        write_ = [](const Cell& cell, void *out) {
             buffer<int8_t>(out) = cell.flag();
         };
     }
     else if (name == "b_idx") {
         type_ = VtkType::Int32;
-        write_ = [](const EuCell& cell, void *out) {
+        write_ = [](const Cell& cell, void *out) {
             buffer<int32_t>(out) = cell.b_idx();
         };
     }
     else if (name == "z_idx") {
         type_ = VtkType::Int32;
-        write_ = [](const EuCell& cell, void *out) {
+        write_ = [](const Cell& cell, void *out) {
             buffer<int32_t>(out) = cell.z_idx();
         };
     }
@@ -90,7 +90,7 @@ Variable::Variable(std::string_view name)
         name_ = "face.rank";
         type_ = VtkType::Int8;
         n_components_ = n_comp;
-        write_ = [n_comp](const EuCell& cell, void *out) {
+        write_ = [n_comp](const Cell& cell, void *out) {
             const int n_faces = std::min(n_comp, cell.face_count());
             for (int i = 0; i < n_faces; ++i) {
                 buffer<int8_t>(out, i) = cell.face(i).adj_rank();
@@ -104,7 +104,7 @@ Variable::Variable(std::string_view name)
         name_ = "face.index";
         type_ = VtkType::Int32;
         n_components_ = n_comp;
-        write_ = [n_comp](const EuCell& cell, void *out) {
+        write_ = [n_comp](const Cell& cell, void *out) {
             const int n_faces = std::min(n_comp, cell.face_count());
             for (int i = 0; i < n_faces; ++i) {
                 buffer<int32_t>(out, i) = cell.face(i).adj_index();
@@ -118,7 +118,7 @@ Variable::Variable(std::string_view name)
         name_ = "face.ghost";
         type_ = VtkType::Int32;
         n_components_ = n_comp;
-        write_ = [n_comp](const EuCell& cell, void *out) {
+        write_ = [n_comp](const Cell& cell, void *out) {
             const int n_faces = std::min(n_comp, cell.face_count());
             for (int i = 0; i < n_faces; ++i) {
                 buffer<int32_t>(out, i) = cell.face(i).adj_ghost();
@@ -132,7 +132,7 @@ Variable::Variable(std::string_view name)
         name_ = "face.boundary";
         type_ = VtkType::Int8;
         n_components_ = n_comp;
-        write_ = [n_comp](const EuCell& cell, void *out) {
+        write_ = [n_comp](const Cell& cell, void *out) {
             const int n_faces = std::min(n_comp, cell.face_count());
             for (int i = 0; i < n_faces; ++i) {
                 buffer<int8_t>(out, i) = static_cast<int8_t>(cell.face(i).flag());
@@ -146,7 +146,7 @@ Variable::Variable(std::string_view name)
         name_ = "face.rotation";
         type_ = VtkType::Int8;
         n_components_ = n_comp;
-        write_ = [n_comp](const EuCell& cell, void *out) {
+        write_ = [n_comp](const Cell& cell, void *out) {
             const int n_faces = std::min(n_comp, cell.face_count());
             for (int i = 0; i < n_faces; ++i) {
                 buffer<int8_t>(out, i) = static_cast<int8_t>(cell.face(i).rotation());
@@ -159,7 +159,7 @@ Variable::Variable(std::string_view name)
     else if (name == "coords" || name == "center") {
         type_ = VtkType::Float32;
         n_components_ = 3;
-        write_ = [](const EuCell& cell, void *out) {
+        write_ = [](const Cell& cell, void *out) {
             buffer<float>(out, 0) = static_cast<float>(cell.center().x());
             buffer<float>(out, 1) = static_cast<float>(cell.center().y());
             buffer<float>(out, 2) = static_cast<float>(cell.center().z());
@@ -169,8 +169,8 @@ Variable::Variable(std::string_view name)
         name_ = "vert.rank";
         type_ = VtkType::Int8;
         n_components_ = n_comp;
-        write_ = [n_comp](const EuCell& cell, void *out) {
-            const mesh::AmrCells& cells = cell.cells();
+        write_ = [n_comp](const Cell& cell, void *out) {
+            const mesh::RawCells& cells = cell.cells();
             int n_nodes = std::min(n_comp, cell.node_count());
             if (!cells.has_nodes()) n_nodes = 0;
 
@@ -186,8 +186,8 @@ Variable::Variable(std::string_view name)
         name_ = "vert.index";
         type_ = VtkType::Int32;
         n_components_ = n_comp;
-        write_ = [n_comp](const EuCell& cell, void *out) {
-            const mesh::AmrCells& cells = cell.cells();
+        write_ = [n_comp](const Cell& cell, void *out) {
+            const mesh::RawCells& cells = cell.cells();
             int n_nodes = std::min(n_comp, cell.node_count());
             if (!cells.has_nodes()) n_nodes = 0;
 
@@ -203,8 +203,8 @@ Variable::Variable(std::string_view name)
         name_ = "vert.ghost";
         type_ = VtkType::Int32;
         n_components_ = n_comp;
-        write_ = [n_comp](const EuCell& cell, void *out) {
-            const mesh::AmrCells& cells = cell.cells();
+        write_ = [n_comp](const Cell& cell, void *out) {
+            const mesh::RawCells& cells = cell.cells();
             int n_nodes = std::min(n_comp, cell.node_count());
             if (!cells.has_nodes()) n_nodes = 0;
 
@@ -229,12 +229,12 @@ bool Variable::node_data() const {
     return std::holds_alternative<WriteNode<void>>(write_);
 }
 
-void Variable::write(EuCell& cell, void* out) const {
+void Variable::write(Cell& cell, void* out) const {
     z_assert(std::get<WriteCell<void>>(write_) != nullptr, "Variable::write: nullptr function");
     std::get<WriteCell<void>>(write_)(cell, out);
 }
 
-void Variable::write(EuNode& node, void* out) const {
+void Variable::write(Node& node, void* out) const {
     z_assert(std::get<WriteNode<void>>(write_) != nullptr, "Variable::write: nullptr function");
     std::get<WriteNode<void>>(write_)(node, out);
 }

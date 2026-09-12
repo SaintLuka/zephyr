@@ -16,7 +16,7 @@ namespace zephyr::mesh::amr {
 /// Фактически структура осуществляет соритровку ячеек по уровням (блочная сортировка,
 /// работает за линейное время).
 struct CellsByLevelPartial {
-    AmrCells &cells;   ///< Ссылка на хранилище
+    RawCells &cells;   ///< Ссылка на хранилище
     index_t from, to;  ///< Диапазон ячеек в хранилище
 
     std::vector<index_t> n_coarse; ///< Число ячеек каждого уровня, которые хотят огрубиться
@@ -29,12 +29,12 @@ struct CellsByLevelPartial {
     std::vector<std::vector<index_t>> retain;
 
     /// @brief Создание экземпляра класса
-    static CellsByLevelPartial create(AmrCells& cells, int max_level, index_t from, index_t to) {
+    static CellsByLevelPartial create(RawCells& cells, int max_level, index_t from, index_t to) {
         return CellsByLevelPartial(cells, max_level, from, to);
     }
 
     /// @brief Конструктор класса
-    explicit CellsByLevelPartial(AmrCells& cells, int max_level, index_t from, index_t to)
+    explicit CellsByLevelPartial(RawCells& cells, int max_level, index_t from, index_t to)
     : cells(cells), from(from), to(to) {
         set_count(max_level);
         sort_by_levels(max_level);
@@ -98,14 +98,14 @@ struct CellsByLevel {
     /// @brief Однопоточный конструктор класса
     /// @details Вызывается конструктор CellsByLevelPartial для всего диапазона
     /// ячеек хранилища, затем данные перемещаются
-    CellsByLevel(AmrCells &cells, int max_level) {
+    CellsByLevel(RawCells &cells, int max_level) {
         serial_constructor(cells, max_level);
     }
 
 #ifdef ZEPHYR_MPI
-    CellsByLevel(Tourism& tourism, AmrCells &locals, int max_level) {
-        AmrCells& border = tourism.border_cells();
-        const AmrCells& ghosts = tourism.ghost_cells();
+    CellsByLevel(Tourism& tourism, RawCells &locals, int max_level) {
+        RawCells& border = tourism.border_cells();
+        const RawCells& ghosts = tourism.ghost_cells();
         const auto& router = tourism.cell_router();
         const auto& border_indices = tourism.border_indices();
 
@@ -170,11 +170,11 @@ struct CellsByLevel {
         recv_requests.resize(mpi::size(), MPI_REQUEST_NULL);
     }
 
-    void send_retain(AmrCells &locals, AmrCells &ghosts, int lvl, int mpi_tag) {
+    void send_retain(RawCells &locals, RawCells &ghosts, int lvl, int mpi_tag) {
         send_flags_impl(mpi_tag, locals.flag, retain_to_send[lvl], ghosts.flag, retain_to_recv[lvl]);
     }
 
-    void send_coarse(AmrCells& locals, AmrCells& ghosts, int lvl, int mpi_tag) {
+    void send_coarse(RawCells& locals, RawCells& ghosts, int lvl, int mpi_tag) {
         send_flags_impl(mpi_tag, locals.flag, coarse_to_send[lvl], ghosts.flag, coarse_to_recv[lvl]);
     }
 
@@ -236,7 +236,7 @@ struct CellsByLevel {
 
 private:
     /// @brief Однопоточный конструктор класса
-    void serial_constructor(AmrCells& cells, int max_level) {
+    void serial_constructor(RawCells& cells, int max_level) {
         CellsByLevelPartial part(cells, max_level, 0, cells.n_cells());
         n_coarse = std::move(part.n_coarse);
         n_retain = std::move(part.n_retain);
@@ -270,7 +270,7 @@ private:
 
 /// @brief Обновляет флаг ячейки под индексом index, которая имеет флаг 0.
 /// Повышает флаг адаптации, если один из соседей хочет уровень на два выше
-inline void retain_update_flag(index_t ic, AmrCells &locals, AmrCells& ghosts) {
+inline void retain_update_flag(index_t ic, RawCells &locals, RawCells& ghosts) {
     scrutiny_check(ic < locals.size(), "round_1: cell_idx >= cells.size()")
     scrutiny_check(locals.flag[ic] == 0, "retain_update_flag: cell.flag != 0")
 
@@ -294,7 +294,7 @@ inline void retain_update_flag(index_t ic, AmrCells &locals, AmrCells& ghosts) {
 /// Ставит флаг адаптации 0, если сосед хочет уровень на 1 выше,
 /// ставит флаг адаптации 1, если сосед хочет уровень на 2 выше,
 /// флаги сиблингов не рассматриваются.
-inline void coarse_update_flag(index_t ic, AmrCells &locals, AmrCells& ghosts) {
+inline void coarse_update_flag(index_t ic, RawCells &locals, RawCells& ghosts) {
     scrutiny_check(ic < locals.size(), "round_2/3: cell_idx >= cells.size()")
 
     if (locals.flag[ic] >= 0) {
@@ -325,7 +325,7 @@ inline void coarse_update_flag(index_t ic, AmrCells &locals, AmrCells& ghosts) {
 /// @brief Обновляет флаг ячейки, которая имеет флаг -1.
 /// Ставит флаг адаптации 0, если один из сиблингов не хочет огрубляться.
 template <int dim>
-void coarse_update_flag_by_sibs(index_t ic, AmrCells &locals) {
+void coarse_update_flag_by_sibs(index_t ic, RawCells &locals) {
     scrutiny_check(ic < locals.size(), "round_4: cell_idx >= cells.size()")
 
     if (locals.flag[ic] >= 0) {
@@ -348,7 +348,7 @@ void coarse_update_flag_by_sibs(index_t ic, AmrCells &locals) {
 /// уровень ячеек больше не меняется
 /// @param indices Индексы ячеек с флагом = 0 в хранилище
 /// @param locals Ссылка на хранилище
-inline void round_1(const std::vector<index_t> &indices, AmrCells &locals, AmrCells &ghosts) {
+inline void round_1(const std::vector<index_t> &indices, RawCells &locals, RawCells &ghosts) {
     threads::for_each(indices.begin(), indices.end(),
                       retain_update_flag, std::ref(locals), std::ref(ghosts));
 }
@@ -360,7 +360,7 @@ inline void round_1(const std::vector<index_t> &indices, AmrCells &locals, AmrCe
 /// флаги на данном обходе (сохранили флаг -1).
 /// @param indices Индексы ячеек с флагом = -1 в хранилище
 /// @param cells Ссылка на хранилище
-inline void round_2(const std::vector<index_t> &indices, AmrCells &cells, AmrCells& ghosts) {
+inline void round_2(const std::vector<index_t> &indices, RawCells &cells, RawCells& ghosts) {
     threads::for_each(indices.begin(), indices.end(),
                       coarse_update_flag, std::ref(cells), std::ref(ghosts));
 }
@@ -371,7 +371,7 @@ inline void round_2(const std::vector<index_t> &indices, AmrCells &cells, AmrCel
 /// обхода флаги ячеек ещё могут измениться (@see round_4).
 /// @param indices Индексы ячеек с исходным флагом = -1 в хранилище
 /// @param cells Ссылка на хранилище
-inline void round_3(const std::vector<index_t> &indices, AmrCells &cells, AmrCells& ghosts) {
+inline void round_3(const std::vector<index_t> &indices, RawCells &cells, RawCells& ghosts) {
     threads::for_each(indices.begin(), indices.end(),
                       coarse_update_flag, std::ref(cells), std::ref(ghosts));
 }
@@ -384,7 +384,7 @@ inline void round_3(const std::vector<index_t> &indices, AmrCells &cells, AmrCel
 /// @param indices Индексы ячеек с исходным флагом = -1 в хранилище
 /// @param cells Ссылка на хранилище
 template <int dim>
-void round_4(const std::vector<index_t> &indices, AmrCells &cells) {
+void round_4(const std::vector<index_t> &indices, RawCells &cells) {
     threads::for_each(indices.begin(), indices.end(),
                       coarse_update_flag_by_sibs<dim>, std::ref(cells));
 }
@@ -409,7 +409,7 @@ void round_4(const std::vector<index_t> &indices, AmrCells &cells) {
 /// 4. На заключительном обходе координируются сиблинги, которые хотят
 /// огрубиться (@see round_4), флаги могут повыситься до 0.
 template <int dim>
-void balance_flags_fast(AmrCells& locals, int max_level) {
+void balance_flags_fast(RawCells& locals, int max_level) {
     static Stopwatch restriction_timer;
     static Stopwatch sorting_timer;
     static Stopwatch round_timer_1;
@@ -420,7 +420,7 @@ void balance_flags_fast(AmrCells& locals, int max_level) {
     static int n_total_retain = 0;
     static int n_total_coarse = 0;
 
-    static AmrCells ghosts;
+    static RawCells ghosts;
 
     restriction_timer.resume();
     base_restrictions<dim>(locals, max_level);
@@ -473,7 +473,7 @@ void balance_flags_fast(AmrCells& locals, int max_level) {
 // Отличия параллельной реализации?
 // Объяснить безумие с отправкой флагов.
 template <int dim>
-void balance_flags_fast(AmrCells &locals, int max_level, Tourism& tourism) {
+void balance_flags_fast(RawCells &locals, int max_level, Tourism& tourism) {
     static Stopwatch restriction_timer;
     static Stopwatch sorting_timer;
     static Stopwatch round_timer_1;
@@ -484,7 +484,7 @@ void balance_flags_fast(AmrCells &locals, int max_level, Tourism& tourism) {
     static int n_total_retain = 0;
     static int n_total_coarse = 0;
 
-    AmrCells& ghosts = tourism.ghost_cells();
+    RawCells& ghosts = tourism.ghost_cells();
 
     restriction_timer.resume();
     base_restrictions<dim>(locals, max_level);

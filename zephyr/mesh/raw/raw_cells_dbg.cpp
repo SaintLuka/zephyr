@@ -5,14 +5,14 @@
 #include <zephyr/utils/mpi.h>
 #include <zephyr/geom/geom.h>
 #include <zephyr/geom/indexing.h>
-#include <zephyr/mesh/euler/amr_cells.h>
+#include <zephyr/mesh/raw/raw_cells.h>
 
 using zephyr::utils::mpi;
 using namespace zephyr::geom;
 
 namespace zephyr::mesh {
 
-void AmrCells::print_info(index_t ic) const {
+void RawCells::print_info(index_t ic) const {
     std::cout << "\t\tarr.ic: " << ic << "\n";
     std::cout << "\t\tcenter: " << center[ic].transpose() << "\n";
     std::cout << "\t\trank:   " << rank[ic] << "\n";
@@ -54,7 +54,7 @@ void AmrCells::print_info(index_t ic) const {
     }
 }
 
-void AmrCells::visualize(index_t ic, std::string filename) const {
+void RawCells::visualize(index_t ic, std::string filename) const {
     if (filename.find(".py") == std::string::npos) {
         filename += ".py";
     }
@@ -155,7 +155,7 @@ void AmrCells::visualize(index_t ic, std::string filename) const {
     file << "plt.show()\n";
 }
 
-int AmrCells::check_geometry(index_t ic) const {
+int RawCells::check_geometry(index_t ic) const {
     for (index_t iface: faces.range(ic)) {
         if (faces.is_undefined(iface)) continue;
 
@@ -190,7 +190,7 @@ int AmrCells::check_geometry(index_t ic) const {
             return -1;
         }
         // Должны быть проинициализированы как -1
-        for (int i = n_verts_per_face; i < AmrFaces::max_vertices; ++i) {
+        for (int i = n_verts_per_face; i < RawFaces::max_vertices; ++i) {
             if (faces.vertices[iface][i] >= 0) {
                 std::cout << "\tLocal vertices indices should be undefined\n";
                 print_info(ic);
@@ -248,7 +248,7 @@ int AmrCells::check_geometry(index_t ic) const {
     return 0;
 }
 
-int AmrCells::check_base_face_orientation(index_t ic) const {
+int RawCells::check_base_face_orientation(index_t ic) const {
     // Для обычных сеток проверять нечего
     if (!adaptive_) return 0;
 
@@ -315,7 +315,7 @@ int AmrCells::check_base_face_orientation(index_t ic) const {
     return 0;
 }
 
-int AmrCells::check_base_vertices_order(index_t ic) const {
+int RawCells::check_base_vertices_order(index_t ic) const {
     // Для обычных сеток проверять нечего
     if (!adaptive_) return 0;
 
@@ -476,7 +476,7 @@ int AmrCells::check_base_vertices_order(index_t ic) const {
     return 0;
 }
 
-int AmrCells::check_complex_faces(index_t ic) const {
+int RawCells::check_complex_faces(index_t ic) const {
     if (dim_ == 2) {
         for (Side2D side: Side2D::items()) {
             auto iface1 = faces.offsets[ic] + side;
@@ -534,12 +534,12 @@ int AmrCells::check_complex_faces(index_t ic) const {
     return 0;
 }
 
-int AmrCells::check_connectivity(index_t ic) const {
-    AmrCells ghosts = same();
+int RawCells::check_connectivity(index_t ic) const {
+    RawCells ghosts = same();
     return check_connectivity(ic, ghosts);
 }
 
-int AmrCells::check_connectivity(index_t ic, const AmrCells& ghosts) const {
+int RawCells::check_connectivity(index_t ic, const RawCells& ghosts) const {
     if (ic >= m_size) {
         throw std::runtime_error("Данная проверка только для локальных ячеек!");
     }

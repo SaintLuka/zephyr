@@ -45,7 +45,7 @@ public:
     /// @param ic Целевая ячейка, для которой определяется окрестность
     /// @param locals Ссылка на локальное хранилище
     /// @param ghosts Ссылка на хранилище ячеек с других процессов
-    void setup(index_t ic, AmrCells &locals, AmrCells& ghosts) {
+    void setup(index_t ic, RawCells &locals, RawCells& ghosts) {
         scrutiny_check(ic < locals.size(), "setup: ic >= locals.size()")
 
         neib_count = 0;
@@ -148,7 +148,7 @@ struct VicinityList {
     /// @brief Конструктор построения окружения
     /// @param locals Ссылка на локальное хранилище
     /// @param ghosts Ссылка на хранилище ячеек с других процессов
-    void fill(AmrCells& locals, AmrCells& ghosts) {
+    void fill(RawCells& locals, RawCells& ghosts) {
         m_list.resize(locals.n_cells());
         threads::parallel_for(index_t{0}, index_t{locals.n_cells()},
                 [this, &locals, &ghosts](index_t ic) {
@@ -178,7 +178,7 @@ struct VicinityList {
 /// @param vicinity_list Ссылка на массив с окружением ячеек
 /// @return true если ячейка изменила свой флаг
 template <int dim>
-bool update_flag(index_t ic, AmrCells& locals, const VicinityList<dim>& vicinity_list) {
+bool update_flag(index_t ic, RawCells& locals, const VicinityList<dim>& vicinity_list) {
     scrutiny_check(ic < locals.size(), "update_flag error: ic >= locals.size()")
 
     if (locals.flag[ic] > 0) { return false; }
@@ -224,7 +224,7 @@ bool update_flag(index_t ic, AmrCells& locals, const VicinityList<dim>& vicinity
 /// @brief Выполняет функцию update_flag для всех ячеек
 /// @return true если хотя бы одна ячейка изменила свой флаг
 template <int dim>
-bool flag_balancing_step(AmrCells& locals, const VicinityList<dim>& vicinity_list) {
+bool flag_balancing_step(RawCells& locals, const VicinityList<dim>& vicinity_list) {
     // Функция max в данном контексте заменяет логическое "И"
     range_t<index_t> range(0, locals.n_cells());
     return threads::max(
@@ -251,12 +251,12 @@ bool flag_balancing_step(AmrCells& locals, const VicinityList<dim>& vicinity_lis
 /// (и достаточно эффективно) реализуется многопоточность, также алгоритм легко
 /// обобщается на многопроцессорную систему.
 template<int dim>
-void balance_flags_slow(AmrCells& locals, int max_level) {
+void balance_flags_slow(RawCells& locals, int max_level) {
     static Stopwatch restriction_timer;
     static Stopwatch setup_vicinity_timer;
     static Stopwatch flag_balancing_timer;
 
-    static AmrCells ghosts;
+    static RawCells ghosts;
 
     restriction_timer.resume();
     base_restrictions<dim>(locals, max_level);
@@ -293,12 +293,12 @@ void balance_flags_slow(AmrCells& locals, int max_level) {
 /// @brief Простая итерационная версия функции балансировки флагов.
 /// @details Смотреть однопроцессорную версию.
 template<int dim>
-void balance_flags_slow(AmrCells &locals, int max_level, Tourism& tourism) {
+void balance_flags_slow(RawCells &locals, int max_level, Tourism& tourism) {
     static Stopwatch restrictions_timer;
     static Stopwatch setup_vicinity_timer;
     static Stopwatch flag_balancing_timer;
 
-    AmrCells &ghosts = tourism.ghost_cells();
+    RawCells &ghosts = tourism.ghost_cells();
 
     // Делаем статическим, чтобы не выделять каждый раз память (гениально)
     static VicinityList<dim> vicinity_list;
@@ -337,7 +337,7 @@ void balance_flags_slow(AmrCells &locals, int max_level, Tourism& tourism) {
 
 /// @brief Специализация для процессов без ячеек
 template<> inline
-void balance_flags_slow<0>(AmrCells &locals, int max_level, Tourism& tourism) {
+void balance_flags_slow<0>(RawCells &locals, int max_level, Tourism& tourism) {
     int changed = 1;
     while (changed) {
         tourism.sync<MpiTag::FLAG>(locals);

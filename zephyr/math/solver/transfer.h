@@ -1,6 +1,6 @@
 #pragma once
 
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/mesh.h>
 #include <zephyr/geom/plic.h>
 #include <zephyr/math/cfd/limiter.h>
 
@@ -9,9 +9,9 @@ namespace zephyr::math {
 using zephyr::geom::Vector3d;
 using zephyr::geom::Plic;
 
-using zephyr::mesh::EuCell;
-using zephyr::mesh::EuMesh;
-using zephyr::mesh::AmrCells;
+using zephyr::mesh::Cell;
+using zephyr::mesh::Mesh;
+using zephyr::mesh::RawCells;
 using zephyr::mesh::Storable;
 using zephyr::mesh::Direction;
 using zephyr::mesh::Distributor;
@@ -75,7 +75,7 @@ public:
     void set_dim(int dim);
 
     /// @brief Добавить типы для хранения на сетку
-    State add_types(EuMesh& mesh);
+    State add_types(Mesh& mesh);
 
     /// @brief Число Куранта
     double CFL() const;
@@ -108,48 +108,48 @@ public:
 
     /// @brief Посчитать шаг интегрирования по времени с учетом
     /// условия Куранта (для всех ячеек)
-    double compute_dt(EuMesh& mesh) const;
+    double compute_dt(Mesh& mesh) const;
 
     /// @brief Один шаг интегрирования по времени
-    void update(EuMesh& mesh, Direction dir = Direction::ANY);
+    void update(Mesh& mesh, Direction dir = Direction::ANY);
 
     /// @brief Подсеточная реконструкция границы
     /// @param smoothing Число итераций сглаживания
-    void update_interface(EuMesh& mesh, int smoothing = 3) const;
+    void update_interface(Mesh& mesh, int smoothing = 3) const;
 
     /// @brief Установить флаги адаптации
-    void set_flags(EuMesh& mesh) const;
+    void set_flags(Mesh& mesh) const;
 
     /// @brief Распределитель данных при адаптации
     Distributor distributor() const;
 
-    EuMesh body(EuMesh& mesh) const;
+    Mesh body(Mesh& mesh) const;
 
 protected:
 
     /// @brief Посчитать шаг интегрирования по времени с учетом
     /// условия Куранта (для одной ячейки)
-    double compute_dt(EuCell& cell) const;
+    double compute_dt(Cell& cell) const;
 
-    void compute_slopes(EuMesh& mesh) const;
+    void compute_slopes(Mesh& mesh) const;
 
-    void update_CRP(EuMesh& mesh, Direction dir) const;
+    void update_CRP(Mesh& mesh, Direction dir) const;
 
-    void update_VOF(EuMesh& mesh, Direction dir);
+    void update_VOF(Mesh& mesh, Direction dir);
 
-    void update_MUSCL(EuMesh& mesh, Direction dir) const;
+    void update_MUSCL(Mesh& mesh, Direction dir) const;
 
-    void update_WENO(EuMesh& mesh, Direction dir) const;
+    void update_WENO(Mesh& mesh, Direction dir) const;
 
 
     /// @brief Потоки по схеме CRP
-    void fluxes_CRP(EuCell& cell, Direction dir = Direction::ANY) const;
+    void fluxes_CRP(Cell& cell, Direction dir = Direction::ANY) const;
 
     /// @brief Потоки по аналогу VOF
-    void fluxes_VOF(EuCell& cell, Direction dir = Direction::ANY) const;
+    void fluxes_VOF(Cell& cell, Direction dir = Direction::ANY) const;
 
     /// @brief Потоки по схеме MUSCL
-    void fluxes_MUSCL(EuCell& cell, Direction dir = Direction::ANY) const;
+    void fluxes_MUSCL(Cell& cell, Direction dir = Direction::ANY) const;
 
 protected:
     double m_dt;       ///< Шаг интегрирования

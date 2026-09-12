@@ -18,7 +18,7 @@ void Grid::move(const Vector3d& shift) {
     require_editable_();
     threads::for_each(
         m_nodes.begin(), m_nodes.end(),
-        [shift](Node& node) {
+        [shift](GNode& node) {
            node.pos += shift;
         });
 }
@@ -27,7 +27,7 @@ void Grid::scale(double q) {
     require_editable_();
     threads::for_each(
         m_nodes.begin(), m_nodes.end(),
-        [q](Node& node) {
+        [q](GNode& node) {
            node.pos *= q;
         });
 }
@@ -38,7 +38,7 @@ void Grid::rotate(double phi) {
     double cos = std::cos(phi);
     threads::for_each(
         m_nodes.begin(), m_nodes.end(),
-        [sin, cos](Node& node) {
+        [sin, cos](GNode& node) {
             double x = cos * node.pos.x() - sin * node.pos.y();
             double y = sin * node.pos.x() + cos * node.pos.y();
             node.pos.x() = x;
@@ -50,7 +50,7 @@ void Grid::rotate(const Matrix3d& R) {
     require_editable_();
     threads::for_each(
         m_nodes.begin(), m_nodes.end(),
-        [R](Node& node) {
+        [R](GNode& node) {
            node.pos.applyOnTheLeft(R);
         });
 }
@@ -59,16 +59,16 @@ void Grid::transform(const std::function<Vector3d(const Vector3d&)>& func) {
     require_editable_();
     threads::for_each(
         m_nodes.begin(), m_nodes.end(),
-        [&func](Node& node) {
+        [&func](GNode& node) {
            node.pos = func(node.pos);
         });
 }
 
-std::vector<Node::Ptr> Grid::create_central_nodes_() {
-    std::vector<Node::Ptr> central(m_cells.size());
+std::vector<GNode::Ptr> Grid::create_central_nodes_() {
+    std::vector<GNode::Ptr> central(m_cells.size());
     for (id_t i = 0; i < m_cells.size(); ++i) {
         Vector3d c = m_cells[i].center(m_nodes);
-        central[i] = Node::create(c);
+        central[i] = GNode::create(c);
     }
     for (const auto& node: central) {
         add_node(node);
@@ -76,17 +76,17 @@ std::vector<Node::Ptr> Grid::create_central_nodes_() {
     return central;
 }
 
-std::unordered_map<FaceKey, Node::Ptr> Grid::create_face_nodes_() {
-    std::unordered_map<FaceKey, Node::Ptr> face_nodes;
+std::unordered_map<FaceKey, GNode::Ptr> Grid::create_face_nodes_() {
+    std::unordered_map<FaceKey, GNode::Ptr> face_nodes;
     for (auto & cell: m_cells) {
         if (!cell.has_faces()) {
             cell.init_faces();
         }
         for (int iface = 0; iface < cell.n_faces(); ++iface) {
-            const Face& face = cell.get_face(iface);
+            const GFace& face = cell.get_face(iface);
             Vector3d fc = cell.face_center(m_nodes, iface);
             FaceKey face_key{cell, face};
-            face_nodes[face_key] = Node::create(fc);
+            face_nodes[face_key] = GNode::create(fc);
         }
     }
     for (const auto& val: face_nodes | std::views::values) {
@@ -95,12 +95,12 @@ std::unordered_map<FaceKey, Node::Ptr> Grid::create_face_nodes_() {
     return face_nodes;
 }
 
-std::unordered_map<EdgeKey, Node::Ptr> Grid::create_edge_nodes_() {
+std::unordered_map<EdgeKey, GNode::Ptr> Grid::create_edge_nodes_() {
     if (m_dim != 3 && m_type != Type::QUAD) {
         throw std::runtime_error("Grid::create_edge_nodes_: Only for HEX cells");
     }
 
-    std::unordered_map<EdgeKey, Node::Ptr> edge_nodes;
+    std::unordered_map<EdgeKey, GNode::Ptr> edge_nodes;
     edge_nodes.reserve(4 * m_cells.size()); // Для сетки из HEX ячеек
     for (auto& cell: m_cells) {
         if (!cell.has_faces()) {
@@ -115,7 +115,7 @@ std::unordered_map<EdgeKey, Node::Ptr> Grid::create_edge_nodes_() {
                 if (!edge_nodes.contains(edge)) {
                     Vector3d v1 = m_nodes[nid1].pos;
                     Vector3d v2 = m_nodes[nid2].pos;
-                    edge_nodes[edge] = Node::create(0.5 * (v1 + v2));
+                    edge_nodes[edge] = GNode::create(0.5 * (v1 + v2));
                 }
             }
         }
@@ -157,14 +157,14 @@ void Grid::mirror_(int axis) {
 
     // Добавить отраженные вершины
     const id_t n_nodes_prev = m_nodes.size();
-    std::vector<Node::Ptr> mirror_nodes(m_nodes.size());
+    std::vector<GNode::Ptr> mirror_nodes(m_nodes.size());
     for (id_t i = 0; i < m_nodes.size(); ++i) {
         if (border_nodes.contains(i)) {
-            mirror_nodes[i] = Node::create(m_nodes[i].pos);
+            mirror_nodes[i] = GNode::create(m_nodes[i].pos);
             mirror_nodes[i]->m_id = m_nodes[i].id();
         }
         else {
-            mirror_nodes[i] = Node::create(m_nodes[i].pos);
+            mirror_nodes[i] = GNode::create(m_nodes[i].pos);
             mirror_nodes[i]->pos[axis] *= -1.0;
         }
     }
@@ -265,7 +265,7 @@ int choose_delaunay_diagonal(const std::array<Vector3d, 4>& vs) {
 }
 
 void Grid::triangulation_quad_delaunay_() {
-    const std::vector<Cell> quads = std::move(m_cells);
+    const std::vector<GCell> quads = std::move(m_cells);
 
     id_t n_cells = quads.size();
     m_cells.clear();
@@ -281,20 +281,20 @@ void Grid::triangulation_quad_delaunay_() {
         using indexing::quad::vs;
 
         if (choose_delaunay_diagonal(node_pos) == 0) {
-            Cell c1(CellType::TRIANGLE, {node_ids[vs<0, 0>()], node_ids[vs<1, 0>()], node_ids[vs<1, 1>()]});
+            GCell c1(CellType::TRIANGLE, {node_ids[vs<0, 0>()], node_ids[vs<1, 0>()], node_ids[vs<1, 1>()]});
             c1.set_face_bc({face_bc[Side2D::B], face_bc[Side2D::R], Boundary::INNER});
 
-            Cell c2(CellType::TRIANGLE, {node_ids[vs<0, 0>()], node_ids[vs<1, 1>()], node_ids[vs<0, 1>()]});
+            GCell c2(CellType::TRIANGLE, {node_ids[vs<0, 0>()], node_ids[vs<1, 1>()], node_ids[vs<0, 1>()]});
             c2.set_face_bc({Boundary::INNER, face_bc[Side2D::T], face_bc[Side2D::L]});
 
             m_cells.emplace_back(std::move(c1));
             m_cells.emplace_back(std::move(c2));
         }
         else {
-            Cell c1(CellType::TRIANGLE, {node_ids[vs<0, 0>()], node_ids[vs<1, 0>()], node_ids[vs<0, 1>()]});
+            GCell c1(CellType::TRIANGLE, {node_ids[vs<0, 0>()], node_ids[vs<1, 0>()], node_ids[vs<0, 1>()]});
             c1.set_face_bc({face_bc[Side2D::B], Boundary::INNER, face_bc[Side2D::L]});
 
-            Cell c2(CellType::TRIANGLE, {node_ids[vs<1, 0>()], node_ids[vs<1, 1>()], node_ids[vs<0, 1>()]});
+            GCell c2(CellType::TRIANGLE, {node_ids[vs<1, 0>()], node_ids[vs<1, 1>()], node_ids[vs<0, 1>()]});
             c2.set_face_bc({face_bc[Side2D::R], face_bc[Side2D::T], Boundary::INNER});
 
             m_cells.emplace_back(std::move(c1));
@@ -309,7 +309,7 @@ void Grid::triangulation_quad_symmetry_() {
     const auto central = create_central_nodes_();
 
     // Переместить исходные ячейки
-    const std::vector<Cell> quads = std::move(m_cells);
+    const std::vector<GCell> quads = std::move(m_cells);
 
     id_t n_cells = quads.size();
     m_cells.clear();
@@ -321,16 +321,16 @@ void Grid::triangulation_quad_symmetry_() {
         auto face_bc = quads[ic].faces_bc<4>();
 
         using indexing::quad::vs;
-        Cell c1(CellType::TRIANGLE, {node_ids[vs<0, 1>()], node_ids[vs<0, 0>()], central_id});
+        GCell c1(CellType::TRIANGLE, {node_ids[vs<0, 1>()], node_ids[vs<0, 0>()], central_id});
         c1.set_face_bc({face_bc[Side2D::L], Boundary::INNER, Boundary::INNER});
 
-        Cell c2(CellType::TRIANGLE, {node_ids[vs<1, 0>()], node_ids[vs<1, 1>()], central_id});
+        GCell c2(CellType::TRIANGLE, {node_ids[vs<1, 0>()], node_ids[vs<1, 1>()], central_id});
         c2.set_face_bc({face_bc[Side2D::R], Boundary::INNER, Boundary::INNER});
 
-        Cell c3(CellType::TRIANGLE, {node_ids[vs<0, 0>()], node_ids[vs<1, 0>()], central_id});
+        GCell c3(CellType::TRIANGLE, {node_ids[vs<0, 0>()], node_ids[vs<1, 0>()], central_id});
         c3.set_face_bc({face_bc[Side2D::B], Boundary::INNER, Boundary::INNER});
 
-        Cell c4(CellType::TRIANGLE, {node_ids[vs<1, 1>()], node_ids[vs<0, 1>()], central_id});
+        GCell c4(CellType::TRIANGLE, {node_ids[vs<1, 1>()], node_ids[vs<0, 1>()], central_id});
         c4.set_face_bc({face_bc[Side2D::T], Boundary::INNER, Boundary::INNER});
 
         m_cells.emplace_back(std::move(c1));
@@ -362,7 +362,7 @@ void Grid::triangulation_hex_symmetry_() {
     auto face_unique_nodes = create_face_nodes_();
 
     // Переместить исходные ячейки
-    const std::vector<Cell> cubes = std::move(m_cells);
+    const std::vector<GCell> cubes = std::move(m_cells);
 
     id_t n_cells = cubes.size();
     m_cells.clear();
@@ -383,16 +383,16 @@ void Grid::triangulation_hex_symmetry_() {
             // У hex грани обходятся нормалью наружу
             using indexing::hex::face_nodes;
 
-            Cell c1(CellType::TETRA, {face_ids[side], node_ids[face_nodes[side][1]], node_ids[face_nodes[side][0]], central_id});
+            GCell c1(CellType::TETRA, {face_ids[side], node_ids[face_nodes[side][1]], node_ids[face_nodes[side][0]], central_id});
             c1.set_face_bc({face_bc[side], Boundary::INNER, Boundary::INNER, Boundary::INNER});
 
-            Cell c2(CellType::TETRA, {face_ids[side], node_ids[face_nodes[side][2]], node_ids[face_nodes[side][1]], central_id});
+            GCell c2(CellType::TETRA, {face_ids[side], node_ids[face_nodes[side][2]], node_ids[face_nodes[side][1]], central_id});
             c2.set_face_bc({face_bc[side], Boundary::INNER, Boundary::INNER, Boundary::INNER});
 
-            Cell c3(CellType::TETRA, {face_ids[side], node_ids[face_nodes[side][3]], node_ids[face_nodes[side][2]], central_id});
+            GCell c3(CellType::TETRA, {face_ids[side], node_ids[face_nodes[side][3]], node_ids[face_nodes[side][2]], central_id});
             c3.set_face_bc({face_bc[side], Boundary::INNER, Boundary::INNER, Boundary::INNER});
 
-            Cell c4(CellType::TETRA, {face_ids[side], node_ids[face_nodes[side][0]], node_ids[face_nodes[side][3]], central_id});
+            GCell c4(CellType::TETRA, {face_ids[side], node_ids[face_nodes[side][0]], node_ids[face_nodes[side][3]], central_id});
             c4.set_face_bc({face_bc[side], Boundary::INNER, Boundary::INNER, Boundary::INNER});
 
             m_cells.emplace_back(std::move(c1));
@@ -423,7 +423,7 @@ void Grid::pyramidize() {
     const auto central = create_central_nodes_();
 
     // Переместить исходные ячейки
-    const std::vector<Cell> cubes = std::move(m_cells);
+    const std::vector<GCell> cubes = std::move(m_cells);
 
     id_t n_cells = cubes.size();
     m_cells.clear();
@@ -439,7 +439,7 @@ void Grid::pyramidize() {
             // узлы основания перечисляются нормалью внутрь
             using indexing::hex::face_nodes;
 
-            Cell cell(CellType::PYRAMID, {
+            GCell cell(CellType::PYRAMID, {
                 base_ids[face_nodes[side][3]],
                 base_ids[face_nodes[side][2]],
                 base_ids[face_nodes[side][1]],
@@ -483,12 +483,12 @@ void Grid::extrude(const Vector3d& p, int N, Boundary side1, Boundary side2) {
     m_nodes.reserve((N + 1) * n_nodes);
     for (id_t k = 1; k <= N; ++k) {
         for (id_t j = 0; j < n_nodes; ++j) {
-            auto node = Node::create(m_nodes[j].pos + (k * p) / N);
+            auto node = GNode::create(m_nodes[j].pos + (k * p) / N);
             add_node(node);
         }
     }
 
-    const std::vector<Cell> grid = std::move(m_cells);
+    const std::vector<GCell> grid = std::move(m_cells);
 
     id_t n_cells = grid.size();
     m_cells.reserve(N * n_cells);
@@ -505,7 +505,7 @@ void Grid::extrude(const Vector3d& p, int N, Boundary side1, Boundary side2) {
             if (type == CellType::TRIANGLE) {
                 // Преобразуем в WEDGE (треугольная призма)
                 using namespace indexing;
-                Cell cell(CellType::WEDGE, {
+                GCell cell(CellType::WEDGE, {
                     base_ids[0] + k * n_nodes,
                     base_ids[2] + k * n_nodes,
                     base_ids[1] + k * n_nodes,
@@ -526,7 +526,7 @@ void Grid::extrude(const Vector3d& p, int N, Boundary side1, Boundary side2) {
             else if (type == CellType::QUAD) {
                 // Преобразуем в HEX
                 using namespace indexing;
-                Cell cell(CellType::HEXAHEDRON, {
+                GCell cell(CellType::HEXAHEDRON, {
                     base_ids[quad::vs<0,0>()] + k * n_nodes,
                     base_ids[quad::vs<1,0>()] + k * n_nodes,
                     base_ids[quad::vs<1,1>()] + k * n_nodes,
@@ -558,7 +558,7 @@ void Grid::extrude(const Vector3d& p, int N, Boundary side1, Boundary side2) {
                     node_ids[i + poly_size] = base_ids[i] + (k + 1) * n_nodes;
                 }
 
-                Cell cell(CellType::POLYHEDRON, std::move(node_ids));
+                GCell cell(CellType::POLYHEDRON, std::move(node_ids));
 
                 // Массив граничных условий
                 std::vector face_bc(poly_size + 2, Boundary::UNDEFINED);
@@ -605,12 +605,12 @@ void Grid::make_amr_2D_() {
     auto face_nodes = create_face_nodes_();
 
     // Сохраняем исходные ячейки
-    const std::vector<Cell> quads = std::move(m_cells);
+    const std::vector<GCell> quads = std::move(m_cells);
 
     // Преобразовать ячейки в AMR2D (заменяем полигоны на таблицы 3x3)
     m_cells.clear();
     for (id_t i = 0; i < quads.size(); ++i) {
-        const Cell& quad = quads[i];
+        const GCell& quad = quads[i];
         FaceKey L{quad, quad.get_face(Side2D::L)};
         FaceKey R{quad, quad.get_face(Side2D::R)};
         FaceKey B{quad, quad.get_face(Side2D::B)};
@@ -631,7 +631,7 @@ void Grid::make_amr_2D_() {
         id_t v_B = face_nodes[B]->id();
         id_t v_T = face_nodes[T]->id();
 
-        Cell cell(CellType::AMR2D,{
+        GCell cell(CellType::AMR2D,{
             vLB, v_B, vRB,
             v_L, v_C, v_R,
             vLT, v_T, vRT
@@ -656,12 +656,12 @@ void Grid::make_amr_3D_() {
     auto edge_nodes = create_edge_nodes_();
 
     // Сохраняем исходные ячейки
-    const std::vector<Cell> quads = std::move(m_cells);
+    const std::vector<GCell> quads = std::move(m_cells);
 
     // Преобразовать ячейки в AMR2D (заменяем полигоны на таблицы 3x3)
     m_cells.clear();
     for (id_t i = 0; i < quads.size(); ++i) {
-        const Cell& quad = quads[i];
+        const GCell& quad = quads[i];
         FaceKey L{quad, quad.get_face(Side3D::L)};
         FaceKey R{quad, quad.get_face(Side3D::R)};
         FaceKey B{quad, quad.get_face(Side3D::B)};
@@ -736,7 +736,7 @@ void Grid::make_amr_3D_() {
         nodes[amr::vs<+1, -1, 0>()] = edge_nodes[e_rb]->id();
         nodes[amr::vs<+1, +1, 0>()] = edge_nodes[e_rt]->id();
 
-        Cell cell(CellType::AMR3D, std::move(nodes));
+        GCell cell(CellType::AMR3D, std::move(nodes));
         cell.init_faces();
         for (int k = 0; k < 6; ++k) {
             cell.set_bc(k, quad.get_face(k).bc());

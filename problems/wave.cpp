@@ -2,7 +2,7 @@
 /// @brief Numerical solution of a wave equation.
 
 #include <zephyr/geom/generator/rectangle.h>
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/mesh.h>
 #include <zephyr/io/pvd_file.h>
 
 using namespace zephyr::geom;
@@ -18,7 +18,7 @@ int main() {
                         .bottom=Boundary::WALL, .top=Boundary::WALL});
 
     // Create mesh
-    EuMesh mesh(gen);
+    Mesh mesh(gen);
 
     // Add data fields
     Storable<double> u_prev = mesh.add<double>("u_prev");

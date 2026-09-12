@@ -13,8 +13,8 @@
 #include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/geom/generator/collection/plane_with_hole.h>
 
-#include <zephyr/mesh/euler/eu_prim.h>
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/cell.h>
+#include <zephyr/mesh/mesh.h>
 
 #include <zephyr/mesh/decomp/ORB.h>
 #include <zephyr/mesh/decomp/rwalk.h>
@@ -24,8 +24,8 @@ using namespace zephyr::mesh;
 using namespace zephyr::io;
 using namespace zephyr::geom::generator;
 
-using zephyr::mesh::EuMesh;
-using zephyr::mesh::EuCell;
+using zephyr::mesh::Mesh;
+using zephyr::mesh::Cell;
 using zephyr::mesh::decomp::ORB;
 using zephyr::mesh::decomp::RWalk;
 using zephyr::utils::mpi;
@@ -36,94 +36,94 @@ auto ZOE = Boundary::ZOE;
 
 
 // Простой квадрат с декартовой сеткой
-EuMesh test1() {
+Mesh test1() {
     Rectangle gen(-1.0, 1.0, -1.0, 1.0);
     gen.set_boundaries({.left=WALL, .right=WALL, .bottom=WALL, .top=WALL});
     gen.set_nx(20);
     gen.set_adaptive(false);
-    return EuMesh(gen, true);
+    return Mesh(gen, true);
 }
 
 // Простой квадрат с адаптивной декартовой сеткой
-EuMesh test2() {
+Mesh test2() {
     Rectangle gen(-1.0, 1.0, -1.0, 1.0);
     gen.set_boundaries({.left=WALL, .right=WALL, .bottom=WALL, .top=WALL});
     gen.set_nx(20);
-    return EuMesh(gen, true);
+    return Mesh(gen, true);
 }
 
 // Ячейки Вороного в прямоугольнике
-EuMesh test3() {
+Mesh test3() {
     Rectangle gen(-1.0, 1.0, -1.0, 1.0, true);
     gen.set_boundaries({.left=WALL, .right=WALL, .bottom=WALL, .top=WALL});
     gen.set_nx(20);
-    return EuMesh(gen, true);
+    return Mesh(gen, true);
 }
 
 // Декартова сетка в кубе
-EuMesh test4() {
+Mesh test4() {
     Cuboid gen(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
     gen.set_boundaries({.left=WALL, .right=WALL, .bottom=WALL, .top=WALL, .back=WALL, .front=WALL});
     gen.set_nx(20);
     gen.set_adaptive(false);
-    return EuMesh(gen, true);
+    return Mesh(gen, true);
 }
 
 // Декартова адаптивная сетка в кубе
-EuMesh test5() {
+Mesh test5() {
     Cuboid gen(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
     gen.set_boundaries({.left=WALL, .right=WALL, .bottom=WALL, .top=WALL, .back=WALL, .front=WALL});
     gen.set_nx(20);
-    return EuMesh(gen, true);
+    return Mesh(gen, true);
 }
 
 // Extrude сетки из многоугольников
-EuMesh test6() {
+Mesh test6() {
     Rectangle gen(-1.0, 1.0, -1.0, 1.0, true);
     gen.set_boundaries({.left=WALL, .right=WALL, .bottom=WALL, .top=WALL});
     gen.set_nx(20);
     Grid grid = gen.make();
     grid.extrude(Vector3d{0.0, 0.0, 1.0}, 12, WALL, WALL);
-    return EuMesh(std::move(grid), true);
+    return Mesh(std::move(grid), true);
 }
 
 // Простая BlockStructured сетка
-EuMesh test7() {
+Mesh test7() {
     collection::PlaneWithHole gen(0.0, 2.0, 0.0, 1.0, 0.6, 0.2, 0.1);
     gen.set_boundaries({.left=ZOE, .right=ZOE, .bottom=WALL, .top=WALL});
     gen.set_ny(40);
-    return EuMesh(gen, true);
+    return Mesh(gen, true);
 }
 
 // BlockStructured с extrude
-EuMesh test8() {
+Mesh test8() {
     collection::PlaneWithHole gen = collection::PlaneWithHole(0.0, 2.0, 0.0, 2.0, 1.0, 1.0, 0.3);
     gen.set_boundaries({.left=ZOE, .right=ZOE, .bottom=WALL, .top=WALL});
     gen.set_ny(40);
     Grid grid = gen.make();
     grid.extrude(Vector3d::UnitZ(), 20, ZOE, ZOE);
-    return EuMesh(std::move(grid), true);
+    return Mesh(std::move(grid), true);
 }
 
 // BlockStructured, затем make_amr
-EuMesh test9() {
+Mesh test9() {
     collection::PlaneWithHole gen = collection::PlaneWithHole(0.0, 2.0, 0.0, 2.0, 1.0, 1.0, 0.3);
     gen.set_boundaries({.left=WALL, .right=WALL, .bottom=WALL, .top=WALL});
     gen.set_ny(40);
     Grid grid = gen.make();
     grid.make_amr();
-    return EuMesh(std::move(grid), true);
+    return Mesh(std::move(grid), true);
 }
 
 // BlockStructured, затем extrude и make_amr
-EuMesh test10() {
+Mesh test10() {
     collection::PlaneWithHole gen = collection::PlaneWithHole(0.0, 2.0, 0.0, 2.0, 1.0, 1.0, 0.3);
     gen.set_boundaries({.left=WALL, .right=WALL, .bottom=WALL, .top=WALL});
     gen.set_ny(40);
     Grid grid = gen.make();
     grid.extrude(Vector3d::UnitZ()/5, 4, ZOE, ZOE);
     grid.make_amr();
-    return EuMesh(std::move(grid), true);
+    return Mesh(std::move(grid), true);
 }
 
 // План.
@@ -132,7 +132,7 @@ EuMesh test10() {
 // redistribute
 // check_base() for all
 
-void check_mesh(const EuMesh& mesh) {
+void check_mesh(const Mesh& mesh) {
     mpi::for_each([&]() {
         int res = mesh.check_base();
         if (res < 0) {
@@ -144,8 +144,8 @@ void check_mesh(const EuMesh& mesh) {
     });
 }
 
-void save_markers(const AmrNodes& nodes, std::string filename) {
-    EuMesh points = EuMesh::PolySet(2);
+void save_markers(const RawNodes& nodes, std::string filename) {
+    Mesh points = Mesh::PolySet(2);
     for (int in = 0; in < nodes.n_nodes(); ++in) {
         points.add_marker(nodes.coord[in], 0.02);
     }
@@ -181,7 +181,7 @@ int main(int argc, char** argv) {
     threads::off();
 
     // Создать сетку
-    EuMesh mesh = test2();
+    Mesh mesh = test2();
 
     mpi::cout << "Single process:\n";
     check_mesh(mesh);
@@ -198,7 +198,7 @@ int main(int argc, char** argv) {
 
     // Переменные для сохранения
     pvd.variables = {"level", "verts2D"};
-    pvd.variables += {"u",  [u](EuCell& cell) -> double { return cell[u]; }};
+    pvd.variables += {"u",  [u](Cell& cell) -> double { return cell[u]; }};
     pvd.options.unique_nodes = false;
     pvd.save(mesh, 0.0);
 

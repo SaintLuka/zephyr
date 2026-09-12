@@ -1,4 +1,4 @@
-#include <zephyr/mesh/euler/eu_node.h>
+#include <zephyr/mesh/node.h>
 
 namespace zephyr::mesh {
 

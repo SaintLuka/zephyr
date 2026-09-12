@@ -4,7 +4,7 @@
 #include <iomanip>
 
 #include <zephyr/geom/generator/strip.h>
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/mesh.h>
 
 #include <zephyr/io/pvd_file.h>
 
@@ -17,8 +17,8 @@ using zephyr::geom::Box;
 using zephyr::geom::Boundary;
 using zephyr::geom::Vector3d;
 using zephyr::geom::generator::Strip;
-using zephyr::mesh::EuMesh;
-using zephyr::mesh::EuCell;
+using zephyr::mesh::Mesh;
+using zephyr::mesh::Cell;
 using zephyr::io::PvdFile;
 
 using namespace zephyr::phys;
@@ -39,7 +39,7 @@ int main() {
     gen.set_boundaries({.left = Boundary::ZOE, .right = Boundary::ZOE});
 
     // Создать сетку
-    EuMesh mesh(gen);
+    Mesh mesh(gen);
 
     // Переменные для хранения на сетке
     auto rho1 = mesh.add<double>("rho1");
@@ -57,7 +57,7 @@ int main() {
 
     // Переменные для сохранения
     pvd.variables.add_cell_data("rho", rho1);
-    pvd.variables += {"velocity", [v1](EuCell& cell) -> double { return cell[v1].x(); }};
+    pvd.variables += {"velocity", [v1](Cell& cell) -> double { return cell[v1].x(); }};
     pvd.variables.add_cell_data("pressure", p1);
     pvd.variables.add_cell_data("energy", e1);
 

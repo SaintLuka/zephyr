@@ -4,8 +4,8 @@
 #include <zephyr/io/pvd_file.h>
 #include <zephyr/geom/indexing.h>
 #include <zephyr/mesh/amr/common.h>
-#include <zephyr/mesh/euler/router.h>
-#include <zephyr/mesh/euler/tourism.h>
+#include <zephyr/mesh/raw/router.h>
+#include <zephyr/mesh/raw/tourism.h>
 #include <zephyr/utils/threads.h>
 
 #ifdef ZEPHYR_MPI
@@ -117,7 +117,7 @@ void Tourism::shrink_to_fit() {
     ghost_nodes_.shrink_to_fit();
 }
 
-void Tourism::init_types(const AmrCells& cells) {
+void Tourism::init_types(const RawCells& cells) {
     border_cells_ = cells.same();
     ghost_cells_ = cells.same();
 }
@@ -192,7 +192,7 @@ void Tourism::extend_ghost_nodes() {
     }
 }
 
-void Tourism::fill_nodes_send_count(const AmrNodes& nodes) {
+void Tourism::fill_nodes_send_count(const RawNodes& nodes) {
     if (nodes.empty()) {
         // Сетка без уникальных узлов
         node_router_.set_zero_send_count();
@@ -230,7 +230,7 @@ void Tourism::fill_nodes_send_count(const AmrNodes& nodes) {
     inct_router_.set_send_count(inct_send_count);
 }
 
-void Tourism::fill_border_nodes_indices(const AmrNodes& nodes) {
+void Tourism::fill_border_nodes_indices(const RawNodes& nodes) {
     if (nodes.empty()) {
         border_nodes_indices_.clear();
         return;
@@ -266,7 +266,7 @@ void Tourism::fill_border_nodes_indices(const AmrNodes& nodes) {
     }
 }
 
-void Tourism::fill_cells_send_count(const AmrCells& cells) {
+void Tourism::fill_cells_send_count(const RawCells& cells) {
     if (cells.empty()) {
         cell_router_.set_zero_send_count();
         face_router_.set_zero_send_count();
@@ -309,7 +309,7 @@ void Tourism::fill_cells_send_count(const AmrCells& cells) {
     vert_router_.set_send_count(vert_send_count);
 }
 
-void Tourism::fill_border_cells_indices(const AmrCells& cells) {
+void Tourism::fill_border_cells_indices(const RawCells& cells) {
     if (cells.empty()) {
         border_cells_indices_.clear();
         return;
@@ -351,7 +351,7 @@ void Tourism::fill_border_cells_indices(const AmrCells& cells) {
     }
 }
 
-void Tourism::fill_cells_send_count(const AmrCells& cells, const AmrNodes& nodes) {
+void Tourism::fill_cells_send_count(const RawCells& cells, const RawNodes& nodes) {
     if (cells.empty()) {
         cell_router_.set_zero_send_count();
         face_router_.set_zero_send_count();
@@ -394,7 +394,7 @@ void Tourism::fill_cells_send_count(const AmrCells& cells, const AmrNodes& nodes
             index_t idx = cells.verts.index[i];
 
             index_t inode = gst < 0 ? idx : gst;
-            const AmrNodes& neibs = gst < 0 ? nodes : ghost_nodes_;
+            const RawNodes& neibs = gst < 0 ? nodes : ghost_nodes_;
 
             if (inode < 0 || inode >= neibs.n_nodes()) {
                 std::cout << "Rank " << mpi::rank() << "\n";
@@ -428,7 +428,7 @@ void Tourism::fill_cells_send_count(const AmrCells& cells, const AmrNodes& nodes
     vert_router_.set_send_count(vert_send_count);
 }
 
-void Tourism::fill_border_cells_indices(const AmrCells& cells, const AmrNodes& nodes) {
+void Tourism::fill_border_cells_indices(const RawCells& cells, const RawNodes& nodes) {
     if (cells.empty()) {
         border_cells_indices_.clear();
         return;
@@ -475,7 +475,7 @@ void Tourism::fill_border_cells_indices(const AmrCells& cells, const AmrNodes& n
             index_t idx = cells.verts.index[i];
 
             index_t inode = gst < 0 ? idx : gst;
-            const AmrNodes& neibs = gst < 0 ? nodes : ghost_nodes_;
+            const RawNodes& neibs = gst < 0 ? nodes : ghost_nodes_;
 
             for (index_t inc: neibs.incident.range(inode)) {
                 if (neibs.incident.is_undefined(inc)) {
@@ -498,7 +498,7 @@ void Tourism::fill_border_cells_indices(const AmrCells& cells, const AmrNodes& n
     }
 }
 
-void Tourism::prepare_cells_geometry(const AmrCells& cells) {
+void Tourism::prepare_cells_geometry(const RawCells& cells) {
     z_assert(border_cells_.has_nodes() == cells.has_nodes(), "Has no nodes");
     z_assert(ghost_cells_. has_nodes() == cells.has_nodes(), "Has no nodes");
 
@@ -512,7 +512,7 @@ void Tourism::prepare_cells_geometry(const AmrCells& cells) {
     }
 }
 
-void Tourism::prepare_nodes_geometry(const AmrNodes& nodes) {
+void Tourism::prepare_nodes_geometry(const RawNodes& nodes) {
     index_t inc_offset = 0;
     for (index_t in = 0; in < border_nodes_indices_.size(); ++in) {
         nodes.copy_geom(border_nodes_indices_[in], border_nodes_, in, inc_offset);
@@ -521,7 +521,7 @@ void Tourism::prepare_nodes_geometry(const AmrNodes& nodes) {
     }
 }
 
-void Tourism::build_border_nodes(const AmrNodes& nodes) {
+void Tourism::build_border_nodes(const RawNodes& nodes) {
     // Заполнить router.send_count
     fill_nodes_send_count(nodes);
 
@@ -535,7 +535,7 @@ void Tourism::build_border_nodes(const AmrNodes& nodes) {
     prepare_nodes_geometry(nodes);
 }
 
-void Tourism::build_border_cells(const AmrCells& cells, const AmrNodes& nodes) {
+void Tourism::build_border_cells(const RawCells& cells, const RawNodes& nodes) {
     if (!cells.has_nodes()) {
         // Нет уникальных узлов - окрестность Неймана
 
@@ -563,7 +563,7 @@ void Tourism::build_border_cells(const AmrCells& cells, const AmrNodes& nodes) {
 }
 
 // Инициализация индекса ghost = -1 для большинства граней
-void set_undef_ghosts(AmrCells& cells, int rank) {
+void set_undef_ghosts(RawCells& cells, int rank) {
     threads::parallel_for(
         index_t{0}, cells.n_cells(),
         [&cells, rank](index_t ic) {
@@ -598,7 +598,7 @@ index_t Tourism::find_ghost_cell(int rank, index_t index) const {
 }
 
 // выставить index/ghost в verts
-void Tourism::find_connections_verts(AmrVerts &verts, int rank) const {
+void Tourism::find_connections_verts(RawVerts &verts, int rank) const {
     for (index_t iv = 0; iv < verts.n_verts(); ++iv) {
         index_t rnk = verts.rank[iv];
         if (rnk < 0 || rnk >= mpi::size()) {
@@ -632,7 +632,7 @@ void Tourism::find_connections_verts(AmrVerts &verts, int rank) const {
 }
 
 // Обходим ячейки в ghost и ищем связи
-void Tourism::find_connections_neumann(AmrCells& cells, int rank) const {
+void Tourism::find_connections_neumann(RawCells& cells, int rank) const {
     // Инициализация индекса ghost = -1 для большинства граней
     set_undef_ghosts(cells, mpi::rank());
 
@@ -661,8 +661,8 @@ void Tourism::find_connections_neumann(AmrCells& cells, int rank) const {
 }
 
 // Обходим ячейки в ghost и ищем связи
-void Tourism::find_connections_moore(AmrCells& cells, AmrNodes &nodes, int rank) {
-    auto mark_incident = [this, rank](AmrNodes& nodes) {
+void Tourism::find_connections_moore(RawCells& cells, RawNodes &nodes, int rank) {
+    auto mark_incident = [this, rank](RawNodes& nodes) {
         for (index_t inc = 0; inc < nodes.incident.n_values(); ++inc) {
             if (nodes.incident.is_undefined(inc)) continue;
 
@@ -680,7 +680,7 @@ void Tourism::find_connections_moore(AmrCells& cells, AmrNodes &nodes, int rank)
     mark_incident(nodes);
     mark_incident(ghost_nodes_);
 
-    auto mark_adjacent = [this, rank](AmrCells& cells) {
+    auto mark_adjacent = [this, rank](RawCells& cells) {
         for (index_t iface = 0; iface < cells.n_faces(); ++iface) {
             if (cells.faces.is_undefined(iface)) continue;
 
@@ -699,7 +699,7 @@ void Tourism::find_connections_moore(AmrCells& cells, AmrNodes &nodes, int rank)
     mark_adjacent(ghost_cells_);
 }
 
-void Tourism::build_ghost_cells(const AmrCells& cells, const AmrNodes& nodes) {
+void Tourism::build_ghost_cells(const RawCells& cells, const RawNodes& nodes) {
     // Построить border-слой
     build_border_cells(cells, nodes);
 
@@ -715,7 +715,7 @@ void Tourism::build_ghost_cells(const AmrCells& cells, const AmrNodes& nodes) {
     sync_cells_geometry();
 }
 
-void Tourism::build_ghost_nodes(const AmrNodes &nodes) {
+void Tourism::build_ghost_nodes(const RawNodes &nodes) {
     // Построить border-слой узлов
     build_border_nodes(nodes);
 
@@ -730,7 +730,7 @@ void Tourism::build_ghost_nodes(const AmrNodes &nodes) {
     sync_nodes_geometry();
 }
 
-void Tourism::update(AmrCells& cells, AmrNodes& nodes) {
+void Tourism::update(RawCells& cells, RawNodes& nodes) {
     if (cells.has_nodes()) {
         build_ghost_nodes(nodes);
         find_connections_verts(cells.verts, mpi::rank());
@@ -752,7 +752,7 @@ void Tourism::update(AmrCells& cells, AmrNodes& nodes) {
 // @param rank Ранг процесса, к которому ищется прилегание.
 // @return bitset<8> - true/false, прилегает дочерняя ячейка или нет.
 template<int dim>
-std::bitset<8> border_children(const AmrFaces& faces, index_t ic, int rank) {
+std::bitset<8> border_children(const RawFaces& faces, index_t ic, int rank) {
     std::bitset<8> children; children.reset();
     index_t face_beg = Side<dim>::n_subfaces() * ic;
     for (Side<dim> side: Side<dim>::items()) {
@@ -1029,7 +1029,7 @@ void set_amr_indices(std::vector<index_t>& faces_beg, std::vector<index_t>& vert
 
 template <int dim>
 void set_amr_incident(std::vector<index_t>& offsets) {
-    constexpr int n_inc = AmrIncident::max_incident_amr(dim);
+    constexpr int n_inc = RawIncident::max_incident_amr(dim);
     threads::parallel_for(
         index_t{0}, index_t(offsets.size()),
         [&offsets](index_t ic) {
@@ -1037,12 +1037,12 @@ void set_amr_incident(std::vector<index_t>& offsets) {
         });
 }
 
-void Tourism::send_geometry(const AmrCells& cells) {
+void Tourism::send_geometry(const RawCells& cells) {
     prepare_cells_geometry(cells);
     sync_cells_geometry();
 }
 
-void Tourism::restore_indices(AmrCells& cells) const {
+void Tourism::restore_indices(RawCells& cells) const {
     for (index_t ic: border_cells_indices_) {
         for (index_t iface: cells.faces.range(ic)) {
             index_t ghost_index = cells.faces.adjacent.ghost[iface];

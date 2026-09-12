@@ -65,7 +65,7 @@ public:
     /// @code
     /// Variables vars;
     /// vars.append("momentum", 2,
-    ///     WriteFunction<float>([](EuCell& cell, float* out) {
+    ///     WriteFunction<float>([](Cell& cell, float* out) {
     ///         out[0] = static_cast<float>(cell.mass * cell.velocity.x);
     ///         out[1] = static_cast<float>(cell.mass * cell.velocity.y);
     ///     }));
@@ -94,9 +94,9 @@ public:
     /// @brief Упрощенный вариант для добавления скалярных полей ячеек
     template <typename T = double>
     std::enable_if_t<std::is_arithmetic_v<T>, void>
-    append(std::string_view name, std::function<T(mesh::EuCell&)> func) {
+    append(std::string_view name, std::function<T(mesh::Cell&)> func) {
         list_.emplace_back(name, 1, WriteCell<T>(
-                [func](mesh::EuCell& cell, T *out) {
+                [func](mesh::Cell& cell, T *out) {
                     out[0] = func(cell);
                 }));
     }
@@ -104,9 +104,9 @@ public:
     /// @brief Упрощенный вариант для добавления скалярных полей узлов
     template <typename T = double>
     std::enable_if_t<std::is_arithmetic_v<T>, void>
-    append(std::string_view name, std::function<T(mesh::EuNode&)> func) {
+    append(std::string_view name, std::function<T(mesh::Node&)> func) {
         list_.emplace_back(name, 1, WriteNode<T>(
-                [func](mesh::EuNode& node, T *out) {
+                [func](mesh::Node& node, T *out) {
                     out[0] = func(node);
                 }));
     }
@@ -114,9 +114,9 @@ public:
     /// @brief Упрощенный вариант для добавления векторных полей ячеек
     template <typename T>
     std::enable_if_t<std::is_same_v<T, geom::Vector3d>, void>
-    append(std::string_view name, std::function<geom::Vector3d(mesh::EuCell&)> func) {
+    append(std::string_view name, std::function<geom::Vector3d(mesh::Cell&)> func) {
         list_.emplace_back(name, 3, WriteCell<double>(
-                [func](mesh::EuCell& cell, double *out) {
+                [func](mesh::Cell& cell, double *out) {
                     *reinterpret_cast<geom::Vector3d*>(out) = func(cell);
                 }));
     }
@@ -124,24 +124,24 @@ public:
     /// @brief Упрощенный вариант для добавления векторных полей узлов
     template <typename T>
     std::enable_if_t<std::is_same_v<T, geom::Vector3d>, void>
-    append(std::string_view name, std::function<geom::Vector3d(mesh::EuNode&)> func) {
+    append(std::string_view name, std::function<geom::Vector3d(mesh::Node&)> func) {
         list_.emplace_back(name, 3, WriteNode<double>(
-                [func](mesh::EuNode& node, double *out) {
+                [func](mesh::Node& node, double *out) {
                     *reinterpret_cast<geom::Vector3d*>(out) = func(node);
                 }));
     }
 
     /// @brief Упрощенный синтаксис для добавления полей типа double
     /// Variables vars;
-    /// vars += {"rho", [](EuCell& cell) -> double { ... } };
-    void operator+=(std::pair<std::string_view, std::function<double(mesh::EuCell&)>> p) {
+    /// vars += {"rho", [](Cell& cell) -> double { ... } };
+    void operator+=(std::pair<std::string_view, std::function<double(mesh::Cell&)>> p) {
         append(p.first, p.second);
     }
 
     /// @brief Упрощенный синтаксис для добавления полей типа double
     /// Variables vars;
-    /// vars += {"rho", [](EuNode& node) -> double { ... } };
-    void operator+=(std::pair<std::string_view, std::function<double(mesh::EuNode&)>> p) {
+    /// vars += {"rho", [](Node& node) -> double { ... } };
+    void operator+=(std::pair<std::string_view, std::function<double(mesh::Node&)>> p) {
         append(p.first, p.second);
     }
 
@@ -159,7 +159,7 @@ public:
         if (VtkType::get<T>().is_undefined()) {
             if constexpr (std::is_same_v<T, geom::Vector3d>) {
                 append(name, 3, WriteCell<double>(
-                        [p](mesh::EuCell &cell, double *out) {
+                        [p](mesh::Cell &cell, double *out) {
                             out[0] = cell[p].x();
                             out[1] = cell[p].y();
                             out[2] = cell[p].z();
@@ -170,7 +170,7 @@ public:
         }
         else {
             append(name, 1, WriteCell<T>(
-                [p](mesh::EuCell &cell, T *out) {
+                [p](mesh::Cell &cell, T *out) {
                     out[0] = cell[p];
                 }));
         }
@@ -185,7 +185,7 @@ public:
         if (VtkType::get<T>().is_undefined()) {
             if constexpr (std::is_same_v<T, geom::Vector3d>) {
                 append(name, 3, WriteNode<double>(
-                        [p](mesh::EuNode &node, double *out) {
+                        [p](mesh::Node &node, double *out) {
                             out[0] = node[p].x();
                             out[1] = node[p].y();
                             out[2] = node[p].z();
@@ -196,7 +196,7 @@ public:
         }
         else {
             append(name, 1, WriteNode<T>(
-                [p](mesh::EuNode &node, T *out) {
+                [p](mesh::Node &node, T *out) {
                     out[0] = node[p];
                 }));
         }

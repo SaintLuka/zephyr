@@ -15,7 +15,7 @@
 #include <zephyr/geom/geom.h>
 #include <zephyr/geom/side.h>
 #include <zephyr/geom/indexing.h>
-#include <zephyr/mesh/euler/amr_cells.h>
+#include <zephyr/mesh/raw/raw_cells.h>
 
 namespace zephyr::mesh::amr {
 
@@ -373,7 +373,7 @@ template <int dim>
 using Map = std::conditional_t<dim == 2, Quad, Cube>;
 
 template <int dim>
-void find_rotations_impl(AmrCells& locals, const AmrCells& ghosts) {
+void find_rotations_impl(RawCells& locals, const RawCells& ghosts) {
     z_assert(locals.adaptive(), "find_rotations: not adaptive mesh");
     for (index_t ic = 0; ic < locals.n_cells(); ++ic) {
         Map<dim> map1 = locals.verts.mapping<dim>(ic).reduce();
@@ -399,8 +399,8 @@ void find_rotations_impl(AmrCells& locals, const AmrCells& ghosts) {
 }
 
 /// @brief Автоматический выбор размерности
-inline void find_rotations(AmrCells &locals) {
-    static AmrCells ghosts;
+inline void find_rotations(RawCells &locals) {
+    static RawCells ghosts;
 
     if (locals.empty()) return;
 

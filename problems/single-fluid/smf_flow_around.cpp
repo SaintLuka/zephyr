@@ -10,7 +10,7 @@
 #include <zephyr/geom/generator/collection/plane_with_cube.h>
 #include <zephyr/geom/generator/cuboid.h>
 
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/mesh.h>
 #include <zephyr/math/solver/sm_fluid.h>
 
 #include <zephyr/io/pvd_file.h>
@@ -32,38 +32,38 @@ using namespace zephyr::phys;
 using namespace zephyr::math;
 using namespace zephyr::math::smf;
 
-using zephyr::mesh::EuMesh;
+using zephyr::mesh::Mesh;
 using zephyr::math::SmFluid;
 using zephyr::utils::mpi;
 using zephyr::utils::threads;
 using zephyr::utils::Stopwatch;
 
-EuMesh wedge() {
+Mesh wedge() {
     Wedge gen(0.0, 2.0, 0.0, 1.0, 0.8, M_PI / 6.0);
     gen.set_boundaries({.left   = Boundary::ZOE,  .right = Boundary::ZOE,
                         .bottom = Boundary::WALL, .top   = Boundary::WALL});
     gen.set_nx(200);
     gen.set_adaptive(true);
-    return EuMesh(gen);
+    return Mesh(gen);
 }
 
-EuMesh plane_with_hole() {
+Mesh plane_with_hole() {
     PlaneWithHole gen(0.0, 2.0, -1.0, 1.0, 0.5, 0.0, 0.1);
     gen.set_boundaries({.left   = Boundary::ZOE, .right = Boundary::ZOE,
                         .bottom = Boundary::ZOE, .top   = Boundary::ZOE,
                         .hole   = Boundary::WALL});
     gen.set_nx(200);
     gen.set_adaptive(true);
-    return EuMesh(gen);
+    return Mesh(gen);
 }
 
-EuMesh plane_with_cube() {
+Mesh plane_with_cube() {
     PlaneWithCube gen(0.0, 2.0, -1.0, 1.0, 0.5, 0.0, 0.1);
     gen.set_boundaries({.left   = Boundary::ZOE, .right = Boundary::ZOE,
                         .bottom = Boundary::ZOE, .top   = Boundary::ZOE});
     gen.set_nx(200);
     gen.set_adaptive(true);
-    return EuMesh(gen);
+    return Mesh(gen);
 }
 
 int main(int argc, char** argv) {
@@ -75,9 +75,9 @@ int main(int argc, char** argv) {
     ShockWave test(3.0, 0.1, 2.0);
 
     // Create mesh
-    //EuMesh mesh = wedge();
-    //EuMesh mesh = plane_with_hole();
-    EuMesh mesh = plane_with_cube();
+    //Mesh mesh = wedge();
+    //Mesh mesh = plane_with_hole();
+    Mesh mesh = plane_with_cube();
 
     // Test class provides EoS
     auto eos = test.get_eos();
@@ -103,14 +103,14 @@ int main(int argc, char** argv) {
 
     // Variables to save
     pvd.variables = {"level"};
-    pvd.variables += {"density",  [z](EuCell& cell) -> double { return cell[z].density; }};
-    pvd.variables += {"vel.x",    [z](EuCell& cell) -> double { return cell[z].velocity.x(); }};
-    pvd.variables += {"vel.y",    [z](EuCell& cell) -> double { return cell[z].velocity.y(); }};
-    pvd.variables += {"pressure", [z](EuCell& cell) -> double { return cell[z].pressure; }};
-    pvd.variables += {"energy",   [z](EuCell& cell) -> double { return cell[z].energy; }};
+    pvd.variables += {"density",  [z](Cell& cell) -> double { return cell[z].density; }};
+    pvd.variables += {"vel.x",    [z](Cell& cell) -> double { return cell[z].velocity.x(); }};
+    pvd.variables += {"vel.y",    [z](Cell& cell) -> double { return cell[z].velocity.y(); }};
+    pvd.variables += {"pressure", [z](Cell& cell) -> double { return cell[z].pressure; }};
+    pvd.variables += {"energy",   [z](Cell& cell) -> double { return cell[z].energy; }};
 
     // Setup initial conditions
-    auto init_cell = [&test, z](EuCell& cell) {
+    auto init_cell = [&test, z](Cell& cell) {
         auto cell_c = cell.center();
         cell[z].density  = test.density(cell_c);
         cell[z].velocity = test.velocity(cell_c);

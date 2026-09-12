@@ -3,7 +3,7 @@
 #include <zephyr/geom/vector.h>
 
 namespace zephyr::mesh {
-class EuCell;
+class Cell;
 }
 
 namespace zephyr::geom {
@@ -25,7 +25,7 @@ public:
     using plane_t = std::tuple<double, Vector3d>;
 
     /// @brief Функция вытаскивания i-ой объемной доли из ячейки
-    using get_fraction_t = std::function<double(const mesh::EuCell&, int)>;
+    using get_fraction_t = std::function<double(const mesh::Cell&, int)>;
 
     /// @brief Тривиальный конструктор
     Plic();
@@ -35,11 +35,11 @@ public:
     Plic(int dim, bool cartesian, Type type, const get_fraction_t& get_vf);
 
     /// @brief Реконструировать плоскость в ячейке
-    plane_t plane(mesh::EuCell& cell, int idx) const;
+    plane_t plane(mesh::Cell& cell, int idx) const;
 
 private:
     /// @brief Основная функция, инициализируется после выбора параметров
-    std::function<plane_t(mesh::EuCell&, int)> m_find_plane;
+    std::function<plane_t(mesh::Cell&, int)> m_find_plane;
 };
 
 } // namespace zephyr::geom

@@ -9,7 +9,7 @@
 
 #include <zephyr/io/pvd_file.h>
 
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/mesh.h>
 #include <zephyr/mesh/decomp/ORB.h>
 
 #include <zephyr/geom/generator/cuboid.h>
@@ -33,7 +33,7 @@ Vector3d velocity(const Vector3d& c) {
 }
 
 // Шар в левом нижнем углу области
-void set_initials(EuMesh& mesh, const Box& domain,
+void set_initials(Mesh& mesh, const Box& domain,
         Storable<double> u1, Storable<double> u2) {
     Vector3d vc = domain.vmin + 0.2 * domain.sizes();
     double D = 0.1 * domain.diameter();
@@ -44,7 +44,7 @@ void set_initials(EuMesh& mesh, const Box& domain,
 }
 
 // Адаптация больших перепадов концентрации
-void set_flags(EuMesh& mesh, Storable<double> var) {
+void set_flags(Mesh& mesh, Storable<double> var) {
     for (auto cell: mesh) {
         cell.set_flag(-1);
 
@@ -63,7 +63,7 @@ void set_flags(EuMesh& mesh, Storable<double> var) {
 // Распределитель данных при адаптации
 Distributor get_distributor(Storable<double> var) {
     Distributor distr = Distributor::simple();
-    distr.merge = [var](const Children &children, EuCell &parent) {
+    distr.merge = [var](const Children &children, Cell &parent) {
         double sum = 0.0;
         for (auto child: children) {
             sum += child[var] * child.volume();
@@ -82,7 +82,7 @@ int main() {
     gen.set_nx(123);
 
     // Создаем сетку
-    EuMesh mesh(gen);
+    Mesh mesh(gen);
 
     // Добавить данные на сетку
     auto [u1, u2] = mesh.add_multi<double>("u1", "u2");

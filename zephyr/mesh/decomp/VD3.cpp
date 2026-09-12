@@ -14,7 +14,7 @@ VD3::VD3(const Box &domain, int size)
     diagram_ = VDiagram(domain, gs);
 }
 
-int VD3::rank(const EuCell &elem) const {
+int VD3::rank(const Cell &elem) const {
     return diagram_.rank(elem.center());
 }
 

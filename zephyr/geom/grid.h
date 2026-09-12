@@ -41,17 +41,17 @@ using node_ids_t = boost::container::static_vector<node_id_t, max_nodes_per_face
 
 /// @brief Узел сетки (положение + индекс). Индекс проставляет Grid,
 /// при этом выполняется дедубликация по указателям.
-class Node {
+class GNode {
 public:
-    using Ptr = std::shared_ptr<Node>;
-    using Ref = const std::shared_ptr<Node>&;
+    using Ptr = std::shared_ptr<GNode>;
+    using Ref = const std::shared_ptr<GNode>&;
 
     Vector3d pos{nanvec()};           ///< Положение
     Boundary bc{Boundary::UNDEFINED}; ///< Граничное условие
 
 
     /// @brief Создать узел из Eigen вектора
-    explicit Node(const Vector3d& v);
+    explicit GNode(const Vector3d& v);
 
     /// @brief Создать узел из Eigen вектора
     static Ptr create(const Vector3d& v);
@@ -66,10 +66,10 @@ public:
     bool is_finite() const;
 
     /// @brief Точное сравнение координат и индексов
-    bool operator==(const Node& other) const;
+    bool operator==(const GNode& other) const;
 
     /// @brief Точное сравнение координат и индексов
-    bool operator!=(const Node& other) const;
+    bool operator!=(const GNode& other) const;
 
 private:
     friend class Grid;
@@ -77,10 +77,10 @@ private:
 };
 
 /// @brief Грань ячейки
-class Face {
+class GFace {
 public:
     /// @brief Пустая грань без узлов и гран условий
-    Face() = default;
+    GFace() = default;
 
     // ------------------------------- Индексы --------------------------------
 
@@ -142,15 +142,15 @@ private:
 };
 
 /// @brief Ячейка сетки.
-class Cell {
+class GCell {
 public:
     // ---------------------------- Инициализация -----------------------------
 
     /// @brief Конструктор базовой ячейки (только необходимое)
-    Cell(CellType type, std::vector<id_t>&& node_ids);
+    GCell(CellType type, std::vector<id_t>&& node_ids);
 
     /// @brief Конструктор базовой ячейки (только необходимое)
-    Cell(CellType type, std::initializer_list<id_t> node_ids);
+    GCell(CellType type, std::initializer_list<id_t> node_ids);
 
     /// @brief Установить граничные условия, если граней нет, то они будут созданы
     void set_face_bc(const std::vector<Boundary>& face_bc);
@@ -191,13 +191,13 @@ public:
 
     int n_faces() const { return static_cast<int>(m_faces.size()); }
 
-    const Face& get_face(int iface) const { return m_faces[iface]; }
+    const GFace& get_face(int iface) const { return m_faces[iface]; }
 
     void set_bc(int iface, Boundary bc) { m_faces[iface].set_bc(bc); }
 
     void set_neib(int iface, id_t neib_id, int face_id);
 
-    const std::vector<Face>& faces() const { return m_faces; }
+    const std::vector<GFace>& faces() const { return m_faces; }
 
 
 
@@ -218,18 +218,18 @@ public:
     Vector3d centroid() const { return m_center; }
 
     /// @brief Среднее вершин грани
-    Vector3d face_center(const std::vector<Node>& grid_nodes, int iface) const;
+    Vector3d face_center(const std::vector<GNode>& grid_nodes, int iface) const;
 
     /// @brief Среднее вершин ячейки
-    Vector3d center(const std::vector<Node>& grid_nodes) const;
+    Vector3d center(const std::vector<GNode>& grid_nodes) const;
 
     /// @brief Вычислить геометрию ячейки и граней
-    void calc_geom(const std::vector<Node>& grid_nodes);
+    void calc_geom(const std::vector<GNode>& grid_nodes);
 
 private:
     CellType m_type{};            ///< Тип ячейки
     std::vector<id_t> m_nodes{};  ///< Индексы вершин
-    std::vector<Face> m_faces{};  ///< Грани (optional)
+    std::vector<GFace> m_faces{};  ///< Грани (optional)
 
     Vector3d m_center{nanvec()};  ///< Барицентр ячейки
     double   m_volume{NAN};       ///< Объем ячейки
@@ -239,7 +239,7 @@ private:
 struct FaceKey {
     std::vector<id_t> ids;
 
-    explicit FaceKey(const Cell& cell, const Face& face);
+    explicit FaceKey(const GCell& cell, const GFace& face);
 
     bool operator==(const FaceKey& o) const noexcept;
 };
@@ -336,18 +336,18 @@ public:
     void reserve_cells(id_t n_cells);
 
     /// @brief Add a node via shared pointer; returns node index.
-    id_t add_node(Node::Ref node);
+    id_t add_node(GNode::Ref node);
 
     /// @brief Add a node via shared pointer; returns node indices.
-    std::vector<id_t> add_nodes(const std::vector<Node::Ptr>& nodes);
+    std::vector<id_t> add_nodes(const std::vector<GNode::Ptr>& nodes);
 
     /// @brief Add a cell using a vector of
-    id_t add_cell(CellType type, const std::vector<Node::Ptr>& nodes,
+    id_t add_cell(CellType type, const std::vector<GNode::Ptr>& nodes,
                   const std::vector<Boundary>& faces_bc = {});
 
     /// @brief Add a cell of special kind (CellType::POLYHEDRON)
-    id_t add_polyhedron(const std::vector<Node::Ptr>& nodes,
-                        const std::vector<std::vector<Node::Ptr>>& faces,
+    id_t add_polyhedron(const std::vector<GNode::Ptr>& nodes,
+                        const std::vector<std::vector<GNode::Ptr>>& faces,
                         const std::vector<Boundary>& faces_bc = {});
 
     // --------------------------
@@ -426,10 +426,10 @@ public:
     std::size_t n_cells() const noexcept { return m_cells.size(); }
 
     /// @brief Access finalized nodes.
-    const std::vector<Node>& nodes() const noexcept { return m_nodes; }
+    const std::vector<GNode>& nodes() const noexcept { return m_nodes; }
 
     /// @brief Access finalized cells.
-    const std::vector<Cell>& cells() const noexcept { return m_cells; }
+    const std::vector<GCell>& cells() const noexcept { return m_cells; }
 
     /// @brief Faces is computed?
     bool has_faces() const noexcept;
@@ -447,13 +447,13 @@ private:
     // ==========================
 
     /// @brief Создать узлы в центрах ячеек и добавить их на сетку
-    std::vector<Node::Ptr> create_central_nodes_();
+    std::vector<GNode::Ptr> create_central_nodes_();
 
     /// @brief Создать узлы в центрах граней и добавить их на сетку
-    std::unordered_map<FaceKey, Node::Ptr> create_face_nodes_();
+    std::unordered_map<FaceKey, GNode::Ptr> create_face_nodes_();
 
     /// @brief Создать узлы в центрах рёбер и добавить их на сетку
-    std::unordered_map<EdgeKey, Node::Ptr> create_edge_nodes_();
+    std::unordered_map<EdgeKey, GNode::Ptr> create_edge_nodes_();
 
     /// @brief Достроить зеркальное отражение сетки. Все узлы сетки должны
     /// лежать в одной полуплоскости.
@@ -494,8 +494,8 @@ private:
 
     int m_dim{0};
     Type m_type{Type::NONE};
-    std::vector<Node> m_nodes{};
-    std::vector<Cell> m_cells{};
+    std::vector<GNode> m_nodes{};
+    std::vector<GCell> m_cells{};
 };
 
 } // namespace zephyr::geom

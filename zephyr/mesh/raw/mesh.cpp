@@ -3,8 +3,8 @@
 #include <iomanip>
 #include <set>
 
-#include <zephyr/mesh/euler/eu_mesh.h>
-#include <zephyr/mesh/euler/eu_prim.h>
+#include <zephyr/mesh/mesh.h>
+#include <zephyr/mesh/cell.h>
 
 #include <zephyr/geom/indexing.h>
 #include <zephyr/geom/generator/rectangle.h>
@@ -32,7 +32,7 @@ using namespace geom::indexing;
 namespace {
 
 // Генерация локальной сетки из grid
-AmrCells make_locals(geom::Grid&& grid, bool unique_nodes) {
+RawCells make_locals(geom::Grid&& grid, bool unique_nodes) {
     // Опции генерации сетки
     constexpr Grid::BuildOptions options{
         .build_faces=true
@@ -44,7 +44,7 @@ AmrCells make_locals(geom::Grid&& grid, bool unique_nodes) {
         throw std::runtime_error("Grid was built with wrong options, need faces per cell");
     }
 
-    AmrCells locals({
+    RawCells locals({
         .dim = grid.dimension(),
         .adaptive = grid.adaptive(),
         .linear = true,
@@ -148,7 +148,7 @@ AmrCells make_locals(geom::Grid&& grid, bool unique_nodes) {
 
 } // anonymous namespace
 
-void EuMesh::sync_params_() {
+void Mesh::sync_params_() {
 #ifdef ZEPHYR_MPI
     if (!mpi::single()) {
         int dim = local_cells_.dim();
@@ -169,7 +169,7 @@ void EuMesh::sync_params_() {
                 .axial    = bool(axial),
                 .nodes    = bool(nodes)
             };
-            local_cells_ = AmrCells(opts);
+            local_cells_ = RawCells(opts);
         }
     }
 
@@ -179,7 +179,7 @@ void EuMesh::sync_params_() {
 #endif
 }
 
-void EuMesh::build_(Generator& gen, bool unique_nodes) {
+void Mesh::build_(Generator& gen, bool unique_nodes) {
     if (mpi::master()) {
         if (gen.can_make_cells()) {
             local_cells_ = gen.make_cells(unique_nodes);
@@ -216,7 +216,7 @@ void EuMesh::build_(Generator& gen, bool unique_nodes) {
     }
 }
 
-EuMesh::EuMesh(Grid&& grid, bool unique_nodes) {
+Mesh::Mesh(Grid&& grid, bool unique_nodes) {
     if (mpi::master()) {
         local_cells_ = make_locals(std::move(grid), unique_nodes);
         init_amr();
@@ -227,11 +227,11 @@ EuMesh::EuMesh(Grid&& grid, bool unique_nodes) {
     sync_params_();
 }
 
-EuMesh::EuMesh(Generator& gen, bool unique_nodes) {
+Mesh::Mesh(Generator& gen, bool unique_nodes) {
     build_(gen, unique_nodes);
 }
 
-EuMesh::EuMesh(const Json& config) {
+Mesh::Mesh(const Json& config) {
     // Создать сетку на master-процессе
     auto gen = Generator::create(config);
 
@@ -274,7 +274,7 @@ EuMesh::EuMesh(const Json& config) {
             int dim = local_cells_.empty() ? 0 : local_cells_.dim();
             dim = mpi::max(dim);
 
-            z_assert((dim == 2 || dim == 3), "Strange dimension, EuMesh constructed by json");
+            z_assert((dim == 2 || dim == 3), "Strange dimension, Mesh constructed by json");
 
             // По умолчанию что-то такое
             set_decomposition(dim < 3 ? "XY" : "XYZ");
@@ -282,28 +282,28 @@ EuMesh::EuMesh(const Json& config) {
     }
 }
 
-EuMesh EuMesh::PolySet(int dim) {
-    EuMesh mesh;
+Mesh Mesh::PolySet(int dim) {
+    Mesh mesh;
     MeshOpts opts{.dim=dim, .adaptive=false, .nodes=false};
-    mesh.local_cells_ = AmrCells(opts);
+    mesh.local_cells_ = RawCells(opts);
     return mesh;
 }
 
-void EuMesh::init_amr() {
+void Mesh::init_amr() {
     if (!local_cells_.adaptive()) return;
 
     amr::find_rotations(local_cells_);
 }
 
-bool EuMesh::adaptive() const {
+bool Mesh::adaptive() const {
     return max_level_ > 0;
 }
 
-int EuMesh::max_level() const {
+int Mesh::max_level() const {
     return max_level_;
 }
 
-void EuMesh::set_max_level(int max_level) {
+void Mesh::set_max_level(int max_level) {
     if (!local_cells_.adaptive()) {
         max_level_ = 0;
     } else {
@@ -311,7 +311,7 @@ void EuMesh::set_max_level(int max_level) {
     }
 }
 
-void EuMesh::set_distributor(const std::string& name) {
+void Mesh::set_distributor(const std::string& name) {
     if (name == "empty") {
         distributor_ = Distributor::empty();
     } else {
@@ -319,11 +319,11 @@ void EuMesh::set_distributor(const std::string& name) {
     }
 }
 
-void EuMesh::set_distributor(Distributor distr) {
+void Mesh::set_distributor(Distributor distr) {
     distributor_ = std::move(distr);
 }
 
-void EuMesh::balance_flags() {
+void Mesh::balance_flags() {
 #if SCRUTINY
     static bool first_time = true;
     if (first_time) {
@@ -343,7 +343,7 @@ void EuMesh::balance_flags() {
 #endif
 }
 
-void EuMesh::apply_flags() {
+void Mesh::apply_flags() {
 #if SCRUTINY
     static size_t pvd_counter = 0;
 
@@ -394,7 +394,7 @@ void EuMesh::apply_flags() {
 #endif
 }
 
-void EuMesh::make_shuba(int count) {
+void Mesh::make_shuba(int count) {
     count = std::max(0, std::min(count, 50));
 
     for (int i = 1; i <= count; i++) {
@@ -403,7 +403,7 @@ void EuMesh::make_shuba(int count) {
             tourists_.sync<MpiTag::FLAG>(local_cells_);
         }
 #endif
-        for_each([&](EuCell& cell) {
+        for_each([&](Cell& cell) {
             if (cell.flag() > 0) return;
             for (auto face: cell.faces()) {
                 if (face.neib_flag() == i) {
@@ -415,7 +415,7 @@ void EuMesh::make_shuba(int count) {
     }
 }
 
-void EuMesh::refine() {
+void Mesh::refine() {
     if (!adaptive()) { return; }
     structured_ = false;
 
@@ -425,11 +425,11 @@ void EuMesh::refine() {
 
     // Для однопроцессорной версии при пустой сетке сразу выход
     if (mpi::single() && local_cells_.empty()) {
-        throw std::runtime_error("EuMesh::refine(): Empty mesh");
+        throw std::runtime_error("Mesh::refine(): Empty mesh");
     }
 
     if (local_cells_.has_nodes()) {
-        throw std::runtime_error("EuMesh::refine(): Unique nodes are not supported");
+        throw std::runtime_error("Mesh::refine(): Unique nodes are not supported");
     }
 
     full.resume();
@@ -488,7 +488,7 @@ void EuMesh::refine() {
 #endif
 }
 
-void EuMesh::refine_full(int level) {
+void Mesh::refine_full(int level) {
     if (level < 0 || level > max_level_) {
         level = max_level_;
     }
@@ -497,14 +497,14 @@ void EuMesh::refine_full(int level) {
     }
 
     for (int i = 0; i < level; ++i) {
-        for_each([level](EuCell &cell) {
+        for_each([level](Cell &cell) {
             cell.set_flag(cell.level() < level ? 1 : 0);
         });
         refine();
     }
 }
 
-void EuMesh::check_reference(bool fix) {
+void Mesh::check_reference(bool fix) {
     Box box = bbox();
     double xmin = box.vmin.x();
     double xmax = box.vmax.x();
@@ -682,7 +682,7 @@ std::string bytes(size_t n_bytes) {
     return std::format("{:6.1f} GB", 1.0e-9 * double(n_bytes));
 }
 
-void EuMesh::memory_usage() const {
+void Mesh::memory_usage() const {
     memory_t geom_size = local_cells_.memory_usage();
     memory_t face_size = local_cells_.faces.memory_usage();
     memory_t adj_size = local_cells_.faces.adjacent.memory_usage();
@@ -723,7 +723,7 @@ void EuMesh::memory_usage() const {
     // Сделать MPI-версию проверки памяти. Ну и подумать над оптимизацией размеров
 }
 
-int EuMesh::check_base() const {
+int Mesh::check_base() const {
     if (local_cells_.empty()) {
         if (mpi::single()) {
             std::cout << "\tEmpty storage\n";
@@ -860,7 +860,7 @@ int EuMesh::check_base() const {
     return 0;
 }
 
-int EuMesh::check_refined() const {
+int Mesh::check_refined() const {
     if (local_cells_.empty()) {
         if (mpi::single()) {
             std::cout << "\tEmpty storage\n";
@@ -960,7 +960,7 @@ int EuMesh::check_refined() const {
     return 0;
 }
 
-Box EuMesh::bbox() const {
+Box Mesh::bbox() const {
     Box box1 = Box::Empty(3);
     for (auto& v: local_cells_.verts.coord) {
         box1.capture(v);
@@ -979,20 +979,20 @@ Box EuMesh::bbox() const {
     return box2;
 }
 
-void EuMesh::push_back(const geom::Line& line) {
+void Mesh::push_back(const geom::Line& line) {
     geom::Polygon poly = {line[0], line[1], line[1], line[0]};
     local_cells_.push_back(poly);
 }
 
-void EuMesh::push_back(const geom::Polygon& poly) {
+void Mesh::push_back(const geom::Polygon& poly) {
     local_cells_.push_back(poly);
 }
 
-void EuMesh::push_back(const geom::Polyhedron& poly) {
+void Mesh::push_back(const geom::Polyhedron& poly) {
     local_cells_.push_back(poly);
 }
 
-void EuMesh::add_marker(const geom::Vector3d& pos, double size) {
+void Mesh::add_marker(const geom::Vector3d& pos, double size) {
     if (dim() < 3) {
         double c1 = 0.5 * size;
         double c2 = 0.5 * size * std::sqrt(3.0);
@@ -1007,46 +1007,46 @@ void EuMesh::add_marker(const geom::Vector3d& pos, double size) {
     }
 }
 
-EuCell_Iter EuMesh::begin() {
+Cell_Iter Mesh::begin() {
     return {&local_cells_, 0,
         mpi_cond(&tourists_.ghost_cells(), nullptr) };
 }
 
-EuCell_Iter EuMesh::end() {
+Cell_Iter Mesh::end() {
     return {&local_cells_, local_cells_.n_cells(),
         mpi_cond(&tourists_.ghost_cells(), nullptr) };
 }
 
-EuCell EuMesh::operator[](index_t idx) {
+Cell Mesh::operator[](index_t idx) {
     return {&local_cells_, idx,
         mpi_cond(&tourists_.ghost_cells(), nullptr) };
 }
 
-EuCell EuMesh::operator()(int i, int j) {
+Cell Mesh::operator()(int i, int j) {
     i = (i + nx_) % nx_;
     j = (j + ny_) % ny_;
     return operator[](ny_ * i + j);
 }
 
-EuCell EuMesh::operator()(int i, int j, int k) {
+Cell Mesh::operator()(int i, int j, int k) {
     i = (i + nx_) % nx_;
     j = (j + ny_) % ny_;
     k = (k + nz_) % nz_;
     return operator[](nz_ * (ny_ * i + j) + k);
 }
 
-EuNodeRange EuMesh::nodes() {
+NodesRange Mesh::nodes() {
     if (!has_nodes()) {
-        throw std::runtime_error("EuMesh::nodes: has no unique nodes");
+        throw std::runtime_error("Mesh::nodes: has no unique nodes");
     }
 #ifndef ZEPHYR_MPI
-    return EuNodeRange(&local_nodes_, &local_cells_, nullptr);
+    return NodesRange(&local_nodes_, &local_cells_, nullptr);
 #else
-    return EuNodeRange(&local_nodes_, &local_cells_, &tourists_.ghost_cells());
+    return NodesRange(&local_nodes_, &local_cells_, &tourists_.ghost_cells());
 #endif
 }
 
-void EuMesh::backup(const std::string& sroot, const std::vector<std::string>& variables) const {
+void Mesh::backup(const std::string& sroot, const std::vector<std::string>& variables) const {
     namespace fs = std::filesystem;
 
     const fs::path root = sroot;

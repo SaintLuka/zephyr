@@ -12,7 +12,7 @@
 namespace zephyr::mesh::amr {
 
 /// @brief Функция балансировки флагов верхнего уровня
-inline void balance_flags(AmrCells &cells, int max_level) {
+inline void balance_flags(RawCells &cells, int max_level) {
     if (cells.empty()) return;
 
 #if FAST_BALANCING
@@ -37,7 +37,7 @@ inline void balance_flags(AmrCells &cells, int max_level) {
 #ifdef ZEPHYR_MPI
 
 /// @brief Функция балансировки флагов верхнего уровня
-inline void balance_flags(AmrCells &locals, int max_level, Tourism& tourism) {
+inline void balance_flags(RawCells &locals, int max_level, Tourism& tourism) {
 #if FAST_BALANCING
     if (locals.dim() < 3) {
         amr::balance_flags_fast<2>(locals, max_level, tourism);

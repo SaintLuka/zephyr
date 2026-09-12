@@ -1,8 +1,8 @@
 #include <set>
 
 #include <zephyr/utils/mpi.h>
-#include <zephyr/mesh/euler/amr_nodes.h>
-#include <zephyr/mesh/euler/amr_cells.h>
+#include <zephyr/mesh/raw/raw_nodes.h>
+#include <zephyr/mesh/raw/raw_cells.h>
 #include <zephyr/utils/threads.h>
 
 using zephyr::utils::mpi;
@@ -12,7 +12,7 @@ using zephyr::geom::Boundary;
 
 namespace zephyr::mesh {
 
-void AmrIncident::clear() {
+void RawIncident::clear() {
     offsets = {0};
 
     role.clear();
@@ -21,7 +21,7 @@ void AmrIncident::clear() {
     ghost.clear();
 }
 
-void AmrIncident::resize(index_t n_nodes, index_t n_values) {
+void RawIncident::resize(index_t n_nodes, index_t n_values) {
     offsets.resize(n_nodes + 1, offsets.back());
 
     role.resize(n_values, -1);
@@ -30,8 +30,8 @@ void AmrIncident::resize(index_t n_nodes, index_t n_values) {
     ghost.resize(n_values, -1);
 }
 
-void AmrIncident::resize_amr(index_t n_nodes, int dim) {
-    z_assert(dim == 2 || dim == 3, "AmrIncident::resize_amr: bad dimension");
+void RawIncident::resize_amr(index_t n_nodes, int dim) {
+    z_assert(dim == 2 || dim == 3, "RawIncident::resize_amr: bad dimension");
 
     index_t prev_size = role.size();
     int inc_per_node = max_incident_amr(dim);
@@ -41,7 +41,7 @@ void AmrIncident::resize_amr(index_t n_nodes, int dim) {
     }
 }
 
-void AmrIncident::reserve(index_t n_nodes, index_t n_values) {
+void RawIncident::reserve(index_t n_nodes, index_t n_values) {
     offsets.reserve(n_nodes + 1);
 
     role.reserve(n_values);
@@ -50,14 +50,14 @@ void AmrIncident::reserve(index_t n_nodes, index_t n_values) {
     ghost.reserve(n_values);
 }
 
-void AmrIncident::reserve_amr(index_t n_nodes, int dim) {
-    z_assert(dim == 2 || dim == 3, "AmrIncident::reserve: bad dimension");
+void RawIncident::reserve_amr(index_t n_nodes, int dim) {
+    z_assert(dim == 2 || dim == 3, "RawIncident::reserve: bad dimension");
 
     int inc_per_node = max_incident_amr(dim);
     reserve(n_nodes, inc_per_node * n_nodes);
 }
 
-void AmrIncident::shrink_to_fit() {
+void RawIncident::shrink_to_fit() {
     offsets.shrink_to_fit();
     role.shrink_to_fit();
     rank.shrink_to_fit();
@@ -65,7 +65,7 @@ void AmrIncident::shrink_to_fit() {
     ghost.shrink_to_fit();
 }
 
-int AmrIncident::count(index_t inode) const {
+int RawIncident::count(index_t inode) const {
     index_t i = offsets[inode];
     while (i < offsets[inode + 1] && role[i] >= 0) {
         ++i;
@@ -73,7 +73,7 @@ int AmrIncident::count(index_t inode) const {
     return i - offsets[inode];
 }
 
-memory_t AmrIncident::memory_usage() const {
+memory_t RawIncident::memory_usage() const {
     memory_t mem;
     mem.add(role);
     mem.add(rank);
@@ -82,7 +82,7 @@ memory_t AmrIncident::memory_usage() const {
     return mem;
 }
 
-void AmrNodes::clear() {
+void RawNodes::clear() {
     rank.clear();
     next.clear();
     index.clear();
@@ -90,7 +90,7 @@ void AmrNodes::clear() {
     incident.clear();
 }
 
-void AmrNodes::resize(index_t n_nodes, index_t n_incident) {
+void RawNodes::resize(index_t n_nodes, index_t n_incident) {
     data.resize(n_nodes);
     rank.resize(n_nodes);
     next.resize(n_nodes);
@@ -99,7 +99,7 @@ void AmrNodes::resize(index_t n_nodes, index_t n_incident) {
     incident.resize(n_nodes, n_incident);
 }
 
-void AmrNodes::resize_amr(index_t n_nodes, int dim) {
+void RawNodes::resize_amr(index_t n_nodes, int dim) {
     data.resize(n_nodes);
     rank.resize(n_nodes);
     next.resize(n_nodes);
@@ -108,7 +108,7 @@ void AmrNodes::resize_amr(index_t n_nodes, int dim) {
     incident.resize_amr(n_nodes, dim);
 }
 
-void AmrNodes::reserve(index_t n_nodes, index_t n_incident) {
+void RawNodes::reserve(index_t n_nodes, index_t n_incident) {
     data.reserve(n_nodes);
     rank.reserve(n_nodes);
     next.reserve(n_nodes);
@@ -117,7 +117,7 @@ void AmrNodes::reserve(index_t n_nodes, index_t n_incident) {
     incident.reserve(n_nodes, n_incident);
 }
 
-void AmrNodes::reserve_amr(index_t n_nodes, int dim) {
+void RawNodes::reserve_amr(index_t n_nodes, int dim) {
     data.reserve(n_nodes);
     rank.reserve(n_nodes);
     next.reserve(n_nodes);
@@ -126,7 +126,7 @@ void AmrNodes::reserve_amr(index_t n_nodes, int dim) {
     incident.reserve_amr(n_nodes, dim);
 }
 
-void AmrNodes::shrink_to_fit() {
+void RawNodes::shrink_to_fit() {
     data.shrink_to_fit();
     rank.shrink_to_fit();
     next.shrink_to_fit();
@@ -135,15 +135,15 @@ void AmrNodes::shrink_to_fit() {
     incident.shrink_to_fit();
 }
 
-void AmrNodes::copy_data(index_t from, index_t to) {
+void RawNodes::copy_data(index_t from, index_t to) {
     copy_data(from, this, to);
 }
 
-void AmrNodes::copy_data(index_t from, AmrNodes* dst, index_t to) const {
+void RawNodes::copy_data(index_t from, RawNodes* dst, index_t to) const {
     data.copy_data(from, &dst->data, to);
 }
 
-void AmrNodes::copy_geom(index_t in, AmrNodes& nodes, index_t jn, index_t inc_offset) const {
+void RawNodes::copy_geom(index_t in, RawNodes& nodes, index_t jn, index_t inc_offset) const {
     nodes.rank [jn] = rank [in];
     nodes.next [jn] = next [in];
     nodes.index[jn] = index[in];
@@ -206,7 +206,7 @@ struct NodeOwners {
     std::set<NodeOwner> owners;
 };
 
-NodeOwners find_owners(const AmrCells& cells, index_t ic0, role_t loc_iv0) {
+NodeOwners find_owners(const RawCells& cells, index_t ic0, role_t loc_iv0) {
     // Интересующая нас вершина
     index_t iv0 = cells.verts.offsets[ic0] + loc_iv0;
     Vector3d p = cells.verts[iv0];
@@ -266,7 +266,7 @@ NodeOwners find_owners(const AmrCells& cells, index_t ic0, role_t loc_iv0) {
             // Сосед может не содержать искомую вершину
             if (loc_iv_n >= cells.verts.max_count(ic_n)) continue;
 
-            z_assert(iv_n >= 0, "AmrFaces::setup_for: Impossible error");
+            z_assert(iv_n >= 0, "RawFaces::setup_for: Impossible error");
 
             // Соседняя ячейка нам подходит, помещаем в стек
             in_work.emplace_back(NodeOwner{.ic=ic_n, .iv=iv_n, .role=loc_iv_n});
@@ -277,9 +277,9 @@ NodeOwners find_owners(const AmrCells& cells, index_t ic0, role_t loc_iv0) {
 }
 
 template <bool complete>
-AmrNodes::Incomplete AmrNodes::generate(const AmrCells& cells) {
-    AmrNodes nodes;
-    AmrVerts verts;
+RawNodes::Incomplete RawNodes::generate(const RawCells& cells) {
+    RawNodes nodes;
+    RawVerts verts;
 
     // Пустые массивы
     if (cells.empty()) {
@@ -325,7 +325,7 @@ AmrNodes::Incomplete AmrNodes::generate(const AmrCells& cells) {
             int n_incident = owners.size();
             if (cells.adaptive()) {
                 // Для адаптивных строго фиксируется число инцидентных
-                n_incident = AmrIncident::max_incident_amr(cells.dim());
+                n_incident = RawIncident::max_incident_amr(cells.dim());
             }
 
             if constexpr (complete) {
@@ -363,11 +363,11 @@ AmrNodes::Incomplete AmrNodes::generate(const AmrCells& cells) {
     return {verts, nodes};
 }
 
-template AmrNodes::Incomplete AmrNodes::generate<true >(const AmrCells& cells);
-template AmrNodes::Incomplete AmrNodes::generate<false>(const AmrCells& cells);
+template RawNodes::Incomplete RawNodes::generate<true >(const RawCells& cells);
+template RawNodes::Incomplete RawNodes::generate<false>(const RawCells& cells);
 
-void AmrNodes::setup_for(AmrCells& cells) {
-    auto [verts, nodes] = AmrNodes::generate<true>(cells);
+void RawNodes::setup_for(RawCells& cells) {
+    auto [verts, nodes] = RawNodes::generate<true>(cells);
 
     z_assert(cells.has_nodes(), "No nodes");
     z_assert(cells.n_verts() == verts.index.size(), "bad sizes");
@@ -376,7 +376,7 @@ void AmrNodes::setup_for(AmrCells& cells) {
     *this = std::move(nodes);
 }
 
-memory_t AmrNodes::memory_usage() const {
+memory_t RawNodes::memory_usage() const {
     memory_t mem;
     mem.add(next);
     mem.add(rank);
@@ -385,13 +385,13 @@ memory_t AmrNodes::memory_usage() const {
     return mem;
 }
 
-int AmrNodes::check_nodes(const AmrCells& locals) const {
-    AmrCells ghosts = locals.same();
-    AmrNodes ghost_nodes;
+int RawNodes::check_nodes(const RawCells& locals) const {
+    RawCells ghosts = locals.same();
+    RawNodes ghost_nodes;
     return check_nodes(locals, ghosts, ghost_nodes);
 }
 
-int AmrNodes::check_sizes() const {
+int RawNodes::check_sizes() const {
     int n_nodes = this->n_nodes();
     if (n_nodes < 1) {
         std::cout << "\tHas no unique nodes\n";
@@ -420,7 +420,7 @@ int AmrNodes::check_sizes() const {
     return 0;
 }
 
-int AmrNodes::check_nodes(const AmrCells& locals, const AmrCells& ghosts, const AmrNodes& ghost_nodes) const {
+int RawNodes::check_nodes(const RawCells& locals, const RawCells& ghosts, const RawNodes& ghost_nodes) const {
     int res = check_sizes();
     if (res < 0) return res;
 
@@ -514,7 +514,7 @@ int AmrNodes::check_nodes(const AmrCells& locals, const AmrCells& ghosts, const 
     // Проверяем смежность
     for (index_t in = 0; in < n_nodes(); ++in) {
         if (locals.adaptive()) {
-            if (incident.max_count(in) != AmrIncident::max_incident_amr(locals.dim())) {
+            if (incident.max_count(in) != RawIncident::max_incident_amr(locals.dim())) {
                 std::cout << "Wrong max count of incident cells: " << incident.max_count(in) << "\n";
                 return -1;
             }

@@ -9,8 +9,8 @@
 
 namespace zephyr::mesh {
 
-class AmrCells;
-class AmrVerts;
+class RawCells;
+class RawVerts;
 
 using role_t = std::int8_t;
 
@@ -20,7 +20,7 @@ using role_t = std::int8_t;
 ///    rank  :    == this.rank    |    != this.rank
 ///    index :    < locals.size   |    < decomposition(rank).locals.size
 ///    ghost :    < 0             |    < ghosts.size
-class AmrIncident final {
+class RawIncident final {
 public:
     /// @brief Эта структура имеет формат CSR, даны смещения
     std::vector<index_t> offsets = {0};
@@ -43,7 +43,7 @@ public:
 
 
     /// @brief Пустые массивы по умолчанию
-    AmrIncident() = default;
+    RawIncident() = default;
 
     /// @brief Количество значений/записей
     index_t n_values() const { return static_cast<index_t>(rank.size()); }
@@ -117,8 +117,8 @@ public:
     memory_t memory_usage() const;
 };
 
-/// @brief Список уникальных узлов, дополняет класс AmrCells
-class AmrNodes final {
+/// @brief Список уникальных узлов, дополняет класс RawCells
+class RawNodes final {
     // aliases inside class
     using Vector3d = geom::Vector3d;
 
@@ -132,14 +132,14 @@ public:
     std::vector<Vector3d> coord;
 
     /// @brief Списки инцидентных ячеек
-    AmrIncident incident;
+    RawIncident incident;
 
     /// @brief Данные узлов
     Storage data;
 
 
     /// @brief Конструктор по умолчанию
-    AmrNodes() = default;
+    RawNodes() = default;
 
     /// @brief Пустое хранилище узлов?
     bool empty() const { return coord.empty(); }
@@ -186,20 +186,20 @@ public:
 
     /// @brief Скопировать все данные целиком с индекса from,
     /// в хранилище dst на индекс to
-    void copy_data(index_t from, AmrNodes* dst, index_t to) const;
+    void copy_data(index_t from, RawNodes* dst, index_t to) const;
 
-    void copy_geom(index_t ic, AmrNodes& nodes,
+    void copy_geom(index_t ic, RawNodes& nodes,
                    index_t jc, index_t inc_offset) const;
 
     /// @brief Кортеж {vert.index, nodes}
-    using Incomplete = std::tuple<AmrVerts, AmrNodes>;
+    using Incomplete = std::tuple<RawVerts, RawNodes>;
 
     /// @brief Сгенерировать уникальные узлы для множества ячеек
     template <bool complete>
-    static Incomplete generate(const AmrCells& cells);
+    static Incomplete generate(const RawCells& cells);
 
     /// @brief Установить уникальные узлы для множества ячеек
-    void setup_for(AmrCells& cells);
+    void setup_for(RawCells& cells);
 
     /// @brief Расход памяти
     memory_t memory_usage() const;
@@ -208,13 +208,13 @@ public:
     int check_sizes() const;
 
     /// @brief Проверка уникальных узлов для однопроцессорной версии
-    int check_nodes(const AmrCells& locals) const;
+    int check_nodes(const RawCells& locals) const;
 
     /// @brief Проверка уникальных узлов в MPI версии
-    int check_nodes(const AmrCells& locals, const AmrCells& ghosts, const AmrNodes& ghost_nodes) const;
+    int check_nodes(const RawCells& locals, const RawCells& ghosts, const RawNodes& ghost_nodes) const;
 };
 
-extern template AmrNodes::Incomplete AmrNodes::generate<true> (const AmrCells& cells);
-extern template AmrNodes::Incomplete AmrNodes::generate<false>(const AmrCells& cells);
+extern template RawNodes::Incomplete RawNodes::generate<true> (const RawCells& cells);
+extern template RawNodes::Incomplete RawNodes::generate<false>(const RawCells& cells);
 
 } // namespace zephyr::mesh

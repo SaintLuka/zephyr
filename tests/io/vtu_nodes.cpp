@@ -1,11 +1,11 @@
 // Сохранение массива узлов и сетки с узлами.
 #include <zephyr/geom/generator/rectangle.h>
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/mesh.h>
 #include <zephyr/io/pvd_file.h>
 #include <zephyr/utils/mpi.h>
 
 using zephyr::geom::generator::Rectangle;
-using zephyr::mesh::EuMesh;
+using zephyr::mesh::Mesh;
 using zephyr::io::Variables;
 using zephyr::io::VtuFile;
 using zephyr::io::PvdFile;
@@ -19,7 +19,7 @@ int main(int argc, char** argv) {
     gen.set_nx(100);
 
     // Создаем сетку
-    EuMesh mesh(gen, true);
+    Mesh mesh(gen, true);
     mesh.set_decomposition("XY");
 
     // Добавим массив данных к ячейкам

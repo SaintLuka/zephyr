@@ -5,7 +5,7 @@
 #include <iomanip>
 
 #include <zephyr/geom/generator/rectangle.h>
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/mesh.h>
 #include <zephyr/io/pvd_file.h>
 
 using zephyr::geom::Vector3d;
@@ -13,8 +13,8 @@ using zephyr::geom::Box;
 using zephyr::geom::Boundary;
 using zephyr::geom::generator::Rectangle;
 using zephyr::mesh::Storable;
-using zephyr::mesh::EuMesh;
-using zephyr::mesh::EuCell;
+using zephyr::mesh::Mesh;
+using zephyr::mesh::Cell;
 using zephyr::io::PvdFile;
 
 // Velocity vector field
@@ -31,7 +31,7 @@ int main() {
         .bottom = Boundary::PERIODIC, .top   = Boundary::PERIODIC});
 
     // Create mesh
-    EuMesh mesh(rect);
+    Mesh mesh(rect);
 
     // Add data fields
     auto u1 = mesh.add<double>("u1");
@@ -42,8 +42,8 @@ int main() {
 
     // Variables to save
     pvd.variables.add_cell_data("u", u1);
-    pvd.variables += {"vx", [](EuCell cell) -> double { return velocity(cell.center()).x(); } };
-    pvd.variables += {"vy", [](EuCell cell) -> double { return velocity(cell.center()).y(); } };
+    pvd.variables += {"vx", [](Cell cell) -> double { return velocity(cell.center()).x(); } };
+    pvd.variables += {"vy", [](Cell cell) -> double { return velocity(cell.center()).y(); } };
 
     // Initial conditions
     Box box = mesh.bbox();

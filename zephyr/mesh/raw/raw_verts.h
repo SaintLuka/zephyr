@@ -20,7 +20,7 @@ template <int dim>
 using SqMap = std::conditional_t<dim < 3, geom::SqQuad, geom::SqCube>;
 
 /// @brief Набор дублирующихся вершин ячеек в форме Structure of Arrays (набор массивов).
-class AmrVerts final {
+class RawVerts final {
     // aliases inside class
     using Vector3d = geom::Vector3d;
 
@@ -49,7 +49,7 @@ public:
 
     /// @brief Пустые массивы по умолчанию
     /// @param unique_nodes Нужны уникальные узлы?
-    explicit AmrVerts(bool unique_nodes = false);
+    explicit RawVerts(bool unique_nodes = false);
 
     /// @brief Используются уникальные узлы?
     bool has_nodes() const { return has_nodes_; }

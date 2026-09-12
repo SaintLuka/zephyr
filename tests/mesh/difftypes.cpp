@@ -26,8 +26,8 @@ using namespace zephyr::math;
 using namespace zephyr::math::smf;
 using namespace zephyr::geom::generator;
 
-using zephyr::mesh::EuMesh;
-using zephyr::mesh::EuCell;
+using zephyr::mesh::Mesh;
+using zephyr::mesh::Cell;
 using zephyr::math::SmFluid;
 using zephyr::utils::mpi;
 using zephyr::utils::threads;
@@ -193,7 +193,7 @@ int main(int argc, char** argv) {
     // Создать сетку
     Grid grid = test11();
     bool polyhedral = grid.polyhedral();
-    EuMesh mesh(std::move(grid));
+    Mesh mesh(std::move(grid));
 
     // Создать и настроить решатель
     auto eos = IdealGas::create("Air");
@@ -214,8 +214,8 @@ int main(int argc, char** argv) {
 
     // Задание начальных данных
     double R = 0.3;
-    auto init_cells = [R, eos, z](EuMesh& mesh) {
-        mesh.for_each([R, eos, z](EuCell& cell) {
+    auto init_cells = [R, eos, z](Mesh& mesh) {
+        mesh.for_each([R, eos, z](Cell& cell) {
             if (cell.center().norm() < R) {
                 cell[z].density = 3.0;
                 cell[z].pressure = 3.0;
@@ -236,12 +236,12 @@ int main(int argc, char** argv) {
 
     // Переменные для сохранения
     pvd.variables = {"level"};
-    pvd.variables += {"density",  [z](EuCell& cell) -> double { return cell[z].density; }};
-    pvd.variables += {"vel.x",    [z](EuCell& cell) -> double { return cell[z].velocity.x(); }};
-    pvd.variables += {"vel.y",    [z](EuCell& cell) -> double { return cell[z].velocity.y(); }};
-    pvd.variables += {"vel.z",    [z](EuCell& cell) -> double { return cell[z].velocity.z(); }};
-    pvd.variables += {"pressure", [z](EuCell& cell) -> double { return cell[z].pressure; }};
-    pvd.variables += {"energy",   [z](EuCell& cell) -> double { return cell[z].energy; }};
+    pvd.variables += {"density",  [z](Cell& cell) -> double { return cell[z].density; }};
+    pvd.variables += {"vel.x",    [z](Cell& cell) -> double { return cell[z].velocity.x(); }};
+    pvd.variables += {"vel.y",    [z](Cell& cell) -> double { return cell[z].velocity.y(); }};
+    pvd.variables += {"vel.z",    [z](Cell& cell) -> double { return cell[z].velocity.z(); }};
+    pvd.variables += {"pressure", [z](Cell& cell) -> double { return cell[z].pressure; }};
+    pvd.variables += {"energy",   [z](Cell& cell) -> double { return cell[z].energy; }};
 
     double curr_time = 0.0;
 

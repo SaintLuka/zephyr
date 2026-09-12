@@ -1,7 +1,7 @@
 // Тестирование многогранников: построение и сечения
 
 #include <zephyr/geom/primitives/polyhedron.h>
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/mesh.h>
 #include <zephyr/io/pvd_file.h>
 
 using namespace zephyr::geom;
@@ -111,7 +111,7 @@ void plot_sections(
         if (max_epsilon_fsb < epsilon_fsb)
             max_epsilon_fsb = epsilon_fsb;
 
-        EuMesh mesh = EuMesh::PolySet(3);
+        Mesh mesh = Mesh::PolySet(3);
         mesh.push_back(clip);
 
         pvd.save(mesh, i / (N - 1.0));

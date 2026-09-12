@@ -7,7 +7,7 @@
 #include <zephyr/utils/stopwatch.h>
 #include <zephyr/utils/threads.h>
 #include <zephyr/geom/generator/rectangle.h>
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/mesh.h>
 #include <zephyr/io/pvd_file.h>
 
 using namespace zephyr::mesh;
@@ -23,7 +23,7 @@ static Storable<int> idx;
 static Storable<int> bit;
 
 // Периодическая функция времени, с периодом = 1
-int calc_idx(EuCell& cell, double t) {
+int calc_idx(Cell& cell, double t) {
     Vector3d c = cell.center();
 
     double r = c.norm();
@@ -46,7 +46,7 @@ int calc_idx(EuCell& cell, double t) {
 }
 
 // Отметить ячейки на границах областей
-int calc_bit(EuCell& cell) {
+int calc_bit(Cell& cell) {
     int idx_c = cell[idx];
     for (auto& face: cell.faces()) {
         if (face.is_boundary()) {
@@ -62,11 +62,11 @@ int calc_bit(EuCell& cell) {
 }
 
 // Выставить функцию-индикатор подобласти
-void set_index(EuCell& cell, double t) {
+void set_index(Cell& cell, double t) {
     cell[idx] = calc_idx(cell, t);
 }
 
-void set_flag(EuCell& cell) {
+void set_flag(Cell& cell) {
     cell[bit] = calc_bit(cell);
     cell.set_flag(cell[bit] > 0 ? 1 : -1);
 }
@@ -79,7 +79,7 @@ int main(int argc, char** argv) {
     Rectangle rect(-1.0, 1.0, -1.0, 1.0);
     rect.set_nx(30);
 
-    EuMesh mesh(rect);
+    Mesh mesh(rect);
     idx = mesh.add<int>("idx");
     bit = mesh.add<int>("bit");
 

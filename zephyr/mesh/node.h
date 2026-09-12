@@ -1,73 +1,73 @@
 #pragma once
 
-#include <zephyr/mesh/euler/eu_prim.h>
+#include <zephyr/mesh/cell.h>
 #include <zephyr/utils/mpi.h>
 
 namespace zephyr::mesh {
 
 // forward declaration
-class EuCell;
-class EuMesh;
+class Cell;
+class Mesh;
 
-class EuFace_Iter;
+class Face_Iter;
 
 /// @brief Итератор по инцидентным ячейкам
-class EuIncCell_Iter final {
-    AmrIncident* incident_;   ///< Список инцидентных ячеек
+class IncCell_Iter final {
+    RawIncident* incident_;   ///< Список инцидентных ячеек
     index_t      inc_index_;  ///< Индекс в списке инцидентных
 
-    AmrCells* local_cells_;   ///< Локальные ячейки
-    AmrCells* ghost_cells_;   ///< Ячейки с других процессов
+    RawCells* local_cells_;   ///< Локальные ячейки
+    RawCells* ghost_cells_;   ///< Ячейки с других процессов
 
 public:
     /// @brief Изолированная грань на стороне side,
     /// не позволяет обходить грани
-    EuIncCell_Iter(AmrIncident* incident, index_t inc_index,
-                   AmrCells* locals, AmrCells* ghosts = nullptr)
+    IncCell_Iter(RawIncident* incident, index_t inc_index,
+                   RawCells* locals, RawCells* ghosts = nullptr)
         : incident_(incident),
           inc_index_(inc_index),
           local_cells_(locals),
           ghost_cells_(ghosts) { }
 
     /// @brief Ссылка на грань при разыменовании
-    EuCell operator*() const {
+    Cell operator*() const {
         if (incident_->ghost[inc_index_] < 0) {
-            return EuCell(local_cells_, incident_->index[inc_index_]);
+            return Cell(local_cells_, incident_->index[inc_index_]);
         }
         else {
-            return EuCell(ghost_cells_, incident_->ghost[inc_index_]);
+            return Cell(ghost_cells_, incident_->ghost[inc_index_]);
         }
     }
 
     /// @brief Перейти к следующей инцидентной ячейке
-    EuIncCell_Iter &operator++() {
+    IncCell_Iter &operator++() {
         ++inc_index_; return *this;
     }
 
     /// @brief Сравнение итераторов
-    bool operator!=(const EuIncCell_Iter &cell_iter) const{
+    bool operator!=(const IncCell_Iter &cell_iter) const{
         return inc_index_ != cell_iter.inc_index_;
     }
 };
 
 
 /// @brief Интерфейс для итераций по инцидентным ячейкам
-class EuIncidentCells final {
-    AmrIncident* incident_;
+class IncidentCells final {
+    RawIncident* incident_;
     index_t inc_begin_;
     index_t inc_end_;
-    AmrCells* locals_;
-    AmrCells* ghosts_;
+    RawCells* locals_;
+    RawCells* ghosts_;
 
 public:
-    EuIncidentCells(AmrIncident *incident, index_t node_idx,
-                    AmrCells *locals, AmrCells* ghosts);
+    IncidentCells(RawIncident *incident, index_t node_idx,
+                    RawCells *locals, RawCells* ghosts);
 
-    EuIncCell_Iter begin() const {
+    IncCell_Iter begin() const {
         return {incident_, inc_begin_, locals_, ghosts_};
     }
 
-    EuIncCell_Iter end() const {
+    IncCell_Iter end() const {
         return {incident_, inc_end_, locals_, ghosts_};
     }
 
@@ -75,25 +75,25 @@ public:
 };
 
 /// @brief Узел сетки
-/// @ingroup euler-mesh
-class EuNode final {
-    friend class EuNode_Iter;
+/// @ingroup raw-mesh
+class Node final {
+    friend class Node_Iter;
 
     using Vector3d = geom::Vector3d;
 
 private:
-    AmrNodes* nodes_{nullptr};  //< Указатель на хранилище узлов
+    RawNodes* nodes_{nullptr};  //< Указатель на хранилище узлов
     index_t   index_{-1};       //< Индекс узла
 
     /// @brief Массивы нужны для прохода по инцидентным ячейкам
-    AmrCells* locals_{nullptr};
-    AmrCells* ghosts_{nullptr};
+    RawCells* locals_{nullptr};
+    RawCells* ghosts_{nullptr};
 
 public:
     /// @brief Конструктор по умолчанию (иногда требует TBB)
-    EuNode() = default;    
+    Node() = default;
 
-    EuNode(AmrNodes* nodes, index_t index, AmrCells* locals = nullptr, AmrCells* ghosts = nullptr)
+    Node(RawNodes* nodes, index_t index, RawCells* locals = nullptr, RawCells* ghosts = nullptr)
         : nodes_(nodes), index_(index), locals_(locals), ghosts_(ghosts) { }
 
     /// @{ @name Характеристики узла
@@ -114,7 +114,7 @@ public:
     void set_rank(int rank) const;
 
     /// @brief Хранилище, которому принадлежит узел
-    const AmrNodes& nodes() const { return *nodes_; }
+    const RawNodes& nodes() const { return *nodes_; }
 
     /// @}
 
@@ -162,7 +162,7 @@ public:
     std::span<const T, N> operator[](Storable<T[N]> var) const;
 
     /// @brief Скопировать данные в другой узел
-    void copy_data_to(EuNode& dst_node) const;
+    void copy_data_to(Node& dst_node) const;
 
     /// @}
 
@@ -172,56 +172,56 @@ public:
     int n_incident() const;
 
     /// @brief Итератор по инцидентным ячейкам
-    EuIncidentCells incident() const;
+    IncidentCells incident() const;
 
     /// @}
 };
 
-/// @brief Итератор по узлам из EuMesh или AmrNodes
-class EuNode_Iter final {
+/// @brief Итератор по узлам из Mesh или RawNodes
+class Node_Iter final {
 private:
-    EuNode node_{};  ///< Реальная ячейка
+    Node node_{};  ///< Реальная ячейка
 
 public:
     using iterator_category = std::random_access_iterator_tag;
     using difference_type = index_t;
-    using value_type = EuNode;
-    using pointer    = EuNode*;
-    using reference  = EuNode&;
+    using value_type = Node;
+    using pointer    = Node*;
+    using reference  = Node&;
 
     /// @brief Конструктор по умолчанию (иногда требует TBB)
-    EuNode_Iter() = default;
+    Node_Iter() = default;
 
     /// @brief Конструктор как у узла
-    EuNode_Iter(AmrNodes *nodes, index_t index, AmrCells* locals = nullptr, AmrCells *ghosts = nullptr)
+    Node_Iter(RawNodes *nodes, index_t index, RawCells* locals = nullptr, RawCells *ghosts = nullptr)
             : node_{nodes, index, locals, ghosts} { }
 
     /// @brief Ссылка на узел при разыменовании
-    EuNode &operator*() { return node_; }
+    Node &operator*() { return node_; }
 
     /// @brief Ссылка на узел при разыменовании
-    const EuNode &operator*() const { return node_; }
+    const Node &operator*() const { return node_; }
 
     /// @brief Инкремент
-    EuNode_Iter &operator++() {
+    Node_Iter &operator++() {
         ++node_.index_;
         return *this;
     }
 
     /// @brief Декремент
-    EuNode_Iter &operator--() {
+    Node_Iter &operator--() {
         --node_.index_;
         return *this;
     }
 
     /// @brief Итератор через step
-    EuNode_Iter &operator+=(index_t step) {
+    Node_Iter &operator+=(index_t step) {
         node_.index_ += step;
         return *this;
     }
 
     /// @brief Итератор через step
-    EuNode_Iter operator+(index_t step) const {
+    Node_Iter operator+(index_t step) const {
         return {node_.nodes_,
                 node_.index_ + step,
                 node_.locals_,
@@ -229,7 +229,7 @@ public:
     }
 
     /// @brief Оператор доступа как для указателя (random access iterator)
-    EuNode operator[](index_t offset) const {
+    Node operator[](index_t offset) const {
         return {node_.nodes_,
                 node_.index_ + offset,
                 node_.locals_,
@@ -237,55 +237,55 @@ public:
     }
 
     /// @brief Расстояние между двумя ячейками
-    index_t operator-(const EuNode_Iter &cell) const {
+    index_t operator-(const Node_Iter &cell) const {
         return node_.index_ - cell.node_.index_;
     }
 
     /// @brief Оператор сравнения
-    bool operator<(const EuNode_Iter &cell) const {
+    bool operator<(const Node_Iter &cell) const {
         return node_.index_ < cell.node_.index_;
     }
 
     /// @brief Оператор сравнения
-    bool operator!=(const EuNode_Iter &cell) const {
+    bool operator!=(const Node_Iter &cell) const {
         return node_.index_ != cell.node_.index_;
     }
 
     /// @brief Оператор сравнения
-    bool operator==(const EuNode_Iter &cell) const {
+    bool operator==(const Node_Iter &cell) const {
         return node_.index_ == cell.node_.index_;
     }
 };
 
-/// @brief Для итераций по AmrNodes, locals = ghosts = nullptr,
+/// @brief Для итераций по RawNodes, locals = ghosts = nullptr,
 /// поэтому проход по инцидентным ячейкам невозможен
-inline EuNode_Iter begin(AmrNodes& nodes) {
+inline Node_Iter begin(RawNodes& nodes) {
     return {&nodes, 0, nullptr, nullptr};
 }
 
-/// @brief Для итераций по AmrNodes, locals = ghosts = nullptr,
+/// @brief Для итераций по RawNodes, locals = ghosts = nullptr,
 /// поэтому проход по инцидентным ячейкам невозможен
-inline EuNode_Iter end(AmrNodes& nodes) {
+inline Node_Iter end(RawNodes& nodes) {
     return {&nodes, nodes.n_nodes(), nullptr, nullptr};
 }
 
-class EuNodeRange {
+class NodesRange {
 private:
-    AmrNodes* nodes_;
-    AmrCells* local_cells_{nullptr};
-    AmrCells* ghost_cells_{nullptr};
+    RawNodes* nodes_;
+    RawCells* local_cells_{nullptr};
+    RawCells* ghost_cells_{nullptr};
 
 public:
-    EuNodeRange(AmrNodes* nodes, AmrCells* local_cells, AmrCells* ghost_cells)
+    NodesRange(RawNodes* nodes, RawCells* local_cells, RawCells* ghost_cells)
         : nodes_{nodes}, local_cells_{local_cells}, ghost_cells_{ghost_cells} {
     }
 
-    EuNode_Iter begin() const {
-        return EuNode_Iter(nodes_, 0, local_cells_, ghost_cells_);
+    Node_Iter begin() const {
+        return Node_Iter(nodes_, 0, local_cells_, ghost_cells_);
     }
 
-    EuNode_Iter end() const {
-        return EuNode_Iter(nodes_, nodes_->n_nodes(), local_cells_, ghost_cells_);
+    Node_Iter end() const {
+        return Node_Iter(nodes_, nodes_->n_nodes(), local_cells_, ghost_cells_);
     }
 };
 
@@ -293,14 +293,14 @@ public:
 //                                     inline функции итераторов
 // ================================================================================================
 
-inline EuIncidentCells::EuIncidentCells(AmrIncident *incident,
-    index_t node_idx, AmrCells *locals, AmrCells* ghosts)
+inline IncidentCells::IncidentCells(RawIncident *incident,
+    index_t node_idx, RawCells *locals, RawCells* ghosts)
     : incident_(incident), locals_(locals), ghosts_(ghosts) {
 
-    z_assert(incident, "EuIncidentCells nullptr incident");
-    z_assert(locals, "EuIncidentCells nullptr locals");
-    z_assert(ghosts, "EuIncidentCells nullptr ghosts");
-    z_assert(node_idx < incident->offsets.size() - 1, "EuIncidentCells node_idx out of range");
+    z_assert(incident, "IncidentCells nullptr incident");
+    z_assert(locals, "IncidentCells nullptr locals");
+    z_assert(ghosts, "IncidentCells nullptr ghosts");
+    z_assert(node_idx < incident->offsets.size() - 1, "IncidentCells node_idx out of range");
 
     inc_begin_ = incident->offsets[node_idx];
     inc_end_ = inc_begin_;
@@ -312,45 +312,45 @@ inline EuIncidentCells::EuIncidentCells(AmrIncident *incident,
 }
 
 // ================================================================================================
-//                                     inline функции EuNode
+//                                     inline функции Node
 // ================================================================================================
 
-inline int EuNode::rank() const { return nodes_->rank[index_]; }
+inline int Node::rank() const { return nodes_->rank[index_]; }
 
-inline index_t EuNode::id() const { return index_; }
+inline index_t Node::id() const { return index_; }
 
-inline index_t EuNode::index() const { return nodes_->index[index_]; }
+inline index_t Node::index() const { return nodes_->index[index_]; }
 
-inline index_t EuNode::next() const { return nodes_->next[index_]; }
+inline index_t Node::next() const { return nodes_->next[index_]; }
 
-inline void EuNode::set_rank(int rank) const { nodes_->rank[index_] = rank; }
-
-template <typename T>
-T& EuNode::operator[](Storable<T> var) { return nodes_->data.get_val<T>(var, index_); }
+inline void Node::set_rank(int rank) const { nodes_->rank[index_] = rank; }
 
 template <typename T>
-std::span<T> EuNode::operator[](Storable<T[]> var) { return nodes_->data.get_val<T>(var, index_); }
+T& Node::operator[](Storable<T> var) { return nodes_->data.get_val<T>(var, index_); }
+
+template <typename T>
+std::span<T> Node::operator[](Storable<T[]> var) { return nodes_->data.get_val<T>(var, index_); }
 
 template <typename T, size_t N>
-std::span<T, N> EuNode::operator[](Storable<T[N]> var) { return nodes_->data.get_val<T>(var, index_); }
+std::span<T, N> Node::operator[](Storable<T[N]> var) { return nodes_->data.get_val<T>(var, index_); }
 
 template <typename T>
-const T& EuNode::operator[](Storable<T> var) const { return nodes_->data.get_val<T>(var, index_); }
+const T& Node::operator[](Storable<T> var) const { return nodes_->data.get_val<T>(var, index_); }
 
 template <typename T>
-std::span<const T> EuNode::operator[](Storable<T[]> var) const { return nodes_->data.get_val<T>(var, index_); }
+std::span<const T> Node::operator[](Storable<T[]> var) const { return nodes_->data.get_val<T>(var, index_); }
 
 template <typename T, size_t N>
-std::span<const T, N> EuNode::operator[](Storable<T[N]> var) const { return nodes_->data.get_val<T>(var, index_); }
+std::span<const T, N> Node::operator[](Storable<T[N]> var) const { return nodes_->data.get_val<T>(var, index_); }
 
-inline void EuNode::copy_data_to(EuNode &dst_node) const {
+inline void Node::copy_data_to(Node &dst_node) const {
     nodes_->copy_data(index_, dst_node.nodes_, dst_node.index_);
 }
 
-inline int EuNode::n_incident() const { return nodes_->incident.max_count(index_); }
+inline int Node::n_incident() const { return nodes_->incident.max_count(index_); }
 
-inline EuIncidentCells EuNode::incident() const {
-    return EuIncidentCells(&nodes_->incident, index_, locals_, ghosts_);
+inline IncidentCells Node::incident() const {
+    return IncidentCells(&nodes_->incident, index_, locals_, ghosts_);
 }
 
 } // namespace zephyr::mesh

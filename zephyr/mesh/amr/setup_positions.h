@@ -21,7 +21,7 @@ namespace zephyr::mesh::amr {
 /// Алгоритм может выполняться как для всего хранилища, так и для части сетки
 /// в многопроцессорном режиме. Многопоточная реализация отсутствует.
 template<int dim>
-void setup_positions(AmrCells &cells, const Statistics &count, const SwapLists& swap_list) {
+void setup_positions(RawCells &cells, const Statistics &count, const SwapLists& swap_list) {
     // TODO: Подумать над параллельной версией
     int coarse_counter = count.n_cells;
     int refine_counter = count.n_cells + count.n_parents;

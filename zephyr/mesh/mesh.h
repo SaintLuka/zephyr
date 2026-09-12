@@ -5,11 +5,11 @@
 #include <zephyr/utils/threads.h>
 #include <zephyr/utils/mpi.h>
 
-#include <zephyr/mesh/euler/eu_node.h>
-#include <zephyr/mesh/euler/eu_prim.h>
-#include <zephyr/mesh/euler/distributor.h>
-#include <zephyr/mesh/euler/tourism.h>
-#include <zephyr/mesh/euler/migration.h>
+#include <zephyr/mesh/node.h>
+#include <zephyr/mesh/cell.h>
+#include <zephyr/mesh/raw/distributor.h>
+#include <zephyr/mesh/raw/tourism.h>
+#include <zephyr/mesh/raw/migration.h>
 #include <zephyr/mesh/decomp/ORB.h>
 
 #include "zephyr/geom/generator/array2d.h"
@@ -29,14 +29,14 @@ class Grid;
 namespace zephyr::mesh {
 
 /// @brief Эйлерова сетка.
-/// @ingroup euler-mesh
+/// @ingroup raw-mesh
 ///
 /// Поддерживается три типа сеток:
 ///   1. Двумерная AMR сетка, по 8 граней, по 9 вершин на ячейку.
 ///   2. Трехмерная AMR сетка, по 24 грани, по 27 вершин на ячейку.
 ///   3. Неструктурированная/произвольная сетка. Произвольное число граней
 ///      и вершин на ячейку, но вершины не уникальны.
-class EuMesh {
+class Mesh {
     if_mpi(using mpi = utils::mpi;)
     using threads = utils::threads;
     using ORB = decomp::ORB;
@@ -46,17 +46,17 @@ public:
     /// @{ @name Создание сетки
 
     /// @brief Инициализация сетки из json-конфига
-    explicit EuMesh(const utils::Json& config);
+    explicit Mesh(const utils::Json& config);
 
     /// @brief Создание сетки с помощью сеточного генератора
-    explicit EuMesh(geom::Generator& gen, bool unique_nodes = false);
+    explicit Mesh(geom::Generator& gen, bool unique_nodes = false);
 
-    explicit EuMesh(geom::Grid&& grid, bool unique_nodes = false);
+    explicit Mesh(geom::Grid&& grid, bool unique_nodes = false);
 
     /// @brief Сетка для заполнения ячейками через push_back;
     /// Можно добавлять полигоны и многогранники, но связи с соседями
     /// не восстанавливаются, используется для визуализации.
-    static EuMesh PolySet(int dim);
+    static Mesh PolySet(int dim);
 
     /// @brief Добавить на неструктурированную сетку ячейку в виде отрезка
     /// (сплюснутая четырехугольная ячейка)
@@ -155,13 +155,13 @@ public:
     /// @{ @name Выбор ячеек
 
     /// @brief Итератор, указывающий на первую ячейку
-    EuCell_Iter begin();
+    Cell_Iter begin();
 
     /// @brief Итератор, указывающий на ячейку за последней
-    EuCell_Iter end();
+    Cell_Iter end();
 
     /// @brief Локальная ячейка по индексу
-    EuCell operator[](index_t idx);
+    Cell operator[](index_t idx);
 
     /// @}
 
@@ -246,27 +246,27 @@ public:
 
     /// @{ @name Части распределенной сетки
 
-    /// @brief Неявное преобразование в AmrCells
-    operator AmrCells&() { return locals(); }
+    /// @brief Неявное преобразование в RawCells
+    operator RawCells&() { return locals(); }
 
     /// @brief Локальные ячейки (принадлежат данному процессу)
-    AmrCells& locals() { return local_cells_; }
+    RawCells& locals() { return local_cells_; }
 
     /// @brief Локальные ячейки (принадлежат данному процессу)
-    AmrCells& local_cells() { return local_cells_; }
+    RawCells& local_cells() { return local_cells_; }
 
     /// @brief Локальные ячейки (принадлежат данному процессу)
-    const AmrCells& locals() const { return local_cells_; }
+    const RawCells& locals() const { return local_cells_; }
 
     /// @brief Локальные ячейки (принадлежат данному процессу)
-    const AmrCells& local_cells() const { return local_cells_; }
+    const RawCells& local_cells() const { return local_cells_; }
 
 #ifdef ZEPHYR_MPI
     /// @brief Слой обменных ячеек (с других процессов)
-    AmrCells& ghosts() { return tourists_.ghost_cells(); }
+    RawCells& ghosts() { return tourists_.ghost_cells(); }
 
     /// @brief Слой обменных ячеек (с других процессов)
-    const AmrCells& ghosts() const { return tourists_.ghost_cells(); }
+    const RawCells& ghosts() const { return tourists_.ghost_cells(); }
 #endif
 
     /// @}
@@ -350,13 +350,13 @@ public:
     /// является структурированной. Индексы периодически замкнуты (допускаются
     /// отрицательные индексы и индексы сверх нормы)
     /// @details Не актуально для распределенных сеток
-    EuCell operator()(index_t i, index_t j);
+    Cell operator()(index_t i, index_t j);
 
     /// @brief Получить ячейку по нескольким индексам подразумевая, что сетка
     /// является структурированной. Индексы периодически замкнуты (допускаются
     /// отрицательные индексы и индексы сверх нормы)
     /// @details Не актуально для распределенных сеток
-    EuCell operator()(index_t i, index_t j, index_t k);
+    Cell operator()(index_t i, index_t j, index_t k);
 
     /// @}
 
@@ -366,19 +366,19 @@ public:
     bool has_nodes() const { return !local_nodes_.empty(); }
 
     /// @brief Ссылка на массив уникальных узлов
-    EuNodeRange nodes() ;
+    NodesRange nodes() ;
 
     /// @brief Ссылка на массив уникальных узлов
-    AmrNodes& local_nodes() { return local_nodes_; }
+    RawNodes& local_nodes() { return local_nodes_; }
 
     /// @brief Ссылка на массив уникальных узлов
-    const AmrNodes& local_nodes() const { return local_nodes_; }
+    const RawNodes& local_nodes() const { return local_nodes_; }
 
     /// @brief Ссылка на массив уникальных узлов
-    AmrNodes& ghost_nodes();
+    RawNodes& ghost_nodes();
 
     /// @brief Ссылка на массив уникальных узлов
-    const AmrNodes& ghost_nodes() const;
+    const RawNodes& ghost_nodes() const;
 
     /// @}
 
@@ -402,7 +402,7 @@ public:
 
 private:
     /// @brief Конструктор пустой сетки
-    EuMesh() = default;
+    Mesh() = default;
 
     /// @brief Реальный конструктор сетки
     void build_(geom::Generator& gen, bool unique_nodes);
@@ -428,8 +428,8 @@ private:
     /// @brief Процедуры слияния и огрубления данных при адаптации
     Distributor distributor_;
 
-    AmrCells local_cells_;  ///< Ячейки, которые принадлежат данному процессу
-    AmrNodes local_nodes_;  ///< Узлы, которые принадлежат данному процессу
+    RawCells local_cells_;  ///< Ячейки, которые принадлежат данному процессу
+    RawNodes local_nodes_;  ///< Узлы, которые принадлежат данному процессу
 
     /// @brief Метод декомпозиции
     Decomposition::Ptr decomp_ = nullptr;
@@ -450,55 +450,55 @@ private:
 // ============================================================================
 
 template <typename T>
-Storable<T> EuMesh::add_cell_data(const std::string& name) {
+Storable<T> Mesh::add_cell_data(const std::string& name) {
     auto res1 = local_cells_.data.add<T>(name);
 #ifdef ZEPHYR_MPI
     auto res2 = tourists_.add_cell_data<T>(name);
     if (res1 != res2) {
-        throw std::runtime_error("EuMesh error: bad add_cell_data<T> #2");
+        throw std::runtime_error("Mesh error: bad add_cell_data<T> #2");
     }
 #endif
     return res1;
 }
 
 template <typename T>
-Storable<T> EuMesh::add_node_data(const std::string& name) {
+Storable<T> Mesh::add_node_data(const std::string& name) {
     auto res1 = local_nodes_.data.add<T>(name);
 #ifdef ZEPHYR_MPI
     auto res2 = tourists_.add_node_data<T>(name);
     if (res1 != res2) {
-        throw std::runtime_error("EuMesh error: bad add_node_data<T> #2");
+        throw std::runtime_error("Mesh error: bad add_node_data<T> #2");
     }
 #endif
     return res1;
 }
 
 template <typename T>
-Storable<T> EuMesh::add_cell_data(const std::string& name, int count) {
+Storable<T> Mesh::add_cell_data(const std::string& name, int count) {
     auto res1 = local_cells_.data.add<T>(name, count);
 #ifdef ZEPHYR_MPI
     auto res2 = tourists_.add_cell_data<T>(name, count);
     if (res1 != res2) {
-        throw std::runtime_error("EuMesh error: bad add_cell_data<T> #2");
+        throw std::runtime_error("Mesh error: bad add_cell_data<T> #2");
     }
 #endif
     return res1;
 }
 
 template <typename T>
-Storable<T> EuMesh::add_node_data(const std::string& name, int count) {
+Storable<T> Mesh::add_node_data(const std::string& name, int count) {
     auto res1 = local_nodes_.data.add<T>(name, count);
 #ifdef ZEPHYR_MPI
     auto res2 = tourists_.add_node_data<T>(name, count);
     if (res1 != res2) {
-        throw std::runtime_error("EuMesh error: bad add_node_data<T> #2");
+        throw std::runtime_error("Mesh error: bad add_node_data<T> #2");
     }
 #endif
     return res1;
 }
 
 template <typename T>
-void EuMesh::swap(Storable<T> var1, Storable<T> var2) {
+void Mesh::swap(Storable<T> var1, Storable<T> var2) {
     local_cells_.data.swap<T>(var1, var2);
 #ifdef ZEPHYR_MPI
     tourists_.swap_cell_data<T>(var1, var2);
@@ -506,7 +506,7 @@ void EuMesh::swap(Storable<T> var1, Storable<T> var2) {
 }
 
 template <typename... Args, typename >
-void EuMesh::sync_cells(Args&&... vars) {
+void Mesh::sync_cells(Args&&... vars) {
 #ifdef ZEPHYR_MPI
     if (mpi::single()) return;
     tourists_.sync(local_cells_, std::forward<Args>(vars)...);
@@ -514,7 +514,7 @@ void EuMesh::sync_cells(Args&&... vars) {
 }
 
 template <typename... Args, typename >
-void EuMesh::sync_nodes(Args&&... vars) {
+void Mesh::sync_nodes(Args&&... vars) {
 #ifdef ZEPHYR_MPI
     if (mpi::single()) return;
     tourists_.sync(local_nodes_, std::forward<Args>(vars)...);
@@ -522,7 +522,7 @@ void EuMesh::sync_nodes(Args&&... vars) {
 }
 
 template <typename... Args>
-void EuMesh::redistribute(Args&&... vars) {
+void Mesh::redistribute(Args&&... vars) {
 #ifdef ZEPHYR_MPI
     if (mpi::single()) return;
 

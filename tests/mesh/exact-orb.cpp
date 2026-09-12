@@ -7,7 +7,7 @@
 
 #include <zephyr/io/pvd_file.h>
 
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/mesh.h>
 #include <zephyr/mesh/decomp/ORB.h>
 
 #include <zephyr/geom/generator/cuboid.h>
@@ -41,7 +41,7 @@ int main() {
     gen.set_nx(150);
 
     // Создаем сетку
-    EuMesh mesh(gen);
+    Mesh mesh(gen);
     mesh.set_max_level(2);
 
     // Добавить переменные на сетку
@@ -61,14 +61,14 @@ int main() {
     mesh.set_decomposition(orb);
 
     // Заполняем начальные данные и нагрузку
-    auto init_cells = [u, &domain](EuCell& cell) {
+    auto init_cells = [u, &domain](Cell& cell) {
         Vector3d vm = domain.vmin;
         Vector3d ds = domain.sizes();
         Vector3d vc = {vm.x() + 0.23 * ds.x(), vm.y() + 0.43 * ds.y(), 0.0};
         cell[u] = (cell.center() - vc).norm() < 0.23 ? 1.0 : 0.0;
     };
 
-    auto set_flags = [u](EuCell& cell) {
+    auto set_flags = [u](Cell& cell) {
         cell.set_flag(cell[u] > 0.5 ? 1 : -1);
     };
 

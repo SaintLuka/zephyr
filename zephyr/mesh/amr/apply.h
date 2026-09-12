@@ -9,7 +9,7 @@
 #include <zephyr/mesh/amr/statistics.h>
 #include <zephyr/mesh/amr/setup_positions.h>
 #include <zephyr/mesh/amr/setup_geometry.h>
-#include <zephyr/mesh/euler/tourism.h>
+#include <zephyr/mesh/raw/tourism.h>
 
 namespace zephyr::mesh::amr {
 
@@ -41,7 +41,7 @@ namespace zephyr::mesh::amr {
 /// ячейки. Необходимо выполнить цикл по обменным спискам и сделать перемещение
 /// ячеек из конца хранилища на места неопределенных ячеек.
 template<int dim>
-void apply_impl(AmrCells &locals, const Distributor& op) {
+void apply_impl(RawCells &locals, const Distributor& op) {
     static Stopwatch count_timer;
     static Stopwatch swap_timer;
     static Stopwatch positions_timer;
@@ -94,7 +94,7 @@ void apply_impl(AmrCells &locals, const Distributor& op) {
 }
 
 /// @brief Автоматический выбор размерности
-inline void apply(AmrCells &cells, const Distributor& op) {
+inline void apply(RawCells &cells, const Distributor& op) {
     if (cells.empty()) return;
 
     if (cells.dim() < 3) {
@@ -155,7 +155,7 @@ inline void apply(AmrCells &cells, const Distributor& op) {
 /// и отправить геометрию из border в ghosts.
 /// Этап 7. Проставить индексы adjacent.index для ghost-ячеек.
 template<int dim>
-void apply_impl(AmrCells &locals, const Distributor& op, Tourism& tourism) {
+void apply_impl(RawCells &locals, const Distributor& op, Tourism& tourism) {
     static Stopwatch count_timer;
     static Stopwatch swap_timer;
     static Stopwatch positions_timer1;
@@ -227,13 +227,13 @@ void apply_impl(AmrCells &locals, const Distributor& op, Tourism& tourism) {
 
 /// @brief Специализация для пустых хранилищ
 template<>
-inline void apply_impl<0>(AmrCells &locals, const Distributor& op, Tourism& tourism) {
+inline void apply_impl<0>(RawCells &locals, const Distributor& op, Tourism& tourism) {
     // там коллективная операция у роутера
     tourism.setup_positions<0>(locals.next);
 }
 
 /// @brief Автоматический выбор размерности
-inline void apply(AmrCells &locals, const Distributor& op, Tourism& tourism) {
+inline void apply(RawCells &locals, const Distributor& op, Tourism& tourism) {
     if (locals.empty()) {
         amr::apply_impl<0>(locals, op, tourism);
     } else {

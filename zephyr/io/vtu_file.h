@@ -4,9 +4,9 @@
 
 // Forward declaration
 namespace zephyr::mesh {
-class AmrCells;
-class AmrNodes;
-class EuMesh;
+class RawCells;
+class RawNodes;
+class Mesh;
 }
 
 namespace zephyr::io {
@@ -47,22 +47,22 @@ public:
 
     /// @brief Базовая функция записи в файл. До вызова функции должен быть
     /// создан экземпляр класса и настроены опции записи.
-    void save(mesh::EuMesh& mesh) const;
+    void save(mesh::Mesh& mesh) const;
 
     /// @brief Базовая функция записи в файл. До вызова функции должен быть
     /// создан экземпляр класса и настроены опции записи.
-    void save(mesh::AmrCells& cells) const;
+    void save(mesh::RawCells& cells) const;
 
     /// @brief Статическая функция записи в файл. Полный аналог функции-члена
     /// класса save, но вызывается без экземпляра класса, все параметры записи
     /// передаются непосредственно как аргументы функции.
     static void save(std::string_view filename,
-                     mesh::EuMesh& mesh,
+                     mesh::Mesh& mesh,
                      const Variables& variables = {},
                      const VtuOptions& options = {});
 
     static void save(std::string_view filename,
-                     mesh::AmrCells& locals,
+                     mesh::RawCells& locals,
                      const Variables& variables = {},
                      const VtuOptions& options = {});
 

@@ -7,7 +7,7 @@
 #include <zephyr/geom/generator/rectangle.h>
 #include <zephyr/geom/generator/cuboid.h>
 
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/mesh.h>
 
 #include <zephyr/math/solver/convection.h>
 
@@ -21,8 +21,8 @@ using zephyr::geom::Boundary;
 using zephyr::geom::Vector3d;
 using zephyr::geom::generator::Rectangle;
 using zephyr::geom::generator::Cuboid;
-using zephyr::mesh::EuCell;
-using zephyr::mesh::EuMesh;
+using zephyr::mesh::Cell;
+using zephyr::mesh::Mesh;
 using zephyr::mesh::Storable;
 using zephyr::io::PvdFile;
 using zephyr::utils::threads;
@@ -44,7 +44,7 @@ public:
 const double margin = 0.0198;
 
 // Начальное условие в виде круга
-void setup_initial_1(EuMesh& mesh, double D, Storable<double> u) {
+void setup_initial_1(Mesh& mesh, double D, Storable<double> u) {
     //double R = D / 2.0;
     //Vector3d vc = {R + margin, R + margin, 0.2};
     double R = 0.1;
@@ -55,7 +55,7 @@ void setup_initial_1(EuMesh& mesh, double D, Storable<double> u) {
 }
 
 // Начальное условие в виде квадрата
-void setup_initial_2(EuMesh& mesh, double D, Storable<double> u) {
+void setup_initial_2(Mesh& mesh, double D, Storable<double> u) {
     double x_min = margin;
     double x_max = D + x_min;
     double y_min = margin;
@@ -114,7 +114,7 @@ int main() {
     solver.set_limiter("MC");
 
     // Создать сетку
-    EuMesh mesh(gen);
+    Mesh mesh(gen);
 
     /*
     if (mesh.check_base() < 0) {
@@ -141,8 +141,8 @@ int main() {
     pvd.variables.add_cell_data("uh", solver.u_half);
     pvd.variables.add_cell_data("dx", solver.du_dx);
     pvd.variables.add_cell_data("dy", solver.du_dy);
-    pvd.variables += {"v.x", [&solver](EuCell& cell) { return solver.velocity(cell.center()).x(); } };
-    pvd.variables += {"v.y", [&solver](EuCell& cell) { return solver.velocity(cell.center()).y(); } };
+    pvd.variables += {"v.x", [&solver](Cell& cell) { return solver.velocity(cell.center()).x(); } };
+    pvd.variables += {"v.y", [&solver](Cell& cell) { return solver.velocity(cell.center()).y(); } };
 
     // Заполняем начальные данные
     Box box = mesh.bbox();

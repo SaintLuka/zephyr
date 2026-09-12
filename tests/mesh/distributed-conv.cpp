@@ -8,7 +8,7 @@
 
 #include <zephyr/io/pvd_file.h>
 
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/mesh.h>
 #include <zephyr/mesh/decomp/ORB.h>
 
 #include <zephyr/geom/generator/cuboid.h>
@@ -31,7 +31,7 @@ Vector3d velocity(const Vector3d& c) {
 }
 
 // Просуммировать фиктивную нагрузку
-double calc_loads(EuMesh& mesh, Storable<double> load) {
+double calc_loads(Mesh& mesh, Storable<double> load) {
     double full = 0;
     for (auto cell: mesh) {
         full += cell[load];
@@ -49,7 +49,7 @@ int main(int argc, char** argv) {
     gen.set_nx(400);
 
     // Создаем сетку
-    EuMesh mesh(gen);
+    Mesh mesh(gen);
 
     // Добавить переменные на сетку
     auto [u1, u2, load] = mesh.add_multi<double>("u1", "u2", "load");

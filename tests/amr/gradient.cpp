@@ -6,7 +6,7 @@
 #include <zephyr/utils/stopwatch.h>
 #include <zephyr/utils/threads.h>
 #include <zephyr/geom/generator/rectangle.h>
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/mesh.h>
 #include <zephyr/io/pvd_file.h>
 
 using namespace zephyr::mesh;
@@ -32,7 +32,7 @@ Vector3d epitrochoid(double t) {
 }
 
 // Периодическая функция времени, с периодом = 1
-void set_wanted(EuCell& cell, int level, double t) {
+void set_wanted(Cell& cell, int level, double t) {
     double phi = 10 * M_PI * t;
     Vector3d C = epitrochoid(phi);
     Vector3d T = epitrochoid(phi + 1.0e-6) - epitrochoid(phi - 1.0e-6); // касательная
@@ -48,7 +48,7 @@ void set_wanted(EuCell& cell, int level, double t) {
     cell[wanted] = int(std::floor((level + 0.99) * std::pow(xi, 8)));
 }
 
-void set_flag(EuCell& cell) {
+void set_flag(Cell& cell) {
     if (cell.level() < cell[wanted]) {
         cell.set_flag(1);
     }
@@ -68,7 +68,7 @@ int main(int argc, char** argv) {
     Rectangle rect(-1.0, 1.0, -1.0, 1.0);
     rect.set_nx(20);
 
-    EuMesh mesh(rect);
+    Mesh mesh(rect);
     wanted = mesh.add<int>("wanted");
 
     mesh.set_max_level(5);

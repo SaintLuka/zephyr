@@ -3,7 +3,7 @@
 #include <zephyr/geom/generator/strip.h>
 #include <zephyr/geom/generator/rectangle.h>
 
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/mesh.h>
 
 #include <zephyr/math/calc/weno.h>
 
@@ -45,7 +45,7 @@ void test_1D(TestFunc test) {
     Strip gen(0.0, 1.0, Strip::Type::UNIFORM);
     gen.set_nx(54);
 
-    EuMesh cells(gen);
+    Mesh cells(gen);
     u = cells.add<double>("u");
     du_dx = cells.add<double>("du_dx");
 

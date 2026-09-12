@@ -1,7 +1,7 @@
 // В проекте реализована поддержка JSON, некоторые классы можно
 // инициализовать из JSON строки/файла.
 
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/mesh.h>
 #include <zephyr/utils/json.h>
 #include <zephyr/utils/mpi.h>
 #include <zephyr/io/pvd_file.h>
@@ -10,7 +10,7 @@
 using zephyr::utils::mpi;
 using zephyr::utils::Json;
 using zephyr::io::PvdFile;
-using zephyr::mesh::EuMesh;
+using zephyr::mesh::Mesh;
 
 struct U {
     double x;
@@ -22,7 +22,7 @@ int main(int argc, char** argv) {
 
     Json config = Json::load(argc, argv, "json-config.json");
 
-    EuMesh mesh(config["mesh"]);
+    Mesh mesh(config["mesh"]);
 
     PvdFile pvd(config["io"]);
 

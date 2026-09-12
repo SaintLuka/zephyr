@@ -20,7 +20,7 @@ using geom::Side3D;
 ///    rank  :    == this.rank    |    != this.rank
 ///    index :    < locals.size   |    < decomposition(rank).locals.size
 ///    ghost :    < 0             |    < ghosts.size
-class AmrAdjacent final {
+class RawAdjacent final {
 public:
     /// @brief Ранг процесса, на котором находится смежная ячейка
     /// при распределенном расчете.
@@ -41,7 +41,7 @@ public:
     std::vector<std::uint8_t> rotation;
 
     /// @brief Пустые массивы по умолчанию
-    AmrAdjacent() = default;
+    RawAdjacent() = default;
 
     /// @brief Расширить массивы по числу граней
     void resize(index_t n_faces);
@@ -83,7 +83,7 @@ enum class Direction : int {
 };
 
 /// @brief Набор граней в форме Structure of Arrays (набор массивов).
-class AmrFaces final {
+class RawFaces final {
     // aliases inside class
     using Boundary = geom::Boundary;
     using Vector3d = geom::Vector3d;
@@ -95,7 +95,7 @@ public:
     /// @brief Индексы первых граней ячеек (CSR-структура)
     std::vector<index_t>  offsets = {0};
 
-    AmrAdjacent           adjacent;  ///< Индексы смежных ячеек
+    RawAdjacent           adjacent;  ///< Индексы смежных ячеек
 
     std::vector<Boundary> boundary;  ///< Тип граничного условия
     std::vector<Vector3d> normal;    ///< Внешняя нормаль к грани
@@ -107,7 +107,7 @@ public:
     std::vector<std::array<short, max_vertices>> vertices;
 
     /// @brief Пустые массивы по умолчанию
-    AmrFaces() = default;
+    RawFaces() = default;
 
     /// @brief Число ячеек
     index_t n_cells() const { return static_cast<index_t>(offsets.size()) - 1; }
@@ -193,21 +193,21 @@ public:
 };
 
 
-inline bool AmrFaces::is_boundary(index_t iface) const {
+inline bool RawFaces::is_boundary(index_t iface) const {
     return boundary[iface] != Boundary::INNER &&
            boundary[iface] != Boundary::PERIODIC &&
            boundary[iface] != Boundary::UNDEFINED;
 }
 
-inline bool AmrFaces::is_actual(index_t iface) const {
+inline bool RawFaces::is_actual(index_t iface) const {
     return boundary[iface] != Boundary::UNDEFINED;
 }
 
-inline bool AmrFaces::is_undefined(index_t iface) const {
+inline bool RawFaces::is_undefined(index_t iface) const {
     return boundary[iface] == Boundary::UNDEFINED;
 }
 
-inline void AmrFaces::set_undefined(index_t iface) {
+inline void RawFaces::set_undefined(index_t iface) {
     boundary[iface] = Boundary::UNDEFINED;
     adjacent.rank[iface]  = -1;
     adjacent.index[iface] = -1;
@@ -215,17 +215,17 @@ inline void AmrFaces::set_undefined(index_t iface) {
     adjacent.basic[iface] = -1;
 }
 
-inline AmrFaces::Vector3d AmrFaces::area_n(index_t iface) const {
+inline RawFaces::Vector3d RawFaces::area_n(index_t iface) const {
     return area[iface] * normal[iface];
 }
 
-inline double AmrFaces::get_area(index_t iface, bool axial) const {
+inline double RawFaces::get_area(index_t iface, bool axial) const {
     return axial ? area_alt[iface] : area[iface];
 }
 
-inline int AmrFaces::n_vertices(index_t iface) const {
+inline int RawFaces::n_vertices(index_t iface) const {
     int count = 2;
-    for (; count < AmrFaces::max_vertices; ++count) {
+    for (; count < RawFaces::max_vertices; ++count) {
         if (vertices[iface][count] < 0) {
             break;
         }
@@ -233,7 +233,7 @@ inline int AmrFaces::n_vertices(index_t iface) const {
     return count;
 }
 
-inline AmrFaces::Vector3d AmrFaces::symm_point(index_t iface, const Vector3d& p) const {
+inline RawFaces::Vector3d RawFaces::symm_point(index_t iface, const Vector3d& p) const {
     return p + 2.0 * (center[iface] - p).dot(normal[iface]) * normal[iface];
 }
 

@@ -3,7 +3,7 @@
 
 #include <zephyr/geom/grid.h>
 #include <zephyr/geom/generator/generator.h>
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/mesh.h>
 #include <zephyr/io/vtu_file.h>
 
 using namespace zephyr::geom;
@@ -11,7 +11,7 @@ using namespace zephyr::mesh;
 using namespace zephyr::io;
 
 #if 0
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/raw/eu_mesh.h>
 #include <zephyr/io/vtu_file.h>
 
 #include <zephyr/geom/box.h>
@@ -86,7 +86,7 @@ struct Test {
     
     Test(TestType test);
 
-    EuMesh gen_eu() const;
+    Mesh gen_eu() const;
 
     LaMesh gen_la() const;
 };
@@ -483,8 +483,8 @@ Test::Test(TestType test) {
 void fill(AmrStorage& cells) {
 }
 
-EuMesh Test::gen_eu() const {
-    EuMesh mesh(generator, U);
+Mesh Test::gen_eu() const {
+    Mesh mesh(generator, U);
     
     Box box = mesh.bbox();
     double L = box.diameter();
@@ -525,10 +525,10 @@ int main(int argc, char *argv[]) {
 
     constexpr int nx = 10;
     constexpr int ny = 10;
-    std::array<std::array<Node::Ptr, ny + 1>, nx + 1> ps{};
+    std::array<std::array<GNode::Ptr, ny + 1>, nx + 1> ps{};
     for (int i = 0; i <= nx; ++i) {
         for (int j = 0; j <= ny; ++j) {
-            ps[i][j] = Node::create(Vector3d{0.1 * i, 0.2 * j, 0.0});
+            ps[i][j] = GNode::create(Vector3d{0.1 * i, 0.2 * j, 0.0});
         }
     }
 
@@ -555,7 +555,7 @@ int main(int argc, char *argv[]) {
 
     grid.finalize(opts);
 
-    EuMesh mesh(std::move(grid));
+    Mesh mesh(std::move(grid));
 
     VtuFile::save("out/mesh.vtu", mesh, Variables{"index", "faces2D"});
 

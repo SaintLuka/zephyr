@@ -6,14 +6,14 @@
 #include <zephyr/geom/geom.h>
 #include <zephyr/math/funcs.h>
 #include <zephyr/utils/mpi.h>
-#include <zephyr/mesh/euler/amr_cells.h>
+#include <zephyr/mesh/raw/raw_cells.h>
 
 using namespace zephyr::geom;
 using zephyr::utils::mpi;
 
 namespace zephyr::mesh {
 
-AmrCells::AmrCells(MeshOpts options) :
+RawCells::RawCells(MeshOpts options) :
     dim_(options.dim),
     adaptive_(options.adaptive),
     linear_(options.linear),
@@ -22,13 +22,13 @@ AmrCells::AmrCells(MeshOpts options) :
 
 }
 
-AmrCells AmrCells::same() const {
-    AmrCells cells(options());
+RawCells RawCells::same() const {
+    RawCells cells(options());
     cells.data = data.same();
     return cells;
 }
 
-MeshOpts AmrCells::options() const {
+MeshOpts RawCells::options() const {
     return MeshOpts {
         .dim      = dim_,
         .adaptive = adaptive_,
@@ -38,7 +38,7 @@ MeshOpts AmrCells::options() const {
     };
 }
 
-int AmrCells::face_count(index_t ic) const {
+int RawCells::face_count(index_t ic) const {
     if (adaptive_) {
         int count = 0;
         for (index_t iface: faces.range(ic)) {
@@ -53,23 +53,23 @@ int AmrCells::face_count(index_t ic) const {
     }
 }
 
-double AmrCells::hx(index_t ic) const {
+double RawCells::hx(index_t ic) const {
     z_assert(adaptive_, "Not adaptive mesh, can't get 'hx' for cell");
     return (verts.mapping<2>(ic).vs<+1, 0>() - verts.mapping<2>(ic).vs<-1, 0>()).norm();
 }
 
-double AmrCells::hy(index_t ic) const {
+double RawCells::hy(index_t ic) const {
     z_assert(adaptive_, "Not adaptive mesh, can't get 'hy' for cell");
     return (verts.mapping<2>(ic).vs<0, +1>() - verts.mapping<2>(ic).vs<0, -1>()).norm();
 }
 
-double AmrCells::hz(index_t ic) const {
+double RawCells::hz(index_t ic) const {
     z_assert(adaptive_, "Not adaptive mesh, can't get 'hz' for cell");
     z_assert(dim_ == 3, "Two dimensional mesh, can't get 'hz' for cell");
     return (verts.mapping<3>(ic).vs<0, 0, +1>() - verts.mapping<3>(ic).vs<0, 0, -1>()).norm();
 }
 
-double AmrCells::incircle_diameter(index_t ic) const {
+double RawCells::incircle_diameter(index_t ic) const {
     if (adaptive_) {
         if (dim_ == 2) {
             const SqQuad &vertices = verts.mapping<2>(ic);
@@ -102,7 +102,7 @@ double AmrCells::incircle_diameter(index_t ic) const {
     }
 }
 
-Box AmrCells::bbox(index_t ic) const {
+Box RawCells::bbox(index_t ic) const {
     // TODO: Сделать оптимальный код для декартовых сеток, и не только здесь
     Box box = Box::Empty(dim_);
     for (index_t iv: verts.range(ic)) {
@@ -111,9 +111,9 @@ Box AmrCells::bbox(index_t ic) const {
     return box;
 }
 
-Polygon AmrCells::polygon(index_t ic) const {
+Polygon RawCells::polygon(index_t ic) const {
     if (dim_ > 2) {
-        throw std::runtime_error("AmrCell::polygon() error #1");
+        throw std::runtime_error("RawCell::polygon() error #1");
     }
 
     if (adaptive_) {
@@ -147,9 +147,9 @@ Polygon AmrCells::polygon(index_t ic) const {
     return Polygon(std::span(verts.coords_data(ic), verts.count(ic)));
 }
 
-Polyhedron AmrCells::polyhedron(index_t ic) const {
+Polyhedron RawCells::polyhedron(index_t ic) const {
     if (dim_ < 3) {
-        throw std::runtime_error("AmrCell::polyhedron() error #1");
+        throw std::runtime_error("RawCell::polyhedron() error #1");
     }
 
     if (adaptive_ && linear_) {
@@ -168,10 +168,10 @@ Polyhedron AmrCells::polyhedron(index_t ic) const {
         return Polyhedron(CellType::HEXAHEDRON, vs);
     }
 
-    throw std::runtime_error("AmrCell::polyhedron() error #2");
+    throw std::runtime_error("RawCell::polyhedron() error #2");
 }
 
-double AmrCells::approx_vol_fraction(index_t ic, const InFunction &inside) const {
+double RawCells::approx_vol_fraction(index_t ic, const InFunction &inside) const {
     if (dim_ < 3) {
         if (adaptive_) {
             const SqQuad& vertices = verts.mapping<2>(ic);
@@ -277,7 +277,7 @@ double AmrCells::approx_vol_fraction(index_t ic, const InFunction &inside) const
     }
 }
 
-double AmrCells::volume_fraction(index_t ic, const InFunction &inside, int n_points) const {
+double RawCells::volume_fraction(index_t ic, const InFunction &inside, int n_points) const {
     if (dim_ < 3) {
         if (adaptive_) {
             if (linear_) {
@@ -311,11 +311,11 @@ double AmrCells::volume_fraction(index_t ic, const InFunction &inside, int n_poi
             return verts.mapping<3>(ic).reduce().volume_fraction(inside, n_points);
         }
         // Трехмерный многогранник
-        throw std::runtime_error("AmrCell::volume_fraction #1");
+        throw std::runtime_error("RawCell::volume_fraction #1");
     }
 }
 
-bool AmrCells::const_function(index_t ic, const SpFunction& func) const {
+bool RawCells::const_function(index_t ic, const SpFunction& func) const {
     double value = func(center[ic]);
     if (dim_ < 3) {
         if (adaptive_) {
@@ -348,11 +348,11 @@ bool AmrCells::const_function(index_t ic, const SpFunction& func) const {
     }
     else {
         // Трехмерная ячейка
-        throw std::runtime_error("AmrCell::const_function #1");
+        throw std::runtime_error("RawCell::const_function #1");
     }
 }
 
-double AmrCells::integrate_low(index_t ic, const SpFunction& func, int n_points) const {
+double RawCells::integrate_low(index_t ic, const SpFunction& func, int n_points) const {
     if (dim_ < 3) {
         if (adaptive_) {
             if (linear_) {
@@ -386,11 +386,11 @@ double AmrCells::integrate_low(index_t ic, const SpFunction& func, int n_points)
         if (adaptive_) {
             return verts.mapping<3>(ic).reduce().integrate_low(func, n_points);
         }
-        throw std::runtime_error("AmrCell::volume_fraction #1");
+        throw std::runtime_error("RawCell::volume_fraction #1");
     }
 }
 
-void AmrCells::move_item(index_t from, index_t to) {
+void RawCells::move_item(index_t from, index_t to) {
     rank[to] = rank[from];
     next[to] = to;
     index[to] = to;
@@ -432,15 +432,15 @@ void AmrCells::move_item(index_t from, index_t to) {
     set_undefined(from);
 }
 
-void AmrCells::copy_data(index_t from, index_t to) {
+void RawCells::copy_data(index_t from, index_t to) {
     copy_data(from, this, to);
 }
 
-void AmrCells::copy_data(index_t from, AmrCells* dst, index_t to) const {
+void RawCells::copy_data(index_t from, RawCells* dst, index_t to) const {
     data.copy_data(from, &dst->data, to);
 }
 
-void AmrCells::copy_geom(index_t ic, AmrCells& cells,
+void RawCells::copy_geom(index_t ic, RawCells& cells,
         index_t jc, index_t face_beg, index_t node_beg) const {
 
     cells.rank [jc] = rank [ic];
@@ -496,7 +496,7 @@ void AmrCells::copy_geom(index_t ic, AmrCells& cells,
     }
 }
 
-void AmrCells::copy_geom_basic(index_t ic, AmrCells& cells,
+void RawCells::copy_geom_basic(index_t ic, RawCells& cells,
         index_t jc, index_t face_beg, index_t node_beg) const {
 
     cells.rank [jc] = rank [ic];
@@ -521,11 +521,11 @@ void AmrCells::copy_geom_basic(index_t ic, AmrCells& cells,
     cells.verts.offsets[jc + 1] = node_beg + verts.max_count(ic);
 }
 
-void AmrCells::clear() {
+void RawCells::clear() {
     resize(0, 0, 0);
 }
 
-void AmrCells::resize_amr(index_t n_cells) {
+void RawCells::resize_amr(index_t n_cells) {
     if (!adaptive_) {
         throw std::runtime_error("Resize of unstructured mesh");
     }
@@ -536,7 +536,7 @@ void AmrCells::resize_amr(index_t n_cells) {
     resize(n_cells, n_faces, n_nodes);
 }
 
-void AmrCells::reserve_amr(index_t n_cells) {
+void RawCells::reserve_amr(index_t n_cells) {
     if (!adaptive_) {
         throw std::runtime_error("Resize of unstructured mesh");
     }
@@ -547,7 +547,7 @@ void AmrCells::reserve_amr(index_t n_cells) {
     reserve(n_cells, n_faces, n_nodes);
 }
 
-void AmrCells::resize_cells(index_t n_cells) {
+void RawCells::resize_cells(index_t n_cells) {
     m_size = n_cells;
 
     // Поля ячеек по числу ячеек, логично
@@ -572,7 +572,7 @@ void AmrCells::resize_cells(index_t n_cells) {
     verts.offsets.resize(n_cells + 1);
 }
 
-void AmrCells::reserve_cells(index_t n_cells) {
+void RawCells::reserve_cells(index_t n_cells) {
     // Поля ячеек по числу ячеек, логично
     next.reserve(n_cells);
     rank.reserve(n_cells);
@@ -595,7 +595,7 @@ void AmrCells::reserve_cells(index_t n_cells) {
     verts.offsets.reserve(n_cells + 1);
 }
 
-void AmrCells::shrink_to_fit_cells() {
+void RawCells::shrink_to_fit_cells() {
     // Поля ячеек по числу ячеек, логично
     next.shrink_to_fit();
     rank.shrink_to_fit();
@@ -618,7 +618,7 @@ void AmrCells::shrink_to_fit_cells() {
     verts.offsets.shrink_to_fit();
 }
 
-void AmrCells::resize(index_t n_cells, index_t n_faces, index_t n_nodes) {
+void RawCells::resize(index_t n_cells, index_t n_faces, index_t n_nodes) {
     if_debug(adaptive_) {
         z_assert(n_faces == (dim_ < 3 ? 8 : 24) * n_cells, "bad sizes");
         z_assert(n_nodes == (dim_ < 3 ? 9 : 27) * n_cells, "bad sizes");
@@ -628,19 +628,19 @@ void AmrCells::resize(index_t n_cells, index_t n_faces, index_t n_nodes) {
     verts.resize(n_cells, n_nodes);
 }
 
-void AmrCells::reserve(index_t n_cells, index_t n_faces, index_t n_nodes) {
+void RawCells::reserve(index_t n_cells, index_t n_faces, index_t n_nodes) {
     reserve_cells(n_cells);
     faces.reserve(n_cells, n_faces);
     verts.reserve(n_cells, n_nodes);
 }
 
-void AmrCells::shrink_to_fit() {
+void RawCells::shrink_to_fit() {
     shrink_to_fit_cells();
     faces.shrink_to_fit();
     verts.shrink_to_fit();
 }
 
-memory_t AmrCells::memory_usage() const {
+memory_t RawCells::memory_usage() const {
     memory_t mem;
     mem.add(next);
     mem.add(rank);
@@ -655,7 +655,7 @@ memory_t AmrCells::memory_usage() const {
     return mem;
 }
 
-void AmrCells::set_cell(index_t ic, const Quad& quad) {
+void RawCells::set_cell(index_t ic, const Quad& quad) {
     assert(dim_ == 2);
     assert(adaptive_);
     assert(linear_);
@@ -693,7 +693,7 @@ void AmrCells::set_cell(index_t ic, const Quad& quad) {
     }
 }
 
-void AmrCells::set_cell(index_t ic, const Quad& quad, bool axial) {
+void RawCells::set_cell(index_t ic, const Quad& quad, bool axial) {
     assert(dim_ == 2);
     assert(adaptive_);
     assert(linear_);
@@ -733,7 +733,7 @@ void AmrCells::set_cell(index_t ic, const Quad& quad, bool axial) {
 
     for (auto i: verts.range(ic)) {
         if (verts[i].z() != 0.0) {
-            throw std::runtime_error("AmrCells add axial cell, vertex.z != 0.0");
+            throw std::runtime_error("RawCells add axial cell, vertex.z != 0.0");
         }
     }
 
@@ -754,17 +754,17 @@ void AmrCells::set_cell(index_t ic, const Quad& quad, bool axial) {
     }
 }
 
-void AmrCells::set_cell(index_t ic, const SqQuad& quad) {
+void RawCells::set_cell(index_t ic, const SqQuad& quad) {
     set_cell(ic, quad.reduce());
-    //std::cerr << "Nonlinear AmrCells is not supported\n";
+    //std::cerr << "Nonlinear RawCells is not supported\n";
 }
 
-void AmrCells::set_cell(index_t ic, const SqQuad& quad, bool axial) {
+void RawCells::set_cell(index_t ic, const SqQuad& quad, bool axial) {
     set_cell(ic, quad.reduce(), axial);
-    //std::cerr << "Nonlinear AmrCells is not supported\n";
+    //std::cerr << "Nonlinear RawCells is not supported\n";
 }
 
-void AmrCells::set_cell(index_t ic, const Cube& cube) {
+void RawCells::set_cell(index_t ic, const Cube& cube) {
     assert(dim_ == 3);
     assert(adaptive_);
     assert(linear_);
@@ -804,15 +804,15 @@ void AmrCells::set_cell(index_t ic, const Cube& cube) {
     }
 }
 
-void AmrCells::set_cell(index_t ic, const SqCube& cube) {
+void RawCells::set_cell(index_t ic, const SqCube& cube) {
     set_cell(ic, cube.reduce());
 }
 
-void AmrCells::push_back(const geom::Line &line) {
+void RawCells::push_back(const geom::Line &line) {
     throw std::runtime_error("NO WAY ACPBWER");
 }
 
-void AmrCells::push_back(const Polygon& poly) {
+void RawCells::push_back(const Polygon& poly) {
     assert(dim_ == 2);
     assert(!adaptive_);
     assert(linear_);
@@ -867,10 +867,10 @@ void AmrCells::push_back(const Polygon& poly) {
     }
 }
 
-void AmrCells::push_back(const Polyhedron& poly) {
-    if (poly.need_simplify(AmrFaces::max_vertices)) {
+void RawCells::push_back(const Polyhedron& poly) {
+    if (poly.need_simplify(RawFaces::max_vertices)) {
         Polyhedron simple_poly = poly;
-        simple_poly.simplify_faces(AmrFaces::max_vertices);
+        simple_poly.simplify_faces(RawFaces::max_vertices);
         push_back_impl(simple_poly);
     }
     else {
@@ -878,7 +878,7 @@ void AmrCells::push_back(const Polyhedron& poly) {
     }
 }
 
-void AmrCells::push_back_impl(const Polyhedron& poly) {
+void RawCells::push_back_impl(const Polyhedron& poly) {
     assert(dim_ == 3);
     assert(!adaptive_);
     assert(linear_);
@@ -927,7 +927,7 @@ void AmrCells::push_back_impl(const Polyhedron& poly) {
 
         // Выставить вершины грани
         int n_verts = poly.face_indices(i).size();
-        if (n_verts > AmrFaces::max_vertices) {
+        if (n_verts > RawFaces::max_vertices) {
             std::string message = "Can't add polyhedron with " +
                     std::to_string(n_verts) + " vertices per face.";
             std::cerr << message << "\n";
@@ -1041,15 +1041,15 @@ inline void save_buffer(
     file << tab << "}" << end;
 }
 
-void AmrCells::backup(const std::filesystem::path& root, std::ofstream& file,
+void RawCells::backup(const std::filesystem::path& root, std::ofstream& file,
     const std::string& tab, const std::vector<std::string>& variables) const {
 
     if (!fs::exists(root) && !fs::is_directory(root)) {
-        throw std::runtime_error("AmrCells::backup(): directory " + root.string() + "\" doesn't exist");
+        throw std::runtime_error("RawCells::backup(): directory " + root.string() + "\" doesn't exist");
     }
 
     if (mpi::master() && !file.is_open()) {
-        throw std::runtime_error("AmrCells::backup(): cannot open output file.");
+        throw std::runtime_error("RawCells::backup(): cannot open output file.");
     }
 
     const std::string tab2 = tab + "  ";

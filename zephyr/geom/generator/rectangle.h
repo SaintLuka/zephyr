@@ -82,7 +82,7 @@ public:
     bool can_make_cells() const override { return adaptive_ && !voronoi_; }
 
     /// @brief Инициализация SoA-хранилища сетки
-    mesh::AmrCells make_cells(bool unique_nodes) const override;
+    mesh::RawCells make_cells(bool unique_nodes) const override;
 
     // Далее не самые полезные get-функции
 
@@ -130,10 +130,10 @@ private:
     Grid create_voronoi() const;
 
     /// @brief Создать классическую декартову сетку
-    void initialize_classic(mesh::AmrCells& cells) const;
+    void initialize_classic(mesh::RawCells& cells) const;
 
     /// @brief Создать сетку из шестиугольников
-    void initialize_voronoi(mesh::AmrCells& cells);
+    void initialize_voronoi(mesh::RawCells& cells);
 
     int nx_{0}, ny_{0};     ///< Число ячеек по осям
     int size_{0};           ///< Суммарное число ячеек

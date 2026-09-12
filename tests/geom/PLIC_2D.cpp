@@ -69,12 +69,12 @@ static Storable<double[4]>   ps; // Положения
 static Storable<double[4]>   es; // Погрешности
 
 // Смешанная ячейка?
-inline bool mixed(EuCell& cell) {
+inline bool mixed(Cell& cell) {
     return 0.0 < cell[a] && cell[a] < 1.0;
 }
 
-void make_interface(EuMesh& mesh) {
-    Plic::get_fraction_t get_vf = [](const EuCell& cell, int idx) ->double {
+void make_interface(Mesh& mesh) {
+    Plic::get_fraction_t get_vf = [](const Cell& cell, int idx) ->double {
         return cell[a];
     };
 
@@ -86,7 +86,7 @@ void make_interface(EuMesh& mesh) {
         Plic(2, true, Plic::CSIR,   get_vf),
     };
 
-    mesh.for_each([&plic](EuCell& cell) {
+    mesh.for_each([&plic](Cell& cell) {
         if (!mixed(cell)) {
             for (auto& n: cell[ns]) n = Vector3d::Zero();
             for (auto& p: cell[ps]) p = 0.0;
@@ -102,13 +102,13 @@ void make_interface(EuMesh& mesh) {
     });
 }
 
-void calc_errors(EuMesh& mesh, InFunction func, int nx) {
+void calc_errors(Mesh& mesh, InFunction func, int nx) {
     std::atomic<size_t> err1_li{0}, err1_l1{0};
     std::atomic<size_t> err2_li{0}, err2_l1{0};
     std::atomic<size_t> err3_li{0}, err3_l1{0};
     std::atomic<size_t> err4_li{0}, err4_l1{0};
 
-    mesh.for_each([&, nx](EuCell& cell) {
+    mesh.for_each([&, nx](Cell& cell) {
         // Нулевые погрешности
         for (auto& e: cell[es]) e = 0.0;
 
@@ -193,8 +193,8 @@ void calc_errors(EuMesh& mesh, InFunction func, int nx) {
     std::cout.flush();
 }
 
-EuMesh body(EuMesh& mesh, int k) {
-    EuMesh clipped = EuMesh::PolySet(2);
+Mesh body(Mesh& mesh, int k) {
+    Mesh clipped = Mesh::PolySet(2);
     for (auto cell: mesh) {
         if (cell[a] <= 0.0 || (cell[a] < 0.5 && cell[ns][k].isZero())) {
             continue;
@@ -211,14 +211,14 @@ EuMesh body(EuMesh& mesh, int k) {
     return clipped;
 }
 
-void save_mesh(EuMesh& mesh) {
+void save_mesh(Mesh& mesh) {
     Variables vars = {"level", "flag"};
     vars.add_cell_data("a", a);
     //vars.append("ns", ns);
     //vars.append("ps", ps);
     //vars.append("es", es);
     vars.append<bool>("mixed", mixed);
-    vars.append<double>("delta", [](EuCell& cell) -> double {
+    vars.append<double>("delta", [](Cell& cell) -> double {
         return std::min(std::abs(cell[a]), std::abs(1.0 - cell[a]));
     });
 
@@ -238,7 +238,7 @@ void save_mesh(EuMesh& mesh) {
 }
 
 // Адаптировать, если ячейка или сосед смешанные
-void set_flag(EuCell& cell) {
+void set_flag(Cell& cell) {
     cell.set_flag(-1);
     if (mixed(cell)) {
         cell.set_flag(1);
@@ -254,7 +254,7 @@ void set_flag(EuCell& cell) {
 }
 
 // Выставить значения объемной доли и провести адаптацию
-void initialize(EuMesh& mesh, std::function<void(EuCell&)> set_alpha) {
+void initialize(Mesh& mesh, std::function<void(Cell&)> set_alpha) {
     mesh.set_distributor(Distributor::initializer(set_alpha));
     mesh.for_each(set_alpha);
     if (mesh.adaptive()) {
@@ -267,8 +267,8 @@ void initialize(EuMesh& mesh, std::function<void(EuCell&)> set_alpha) {
 }
 
 // Для плоскости
-void show_plain(EuMesh& mesh) {
-    initialize(mesh, [](EuCell& cell) {
+void show_plain(Mesh& mesh) {
+    initialize(mesh, [](Cell& cell) {
         double p = -cell.center().dot(some_n);
         cell[a] = quad_volume_fraction(p, some_n, cell.hx(), cell.hy());
     });
@@ -281,8 +281,8 @@ void show_plain(EuMesh& mesh) {
 }
 
 // Для обычной характеристической функции
-void show_classic(EuMesh& mesh, InFunction func, int nx = 200) {
-    initialize(mesh, [func, nx](EuCell& cell) {
+void show_classic(Mesh& mesh, InFunction func, int nx = 200) {
+    initialize(mesh, [func, nx](Cell& cell) {
         cell[a] = cell.volume_fraction(func, nx * nx);
     });
 
@@ -293,10 +293,10 @@ void show_classic(EuMesh& mesh, InFunction func, int nx = 200) {
     save_mesh(mesh);
 }
 
-void show_diffuse(EuMesh& mesh) {
+void show_diffuse(Mesh& mesh) {
     mesh.set_max_level(0);
 
-    mesh.for_each([](EuCell& cell) {
+    mesh.for_each([](Cell& cell) {
         double alpha = cell.integrate_low(diffuse_func, 10) / cell.volume();
         if (alpha < 1.0e-6) alpha = 0.0;
         if (alpha > 1.0 - 1.0e-6) alpha = 1.0;
@@ -308,16 +308,16 @@ void show_diffuse(EuMesh& mesh) {
     save_mesh(mesh);
 }
 
-void show_noise(EuMesh& mesh, InFunction func) {
+void show_noise(Mesh& mesh, InFunction func) {
     mesh.set_max_level(0);
 
-    mesh.for_each([func](EuCell& cell) {
+    mesh.for_each([func](Cell& cell) {
         cell[a] = cell.volume_fraction(func, 1000);
     });
 
     // Добавить шум
     auto ampl = mesh.add<double>("ampl");
-    mesh.for_each([ampl](EuCell& cell) {
+    mesh.for_each([ampl](Cell& cell) {
         double avg_a = 0.0;
         for (int i = - 2; i <= 2; ++i) {
             for (int j = - 2; j <= 2; ++j) {
@@ -328,7 +328,7 @@ void show_noise(EuMesh& mesh, InFunction func) {
         cell[ampl] = 0.5 - std::abs(avg_a - 0.5);
     });
 
-    mesh.for_each([ampl](EuCell& cell) {
+    mesh.for_each([ampl](Cell& cell) {
         double r = 2.0 * rand() / double(RAND_MAX) - 1.0;
         double alpha = cell[a] + 0.08 * r * cell[ampl];
         cell[a] = math::between(alpha, 0.0, 1.0);
@@ -340,8 +340,8 @@ void show_noise(EuMesh& mesh, InFunction func) {
 }
 
 // Исследование сходимости
-void convergence(EuMesh& mesh, InFunction func, int nx) {
-    auto set_alpha = [func, nx](EuCell& cell) {
+void convergence(Mesh& mesh, InFunction func, int nx) {
+    auto set_alpha = [func, nx](Cell& cell) {
         cell[a] = cell.volume_fraction(func, nx * nx);
     };
 
@@ -370,7 +370,7 @@ int main() {
     gen.set_nx(50);
     //gen.set_sizes(30, 50);
 
-    EuMesh mesh(gen);
+    Mesh mesh(gen);
     mesh.set_max_level(2);
 
     a = mesh.add<double>("a");

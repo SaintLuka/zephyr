@@ -16,7 +16,7 @@ namespace zephyr::mesh::amr {
 /// @param rank Ранг текущего процесса
 /// @param op Оператор распределения данных при огрублении и разбиении
 template<int dim>
-void setup_geometry_one(index_t ic, AmrCells &locals, AmrCells& ghosts, const Distributor& op, int rank) {
+void setup_geometry_one(index_t ic, RawCells &locals, RawCells& ghosts, const Distributor& op, int rank) {
     if (locals.flag[ic] == 0) {
         retain_cell<dim>(locals, ghosts, ic);
         return;
@@ -33,8 +33,8 @@ void setup_geometry_one(index_t ic, AmrCells &locals, AmrCells& ghosts, const Di
 /// @brief Осуществляет проход по ячейкам и вызывает для них
 /// соответствующие методы адаптации (без MPI)
 template<int dim>
-void setup_geometry(AmrCells &locals, const Statistics &count, const Distributor& op) {
-    static AmrCells ghosts;
+void setup_geometry(RawCells &locals, const Statistics &count, const Distributor& op) {
+    static RawCells ghosts;
     threads::parallel_for(
             index_t{0}, index_t{count.n_cells},
             setup_geometry_one<dim>,
@@ -45,9 +45,9 @@ void setup_geometry(AmrCells &locals, const Statistics &count, const Distributor
 /// @brief Осуществляет проход по диапазону ячеек и вызывает для них
 /// соответствующие методы адаптации (с MPI и без тредов)
 template<int dim>
-void setup_geometry(AmrCells &locals, Tourism& tourism, const Statistics &count, const Distributor& op) {
+void setup_geometry(RawCells &locals, Tourism& tourism, const Statistics &count, const Distributor& op) {
     int rank = mpi::rank();
-    AmrCells& ghosts = tourism.ghost_cells();
+    RawCells& ghosts = tourism.ghost_cells();
     threads::parallel_for(
             index_t{0}, index_t{count.n_cells},
             setup_geometry_one<dim>,

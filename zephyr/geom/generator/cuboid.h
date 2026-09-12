@@ -81,7 +81,7 @@ public:
     bool can_make_cells() const override { return adaptive_; }
 
     /// @brief Инициализация SoA-хранилища сетки
-    mesh::AmrCells make_cells(bool cells) const override;
+    mesh::RawCells make_cells(bool cells) const override;
 
     // Далее не самые полезные get-функции
 

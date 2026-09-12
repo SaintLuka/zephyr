@@ -1,6 +1,6 @@
-#include <zephyr/mesh/euler/migration.h>
+#include <zephyr/mesh/raw/migration.h>
 #include <zephyr/io/vtu_file.h>
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/mesh.h>
 
 namespace zephyr::mesh {
 
@@ -18,8 +18,8 @@ inline std::ostream &operator<<(std::ostream &os, const std::vector<index_t> &ar
     return os;
 }
 
-void Migration::init_types(const AmrCells& cells) {
-    cell_buffer_ = AmrCells(cells.options());
+void Migration::init_types(const RawCells& cells) {
+    cell_buffer_ = RawCells(cells.options());
 }
 
 void Migration::clear() {
@@ -32,8 +32,8 @@ void Migration::shrink_to_fit() {
     node_buffer_.shrink_to_fit();
 }
 
-void Migration::setup_node_ranks(AmrNodes& nodes,
-    const AmrCells& locals, const AmrCells& ghosts) {
+void Migration::setup_node_ranks(RawNodes& nodes,
+    const RawCells& locals, const RawCells& ghosts) {
 
     for (index_t in = 0; in < nodes.n_nodes(); ++in) {
         int r = std::numeric_limits<int>::max();
@@ -59,7 +59,7 @@ void Migration::setup_node_ranks(AmrNodes& nodes,
     }
 }
 
-void Migration::fill_cell_routers(const AmrCells& cells) {
+void Migration::fill_cell_routers(const RawCells& cells) {
     // Сколько элементов каждого ранга пересылается с данного процесса
     // при миграции, включая пересылки на сам процесс (пересылка r -> r)
     // Строка матрицы пересылок
@@ -99,7 +99,7 @@ void Migration::fill_cell_routers(const AmrCells& cells) {
     */
 }
 
-void Migration::fill_node_routers(const AmrNodes& nodes, bool unique_nodes) {
+void Migration::fill_node_routers(const RawNodes& nodes, bool unique_nodes) {
     if (!unique_nodes) {
         node_router_.set_zero_complete();
         inct_router_.set_zero_complete();
@@ -139,7 +139,7 @@ void Migration::fill_node_routers(const AmrNodes& nodes, bool unique_nodes) {
     */
 }
 
-void Migration::cells_reindexing(Tourism& tourism, AmrCells& cells) const {
+void Migration::cells_reindexing(Tourism& tourism, RawCells& cells) const {
     // Отправим новые ранги ячеек
     tourism.prepare<MpiTag::RANK>(cells);
     auto send_rnk = tourism.isend<MpiTag::RANK>();
@@ -175,7 +175,7 @@ void Migration::cells_reindexing(Tourism& tourism, AmrCells& cells) const {
     recv_idx.wait();
 }
 
-void Migration::nodes_reindexing(Tourism& tourism, AmrNodes& nodes) const {
+void Migration::nodes_reindexing(Tourism& tourism, RawNodes& nodes) const {
     // Отправим новые ранги ячеек
     tourism.prepare<MpiTag::NODE_RANK>(nodes);
     auto send_rnk = tourism.isend<MpiTag::NODE_RANK>();
@@ -209,7 +209,7 @@ void Migration::nodes_reindexing(Tourism& tourism, AmrNodes& nodes) const {
     recv_idx.wait();
 }
 
-void Migration::update_face_adjacent(AmrCells& locals, const AmrCells& ghosts) {
+void Migration::update_face_adjacent(RawCells& locals, const RawCells& ghosts) {
     auto& faces = locals.faces;
     for (index_t ic = 0; ic < locals.n_cells(); ++ic) {
         for(auto iface: locals.faces.range(ic)){
@@ -230,7 +230,7 @@ void Migration::update_face_adjacent(AmrCells& locals, const AmrCells& ghosts) {
         }
     }
 }
-void Migration::update_cell_verts(AmrVerts& verts, const AmrNodes& locals, const AmrNodes& ghosts) {
+void Migration::update_cell_verts(RawVerts& verts, const RawNodes& locals, const RawNodes& ghosts) {
     for (index_t inode = 0; inode < verts.n_verts(); ++inode) {
         index_t idx = verts.index[inode];
         index_t gst = verts.ghost[inode];

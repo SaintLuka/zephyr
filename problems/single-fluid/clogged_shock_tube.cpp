@@ -5,8 +5,8 @@
 #include <iomanip>
 
 #include <zephyr/geom/generator/rectangle.h>
-#include <zephyr/mesh/euler/eu_prim.h>
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/cell.h>
+#include <zephyr/mesh/mesh.h>
 
 #include <zephyr/utils/threads.h>
 #include <zephyr/io/pvd_file.h>
@@ -25,7 +25,7 @@ using namespace zephyr::io;
 using generator::Rectangle;
 using zephyr::utils::threads;
 
-void setup_initial(EuMesh &mesh, Storable<PState> z, IdealGas &eos, double u0, double u3, double P0, double P3, double rho0, double rho3, double l) {
+void setup_initial(Mesh &mesh, Storable<PState> z, IdealGas &eos, double u0, double u3, double P0, double P3, double rho0, double rho3, double l) {
     for (auto cell: mesh) {
         // Инициализация
         if (cell.center().x() > l) {
@@ -45,7 +45,7 @@ void setup_initial(EuMesh &mesh, Storable<PState> z, IdealGas &eos, double u0, d
 }
 
 /// @param G Правая граница
-void setup_boundary(EuMesh &mesh, Storable<bool> inside, double G, double h, double L, double l) {
+void setup_boundary(Mesh &mesh, Storable<bool> inside, double G, double h, double L, double l) {
     for (auto &cell: mesh) {
         cell[inside] = !((cell.center().x() < G) &&
                          (cell.center().y() < h) &&
@@ -156,7 +156,7 @@ int main() {
         .bottom = Boundary::WALL, .top   = Boundary::WALL});
 
     // Создать сетку
-    EuMesh mesh(rect);
+    Mesh mesh(rect);
 
     // Создать решатель
     SmFluid solver(eos);
@@ -178,16 +178,16 @@ int main() {
 
     // Переменные для сохранения
     pvd.variables = {"level", "faces2D"};
-    pvd.variables += {"rho", [z](EuCell& cell) -> double { return cell[z].density; }};
-    pvd.variables += {"u",   [z](EuCell& cell) -> double { return cell[z].velocity.x(); }};
-    pvd.variables += {"v",   [z](EuCell& cell) -> double { return cell[z].velocity.y(); }};
-    pvd.variables += {"p",   [z](EuCell& cell) -> double { return cell[z].pressure; }};
-    pvd.variables += {"e",   [z](EuCell& cell) -> double { return cell[z].energy; }};
-    pvd.variables += {"inside", [inside](EuCell& cell) -> int { return cell[inside]; } };
-    pvd.variables += {"c", [&eos, z](EuCell& cell) -> double {
+    pvd.variables += {"rho", [z](Cell& cell) -> double { return cell[z].density; }};
+    pvd.variables += {"u",   [z](Cell& cell) -> double { return cell[z].velocity.x(); }};
+    pvd.variables += {"v",   [z](Cell& cell) -> double { return cell[z].velocity.y(); }};
+    pvd.variables += {"p",   [z](Cell& cell) -> double { return cell[z].pressure; }};
+    pvd.variables += {"e",   [z](Cell& cell) -> double { return cell[z].energy; }};
+    pvd.variables += {"inside", [inside](Cell& cell) -> int { return cell[inside]; } };
+    pvd.variables += {"c", [&eos, z](Cell& cell) -> double {
         return eos->sound_speed_rP(cell[z].density, cell[z].pressure);
     }};
-    pvd.variables += {"mach", [&eos, z](EuCell& cell) -> double {
+    pvd.variables += {"mach", [&eos, z](Cell& cell) -> double {
         return abs(cell[z].velocity.x() / eos->sound_speed_rP(cell[z].density, cell[z].pressure));
     }};
 

@@ -34,7 +34,7 @@ constexpr std::array<Side3D, CpC(dim)> side_to_next_sibling() {
 //  - Все сиблинги имеют один уровень.
 //  - Все сиблинги хотят огрубиться.
 template <int dim>
-bool can_coarse(AmrCells& cells, int ic) {
+bool can_coarse(RawCells& cells, int ic) {
     static constexpr auto sides = side_to_next_sibling<dim>();
 
     const auto& adj = cells.faces.adjacent;
@@ -91,7 +91,7 @@ bool can_coarse(AmrCells& cells, int ic) {
 /// @param cells Хранилище ячеек
 /// @param ic Целевая ячейка (от которой запрос)
 template<int dim>
-std::array<int, CpC(dim) - 1> get_siblings(AmrCells &cells, index_t ic) {
+std::array<int, CpC(dim) - 1> get_siblings(RawCells &cells, index_t ic) {
     static constexpr std::array<Side3D, CpC(dim)> sides = side_to_next_sibling<dim>();
 
     std::array<int, CpC(dim) - 1> siblings;
@@ -183,7 +183,7 @@ std::array<int, CpC(dim) - 1> get_siblings(AmrCells &cells, index_t ic) {
 // Ячейка по индексу ic является главной среди сиблингов,
 // прилегающих к грани с рангом rank?
 template<int dim>
-bool main_border_child(AmrCells& locals, index_t ic, int rank) {
+bool main_border_child(RawCells& locals, index_t ic, int rank) {
     index_t min_idx = ic;
     int min_z_idx = locals.z_idx[ic] % CpC(dim);
 

@@ -2,7 +2,7 @@
 
 #include <vector>
 
-#include <zephyr/mesh/euler/tourism.h>
+#include <zephyr/mesh/raw/tourism.h>
 
 namespace zephyr::mesh {
 
@@ -11,7 +11,7 @@ namespace zephyr::mesh {
 class Migration {
 public:
     /// @brief Инициализирует буфер с теми же опциями
-    void init_types(const AmrCells& cells);
+    void init_types(const RawCells& cells);
 
     /// @brief Очистить буферы
     void clear();
@@ -29,51 +29,51 @@ public:
     /// На данный момент не занимается построением обменного слоя, после
     /// миграции следует вызвать build_ghosts().
     template <typename... Args>
-    void migrate(Tourism& tourism, AmrCells& cells, AmrNodes& nodes, Args&&... vars);
+    void migrate(Tourism& tourism, RawCells& cells, RawNodes& nodes, Args&&... vars);
 
 protected:
     /// @brief Выставить новые ранги узлов исходя из рангов ячеек.
     /// Владельцем узла считается процесс с минимальным рангом среди
     /// инцидентных ячеек.
-    static void setup_node_ranks(AmrNodes& nodes, const AmrCells& locals, const AmrCells& ghosts);
+    static void setup_node_ranks(RawNodes& nodes, const RawCells& locals, const RawCells& ghosts);
 
     /// @brief Составить матрицу пересылок перед миграцей.
     /// Проверяет новые ранги ячеек и подсчитывает число пересылок ячеек,
     /// граней и вершин. Заполняет cell_router, face_router, vert_route.
     /// Требует коллективной MPI-операции, по типу all-to-all.
-    void fill_cell_routers(const AmrCells& cells);
+    void fill_cell_routers(const RawCells& cells);
 
-    void fill_node_routers(const AmrNodes& nodes, bool unique_nodes);
+    void fill_node_routers(const RawNodes& nodes, bool unique_nodes);
 
     // Новая индексация ячеек (какая будет после миграции), пересылка
     // и получение новых index и rank в ghost-слой.
-    void cells_reindexing(Tourism& tourism, AmrCells& cells) const;
+    void cells_reindexing(Tourism& tourism, RawCells& cells) const;
 
     // Новая индексация узлов (какая будет после миграции), пересылка
     // и получение новых index и rank в ghost-слой.
-    void nodes_reindexing(Tourism& tourism, AmrNodes& nodes) const;
+    void nodes_reindexing(Tourism& tourism, RawNodes& nodes) const;
 
     // Обновить face.adjacent.index в соответствии с индексами в массивах
-    static void update_face_adjacent(AmrCells& locals, const AmrCells& ghosts);
+    static void update_face_adjacent(RawCells& locals, const RawCells& ghosts);
 
-    static void update_cell_verts(AmrVerts& verts, const AmrNodes& locals, const AmrNodes& ghosts);
+    static void update_cell_verts(RawVerts& verts, const RawNodes& locals, const RawNodes& ghosts);
 
     // Копировать геометрию и поля данных в хранилище migrants
     // Все аргументы Vars должны иметь тип Storable<T>
     template <typename... Vars>
-    void fill_migrant_cells(AmrCells& cells,
+    void fill_migrant_cells(RawCells& cells,
         const std::tuple<Vars...>& loc_vars,
         const std::tuple<Vars...>& mig_vars);
 
     // Копировать геометрию и поля данных в хранилище migrants
     // Все аргументы Vars должны иметь тип Storable<T>
     template <typename... Vars>
-    void fill_migrant_nodes(AmrNodes& nodes,
+    void fill_migrant_nodes(RawNodes& nodes,
         const std::tuple<Vars...>& loc_vars,
         const std::tuple<Vars...>& mig_vars);
 
     /// @brief Вспомогательный буфер ячеек
-    AmrCells cell_buffer_;
+    RawCells cell_buffer_;
 
     // Маршрутизаторы для отправки примитивов из cells
     Router cell_router_;
@@ -81,7 +81,7 @@ protected:
     Router vert_router_;
 
     /// @brief Вспомогательный буфер узлов
-    AmrNodes node_buffer_;
+    RawNodes node_buffer_;
 
     // Маршрутизаторы для отправки примитивов из cells
     Router node_router_;
@@ -90,7 +90,7 @@ protected:
 
 template <typename... Vars>
 void Migration::fill_migrant_cells(
-    AmrCells& cells,
+    RawCells& cells,
     const std::tuple<Vars...>& loc_vars,
     const std::tuple<Vars...>& mig_vars) {
     using utils::Buffer;
@@ -111,7 +111,7 @@ void Migration::fill_migrant_cells(
             cells.n_faces(),
             cells.n_verts());
 
-    // Сортировка migrants по rank, получается нормальный AmrCells
+    // Сортировка migrants по rank, получается нормальный RawCells
     // стартовые индексы (?)
     auto cell_index = cell_router_.send_offset();
     auto face_index = face_router_.send_offset();
@@ -159,7 +159,7 @@ void Migration::fill_migrant_cells(
 
 template <typename... Vars>
 void Migration::fill_migrant_nodes(
-    AmrNodes& nodes,
+    RawNodes& nodes,
     const std::tuple<Vars...>& loc_vars,
     const std::tuple<Vars...>& mig_vars) {
     using utils::Buffer;
@@ -178,7 +178,7 @@ void Migration::fill_migrant_nodes(
             nodes.n_nodes(),
             nodes.n_incident());
 
-    // Сортировка migrants по rank, получается нормальный AmrCells
+    // Сортировка migrants по rank, получается нормальный RawCells
     // стартовые индексы (?)
     auto node_index = node_router_.send_offset();
     auto inc_offset = inct_router_.send_offset();
@@ -195,10 +195,10 @@ void Migration::fill_migrant_nodes(
 }
 
 template <typename... Vars>
-void Migration::migrate(Tourism& tourism, AmrCells& cells, AmrNodes& nodes, Vars&&... vars) {
+void Migration::migrate(Tourism& tourism, RawCells& cells, RawNodes& nodes, Vars&&... vars) {
     using utils::Buffer;
-    AmrCells& ghost_cells = tourism.ghost_cells();
-    AmrNodes& ghost_nodes = tourism.ghost_nodes();
+    RawCells& ghost_cells = tourism.ghost_cells();
+    RawNodes& ghost_nodes = tourism.ghost_nodes();
 
     // Все дополнительные переменные имеют тип Storable<T>
     soa::assert_storable<Vars...>();

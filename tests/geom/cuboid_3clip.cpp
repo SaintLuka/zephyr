@@ -5,7 +5,7 @@
 #include <zephyr/geom/geom.h>
 #include <zephyr/geom/sections.h>
 #include <zephyr/geom/generator/cuboid.h>
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/mesh.h>
 #include <zephyr/io/vtu_file.h>
 #include <zephyr/io/vtr_file.h>
 #include <zephyr/io/pvd_file.h>
@@ -30,7 +30,7 @@ void save_origin() {
     poly2.move(Vector3d::UnitX());
     poly3.move(Vector3d::UnitY());
 
-    EuMesh orig = EuMesh::PolySet(3);
+    Mesh orig = Mesh::PolySet(3);
     orig.push_back(poly1);
     orig.push_back(poly2);
     orig.push_back(poly3);
@@ -57,7 +57,7 @@ void save_history(const std::vector<double>& ps, const std::vector<Vector3d>& ns
         auto clip2 = poly2.clip(p, ns[i]);
         auto clip3 = poly3.clip(p, ns[i]);
 
-        EuMesh clipped = EuMesh::PolySet(3);
+        Mesh clipped = Mesh::PolySet(3);
         clipped.push_back(clip1);
         clipped.push_back(clip2);
         clipped.push_back(clip3);
