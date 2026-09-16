@@ -126,12 +126,16 @@ public:
 
     VtuStructure(const RawCells &cells, const DistNodes& nodes, bool polyhedral);
 
-    void write_header(std::ofstream &file, bool node_data, const Variables &variables) const;
+    VtuStructure(const RawNodes& nodes);
+
+    void write_header(std::ofstream &file, bool cell_data, bool node_data, const Variables &variables) const;
 
     void write_primitives(std::ofstream &file) const;
 
 private:
     void fill(const RawCells& cells, const DistNodes &nodes, bool polyhedral);
+
+    void fill(const RawNodes& nodes);
 
     // Двумерная адаптивная сетка в виде простых квадратов
     void fill_adaptive_hex_2D(const RawCells& cells, const DistNodes &nodes = {});
@@ -211,6 +215,18 @@ VtuStructure::VtuStructure(const RawCells &cells, bool polyhedral) {
 
 VtuStructure::VtuStructure(const RawCells &cells, const DistNodes& nodes, bool polyhedral) {
     fill(cells, nodes, polyhedral);
+}
+
+VtuStructure::VtuStructure(const RawNodes& nodes) {
+    fill(nodes);
+}
+
+void VtuStructure::fill(const RawNodes& nodes) {
+    index_t n_nodes = nodes.n_nodes();
+    types.resize(n_nodes, type_t{1});
+    points = nodes.coord;
+    connectivity = arange(n_nodes);
+    offsets = uniform_offsets(n_nodes, 1);
 }
 
 void VtuStructure::fill(const RawCells& cells, const DistNodes &nodes, bool polyhedral) {
@@ -486,9 +502,12 @@ void VtuStructure::fill_polyfaces_3D(const RawCells& cells, const DistNodes &nod
     }
 }
 
-void VtuStructure::write_header(std::ofstream &file, bool node_data, const Variables &variables) const {
+void VtuStructure::write_header(std::ofstream &file, bool cell_data, bool node_data, const Variables &variables) const {
     index_t n_cells = types.size();
     index_t n_nodes = points.size();
+
+    if (cell_data && !variables.has_cell_data()) cell_data = false;
+    if (node_data && !variables.has_node_data()) node_data = false;
 
     file << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" byte_order=\"" + byteorder() + "\">\n";
     file << "  <UnstructuredGrid>" << '\n';
@@ -523,19 +542,21 @@ void VtuStructure::write_header(std::ofstream &file, bool node_data, const Varia
     file << "      </Cells>\n";
 
     // CellData
-    file << "      <CellData>\n";
-    for (auto &field: variables.list()) {
-        if (!field.cell_data()) continue;
+    if (cell_data) {
+        file << "      <CellData>\n";
+        for (auto &field: variables.list()) {
+            if (!field.cell_data()) continue;
 
-        file << "        <DataArray type=\"" << field.type() << "\" Name=\"" << field.name();
-        if (!field.is_scalar()) {
-            file << "\" NumberOfComponents=\"" << field.n_components();
+            file << "        <DataArray type=\"" << field.type() << "\" Name=\"" << field.name();
+            if (!field.is_scalar()) {
+                file << "\" NumberOfComponents=\"" << field.n_components();
+            }
+            file << "\" format=\"appended\" offset=\"" << byte_offset << "\"/>\n";
+
+            byte_offset += sizeof(datasize_t) + n_cells * field.size();
         }
-        file << "\" format=\"appended\" offset=\"" << byte_offset << "\"/>\n";
-
-        byte_offset += sizeof(datasize_t) + n_cells * field.size();
+        file << "      </CellData>\n";
     }
-    file << "      </CellData>\n";
 
     // PointData
     if (node_data) {
@@ -633,6 +654,30 @@ void write_nodes_data(std::ofstream &file, const DistNodes &nodes, const Variabl
     }
 }
 
+void write_nodes_data(std::ofstream &file, RawNodes &nodes, const Variables &variables) {
+    std::vector<char> temp;
+
+    const index_t n_nodes = nodes.n_nodes();
+    for (auto &field: variables.list()) {
+        if (!field.node_data()) continue;
+
+        index_t field_size = field.size();
+        datasize_t data_size = n_nodes * field_size;
+
+        file.write((char*) &data_size, sizeof(datasize_t));
+
+        temp.resize(data_size);
+
+        index_t counter = 0;
+        for (index_t i = 0; i < nodes.n_nodes(); ++i) {
+            Node node(&nodes, i);
+            field.write(node, temp.data() + counter * field_size);
+            ++counter;
+        }
+        file.write(temp.data(), data_size);
+    }
+}
+
 } // anonymous namespace
 
 // ====================================================================================================================
@@ -651,6 +696,10 @@ void VtuFile::save(RawCells &cells) const {
     save(filename, cells, variables, options);
 }
 
+void VtuFile::save(RawNodes& nodes) const {
+    save(filename, nodes, variables);
+}
+
 void save_with_nodes(std::string_view filename, RawCells &locals,
     const DistNodes& nodes, const Variables &variables, const VtuOptions& options) {
     std::string fullname = add_extension(filename, ".vtu");
@@ -663,25 +712,24 @@ void save_with_nodes(std::string_view filename, RawCells &locals,
     }
 
     VtuStructure formatter(locals, nodes, options.polyhedral);
-    formatter.write_header(file, nodes.true_nodes(), variables);
+    formatter.write_header(file, true, nodes.true_nodes(), variables);
     formatter.write_primitives(file);
     write_cells_data(file, locals, variables);
     write_nodes_data(file, nodes, variables);
-
     file.close();
 }
 
-void VtuFile::save(std::string_view filename, RawCells &locals,
+void VtuFile::save(std::string_view filename, RawCells &cells,
                    const Variables &variables, const VtuOptions& options) {
 
     DistNodes nodes;
     if (options.unique_nodes) {
-        auto [inc_verts, inc_nodes] = RawNodes::generate<false>(locals);
+        auto [inc_verts, inc_nodes] = RawNodes::generate<false>(cells);
         nodes = DistNodes(
             std::move(inc_verts.index),
             std::move(inc_nodes.coord));
     }
-    save_with_nodes(filename, locals, nodes, variables, options);
+    save_with_nodes(filename, cells, nodes, variables, options);
 }
 
 void VtuFile::save(std::string_view filename, Mesh &mesh,
@@ -703,6 +751,23 @@ void VtuFile::save(std::string_view filename, Mesh &mesh,
         }
     }
     save_with_nodes(filename, mesh.local_cells(), nodes, variables, options);
+}
+
+void VtuFile::save(std::string_view filename, RawNodes& nodes, const Variables& variables) {
+    std::string fullname = add_extension(filename, ".vtu");
+    create_directories(fullname);
+
+    std::ofstream file(fullname, std::ios::out | std::ios::binary);
+    if (!file.is_open()) {
+        std::cerr << "Warning: Cannot open file '" << fullname << "'\n";
+        return;
+    }
+
+    VtuStructure formatter(nodes);
+    formatter.write_header(file, false, true, variables);
+    formatter.write_primitives(file);
+    write_nodes_data(file, nodes, variables);
+    file.close();
 }
 
 } // namespace zephyr::io

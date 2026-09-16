@@ -50,10 +50,24 @@ Variable::Variable(std::string_view name)
             buffer<int32_t>(out) = cell.rank();
         };
     }
+    else if (name == "^rank") {
+        name_ = "rank";
+        type_ = VtkType::Int32;
+        write_ = [](const Node& node, void *out) {
+            buffer<int32_t>(out) = node.rank();
+        };
+    }
     else if (name == "index") {
         type_ = VtkType::Int32;
         write_ = [](const Cell& cell, void *out) {
             buffer<int32_t>(out) = cell.index();
+        };
+    }
+    else if (name == "^index") {
+        name_ = "index";
+        type_ = VtkType::Int32;
+        write_ = [](const Node& node, void *out) {
+            buffer<int32_t>(out) = node.index();
         };
     }
     else if (name == "level") {
@@ -212,6 +226,62 @@ Variable::Variable(std::string_view name)
                 buffer<int32_t>(out, i) = cell.node_ghost(i);
             }
             for (int i = n_nodes; i < n_comp; ++i) {
+                buffer<int32_t>(out, i) = int32_t{-42};
+            }
+        };
+    }
+    else if (contain(name, "incident.role") && n_comp > 0) {
+        name_ = "incident.role";
+        type_ = VtkType::Int8;
+        n_components_ = n_comp;
+        write_ = [n_comp](const Node& node, void *out) {
+            int n_inc = std::min(n_comp, node.n_incident());
+            for (int i = 0; i < n_inc; ++i) {
+                buffer<int8_t>(out, i) = node.incident_role(i);
+            }
+            for (int i = n_inc; i < n_comp; ++i) {
+                buffer<int8_t>(out, i) = int8_t{-42};
+            }
+        };
+    }
+    else if (contain(name, "incident.rank") && n_comp > 0) {
+        name_ = "incident.rank";
+        type_ = VtkType::Int8;
+        n_components_ = n_comp;
+        write_ = [n_comp](const Node& node, void *out) {
+            int n_inc = std::min(n_comp, node.n_incident());
+            for (int i = 0; i < n_inc; ++i) {
+                buffer<int8_t>(out, i) = node.incident_rank(i);
+            }
+            for (int i = n_inc; i < n_comp; ++i) {
+                buffer<int8_t>(out, i) = int8_t{-42};
+            }
+        };
+    }
+    else if (contain(name, "incident.index") && n_comp > 0) {
+        name_ = "incident.index";
+        type_ = VtkType::Int32;
+        n_components_ = n_comp;
+        write_ = [n_comp](const Node& node, void *out) {
+            int n_inc = std::min(n_comp, node.n_incident());
+            for (int i = 0; i < n_inc; ++i) {
+                buffer<int32_t>(out, i) = node.incident_index(i);
+            }
+            for (int i = n_inc; i < n_comp; ++i) {
+                buffer<int32_t>(out, i) = int32_t{-42};
+            }
+        };
+    }
+    else if (contain(name, "incident.ghost") && n_comp > 0) {
+        name_ = "incident.ghost";
+        type_ = VtkType::Int32;
+        n_components_ = n_comp;
+        write_ = [n_comp](const Node& node, void *out) {
+            int n_inc = std::min(n_comp, node.n_incident());
+            for (int i = 0; i < n_inc; ++i) {
+                buffer<int32_t>(out, i) = node.incident_ghost(i);
+            }
+            for (int i = n_inc; i < n_comp; ++i) {
                 buffer<int32_t>(out, i) = int32_t{-42};
             }
         };

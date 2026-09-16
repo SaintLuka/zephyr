@@ -84,6 +84,19 @@ void Variables::append(std::string_view name) {
             list_.emplace_back("vert.index" + count);
         }
     }
+    else if (contain(name, "incident")) {
+        if (name == "incident2D") n_comp = 5;
+        if (name == "incident3D") n_comp = 10;
+        if (n_comp > 0) {
+            std::string count = "[" + std::to_string(n_comp) + "]";
+
+            // Здесь добавляются сложные типы данных
+            list_.emplace_back("incident.role" + count);
+            list_.emplace_back("incident.rank" + count);
+            list_.emplace_back("incident.index" + count);
+            list_.emplace_back("incident.ghost" + count);
+        }
+    }
     else {
         list_.emplace_back(name);
     }
@@ -129,6 +142,24 @@ const Variable& Variables::operator[](int i) const {
 
 size_t Variables::size() const {
     return list_.size();
+}
+
+bool Variables::has_cell_data() const {
+    for (auto& name: list_) {
+        if (name.cell_data()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool Variables::has_node_data() const {
+    for (auto& name: list_) {
+        if (name.node_data()) {
+            return true;
+        }
+    }
+    return false;
 }
 
 const std::vector<Variable>& Variables::list() const {

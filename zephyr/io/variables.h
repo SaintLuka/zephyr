@@ -211,6 +211,12 @@ public:
     /// @brief Количество переменных
     size_t size() const;
 
+    /// @brief Есть данные ячеек?
+    bool has_cell_data() const;
+
+    /// @brief Есть данные узлов?
+    bool has_node_data() const;
+
     /// @brief Доступ ко всему списку переменных
     const std::vector<Variable> &list() const;
 

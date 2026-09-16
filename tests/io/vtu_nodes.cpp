@@ -38,7 +38,7 @@ int main(int argc, char** argv) {
     mesh.sync_nodes(v);
 
     // Переменная для записи
-    Variables vars = {"faces[6]"};
+    Variables vars = {"faces[6]", "^rank", "^index", "incident[5]"};
     vars.add_cell_data("u", u);
     vars.add_node_data("v", v);
 
@@ -48,6 +48,9 @@ int main(int argc, char** argv) {
 
         // Сохранить как набор ячеек
         VtuFile::save("output/cells", mesh.local_cells(), vars, {.unique_nodes = true});
+
+        // Сохранить как набор узлов
+        VtuFile::save("output/nodes", mesh.local_nodes(), vars);
     }
     else {
         // Сохранение распределенной сетки

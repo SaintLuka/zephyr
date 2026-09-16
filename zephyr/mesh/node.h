@@ -171,6 +171,14 @@ public:
     /// @brief Число инцидентных ячеек
     int n_incident() const;
 
+    int incident_rank(int idx) const;
+
+    int8_t incident_role(int idx) const;
+
+    index_t incident_index(int idx) const;
+
+    index_t incident_ghost(int idx) const;
+
     /// @brief Итератор по инцидентным ячейкам
     IncidentCells incident() const;
 
@@ -347,7 +355,25 @@ inline void Node::copy_data_to(Node &dst_node) const {
     nodes_->copy_data(index_, dst_node.nodes_, dst_node.index_);
 }
 
-inline int Node::n_incident() const { return nodes_->incident.max_count(index_); }
+inline int Node::n_incident() const {
+    return nodes_->incident.max_count(index_);
+}
+
+inline int Node::incident_rank(int idx) const {
+    return nodes_->incident.rank[nodes_->incident.offsets[index_] + idx];
+}
+
+inline int8_t Node::incident_role(int idx) const {
+    return nodes_->incident.role[nodes_->incident.offsets[index_] + idx];
+}
+
+inline index_t Node::incident_index(int idx) const {
+    return nodes_->incident.index[nodes_->incident.offsets[index_] + idx];
+}
+
+inline index_t Node::incident_ghost(int idx) const {
+    return nodes_->incident.ghost[nodes_->incident.offsets[index_] + idx];
+}
 
 inline IncidentCells Node::incident() const {
     return IncidentCells(&nodes_->incident, index_, locals_, ghosts_);

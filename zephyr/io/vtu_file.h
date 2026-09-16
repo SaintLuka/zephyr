@@ -53,6 +53,10 @@ public:
     /// создан экземпляр класса и настроены опции записи.
     void save(mesh::RawCells& cells) const;
 
+    /// @brief Базовая функция записи в файл. До вызова функции должен быть
+    /// создан экземпляр класса и настроены опции записи.
+    void save(mesh::RawNodes& nodes) const;
+
     /// @brief Статическая функция записи в файл. Полный аналог функции-члена
     /// класса save, но вызывается без экземпляра класса, все параметры записи
     /// передаются непосредственно как аргументы функции.
@@ -62,9 +66,13 @@ public:
                      const VtuOptions& options = {});
 
     static void save(std::string_view filename,
-                     mesh::RawCells& locals,
+                     mesh::RawCells& cells,
                      const Variables& variables = {},
                      const VtuOptions& options = {});
+
+    static void save(std::string_view filename,
+                     mesh::RawNodes& nodes,
+                     const Variables& variables = {});
 
 };
 
