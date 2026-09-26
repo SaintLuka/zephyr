@@ -9,6 +9,7 @@
 #include <zephyr/mesh/amr/statistics.h>
 #include <zephyr/mesh/amr/setup_positions.h>
 #include <zephyr/mesh/amr/setup_geometry.h>
+#include <zephyr/mesh/amr/incident.h>
 #include <zephyr/mesh/raw/tourism.h>
 
 namespace zephyr::mesh::amr {
@@ -16,7 +17,7 @@ namespace zephyr::mesh::amr {
 /// @brief Функция выполняет непосредственную адаптацию ячеек в хранилище в
 /// соответствии с флагами адаптации. Предполагается, что флаги адаптации
 /// сбалансированы.
-/// @param locals Ссылка на хранилище ячеек
+/// @param cells Ссылка на хранилище ячеек
 /// @param op Осуществляет распределение данных
 /// @details Детали алгоритма:
 /// Этап 1. Сбор данных о количестве ячеек для огрубления, разбиения и т. д.
@@ -40,8 +41,8 @@ namespace zephyr::mesh::amr {
 /// неопределенными. При этом за пределами исходного хранилища созданы новые
 /// ячейки. Необходимо выполнить цикл по обменным спискам и сделать перемещение
 /// ячеек из конца хранилища на места неопределенных ячеек.
-template<int dim>
-void apply_impl(RawCells &locals, const Distributor& op) {
+template<int dim, bool unique_nodes>
+void apply_impl(RawCells &cells, RawNodes& nodes, const Distributor& op) {
     static Stopwatch count_timer;
     static Stopwatch swap_timer;
     static Stopwatch positions_timer;
@@ -50,7 +51,7 @@ void apply_impl(RawCells &locals, const Distributor& op) {
 
     /// Этап 1. Сбор статистики
     count_timer.resume();
-    const Statistics count(locals.flag, locals.dim());
+    const Statistics count(cells.flag, cells.dim());
     //count.print();
     count_timer.stop();
 
@@ -60,24 +61,31 @@ void apply_impl(RawCells &locals, const Distributor& op) {
 
     // Этап 2. Определение обменных списков
     swap_timer.resume();
-    SwapLists swap_list(count, locals.flag);
+    SwapLists swap_list(count, cells.flag);
     swap_timer.stop();
 
-    /// Этап 3. Распределяем места для новых ячеек
+    // Этап 3. Распределяем места для новых ячеек
     positions_timer.resume();
-    locals.resize_amr(count.n_cells_large);
-    setup_positions<dim>(locals, count, swap_list);
+    cells.resize_amr(count.n_cells_large);
+    std::vector<index_t> split_indices;
+    setup_positions<dim, unique_nodes>(cells, count, swap_list, split_indices);
     positions_timer.stop();
 
-    /// Этап 4. Создание новых ячеек
+    if constexpr (unique_nodes) {
+        // Этап 3.1. Обновить инцидентные списки для существующих
+        // узлов, заполнить для новых.
+        update_incident<dim>(cells, nodes, count, split_indices);
+    }
+
+    // Этап 4. Создание новых ячеек
     geometry_timer.resume();
-    setup_geometry<dim>(locals, count, op);
+    setup_geometry<dim>(cells, count, op);
     geometry_timer.stop();
 
-    /// Этап 5. Перемещение готовых ячеек
+    // Этап 5. Перемещение готовых ячеек
     remove_timer.resume();
-    swap_list.move_elements(locals);
-    locals.resize_amr(count.n_cells_short);
+    swap_list.move_elements(cells);
+    cells.resize_amr(count.n_cells_short);
     remove_timer.stop();
 
 #if CHECK_PERFORMANCE
@@ -94,14 +102,24 @@ void apply_impl(RawCells &locals, const Distributor& op) {
 }
 
 /// @brief Автоматический выбор размерности
-inline void apply(RawCells &cells, const Distributor& op) {
+inline void apply(RawCells &cells, RawNodes& nodes,const Distributor& op) {
     if (cells.empty()) return;
 
     if (cells.dim() < 3) {
-        amr::apply_impl<2>(cells, op);
+        if (cells.has_nodes()) {
+            amr::apply_impl<2, true>(cells, nodes, op);
+        }
+        else {
+            amr::apply_impl<2, false>(cells, nodes, op);
+        }
     }
     else {
-        amr::apply_impl<3>(cells, op);
+        if (cells.has_nodes()) {
+            amr::apply_impl<3, true>(cells, nodes, op);
+        }
+        else {
+            amr::apply_impl<3, false>(cells, nodes, op);
+        }
     }
 }
 
@@ -178,7 +196,8 @@ void apply_impl(RawCells &locals, const Distributor& op, Tourism& tourism) {
     /// Этап 3а. Распределяем места для новых ячеек
     positions_timer1.resume();
     locals.resize_amr(count.n_cells_large);
-    setup_positions<dim>(locals, count, swap_list);
+    std::vector<index_t> split_indices;
+    setup_positions<dim, false>(locals, count, swap_list, split_indices);
     positions_timer1.stop();
 
     // Этап 3б. Сделать setup_positions для ghost-ячеек

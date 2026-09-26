@@ -370,7 +370,7 @@ void Mesh::apply_flags() {
 #endif
 
     if (mpi::single()) {
-        amr::apply(local_cells_, distributor_);
+        amr::apply(local_cells_, local_nodes_, distributor_);
     }
 #ifdef ZEPHYR_MPI
     else {
@@ -426,10 +426,6 @@ void Mesh::refine() {
     // Для однопроцессорной версии при пустой сетке сразу выход
     if (mpi::single() && local_cells_.empty()) {
         throw std::runtime_error("Mesh::refine(): Empty mesh");
-    }
-
-    if (local_cells_.has_nodes()) {
-        throw std::runtime_error("Mesh::refine(): Unique nodes are not supported");
     }
 
     full.resume();

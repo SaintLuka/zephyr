@@ -11,6 +11,7 @@ list(APPEND TESTS PLIC_3D)
 #list(APPEND TESTS poly_integrate)
 #list(APPEND TESTS polygon_clip)
 #list(APPEND TESTS polyhedra)
+list(APPEND TESTS roles)
 list(APPEND TESTS rotations)
 #list(APPEND TESTS splines)
 

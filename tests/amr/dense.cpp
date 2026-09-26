@@ -86,11 +86,11 @@ int main(int argc, char** argv) {
     //Cuboid gen(-2.0, 2.0, -1.0, 1.0, -1.0, 1.0);
     //gen.set_nx(20);
 
-    Mesh mesh(gen);
+    Mesh mesh(gen, true);
     bit = mesh.add<int>("bit");
 
     mesh.set_decomposition("XY");
-    mesh.set_max_level(mesh.dim() == 2 ? 5 : 4);
+    mesh.set_max_level(1); //mesh.dim() == 2 ? 5 : 4);
     mesh.set_distributor("simple");
 
     PvdFile pvd("mesh", "output");
@@ -117,6 +117,8 @@ int main(int argc, char** argv) {
             throw std::runtime_error("Bad init refinement");
         }
     }
+
+    return 0;
 
     Stopwatch elapsed;
     Stopwatch sw_write;
