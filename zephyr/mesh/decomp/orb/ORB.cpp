@@ -44,7 +44,7 @@ ORB::ORB(Box domain, const utils::Json& config)
         m_mobility = config["mobility"].as<double>();
     }
     if (config["newton"]) {
-        m_newton = config["newton"].as<double>();
+        m_newton = config["newton"].as<bool>();
     }
     if (config["exact"]) {
         m_exact = config["exact"].as<bool>();

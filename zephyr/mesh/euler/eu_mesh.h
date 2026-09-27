@@ -222,6 +222,9 @@ public:
     /// По умолчанию до максимального уровня адаптации.
     void refine_full(int level = -1);
 
+    /// @brief Уменьшить буферы памяти
+    void shrink();
+
     /// @brief Поправить референсную сетку
     void check_reference(bool fix = false);
 

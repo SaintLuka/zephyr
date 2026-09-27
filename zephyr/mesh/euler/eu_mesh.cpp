@@ -366,11 +366,33 @@ void EuMesh::refine_full(int level) {
         return;
     }
 
+    int cpc = CpC(m_locals.dim());
+    int pow = 1;
+    for (int i = 0; i < level - 1; ++i) {
+        pow *= cpc;
+    }
+
+    index_t cells_to_reserve = m_locals.size() * pow * (cpc + 1) + 100;
+
+    m_locals.reserve_amr(cells_to_reserve);
+
     for (int i = 0; i < level; ++i) {
-        for_each([level](EuCell &cell) {
+        for_each([level](const EuCell &cell) {
             cell.set_flag(cell.level() < level ? 1 : 0);
         });
         refine();
+    }
+    shrink();
+}
+
+void EuMesh::shrink() {
+    int cpc = CpC(m_locals.dim());
+    if (m_locals.rank.capacity() > (cpc + 1) * m_locals.rank.size()) {
+        m_locals.shrink_to_fit();
+    }
+    m_tourists.shrink_to_fit();
+    if (m_migrants.cells_capacity() > 2 * m_locals.n_cells()) {
+        m_migrants.shrink_to_fit();
     }
 }
 

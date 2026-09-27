@@ -126,35 +126,35 @@ index_t Router::recv_buffer_size() const {
     return m_recv_offset.back() + m_recv_count.back();
 }
 
-void Router::print() const {
+void Router::print(std::ostream& os) const {
     if (complete()) {
-        print_complete();
+        print_complete(os);
     } else {
-        print_partial();
+        print_partial(os);
     }
 }
 
-void Router::print_partial() const {
-    std::cout << "Rank " << mpi::rank() << ". send count: " << m_send_count << "\n";
-    std::cout << "        recv count: " << m_recv_count << "\n";
+void Router::print_partial(std::ostream& os) const {
+    os << "Rank " << mpi::rank() << ". send count: " << m_send_count << "\n";
+    os << "        recv count: " << m_recv_count << "\n";
 }
 
-void Router::print_complete() const {
-    int n = 7;
-    std::cout << "from \\ to |";
+void Router::print_complete(std::ostream& os) const {
+    int n = 8;
+    os << "from \\ to |";
     for (int i = 0; i < m_size; ++i) {
-        std::cout << std::setw(n) << i << " |";
+        os << std::setw(n) << i << " |";
     }
-    std::cout << "\n";
+    os << "\n";
 
     for (int i = 0; i < m_size; ++i) {
-        std::cout << "   " << i << "      |";
+        os << "   " << i << "      |";
         for (int j = 0; j < m_size; ++j) {
-            std::cout << std::setw(n) << get(i, j) << " |";
+            os << std::setw(n) << get(i, j) << " |";
         }
-        std::cout << "\n";
+        os << "\n";
     }
-    std::cout << "\n";
+    os << "\n";
 }
 
 Requests Router::isend(const utils::Buffer& src, MpiTag tag) const {

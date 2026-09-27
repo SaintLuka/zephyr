@@ -25,7 +25,11 @@ void Migration::shrink_to_fit() {
     migrants.shrink_to_fit();
 }
 
-void Migration::fill_router(AmrCells& locals) {
+index_t Migration::cells_capacity() const {
+    return migrants.rank.capacity();
+}
+
+void Migration::fill_router(const AmrCells& locals) {
     // Сколько элементов каждого ранга пересылается с данного процесса
     // при миграции, включая пересылки на сам процесс (пересылка r -> r)
     // Строка матрицы пересылок
@@ -56,11 +60,11 @@ void Migration::fill_router(AmrCells& locals) {
     mpi::for_each([&]() {
         std::cout << "Rank " << mpi::rank() << "\n";
         std::cout << "Cell Router\n";
-        m_cell_route.print();
+        m_cell_router.print();
         std::cout << "Face Router\n";
-        m_face_route.print();
+        m_face_router.print();
         std::cout << "Node Router\n";
-        m_node_route.print();
+        m_node_router.print();
     });
      */
 }

@@ -4,6 +4,8 @@
 
 namespace zephyr::mesh {
 
+using geom::Boundary;
+
 EuFace_Iter::EuFace_Iter(
         AmrCells *cells, index_t face_idx, index_t face_end,
         AmrCells *aliens, Direction dir)
@@ -134,6 +136,90 @@ EuCell EuCell::neib(index_t i, index_t j, index_t k) const {
         neighbor.replace(Side3D::Z);
     }
     return neighbor;
+}
+
+bool EuCell::local_neibs() const {
+    for (index_t iface: m_cells->faces_range(m_index)) {
+        auto flag = m_cells->faces.boundary[iface];
+        if (flag == Boundary::INNER || flag == Boundary::PERIODIC) {
+            if (m_cells->faces.adjacent.is_alien(iface)) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+// Сосед того же уровня по стороне side
+template<int dim>
+bool good_neibs(const EuCell& cell, Side<dim> side, int lvl) {
+    return cell.simple_face(side) && cell.face(side).neib_level() == lvl;
+}
+
+// Локальный сосед того же уровня по стороне side
+template<int dim>
+bool good_local_neibs(const EuCell& cell, Side<dim> side, int lvl) {
+    return cell.simple_face(side) && cell.face(side).local_neib() && cell.face(side).neib_level() == lvl;
+}
+
+bool EuCell::extended_stencil() const {
+    int lvl = level();
+
+    if (dim() < 3) {
+        if (!good_local_neibs(*this, Side2D::L, lvl)) return false;
+        if (!good_local_neibs(*this, Side2D::R, lvl)) return false;
+        if (!good_local_neibs(*this, Side2D::B, lvl)) return false;
+        if (!good_local_neibs(*this, Side2D::T, lvl)) return false;
+
+        auto neib_L = face(Side2D::L).neib();
+        if (!good_neibs(neib_L, Side2D::B, lvl)) return false;
+        if (!good_neibs(neib_L, Side2D::T, lvl)) return false;
+
+        auto neib_R = face(Side2D::R).neib();
+        if (!good_neibs(neib_R, Side2D::B, lvl)) return false;
+        if (!good_neibs(neib_R, Side2D::T, lvl)) return false;
+
+        return true;
+    }
+    else {
+        // Хорошие локальные соседи через 6 граней
+        for (auto side: Side3D::items()) {
+            if (!good_local_neibs(*this, side, lvl)) return false;
+        }
+
+        // Хорошие локальные соседи второго уровня
+        for (auto side_x: {Side3D::L, Side3D::R}) {
+            auto neib_x = face(side_x).neib();
+            for (auto side: {Side3D::B, Side3D::T, Side3D::Z, Side3D::F}) {
+                if (!good_local_neibs(neib_x, side, lvl)) return false;
+            }
+        }
+
+        for (auto side_y: {Side3D::B, Side3D::T}) {
+            auto neib_y = face(side_y).neib();
+            for (auto side: {Side3D::L, Side3D::R, Side3D::Z, Side3D::F}) {
+                if (!good_local_neibs(neib_y, side, lvl)) return false;
+            }
+        }
+
+        for (auto side_z: {Side3D::Z, Side3D::F}) {
+            auto neib_z = face(side_z).neib();
+            for (auto side: {Side3D::L, Side3D::R, Side3D::B, Side3D::T}) {
+                if (!good_local_neibs(neib_z, side, lvl)) return false;
+            }
+        }
+
+        // Хорошие угловые соседи
+        for (auto side: {Side3D::Z, Side3D::F}) {
+            if (!good_neibs(neib(-1, -1, 0), side, lvl)) return false;
+            if (!good_neibs(neib(-1, +1, 0), side, lvl)) return false;
+            if (!good_neibs(neib(+1, -1, 0), side, lvl)) return false;
+            if (!good_neibs(neib(+1, +1, 0), side, lvl)) return false;
+        }
+
+        return true;
+    }
+    return true;
 }
 
 } // namespace zephyr::mesh

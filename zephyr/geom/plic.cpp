@@ -9,13 +9,13 @@ namespace zephyr::geom {
 
 using mesh::EuCell;
 
-Plic::plane_t Plic::plane(EuCell& cell, int idx) const {
-    return m_find_plane(cell, idx);
+Plic::plane_t Plic::plane(EuCell& cell, int idx, bool norm) const {
+    return m_find_plane(cell, idx, norm);
 }
 
 
 Plic::Plic() {
-    m_find_plane = [](const EuCell& cell, int idx) ->plane_t {
+    m_find_plane = [](const EuCell& cell, int idx, bool norm) ->plane_t {
         return {0.0, Vector3d::Zero()};
     };
 }
@@ -30,7 +30,9 @@ Vector3d grad_normal(const EuCell& cell, int idx, const Plic::get_fraction_t& ge
         double a_f = 0.5 * (a0 + get_vf(face.neib(), idx));
         grad += a_f * face.area_n();
     }
-    return -grad.normalized();
+
+    //return -grad.normalized();
+    return -grad;
 }
 
 // Двумерная формула CSIR
@@ -41,7 +43,8 @@ Vector3d csir2_normal(const EuCell& cell, int idx, const Plic::get_fraction_t& g
         double a_f = face_fraction(a0, get_vf(face.neib(), idx));
         grad += a_f * face.area_n();
     }
-    return -grad.normalized();
+    //return -grad.normalized();
+    return -grad;
 }
 
 // Трёхмерная формула CSIR
@@ -61,7 +64,8 @@ Vector3d csir3_normal(const EuCell& cell, int idx, const Plic::get_fraction_t& g
     for (auto face: cell.faces()) {
         grad += a_f[face.side()] * face.area_n();
     }
-    return -grad.normalized();
+    //return -grad.normalized();
+    return -grad;
 }
 
 double polygon_section(const EuCell& cell, int idx, const Vector3d& n, const Plic::get_fraction_t& get_vf) {
@@ -129,12 +133,17 @@ public:
     double& operator()(int i, int j)       { return C(i, j); }
     double  operator()(int i, int j) const { return C(i, j); }
 
+
+
     Vector3d Youngs(double hx, double hy) const {
         Vector3d norm = Vector3d::Zero();
         norm.x() = ((C(-1, +1) + 2 * C(-1, 0) + C(-1, -1)) - (C(+1, +1) + 2 * C(+1, 0) + C(+1, -1))) / hx;
         norm.y() = ((C(+1, -1) + 2 * C(0, -1) + C(-1, -1)) - (C(+1, +1) + 2 * C(0, +1) + C(-1, +1))) / hy;
-        return norm.normalized();
+
+        //return norm.normalized();
+        return norm;
     }
+
 
     Vector3d ELVIRA(double hx, double hy) const {
         // Функции строк x(y)
@@ -154,7 +163,10 @@ public:
         triplet dy_dx = derivatives(func_y, hx);
 
         // Нормали для тестов
-        Vector3d YN = Youngs(hx, hy);
+        Vector3d YN1 = Youngs(hx, hy);
+        double YN1_length = YN1.norm();
+        Vector3d YN = YN1.normalized();
+
         double sgn_nx = math::sign(YN.x());
         double sgn_ny = math::sign(YN.y());
         std::array ns = {
@@ -183,7 +195,7 @@ public:
         }
 
         int err_min = std::min_element(errors.begin(), errors.end()) - errors.begin();
-        return ns[err_min];
+        return YN1_length*ns[err_min];
     }
 };
 
@@ -209,6 +221,7 @@ public:
     double  operator()(int i, int j, int k) const { return C(i, j, k); }
 
     Vector3d Youngs(double hx, double hy, double hz) const {
+
         Vector3d norm = Vector3d::Zero();
         norm.x()  = C(+1,-1,-1) + C(+1,-1,1) + C(+1,1,-1) + C(+1,1,1) + 2*(C(+1,0,1) + C(+1,0,-1) + C(+1,1,0) + C(+1,-1,0)) + 4*C(+1,0,0);
         norm.x() -= C(-1,-1,-1) + C(-1,-1,1) + C(-1,1,-1) + C(-1,1,1) + 2*(C(-1,0,1) + C(-1,0,-1) + C(-1,1,0) + C(-1,-1,0)) + 4*C(-1,0,0);
@@ -219,11 +232,15 @@ public:
         norm.z()  = C(-1,-1,+1) + C(-1,1,+1) + C(1,-1,+1) + C(1,1,+1) + 2*(C(0,1,+1) + C(0,-1,+1) + C(1,0,+1) + C(-1,0,+1)) + 4*C(0,0,+1);
         norm.z() -= C(-1,-1,-1) + C(-1,1,-1) + C(1,-1,-1) + C(1,1,-1) + 2*(C(0,1,-1) + C(0,-1,-1) + C(1,0,-1) + C(-1,0,-1)) + 4*C(0,0,-1);
         norm.z() /= hz;
-        return -norm.normalized();
+        //return -norm.normalized();
+        return -norm;
+
     }
 
     Vector3d ELVIRA(double hx, double hy, double hz) const {
-        Vector3d YN = Youngs(hx, hy, hz);
+        Vector3d YN1 = Youngs(hx, hy, hz);
+        double YN1_length = YN1.norm();
+        Vector3d YN = YN1.normalized();
 
         // Height-functions: x(y, z), y(z, x), z(x, y)
         table_3x3 func_x, func_y, func_z;
@@ -290,27 +307,36 @@ public:
                 }
             }
         }
-        return norm;
+        return YN1_length*norm;
     }
 };
 
 } // anonymous namespace
 
+
+//C++ bless me
 Plic::Plic(int dim, bool cartesian, Type type, const get_fraction_t& get_vf) {
+
     if (type == GRAD) {
         if (!cartesian) {
             if (dim == 2) {
-                m_find_plane = [get_vf](const EuCell& cell, int idx) -> plane_t {
-                    Vector3d n = grad_normal(cell, idx, get_vf);
+                m_find_plane = [get_vf](const EuCell& cell, int idx, bool norm) -> plane_t {
+
+                    Vector3d grad = grad_normal(cell, idx, get_vf);
+                    Vector3d n = grad.normalized();
                     double p = polygon_section(cell, idx, n, get_vf);
-                    return {p, n};
+                    return {p, norm ? n: grad};
+
                 };
             }
             else if (dim == 3) {
-                m_find_plane = [get_vf](const EuCell& cell, int idx) -> plane_t {
-                    Vector3d n = grad_normal(cell, idx, get_vf);
+                m_find_plane = [get_vf](const EuCell& cell, int idx,bool norm) -> plane_t {
+
+                    Vector3d grad = grad_normal(cell, idx, get_vf);
+                    Vector3d n = grad.normalized();
                     double p = polyhedron_section(cell, idx, n, get_vf);
-                    return {p, n};
+                    return {p, norm ? n: grad};
+
                 };
             }
             else {
@@ -319,17 +345,23 @@ Plic::Plic(int dim, bool cartesian, Type type, const get_fraction_t& get_vf) {
         }
         else {
             if (dim == 2) {
-                m_find_plane = [get_vf](const EuCell& cell, int idx) -> plane_t {
-                    Vector3d n = grad_normal(cell, idx, get_vf);
+                m_find_plane = [get_vf](const EuCell& cell, int idx,bool norm) -> plane_t {
+
+                    Vector3d grad = grad_normal(cell, idx, get_vf);
+                    Vector3d n = grad.normalized();
                     double p = quad_section(cell, idx, n, get_vf);
-                    return {p, n};
+                    return {p, norm ? n: grad};
+
                 };
             }
             else if (dim == 3) {
-                m_find_plane = [get_vf](const EuCell& cell, int idx) -> plane_t {
-                    Vector3d n = grad_normal(cell, idx, get_vf);
+                m_find_plane = [get_vf](const EuCell& cell, int idx,bool norm) -> plane_t {
+
+                    Vector3d grad = grad_normal(cell, idx, get_vf);
+                    Vector3d n = grad.normalized();
                     double p = cube_section(cell, idx, n, get_vf);
-                    return {p, n};
+                    return {p, norm ? n: grad};
+
                 };
             }
             else {
@@ -340,19 +372,25 @@ Plic::Plic(int dim, bool cartesian, Type type, const get_fraction_t& get_vf) {
     else if (type == PnY) {
         if (cartesian) {
             if (dim == 2) {
-                m_find_plane = [get_vf](const EuCell& cell, int idx) -> plane_t {
+                m_find_plane = [get_vf](const EuCell& cell, int idx, bool norm) -> plane_t {
+
                     Stencil2D arr(cell, idx, get_vf);
-                    Vector3d n = arr.Youngs(cell.hx(), cell.hy());
+                    Vector3d grad = arr.Youngs(cell.hx(), cell.hy());
+                    Vector3d n = grad.normalized();
                     double p = quad_section(cell, idx, n, get_vf);
-                    return {p, n};
+                    return {p, norm ? n: grad};
+
                 };
             }
             else if (dim == 3) {
-                m_find_plane = [get_vf](const EuCell& cell, int idx) -> plane_t {
+                m_find_plane = [get_vf](const EuCell& cell, int idx, bool norm) -> plane_t {
+
                     Stencil3D arr(cell, idx, get_vf);
-                    Vector3d n = arr.Youngs(cell.hx(), cell.hy(), cell.hz());
+                    Vector3d grad = arr.Youngs(cell.hx(), cell.hy(), cell.hz());
+                    Vector3d n = grad.normalized();
                     double p = cube_section(cell, idx, n, get_vf);
-                    return {p, n};
+                    return {p, norm ? n: grad};
+
                 };
             }
             else {
@@ -366,19 +404,25 @@ Plic::Plic(int dim, bool cartesian, Type type, const get_fraction_t& get_vf) {
     else if (type == ELVIRA) {
         if (cartesian) {
             if (dim == 2) {
-                m_find_plane = [get_vf](const EuCell& cell, int idx) -> plane_t {
+                m_find_plane = [get_vf](const EuCell& cell, int idx, bool norm) -> plane_t {
+
                     Stencil2D arr(cell, idx, get_vf);
-                    Vector3d n = arr.ELVIRA(cell.hx(), cell.hy());
+                    Vector3d grad = arr.ELVIRA(cell.hx(), cell.hy());
+                    Vector3d n = grad.normalized();
                     double p = quad_section(cell, idx, n, get_vf);
-                    return {p, n};
+                    return {p, norm ? n: grad};
+
                 };
             }
             else if (dim == 3) {
-                m_find_plane = [get_vf](const EuCell& cell, int idx) -> plane_t {
+                m_find_plane = [get_vf](const EuCell& cell, int idx, bool norm) -> plane_t {
+
                     Stencil3D arr(cell, idx, get_vf);
-                    Vector3d n = arr.ELVIRA(cell.hx(), cell.hy(), cell.hz());
+                    Vector3d grad = arr.ELVIRA(cell.hx(), cell.hy(), cell.hz());
+                    Vector3d n = grad.normalized();
                     double p = cube_section(cell, idx, n, get_vf);
-                    return {p, n};
+                    return {p, norm ? n: grad};
+
                 };
             }
             else {
@@ -392,17 +436,23 @@ Plic::Plic(int dim, bool cartesian, Type type, const get_fraction_t& get_vf) {
     else if (type == CSIR) {
         if (cartesian) {
             if (dim == 2) {
-                m_find_plane = [get_vf](const EuCell& cell, int idx) -> plane_t {
-                    Vector3d n = csir2_normal(cell, idx, get_vf);
+                m_find_plane = [get_vf](const EuCell& cell, int idx, bool norm) -> plane_t {
+
+                    Vector3d grad = csir2_normal(cell, idx, get_vf);
+                    Vector3d n = grad.normalized();
                     double p = quad_section(cell, idx, n, get_vf);
-                    return {p, n};
+                    return {p, norm ? n: grad};
+
                 };
             }
             else if (dim == 3) {
-                m_find_plane = [get_vf](const EuCell& cell, int idx) -> plane_t {
-                    Vector3d n = csir3_normal(cell, idx, get_vf);
+                m_find_plane = [get_vf](const EuCell& cell, int idx, bool norm) -> plane_t {
+
+                    Vector3d grad = csir3_normal(cell, idx, get_vf);
+                    Vector3d n = grad.normalized();
                     double p = cube_section(cell, idx, n, get_vf);
-                    return {p, n};
+                    return {p, norm ? n: grad};
+
                 };
             }
             else {
@@ -416,17 +466,21 @@ Plic::Plic(int dim, bool cartesian, Type type, const get_fraction_t& get_vf) {
     else if (type == CSIR_2D) {
         if (cartesian) {
             if (dim == 2) {
-                m_find_plane = [get_vf](const EuCell& cell, int idx) -> plane_t {
-                    Vector3d n = csir2_normal(cell, idx, get_vf);
+                m_find_plane = [get_vf](const EuCell& cell, int idx, bool norm) -> plane_t {
+                    Vector3d grad = csir2_normal(cell, idx, get_vf);
+                    Vector3d n = grad.normalized();
+
                     double p = quad_section(cell, idx, n, get_vf);
-                    return {p, n};
+                    return {p, norm ? n: grad};
                 };
             }
             else if (dim == 3) {
-                m_find_plane = [get_vf](const EuCell& cell, int idx) -> plane_t {
-                    Vector3d n = csir2_normal(cell, idx, get_vf);
+                m_find_plane = [get_vf](const EuCell& cell, int idx, bool norm) -> plane_t {
+                    Vector3d grad = csir2_normal(cell, idx, get_vf);
+                    Vector3d n = grad.normalized();
+
                     double p = cube_section(cell, idx, n, get_vf);
-                    return {p, n};
+                    return {p, norm ? n: grad};
                 };
             }
             else {

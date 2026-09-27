@@ -142,6 +142,9 @@ public:
     /// @brief Флаг адаптации соседней ячейки
     int neib_flag() const;
 
+    /// @brief Уровень адаптации соседней ячейки
+    int neib_level() const;
+
     /// @brief Центр соседней ячейки
     Vector3d neib_center() const;
 
@@ -418,6 +421,14 @@ public:
     ///     }
     /// @endcode
     EuCell neib(index_t i, index_t j, index_t k) const;
+
+    /// @brief Все соседи через грани находятся на том же процессе?
+    bool local_neibs() const;
+
+    /// @brief Ячейка имеет расширенный структурированный шаблон?
+    /// Для двумерных сеток 3x3 ячейки, для трёхмерных 3x3x3 ячейки.
+    /// В случае MPI требуется доступ ко всем ячейкам на шаблоне.
+    bool extended_stencil() const;
 
     /// @}
 
@@ -703,6 +714,13 @@ inline int EuFace::neib_flag() const {
         return m_cells->flag[adj_index()];
     }
     return m_aliens->flag[adj_alien()];
+}
+
+inline int EuFace::neib_level() const {
+    if (utils::mpi::single() || local_neib()) {
+        return m_cells->level[adj_index()];
+    }
+    return m_aliens->level[adj_alien()];
 }
 
 inline geom::Vector3d EuFace::neib_center() const {

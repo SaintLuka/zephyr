@@ -16,6 +16,9 @@ public:
     /// @brief Привести буферы к актуальным размерам
     void shrink_to_fit();
 
+    /// @brief Размер буфера ячеек на отправку
+    index_t cells_capacity() const;
+
     /// @brief Основная функция перераспределения ячеек
     /// @param tourists Актуальные слои для пересылок
     /// @param locals Локальные ячейки
@@ -33,7 +36,7 @@ protected:
     /// Проверяет новые ранги ячеек и подсчитывает число пересылок ячеек,
     /// граней и вершин. Заполняет cell_route, face_route, node_route.
     /// Требует коллективной MPI-операции, по типу all-to-all.
-    void fill_router(AmrCells& locals);
+    void fill_router(const AmrCells& locals);
 
     // Новая индексация ячеек (какая будет после миграции), пересылка
     // и получение новых index и rank в alien-слой.

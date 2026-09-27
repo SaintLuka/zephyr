@@ -144,7 +144,7 @@ public:
     }
 
     /// @brief Вывести информацию о пересылках
-    void print() const;
+    void print(std::ostream& os = std::cout) const;
 
 
     /// @brief Асинхронная отправка
@@ -181,10 +181,10 @@ public:
 protected:
 
     /// @brief Вывести полную матрицу пересылок в консоль
-    void print_partial() const;
+    void print_partial(std::ostream& os) const;
 
     /// @brief Вывести полную матрицу пересылок в консоль
-    void print_complete() const;
+    void print_complete(std::ostream& os) const;
 
 
     int m_size;  ///< Число процессов (== mpi::size())

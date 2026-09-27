@@ -35,11 +35,11 @@ public:
     Plic(int dim, bool cartesian, Type type, const get_fraction_t& get_vf);
 
     /// @brief Реконструировать плоскость в ячейке
-    plane_t plane(mesh::EuCell& cell, int idx) const;
+    plane_t plane(mesh::EuCell& cell, int idx, bool norm = true) const;
 
 private:
     /// @brief Основная функция, инициализируется после выбора параметров
-    std::function<plane_t(mesh::EuCell&, int)> m_find_plane;
+    std::function<plane_t(mesh::EuCell&, int, bool)> m_find_plane;
 };
 
 } // namespace zephyr::geom
