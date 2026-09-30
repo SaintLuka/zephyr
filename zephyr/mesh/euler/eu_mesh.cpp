@@ -390,10 +390,12 @@ void EuMesh::shrink() {
     if (m_locals.rank.capacity() > (cpc + 1) * m_locals.rank.size()) {
         m_locals.shrink_to_fit();
     }
+#ifdef ZEPHYR_MPI
     m_tourists.shrink_to_fit();
     if (m_migrants.cells_capacity() > 2 * m_locals.n_cells()) {
         m_migrants.shrink_to_fit();
     }
+#endif
 }
 
 void EuMesh::check_reference(bool fix) {

@@ -1,0 +1,10 @@
+{
+  "position": 4,
+  "label": "Численные методы",
+  "collapsible": true,
+  "collapsed": true,
+  "link": {
+    "type": "generated-index",
+    "slug": '/category/methods'
+  }
+}

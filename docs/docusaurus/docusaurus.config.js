@@ -114,6 +114,13 @@ const config = {
           {
             type: 'docSidebar',
             sidebarId: 'tutorialSidebar',
+            href: '/docs/category/methods',
+            position: 'left',
+            label: 'Методы',
+          },
+          {
+            type: 'docSidebar',
+            sidebarId: 'tutorialSidebar',
             href: '/docs/category/problems',
             position: 'left',
             label: 'Задачи',
