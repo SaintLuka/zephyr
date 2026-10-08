@@ -50,18 +50,6 @@ Vector3d Line::centroid() const {
     return 0.5 * (verts[0] + verts[1]);
 }
 
-// Точная формула, получена интегрированием
-Vector3d Line::centroid(bool axial) const {
-    Vector3d c = 0.5 * (verts[0] + verts[1]);
-    if (!axial || c.y() == 0.0) { return c; }
-
-    double dx = verts[1].x() - verts[0].x();
-    double dy = verts[1].y() - verts[0].y();
-
-    double coeff = dy / (12.0 * c.y());
-    return Vector3d{c.x() + coeff * dx, c.y() + coeff * dy, c.z()};
-}
-
 Vector3d Line::normal(const Vector3d &view) const {
     return perpendicular(verts[1] - verts[0], verts[0] - view);
 }

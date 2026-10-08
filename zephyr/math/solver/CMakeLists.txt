@@ -8,6 +8,7 @@ set(ZEPHYR_MATH_SOLVER_SRC
 
 install(FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/convection.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/criteria.h
         ${CMAKE_CURRENT_SOURCE_DIR}/sm_fluid.h
         ${CMAKE_CURRENT_SOURCE_DIR}/mm_fluid.h
         ${CMAKE_CURRENT_SOURCE_DIR}/riemann.h

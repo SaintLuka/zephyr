@@ -1,16 +1,8 @@
-/// @file mmf_triple_point.cpp
-/// @brief Triple point problem. Two or three material problem.
-/// Shock wave in gases and Kelvin-Helmholtz instability.
-///
-/// [1] Pan S., Han L., Hu X., Adams N. A conservative interface-interaction
-/// method for compressible multi-material flows // Journal of Computational
-/// Physics. –– 2018. –– Vol. 371. –– P. 870–895.
-/// [2] Dobrev V., Ellis T., Kolev T., Rieben R. High-order curvilinear finite
-/// elements for axisymmetric lagrangian hydrodynamics // Computers and Fluids.
-/// –– 2013. –– Vol. 83. –– P. 58–69.
-/// [3] Galera S., Maire P.-H., Breil J. A two-dimensional unstructured cell-centered
-/// multi-material ale scheme using vof interface reconstruction // Journal of
-/// Computational Physics. –- 2010. –- Vol. 229, no. 16. –- P. 5755–5787.
+/// @file mmf_riemann_2D.cpp
+/// @brief Two-dimensional Riemann problem (four materials).
+/// Kurganov, Alexander, Tadmor, Eitan. Solution of two-dimensional Riemann
+/// problems for gas dynamics without Riemann problem solvers.
+/// Numer. Methods Partial Differ. Equ. 18(5), 2002. — c. 584-608.
 
 #include <iomanip>
 
@@ -26,6 +18,8 @@
 #include <zephyr/utils/threads.h>
 #include <zephyr/utils/stopwatch.h>
 
+#include <zephyr/phys/tests/test_2D.h>
+
 using namespace zephyr::io;
 using namespace zephyr::phys;
 using namespace zephyr::math;
@@ -36,6 +30,7 @@ using zephyr::mesh::EuMesh;
 using zephyr::utils::Stopwatch;
 using zephyr::utils::threads;
 using zephyr::utils::mpi;
+using zephyr::phys::Riemann2D;
 
 void init_cells(EuMesh& mesh, const MixturePT& mixture, Storable<PState> init) {
     double R_max = 1.0;
@@ -84,27 +79,29 @@ int main(int argc, char** argv) {
     threads::init(argc, argv);
     threads::info();
 
+    // Test problem
+    Riemann2D test(5);
+
     // Generator of a Cartesian grid
-    generator::Rectangle gen(0.0, 7.0, 0.0, 3.0);
-    gen.set_nx(350);
-    gen.set_boundaries({.left=Boundary::WALL, .right=Boundary::WALL,
-                        .bottom=Boundary::WALL, .top=Boundary::WALL});
+    Rectangle gen(test.xmin(), test.xmax(), test.ymin(), test.ymax());
+    gen.set_boundaries(test.boundaries());
+    gen.set_nx(200);
 
     // Create mesh
     EuMesh mesh(gen);
 
     // Create EoS of materials and mixture
     MixturePT mixture;
-    mixture += IdealGas::create(1.4, 1.0);
-    mixture += IdealGas::create(1.5, 1.0);
-    // optional, same as the second material
-    //mixture += IdealGas::create(1.5, 1.0);
+    mixture += test.get_eos(0);
+    mixture += test.get_eos(1);
+    mixture += test.get_eos(2);
+    mixture += test.get_eos(3);
 
     // Create and configure solver
     MmFluid solver(mixture);
     solver.set_CFL(0.5);
     solver.set_accuracy(2);
-    solver.set_limiter("MC");
+    solver.set_limiter("van Albada");
     solver.set_method(Fluxes::CRP);
     solver.set_crp_mode(CrpMode::PLIC);
     solver.set_splitting(DirSplit::SIMPLE);
@@ -114,9 +111,23 @@ int main(int argc, char** argv) {
     auto z = data.init;
 
     // Configure mesh
-    mesh.set_max_level(1);
+    mesh.set_max_level(3);
     mesh.set_decomposition("XY");
     mesh.set_distributor(solver.distributor());
+
+    // Задание начальных данных
+    auto init_cells = [&test, z, mixture](EuMesh& mesh) {
+        mesh.for_each([&](EuCell& cell) {
+            Vector3d r = cell.center();
+
+            double    rho  = test.density(r);
+            Vector3d  v    = test.velocity(r);
+            double    P    = test.pressure(r);
+            Fractions beta = test.fractions(r);
+
+            cell[z] = PState(rho, v, P, beta, mixture);
+        });
+    };
 
     // Files for output
     PvdFile pvd("mesh", "output");
@@ -134,30 +145,21 @@ int main(int argc, char** argv) {
     pvd.variables += {"e",   [z](EuCell cell) -> double { return cell[z].energy; }};
     pvd.variables += {"P",   [z](EuCell cell) -> double { return cell[z].pressure; }};
     pvd.variables += {"T",   [z](EuCell cell) -> double { return cell[z].temperature; }};
-    pvd.variables += {"b0",  [z](EuCell cell) -> double { return cell[z].mass_frac[0]; }};
-    pvd.variables += {"b1",  [z](EuCell cell) -> double { return cell[z].mass_frac[1]; }};
-    pvd.variables += {"a0",  [z](EuCell cell) -> double { return cell[z].alpha(0); }};
-    pvd.variables += {"a1",  [z](EuCell cell) -> double { return cell[z].alpha(1); }};
-    pvd.variables += {"rho0",[z](EuCell cell) -> double { return cell[z].densities[0]; }};
-    pvd.variables += {"rho1",[z](EuCell cell) -> double { return cell[z].densities[1]; }};
-    pvd.variables += {"n.x", [n=data.n](EuCell cell) -> double { return cell[n][0].x(); }};
-    pvd.variables += {"n.y", [n=data.n](EuCell cell) -> double { return cell[n][0].y(); }};
 
     // Initial conditions (adaptive to initial data)
-    for (int k = 0; mesh.adaptive() && k < mesh.max_level() + 3; ++k) {
-        init_cells(mesh, mixture, z);
+    for (int k = 0; mesh.adaptive() && (k < mesh.max_level() + 3); ++k) {
+        init_cells(mesh);
         solver.set_flags(mesh);
         mesh.refine();
     }
-    init_cells(mesh, mixture, z);
+    init_cells(mesh);
 
     size_t n_step = 0;
     double curr_time = 0.0;
     double next_write = 0.0;
-    double max_time = 5.0;
 
     Stopwatch elapsed(true);
-    while (curr_time < max_time) {
+    while (curr_time < test.max_time()) {
         if (curr_time >= next_write) {
             mpi::cout << "\tStep: " << std::setw(6) << n_step << ";"
                       << "\tTime: " << std::setw(6) << std::setprecision(3) << curr_time << "\n";
@@ -169,11 +171,11 @@ int main(int argc, char** argv) {
                 pvd_domains[i].save(domain, curr_time);
             }
 
-            next_write += max_time / 50;
+            next_write += test.max_time() / 50;
         }
 
         // Finish exactly at max_time
-        solver.set_max_dt(max_time - curr_time);
+        solver.set_max_dt(test.max_time() - curr_time);
 
         // Integration step
         solver.update(mesh);
@@ -183,7 +185,7 @@ int main(int argc, char** argv) {
         curr_time += solver.dt();
         n_step += 1;
     }
-    pvd.save(mesh, max_time);
+    pvd.save(mesh, test.max_time());
 
     solver.interface_recovery(mesh);
     for (int i = 0; i < mixture.size(); ++i) {

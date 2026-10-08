@@ -173,7 +173,7 @@ int main() {
     mesh.set_max_level(3);
     mesh.set_distributor(solver.distributor());
 
-    PvdFile pvd("tube", "output");
+    PvdFile pvd("mesh", "output");
     //pvd.unique_nodes = true;
 
     // Переменные для сохранения

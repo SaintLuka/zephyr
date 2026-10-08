@@ -33,7 +33,9 @@ public:
 };
 
 /// @brief Двумерный распад разрыва.
-/// Набор тестов взят из статьи?
+/// Kurganov, Alexander, Tadmor, Eitan. Solution of two-dimensional Riemann
+/// problems for gas dynamics without Riemann problem solvers.
+/// Numer. Methods Partial Differ. Equ. 18(5), 2002. — c. 584-608.
 class Riemann2D : public Test2D {
 public:
     double x_jump;      ///< Положение разрыва
@@ -68,11 +70,20 @@ public:
 
     // Начальные данные
 
+    /// @brief Индекс материала в точке
+    int index(const Vector3d &r) const final;
+
+    /// @brief Начальная плотность
     double density(const Vector3d &vec) const final;
 
+    /// @brief Начальная скорость
     Vector3d velocity(const Vector3d &vec) const final;
 
+    /// @brief Начальное давление
     double pressure(const Vector3d &vec) const final;
+
+    /// @brief Характеристические функции компонент
+    Fractions fractions(const Vector3d &vec) const final;
 };
 
 /// @brief Одномерный тест, повернутый на угол alpha

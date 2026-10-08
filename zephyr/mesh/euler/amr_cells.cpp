@@ -1,7 +1,6 @@
 #include <filesystem>
 #include <iostream>
 #include <fstream>
-#include <cassert>
 
 #include <zephyr/geom/geom.h>
 #include <zephyr/math/funcs.h>
@@ -685,10 +684,10 @@ memory_t AmrCells::memory_usage() const {
 }
 
 void AmrCells::set_cell(index_t ic, const Quad& quad) {
-    assert(m_dim == 2);
-    assert(m_adaptive);
-    assert(m_linear);
-    assert(!m_axial);
+    z_assert(m_dim == 2);
+    z_assert(m_adaptive);
+    z_assert(m_linear);
+    z_assert(!m_axial);
 
     rank[ic] = -1;
     index[ic] = -1;
@@ -723,10 +722,10 @@ void AmrCells::set_cell(index_t ic, const Quad& quad) {
 }
 
 void AmrCells::set_cell(index_t ic, const Quad& quad, bool axial) {
-    assert(m_dim == 2);
-    assert(m_adaptive);
-    assert(m_linear);
-    assert(m_axial == axial);
+    z_assert(m_dim == 2);
+    z_assert(m_adaptive);
+    z_assert(m_linear);
+    z_assert(m_axial == axial);
 
     rank[ic] = -1;
     index[ic] = -1;
@@ -738,18 +737,8 @@ void AmrCells::set_cell(index_t ic, const Quad& quad, bool axial) {
 
     volume[ic] = quad.area();
     center[ic] = quad.centroid(volume[ic]);
-
-    volume[ic]     = quad.area();
-    volume_alt[ic] = quad.volume_as();
-    center[ic]     = quad.centroid_as(volume_alt[ic]);
-
-    volume[ic] = quad.area();
-    if (!axial) {
-        center[ic]     = quad.centroid(volume[ic]);
-    }
-    else {
+    if (axial) {
         volume_alt[ic] = quad.volume_as();
-        center[ic]     = quad.centroid_as(volume_alt[ic]);
     }
 
     face_begin[ic] = 8 * ic;
@@ -773,7 +762,7 @@ void AmrCells::set_cell(index_t ic, const Quad& quad, bool axial) {
         };
 
         faces.area[iface]     = vs.length();
-        faces.center[iface]   = vs.centroid(axial);
+        faces.center[iface]   = vs.centroid();
         faces.normal[iface]   = vs.normal(center[ic]);
         faces.boundary[iface] = Boundary::INNER;
 
@@ -794,10 +783,10 @@ void AmrCells::set_cell(index_t ic, const SqQuad& quad, bool axial) {
 }
 
 void AmrCells::set_cell(index_t ic, const Cube& cube) {
-    assert(m_dim == 3);
-    assert(m_adaptive);
-    assert(m_linear);
-    assert(!m_axial);
+    z_assert(m_dim == 3);
+    z_assert(m_adaptive);
+    z_assert(m_linear);
+    z_assert(!m_axial);
 
     rank[ic] = -1;
     index[ic] = -1;
@@ -842,9 +831,9 @@ void AmrCells::push_back(const geom::Line &line) {
 }
 
 void AmrCells::push_back(const Polygon& poly) {
-    assert(m_dim == 2);
-    assert(!m_adaptive);
-    assert(m_linear);
+    z_assert(m_dim == 2);
+    z_assert(!m_adaptive);
+    z_assert(m_linear);
 
     index_t ic = size();
 
@@ -908,10 +897,10 @@ void AmrCells::push_back(const Polyhedron& poly) {
 }
 
 void AmrCells::push_back_impl(const Polyhedron& poly) {
-    assert(m_dim == 3);
-    assert(!m_adaptive);
-    assert(m_linear);
-    assert(!m_axial);
+    z_assert(m_dim == 3);
+    z_assert(!m_adaptive);
+    z_assert(m_linear);
+    z_assert(!m_axial);
 
     index_t ic = size();
 

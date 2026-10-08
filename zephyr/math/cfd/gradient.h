@@ -15,6 +15,12 @@ using zephyr::geom::Boundary;
 
 using namespace geom;
 
+// |dr|^3
+inline double pow3(const Vector3d& dr) {
+    double r2 = dr.squaredNorm();
+    return r2 * std::sqrt(r2);
+}
+
 /// @brief Получить вектор состояния типа T из ячейки
 template <class T>
 using GetState = std::function<T(EuCell &)>;
@@ -195,7 +201,7 @@ Grad<State> LSM(EuCell &cell,
 
         Vector3d drn = dr.dot(normal) * normal;
 
-        double w = w0 * face.area() / std::pow(drn.norm(), 3);
+        double w = w0 * face.area() / pow3(drn);
 
         A += w * drn * dr.transpose();
 
@@ -253,7 +259,7 @@ Grad<State> LSM(EuCell &cell, Storable<State> state,
 
         Vector3d drn = dr.dot(normal) * normal;
 
-        double w = w0 * face.area() / std::pow(drn.norm(), 3);
+        double w = w0 * face.area() / pow3(drn);
 
         A += w * drn * dr.transpose();
 
@@ -377,7 +383,7 @@ Grad<State> limiting(EuCell &cell, const Limiter& limiter,
 
         Vector3d drn = dr.dot(normal) * normal;
 
-        double w = w0 * face.area() / std::pow(drn.norm() , 3);
+        double w = w0 * face.area() / pow3(drn);
 
         A += w * drn * dr.transpose();
 
@@ -441,7 +447,7 @@ Grad<State> limiting(EuCell &cell, const Limiter& limiter,
 
         Vector3d drn = dr.dot(normal) * normal;
 
-        double w = w0 * face.area() / std::pow(drn.norm() , 3);
+        double w = w0 * face.area() / pow3(drn);
 
         A += w * drn * dr.transpose();
 

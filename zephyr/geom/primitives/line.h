@@ -70,9 +70,6 @@ public:
     /// @brief Для отрезков эквивалентно center()
     Vector3d centroid() const;
 
-    /// @brief Барицентр для осесимметричных задач, вращение вокруг оси x.
-    Vector3d centroid(bool axial) const;
-
     /// @brief Нормаль к отрезку, располагается в плоскости с отрезком
     /// и точкой 'view', направлена от точки 'view'.
     Vector3d normal(const Vector3d &view) const;

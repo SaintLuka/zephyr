@@ -447,10 +447,12 @@ void MmFluid::compute_grad(EuMesh &mesh, Storable<PState> U)  {
     mesh.for_each([this, U](EuCell &cell) {
         // Для смешанных ячеек в CRP режиме производные равны нулю
         if (m_crp_mode != CrpMode::NONE) {
-            bool set_zero = cell[U].beta().index() < 0;
+            int cln_c = cell[U].beta().index();
+            bool set_zero = cln_c < 0;
             if (!set_zero) {
                 for (auto face: cell.faces()) {
-                    if (face.neib(U).beta().index() < 0) {
+                    int cln_n = face.neib(U).beta().index();
+                    if (cln_n != cln_c) {
                         set_zero = true;
                         break;
                     }
@@ -970,7 +972,7 @@ void MmFluid::set_flags(EuMesh &mesh) {
                 need_split = true;
                 break;
             }
-            /*
+
             // проверяем большой перепад давлений
             if (std::abs(face.neib(part.init).pressure - p) > 0.3 * abs(p)) {
                 need_split = true;
@@ -990,7 +992,6 @@ void MmFluid::set_flags(EuMesh &mesh) {
                     break;
                 }
             }
-            */
         }
 
         cell.set_flag(need_split ? 1 : -1);

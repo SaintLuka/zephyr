@@ -37,7 +37,7 @@ int main(int argc, char** argv) {
     threads::info();
 
     // Тестовая задача
-    Riemann2D test(6);
+    Riemann2D test(3);
     //ToroTest2D test(1, 0.3 * M_PI);
     //SkewShockWave test(5.0, M_PI/6, 0.2);
     //RichtmyerMeshkov test;
@@ -60,7 +60,7 @@ int main(int argc, char** argv) {
     SmFluid solver(eos);
     solver.set_accuracy(2);
     solver.set_CFL(0.5);
-    solver.set_limiter("MC");
+    solver.set_limiter("van Albada");
     solver.set_method(Fluxes::HLLC);
 
     // Добавляем типы на сетку, выбираем основной слой
@@ -88,10 +88,10 @@ int main(int argc, char** argv) {
     };
 
     // Файл для записи
-    PvdFile pvd("test2D", "output");
+    PvdFile pvd("mesh", "output");
 
     // Переменные для сохранения
-    pvd.variables = {"level", "faces2D"};
+    pvd.variables = {"level"};
     pvd.variables += {"density",  [z](EuCell& cell) -> double { return cell[z].density; }};
     pvd.variables += {"vel.x",    [z](EuCell& cell) -> double { return cell[z].velocity.x(); }};
     pvd.variables += {"vel.y",    [z](EuCell& cell) -> double { return cell[z].velocity.y(); }};
@@ -99,6 +99,7 @@ int main(int argc, char** argv) {
     pvd.variables += {"energy",   [z](EuCell& cell) -> double { return cell[z].energy; }};
 
     double curr_time = 0.0;
+    /*
     pvd.variables += {"exact.dens",
                       [&test, &curr_time](const EuCell &cell) -> double {
                           return test.density_t(cell.center(), curr_time);
@@ -107,6 +108,7 @@ int main(int argc, char** argv) {
                       [&test, &curr_time](const EuCell &cell) -> double {
                           return test.pressure_t(cell.center(), curr_time);
                       }};
+    */
 
     // Инициализация начальными данными
     for (int k = 0; k < mesh.max_level() + 3; ++k) {
@@ -146,6 +148,7 @@ int main(int argc, char** argv) {
         curr_time += solver.dt();
         n_step += 1;
     }
+    pvd.unique_nodes = true;
     pvd.save(mesh, curr_time);
     elapsed.stop();
 

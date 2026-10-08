@@ -594,11 +594,6 @@ void Rectangle::initialize(AmrCells& cells) const {
             cells.faces.area_alt[iface + Side2D::R] = hy * quad.vs<+1, 0>().y();
             cells.faces.area_alt[iface + Side2D::B] = hx * quad.vs< 0,-1>().y();
             cells.faces.area_alt[iface + Side2D::T] = hx * quad.vs< 0,+1>().y();
-
-            // Смещения барицентров, есть необходимость?
-            cells.center[ic].y() += hy*hy / (12.0 * quad.vs<0, 0>().y());
-            cells.faces.center[iface + Side2D::L].y() += hy*hy / (12.0 * quad.vs<-1, 0>().y());
-            cells.faces.center[iface + Side2D::R].y() += hy*hy / (12.0 * quad.vs<+1, 0>().y());
         }
     }
 }

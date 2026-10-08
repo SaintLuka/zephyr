@@ -1,6 +1,7 @@
 list(APPEND PROBLEMS mmf_advection_2D)
 list(APPEND PROBLEMS mmf_advection_3D)
 list(APPEND PROBLEMS mmf_bubble_collapse)
+list(APPEND PROBLEMS mmf_riemann_2D)
 list(APPEND PROBLEMS mmf_static)
 list(APPEND PROBLEMS mmf_test_1D)
 list(APPEND PROBLEMS mmf_triple_point)

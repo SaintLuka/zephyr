@@ -20,6 +20,8 @@ SmFluid::SmFluid(Eos::Ptr eos) : m_eos(eos) {
     m_limiter = Limiter("MC");
     m_dt = NAN;
     m_max_dt = std::numeric_limits<double>::max();
+
+    amr_criterion_ = SlopeCriterion::Default();
 }
 
 SmFluid::Parts SmFluid::add_types(EuMesh& mesh) {
@@ -66,6 +68,14 @@ void SmFluid::set_max_dt(double dt) {
     m_max_dt = dt;
 }
 
+void SmFluid::set_criterion(Criterion crit) {
+    if (std::holds_alternative<ChiCriterion>(crit)) {
+        std::cerr << "Chi criterion is not supported yet\n";
+        return;
+    }
+    amr_criterion_ = crit;
+}
+
 PState boundary_value(const PState &zc, const Vector3d &normal, Boundary flag) {
     if (flag != Boundary::WALL) {
         return zc;
@@ -103,8 +113,6 @@ void SmFluid::update(EuMesh &mesh) {
 
 void SmFluid::compute_dt(EuMesh &mesh) {
     double dt = mesh.min([this](EuCell cell) -> double {
-        //double c = m_eos->sound_speed_rP(cell(part.density), cell(part.pressure));
-        //return cell.incircle_diameter() / (cell(part.velocity).norm() + c);
         double c = m_eos->sound_speed_rP(cell[part.init].density, cell[part.init].pressure);
         return cell.incircle_diameter() / (cell[part.init].velocity.norm() + c);
     });
@@ -469,25 +477,27 @@ Distributor SmFluid::distributor(const std::string& type) const {
     return distr;
 }
 
-#if 0
-void SmFluid::set_flags(EuMesh &mesh) const {
-    if (!mesh.adaptive()) { return; }
+void SmFluid::set_flags_slope(EuMesh& mesh) const {
+    z_assert(std::holds_alternative<SlopeCriterion>(amr_criterion_),
+        "SmFluid::set_flags_slope: bad alternative");
 
-    compute_grad(mesh);
+    // Требуются данные соседей
+    mesh.sync(part.init);
 
-    // Пороги (относительные) на разбиение
-    const double xi_dens = 0.05;
-    const double xi_pres = 0.05;
+    // Критерий адаптации по перепаду
+    auto crit = std::get<SlopeCriterion>(amr_criterion_);
 
-    for (auto cell: mesh) {
-        //cell.set_flag(1); continue;
+    mesh.for_each([this, crit](EuCell& cell) {
         cell.set_flag(-1);
 
         double dens = cell[part.init].density;
         double pres = cell[part.init].pressure;
 
-        double dens_split = xi_dens * std::abs(dens);
-        double pres_split = xi_pres * std::abs(pres);
+        double dens_split = crit.dens_split * std::abs(dens);
+        double pres_split = crit.pres_split * std::abs(pres);
+
+        double dens_merge = crit.dens_merge * std::abs(dens);
+        double pres_merge = crit.pres_merge * std::abs(pres);
 
         for (auto face: cell.faces()) {
             if (face.is_boundary()) {
@@ -498,67 +508,39 @@ void SmFluid::set_flags(EuMesh &mesh) const {
             double pres_n = face.neib(part.init).pressure;
 
             // Большой перепад плотностей или давлений
-            if (std::abs(dens_n - dens) > dens_split ||
-                std::abs(pres_n - pres) > pres_split) {
+            if (std::abs(dens_n - dens) >= dens_split ||
+                std::abs(pres_n - pres) >= pres_split) {
                 cell.set_flag(1);
                 break;
             }
 
             // Пороги минимум в два раза меньше
-            if (std::abs(dens_n - dens) > 0.4 * dens_split ||
-                std::abs(pres_n - pres) > 0.4 * pres_split) {
+            if (std::abs(dens_n - dens) >= dens_merge ||
+                std::abs(pres_n - pres) >= pres_merge) {
                 cell.set_flag(0);
             }
         }
-    }
+    });
 }
-#endif
 
-void SmFluid::set_flags(EuMesh &mesh) const {
-    if (!mesh.adaptive()) { return; }
+void SmFluid::set_flags_chi(EuMesh& mesh) const {
+    z_assert(std::holds_alternative<ChiCriterion>(amr_criterion_),
+        "SmFluid::set_flags_chi: bad alternative");
 
+    throw std::runtime_error("SmFluid::set_flag_chi: not implemented");
+
+    // Требуются данные соседей и градиенты
     mesh.sync(part.init);
     compute_grad(mesh);
+    mesh.sync(part.d_dx, part.d_dy, part.d_dz);
 
+    // Хи-критерий адаптации
+    auto crit = std::get<ChiCriterion>(amr_criterion_);
 
-    // Пороги (относительные) на разбиение
-    const double xi_dens = 0.05;
-    const double xi_pres = 0.05;
-
-    for (auto cell: mesh) {
+    mesh.for_each([this, crit](EuCell& cell) {
         cell.set_flag(-1);
+        Vector3d cell_c = cell.center();
 
-        // ---------------------- SLOPE CRITERION ---------------------------
-
-        double dens = cell[part.init].density;
-        double pres = cell[part.init].pressure;
-
-        double dens_split = xi_dens * std::abs(dens);
-        double pres_split = xi_pres * std::abs(pres);
-
-        for (auto face: cell.faces()) {
-            if (face.is_boundary()) {
-                continue;
-            }
-
-            double dens_n = face.neib(part.init).density;
-            double pres_n = face.neib(part.init).pressure;
-
-            // Большой перепад плотностей или давлений
-            if (std::abs(dens_n - dens) > dens_split ||
-                std::abs(pres_n - pres) > pres_split) {
-                cell.set_flag(1);
-                break;
-            }
-
-            // Пороги минимум в два раза меньше
-            if (std::abs(dens_n - dens) > 0.4 * dens_split ||
-                std::abs(pres_n - pres) > 0.4 * pres_split) {
-                cell.set_flag(0);
-            }
-        }
-        /*
-        // ---------------------- CHI CRITERION ---------------------------
         const auto& zc = cell[part.init];
         const auto& dzcx = cell[part.d_dx];
         const auto& dzcy = cell[part.d_dy];
@@ -569,18 +551,12 @@ void SmFluid::set_flags(EuMesh &mesh) const {
         Matrix3d pres_A = Matrix3d::Zero();
         Matrix3d pres_B = Matrix3d::Zero();
 
-        double full_area = 0.0;
-        for(auto& face: cell.faces()) {
-            full_area += face.area();
-        }
-
-        const double eps = 0.001;
-        Vector3d cell_c = cell.center();
+        const double eps = crit.epsilon / cell.linear_size();
 
         for(auto& face: cell.faces()) {
             auto neib = face.neib();
             Vector3d normal = face.normal();
-            Vector3d neig_c = neib.center();
+            Vector3d neib_c = neib.center();
             Vector3d face_c = face.center();
 
             const auto& zn = neib[part.init];
@@ -589,31 +565,33 @@ void SmFluid::set_flags(EuMesh &mesh) const {
             const auto& dznz = neib[part.d_dz];
 
             double S  = face.area();
-            auto   Sn = normal * S;
+            auto   Sn = S * normal;
 
             // Значения на гранях
             Vector3d drc = face_c - cell_c;
-            PState zf = zc.arr() + dzcx.arr() * drc.x() + dzcy.arr() * drc.y() + dzcz.arr() * drc.z();
 
-            //linear interpolation for derivatives at edge
-            double t = (face_c - cell_c).dot(normal);
-            t       /= (neig_c - cell_c).dot(normal);
+            // linear interpolation to edge
+            double t = drc.dot(normal) / (neib_c - cell_c).dot(normal);
+            if (face.is_boundary()) {
+                t = 0.5;
+            }
 
+            PState zf = t * zn.arr() + (1.0 - t) * zc.arr();
             std::array<PState, 3> dzf = {
-                dzcx.arr() + t * (dznx.arr() - dzcx.arr()),
-                dzcy.arr() + t * (dzny.arr() - dzcy.arr()),
-                dzcz.arr() + t * (dznz.arr() - dzcz.arr())
+                t * dznx.arr() + (1.0 - t) * dzcx.arr(),
+                t * dzny.arr() + (1.0 - t) * dzcy.arr(),
+                t * dznz.arr() + (1.0 - t) * dzcz.arr()
             };
 
             for(int i = 0; i < 3; ++i) {
                 for(int j = 0; j < 3; ++j) {
                     dens_A(i, j) += 0.5 * (dzf[i].density * Sn[j] + dzf[j].density * Sn[i]);
-                    dens_B(i, j) += 0.5 * (fabs(dzf[i].density) + fabs(dzf[j].density)) * S;
-                    dens_B(i, j) += eps * fabs(zf.density) * S / full_area;
+                    dens_B(i, j) += 0.5 * (fabs(dzf[i].density * Sn[j]) + fabs(dzf[j].density * Sn[i]));
+                    dens_B(i, j) += eps * fabs(zf.density) * S;
 
-                    pres_A(i, j) += 0.5 * (dzf[i].pressure * Sn[j] + dzf[j].pressure * Sn[i]);
-                    pres_B(i, j) += 0.5 * (fabs(dzf[i].pressure) + fabs(dzf[j].pressure)) * S;
-                    pres_B(i, j) += eps * fabs(zf.pressure) * S / full_area;
+                    pres_A(i, j) += 0.5 * (dzf[i].energy * Sn[j] + dzf[j].energy * Sn[i]);
+                    pres_B(i, j) += 0.5 * (fabs(dzf[i].energy) + fabs(dzf[j].energy)) * S;
+                    pres_B(i, j) += eps * fabs(zf.energy) * S;
                 }
             }
         }
@@ -626,19 +604,31 @@ void SmFluid::set_flags(EuMesh &mesh) const {
         double dens_chi = std::sqrt( dens_norm_a / dens_norm_b );
         double pres_chi = std::sqrt( pres_norm_a / pres_norm_b );
 
-        const double chi_p = 0.15; // Верхний порог
-        const double chi_m = 0.10; // Нижний порог
+        cell[part.chi] = pres_chi;
 
-        if (dens_chi > chi_p || pres_chi > chi_p) {
+        if (dens_chi >= crit.dens_split || pres_chi >= crit.pres_split) {
             cell.set_flag(1);
         }
-        else if (dens_chi < chi_m && pres_chi < chi_m) {
-            cell.set_flag(-1);
-        }
-        else {
+        else if (dens_chi >= crit.dens_merge || pres_chi >= crit.pres_merge) {
             cell.set_flag(0);
         }
-        */
+        else {
+            cell.set_flag(-1);
+        }
+    });
+}
+
+void SmFluid::set_flags(EuMesh &mesh) const {
+    if (!mesh.adaptive()) return;
+
+    if (std::holds_alternative<SlopeCriterion>(amr_criterion_)) {
+        set_flags_slope(mesh);
+    }
+    else if (std::holds_alternative<ChiCriterion>(amr_criterion_)) {
+        set_flags_chi(mesh);
+    }
+    else {
+        throw std::runtime_error("Invalid amr_criterion type");
     }
 }
 

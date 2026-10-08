@@ -69,6 +69,7 @@ EuMesh plane_with_cube() {
 int main(int argc, char** argv) {
     mpi::handler handler(argc, argv);
     threads::init(argc, argv);
+    threads::on(7);
     threads::info();
 
     // Test problems
@@ -95,11 +96,11 @@ int main(int argc, char** argv) {
 
     // Configure mesh
     mesh.set_decomposition("XY");
-    mesh.set_max_level(3);
+    mesh.set_max_level(4);
     mesh.set_distributor(solver.distributor());
 
     // Files for output
-    PvdFile pvd("flow", "output");
+    PvdFile pvd("mesh", "output");
 
     // Variables to save
     pvd.variables = {"level"};
@@ -157,6 +158,7 @@ int main(int argc, char** argv) {
         curr_time += solver.dt();
         n_step += 1;
     }
+    pvd.unique_nodes = true;
     pvd.save(mesh, curr_time);
     elapsed.stop();
 

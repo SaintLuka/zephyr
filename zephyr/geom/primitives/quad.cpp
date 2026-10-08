@@ -376,32 +376,6 @@ Vector3d Quad::centroid_oxy(double area) const {
     return C;
 }
 
-Vector3d Quad::centroid_as(double vol_as) const {
-    z_assert(oxy(), "Quad::centroid_as: only for plain quads");
-    if (vol_as == 0.0) {
-        vol_as = Quad::volume_as();
-    }
-
-    // Обход вершин против часовой стрелки
-    int ord[4] = {0, 1, 3, 2};
-
-    Vector3d C = {0.0, 0.0, 0.0};
-    for (int i: {0, 1, 2, 3}) {
-        auto &v1 = verts[ord[i]];
-        auto &v2 = verts[ord[(i + 1) % 4]];
-
-        C.x() += (+1.5 * sqr(v1.y()) + v1.y() * v2.y() + 0.5 * sqr(v2.y())) * sqr(v1.x()) +
-                 (-1.5 * sqr(v2.y()) - v1.y() * v2.y() - 0.5 * sqr(v1.y())) * sqr(v2.x()) +
-                 (v2.y() * v2.y() - v1.y() * v1.y()) * v1.x() * v2.x();
-
-        C.y() -= (sqr(v1.y()) + sqr(v1.y()) * v2.y() +
-                  sqr(v2.y()) + sqr(v2.y()) * v1.y()) * (v2.x() - v1.x());
-    }
-    C /= (12.0 * vol_as);
-
-    return C;
-}
-
 double Quad::volume_fraction(const std::function<bool(const Vector3d&)>& inside, int N) const {
     return integral2D::volume_fraction(*this, inside, N);
 }

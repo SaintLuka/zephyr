@@ -68,12 +68,7 @@ void setup_face_geom(AmrFaces& faces, index_t iface, const SqMap<dim>& vertices)
 
         // Установить длину и нормаль
         faces.area[iface]   = vl.length();
-        if constexpr (!axial) {
-            faces.center[iface] = vl.centroid();
-        }
-        else {
-            faces.center[iface] = vl.centroid(axial);
-        }
+        faces.center[iface] = vl.centroid();
         faces.normal[iface] = vl.normal(C);
 
         if constexpr (axial) {

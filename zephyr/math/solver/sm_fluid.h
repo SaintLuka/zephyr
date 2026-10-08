@@ -5,6 +5,8 @@
 #include <zephyr/math/cfd/fluxes.h>
 #include <zephyr/math/cfd/limiter.h>
 
+#include "criteria.h"
+
 namespace zephyr::math {
 
 using zephyr::mesh::EuMesh;
@@ -33,6 +35,8 @@ public:
 
         /// @brief Бит изоляции
         Storable<int> wait;
+
+        Storable<double> chi;
     };
 
     Parts part;
@@ -70,6 +74,9 @@ public:
     /// @brief Установить шаг интегрирования по времени
     void set_max_dt(double dt);
 
+    /// @brief Установить критерий адаптации
+    void set_criterion(Criterion crit);
+
     /// @brief Выполнить шаг интегрирования по времени
     void update(EuMesh &mesh);
 
@@ -101,6 +108,12 @@ public:
     void fluxes_stage2(EuMesh &mesh) const;
 
 protected:
+    /// @brief Выставить флаги по перепадам
+    void set_flags_slope(EuMesh& mesh) const;
+
+    /// @brief Выставить флаги по хи-критерию
+    void set_flags_chi(EuMesh& mesh) const;
+
     Eos::Ptr m_eos;          ///< Уравнение состояния
     NumFlux::Ptr m_nf;       ///< Метод расчёта потока
     int m_acc = 1;           ///< Порядок точности
@@ -109,6 +122,7 @@ protected:
     double m_CFL = 0.5;      ///< Число Куранта
     double m_dt;             ///< Шаг интегрирования
     double m_max_dt=1.e300;  ///< Максимальный шаг интегрирования
+    Criterion amr_criterion_;     ///< Критерий адаптации
 };
 
 } // namespace zephyr::math
