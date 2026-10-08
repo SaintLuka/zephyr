@@ -20,8 +20,8 @@ using namespace zephyr::math;
 using namespace zephyr::math::smf;
 
 using zephyr::geom::generator::Cuboid;
-using zephyr::mesh::EuMesh;
-using zephyr::mesh::EuCell;
+using zephyr::mesh::Mesh;
+using zephyr::mesh::Cell;
 using zephyr::math::SmFluid;
 using zephyr::utils::mpi;
 using zephyr::utils::threads;
@@ -29,10 +29,10 @@ using zephyr::utils::Stopwatch;
 
 // Критерий адаптации подобран под задачу.
 // Адаптация ячеек с плотностью выше 1.5.
-void set_flags(EuMesh &mesh, Storable<PState> z) {
+void set_flags(Mesh &mesh, Storable<PState> z) {
     if (!mesh.adaptive()) return;
 
-    mesh.for_each([z](EuCell cell) {
+    mesh.for_each([z](Cell cell) {
         const double threshold = 1.5;
 
         if (cell[z].density > threshold) {
@@ -71,14 +71,14 @@ int main(int argc, char** argv) {
     gen.set_boundaries(test.boundaries());
 
     // Создать сетку
-    EuMesh mesh(gen);
+    Mesh mesh(gen);
 
     // Создать решатель
     SmFluid solver(eos);
-    solver.set_accuracy(1);
-    solver.set_CFL(0.8);
-    solver.set_limiter("minmod");
-    solver.set_method(Fluxes::HLLC);
+    solver.set_accuracy(2);
+    solver.set_CFL(0.5);
+    solver.set_limiter("MC");
+    solver.set_method(Fluxes::HLLC_M);
 
     // Добавляем типы на сетку, выбираем основной слой
     auto data = solver.add_types(mesh);
@@ -86,12 +86,12 @@ int main(int argc, char** argv) {
 
     // Настройка сетки
     mesh.set_decomposition("XYZ");
-    mesh.set_max_level(3);
+    mesh.set_max_level(4);
     mesh.set_distributor(solver.distributor());
 
     // Начальные данные
-    auto init_cells = [&](EuMesh& mesh) {
-        mesh.for_each([&](EuCell& cell) {
+    auto init_cells = [&](Mesh& mesh) {
+        mesh.for_each([&](Cell& cell) {
             Vector3d r = cell.center();
             cell[z].density  = test.density(r);
             cell[z].velocity = test.velocity(r);
@@ -102,7 +102,6 @@ int main(int argc, char** argv) {
 
     // Файл для записи
     PvdFile pvd("mesh", "output");
-    pvd.unique_nodes = true;
 
     size_t n_step = 0;
     double curr_time = test.init_time;
@@ -110,24 +109,24 @@ int main(int argc, char** argv) {
 
     // Переменные для сохранения
     pvd.variables = {"level"};
-    pvd.variables += {"rho", [z](EuCell& cell) -> double { return cell[z].density; }};
-    pvd.variables += {"vr",  [z](EuCell& cell) -> double { return cell[z].velocity.norm(); }};
-    pvd.variables += {"p",   [z](EuCell& cell) -> double { return cell[z].pressure; }};
-    pvd.variables += {"e",   [z](EuCell& cell) -> double { return cell[z].energy; }};
+    pvd.variables += {"rho", [z](Cell& cell) -> double { return cell[z].density; }};
+    pvd.variables += {"vr",  [z](Cell& cell) -> double { return cell[z].velocity.norm(); }};
+    pvd.variables += {"p",   [z](Cell& cell) -> double { return cell[z].pressure; }};
+    pvd.variables += {"e",   [z](Cell& cell) -> double { return cell[z].energy; }};
     pvd.variables += {"rho_exact",
-                      [&test, &curr_time](const EuCell &cell) -> double {
+                      [&test, &curr_time](const Cell &cell) -> double {
                           return test.density_t(cell.center(), curr_time);
                       }};
     pvd.variables += {"vr_exact",
-                      [&test, &curr_time](const EuCell  &cell) -> double {
+                      [&test, &curr_time](const Cell  &cell) -> double {
                           return test.velocity_t(cell.center(), curr_time).norm();
                       }};
     pvd.variables += {"p_exact",
-                      [&test, &curr_time](const EuCell &cell) -> double {
+                      [&test, &curr_time](const Cell &cell) -> double {
                           return test.pressure_t(cell.center(), curr_time);
                       }};
     pvd.variables += {"e_exact",
-                      [&test, &curr_time](const EuCell &cell) -> double {
+                      [&test, &curr_time](const Cell &cell) -> double {
                           return test.energy_t(cell.center(), curr_time);
                       }};
 
@@ -150,8 +149,10 @@ int main(int argc, char** argv) {
     Stopwatch elapsed(true);
     while (curr_time < test.max_time()) {
         sw_write.resume();
-        mpi::cout << "\tStep: " << std::setw(6) << n_step << ";"
-                  << "\tTime: " << std::setw(10) << std::setprecision(5) << curr_time << "\n";
+        if (n_step % 10 == 0) {
+            mpi::cout << "\tStep: " << std::setw(6) << n_step << ";"
+                      << "\tTime: " << std::setw(10) << std::setprecision(5) << curr_time << "\n";
+        }
         if (curr_time >= next_write) {
             pvd.save(mesh, curr_time);
             next_write += test.max_time() / 50;
@@ -184,6 +185,7 @@ int main(int argc, char** argv) {
         n_step += 1;
     }
     elapsed.stop();
+    pvd.options.unique_nodes = true;
     pvd.save(mesh, curr_time);
 
     mpi::cout << "\nElapsed time:   " << elapsed.extended_time()

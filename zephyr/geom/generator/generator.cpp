@@ -14,7 +14,7 @@
 namespace zephyr::geom {
 
 Generator::Generator(const std::string &name)
-    : m_name(name) { }
+    : name_(name) { }
 
 Generator::Ptr Generator::create(const Json& config) {
     using namespace generator;
@@ -52,7 +52,7 @@ Generator::Ptr Generator::create(const Json& config) {
 }
 
 const std::string &Generator::name() const {
-    return m_name;
+    return name_;
 }
 
 Box Generator::bbox() const {
@@ -61,7 +61,7 @@ Box Generator::bbox() const {
 
 void Generator::check_size(size_t size) const {
     if (size < 1) {
-        throw std::runtime_error("Generator::check_size: '" + m_name + "' generator error, cells count is zero.");
+        throw std::runtime_error("Generator::check_size: '" + name_ + "' generator error, cells count is zero.");
     }
     if (size > max_grid_size) {
         throw std::runtime_error(std::format("Generator::check_size: attempt to create mesh that contains more than {} elements", max_grid_size));
@@ -69,15 +69,15 @@ void Generator::check_size(size_t size) const {
 }
 
 void Generator::set_axial(bool axial) {
-    m_axial = axial;
+    axial_ = axial;
 }
 
 void Generator::set_adaptive(bool adaptive) {
-    m_adaptive = adaptive;
+    adaptive_ = adaptive;
 }
 
 void Generator::set_linear(bool linear) {
-    m_linear = linear;
+    linear_ = linear;
 }
 
 } // namespace zephyr::geom

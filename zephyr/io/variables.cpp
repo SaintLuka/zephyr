@@ -1,14 +1,34 @@
 #include <cstring>
+#include <charconv>
 
 #include <zephyr/io/variables.h>
 
 namespace zephyr::io {
 
-Variables::Variables(const char* name) {
-    append(name);
+inline bool contain(std::string_view name, const char* substr) {
+    return name.find(substr) != std::string_view::npos;
 }
 
-Variables::Variables(const std::string& name) {
+inline int get_count(std::string_view sv) {
+    auto beg = sv.find('[');
+    auto end = sv.find(']', beg);
+    if (beg != std::string_view::npos &&
+        end != std::string_view::npos &&
+        end > beg) {
+
+        std::string_view str_num = sv.substr(beg + 1, end - beg - 1);
+
+        int value = 0;
+        auto [ptr, ec] = std::from_chars(str_num.data(), str_num.data() + str_num.size(), value);
+
+        if (ec == std::errc()) {
+            return value;
+        }
+        }
+    return -1;
+}
+
+Variables::Variables(std::string_view name) {
     append(name);
 }
 
@@ -36,37 +56,50 @@ Variables::Variables(const std::vector<std::string>& names) {
     }
 }
 
-void Variables::append(const char* name) {
-    if (!std::strcmp(name, "faces")) {
-        // Здесь добавляются сложные типы данных
-        m_list.emplace_back("face.rank");
-        m_list.emplace_back("face.alien");
-        m_list.emplace_back("face.index");
-        m_list.emplace_back("face.boundary");
+void Variables::append(std::string_view name) {
+    int n_comp = get_count(name);
+    if (contain(name, "faces")) {
+        if (name == "faces2D") n_comp = 8;
+        if (name == "faces3D") n_comp = 24;
+        if (n_comp > 0) {
+            std::string count = "[" + std::to_string(n_comp) + "]";
+
+            // Здесь добавляются сложные типы данных
+            list_.emplace_back("face.rank" + count);
+            list_.emplace_back("face.ghost" + count);
+            list_.emplace_back("face.index" + count);
+            list_.emplace_back("face.boundary" + count);
+            list_.emplace_back("face.rotation" + count);
+        }
     }
-    else if (!std::strcmp(name, "faces2D")) {
-        // Для EuMesh
-        m_list.emplace_back("face2D.rank");
-        m_list.emplace_back("face2D.index");
-        m_list.emplace_back("face2D.alien");
-        m_list.emplace_back("face2D.boundary");
-        m_list.emplace_back("face2D.rotation");
+    else if (contain(name, "verts")) {
+        if (name == "verts2D") n_comp = 9;
+        if (name == "verts3D") n_comp = 27;
+        if (n_comp > 0) {
+            std::string count = "[" + std::to_string(n_comp) + "]";
+
+            // Здесь добавляются сложные типы данных
+            list_.emplace_back("vert.rank" + count);
+            list_.emplace_back("vert.ghost" + count);
+            list_.emplace_back("vert.index" + count);
+        }
     }
-    else if (!std::strcmp(name, "faces3D")) {
-        // Для EuMesh
-        m_list.emplace_back("face3D.rank");
-        m_list.emplace_back("face3D.index");
-        m_list.emplace_back("face3D.alien");
-        m_list.emplace_back("face3D.boundary");
-        m_list.emplace_back("face3D.rotation");
+    else if (contain(name, "incident")) {
+        if (name == "incident2D") n_comp = 5;
+        if (name == "incident3D") n_comp = 10;
+        if (n_comp > 0) {
+            std::string count = "[" + std::to_string(n_comp) + "]";
+
+            // Здесь добавляются сложные типы данных
+            list_.emplace_back("incident.role" + count);
+            list_.emplace_back("incident.rank" + count);
+            list_.emplace_back("incident.index" + count);
+            list_.emplace_back("incident.ghost" + count);
+        }
     }
     else {
-        m_list.emplace_back(name);
+        list_.emplace_back(name);
     }
-}
-
-void Variables::append(const std::string& name) {
-    append(name.c_str());
 }
 
 void Variables::append(std::initializer_list<const char *> names) {
@@ -95,24 +128,42 @@ void Variables::append(const std::vector<std::string> &names) {
 
 void Variables::append(const Variables &variables) {
     for (auto& desc: variables.list()) {
-        m_list.emplace_back(desc);
+        list_.emplace_back(desc);
     }
 }
 
 void Variables::reset() {
-    m_list.clear();
+    list_.clear();
 }
 
 const Variable& Variables::operator[](int i) const {
-    return m_list[i];
+    return list_[i];
 }
 
 size_t Variables::size() const {
-    return m_list.size();
+    return list_.size();
+}
+
+bool Variables::has_cell_data() const {
+    for (auto& name: list_) {
+        if (name.cell_data()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool Variables::has_node_data() const {
+    for (auto& name: list_) {
+        if (name.node_data()) {
+            return true;
+        }
+    }
+    return false;
 }
 
 const std::vector<Variable>& Variables::list() const {
-    return m_list;
+    return list_;
 }
 
 } // namespace zephyr::io

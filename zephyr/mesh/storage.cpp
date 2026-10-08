@@ -36,8 +36,8 @@ void Storage::shrink_to_fit() {
 memory_t Storage::memory_usage() const {
     memory_t mem;
     for (const auto& buf: m_data) {
-        mem.needed = buf.element_size() * buf.size();
-        mem.actual = buf.element_size() * buf.capacity();
+        mem.needed += buf.element_size() * buf.size();
+        mem.actual += buf.element_size() * buf.capacity();
     }
     return mem;
 }

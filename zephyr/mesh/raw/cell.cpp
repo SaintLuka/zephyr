@@ -1,148 +1,146 @@
-#include <zephyr/mesh/euler/eu_prim.h>
+#include <zephyr/mesh/cell.h>
 #include <zephyr/geom/primitives/polygon.h>
 #include <zephyr/geom/primitives/polyhedron.h>
 
 namespace zephyr::mesh {
 
-using geom::Boundary;
+Face_Iter::Face_Iter(
+        RawCells *cells, index_t face_idx, index_t face_end,
+        RawCells *ghosts, Direction dir)
+        : face_{cells, face_idx, ghosts},
+          face_end_(face_end),
+          dir_(dir) {
 
-EuFace_Iter::EuFace_Iter(
-        AmrCells *cells, index_t face_idx, index_t face_end,
-        AmrCells *aliens, Direction dir)
-        : m_eu_face{cells, face_idx, aliens},
-          m_face_end(face_end),
-          m_dir(dir) {
-
-    while (m_eu_face.m_face_idx < m_face_end && to_skip(m_dir)) {
-        m_eu_face.m_face_idx += 1;
+    while (face_.face_idx_ < face_end_ && to_skip(dir_)) {
+        face_.face_idx_ += 1;
     }
 }
 
-EuFace_Iter &EuFace_Iter::operator++() {
+Face_Iter &Face_Iter::operator++() {
     do {
-        m_eu_face.m_face_idx += 1;
-    } while (m_eu_face.m_face_idx < m_face_end && to_skip(m_dir));
+        face_.face_idx_ += 1;
+    } while (face_.face_idx_ < face_end_ && to_skip(dir_));
     return *this;
 }
 
-bool EuFace_Iter::operator!=(const EuFace_Iter &face) const {
-    return m_eu_face.m_face_idx != face.m_eu_face.m_face_idx;
+bool Face_Iter::operator!=(const Face_Iter &face) const {
+    return face_.face_idx_ != face.face_.face_idx_;
 }
 
-bool EuFace_Iter::to_skip(Direction dir) const {
-    return m_eu_face.m_cells->faces.to_skip(m_eu_face.m_face_idx, dir);
+bool Face_Iter::to_skip(Direction dir) const {
+    return face_.cells_->faces.to_skip(face_.face_idx_, dir);
 }
 
-EuFaces::EuFaces(
-        AmrCells *cells,
+FacesRange::FacesRange(
+        RawCells *cells,
         index_t cell_idx,
-        AmrCells *aliens,
+        RawCells *ghosts,
         Direction dir)
         :
-        m_begin(cells,
-                cells->face_begin[cell_idx],
-                cells->face_begin[cell_idx + 1],
-                aliens, dir),
-        m_end(cells,
-              cells->face_begin[cell_idx + 1],
-              cells->face_begin[cell_idx + 1],
-              aliens, dir) { }
+        begin_(cells,
+                cells->faces.offsets[cell_idx],
+                cells->faces.offsets[cell_idx + 1],
+                ghosts, dir),
+        end_(cells,
+              cells->faces.offsets[cell_idx + 1],
+              cells->faces.offsets[cell_idx + 1],
+              ghosts, dir) { }
 
-geom::Box EuCell::bbox() const {
-    return m_cells->bbox(m_index);
+geom::Box Cell::bbox() const {
+    return cells_->bbox(index_);
 }
 
-geom::Polygon EuCell::polygon() const {
-    return m_cells->polygon(m_index);
+geom::Polygon Cell::polygon() const {
+    return cells_->polygon(index_);
 }
 
-geom::Polyhedron EuCell::polyhedron() const {
-    return m_cells->polyhedron(m_index);
+geom::Polyhedron Cell::polyhedron() const {
+    return cells_->polyhedron(index_);
 }
 
-void EuCell::replace(int loc_face) {
-    // Переход от alien-ячейки невозможен
-    z_assert(m_cells != m_aliens, "Not a local cell #1")
-    z_assert(m_cells->rank[m_index] == utils::mpi::rank(), "Not a local cell #2");
+Cell Cell::neib(index_t i, index_t j) const {
+    z_assert(cells_->dim() == 2, "neib(i, j) error: not 2D mesh");
+    z_assert(cells_ != ghosts_, "neib(i, j) error: assuming start from local cell");
+    z_assert(utils::mpi::single() || cells_->has_nodes(), "neib(i, j) error: set nodes for distributed mesh");
 
-    // Индекс правой грани
-    index_t iface = m_cells->face_begin[m_index] + loc_face;
+    // Начинаем с самой ячейки
+    RawCells* cells = cells_;
+    index_t idx = index_;
 
-    // Массив, в котором находится правая ячейка, индекс ячейки в этом массиве
-    std::tie(m_cells, m_index) = m_cells->faces.adjacent.get_neib(iface, m_cells, m_aliens);
-}
-
-EuCell EuCell::neib(index_t i, index_t j) const {
-    z_assert(m_cells->dim() == 2, "neib(i, j) error: not 2D mesh");
-
-    EuCell neighbor(*this);
+    // Сдвинуться на соседа со стороны side
+    auto moves = [&, this](Side2D side) {
+        z_assert(cells->faces.is_simple(idx, side), "Not structured stencil (Side " + side.to_string() + ")");
+        index_t iface = cells->faces.offsets[idx] + side;
+        std::tie(cells, idx) = cells->faces.adjacent.get_neib(iface, cells_, ghosts_);
+    };
 
     // Переходы направо (ничего не делает при i < 0)
     for (int c = 0; c < i; ++c) {
-        z_assert(neighbor.simple_face(Side2D::R), "Not structured stencil (R)");
-        neighbor.replace(Side2D::R);
+        moves(Side2D::R);
     }
     // Переходы налево (ничего не делает при i > 0)
     for (int c = 0; c > i; --c) {
-        z_assert(neighbor.simple_face(Side2D::L), "Not structured stencil (L)");
-        neighbor.replace(Side2D::L);
+        moves(Side2D::L);
     }
     // Переходы вверх (ничего не делает при j < 0)
     for (int c = 0; c < j; ++c) {
-        z_assert(neighbor.simple_face(Side2D::T), "Not structured stencil (T)");
-        neighbor.replace(Side2D::T);
+        moves(Side2D::T);
     }
     // Переходы вниз (ничего не делает при j > 0)
     for (int c = 0; c > j; --c) {
-        z_assert(neighbor.simple_face(Side2D::B), "Not structured stencil (B)");
-        neighbor.replace(Side2D::B);
+        moves(Side2D::B);
     }
-    return neighbor;
+    return Cell(cells, idx);
 }
 
-EuCell EuCell::neib(index_t i, index_t j, index_t k) const {
-    z_assert(m_cells->dim() == 3, "neib(i, j, k) error: not 3D mesh");
+Cell Cell::neib(index_t i, index_t j, index_t k) const {
+    z_assert(cells_->dim() == 3, "neib(i, j, k) error: not 3D mesh");
+    z_assert(cells_ != ghosts_, "neib(i, j, k) error: assuming start from local cell");
+    z_assert(utils::mpi::single() || cells_->has_nodes(), "neib(i, j, k) error: set nodes for distributed mesh");
 
-    EuCell neighbor(*this);
+    // Начинаем с самой ячейки
+    RawCells* cells = cells_;
+    index_t idx = index_;
+
+    // Сдвинуться на соседа со стороны side
+    auto moves = [&, this](Side3D side) {
+        z_assert(cells->faces.is_simple(idx, side), "Not structured stencil (Side " + side.to_string() + ")");
+        index_t iface = cells->faces.offsets[idx] + side;
+        std::tie(cells, idx) = cells->faces.adjacent.get_neib(iface, cells_, ghosts_);
+    };
 
     // Переходы направо (ничего не делает при i < 0)
     for (int c = 0; c < i; ++c) {
-        z_assert(neighbor.simple_face(Side3D::R), "Not structured stencil (R)");
-        neighbor.replace(Side3D::R);
+        moves(Side3D::R);
     }
     // Переходы налево (ничего не делает при i > 0)
     for (int c = 0; c > i; --c) {
-        z_assert(neighbor.simple_face(Side3D::L), "Not structured stencil (L)");
-        neighbor.replace(Side3D::L);
+        moves(Side3D::L);
     }
     // Переходы вверх (ничего не делает при j < 0)
     for (int c = 0; c < j; ++c) {
-        z_assert(neighbor.simple_face(Side3D::T), "Not structured stencil (T)");
-        neighbor.replace(Side3D::T);
+        moves(Side3D::T);
     }
     // Переходы вниз (ничего не делает при j > 0)
     for (int c = 0; c > j; --c) {
-        z_assert(neighbor.simple_face(Side3D::B), "Not structured stencil (B)");
-        neighbor.replace(Side3D::B);
+        moves(Side3D::B);
     }
     // Переходы вверх (ничего не делает при k < 0)
     for (int c = 0; c < k; ++c) {
-        z_assert(neighbor.simple_face(Side3D::F), "Not structured stencil (F)");
-        neighbor.replace(Side3D::F);
+        moves(Side3D::F);
     }
     // Переходы вниз (ничего не делает при k > 0)
     for (int c = 0; c > k; --c) {
-        z_assert(neighbor.simple_face(Side3D::Z), "Not structured stencil (Z)");
-        neighbor.replace(Side3D::Z);
+        moves(Side3D::Z);
     }
-    return neighbor;
+    return Cell(cells, idx);
 }
 
-bool EuCell::local_neibs() const {
-    for (index_t iface: m_cells->faces_range(m_index)) {
-        auto flag = m_cells->faces.boundary[iface];
-        if (flag == Boundary::INNER || flag == Boundary::PERIODIC) {
-            if (m_cells->faces.adjacent.is_alien(iface)) {
+bool Cell::local_neibs() const {
+    for (index_t iface: cells_->faces.range(index_)) {
+        auto flag = cells_->faces.boundary[iface];
+        if (flag == geom::Boundary::INNER || flag == geom::Boundary::PERIODIC) {
+            if (cells_->faces.adjacent.is_ghost(iface)) {
                 return false;
             }
         }
@@ -152,18 +150,18 @@ bool EuCell::local_neibs() const {
 
 // Сосед того же уровня по стороне side
 template<int dim>
-bool good_neibs(const EuCell& cell, Side<dim> side, int lvl) {
+bool good_neibs(const Cell& cell, Side<dim> side, int lvl) {
     return cell.simple_face(side) && cell.face(side).neib_level() == lvl;
 }
 
 // Локальный сосед того же уровня по стороне side
 template<int dim>
-bool good_local_neibs(const EuCell& cell, Side<dim> side, int lvl) {
+bool good_local_neibs(const Cell& cell, Side<dim> side, int lvl) {
     return cell.simple_face(side) && cell.face(side).local_neib() && cell.face(side).neib_level() == lvl;
 }
 
-bool EuCell::extended_stencil() const {
-    int lvl = level();
+bool Cell::extended_stencil() const {
+    int lvl = cells_->level[index_];
 
     if (dim() < 3) {
         if (!good_local_neibs(*this, Side2D::L, lvl)) return false;

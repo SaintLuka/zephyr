@@ -8,7 +8,7 @@ namespace zephyr::mesh::decomp {
 /// @brief RWalk от Random Walk, блуждающие ячейки Вороного.
 class RWalk : public Decomposition {
 public:
-    /// @brief Умный указатель на экземаляр класса
+    /// @brief Умный указатель на экземпляр класса
     using Ptr = std::shared_ptr<RWalk>;
     using Ref = const std::shared_ptr<RWalk>&;
 
@@ -23,16 +23,16 @@ public:
     }
 
     /// @brief Основная функция. Определение нового ранга ячейки.
-    int rank(const EuCell& elem) const final;
+    int rank(const Cell& elem) const final;
 
     /// @brief Балансировка нагрузки (ничего не балансирует,
     /// просто смещает генераторы ячеек)
     void balancing(const std::vector<double>& w) final;
 
 protected:
-    double   m_step;
-    Box      m_domain;
-    VDiagram m_diagram;
+    double   step_;
+    Box      domain_;
+    VDiagram diagram_;
 };
 
 } // namespace zephyr::mesh::decomp

@@ -1,0 +1,27 @@
+set(ZEPHYR_MESH_RAW_SRC
+    ${CMAKE_CURRENT_SOURCE_DIR}/raw_cells.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/raw_cells_dbg.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/raw_faces.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/raw_nodes.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/raw_verts.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/distributor.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/node.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/cell.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/mesh.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/mesh_decomp.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/migration.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/router.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/tourism.cpp
+    PARENT_SCOPE)
+
+install(FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/raw_cells.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/raw_faces.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/raw_nodes.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/raw_verts.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/distributor.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/migration.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/router.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/tourism.h
+    DESTINATION
+    include/${PROJECT_NAME}/mesh/euler)

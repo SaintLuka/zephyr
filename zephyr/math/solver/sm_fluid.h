@@ -1,16 +1,15 @@
 #pragma once
 
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/mesh.h>
 #include <zephyr/phys/matter/eos/eos.h>
 #include <zephyr/math/cfd/fluxes.h>
 #include <zephyr/math/cfd/limiter.h>
-
-#include "criteria.h"
+#include <zephyr/math/solver/criteria.h>
 
 namespace zephyr::math {
 
-using zephyr::mesh::EuMesh;
-using zephyr::mesh::EuCell;
+using zephyr::mesh::Mesh;
+using zephyr::mesh::Cell;
 using zephyr::mesh::Storable;
 using zephyr::mesh::Distributor;
 using zephyr::geom::Vector3d;
@@ -48,7 +47,7 @@ public:
     ~SmFluid() = default;
 
     /// @brief Добавить типы на сетку
-    Parts add_types(EuMesh& mesh);
+    Parts add_types(Mesh& mesh);
 
     /// @brief Установить число Куранта
     void set_CFL(double CFL);
@@ -78,10 +77,10 @@ public:
     void set_criterion(Criterion crit);
 
     /// @brief Выполнить шаг интегрирования по времени
-    void update(EuMesh &mesh);
+    void update(Mesh &mesh);
 
     /// @brief Установить флаги адаптации
-    void set_flags(EuMesh& mesh) const;
+    void set_flags(Mesh& mesh) const;
 
     /// @brief Распределитель данных при адаптации
     /// @param type Тип "const" или "slope" переноса при разбиении
@@ -90,29 +89,29 @@ public:
 
     /// @brief Посчитать шаг интегрирования по времени с учетом
     /// условия Куранта
-    void compute_dt(EuMesh &mesh);
+    void compute_dt(Mesh &mesh);
 
     /// @brief Расчёт потоков
-    void fluxes(EuMesh &mesh) const;
+    void fluxes(Mesh &mesh) const;
 
     /// @brief Обновление ячеек
-    void swap(EuMesh &mesh) const;
+    void swap(Mesh &mesh) const;
 
     /// @brief Вычислить производные
-    void compute_grad(EuMesh &mesh) const;
+    void compute_grad(Mesh &mesh) const;
 
     /// @brief Вычислить потоки на стадии предиктора
-    void fluxes_stage1(EuMesh &mesh) const;
+    void fluxes_stage1(Mesh &mesh) const;
 
     /// @brief Вычислить потоки на стадии корректора
-    void fluxes_stage2(EuMesh &mesh) const;
+    void fluxes_stage2(Mesh &mesh) const;
 
 protected:
     /// @brief Выставить флаги по перепадам
-    void set_flags_slope(EuMesh& mesh) const;
+    void set_flags_slope(Mesh& mesh) const;
 
     /// @brief Выставить флаги по хи-критерию
-    void set_flags_chi(EuMesh& mesh) const;
+    void set_flags_chi(Mesh& mesh) const;
 
     Eos::Ptr m_eos;          ///< Уравнение состояния
     NumFlux::Ptr m_nf;       ///< Метод расчёта потока

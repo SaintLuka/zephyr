@@ -6,7 +6,7 @@
 #include <zephyr/utils/stopwatch.h>
 #include <zephyr/utils/threads.h>
 #include <zephyr/geom/generator/rectangle.h>
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/mesh.h>
 #include <zephyr/io/pvd_file.h>
 
 using namespace zephyr::mesh;
@@ -18,7 +18,7 @@ using zephyr::io::PvdFile;
 
 
 // Выставить в ячейке случайный флаг адаптации
-void set_flag(EuCell& cell) {
+void set_flag(Cell& cell) {
     const double p_coarse = 0.80;  // вероятность огрубления
     const double p_retain = 0.18;  // вероятность сохрнения
 
@@ -43,7 +43,7 @@ int main(int argc, char** argv) {
     Rectangle gen(-1.0, 1.0, -1.0, 1.0);
     gen.set_nx(50);
 
-    EuMesh mesh(gen);
+    Mesh mesh(gen);
     mesh.set_max_level(4);
     mesh.set_decomposition("XY");
 

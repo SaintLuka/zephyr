@@ -4,13 +4,13 @@
 #include <zephyr/geom/vector.h>
 #include <zephyr/mesh/storage.h>
 #include <zephyr/math/cfd/limiter.h>
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/mesh.h>
 
 namespace zephyr::math::gradient {
 
-using zephyr::mesh::EuCell;
+using zephyr::mesh::Cell;
 using zephyr::mesh::Storable;
-using zephyr::mesh::EuMesh;
+using zephyr::mesh::Mesh;
 using zephyr::geom::Boundary;
 
 using namespace geom;
@@ -23,7 +23,7 @@ inline double pow3(const Vector3d& dr) {
 
 /// @brief Получить вектор состояния типа T из ячейки
 template <class T>
-using GetState = std::function<T(EuCell &)>;
+using GetState = std::function<T(Cell &)>;
 
 /// @brief Получить вектор состояния типа T через грань
 /// с граничным условием
@@ -65,7 +65,7 @@ struct Grad {
 
 /// @brief Расчет градиента методом Гаусса
 template<class State>
-Grad<State> gauss(EuCell &cell,
+Grad<State> gauss(Cell &cell,
                   const GetState<State> &get_state,
                   const GetBoundary<State> &boundary_value) {
     using Array = ei_arr<State>;
@@ -114,7 +114,7 @@ Grad<State> gauss(EuCell &cell,
 
 /// @brief Метод наименьших квадратов (классическая версия)
 template<class State>
-Grad<State> LSM_orig(EuCell &cell,
+Grad<State> LSM_orig(Cell &cell,
                 const GetState<State> &get_state,
                 const GetBoundary<State> &boundary_value) {
     using Array = ei_vec<State>;
@@ -170,7 +170,7 @@ Grad<State> LSM_orig(EuCell &cell,
 
 /// @brief Метод наименьших квадратов (улучшенная AMR версия)
 template<class State>
-Grad<State> LSM(EuCell &cell,
+Grad<State> LSM(Cell &cell,
                 const GetState<State> &get_state,
                 const GetBoundary<State> &boundary_value) {
     using Array = ei_vec<State>;
@@ -230,7 +230,7 @@ Grad<State> LSM(EuCell &cell,
 }
 
 template<class State>
-Grad<State> LSM(EuCell &cell, Storable<State> state,
+Grad<State> LSM(Cell &cell, Storable<State> state,
                 const GetBoundary<State> &boundary_value) {
     using Array = ei_vec<State>;
 
@@ -289,7 +289,7 @@ Grad<State> LSM(EuCell &cell, Storable<State> state,
 
 /// @brief Ограничитель градиента (классическая версия)
 template<class State>
-Grad<State> limiting_orig(EuCell &cell, const Limiter& limiter,
+Grad<State> limiting_orig(Cell &cell, const Limiter& limiter,
                           const Grad<State> &grad,
                           const GetState<State> &get_state,
                           const GetBoundary<State> &boundary_value) {
@@ -351,7 +351,7 @@ Grad<State> limiting_orig(EuCell &cell, const Limiter& limiter,
 
 /// @brief Ограничитель градиента (улучшенная AMR версия)
 template<class State>
-Grad<State> limiting(EuCell &cell, const Limiter& limiter,
+Grad<State> limiting(Cell &cell, const Limiter& limiter,
                      const Grad<State> &grad,
                      const GetState<State> &get_state,
                      const GetBoundary<State> &boundary_value) {
@@ -417,7 +417,7 @@ Grad<State> limiting(EuCell &cell, const Limiter& limiter,
 
 /// @brief Ограничитель градиента (улучшенная AMR версия)
 template<class State>
-Grad<State> limiting(EuCell &cell, const Limiter& limiter,
+Grad<State> limiting(Cell &cell, const Limiter& limiter,
                      const Grad<State> &grad, Storable<State> state,
                      const GetBoundary<State> &boundary_value) {
     using Array = ei_arr<State>;

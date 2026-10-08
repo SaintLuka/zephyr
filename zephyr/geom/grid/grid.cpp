@@ -132,7 +132,7 @@ void Grid::reserve_nodes(id_t n_nodes) {
     m_nodes.reserve(n_nodes);
 }
 
-id_t Grid::add_node(Node::Ref node) {
+id_t Grid::add_node(GNode::Ref node) {
     require_editable_();
 
     if (!node) {
@@ -159,7 +159,7 @@ void Grid::reserve_cells(id_t n_cells) {
     m_cells.reserve(n_cells);
 }
 
-std::vector<id_t> Grid::add_nodes(const std::vector<Node::Ptr>& nodes) {
+std::vector<id_t> Grid::add_nodes(const std::vector<GNode::Ptr>& nodes) {
     std::vector<id_t> node_ids(nodes.size());
     for (int i = 0; i < nodes.size(); ++i) {
         if (!nodes[i]) {
@@ -180,7 +180,7 @@ std::vector<id_t> Grid::add_nodes(const std::vector<Node::Ptr>& nodes) {
 }
 
 id_t Grid::add_cell(CellType type,
-                    const std::vector<Node::Ptr>& nodes,
+                    const std::vector<GNode::Ptr>& nodes,
                     const std::vector<Boundary>& faces_bc) {
     require_editable_();
 
@@ -212,8 +212,8 @@ id_t Grid::add_cell(CellType type,
     return cell_id;
 }
 
-id_t Grid::add_polyhedron(const std::vector<Node::Ptr>& nodes,
-                          const std::vector<std::vector<Node::Ptr>>& faces,
+id_t Grid::add_polyhedron(const std::vector<GNode::Ptr>& nodes,
+                          const std::vector<std::vector<GNode::Ptr>>& faces,
                           const std::vector<Boundary>& faces_bc) {
     require_editable_();
 
@@ -302,7 +302,7 @@ std::size_t Grid::total_nodes_per_cell() const noexcept {
 }
 
 void Grid::initialize_faces_(const BuildOptions& options) {
-    auto init_faces = [](Cell& cell) {
+    auto init_faces = [](GCell& cell) {
         if (cell.has_faces()) return;
         if (cell.type() == CellType::POLYHEDRON) {
             throw std::runtime_error("Grid::initialize_faces_: POLYHEDRON without faces");
@@ -315,7 +315,7 @@ void Grid::initialize_faces_(const BuildOptions& options) {
 
 void Grid::initialize_geom_(const BuildOptions& options) {
     threads::for_each(m_cells.begin(), m_cells.end(),
-        [this](Cell& cell) {
+        [this](GCell& cell) {
             cell.calc_geom(m_nodes);
         });
 }
@@ -345,7 +345,7 @@ void Grid::finalize(const BuildOptions& options) {
                 throw std::runtime_error("Grid::finalize: cell without faces");
             }
             for (int iface = 0; iface < cell.n_faces(); ++iface) {
-                const Face& face = cell.get_face(iface);
+                const GFace& face = cell.get_face(iface);
                 FaceKey face_key{cell, face};
                 faces[face_key].emplace_back(ic, iface);
             }

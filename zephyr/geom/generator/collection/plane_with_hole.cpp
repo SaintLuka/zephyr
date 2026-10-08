@@ -23,7 +23,7 @@ PlaneWithHole::PlaneWithHole(const Json& config) :
     throw std::runtime_error("PlaneWithHole(const Json& config): not implemented");
 /*
     if (!config["geometry"]) {
-        throw std::runtime_error("EuMesh config doesn't contain 'geometry'");
+        throw std::runtime_error("Mesh config doesn't contain 'geometry'");
     }
 
     m_xmin = config["geometry"]["x_min"].as<double>();
@@ -35,7 +35,7 @@ PlaneWithHole::PlaneWithHole(const Json& config) :
     m_r    = config["geometry"]["r"].as<double>();
 
     if (!config["boundary"]) {
-        throw std::runtime_error("EuMesh config doesn't contain 'boundary'");
+        throw std::runtime_error("Mesh config doesn't contain 'boundary'");
     }
     m_left_flag   = boundary_from_string(config["boundary"]["left"].as<std::string>());
     m_right_flag  = boundary_from_string(config["boundary"]["right"].as<std::string>());

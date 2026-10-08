@@ -15,7 +15,7 @@
 #include <zephyr/geom/geom.h>
 #include <zephyr/geom/side.h>
 #include <zephyr/geom/indexing.h>
-#include <zephyr/mesh/euler/amr_cells.h>
+#include <zephyr/mesh/raw/raw_cells.h>
 
 namespace zephyr::mesh::amr {
 
@@ -373,21 +373,21 @@ template <int dim>
 using Map = std::conditional_t<dim == 2, Quad, Cube>;
 
 template <int dim>
-void find_rotations_impl(AmrCells& locals, const AmrCells& aliens) {
+void find_rotations_impl(RawCells& locals, const RawCells& ghosts) {
     z_assert(locals.adaptive(), "find_rotations: not adaptive mesh");
-    for (index_t ic = 0; ic < locals.size(); ++ic) {
-        Map<dim> map1 = locals.mapping<dim>(ic).reduce();
+    for (index_t ic = 0; ic < locals.n_cells(); ++ic) {
+        Map<dim> map1 = locals.verts.mapping<dim>(ic).reduce();
 
         for (Side<dim> side: Side<dim>::items()) {
-            index_t iface = locals.face_begin[ic] + side;
+            index_t iface = locals.faces.offsets[ic] + side;
             if (locals.faces.is_boundary(iface)) {
                 locals.faces.adjacent.rotation[iface] = 0;
                 continue;
             }
 
-            auto [neibs, jc] = locals.faces.adjacent.get_neib(iface, locals, aliens);
+            auto [neibs, jc] = locals.faces.adjacent.get_neib(iface, locals, ghosts);
 
-            Map<dim> map2 = neibs.mapping<dim>(jc).reduce();
+            Map<dim> map2 = neibs.verts.mapping<dim>(jc).reduce();
 
             auto r = find_rotation(map1, side, map2);
             if (r == 255) {
@@ -399,16 +399,16 @@ void find_rotations_impl(AmrCells& locals, const AmrCells& aliens) {
 }
 
 /// @brief Автоматический выбор размерности
-inline void find_rotations(AmrCells &locals) {
-    static AmrCells aliens;
+inline void find_rotations(RawCells &locals) {
+    static RawCells ghosts;
 
     if (locals.empty()) return;
 
     if (locals.dim() < 3) {
-        amr::find_rotations_impl<2>(locals, aliens);
+        amr::find_rotations_impl<2>(locals, ghosts);
     }
     else {
-        amr::find_rotations_impl<3>(locals, aliens);
+        amr::find_rotations_impl<3>(locals, ghosts);
     }
 }
 

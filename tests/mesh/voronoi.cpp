@@ -17,7 +17,7 @@ int main() {
             Vector3d{2.0, 1.0, 0.0}};
 
     // Генератор точек в прямоугольнике
-    auto rb = box.random2D(13);
+    auto rb = math::Random2D(box, 13);
 
     // Число ячеек
     int size = 35;
@@ -25,7 +25,7 @@ int main() {
     // Генераторы ячеек диаграммы
     std::vector<Vector3d> gs(size);
     for (int i = 0; i < size; ++i) {
-        gs[i] = rb.get();
+        gs[i] = rb.next();
     }
 
     // Диаграмма Вороного

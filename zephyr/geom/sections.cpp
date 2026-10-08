@@ -524,7 +524,7 @@ std::array<double, Side3D::count()> face_fractions(double a_cell, const std::arr
     double a_rt = edge_fraction(a_cell, a_neib[Side3D::R], a_neib[Side3D::T]);
 
     /*
-    EuCell cell;
+    Cell cell;
 
     Cube cube = cell.mapping<3>().reduce();
 

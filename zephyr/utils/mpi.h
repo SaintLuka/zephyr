@@ -56,6 +56,9 @@ public:
     /// данного вызова.
     static void barrier();
 
+    /// @brief Мастер-процесс выводит сообщение (есть коллективный барьер и flush)
+    static void message(const std::string& line);
+
     /// @brief Выполнить функцию поочередно (!) на каждом процессе
     template <class F>
     static void for_each(F&& func);
@@ -300,6 +303,7 @@ public:
 };
 
 
+template <> inline MPI_Datatype mpi::type<int8_t>() { return MPI_INT8_T; }
 template <> inline MPI_Datatype mpi::type<int>()    { return MPI_INT;    }
 template <> inline MPI_Datatype mpi::type<double>() { return MPI_DOUBLE; }
 template <> inline MPI_Datatype mpi::type<float>()  { return MPI_FLOAT;  }

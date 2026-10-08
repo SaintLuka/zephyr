@@ -11,6 +11,7 @@ list(APPEND TESTS exact-orb)
 #list(APPEND TESTS mesh_generator)
 #list(APPEND TESTS storage)
 #list(APPEND TESTS voronoi)
+list(APPEND TESTS nodes)
 
 # Assume all files in directory are tests
 if (ZEPHYR_TESTS_ALL)

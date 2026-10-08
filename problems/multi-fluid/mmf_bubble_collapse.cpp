@@ -9,7 +9,7 @@
 
 #include <zephyr/geom/primitives/polygon.h>
 #include <zephyr/geom/generator/rectangle.h>
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/mesh.h>
 
 #include <zephyr/phys/literals.h>
 #include <zephyr/phys/matter/eos/ideal_gas.h>
@@ -30,7 +30,7 @@ using zephyr::utils::mpi;
 using zephyr::utils::threads;
 using zephyr::utils::Stopwatch;
 
-void init_cells(EuMesh& mesh, const MixturePT& mixture, Storable<PState> z) {
+void init_cells(Mesh& mesh, const MixturePT& mixture, Storable<PState> z) {
     //mixture.adjust_cv({1.0_kg_m3, 1000.0_kg_m3}, 1.0_bar, 300.0);
 
     const PState z_air(
@@ -64,7 +64,7 @@ void init_cells(EuMesh& mesh, const MixturePT& mixture, Storable<PState> z) {
         return (v - bubble_center).norm() > r;
     };
 
-    mesh.for_each([&](EuCell &cell) {
+    mesh.for_each([&](Cell &cell) {
         if (cell.center().x() < x_shock) {
             cell[z] = z_shock;
             return;
@@ -97,7 +97,7 @@ int main(int argc, char** argv) {
                         .bottom=Boundary::WALL, .top=Boundary::WALL});
 
     // Create mesh
-    EuMesh mesh(gen);
+    Mesh mesh(gen);
 
     // Create EoS of materials and mixture
     Eos::Ptr air = IdealGas::create("Air");
@@ -127,23 +127,23 @@ int main(int argc, char** argv) {
 
     // Variables to save
     pvd.variables = {"level"};
-    pvd.variables += {"cln", [z](EuCell cell) -> double { return cell[z].mass_frac.index(); }};
-    pvd.variables += {"rho", [z](EuCell cell) -> double { return cell[z].density; }};
-    pvd.variables += {"vx",  [z](EuCell cell) -> double { return cell[z].velocity.x(); }};
-    pvd.variables += {"vy",  [z](EuCell cell) -> double { return cell[z].velocity.y(); }};
-    pvd.variables += {"e",   [z](EuCell cell) -> double { return cell[z].energy; }};
-    pvd.variables += {"P",   [z](EuCell cell) -> double { return cell[z].pressure; }};
-    pvd.variables += {"T",   [z](EuCell cell) -> double { return cell[z].temperature; }};
-    pvd.variables += {"b0",  [z](EuCell cell) -> double { return cell[z].mass_frac[0]; }};
-    pvd.variables += {"b1",  [z](EuCell cell) -> double { return cell[z].mass_frac[1]; }};
-    pvd.variables += {"a0",  [z](EuCell cell) -> double { return cell[z].alpha(0); }};
-    pvd.variables += {"a1",  [z](EuCell cell) -> double { return cell[z].alpha(1); }};
-    pvd.variables += {"rho0",[z](EuCell cell) -> double { return cell[z].densities[0]; }};
-    pvd.variables += {"rho1",[z](EuCell cell) -> double { return cell[z].densities[1]; }};
-    //pvd.variables += {"e0",[z,mixture](EuCell cell) -> double { return cell[z].true_energy(mixture, 0); }};
-    //pvd.variables += {"e1",[z,mixture](EuCell cell) -> double { return cell[z].true_energy(mixture, 1); }};
-    //pvd.variables += {"n.x", [n=data.n](EuCell cell) -> double { return cell[n][0].x(); }};
-    //pvd.variables += {"n.y", [n=data.n](EuCell cell) -> double { return cell[n][0].y(); }};
+    pvd.variables += {"cln", [z](Cell cell) -> double { return cell[z].mass_frac.index(); }};
+    pvd.variables += {"rho", [z](Cell cell) -> double { return cell[z].density; }};
+    pvd.variables += {"vx",  [z](Cell cell) -> double { return cell[z].velocity.x(); }};
+    pvd.variables += {"vy",  [z](Cell cell) -> double { return cell[z].velocity.y(); }};
+    pvd.variables += {"e",   [z](Cell cell) -> double { return cell[z].energy; }};
+    pvd.variables += {"P",   [z](Cell cell) -> double { return cell[z].pressure; }};
+    pvd.variables += {"T",   [z](Cell cell) -> double { return cell[z].temperature; }};
+    pvd.variables += {"b0",  [z](Cell cell) -> double { return cell[z].mass_frac[0]; }};
+    pvd.variables += {"b1",  [z](Cell cell) -> double { return cell[z].mass_frac[1]; }};
+    pvd.variables += {"a0",  [z](Cell cell) -> double { return cell[z].alpha(0); }};
+    pvd.variables += {"a1",  [z](Cell cell) -> double { return cell[z].alpha(1); }};
+    pvd.variables += {"rho0",[z](Cell cell) -> double { return cell[z].densities[0]; }};
+    pvd.variables += {"rho1",[z](Cell cell) -> double { return cell[z].densities[1]; }};
+    //pvd.variables += {"e0",[z,mixture](Cell cell) -> double { return cell[z].true_energy(mixture, 0); }};
+    //pvd.variables += {"e1",[z,mixture](Cell cell) -> double { return cell[z].true_energy(mixture, 1); }};
+    //pvd.variables += {"n.x", [n=data.n](Cell cell) -> double { return cell[n][0].x(); }};
+    //pvd.variables += {"n.y", [n=data.n](Cell cell) -> double { return cell[n][0].y(); }};
 
     // Initial conditions (adaptive to initial data)
     for (int k = 0; mesh.adaptive() && k < mesh.max_level() + 3; ++k) {

@@ -13,7 +13,7 @@ namespace zephyr::mesh::amr {
 /// @param ic Индекс главной из дочерних ячеек (z_loc = 0)
 /// @return Массив итераторов дочерних ячеек
 template <int dim>
-Children select_children(AmrCells& locals, index_t ic) {
+Children select_children(RawCells& locals, index_t ic) {
     auto sibs = get_siblings<dim>(locals, ic);
 
     // Дочерние ячейки, упорядоченные по локальному z-индексу
@@ -55,19 +55,19 @@ Children select_children(AmrCells& locals, index_t ic) {
 
 /// @brief Вершины родительской ячейки (2D или 3D)
 template <int dim>
-SqMap<dim> parent_vs(const AmrCells& cells, Children& children) {
-#define subs_vertex_3D(i, j, k) (cells.verts[cells.node_begin[children.index[Cube::iss<i, j, k>()]] + SqCube::iss<i, j, k>()])
+SqMap<dim> parent_vs(const RawCells& cells, Children& children) {
+#define subs_vertex_3D(i, j, k) (cells.verts[cells.verts.offsets[children.index[Cube::iss<i, j, k>()]] + SqCube::iss<i, j, k>()])
     if constexpr (dim == 2) {
         return {
-            cells.verts[cells.node_begin[children.index[0]] + SqQuad::iss<-1, -1>()],
-            cells.verts[cells.node_begin[children.index[0]] + SqQuad::iss<+1, -1>()],
-            cells.verts[cells.node_begin[children.index[1]] + SqQuad::iss<+1, -1>()],
-            cells.verts[cells.node_begin[children.index[0]] + SqQuad::iss<-1, +1>()],
-            cells.verts[cells.node_begin[children.index[0]] + SqQuad::iss<+1, +1>()],
-            cells.verts[cells.node_begin[children.index[1]] + SqQuad::iss<+1, +1>()],
-            cells.verts[cells.node_begin[children.index[2]] + SqQuad::iss<-1, +1>()],
-            cells.verts[cells.node_begin[children.index[2]] + SqQuad::iss<+1, +1>()],
-            cells.verts[cells.node_begin[children.index[3]] + SqQuad::iss<+1, +1>()]
+            cells.verts[cells.verts.offsets[children.index[0]] + SqQuad::iss<-1, -1>()],
+            cells.verts[cells.verts.offsets[children.index[0]] + SqQuad::iss<+1, -1>()],
+            cells.verts[cells.verts.offsets[children.index[1]] + SqQuad::iss<+1, -1>()],
+            cells.verts[cells.verts.offsets[children.index[0]] + SqQuad::iss<-1, +1>()],
+            cells.verts[cells.verts.offsets[children.index[0]] + SqQuad::iss<+1, +1>()],
+            cells.verts[cells.verts.offsets[children.index[1]] + SqQuad::iss<+1, +1>()],
+            cells.verts[cells.verts.offsets[children.index[2]] + SqQuad::iss<-1, +1>()],
+            cells.verts[cells.verts.offsets[children.index[2]] + SqQuad::iss<+1, +1>()],
+            cells.verts[cells.verts.offsets[children.index[3]] + SqQuad::iss<+1, +1>()]
         };
     }
     else {
@@ -87,12 +87,12 @@ SqMap<dim> parent_vs(const AmrCells& cells, Children& children) {
 /// @brief Создает родительскую ячейку. Ячейка ссылается на соседей после
 /// перемещения, то есть учитывает проставленные индексы next.
 /// @param locals Локальное хранилище ячеек
-/// @param aliens Хранилище ячеек с другого процесса
+/// @param ghosts Хранилище ячеек с другого процесса
 /// @param children Массив дочерних ячеек
 /// @param ip Индекс в хранилище locals, по которому следует разместить родительскую ячейку
 /// @param rank Ранг текущего процесса
 template<int dim>
-void make_parent(AmrCells& locals, AmrCells& aliens, Children& children, index_t ip, int rank) {
+void make_parent(RawCells& locals, RawCells& ghosts, Children& children, index_t ip, int rank) {
     if constexpr (dim == 2) {
         locals.set_cell(ip, parent_vs<dim>(locals, children), locals.axial());
     }
@@ -118,73 +118,73 @@ void make_parent(AmrCells& locals, AmrCells& aliens, Children& children, index_t
     for (Side<dim> side: Side<dim>::items()) {
         // Некоторая дочерняя у грани и её грань
         index_t some_ch = children.index[indexing::child(side)];
-        index_t some_ch_face = locals.face_begin[some_ch] + side;
+        index_t some_ch_face = locals.faces.offsets[some_ch] + side;
 #if SCRUTINY
         if (locals.faces.is_undefined(some_ch_face)) {
             throw std::runtime_error("Undefined boundary (coarse cell");
         }
         for (auto subface: side.subfaces()) {
             index_t ich = children.index[indexing::child(subface)];
-            index_t iface = locals.face_begin[ich] + side;
+            index_t iface = locals.faces.offsets[ich] + side;
 
             if (locals.faces.boundary[iface] != locals.faces.boundary[some_ch_face]) {
                 throw std::runtime_error("Different boundary conditions");
             }
         }
 #endif
-        index_t face_beg = locals.face_begin[ip];
+        index_t face_beg = locals.faces.offsets[ip];
         locals.faces.boundary[face_beg + side] = locals.faces.boundary[some_ch_face];
 
         // Внешняя граница, не требуется связывать
         if (locals.faces.is_boundary(some_ch_face)) {
             adj.rank [face_beg + side] = rank;
             adj.index[face_beg + side] = ip_next;
-            adj.alien[face_beg + side] = -1;
+            adj.ghost[face_beg + side] = -1;
             adj.basic[face_beg + side] = ip_next;
             adj.rotation[face_beg + side] = 0;
             continue;
         }
 
         auto some_neib_rank  = adj.rank [some_ch_face];
-        auto some_neib_alien = adj.alien[some_ch_face];
+        auto some_neib_ghost = adj.ghost[some_ch_face];
         auto some_neib_index = adj.index[some_ch_face];
 #if SCRUTINY
-        if (some_neib_rank == rank && (some_neib_alien >= 0 || some_neib_index >= locals.size())) {
+        if (some_neib_rank == rank && (some_neib_ghost >= 0 || some_neib_index >= locals.size())) {
             std::cout << "Child has no local neighbor through the " <<
                       side_to_string(side, dim) << " side #1\n";
             locals.print_info(some_ch);
             throw std::runtime_error("Child has no local neighbor (coarse_cell) #1");
         }
-        if (some_neib_rank != rank && (some_neib_alien < 0 || some_neib_alien >= aliens.size())) {
+        if (some_neib_rank != rank && (some_neib_ghost < 0 || some_neib_ghost >= ghosts.size())) {
             std::cout << "Child has no remote neighbor through the " <<
                       side_to_string(side, dim) << " side #1\n";
             locals.print_info(some_ch);
             throw std::runtime_error("Child has no remote neighbor (coarse_cell) #1");
         }
 #endif
-        auto [some_neibs, some_neib] = adj.get_neib(some_ch_face, locals, aliens);
+        auto [some_neibs, some_neib] = adj.get_neib(some_ch_face, locals, ghosts);
         auto some_neib_wanted_lvl = some_neibs.level[some_neib] + some_neibs.flag[some_neib];
 #if SCRUTINY
         auto children_by_side = indexing::children(side);
         for (int i = 1; i < indexing::VpF(dim); ++i) {
             index_t ich = children.index[children_by_side[i]];
-            index_t iface = locals.face_begin[ich] + side;
+            index_t iface = locals.faces.offsets[ich] + side;
 
-            if (adj.rank[iface] == rank && (adj.alien[iface] >= 0 ||
+            if (adj.rank[iface] == rank && (adj.ghost[iface] >= 0 ||
                     adj.index[iface] < 0 || adj.index[iface] >= locals.size())) {
                 std::cout << "Child has no local neighbor through the " <<
                           side_to_string(side, dim) << " side #2\n";
                 locals.print_info(ich);
                 throw std::runtime_error("Child has no local neighbor (coarse_cell) #2");
             }
-            if (adj.rank[iface] != rank && (adj.alien[iface] < 0 || adj.alien[iface] >= aliens.size())) {
+            if (adj.rank[iface] != rank && (adj.ghost[iface] < 0 || adj.ghost[iface] >= ghosts.size())) {
                 std::cout << "Child has no remote neighbor through the " <<
                           side_to_string(side, dim) << " side #2\n";
                 locals.print_info(ich);
                 throw std::runtime_error("Child has no remote neighbor (coarse_cell) #2");
             }
 
-            auto [neibs2, neib2] = adj.get_neib(iface, locals, aliens);
+            auto [neibs2, neib2] = adj.get_neib(iface, locals, ghosts);
 
             auto neib_wanted_lvl = neibs2.level[neib2] + neibs2.flag[neib2];
             if (neib_wanted_lvl != some_neib_wanted_lvl) {
@@ -201,19 +201,19 @@ void make_parent(AmrCells& locals, AmrCells& aliens, Children& children, index_t
 
             int some_neib_flag = some_neibs.flag[some_neib];
             if (some_neib_flag == 0) {
-                if (some_neib_alien < 0) {
+                if (some_neib_ghost < 0) {
                     adj.index[p_face] = locals.next[some_neib];
                 }
                 else {
-                    adj.alien[p_face] = aliens.next[some_neib];
+                    adj.ghost[p_face] = ghosts.next[some_neib];
                 }
             }
             else {
-                if (some_neib_alien < 0) {
+                if (some_neib_ghost < 0) {
                     adj.index[p_face] = locals.next[some_neibs.next[some_neib]];
                 }
                 else {
-                    adj.alien[p_face] = aliens.next[some_neib];
+                    adj.ghost[p_face] = ghosts.next[some_neib];
                 }
             }
 
@@ -235,8 +235,8 @@ void make_parent(AmrCells& locals, AmrCells& aliens, Children& children, index_t
         // lvl_ch < lvl_n & flan_n < 0 хотя бы у одного, то есть сосед, который делает coarse
         for (auto subface: side.subfaces()) {
             index_t ich = children.index[indexing::child(subface)];
-            index_t ch_face = locals.face_begin[ich] + side;
-            auto[neibs, jc] = adj.get_neib(ch_face, locals, aliens);
+            index_t ch_face = locals.faces.offsets[ich] + side;
+            auto[neibs, jc] = adj.get_neib(ch_face, locals, ghosts);
             scrutiny_check(0 <= jc && jc < neibs.size(), "Out-of-bounds #3");
 
             index_t sface = face_beg + subface;
@@ -250,34 +250,34 @@ void make_parent(AmrCells& locals, AmrCells& aliens, Children& children, index_t
                 // Сосед нашего уровня с родительской, но бьется
                 scrutiny_check(neibs.flag[jc] > 0, "Wrong assumption #4");
                 int zch = indexing::neib_child(subface, symm);
-                if (adj.alien[ch_face] < 0) {
+                if (adj.ghost[ch_face] < 0) {
                     index_t adj_next = neibs.next[jc] + zch;
                     adj.index[sface] = locals.next[adj_next];
                 }
                 else {
-                    adj.alien[sface] = child_next(aliens.next[jc], zch);
+                    adj.ghost[sface] = child_next(ghosts.next[jc], zch);
                 }
             }
             else {
                 scrutiny_check(neibs.flag[jc] <= 0, "Wrong assumption #5");
                 if (neibs.flag[jc] == 0) {
-                    if (adj.alien[ch_face] < 0) {
+                    if (adj.ghost[ch_face] < 0) {
                         adj.index[sface] = locals.next[jc];
                     }
                     else {
-                        adj.alien[sface] = aliens.next[jc];
+                        adj.ghost[sface] = ghosts.next[jc];
                     }
                 }
                 else {
-                    if (adj.alien[ch_face] < 0) {
+                    if (adj.ghost[ch_face] < 0) {
                         adj.index[sface] = locals.next[neibs.next[jc]];
                     }
                     else {
-                        adj.alien[sface] = aliens.next[jc];
+                        adj.ghost[sface] = ghosts.next[jc];
                     }
                 }
             }
-            scrutiny_check(adj.index[sface] >= 0 || adj.alien[sface] >= 0, "Not all cases");
+            scrutiny_check(adj.index[sface] >= 0 || adj.ghost[sface] >= 0, "Not all cases");
         }
 
 #if SCRUTINY
@@ -291,8 +291,8 @@ void make_parent(AmrCells& locals, AmrCells& aliens, Children& children, index_t
         std::array<Vector3d, FpF(dim)> cfaces;
         for (int i = 0; i < FpF(dim); ++i) {
             index_t ich = children.index[children_by_side[i]];
-            index_t iface = locals.face_begin[ich];
-            if (locals.simple_face(ich, side)) {
+            index_t iface = locals.faces.offsets[ich];
+            if (locals.faces.is_simple(ich, side)) {
                 // Простая грань
                 cfaces[i] = locals.faces.center[iface + side];
             } else {
@@ -312,7 +312,7 @@ void make_parent(AmrCells& locals, AmrCells& aliens, Children& children, index_t
         double eps = 1.0e-3 * locals.linear_size(ip);
         for (int i = 0; i < FpF(dim); ++i) {
             index_t ich = children.index[children_by_side[i]];
-            index_t ch_face = locals.face_begin[ich] + side;
+            index_t ch_face = locals.faces.offsets[ich] + side;
             for (int j = 0; j < FpF(dim); ++j) {
                 if ((pfaces[i] - cfaces[j]).norm() < eps) {
                     break;
@@ -380,12 +380,12 @@ void make_parent(AmrCells& locals, AmrCells& aliens, Children& children, index_t
 /// один массив, вызова функции make_parent и переноса полученных данных в
 /// хранилище на место родительской ячейки.
 /// @param locals Хранилище ячеек
-/// @param aliens Хранилище ячеек с других процессов
+/// @param ghosts Хранилище ячеек с других процессов
 /// @param ich Индекс дочерней ячейки, для которой выполняется огрубление
 /// @param op Оператор огрубления данных
 /// @param rank Ранг текущего процесса
 template<int dim>
-void coarse_cell(AmrCells& locals, AmrCells& aliens, index_t ich, const Distributor& op, int rank) {
+void coarse_cell(RawCells& locals, RawCells& ghosts, index_t ich, const Distributor& op, int rank) {
     // Функцию выполняет главный ребенок, остальные выставляются на undefined и отдыхают
     if (locals.z_idx[ich] % CpC(dim) != 0) {
         locals.set_undefined(ich);
@@ -395,9 +395,9 @@ void coarse_cell(AmrCells& locals, AmrCells& aliens, index_t ich, const Distribu
     auto children = select_children<dim>(locals, ich);
 
     index_t ip = locals.next[ich];
-    make_parent<dim>(locals, aliens, children, ip, rank);
+    make_parent<dim>(locals, ghosts, children, ip, rank);
 
-    EuCell parent(&locals, ip);
+    Cell parent(&locals, ip);
     op.merge(children, parent);
 
     locals.set_undefined(ich);

@@ -13,6 +13,8 @@ namespace zephyr::mesh::amr {
 /// устанавливает параметр amrData.next.
 /// @param cells Ссылка на хранилище ячеек
 /// @param count Статистика адаптации
+/// @param swap_list
+/// @param split_indices Индексы ячеек с флагом на разбиение
 /// @details Если ячейка не изменяется, тогда next содержит индекс ячейки в
 /// хранилище. Если ячейка огрубляется, тогда next содержит индекс (создаваемой)
 /// родительской ячейки. Если ячейка бьется, то next содержит индекс первой
@@ -20,8 +22,15 @@ namespace zephyr::mesh::amr {
 /// индексы next+1, next+2, ...
 /// Алгоритм может выполняться как для всего хранилища, так и для части сетки
 /// в многопроцессорном режиме. Многопоточная реализация отсутствует.
-template<int dim>
-void setup_positions(AmrCells &cells, const Statistics &count, const SwapLists& swap_list) {
+template<int dim, bool unique_nodes>
+void setup_positions(RawCells &cells, const Statistics &count,
+    const SwapLists& swap_list, std::vector<index_t> &split_indices) {
+
+    index_t split_counter = 0;
+    if constexpr (unique_nodes) {
+        split_indices.resize(count.n_refine);
+    }
+
     // TODO: Подумать над параллельной версией
     int coarse_counter = count.n_cells;
     int refine_counter = count.n_cells + count.n_parents;
@@ -34,6 +43,9 @@ void setup_positions(AmrCells &cells, const Statistics &count, const SwapLists& 
         if (cells.flag[ic] > 0) {
             cells.next[ic] = refine_counter;
             refine_counter += CpC(dim);
+            if constexpr (unique_nodes) {
+                split_indices[split_counter++] = ic;
+            }
             continue;
         }
 

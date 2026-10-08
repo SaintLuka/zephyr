@@ -5,7 +5,8 @@
 
 #include <zephyr/geom/side.h>
 #include <zephyr/mesh/storage.h>
-#include <zephyr/mesh/euler/amr_faces.h>
+#include <zephyr/mesh/raw/raw_verts.h>
+#include <zephyr/mesh/raw/raw_faces.h>
 
 // forward declaration для классов из geom
 namespace zephyr::geom {
@@ -28,10 +29,14 @@ class Cuboid;
 
 namespace zephyr::mesh {
 
-/// @brief Квадратичное отображение на квадрат/куб в зависимости от размерности
-template <int dim>
-using SqMap = std::conditional_t<dim < 3, geom::SqQuad, geom::SqCube>;
-
+/// @brief Опции сетки
+struct MeshOpts {
+    int  dim      = -1;    ///< Размерность сетки
+    bool adaptive = true;  ///< Адаптивная сетка?
+    bool linear   = true;  ///< Линейная адаптивная сетка?
+    bool axial    = false; ///< Осевая симметрия
+    bool nodes    = false; ///< Уникальные узлы
+};
 
 /// @brief Набор ячеек в форме Structure of Arrays (набор массивов).
 ///
@@ -46,10 +51,9 @@ using SqMap = std::conditional_t<dim < 3, geom::SqQuad, geom::SqCube>;
 /// исключением базовых) помечены как public. Доступ к ним открыт, как
 /// если бы это была обычная структура. Сеточные данные обрабатываются
 /// специальными методами.
-class AmrCells final {
+class RawCells final {
     // aliases inside class
     using Vector3d = geom::Vector3d;
-    using AmrVerts = std::vector<Vector3d>;
 
     /// @brief Характеристическая функция (функция-индикатор)
     using InFunction = std::function<bool(const Vector3d &)>;
@@ -61,10 +65,10 @@ class AmrCells final {
 
     index_t m_size  = 0;      ///< Число ячеек
 
-    int  m_dim      = -1;     ///< Размерность ячейки
-    bool m_adaptive = false;  ///< Адаптивная ячейка?
-    bool m_linear   = true;   ///< Линейная ячейка?
-    bool m_axial    = false;  ///< Осевая симметрия?
+    int  dim_      = -1;     ///< Размерность ячейки
+    bool adaptive_ = false;  ///< Адаптивная ячейка?
+    bool linear_   = true;   ///< Линейная ячейка?
+    bool axial_    = false;  ///< Осевая симметрия?
 
     /// @}
 
@@ -93,11 +97,8 @@ public:
     /// @}
     /// @{ @name Грани и вершины ячеек
 
-    std::vector<index_t> face_begin;   ///< Индекс первой грани ячейки
-    std::vector<index_t> node_begin;   ///< Индекс первой вершины ячейки
-
-    AmrFaces faces;  ///< Массив граней ячеек
-    AmrVerts verts;  ///< Массив вершин ячеек
+    RawFaces faces;  ///< Массив граней ячеек
+    RawVerts verts;  ///< Массив вершин ячеек
 
     /// @}
 
@@ -106,57 +107,34 @@ public:
 public:
     /// @{ @name Конструкторы
 
-    /// @brief Конструктор по умолчанию.
-    AmrCells() = default;
-
     /// @brief Базовый конструктор
-    /// @param dim Размерность сетки (2 для осевой симметрии)
-    /// @param adaptive Использовать возможность адаптации?
-    /// @param axial Сетка с осевой симметрией?
-    explicit AmrCells(int dim, bool adaptive = false, bool axial = false);
+    /// @param options Настройки сетки
+    explicit RawCells(MeshOpts options = {});
 
-    /// @brief Создать пустой набор ячеек с таким же набором типов
-    AmrCells same() const;
-
-    /// @brief Простой встроенный генератор квази-одномерной сетки
-    AmrCells(const geom::generator::Strip& rect);
-
-    /// @brief Простой встроенный генератор прямоугольной декартовой сетки
-    AmrCells(const geom::generator::Rectangle& rect);
-
-    /// @brief Простой встроенный генератор трёхмерной декартовой сетки
-    AmrCells(const geom::generator::Cuboid& rect);
-
-    /// @brief Построение сетки общего вида, grid - finalized.
-    AmrCells(const geom::Grid& grid);
+    /// @brief Пустое множество ячеек с таким же набором опций и типов
+    RawCells same() const;
 
     /// @}
 
     /// @{ @name Общие характеристики ячеек
 
     /// @brief Размерность сетки
-    int dim() const { return m_dim; }
+    int dim() const { return dim_; }
 
     /// @brief Сетка допускает адаптацию?
-    bool adaptive() const { return m_adaptive; }
+    bool adaptive() const { return adaptive_; }
 
     /// @brief Сетка с осевой симметрией?
-    bool axial() const { return m_axial; }
+    bool axial() const { return axial_; }
 
     /// @brief Используются линейные AMR-ячейки (или квадратичные)
-    bool linear() const { return m_linear; }
+    bool linear() const { return linear_; }
 
-    /// @brief Изменить размерность
-    void set_dimension(int dim);
+    /// @brief Сетка хранит уникальные узлы?
+    bool has_nodes() const { return verts.has_nodes(); }
 
-    /// @brief Использовать адаптивные ячейки
-    void set_adaptive(bool adaptive = true);
-
-    /// @brief Использовать осевую симметрию
-    void set_axial(bool axial = true);
-
-    /// @brief Использовать линейные отображения
-    void set_linear(bool linear);
+    /// @brief Настройки сетки
+    MeshOpts options() const;
 
     /// @}
 
@@ -165,17 +143,14 @@ public:
     /// @brief Пустое хранилище?
     bool empty() const { return m_size == 0; }
 
-    /// @brief Число ячеек (не очевидно, что речь о ячейках)
-    index_t size() const { return m_size; }
-
     /// @brief Число ячеек (синоним)
     index_t n_cells() const { return m_size; }
 
     /// @brief Полное число граней
-    index_t n_faces() const { return faces.size(); }
+    index_t n_faces() const { return faces.n_faces(); }
 
-    /// @brief Полное число вершин
-    index_t n_nodes() const { return verts.size(); }
+    /// @brief Полное число вершин с дубликатами
+    index_t n_verts() const { return verts.n_verts(); }
 
     /// @brief Очистить хранилище
     void clear();
@@ -218,52 +193,13 @@ public:
     void set_undefined(index_t ic) { index[ic] = -1; }
 
     /// @brief Число актуальных граней ячейки, для адаптивной ячейки может
-    /// быть меньше max_face_count, для неструктурированной ячейки (полигон
-    /// или многогранник совпадает с max_face_count)
+    /// быть меньше faces.max_count, для неструктурированной ячейки (полигон
+    /// или многогранник совпадает с faces.max_count)
     int face_count(index_t ic) const;
-
-    /// @brief Максимальное число граней для ячейки
-    int max_face_count(index_t ic) const {
-        return face_begin[ic + 1] - face_begin[ic];
-    }
-
-    /// @brief Полный диапазон граней ячейки (могут встречаться неактуальные)
-    range_t<index_t> faces_range(index_t ic) const {
-        return std::views::iota(face_begin[ic], face_begin[ic + 1]);
-    }
-
-    /// @brief Число вершин, оно же максимальное, хранение неактуальных вершин
-    /// не допускается.
-    int node_count(index_t ic) const {
-        return node_begin[ic + 1] - node_begin[ic];
-    }
-
-    /// @brief Число вершин, оно же максимальное, хранение неактуальных вершин
-    /// сейчас не допускается.
-    int max_node_count(index_t ic) const {
-        return node_begin[ic + 1] - node_begin[ic];
-    }
-
-    /// @brief Полный диапазон вершин ячейки
-    range_t<index_t> nodes_range(index_t ic) const {
-        return std::views::iota(node_begin[ic], node_begin[ic + 1]);
-    }
-
-    /// @brief Простая грань на стороне?
-    template <int dim>
-    bool simple_face(index_t ic, Side<dim> side) const {
-        return faces.is_undefined(face_begin[ic] + side[1]);
-    }
-
-    /// @brief Сложная грань на стороне?
-    template <int dim>
-    bool complex_face(index_t ic, Side<dim> side) const {
-        return faces.is_actual(face_begin[ic] + side[1]);
-    }
 
     /// @brief Название грани AMR-ячейки
     std::string face_name(index_t ic, index_t iface) const {
-        return geom::side_to_string(iface - face_begin[ic], m_dim);
+        return geom::side_to_string(iface - faces.offsets[ic], dim_);
     }
 
     /// @}
@@ -281,7 +217,7 @@ public:
 
     /// @brief Линейный размер ячейки
     double linear_size(index_t ic) const {
-        return m_dim < 3 ? std::sqrt(volume[ic]) : std::cbrt(volume[ic]);
+        return dim_ < 3 ? std::sqrt(volume[ic]) : std::cbrt(volume[ic]);
     }
 
     /// @brief Обычный объем или объем осесимметичной ячейки
@@ -298,31 +234,9 @@ public:
     /// стороной прямоугольной ячейки.
     double incircle_diameter(index_t ic) const;
 
-    /// @brief Указатель на первую вершину
-    Vector3d* vertices_data(index_t ic) {
-        return verts.data() + node_begin[ic];
-    }
-
-    /// @brief Константный указатель на первую вершину
-    const Vector3d* vertices_data(index_t ic) const {
-        return verts.data() + node_begin[ic];
-    }
-
     /// @brief Получить вершину по индексу внутри ячейки
     const Vector3d& vertex(index_t ic, int iv) const {
-        return verts[node_begin[ic] + iv];
-    }
-
-    /// @brief Ссылка на вешены в форме набора узлов квадратичного отображения
-    template <int dim>
-    SqMap<dim>& mapping(index_t ic) {
-        return *reinterpret_cast<SqMap<dim>*>(vertices_data(ic));
-    }
-
-    /// @brief Ссылка на вершины в форме набора узлов квадратичного отображения
-    template <int dim>
-    const SqMap<dim>& mapping(index_t ic) const {
-        return *reinterpret_cast<const SqMap<dim>*>(vertices_data(ic));
+        return verts[verts.offsets[ic] + iv];
     }
 
     /// @brief Bounding box ячейки
@@ -376,14 +290,14 @@ public:
 
     /// @brief Скопировать все данные целиком с индекса from,
     /// в хранилище dst на индекс to
-    void copy_data(index_t from, AmrCells* dst, index_t to) const;
+    void copy_data(index_t from, RawCells* dst, index_t to) const;
 
     /// @brief Скопировать ячейку с позиции ic в хранилище cells на индекс jc,
     /// грани на позицию iface, вершины на позицию inode.
-    void copy_geom(index_t ic, AmrCells& cells,
+    void copy_geom(index_t ic, RawCells& cells,
             index_t jc, index_t face_beg, index_t node_beg) const;
 
-    void copy_geom_basic(index_t ic, AmrCells& cells,
+    void copy_geom_basic(index_t ic, RawCells& cells,
             index_t jc, index_t face_beg, index_t node_beg) const;
 
     /// @}
@@ -453,7 +367,7 @@ public:
     int check_connectivity(index_t ic) const;
 
     /// @brief Проверка связности ячеек в MPI версии
-    int check_connectivity(index_t ic, const AmrCells& aliens) const;
+    int check_connectivity(index_t ic, const RawCells& ghosts) const;
 
     /// @brief Полное сохранение сетки
     /// @param root Корневая директория для бэкапа (существует и пустая)

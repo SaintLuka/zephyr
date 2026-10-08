@@ -129,7 +129,7 @@ inline void subface_by_side_child_gen() {
     std::cout << "};\n\n";
 }
 
-inline void neib_child_gen_2D() {
+inline void role_in_child_gen_2D() {
     static const auto group = generate_permutations_2d();
     int gen_neib_child_by_symm_subface_2D[group.size()][Side2D::n_subfaces()];
 
@@ -398,7 +398,7 @@ int main() {
     //print_rotation_matrices();
     //print_permutations();
     subface_by_side_child_gen();
-    neib_child_gen_2D();
+    role_in_child_gen_2D();
     neib_child_gen_3D();
 
     test_2d();

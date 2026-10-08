@@ -8,7 +8,7 @@ namespace zephyr::mesh::decomp {
 /// @brief Декомпозиция на основе диаграмм Вороного
 class VD3 : public Decomposition {
 public:
-    /// @brief Умный указатель на экземаляр класса
+    /// @brief Умный указатель на экземпляр класса
     using Ptr = std::shared_ptr<VD3>;
     using Ref = const std::shared_ptr<VD3>&;
 
@@ -23,13 +23,13 @@ public:
     }
     
     /// @brief Основная функция. Определение нового ранга ячейки.
-    int rank(const EuCell& elem) const final;
+    int rank(const Cell& elem) const final;
 
     /// @brief Балансировка нагрузки
     void balancing(const std::vector<double>& w) final;
 
 protected:
-    VDiagram m_diagram;
+    VDiagram diagram_;
 };
 
 } // namespace zephyr::mesh::decomp

@@ -19,8 +19,8 @@ using geom::Side3D;
 ///             с этого процесса  |  с другого процесса
 ///    rank  :    == this.rank    |    != this.rank
 ///    index :    < locals.size   |    < decomposition(rank).locals.size
-///    alien :    < 0             |    < aliens.size
-class AmrAdjacent final {
+///    ghost :    < 0             |    < ghosts.size
+class RawAdjacent final {
 public:
     /// @brief Ранг процесса, на котором находится смежная ячейка
     /// при распределенном расчете.
@@ -30,15 +30,18 @@ public:
     /// хранилище или в удаленном)
     std::vector<index_t> index;
 
-    /// @brief Индекс смежной ячейки в массиве aliens (или -1, если соседняя
+    /// @brief Индекс смежной ячейки в массиве ghosts (или -1, если соседняя
     /// ячейка с данного процесса).
-    std::vector<index_t> alien;
+    std::vector<index_t> ghost;
 
     /// @brief Индекс базовой ячейки, которая содержит грань
     std::vector<index_t> basic;
 
     /// @brief Относительное вращение ячейки через грань
     std::vector<std::uint8_t> rotation;
+
+    /// @brief Пустые массивы по умолчанию
+    RawAdjacent() = default;
 
     /// @brief Расширить массивы по числу граней
     void resize(index_t n_faces);
@@ -50,20 +53,20 @@ public:
     void shrink_to_fit();
 
     /// @brief Локальная соседняя ячейка?
-    bool is_local(index_t iface) const { return alien[iface] < 0; }
+    bool is_local(index_t iface) const { return ghost[iface] < 0; }
 
     /// @brief Удаленная соседняя ячейка?
-    bool is_alien(index_t iface) const { return alien[iface] >= 0; }
+    bool is_ghost(index_t iface) const { return ghost[iface] >= 0; }
 
     /// @brief Получить хранилище ячеек, в котором находится сосед, а также
     /// индекс соседа в данном хранилище
     template <class SomeArray>
     std::tuple<const SomeArray &, index_t> get_neib(index_t iface,
-            const SomeArray &locals, const SomeArray &aliens) const {
-        if (alien[iface] < 0) {
+            const SomeArray &locals, const SomeArray &ghosts) const {
+        if (ghost[iface] < 0) {
             return {locals, index[iface]};
         } else {
-            return {aliens, alien[iface]};
+            return {ghosts, ghost[iface]};
         }
     }
 
@@ -80,7 +83,7 @@ enum class Direction : int {
 };
 
 /// @brief Набор граней в форме Structure of Arrays (набор массивов).
-class AmrFaces final {
+class RawFaces final {
     // aliases inside class
     using Boundary = geom::Boundary;
     using Vector3d = geom::Vector3d;
@@ -89,7 +92,10 @@ public:
     /// @brief Максимальное число вершин на одну грань
     static constexpr int max_vertices = 8;
 
-    AmrAdjacent adjacent;            ///< Индексы смежных ячеек
+    /// @brief Индексы первых граней ячеек (CSR-структура)
+    std::vector<index_t>  offsets = {0};
+
+    RawAdjacent           adjacent;  ///< Индексы смежных ячеек
 
     std::vector<Boundary> boundary;  ///< Тип граничного условия
     std::vector<Vector3d> normal;    ///< Внешняя нормаль к грани
@@ -100,15 +106,26 @@ public:
     /// @brief Индексы вершин в массиве вершин ячейки
     std::vector<std::array<short, max_vertices>> vertices;
 
+    /// @brief Пустые массивы по умолчанию
+    RawFaces() = default;
+
+    /// @brief Число ячеек
+    index_t n_cells() const { return static_cast<index_t>(offsets.size()) - 1; }
 
     /// @brief Число граней
-    index_t size() const { return boundary.size(); }
+    index_t n_faces() const { return boundary.size(); }
 
     /// @brief Изменить размер под число граней
-    void resize(index_t n_faces);
+    void resize(index_t n_cells, index_t n_faces);
+
+    /// @brief Изменить размер под число граней
+    void resize_amr(index_t n_cells, int dim);
 
     /// @brief Расширить буфер под число граней
-    void reserve(index_t n_faces);
+    void reserve(index_t n_cells, index_t n_faces);
+
+    /// @brief Расширить буфер под число граней
+    void reserve_amr(index_t n_cells, int dim);
 
     /// @brief Сжать до актуальных размеров
     void shrink_to_fit();
@@ -151,42 +168,64 @@ public:
 
     /// @brief Расход памяти (без adjacent)
     memory_t memory_usage() const;
+
+    /// @brief Максимальное число граней для ячейки
+    int max_count(index_t ic) const {
+        return offsets[ic + 1] - offsets[ic];
+    }
+
+    /// @brief Полный диапазон граней ячейки (могут встречаться неактуальные)
+    range_t<index_t> range(index_t ic) const {
+        return std::views::iota(offsets[ic], offsets[ic + 1]);
+    }
+
+    /// @brief Простая грань на стороне?
+    template <int dim>
+    bool is_simple(index_t ic, Side<dim> side) const {
+        return is_undefined(offsets[ic] + side[1]);
+    }
+
+    /// @brief Сложная грань на стороне?
+    template <int dim>
+    bool is_complex(index_t ic, Side<dim> side) const {
+        return is_actual(offsets[ic] + side[1]);
+    }
 };
 
 
-inline bool AmrFaces::is_boundary(index_t iface) const {
+inline bool RawFaces::is_boundary(index_t iface) const {
     return boundary[iface] != Boundary::INNER &&
            boundary[iface] != Boundary::PERIODIC &&
            boundary[iface] != Boundary::UNDEFINED;
 }
 
-inline bool AmrFaces::is_actual(index_t iface) const {
+inline bool RawFaces::is_actual(index_t iface) const {
     return boundary[iface] != Boundary::UNDEFINED;
 }
 
-inline bool AmrFaces::is_undefined(index_t iface) const {
+inline bool RawFaces::is_undefined(index_t iface) const {
     return boundary[iface] == Boundary::UNDEFINED;
 }
 
-inline void AmrFaces::set_undefined(index_t iface) {
+inline void RawFaces::set_undefined(index_t iface) {
     boundary[iface] = Boundary::UNDEFINED;
     adjacent.rank[iface]  = -1;
     adjacent.index[iface] = -1;
-    adjacent.alien[iface] = -1;
+    adjacent.ghost[iface] = -1;
     adjacent.basic[iface] = -1;
 }
 
-inline AmrFaces::Vector3d AmrFaces::area_n(index_t iface) const {
+inline RawFaces::Vector3d RawFaces::area_n(index_t iface) const {
     return area[iface] * normal[iface];
 }
 
-inline double AmrFaces::get_area(index_t iface, bool axial) const {
+inline double RawFaces::get_area(index_t iface, bool axial) const {
     return axial ? area_alt[iface] : area[iface];
 }
 
-inline int AmrFaces::n_vertices(index_t iface) const {
+inline int RawFaces::n_vertices(index_t iface) const {
     int count = 2;
-    for (; count < AmrFaces::max_vertices; ++count) {
+    for (; count < RawFaces::max_vertices; ++count) {
         if (vertices[iface][count] < 0) {
             break;
         }
@@ -194,7 +233,7 @@ inline int AmrFaces::n_vertices(index_t iface) const {
     return count;
 }
 
-inline AmrFaces::Vector3d AmrFaces::symm_point(index_t iface, const Vector3d& p) const {
+inline RawFaces::Vector3d RawFaces::symm_point(index_t iface, const Vector3d& p) const {
     return p + 2.0 * (center[iface] - p).dot(normal[iface]) * normal[iface];
 }
 

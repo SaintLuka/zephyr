@@ -30,7 +30,7 @@ mesh.set_max_level(5);
 ```cpp
 auto chi = mesh.add<double>("chi");
 
-mesh.for_each([](EuCell cell) {
+mesh.for_each([](Cell cell) {
   if (cell[chi] < 0.05)
     cell.set_flag(-1); // Объединить ячейки
   else if (cell[chi] < 0.2)
@@ -72,7 +72,7 @@ mesh.set_distributor(distr);
 Storable<double> u = mesh.add<double>("u");
 
 Distributor distr = Distributor::Simple();
-distr.merge = [u](const Children &children, EuCell &parent) {
+distr.merge = [u](const Children &children, Cell &parent) {
   double sum = 0.0;
   for (auto child: children) {
     sum += child[u] * child.volume();
@@ -92,7 +92,7 @@ Storable<Vector3d> grad = mesh.add<double>("grad_u");
 Distributor distr;
 distr.merge = ...
 
-distr.split = [u, grad](const EuCell &parent, Children &children) {
+distr.split = [u, grad](const Cell &parent, Children &children) {
   for (auto child: children) {
     Vector3d dr = parent.center() - child.center();
     child[u] = parent[u] + parent[grad].dot(dr);

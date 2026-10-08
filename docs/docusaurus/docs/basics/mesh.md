@@ -13,7 +13,7 @@ gen.set_nx(200);
 gen.set_boundaries({.left  =Boundary::ZOE, .right=Boundary::ZOE,
                     .bottom=Boundary::ZOE, .top  =Boundary::ZOE});
 
-EuMesh mesh(gen);
+Mesh mesh(gen);
 ```
 Вызов `gen.set_nx(200)` устанавливает 200 ячеек по оси $x$, при этом число ячеек вдоль оси $y$ выбирается автоматически. Аналогично можно вызвать функцию `set_ny`, или же установить желаемое число ячеек по обеим осям:
 ```cpp
@@ -30,7 +30,7 @@ gen.set_boundaries({.left  =Boundary::ZOE, .right=Boundary::ZOE,
                     .bottom=Boundary::ZOE, .top  =Boundary::ZOE,
                     .back  =Boundary::ZOE, .front=Boundary::ZOE});
 
-EuMesh mesh(gen);
+Mesh mesh(gen);
 ```
 
 ## Данные на сетке
@@ -94,9 +94,9 @@ for (auto cell: mesh) {
 | `simple_face(Side3D side) -> bool` | Простая грань по стороне? Пример: `cell.simple_face(Side3D::BACK)`. |
 | `complex_face(Side2D side) -> bool` | Сложная грань по стороне? Пример: `cell.complex_face(Side2D::LEFT)`. |
 | `complex_face(Side3D side) -> bool` | Сложная грань по стороне? Пример: `cell.complex_face(Side3D::BACK)`. |
-| `face(Side2D side) -> EuFace` | Получить грань ячейки: `cell.face(Side2D::LEFT)`, подгрань `Side2D::LEFT[1]`. |
-| `face(Side3D side) -> EuFace` | Получить грань ячейки: `cell.face(Side3D::BACK)`, подгрань `Side3D::BACK[3]`. |
-| `faces(Direction dir = ANY) -> EuFaces` | Получить итератор по граням. |
+| `face(Side2D side) -> Face` | Получить грань ячейки: `cell.face(Side2D::LEFT)`, подгрань `Side2D::LEFT[1]`. |
+| `face(Side3D side) -> Face` | Получить грань ячейки: `cell.face(Side3D::BACK)`, подгрань `Side3D::BACK[3]`. |
+| `faces(Direction dir = ANY) -> Faces` | Получить итератор по граням. |
 
 Итератор по граням позволяет ограничить обход только одним направлением
 ```cpp
@@ -119,11 +119,11 @@ for (auto face: cell.faces(Direction::X)) {
 | `area() -> double` | Площадь грани (в 3D), длина грани (в 2D). |
 | `area_n() -> Vector3d` | Площадь грани, умноженная на внешнюю нормаль. |
 | `symm_point(Vector3d p) -> Vector3d` | Получить точку, симметричную относительно грани. |
-| `neib() -> EuCell` | Соседняя ячейка через грань |
+| `neib() -> Cell` | Соседняя ячейка через грань |
 
-Функция `neib()` всегда актуальна. Если сосед отсутствует, тогда создается `EuCell`, которая ссылается на исходную ячейку.
+Функция `neib()` всегда актуальна. Если сосед отсутствует, тогда создается `Cell`, которая ссылается на исходную ячейку.
 
-Некоторые функции позволяют сразу получить данные соседней ячейки без создания дополнительного экземпляра `EuCell` для соседней ячейки.
+Некоторые функции позволяют сразу получить данные соседней ячейки без создания дополнительного экземпляра `Cell` для соседней ячейки.
 ```cpp
 auto neib = face.neib();
 Vector3d nc1 = neib.center();

@@ -1,4 +1,4 @@
-#include <zephyr/mesh/euler/eu_prim.h>
+#include <zephyr/mesh/cell.h>
 #include <zephyr/geom/primitives/polygon.h>
 #include <zephyr/geom/surface/solid_body_2d.h>
 
@@ -103,12 +103,12 @@ std::vector<Vector3d> BodyDisk::local_outline(int n_points) const {
     return vs;
 }
 
-double BodyDisk::volume_fraction(const mesh::EuCell& cell, double eps) const {
+double BodyDisk::volume_fraction(const mesh::Cell& cell, double eps) const {
     auto poly = cell.polygon();
     return poly.disk_clip_area(m_center, m_radius) / cell.volume();
 }
 
-double BodyDisk::volume_inside(const mesh::EuCell& cell, double eps) const {
+double BodyDisk::volume_inside(const mesh::Cell& cell, double eps) const {
     auto poly = cell.polygon();
     return poly.disk_clip_area(m_center, m_radius);
 }

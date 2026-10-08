@@ -28,8 +28,8 @@
 #include <zephyr/geom/primitives/quad.h>
 #include <zephyr/geom/primitives/cube.h>
 
-#include <zephyr/mesh/euler/eu_prim.h>
-#include <zephyr/mesh/euler/tourism.h>
+#include <zephyr/mesh/cell.h>
+#include <zephyr/mesh/raw/tourism.h>
 
 #include <zephyr/utils/threads.h>
 #include <zephyr/utils/mpi.h>
@@ -54,7 +54,7 @@ using geom::indexing::FpC;
 using geom::indexing::FpC;
 using geom::indexing::CpC;
 
-using mesh::AmrCells;
+using mesh::RawCells;
 using mesh::Children;
 
 using utils::threads;

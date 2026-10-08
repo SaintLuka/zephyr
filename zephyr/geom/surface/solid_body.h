@@ -3,7 +3,7 @@
 #include <zephyr/geom/vector.h>
 
 namespace zephyr::mesh {
-class EuCell; // forward declaration
+class Cell; // forward declaration
 }
 
 namespace zephyr::geom {
@@ -45,12 +45,12 @@ public:
     /// @brief Объемная доля тела внутри ячейки сетки
     /// @param cell Ячейка сетки
     /// @param eps Точность определения объемной доли
-    virtual double volume_fraction(const mesh::EuCell& cell, double eps) const;
+    virtual double volume_fraction(const mesh::Cell& cell, double eps) const;
 
     /// @brief Объем тела внутри ячейки
     /// @param cell Ячейка сетки
     /// @param eps Точность определения объемной доли
-    virtual double volume_inside(const mesh::EuCell& cell, double eps) const;
+    virtual double volume_inside(const mesh::Cell& cell, double eps) const;
 
 protected:
     /// @brief Координаты точки в локальной системе координат,

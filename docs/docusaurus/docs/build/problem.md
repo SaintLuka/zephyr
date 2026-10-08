@@ -37,11 +37,11 @@ list(APPEND PROBLEMS wave)
 Подключим основные заголовочные файлы:
 ```cpp
 #include <zephyr/geom/generator/rectangle.h>
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/euler/mesh.h>
 #include <zephyr/io/pvd_file.h>
 ```
 Файл `generator/rectangle.h` включает сеточный генератор,
-`euler/eu_mesh.h` содержит класс для работы с эйлеровыми сетками,
+`euler/mesh.h` содержит класс для работы с эйлеровыми сетками,
 `io/pvd_file.h` содержит функции для сохранения расчетных данных.
 
 Разрешим использовать все пространства имен:
@@ -72,9 +72,9 @@ int main() {
 
 В нашем случае (для закрепленной мембраны) целесообразно указать `Boundary::WALL`. Флаги граничных условий потребуется обрабатывать в решателе.
 
-Создаем расчетную сетку `EuMesh` и [добавляем расчетные поля](/docs/basics/mesh#данные-на-сетке):
+Создаем расчетную сетку `Mesh` и [добавляем расчетные поля](/docs/basics/mesh#данные-на-сетке):
 ```cpp
-    EuMesh mesh(gen);
+    Mesh mesh(gen);
 
     Storable<double> u_prev = mesh.add<double>("u_prev");
     Storable<double> u_curr = mesh.add<double>("u_curr");

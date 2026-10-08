@@ -16,42 +16,42 @@ namespace zephyr::geom {
 
 // ------------------------------------------------------- NODE -------------------------------------------------------
 
-Node::Node(const Vector3d& v) : pos(v) { }
+GNode::GNode(const Vector3d& v) : pos(v) { }
 
-Node::Ptr Node::create(const Vector3d& v) {
-    return std::make_shared<Node>(v);
+GNode::Ptr GNode::create(const Vector3d& v) {
+    return std::make_shared<GNode>(v);
 }
 
-Node::Ptr Node::create(double x, double y) {
-    return std::make_shared<Node>(Vector3d{x, y, 0.0});
+GNode::Ptr GNode::create(double x, double y) {
+    return std::make_shared<GNode>(Vector3d{x, y, 0.0});
 }
 
-bool Node::is_finite() const {
+bool GNode::is_finite() const {
     return std::isfinite(pos[0]) && std::isfinite(pos[1]) && std::isfinite(pos[2]);
 }
 
-bool Node::operator==(const Node& other) const {
+bool GNode::operator==(const GNode& other) const {
     return m_id == other.m_id && pos == other.pos && bc == other.bc;
 }
 
-bool Node::operator!=(const Node& other) const {
+bool GNode::operator!=(const GNode& other) const {
     return !(*this == other);
 }
 
 // ------------------------------------------------------- FACE -------------------------------------------------------
 
-void Face::set_nodes(std::span<const int> node_ids) {
+void GFace::set_nodes(std::span<const int> node_ids) {
     m_nodes.resize(node_ids.size());
     for (int i = 0; i < node_ids.size(); ++i) {
         m_nodes[i] = static_cast<node_id_t>(node_ids[i]);
     }
 }
 
-void Face::set_bc(Boundary bc) {
+void GFace::set_bc(Boundary bc) {
     m_bc = m_neib != invalid_id ? Boundary::INNER : bc;
 }
 
-void Face::set_neib(id_t neib_id, int face_id) {
+void GFace::set_neib(id_t neib_id, int face_id) {
     if (neib_id != invalid_id) {
         m_neib = neib_id;
         m_twin = face_id;
@@ -59,7 +59,7 @@ void Face::set_neib(id_t neib_id, int face_id) {
     }
 }
 
-FaceKey::FaceKey(const Cell& cell, const Face& face) {
+FaceKey::FaceKey(const GCell& cell, const GFace& face) {
     const auto& cell_nodes = cell.nodes();
     ids.reserve(face.n_nodes());
     for (auto loc_id: face.nodes()) {
@@ -83,7 +83,7 @@ bool EdgeKey::operator==(const EdgeKey& o) const noexcept {
 
 // ------------------------------------------------------- CELL -------------------------------------------------------
 
-Cell::Cell(CellType type, std::vector<id_t>&& node_ids)
+GCell::GCell(CellType type, std::vector<id_t>&& node_ids)
     : m_type(type), m_nodes(std::move(node_ids)) {
     int default_n_nodes = indexing::n_nodes(m_type);
     if (default_n_nodes >= 0 && default_n_nodes != m_nodes.size()) {
@@ -91,7 +91,7 @@ Cell::Cell(CellType type, std::vector<id_t>&& node_ids)
     }
 }
 
-Cell::Cell(CellType type, std::initializer_list<id_t> node_ids)
+GCell::GCell(CellType type, std::initializer_list<id_t> node_ids)
     : m_type(type) {
     std::ranges::copy(node_ids, std::back_inserter(m_nodes));
     int default_n_nodes = indexing::n_nodes(m_type);
@@ -100,7 +100,7 @@ Cell::Cell(CellType type, std::initializer_list<id_t> node_ids)
     }
 }
 
-void Cell::set_face_bc(const std::vector<Boundary>& face_bc) {
+void GCell::set_face_bc(const std::vector<Boundary>& face_bc) {
     if (face_bc.empty()) return;
 
     if (m_faces.empty()) {
@@ -119,7 +119,7 @@ void Cell::set_face_bc(const std::vector<Boundary>& face_bc) {
     }
 }
 
-void Cell::init_faces() {
+void GCell::init_faces() {
     int n_faces = indexing::n_faces(m_type);
     if (n_faces < 0) {
         // dynamic face type
@@ -202,7 +202,7 @@ void Cell::init_faces() {
     }
 }
 
-void Cell::set_faces(const std::vector<std::vector<int>>& face_ids) {
+void GCell::set_faces(const std::vector<std::vector<int>>& face_ids) {
     if (m_type != CellType::POLYHEDRON) {
         throw std::runtime_error("Cell::set_faces: set_faces only for polyhedron type.");
     }
@@ -212,18 +212,18 @@ void Cell::set_faces(const std::vector<std::vector<int>>& face_ids) {
     }
 }
 
-void Cell::set_neib(int iface, id_t neib_id, int face_id) {
+void GCell::set_neib(int iface, id_t neib_id, int face_id) {
     m_faces[iface].set_neib(neib_id, face_id);
 }
 
-void Cell::replace_nodes(std::vector<id_t>&& new_nodes) {
+void GCell::replace_nodes(std::vector<id_t>&& new_nodes) {
     if (new_nodes.size() != m_nodes.size()) {
         throw std::runtime_error("Cell:replace_nodes must have the same number of nodes");
     }
     m_nodes = std::move(new_nodes);
 }
 
-void Cell::mirror() {
+void GCell::mirror() {
     // Необходимо развернуть ячейки
     if (indexing::get_dimension(m_type) == 2) {
         if (m_type == CellType::TRIANGLE || m_type == CellType::POLYGON) {
@@ -260,7 +260,7 @@ void Cell::mirror() {
     }
 }
 
-Vector3d Cell::face_center(const std::vector<Node>& grid_nodes, int iface) const {
+Vector3d GCell::face_center(const std::vector<GNode>& grid_nodes, int iface) const {
     if (m_faces.empty()) { return nanvec(); }
     if (!m_faces[iface].has_nodes()) { return nanvec(); }
 
@@ -272,7 +272,7 @@ Vector3d Cell::face_center(const std::vector<Node>& grid_nodes, int iface) const
     return fc;
 }
 
-Vector3d Cell::center(const std::vector<Node>& grid_nodes) const {
+Vector3d GCell::center(const std::vector<GNode>& grid_nodes) const {
     Vector3d c = Vector3d::Zero();
     for (id_t j: m_nodes) {
         c += grid_nodes[j].pos;
@@ -281,7 +281,7 @@ Vector3d Cell::center(const std::vector<Node>& grid_nodes) const {
     return c;
 }
 
-void Cell::calc_geom(const std::vector<Node>& grid_nodes) {
+void GCell::calc_geom(const std::vector<GNode>& grid_nodes) {
     if (indexing::get_dimension(m_type) == 2) {
         if (m_type != CellType::AMR2D) {
             Polygon poly;

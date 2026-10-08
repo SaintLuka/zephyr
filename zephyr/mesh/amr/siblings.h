@@ -34,7 +34,7 @@ constexpr std::array<Side3D, CpC(dim)> side_to_next_sibling() {
 //  - Все сиблинги имеют один уровень.
 //  - Все сиблинги хотят огрубиться.
 template <int dim>
-bool can_coarse(AmrCells& cells, int ic) {
+bool can_coarse(RawCells& cells, int ic) {
     static constexpr auto sides = side_to_next_sibling<dim>();
 
     const auto& adj = cells.faces.adjacent;
@@ -48,14 +48,14 @@ bool can_coarse(AmrCells& cells, int ic) {
         // локальный z-индекс
         auto z = cells.z_idx[ic] % CpC(dim);
 
-        index_t jface = cells.face_begin[ic] + sides[z];
+        index_t jface = cells.faces.offsets[ic] + sides[z];
 
         if (adj.rank[jface] != cells.rank[ic]) {
             // Сосед на другом процессе
             return false;
         }
 
-        scrutiny_check(adj.alien[jface] < 0, "can coarse, bad adjacent #1")
+        scrutiny_check(adj.ghost[jface] < 0, "can coarse, bad adjacent #1")
         scrutiny_check(adj.index[jface] >= 0, "can coarse, bad adjacent #2")
         scrutiny_check(adj.index[jface] < cells.size(), "can coarse, bad adjacent #3")
 
@@ -91,7 +91,7 @@ bool can_coarse(AmrCells& cells, int ic) {
 /// @param cells Хранилище ячеек
 /// @param ic Целевая ячейка (от которой запрос)
 template<int dim>
-std::array<int, CpC(dim) - 1> get_siblings(AmrCells &cells, index_t ic) {
+std::array<int, CpC(dim) - 1> get_siblings(RawCells &cells, index_t ic) {
     static constexpr std::array<Side3D, CpC(dim)> sides = side_to_next_sibling<dim>();
 
     std::array<int, CpC(dim) - 1> siblings;
@@ -103,7 +103,7 @@ std::array<int, CpC(dim) - 1> get_siblings(AmrCells &cells, index_t ic) {
         // локальный z-индекс
         auto z = cells.z_idx[jc] % CpC(dim);
 
-        index_t iface = cells.face_begin[jc] + sides[z];
+        index_t iface = cells.faces.offsets[jc] + sides[z];
 
 #if SCRUTINY
         // Следующие недоразумения должны были быть устранены после выполнения
@@ -183,7 +183,7 @@ std::array<int, CpC(dim) - 1> get_siblings(AmrCells &cells, index_t ic) {
 // Ячейка по индексу ic является главной среди сиблингов,
 // прилегающих к грани с рангом rank?
 template<int dim>
-bool main_border_child(AmrCells& locals, index_t ic, int rank) {
+bool main_border_child(RawCells& locals, index_t ic, int rank) {
     index_t min_idx = ic;
     int min_z_idx = locals.z_idx[ic] % CpC(dim);
 
@@ -195,7 +195,7 @@ bool main_border_child(AmrCells& locals, index_t ic, int rank) {
         if (z_idx < min_z_idx) {
             // Проверяем, что сиблинг у границы
             bool on_border = false;
-            for (auto iface: locals.faces_range(is)) {
+            for (auto iface: locals.faces.range(is)) {
                 if (locals.faces.adjacent.rank[iface] == rank) {
                     on_border = true;
                     break;

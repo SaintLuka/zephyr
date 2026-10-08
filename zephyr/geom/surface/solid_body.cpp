@@ -1,4 +1,4 @@
-#include <zephyr/mesh/euler/eu_prim.h>
+#include <zephyr/mesh/cell.h>
 
 #include <zephyr/geom/surface/solid_body.h>
 
@@ -50,7 +50,7 @@ bool SolidBody::inside(const Vector3d& v) const {
     return m_inside(v);
 }
 
-double SolidBody::volume_fraction(const mesh::EuCell& cell, double eps) const {
+double SolidBody::volume_fraction(const mesh::Cell& cell, double eps) const {
     double vol_frac = cell.approx_vol_fraction(m_inside);
     if (0.0 < vol_frac && vol_frac < 1.0) {
         int n_points = std::max(4, std::min(static_cast<int>(1.0 / eps), 100'000'000));
@@ -59,7 +59,7 @@ double SolidBody::volume_fraction(const mesh::EuCell& cell, double eps) const {
     return vol_frac;
 }
 
-double SolidBody::volume_inside(const mesh::EuCell& cell, double eps) const {
+double SolidBody::volume_inside(const mesh::Cell& cell, double eps) const {
     return volume_fraction(cell, eps) * cell.volume();
 }
 

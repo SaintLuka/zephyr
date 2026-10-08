@@ -1,4 +1,4 @@
-#include <zephyr/mesh/euler/eu_prim.h>
+#include <zephyr/mesh/cell.h>
 #include <zephyr/geom/primitives/polygon.h>
 #include <zephyr/geom/primitives/polyhedron.h>
 #include <zephyr/geom/sections.h>
@@ -7,15 +7,15 @@
 
 namespace zephyr::geom {
 
-using mesh::EuCell;
+using mesh::Cell;
 
-Plic::plane_t Plic::plane(EuCell& cell, int idx, bool norm) const {
+Plic::plane_t Plic::plane(Cell& cell, int idx, bool norm) const {
     return m_find_plane(cell, idx, norm);
 }
 
 
 Plic::Plic() {
-    m_find_plane = [](const EuCell& cell, int idx, bool norm) ->plane_t {
+    m_find_plane = [](const Cell& cell, int idx, bool norm) ->plane_t {
         return {0.0, Vector3d::Zero()};
     };
 }
@@ -23,7 +23,7 @@ Plic::Plic() {
 namespace {
 
 // Простая производная (формула Гаусса)
-Vector3d grad_normal(const EuCell& cell, int idx, const Plic::get_fraction_t& get_vf) {
+Vector3d grad_normal(const Cell& cell, int idx, const Plic::get_fraction_t& get_vf) {
     double a0 = get_vf(cell, idx);
     Vector3d grad = Vector3d::Zero();
     for (auto face: cell.faces()) {
@@ -36,7 +36,7 @@ Vector3d grad_normal(const EuCell& cell, int idx, const Plic::get_fraction_t& ge
 }
 
 // Двумерная формула CSIR
-Vector3d csir2_normal(const EuCell& cell, int idx, const Plic::get_fraction_t& get_vf) {
+Vector3d csir2_normal(const Cell& cell, int idx, const Plic::get_fraction_t& get_vf) {
     double a0 = get_vf(cell, idx);
     Vector3d grad = Vector3d::Zero();
     for (auto face: cell.faces()) {
@@ -48,7 +48,7 @@ Vector3d csir2_normal(const EuCell& cell, int idx, const Plic::get_fraction_t& g
 }
 
 // Трёхмерная формула CSIR
-Vector3d csir3_normal(const EuCell& cell, int idx, const Plic::get_fraction_t& get_vf) {
+Vector3d csir3_normal(const Cell& cell, int idx, const Plic::get_fraction_t& get_vf) {
     // Собрать доли в соседних ячейках
     std::array<double, Side3D::count()> a_neib;
     for (auto side: Side3D::items()) {
@@ -68,21 +68,21 @@ Vector3d csir3_normal(const EuCell& cell, int idx, const Plic::get_fraction_t& g
     return -grad;
 }
 
-double polygon_section(const EuCell& cell, int idx, const Vector3d& n, const Plic::get_fraction_t& get_vf) {
+double polygon_section(const Cell& cell, int idx, const Vector3d& n, const Plic::get_fraction_t& get_vf) {
     Vector3d p = cell.polygon().find_section(n, get_vf(cell, idx));
     return (p - cell.center()).dot(n);
 }
 
-double polyhedron_section(const EuCell& cell, int idx, const Vector3d& n, const Plic::get_fraction_t& get_vf) {
+double polyhedron_section(const Cell& cell, int idx, const Vector3d& n, const Plic::get_fraction_t& get_vf) {
     Vector3d p = cell.polyhedron().find_section(n, get_vf(cell, idx));
     return (p - cell.center()).dot(n);
 }
 
-double quad_section(const EuCell& cell, int idx, const Vector3d& n, const Plic::get_fraction_t& get_vf) {
+double quad_section(const Cell& cell, int idx, const Vector3d& n, const Plic::get_fraction_t& get_vf) {
     return quad_find_section(get_vf(cell, idx), n, cell.hx(), cell.hy());
 }
 
-double cube_section(const EuCell& cell, int idx, const Vector3d& n, const Plic::get_fraction_t& get_vf) {
+double cube_section(const Cell& cell, int idx, const Vector3d& n, const Plic::get_fraction_t& get_vf) {
     return cube_find_section(get_vf(cell, idx), n, cell.hx(), cell.hy(), cell.hz());
 }
 
@@ -119,7 +119,7 @@ class Stencil2D {
     table_3x3 arr;
 
 public:
-    Stencil2D(const EuCell& cell, int idx, const Plic::get_fraction_t& get_vf) {
+    Stencil2D(const Cell& cell, int idx, const Plic::get_fraction_t& get_vf) {
         for (int i: {-1, 0, 1}) {
             for (int j: {-1, 0, 1}) {
                 C(i, j) = get_vf(cell.neib(i, j), idx);
@@ -204,7 +204,7 @@ class Stencil3D {
     table_3x3x3 arr;
 
 public:
-    Stencil3D(const EuCell& cell, int idx, const Plic::get_fraction_t& get_vf) {
+    Stencil3D(const Cell& cell, int idx, const Plic::get_fraction_t& get_vf) {
         for (int i: {-1, 0, 1}) {
             for (int j: {-1, 0, 1}) {
                 for (int k: {-1, 0, 1}) {
@@ -320,7 +320,7 @@ Plic::Plic(int dim, bool cartesian, Type type, const get_fraction_t& get_vf) {
     if (type == GRAD) {
         if (!cartesian) {
             if (dim == 2) {
-                m_find_plane = [get_vf](const EuCell& cell, int idx, bool norm) -> plane_t {
+                m_find_plane = [get_vf](const Cell& cell, int idx, bool norm) -> plane_t {
 
                     Vector3d grad = grad_normal(cell, idx, get_vf);
                     Vector3d n = grad.normalized();
@@ -330,7 +330,7 @@ Plic::Plic(int dim, bool cartesian, Type type, const get_fraction_t& get_vf) {
                 };
             }
             else if (dim == 3) {
-                m_find_plane = [get_vf](const EuCell& cell, int idx,bool norm) -> plane_t {
+                m_find_plane = [get_vf](const Cell& cell, int idx,bool norm) -> plane_t {
 
                     Vector3d grad = grad_normal(cell, idx, get_vf);
                     Vector3d n = grad.normalized();
@@ -345,7 +345,7 @@ Plic::Plic(int dim, bool cartesian, Type type, const get_fraction_t& get_vf) {
         }
         else {
             if (dim == 2) {
-                m_find_plane = [get_vf](const EuCell& cell, int idx,bool norm) -> plane_t {
+                m_find_plane = [get_vf](const Cell& cell, int idx,bool norm) -> plane_t {
 
                     Vector3d grad = grad_normal(cell, idx, get_vf);
                     Vector3d n = grad.normalized();
@@ -355,7 +355,7 @@ Plic::Plic(int dim, bool cartesian, Type type, const get_fraction_t& get_vf) {
                 };
             }
             else if (dim == 3) {
-                m_find_plane = [get_vf](const EuCell& cell, int idx,bool norm) -> plane_t {
+                m_find_plane = [get_vf](const Cell& cell, int idx,bool norm) -> plane_t {
 
                     Vector3d grad = grad_normal(cell, idx, get_vf);
                     Vector3d n = grad.normalized();
@@ -372,7 +372,7 @@ Plic::Plic(int dim, bool cartesian, Type type, const get_fraction_t& get_vf) {
     else if (type == PnY) {
         if (cartesian) {
             if (dim == 2) {
-                m_find_plane = [get_vf](const EuCell& cell, int idx, bool norm) -> plane_t {
+                m_find_plane = [get_vf](const Cell& cell, int idx, bool norm) -> plane_t {
 
                     Stencil2D arr(cell, idx, get_vf);
                     Vector3d grad = arr.Youngs(cell.hx(), cell.hy());
@@ -383,7 +383,7 @@ Plic::Plic(int dim, bool cartesian, Type type, const get_fraction_t& get_vf) {
                 };
             }
             else if (dim == 3) {
-                m_find_plane = [get_vf](const EuCell& cell, int idx, bool norm) -> plane_t {
+                m_find_plane = [get_vf](const Cell& cell, int idx, bool norm) -> plane_t {
 
                     Stencil3D arr(cell, idx, get_vf);
                     Vector3d grad = arr.Youngs(cell.hx(), cell.hy(), cell.hz());
@@ -404,7 +404,7 @@ Plic::Plic(int dim, bool cartesian, Type type, const get_fraction_t& get_vf) {
     else if (type == ELVIRA) {
         if (cartesian) {
             if (dim == 2) {
-                m_find_plane = [get_vf](const EuCell& cell, int idx, bool norm) -> plane_t {
+                m_find_plane = [get_vf](const Cell& cell, int idx, bool norm) -> plane_t {
 
                     Stencil2D arr(cell, idx, get_vf);
                     Vector3d grad = arr.ELVIRA(cell.hx(), cell.hy());
@@ -415,7 +415,7 @@ Plic::Plic(int dim, bool cartesian, Type type, const get_fraction_t& get_vf) {
                 };
             }
             else if (dim == 3) {
-                m_find_plane = [get_vf](const EuCell& cell, int idx, bool norm) -> plane_t {
+                m_find_plane = [get_vf](const Cell& cell, int idx, bool norm) -> plane_t {
 
                     Stencil3D arr(cell, idx, get_vf);
                     Vector3d grad = arr.ELVIRA(cell.hx(), cell.hy(), cell.hz());
@@ -436,7 +436,7 @@ Plic::Plic(int dim, bool cartesian, Type type, const get_fraction_t& get_vf) {
     else if (type == CSIR) {
         if (cartesian) {
             if (dim == 2) {
-                m_find_plane = [get_vf](const EuCell& cell, int idx, bool norm) -> plane_t {
+                m_find_plane = [get_vf](const Cell& cell, int idx, bool norm) -> plane_t {
 
                     Vector3d grad = csir2_normal(cell, idx, get_vf);
                     Vector3d n = grad.normalized();
@@ -446,7 +446,7 @@ Plic::Plic(int dim, bool cartesian, Type type, const get_fraction_t& get_vf) {
                 };
             }
             else if (dim == 3) {
-                m_find_plane = [get_vf](const EuCell& cell, int idx, bool norm) -> plane_t {
+                m_find_plane = [get_vf](const Cell& cell, int idx, bool norm) -> plane_t {
 
                     Vector3d grad = csir3_normal(cell, idx, get_vf);
                     Vector3d n = grad.normalized();
@@ -466,7 +466,7 @@ Plic::Plic(int dim, bool cartesian, Type type, const get_fraction_t& get_vf) {
     else if (type == CSIR_2D) {
         if (cartesian) {
             if (dim == 2) {
-                m_find_plane = [get_vf](const EuCell& cell, int idx, bool norm) -> plane_t {
+                m_find_plane = [get_vf](const Cell& cell, int idx, bool norm) -> plane_t {
                     Vector3d grad = csir2_normal(cell, idx, get_vf);
                     Vector3d n = grad.normalized();
 
@@ -475,7 +475,7 @@ Plic::Plic(int dim, bool cartesian, Type type, const get_fraction_t& get_vf) {
                 };
             }
             else if (dim == 3) {
-                m_find_plane = [get_vf](const EuCell& cell, int idx, bool norm) -> plane_t {
+                m_find_plane = [get_vf](const Cell& cell, int idx, bool norm) -> plane_t {
                     Vector3d grad = csir2_normal(cell, idx, get_vf);
                     Vector3d n = grad.normalized();
 

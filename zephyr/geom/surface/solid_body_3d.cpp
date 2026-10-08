@@ -1,4 +1,4 @@
-#include <zephyr/mesh/euler/eu_prim.h>
+#include <zephyr/mesh/cell.h>
 #include <zephyr/geom/primitives/polygon.h>
 #include <zephyr/geom/surface/solid_body_3d.h>
 

@@ -80,10 +80,10 @@ public:
     BodyDisk(double radius, const Vector3d& center);
 
     /// @brief Оптимизированная версия для круга
-    double volume_fraction(const mesh::EuCell& cell, double eps) const final;
+    double volume_fraction(const mesh::Cell& cell, double eps) const final;
 
     /// @brief Оптимизированная версия для круга
-    double volume_inside(const mesh::EuCell& cell, double eps) const final;
+    double volume_inside(const mesh::Cell& cell, double eps) const final;
 
 protected:
     /// @brief Инициализация m_inside

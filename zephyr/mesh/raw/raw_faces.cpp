@@ -1,47 +1,48 @@
 #include <zephyr/geom/cell_type.h>
 #include <zephyr/geom/indexing.h>
-#include <zephyr/mesh/euler/amr_cells.h>
+#include <zephyr/mesh/raw/raw_cells.h>
 
 namespace zephyr::mesh {
 
 using geom::CellType;
 namespace indexing = geom::indexing;
 
-void AmrAdjacent::resize(index_t n_faces) {
+void RawAdjacent::resize(index_t n_faces) {
     rank.resize(n_faces, -1);
     index.resize(n_faces, -1);
-    alien.resize(n_faces, -1);
+    ghost.resize(n_faces, -1);
     basic.resize(n_faces, -1);
     rotation.resize(n_faces, -1);
 }
 
-void AmrAdjacent::reserve(index_t n_faces) {
+void RawAdjacent::reserve(index_t n_faces) {
     rank.reserve(n_faces);
     index.reserve(n_faces);
-    alien.reserve(n_faces);
+    ghost.reserve(n_faces);
     basic.reserve(n_faces);
     rotation.reserve(n_faces);
 }
 
-void AmrAdjacent::shrink_to_fit() {
+void RawAdjacent::shrink_to_fit() {
     rank.shrink_to_fit();
     index.shrink_to_fit();
-    alien.shrink_to_fit();
+    ghost.shrink_to_fit();
     basic.shrink_to_fit();
     rotation.shrink_to_fit();
 }
 
-memory_t AmrAdjacent::memory_usage() const {
+memory_t RawAdjacent::memory_usage() const {
     memory_t mem;
     mem.add(rank);
     mem.add(index);
-    mem.add(alien);
+    mem.add(ghost);
     mem.add(basic);
     mem.add(rotation);
     return mem;
 }
 
-void AmrFaces::resize(index_t n_faces) {
+void RawFaces::resize(index_t n_cells, index_t n_faces) {
+    offsets.resize(n_cells + 1, offsets.back());
     boundary.resize(n_faces);
     adjacent.resize(n_faces);
     normal.resize(n_faces);
@@ -51,7 +52,14 @@ void AmrFaces::resize(index_t n_faces) {
     vertices.resize(n_faces);
 }
 
-void AmrFaces::reserve(index_t n_faces) {
+void RawFaces::resize_amr(index_t n_cells, int dim) {
+    z_assert(dim == 2 || dim == 3, "RawFaces::resize_amr: bad dimension");
+    int n_faces = dim < 3 ? 8 : 24;
+    resize(n_cells, n_faces * n_cells);
+}
+
+void RawFaces::reserve(index_t n_cells, index_t n_faces) {
+    offsets.reserve(n_cells + 1);
     boundary.reserve(n_faces);
     adjacent.reserve(n_faces);
     normal.reserve(n_faces);
@@ -61,7 +69,14 @@ void AmrFaces::reserve(index_t n_faces) {
     vertices.reserve(n_faces);
 }
 
-void AmrFaces::shrink_to_fit() {
+void RawFaces::reserve_amr(index_t n_cells, int dim) {
+    z_assert(dim == 2 || dim == 3, "RawFaces::resize_amr: bad dimension");
+    int n_faces = dim < 3 ? 8 : 24;
+    reserve(n_cells, n_faces * n_cells);
+}
+
+void RawFaces::shrink_to_fit() {
+    offsets.shrink_to_fit();
     boundary.shrink_to_fit();
     adjacent.shrink_to_fit();
     normal.shrink_to_fit();
@@ -71,8 +86,9 @@ void AmrFaces::shrink_to_fit() {
     vertices.shrink_to_fit();
 }
 
-memory_t AmrFaces::memory_usage() const {
+memory_t RawFaces::memory_usage() const {
     memory_t mem;
+    mem.add(offsets);
     mem.add(boundary);
     mem.add(normal);
     mem.add(center);
@@ -82,11 +98,11 @@ memory_t AmrFaces::memory_usage() const {
     return mem;
 }
 
-void AmrFaces::insert(index_t iface, CellType ctype, int count) {
+void RawFaces::insert(index_t iface, CellType ctype, int count) {
     int n_faces = -1;
     switch (ctype) {
         case CellType::AMR2D: {
-            z_assert(count == 8 || count < 0, "AmrFaces::insert: bad size 2D");
+            z_assert(count == 8 || count < 0, "RawFaces::insert: bad size 2D");
             vertices[iface + Side2D::L] = indexing::amr::sf(Side2D::L);
             vertices[iface + Side2D::R] = indexing::amr::sf(Side2D::R);
             vertices[iface + Side2D::B] = indexing::amr::sf(Side2D::B);
@@ -95,7 +111,7 @@ void AmrFaces::insert(index_t iface, CellType ctype, int count) {
         } break;
 
         case CellType::AMR3D: {
-            z_assert(count == 24 || count < 0, "AmrFaces::insert: bad size 3D");
+            z_assert(count == 24 || count < 0, "RawFaces::insert: bad size 3D");
             vertices[iface + Side3D::L] = indexing::amr::sf(Side3D::L);
             vertices[iface + Side3D::R] = indexing::amr::sf(Side3D::R);
             vertices[iface + Side3D::B] = indexing::amr::sf(Side3D::B);
@@ -106,7 +122,7 @@ void AmrFaces::insert(index_t iface, CellType ctype, int count) {
         } break;
 
         case CellType::TRIANGLE: {
-            z_assert(count == 3 || count < 0, "AmrFaces::insert: bad size TRIANGLE");
+            z_assert(count == 3 || count < 0, "RawFaces::insert: bad size TRIANGLE");
             vertices[iface+0] = indexing::tri::sf(0);
             vertices[iface+1] = indexing::tri::sf(1);
             vertices[iface+2] = indexing::tri::sf(2);
@@ -115,7 +131,7 @@ void AmrFaces::insert(index_t iface, CellType ctype, int count) {
             
         case CellType::QUAD:
             // Необычный порядок граней
-            z_assert(count == 4 || count < 0, "AmrFaces::insert: bad size QUAD");
+            z_assert(count == 4 || count < 0, "RawFaces::insert: bad size QUAD");
             vertices[iface+0] = indexing::quad::sf(0);
             vertices[iface+1] = indexing::quad::sf(1);
             vertices[iface+2] = indexing::quad::sf(2);
@@ -125,7 +141,7 @@ void AmrFaces::insert(index_t iface, CellType ctype, int count) {
 
         case CellType::POLYGON: {
             if (count < 0) {
-                throw std::runtime_error("AmrFaces::insert error: set argument 'count' with CellType::POLYGON");
+                throw std::runtime_error("RawFaces::insert error: set argument 'count' with CellType::POLYGON");
             }
             for (int i = 0; i < count; ++i) {
                 vertices[iface + i] = indexing::poly::sf(count, i);
@@ -134,7 +150,7 @@ void AmrFaces::insert(index_t iface, CellType ctype, int count) {
         } break;
 
         case CellType::TETRA: {
-            z_assert(count == 4 || count < 0, "AmrFaces::insert: bad size TETRA");
+            z_assert(count == 4 || count < 0, "RawFaces::insert: bad size TETRA");
             vertices[iface + 0] = indexing::tetra::sf(0);
             vertices[iface + 1] = indexing::tetra::sf(1);
             vertices[iface + 2] = indexing::tetra::sf(2);
@@ -143,7 +159,7 @@ void AmrFaces::insert(index_t iface, CellType ctype, int count) {
         } break;
 
         case CellType::PYRAMID: {
-            z_assert(count == 5 || count < 0, "AmrFaces::insert: bad size PYRAMID");
+            z_assert(count == 5 || count < 0, "RawFaces::insert: bad size PYRAMID");
             vertices[iface + 0] = indexing::pyramid::sf(0);
             vertices[iface + 1] = indexing::pyramid::sf(1);
             vertices[iface + 2] = indexing::pyramid::sf(2);
@@ -153,7 +169,7 @@ void AmrFaces::insert(index_t iface, CellType ctype, int count) {
         } break;
 
         case CellType::WEDGE: {
-            z_assert(count == 5 || count < 0, "AmrFaces::insert: bad size PYRAMID");
+            z_assert(count == 5 || count < 0, "RawFaces::insert: bad size PYRAMID");
             vertices[iface + 0] = indexing::wedge::sf(0);
             vertices[iface + 1] = indexing::wedge::sf(1);
             vertices[iface + 2] = indexing::wedge::sf(2);
@@ -163,7 +179,7 @@ void AmrFaces::insert(index_t iface, CellType ctype, int count) {
         } break;
 
         case CellType::HEXAHEDRON: {
-            z_assert(count == 6 || count < 0, "AmrFaces::insert: bad size HEXAHEDRON");
+            z_assert(count == 6 || count < 0, "RawFaces::insert: bad size HEXAHEDRON");
             vertices[iface + Side3D::L] = indexing::hex::sf(Side3D::L);
             vertices[iface + Side3D::R] = indexing::hex::sf(Side3D::R);
             vertices[iface + Side3D::B] = indexing::hex::sf(Side3D::B);
@@ -175,7 +191,7 @@ void AmrFaces::insert(index_t iface, CellType ctype, int count) {
 
         case CellType::POLYHEDRON:
         default:
-            throw std::runtime_error("AmrFaces::insert: not implemented for current CellType");
+            throw std::runtime_error("RawFaces::insert: not implemented for current CellType");
     }
 
     for (int i = 0; i < n_faces; ++i) {
@@ -183,7 +199,7 @@ void AmrFaces::insert(index_t iface, CellType ctype, int count) {
     }
 }
 
-bool AmrFaces::to_skip(index_t iface, Direction dir) const {
+bool RawFaces::to_skip(index_t iface, Direction dir) const {
     if (boundary[iface] == Boundary::UNDEFINED) {
         return true;
     }
@@ -205,10 +221,10 @@ void reorder(std::vector<T>& field, index_t iface) {
     field[iface + 2] = f0;
 }
 
-void AmrFaces::reorder_quad_faces(index_t iface) {
+void RawFaces::reorder_quad_faces(index_t iface) {
     reorder(adjacent.rank, iface);
     reorder(adjacent.index, iface);
-    reorder(adjacent.alien, iface);
+    reorder(adjacent.ghost, iface);
 
     reorder(boundary, iface);
     reorder(normal, iface);

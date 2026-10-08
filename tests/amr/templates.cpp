@@ -4,7 +4,7 @@
 
 #include <zephyr/geom/vector.h>
 #include <zephyr/geom/generator/rectangle.h>
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/mesh.h>
 #include <zephyr/io/pvd_file.h>
 #include <zephyr/utils/pyplot.h>
 
@@ -45,26 +45,26 @@ struct _U_ {
 static Storable<_U_> U;
 
 // Переменные для сохранения
-int get_interesting(EuCell& cell)  { return cell[U].target; }
-double get_u(EuCell& cell) { return cell[U].u; }
-double get_ux(EuCell& cell) { return cell[U].grad.x(); }
-double get_uy(EuCell& cell) { return cell[U].grad.y(); }
-double get_du_dx_o(EuCell& cell) { return cell[U].grad_o.x(); }
-double get_du_dy_o(EuCell& cell) { return cell[U].grad_o.y(); }
-double get_err_x_o(EuCell& cell) { return cell[U].err_o.x(); }
-double get_err_y_o(EuCell& cell) { return cell[U].err_o.y(); }
-double get_du_dx_n(EuCell& cell) { return cell[U].grad_n.x(); }
-double get_du_dy_n(EuCell& cell) { return cell[U].grad_n.y(); }
-double get_err_x_n(EuCell& cell) { return cell[U].err_n.x(); }
-double get_err_y_n(EuCell& cell) { return cell[U].err_n.y(); }
-double get_du_dx_g(EuCell& cell) { return cell[U].grad_g.x(); }
-double get_du_dy_g(EuCell& cell) { return cell[U].grad_g.y(); }
-double get_err_x_g(EuCell& cell) { return cell[U].err_g.x(); }
-double get_err_y_g(EuCell& cell) { return cell[U].err_g.y(); }
+int get_interesting(Cell& cell)  { return cell[U].target; }
+double get_u(Cell& cell) { return cell[U].u; }
+double get_ux(Cell& cell) { return cell[U].grad.x(); }
+double get_uy(Cell& cell) { return cell[U].grad.y(); }
+double get_du_dx_o(Cell& cell) { return cell[U].grad_o.x(); }
+double get_du_dy_o(Cell& cell) { return cell[U].grad_o.y(); }
+double get_err_x_o(Cell& cell) { return cell[U].err_o.x(); }
+double get_err_y_o(Cell& cell) { return cell[U].err_o.y(); }
+double get_du_dx_n(Cell& cell) { return cell[U].grad_n.x(); }
+double get_du_dy_n(Cell& cell) { return cell[U].grad_n.y(); }
+double get_err_x_n(Cell& cell) { return cell[U].err_n.x(); }
+double get_err_y_n(Cell& cell) { return cell[U].err_n.y(); }
+double get_du_dx_g(Cell& cell) { return cell[U].grad_g.x(); }
+double get_du_dy_g(Cell& cell) { return cell[U].grad_g.y(); }
+double get_err_x_g(Cell& cell) { return cell[U].err_g.x(); }
+double get_err_y_g(Cell& cell) { return cell[U].err_g.y(); }
 
 
 // Расчет градиента методом Гаусса
-void gauss(EuCell &cell) {
+void gauss(Cell &cell) {
     if (!cell[U].target) {
         cell[U].grad_g = Vector2d::Zero();
         cell[U].err_g  = Vector2d::Zero();
@@ -98,7 +98,7 @@ void gauss(EuCell &cell) {
 }
 
 // Расчет градиента старым МНК
-void LSM_old(EuCell &cell) {
+void LSM_old(Cell &cell) {
     if (!cell[U].target) {
         cell[U].grad_o = Vector2d::Zero();
         cell[U].err_o  = Vector2d::Zero();
@@ -129,7 +129,7 @@ void LSM_old(EuCell &cell) {
 }
 
 // Расчет градиента новым МНК
-void LSM_new(EuCell &cell) {
+void LSM_new(Cell &cell) {
     if (!cell[U].target) {
         cell[U].grad_n = Vector2d::Zero();
         cell[U].err_n  = Vector2d::Zero();
@@ -167,12 +167,12 @@ constexpr int n_templates() { return 11; }
 // Все двумерные шаблоны
 // num -- номер шаблона
 // H -- линейный размер целевой ячейки
-EuMesh get_template(int num, double H) {
+Mesh get_template(int num, double H) {
     if (0 <= num && num <= 5) {
         Rectangle rect(-1.5 * H, 1.5 * H, -1.5 * H, 1.5 * H);
         rect.set_nx(3);
 
-        EuMesh mesh(rect);
+        Mesh mesh(rect);
         U = mesh.add<_U_>("U");
         mesh.set_max_level(1);
 
@@ -242,7 +242,7 @@ EuMesh get_template(int num, double H) {
                        -1.5 * H, 2.5 * H);
         rect.set_nx(2);
 
-        EuMesh mesh(rect);
+        Mesh mesh(rect);
         U = mesh.add<_U_>("U");
         mesh.set_max_level(2);
 
@@ -391,7 +391,7 @@ Vector2d test_arb_grad(double x, double y) {
 }
 
 // Задать на сетке все данные
-void set_data(EuMesh& mesh,
+void set_data(Mesh& mesh,
               std::function<double(double, double)> func,
               std::function<Vector2d(double, double)> grad) {
 
@@ -427,7 +427,7 @@ int main() {
 
     // Записать все шаблоны в файл
     for (int k = 0; k < n_templates(); ++k) {
-        EuMesh mesh = get_template(k, 1.0);
+        Mesh mesh = get_template(k, 1.0);
         set_data(mesh, test_linear_func, test_linear_grad);
         pvd.save(mesh, k + 1);
     }
@@ -448,7 +448,7 @@ int main() {
             double h = std::pow(xi, j);
             hs.push_back(h);
 
-            EuMesh mesh = get_template(k, h);
+            Mesh mesh = get_template(k, h);
 
             //set_data(mesh, test_linear_func, test_linear_grad);
             //set_data(mesh, test_x_func, test_x_grad);

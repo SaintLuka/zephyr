@@ -68,7 +68,7 @@ Vector3d Triangle::centroid() const {
     return center();
 }
 
-struct Node {
+struct GNode {
     double i, j, k, w;
 };
 
@@ -151,8 +151,8 @@ double Triangle::integrate_low(const std::function<double(const Vector3d&)>& fun
 //  J. Albrecht, L. Collatz, "Zur numerischen Auswertung mehrdimensionaler Integrale"
 //  ZAMM, Volume 38, Issue 1-2, 1958, pp. 1-15.
 double Triangle::integrate_mid(const std::function<double(const Vector3d&)>& func, int n) const {
-    static const std::array<Node, 37> weights = {
-            Node{5.00000000000000000000000000000000e-01, +5.00000000000000000000000000000000e-01,
+    static const std::array<GNode, 37> weights = {
+            GNode{5.00000000000000000000000000000000e-01, +5.00000000000000000000000000000000e-01,
                  +0.00000000000000000000000000000000e+00, +3.33333333333333328707404064061848e-02},
             {5.00000000000000000000000000000000e-01, +0.00000000000000000000000000000000e+00,
              +5.00000000000000000000000000000000e-01, +3.33333333333333328707404064061848e-02},
@@ -175,7 +175,7 @@ double Triangle::integrate_mid(const std::function<double(const Vector3d&)>& fun
                     get(i, j + 1, k - 1),
                     get(i, j, k));
 
-            for (const Node &node: weights) {
+            for (const GNode &node: weights) {
                 res += node.w * func(tri.pget(node.i, node.j, node.k));
             }
         }
@@ -188,7 +188,7 @@ double Triangle::integrate_mid(const std::function<double(const Vector3d&)>& fun
                          get(i, j + 1, k - 1),
                          get(i - 1, j + 1, k));
 
-            for (const Node &node: weights) {
+            for (const GNode &node: weights) {
                 res += node.w * func(tri.pget(node.i, node.j, node.k));
             }
         }
@@ -200,8 +200,8 @@ double Triangle::integrate_mid(const std::function<double(const Vector3d&)>& fun
 // G.R. Cowper, "Gaussian quadrature formulas for triangles",
 // Numerical Methods in Engineering, Volume 7, Issue 3, (1973), pp. 405-408.
 double Triangle::integrate_high(const std::function<double(const Vector3d&)>& func, int n) const {
-    static const std::array<Node, 37> weights = {
-            Node{6.30890144915020045779385782225290e-02, 6.30890144915020045779385782225290e-02,
+    static const std::array<GNode, 37> weights = {
+            GNode{6.30890144915020045779385782225290e-02, 6.30890144915020045779385782225290e-02,
                  8.73821971016995990844122843554942e-01, 5.08449063702068951298151944229176e-02},
             {6.30890144915020045779385782225290e-02, 8.73821971016995990844122843554942e-01,
              6.30890144915020045779385782225290e-02, 5.08449063702068951298151944229176e-02},
@@ -236,7 +236,7 @@ double Triangle::integrate_high(const std::function<double(const Vector3d&)>& fu
                     get(i, j + 1, k - 1),
                     get(i, j, k));
 
-            for (const Node &node: weights) {
+            for (const GNode &node: weights) {
                 res += node.w * func(tri.pget(node.i, node.j, node.k));
             }
         }
@@ -249,7 +249,7 @@ double Triangle::integrate_high(const std::function<double(const Vector3d&)>& fu
                          get(i, j + 1, k - 1),
                          get(i - 1, j + 1, k));
 
-            for (const Node &node: weights) {
+            for (const GNode &node: weights) {
                 res += node.w * func(tri.pget(node.i, node.j, node.k));
             }
         }
@@ -261,8 +261,8 @@ double Triangle::integrate_high(const std::function<double(const Vector3d&)>& fu
 // J. Berntsen, T.O. Espelid, "Degree 13 symmetric quadrature rules for the triangle",
 // Reports in Informatics, Dept. of Informatics, University of Bergen, (1990).
 double Triangle::integrate_extra(const std::function<double(const Vector3d&)>& func, int n) const {
-    static const std::array<Node, 37> weights = {
-            Node{3.33333333333334314030338418888277e-01, 3.33333333333333314829616256247391e-01,
+    static const std::array<GNode, 37> weights = {
+            GNode{3.33333333333334314030338418888277e-01, 3.33333333333333314829616256247391e-01,
                  3.33333333333332315628894093606505e-01, 5.17397660657436322950708529333497e-02},
             {2.48621685379472150134727570502946e-02, 2.48621685379472982801996039370351e-02,
              9.50275662924105479767433735105442e-01, 8.00779955556481931600032453388849e-03},
@@ -347,7 +347,7 @@ double Triangle::integrate_extra(const std::function<double(const Vector3d&)>& f
                     get(i, j + 1, k - 1),
                     get(i, j, k));
 
-            for (const Node &node: weights) {
+            for (const GNode &node: weights) {
                 res += node.w * func(tri.pget(node.i, node.j, node.k));
             }
         }
@@ -360,7 +360,7 @@ double Triangle::integrate_extra(const std::function<double(const Vector3d&)>& f
                          get(i, j + 1, k - 1),
                          get(i - 1, j + 1, k));
 
-            for (const Node &node: weights) {
+            for (const GNode &node: weights) {
                 res += node.w * func(tri.pget(node.i, node.j, node.k));
             }
         }

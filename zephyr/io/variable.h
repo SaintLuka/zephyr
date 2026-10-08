@@ -1,8 +1,8 @@
 #pragma once
 
 #include <string>
-#include <iostream>
 #include <functional>
+#include <variant>
 
 #include <zephyr/io/vtk_type.h>
 
@@ -10,7 +10,8 @@
 namespace zephyr::mesh {
 template<typename T>
 class Storable;
-class EuCell;
+class Cell;
+class Node;
 }
 
 namespace zephyr::io {
@@ -20,12 +21,16 @@ namespace zephyr::io {
 /// Позволяет сократить размер выходного файла.
 /// @code
 /// WriteFunction<float> ev_energy =
-///     [](EuCell& cell, float* out) {
+///     [](Cell& cell, float* out) {
 ///         out[0] = static_cast<float>(cell.energy / 1.6e-19);
 ///     };
 /// @endcode
 template <typename T>
-using WriteCell = std::function<void(mesh::EuCell&, T*)>;
+using WriteCell = std::function<void(mesh::Cell&, T*)>;
+
+/// @brief Тип функции для записи переменных из узлов
+template <typename T>
+using WriteNode = std::function<void(mesh::Node&, T*)>;
 
 /// @brief Класс для записи переменных в VTU файл, каждой переменной для
 /// записи должен соответствовать экземпляр Variable.
@@ -37,11 +42,8 @@ public:
     /// @brief Создание дескриптора по имени.
     /// @name Имя переменной
     /// @details Функция актуальна для некоторых предопределенных имен:
-    /// "coords", "center", "volume"...
-    explicit Variable(const char *name);
-
-    /// @brief Аналогично конструктору Variable(const char* )
-    explicit Variable(const std::string &name);
+    /// "coord", "center", "volume"...
+    explicit Variable(std::string_view name);
 
     /// @brief Создать переменную с полным описанием
     /// @param name Имя переменной
@@ -53,50 +55,65 @@ public:
     /// позволяет записывать две компоненты импульса в формате Float32.
     /// @code
     /// Variable fd("momentum", 2,
-    ///     WriteFunction<float>([](EuCell& cell, float* out) {
+    ///     WriteFunction<float>([](Cell& cell, float* out) {
     ///         out[0] = static_cast<float>(cell.mass * cell.velocity.x);
     ///         out[1] = static_cast<float>(cell.mass * cell.velocity.y);
     ///     }));
     /// @endcode
     template<class T>
-    Variable(const char *name, int n_components, const WriteCell<T> &func) {
-        m_name = name;
-        m_type = VtkType::get<T>();
-        m_n_components = n_components;
-        m_write = [func](mesh::EuCell &cell, void *out) {
+    Variable(std::string_view name, int n_components, const WriteCell<T> &func) {
+        name_ = name;
+        type_ = VtkType::get<T>();
+        n_components_ = n_components;
+        write_ = [func](mesh::Cell &cell, void *out) {
             func(cell, static_cast<T *>(out));
         };
     }
 
-    /// Тип VtkType выводится из T.
     template<class T>
-    Variable(const std::string &name, int n_components, const WriteCell<T> &func)
-            : Variable(name.c_str(), n_components, func) { }
+    Variable(std::string_view name, int n_components, const WriteNode<T> &func) {
+        name_ = name;
+        type_ = VtkType::get<T>();
+        n_components_ = n_components;
+        write_ = [func](mesh::Node &node, void *out) {
+            func(node, static_cast<T *>(out));
+        };
+    }
 
     /// @brief Имя переменной
-    std::string name() const { return m_name; }
+    std::string name() const { return name_; }
 
     /// @brief Тип переменной
-    VtkType type() const { return m_type; }
+    VtkType type() const { return type_; }
 
     /// @brief Число компонент для векторной переменной
-    int n_components() const { return m_n_components; }
+    int n_components() const { return n_components_; }
 
     /// @brief Является ли переменная скаляром
-    bool is_scalar() const { return m_n_components < 2; }
+    bool is_scalar() const { return n_components_ < 2; }
 
     /// @brief Размер переменной в байтах (аналог sizeof)
-    size_t size() const { return m_n_components * m_type.size(); }
+    size_t size() const { return n_components_ * type_.size(); }
 
-    /// @brief Основная функция класса. Запись переменной из ячейки в поток.
-    void write(mesh::EuCell &cell, void *out) const;
+    /// @brief Переменная для записи сеточных данных?
+    bool cell_data() const;
+
+    /// @brief Переменная для записи сеточных данных?
+    bool node_data() const;
+
+    /// @brief Основная функция класса. Запись переменной из ячейки в буфер.
+    void write(mesh::Cell &cell, void *out) const;
+
+    /// @brief Основная функция класса. Запись переменной из узла в буфер.
+    void write(mesh::Node &node, void *out) const;
 
 private:
-    std::string m_name;  ///< Имя переменной
-    VtkType m_type;      ///< Тип переменной
-    int m_n_components;  ///< Число компонент (для вектора)
+    std::string name_;  ///< Имя переменной
+    VtkType type_;      ///< Тип переменной
+    int n_components_;  ///< Число компонент (для вектора)
 
-    WriteCell<void> m_write = nullptr; ///< Функция записи
+    /// @brief Функция записи
+    std::variant<WriteCell<void>, WriteNode<void>> write_ = {};
 };
 
 } // namespace zephyr::io

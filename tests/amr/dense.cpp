@@ -9,7 +9,7 @@
 #include <zephyr/geom/primitives/polygon.h>
 #include <zephyr/geom/generator/cuboid.h>
 #include <zephyr/geom/generator/rectangle.h>
-#include <zephyr/mesh/euler/eu_mesh.h>
+#include <zephyr/mesh/mesh.h>
 #include <zephyr/io/pvd_file.h>
 
 using namespace zephyr::mesh;
@@ -68,11 +68,11 @@ struct Star {
     }
 };
 
-void set_index(EuCell& cell, Star& star) {
+void set_index(Cell& cell, Star& star) {
     cell[bit] = star.inside(cell.center());
 }
 
-void set_flag(EuCell& cell) {
+void set_flag(Cell& cell) {
     cell.set_flag(cell[bit] > 0 ? 1 : -1);
 }
 
@@ -86,16 +86,16 @@ int main(int argc, char** argv) {
     //Cuboid gen(-2.0, 2.0, -1.0, 1.0, -1.0, 1.0);
     //gen.set_nx(20);
 
-    EuMesh mesh(gen);
+    Mesh mesh(gen, true);
     bit = mesh.add<int>("bit");
 
     mesh.set_decomposition("XY");
-    mesh.set_max_level(mesh.dim() == 2 ? 5 : 4);
+    mesh.set_max_level(1); //mesh.dim() == 2 ? 5 : 4);
     mesh.set_distributor("simple");
 
     PvdFile pvd("mesh", "output");
     pvd.variables = {"rank", "index", "next", "level", "flag", "faces2D"};
-    pvd.variables.append("wanted", bit);
+    pvd.variables.add_cell_data("wanted", bit);
 
     if (mesh.check_base() < 0) {
         mpi::cout << "Bad init mesh\n";
@@ -117,6 +117,8 @@ int main(int argc, char** argv) {
             throw std::runtime_error("Bad init refinement");
         }
     }
+
+    return 0;
 
     Stopwatch elapsed;
     Stopwatch sw_write;

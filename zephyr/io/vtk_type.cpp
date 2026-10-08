@@ -10,6 +10,17 @@ std::string byteorder() {
     return bint.c[0] == 1 ? "BigEndian" : "LittleEndian";
 }
 
+std::string add_extension(std::string_view filename, const std::string& ext) {
+    auto dot_pos = filename.find_last_of('.');
+    auto slash_pos = filename.find_last_of("/\\");
+
+    // Если точки нет ИЛИ она находится в названии папки (до слэша), то расширения нет
+    if (dot_pos == std::string_view::npos || (slash_pos != std::string_view::npos && dot_pos < slash_pos)) {
+        return std::string(filename) + ext;
+    }
+    return std::string(filename);
+}
+
 void create_directories(const std::string& filename) {
     namespace fs = std::filesystem;
     fs::path file_path(filename);

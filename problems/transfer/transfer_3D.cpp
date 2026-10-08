@@ -42,7 +42,7 @@ public:
     }
 
     // Сетка с точным решением от времени
-    EuMesh exact(SolidBody3D& body, double curr_time) const {
+    Mesh exact(SolidBody3D& body, double curr_time) const {
         // Точное решение
         if (test == Test::Translation) {
             Vector3d V0 = {0.7, -0.35, 0.3};
@@ -57,7 +57,7 @@ public:
         auto triangles = body.triangulation(400);
         int n_triangles = triangles.size();
 
-        EuMesh cells(2, false);
+        Mesh cells = Mesh::PolySet(2);
         cells.locals().reserve(n_triangles, 3 * n_triangles, 3 * n_triangles);
         for (const auto& tri: triangles) {
             Polygon poly(tri);
@@ -70,7 +70,7 @@ public:
 static Solver::State data;
 
 // Объем тела
-double volume(EuMesh& cells, Storable<double> u1) {
+double volume(Mesh& cells, Storable<double> u1) {
     double sum = 0.0;
     for (auto cell: cells) {
         sum += cell.volume() * cell[u1];
@@ -79,7 +79,7 @@ double volume(EuMesh& cells, Storable<double> u1) {
 }
 
 // Какой объем сетки отсекается телом
-double volume_inside(const SolidBody3D& body, EuMesh &cells) {
+double volume_inside(const SolidBody3D& body, Mesh &cells) {
     double sum = 0.0;
     for (auto cell: cells) {
         sum += body.volume_inside(cell, 1.0e-3);
@@ -92,7 +92,7 @@ int main() {
     PvdFile pvd("mesh", "output");
     PvdFile pvd_body("body", "output");
     PvdFile pvd_exact("exact", "output");
-    pvd_body.polyhedral = true;
+    pvd_body.options.polyhedral = true;
 
     // Геометрия области
     Cuboid gen(0.0, 1.0, 0.0, 0.7, 0.0, 0.6);
@@ -103,7 +103,7 @@ int main() {
         .back   = Boundary::ZOE, .front = Boundary::ZOE});
 
     // Создать сетку
-    EuMesh mesh(gen);
+    Mesh mesh(gen);
     mesh.set_max_level(2);
 
     // Создать решатель
@@ -129,20 +129,20 @@ int main() {
 
     // Переменные для сохранения
     pvd.variables = {"level"};
-    pvd.variables.append("u", data.u1);
-    pvd.variables.append("u2", data.u2);
-    pvd.variables.append("n", data.n);
-    pvd.variables.append("p", data.p);
-    pvd.variables.append("grad", data.grad);
-    pvd.variables += {"over", [](EuCell& cell) -> double {
+    pvd.variables.add_cell_data("u", data.u1);
+    pvd.variables.add_cell_data("u2", data.u2);
+    pvd.variables.add_cell_data("n", data.n);
+    pvd.variables.add_cell_data("p", data.p);
+    pvd.variables.add_cell_data("grad", data.grad);
+    pvd.variables += {"over", [](Cell& cell) -> double {
         double u = cell[data.u1];
         return u < 0.0 ? u : (u <= 1.0 ? NAN : u - 1.0);
     }};
-    pvd.variables += {"close", [](EuCell& cell) -> double {
+    pvd.variables += {"close", [](Cell& cell) -> double {
         double u = cell[data.u1];
         return std::abs(u < 0.5 ? u : 1.0 - u);
     }};
-    pvd.variables += {"min_val", [](EuCell& cell) -> double {
+    pvd.variables += {"min_val", [](Cell& cell) -> double {
         double min_val = cell[data.u1];
         for (auto face: cell.faces()) {
             if (face.is_boundary()) continue;
@@ -150,7 +150,7 @@ int main() {
         }
         return min_val;
     }};
-    pvd.variables += {"max_val", [](EuCell& cell) -> double {
+    pvd.variables += {"max_val", [](Cell& cell) -> double {
         double max_val = cell[data.u1];
         for (auto face: cell.faces()) {
             if (face.is_boundary()) continue;
@@ -160,7 +160,7 @@ int main() {
     }};
 
     // Начальные условия
-    auto initialize = [&body](EuCell& cell) {
+    auto initialize = [&body](Cell& cell) {
         cell[data.u1] = body.volume_fraction(cell, 1.0e-4);
         cell[data.u2] = 0.0;
     };
@@ -203,11 +203,11 @@ int main() {
             pvd.save(mesh, curr_time);
 
             solver.update_interface(mesh);
-            EuMesh crop = solver.body(mesh);
+            Mesh crop = solver.body(mesh);
             pvd_body.save(crop, curr_time);
 
             auto curr_body = body;
-            EuMesh exact = solver.exact(curr_body, curr_time);
+            Mesh exact = solver.exact(curr_body, curr_time);
             pvd_exact.save(exact, curr_time);
 
             write_next += write_freq;
@@ -242,10 +242,10 @@ int main() {
     pvd.save(mesh, curr_time);
 
     solver.update_interface(mesh);
-    EuMesh crop = solver.body(mesh);
+    Mesh crop = solver.body(mesh);
     pvd_body.save(crop, curr_time);
 
-    EuMesh exact = solver.exact(body, curr_time);
+    Mesh exact = solver.exact(body, curr_time);
     pvd_exact.save(exact, curr_time);
 
     double vi = volume_inside(body, crop);

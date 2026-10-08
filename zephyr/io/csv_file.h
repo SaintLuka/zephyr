@@ -1,10 +1,10 @@
 #pragma once
 
-#include <zephyr/mesh/euler/amr_cells.h>
+#include <zephyr/mesh/raw/raw_cells.h>
 #include <zephyr/io/variables.h>
 
 namespace zephyr::mesh {
-class AmrCells;
+class RawCells;
 }
 
 namespace zephyr::io {
@@ -29,12 +29,12 @@ public:
 
     /// @brief Базовая функция записи в файл. До вызова функции должен быть
     /// создан экземпляр класса и настроены опции записи.
-    void save(mesh::AmrCells &cells) const;
+    void save(mesh::RawCells &cells) const;
 
     /// @brief Статическая функция записи в файл. Полный аналог функции-члена
     /// класса write, но вызывается без экземпляра класса, все параметры записи
     /// передаются непосредственно как аргументы функции.
-    static void save(const std::string &filename, mesh::AmrCells &cells,
+    static void save(const std::string &filename, mesh::RawCells &cells,
                      int precision, const Variables &variables);
 
 };

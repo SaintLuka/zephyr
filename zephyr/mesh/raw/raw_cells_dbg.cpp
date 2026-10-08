@@ -5,14 +5,14 @@
 #include <zephyr/utils/mpi.h>
 #include <zephyr/geom/geom.h>
 #include <zephyr/geom/indexing.h>
-#include <zephyr/mesh/euler/amr_cells.h>
+#include <zephyr/mesh/raw/raw_cells.h>
 
 using zephyr::utils::mpi;
 using namespace zephyr::geom;
 
 namespace zephyr::mesh {
 
-void AmrCells::print_info(index_t ic) const {
+void RawCells::print_info(index_t ic) const {
     std::cout << "\t\tarr.ic: " << ic << "\n";
     std::cout << "\t\tcenter: " << center[ic].transpose() << "\n";
     std::cout << "\t\trank:   " << rank[ic] << "\n";
@@ -26,19 +26,19 @@ void AmrCells::print_info(index_t ic) const {
     std::cout << "\t\tz_idx:  " << z_idx[ic] << "\n";
 
     std::cout << "\t\tcell.vertices:\n";
-    for (index_t i: nodes_range(ic)) {
+    for (index_t i: verts.range(ic)) {
         if (!verts[i].hasNaN()) {
-            std::cout << "\t\t\t" << i - node_begin[ic] << ": " << verts[i].transpose() << "\n";
+            std::cout << "\t\t\t" << i - verts.offsets[ic] << ": " << verts[i].transpose() << "\n";
         }
     }
 
     std::cout << "\t\tcell.faces:\n";
-    for (index_t iface: faces_range(ic)) {
+    for (index_t iface: faces.range(ic)) {
         if (faces.is_undefined(iface)) continue;
 
-        std::cout << "\t\t\t" << side_to_string(iface - face_begin[ic], m_dim) << ":\n";
+        std::cout << "\t\t\t" << side_to_string(iface - faces.offsets[ic], dim_) << ":\n";
         std::cout << "\t\t\t\tvertices:";
-        for (int j = 0; j < (m_dim < 3 ? 2 : 4); ++j) {
+        for (int j = 0; j < (dim_ < 3 ? 2 : 4); ++j) {
             std::cout << " " << faces.vertices[iface][j];
         }
         std::cout << "\n";
@@ -48,13 +48,13 @@ void AmrCells::print_info(index_t ic) const {
         std::cout << "\t\t\t\tcenter:     " << faces.center[iface].transpose() << "\n";
         std::cout << "\t\t\t\tadj.rank:   " << faces.adjacent.rank[iface] << "\n";
         std::cout << "\t\t\t\tadj.index:  " << faces.adjacent.index[iface] << "\n";
-        std::cout << "\t\t\t\tadj.alien:  " << faces.adjacent.alien[iface] << "\n";
+        std::cout << "\t\t\t\tadj.ghost:  " << faces.adjacent.ghost[iface] << "\n";
         std::cout << "\t\t\t\tadj.basic:  " << faces.adjacent.basic[iface] << "\n";
         std::cout << "\t\t\t\tadj.rotat:  " << int(faces.adjacent.rotation[iface]) << "\n";
     }
 }
 
-void AmrCells::visualize(index_t ic, std::string filename) const {
+void RawCells::visualize(index_t ic, std::string filename) const {
     if (filename.find(".py") == std::string::npos) {
         filename += ".py";
     }
@@ -77,7 +77,7 @@ void AmrCells::visualize(index_t ic, std::string filename) const {
          << "            color=color)\n\n";
 
     // Основные точки
-    SqQuad map = mapping<2>(ic);
+    SqQuad map = verts.mapping<2>(ic);
 
     file << "fig = plt.figure(dpi=150, figsize=(8, 8))\n";
     file << "ax = fig.add_subplot()\n\n";
@@ -97,11 +97,11 @@ void AmrCells::visualize(index_t ic, std::string filename) const {
 
     file << "ax.plot([" << center[ic].x() << "], [" << center[ic].y() << "], color='black', marker='x')\n\n";
 
-    if (m_dim != 2) {
+    if (dim_ != 2) {
         throw std::runtime_error("Can't visualize 3D cell, sorry");
     }
 
-    SqQuad vertices = mapping<2>(ic);
+    SqQuad vertices = verts.mapping<2>(ic);
 
     for (int i = 0; i < 9; ++i) {
         file << "ax.text(" << vertices[i].x() << ", " << vertices[i].y() << ", " << i << ")\n";
@@ -120,7 +120,7 @@ void AmrCells::visualize(index_t ic, std::string filename) const {
         file << "ax.plot(curve_Lx, curve_Ly, linestyle='dotted', color='green', linewidth=0.5)\n\n";
     }
 
-    for (index_t iface: faces_range(ic)) {
+    for (index_t iface: faces.range(ic)) {
         if (faces.is_undefined(iface)) {
             continue;
         }
@@ -155,15 +155,15 @@ void AmrCells::visualize(index_t ic, std::string filename) const {
     file << "plt.show()\n";
 }
 
-int AmrCells::check_geometry(index_t ic) const {
-    for (index_t iface: faces_range(ic)) {
+int RawCells::check_geometry(index_t ic) const {
+    for (index_t iface: faces.range(ic)) {
         if (faces.is_undefined(iface)) continue;
 
         Vector3d fc(0.0, 0.0, 0.0);
-        for (int iv = 0; iv < indexing::VpF(m_dim); ++iv) {
-            fc += verts[node_begin[ic] + faces.vertices[iface][iv]];
+        for (int iv = 0; iv < indexing::VpF(dim_); ++iv) {
+            fc += verts[verts.offsets[ic] + faces.vertices[iface][iv]];
         }
-        fc /= indexing::VpF(m_dim);
+        fc /= indexing::VpF(dim_);
 
         // Нормаль внешняя
         if (faces.normal[iface].dot(fc - center[ic]) < 0.0) {
@@ -172,31 +172,91 @@ int AmrCells::check_geometry(index_t ic) const {
             return -1;
         }
 
-        // Вершины грани перечислены в правильном порядке
-        if (m_dim > 2) {
-            Vector3d v0 = verts[node_begin[ic] + faces.vertices[iface][0]];
-            Vector3d v1 = verts[node_begin[ic] + faces.vertices[iface][1]];
-            Vector3d v2 = verts[node_begin[ic] + faces.vertices[iface][2]];
-            Vector3d v3 = verts[node_begin[ic] + faces.vertices[iface][3]];
-
-            Vector3d n1 = (v2 - v1).cross(v0 - v1);
-            Vector3d n2 = (v1 - v2).cross(v3 - v2);
-            if (n1.dot(n2) < 0.0) {
-                std::cout << "Wrong order of vertices on face\n";
+        // Число вершин грани
+        int n_verts_per_face = 0;
+        for (auto iv: faces.vertices[iface]) {
+            if (iv >= 0) {
+                ++n_verts_per_face;
+            }
+            if (iv >= verts.max_count(ic)) {
+                std::cout << "\tWrong local vertex index\n";
                 print_info(ic);
                 return -1;
+            }
+        }
+        if (n_verts_per_face < dim_) {
+            std::cout << "\tWrong number of vertices in face\n";
+            print_info(ic);
+            return -1;
+        }
+        // Должны быть проинициализированы как -1
+        for (int i = n_verts_per_face; i < RawFaces::max_vertices; ++i) {
+            if (faces.vertices[iface][i] >= 0) {
+                std::cout << "\tLocal vertices indices should be undefined\n";
+                print_info(ic);
+                return -1;
+            }
+        }
+
+        // Число вершин адаптивной ячейки фиксированно
+        if (adaptive_ && n_verts_per_face != indexing::VpF(dim_)) {
+            std::cout << "\tWrong number of vertices in face\n";
+            print_info(ic);
+            return -1;
+        }
+
+        // Вершины грани перечислены в правильном порядке
+        if (dim_ > 2) {
+            if (adaptive_) {
+                // Обход по кривой Мортона (вроде как)
+                Vector3d v0 = verts[verts.offsets[ic] + faces.vertices[iface][0]];
+                Vector3d v1 = verts[verts.offsets[ic] + faces.vertices[iface][1]];
+                Vector3d v2 = verts[verts.offsets[ic] + faces.vertices[iface][2]];
+                Vector3d v3 = verts[verts.offsets[ic] + faces.vertices[iface][3]];
+
+                Vector3d n1 = (v2 - v1).cross(v0 - v1);
+                Vector3d n2 = (v1 - v2).cross(v3 - v2);
+                if (n1.dot(n2) < 0.0) {
+                    std::cout << "Wrong order of vertices on face (AMR)\n";
+                    print_info(ic);
+                    return -1;
+                }
+            }
+            else {
+                // Обход против часовой
+                std::vector<Vector3d> poly(n_verts_per_face);
+                for (int i = 0; i < n_verts_per_face; ++i) {
+                    int iv = faces.vertices[iface][i];
+                    poly[i] = verts[verts.offsets[ic] + iv];
+                }
+                // Проверить сортировку?
+                Vector3d face_c = faces.center[iface];
+                Vector3d face_n = faces.normal[iface];
+                for (int i = 0; i < n_verts_per_face; ++i) {
+                    int j = (i + 1) % n_verts_per_face;
+                    Vector3d v1 = poly[i] - face_c;
+                    Vector3d v2 = poly[j] - face_c;
+                    if (v1.cross(v2).dot(face_n) < 0.0) {
+                        std::cout << "Wrong order of vertices on face (general)\n";
+                        print_info(ic);
+                        return -1;
+                    }
+                }
             }
         }
     }
     return 0;
 }
 
-int AmrCells::check_base_face_orientation(index_t ic) const {
-    if (m_dim == 2) {
-        Vector3d nx1 = faces.normal[face_begin[ic] + Side3D::L];
-        Vector3d nx2 = faces.normal[face_begin[ic] + Side3D::R];
-        Vector3d ny1 = faces.normal[face_begin[ic] + Side3D::B];
-        Vector3d ny2 = faces.normal[face_begin[ic] + Side3D::T];
+int RawCells::check_base_face_orientation(index_t ic) const {
+    // Для обычных сеток проверять нечего
+    if (!adaptive_) return 0;
+
+    if (dim_ == 2) {
+        Vector3d nx1 = faces.normal[faces.offsets[ic] + Side3D::L];
+        Vector3d nx2 = faces.normal[faces.offsets[ic] + Side3D::R];
+        Vector3d ny1 = faces.normal[faces.offsets[ic] + Side3D::B];
+        Vector3d ny2 = faces.normal[faces.offsets[ic] + Side3D::T];
 
         if (nx1.dot(nx2) > -0.8) {
             std::cout << "\tOpposite outward normals (left-right) are co-directed\n";
@@ -219,12 +279,12 @@ int AmrCells::check_base_face_orientation(index_t ic) const {
             return -1;
         }
     } else {
-        Vector3d nx1 = faces.normal[face_begin[ic] + Side3D::L];
-        Vector3d nx2 = faces.normal[face_begin[ic] + Side3D::R];
-        Vector3d ny1 = faces.normal[face_begin[ic] + Side3D::B];
-        Vector3d ny2 = faces.normal[face_begin[ic] + Side3D::T];
-        Vector3d nz1 = faces.normal[face_begin[ic] + Side3D::Z];
-        Vector3d nz2 = faces.normal[face_begin[ic] + Side3D::F];
+        Vector3d nx1 = faces.normal[faces.offsets[ic] + Side3D::L];
+        Vector3d nx2 = faces.normal[faces.offsets[ic] + Side3D::R];
+        Vector3d ny1 = faces.normal[faces.offsets[ic] + Side3D::B];
+        Vector3d ny2 = faces.normal[faces.offsets[ic] + Side3D::T];
+        Vector3d nz1 = faces.normal[faces.offsets[ic] + Side3D::Z];
+        Vector3d nz2 = faces.normal[faces.offsets[ic] + Side3D::F];
 
         if (nx1.dot(nx2) > -0.8) {
             std::cout << "\tOpposite outward normals (left-right) are co-directed\n";
@@ -255,14 +315,17 @@ int AmrCells::check_base_face_orientation(index_t ic) const {
     return 0;
 }
 
-int AmrCells::check_base_vertices_order(index_t ic) const {
+int RawCells::check_base_vertices_order(index_t ic) const {
+    // Для обычных сеток проверять нечего
+    if (!adaptive_) return 0;
+
     const double h = linear_size(ic);
     auto close = [h](Vector3d& x, Vector3d& y) -> bool {
         return (x - y).norm() < 1.0e-6 * h;
     };
 
-    if (m_dim == 2) {
-        SqQuad quad = mapping<2>(ic);
+    if (dim_ == 2) {
+        SqQuad quad = verts.mapping<2>(ic);
 
         bool bad = false;
 
@@ -305,21 +368,21 @@ int AmrCells::check_base_vertices_order(index_t ic) const {
         }
 
         // Пересечения граней по нужным вершинам
-        if (cross_face(face_begin[ic], Side2D::LEFT, Side2D::BOTTOM), SqQuad::iss<-1, -1>()) {
+        if (cross_face(faces.offsets[ic], Side2D::LEFT, Side2D::BOTTOM) != SqQuad::iss<-1, -1>()) {
             bad = true;
         }
-        if (cross_face(face_begin[ic], Side2D::LEFT[0], Side2D::TOP) != SqQuad::iss<-1, +1>() &&
-            cross_face(face_begin[ic], Side2D::LEFT[1], Side2D::TOP) != SqQuad::iss<-1, +1>()) {
+        if (cross_face(faces.offsets[ic], Side2D::LEFT[0], Side2D::TOP) != SqQuad::iss<-1, +1>() &&
+            cross_face(faces.offsets[ic], Side2D::LEFT[1], Side2D::TOP) != SqQuad::iss<-1, +1>()) {
             bad = true;
         }
-        if (cross_face(face_begin[ic], Side2D::RIGHT, Side2D::BOTTOM[0]) != SqQuad::iss<+1, -1>() &&
-            cross_face(face_begin[ic], Side2D::RIGHT, Side2D::BOTTOM[1]) != SqQuad::iss<+1, -1>()) {
+        if (cross_face(faces.offsets[ic], Side2D::RIGHT, Side2D::BOTTOM[0]) != SqQuad::iss<+1, -1>() &&
+            cross_face(faces.offsets[ic], Side2D::RIGHT, Side2D::BOTTOM[1]) != SqQuad::iss<+1, -1>()) {
             bad = true;
         }
-        if (cross_face(face_begin[ic], Side2D::RIGHT[0], Side2D::TOP[0]) != SqQuad::iss<+1, +1>() &&
-            cross_face(face_begin[ic], Side2D::RIGHT[0], Side2D::TOP[1]) != SqQuad::iss<+1, +1>() &&
-            cross_face(face_begin[ic], Side2D::RIGHT[1], Side2D::TOP[0]) != SqQuad::iss<+1, +1>() &&
-            cross_face(face_begin[ic], Side2D::RIGHT[1], Side2D::TOP[1]) != SqQuad::iss<+1, +1>()) {
+        if (cross_face(faces.offsets[ic], Side2D::RIGHT[0], Side2D::TOP[0]) != SqQuad::iss<+1, +1>() &&
+            cross_face(faces.offsets[ic], Side2D::RIGHT[0], Side2D::TOP[1]) != SqQuad::iss<+1, +1>() &&
+            cross_face(faces.offsets[ic], Side2D::RIGHT[1], Side2D::TOP[0]) != SqQuad::iss<+1, +1>() &&
+            cross_face(faces.offsets[ic], Side2D::RIGHT[1], Side2D::TOP[1]) != SqQuad::iss<+1, +1>()) {
             bad = true;
         }
 
@@ -329,36 +392,35 @@ int AmrCells::check_base_vertices_order(index_t ic) const {
             return -1;
         }
     } else {
-        SqCube cube = mapping<3>(ic);
+        SqCube cube = verts.mapping<3>(ic);
 
         bool bad = false;
         static bool first = true;
         if (first) {
-            std::cerr << "Can't check 3D cell!!!\n";
             first = false;
         }
-        /*
-        // Индекс пересечения трех граней
-        auto cross_face = [](const Faces& faces, Side3D side1, Side3D side2, Side3D side3) -> int {
-            auto& face1 = faces[side1];
-            auto& face2 = faces[side2];
-            auto& face3 = faces[side3];
 
-            if (face1.is_undefined()) {
+        // Индекс пересечения трех граней
+        auto cross_face = [&](index_t iface_base, Side3D side1, Side3D side2, Side3D side3) -> int {
+            index_t iface = iface_base + side1;
+            index_t jface = iface_base + side2;
+            index_t kface = iface_base + side3;
+
+            if (faces.is_undefined(iface)) {
                 return 100;
             }
-            if (face2.is_undefined()) {
+            if (faces.is_undefined(iface)) {
                 return 100;
             }
-            if (face3.is_undefined()) {
+            if (faces.is_undefined(iface)) {
                 return 100;
             }
             for (int i: {0, 1, 2, 3}) {
                 for (int j: {0, 1, 2, 3}) {
                     for (int k: {0, 1, 2, 3}) {
-                        if (face1.vertices[i] == face2.vertices[j] &&
-                            face2.vertices[j] == face3.vertices[k]) {
-                            return face1.vertices[i];
+                        if (faces.vertices[iface][i] == faces.vertices[jface][j] &&
+                            faces.vertices[iface][i] == faces.vertices[kface][k]) {
+                            return faces.vertices[iface][i];
                         }
                     }
                 }
@@ -391,30 +453,40 @@ int AmrCells::check_base_vertices_order(index_t ic) const {
             }
         }
 
-        // Пересечения граней по нужным вершинам ???
+        // Пересечение трёх сторон по базовой вершине
+#define check_base_vertex(i, j, k) if (cross_face(faces.offsets[ic], Side3D::by_dir<i, 0, 0>(), Side3D::by_dir<0, j, 0>(), Side3D::by_dir<0, 0, k>()) != SqCube::iss<i, j, k>()) bad = true;
+
+        // Пересечения граней по нужным вершинам
+        check_base_vertex(-1, -1, -1);
+        check_base_vertex(+1, -1, -1);
+        check_base_vertex(-1, +1, -1);
+        check_base_vertex(+1, +1, -1);
+        check_base_vertex(-1, -1, +1);
+        check_base_vertex(+1, -1, +1);
+        check_base_vertex(-1, +1, +1);
+        check_base_vertex(+1, +1, +1);
 
         if (bad) {
             std::cout << "\tBad arrangement of vertices in cell (3D)\n";
             print_info(ic);
             return -1;
         }
-         */
     }
 
     return 0;
 }
 
-int AmrCells::check_complex_faces(index_t ic) const {
-    if (m_dim == 2) {
+int RawCells::check_complex_faces(index_t ic) const {
+    if (dim_ == 2) {
         for (Side2D side: Side2D::items()) {
-            auto iface1 = face_begin[ic] + side;
-            auto iface2 = face_begin[ic] + side[1];
+            auto iface1 = faces.offsets[ic] + side;
+            auto iface2 = faces.offsets[ic] + side[1];
             if (faces.is_undefined(iface2)) {
                 continue;
             }
 
             if (std::abs(faces.normal[iface1].dot(faces.normal[iface2]) - 1.0) > 1.0e-2) {
-                std::cout << "\tSubfaces are not co-directed (" << side_to_string(side, m_dim) << ")\n";
+                std::cout << "\tSubfaces are not co-directed (" << side_to_string(side, dim_) << ")\n";
                 print_info(ic);
                 return -1;
             }
@@ -434,16 +506,16 @@ int AmrCells::check_complex_faces(index_t ic) const {
         }
     } else {
         for (Side3D side: Side3D::items()) {
-            auto iface1 = face_begin[ic] + side;
-            auto iface2 = face_begin[ic] + side[1];
+            auto iface1 = faces.offsets[ic] + side;
+            auto iface2 = faces.offsets[ic] + side[1];
             if (faces.is_undefined(iface2)) {
                 continue;
             }
 
-            auto iface3 = face_begin[ic] + side[2];
-            auto iface4 = face_begin[ic] + side[3];
+            auto iface3 = faces.offsets[ic] + side[2];
+            auto iface4 = faces.offsets[ic] + side[3];
             if (faces.is_undefined(iface3) || faces.is_undefined(iface4)) {
-                std::cout << "\tComplex 3D face (" + side_to_string(side, m_dim) + " side) has less than 4 subfaces\n";
+                std::cout << "\tComplex 3D face (" + side_to_string(side, dim_) + " side) has less than 4 subfaces\n";
                 print_info(ic);
                 return -1;
             }
@@ -452,7 +524,7 @@ int AmrCells::check_complex_faces(index_t ic) const {
             double d2 = std::abs(faces.normal[iface1].dot(faces.normal[iface3]) - 1.0);
             double d3 = std::abs(faces.normal[iface1].dot(faces.normal[iface4]) - 1.0);
             if (d1 + d2 + d3 > 1.0e-5) {
-                std::cout << "\tSubfaces are not co-directed (" + side_to_string(side, m_dim) << ")\n";
+                std::cout << "\tSubfaces are not co-directed (" + side_to_string(side, dim_) << ")\n";
                 print_info(ic);
                 return -1;
             }
@@ -462,12 +534,12 @@ int AmrCells::check_complex_faces(index_t ic) const {
     return 0;
 }
 
-int AmrCells::check_connectivity(index_t ic) const {
-    AmrCells aliens;
-    return check_connectivity(ic, aliens);
+int RawCells::check_connectivity(index_t ic) const {
+    RawCells ghosts = same();
+    return check_connectivity(ic, ghosts);
 }
 
-int AmrCells::check_connectivity(index_t ic, const AmrCells& aliens) const {
+int RawCells::check_connectivity(index_t ic, const RawCells& ghosts) const {
     if (ic >= m_size) {
         throw std::runtime_error("Данная проверка только для локальных ячеек!");
     }
@@ -475,7 +547,7 @@ int AmrCells::check_connectivity(index_t ic, const AmrCells& aliens) const {
     if (is_undefined(ic)) return 0;
 
     // Через обычные грани существуют соседи
-    for (index_t iface: faces_range(ic)) {
+    for (index_t iface: faces.range(ic)) {
         if (faces.is_undefined(iface)) {
             // Проверим обнуление параметров
             if (faces.adjacent.rank[iface] >= 0) {
@@ -488,8 +560,8 @@ int AmrCells::check_connectivity(index_t ic, const AmrCells& aliens) const {
                 print_info(ic);
                 return -1;
             }
-            if (faces.adjacent.alien[iface] >= 0) {
-                std::cout << "\tUndefined face, adjacent.alien >= 0\n";
+            if (faces.adjacent.ghost[iface] >= 0) {
+                std::cout << "\tUndefined face, adjacent.ghost >= 0\n";
                 print_info(ic);
                 return -1;
             }
@@ -511,13 +583,13 @@ int AmrCells::check_connectivity(index_t ic, const AmrCells& aliens) const {
         // Простая граничная грань
         if (faces.is_boundary(iface)) {
             // Грань должна ссылаться на саму ячейку
-            if (adj.rank[iface] != rank[ic] || adj.index[iface] != ic || adj.alien[iface] >= 0) {
+            if (adj.rank[iface] != rank[ic] || adj.index[iface] != ic || adj.ghost[iface] >= 0) {
                 std::cout << "\tBoundary face should point to origin cell\n";
                 print_info(ic);
                 return -1;
             }
             if (adj.rotation[iface] != 0) {
-                std::cout << "\tBoundary face should point to origin cell (rotation)\n";
+                std::cout << "\tBoundary face should have zero rotation\n";
                 print_info(ic);
                 return -1;
             }
@@ -537,7 +609,7 @@ int AmrCells::check_connectivity(index_t ic, const AmrCells& aliens) const {
             return -1;
         }
 
-        int n_symmetries = m_dim == 2 ? 8 : 48;
+        int n_symmetries = dim_ == 2 ? 8 : 48;
         if (adj.rotation[iface] > n_symmetries) {
             std::cout << "\tadjacent.rotation out of range\n";
             print_info(ic);
@@ -551,8 +623,8 @@ int AmrCells::check_connectivity(index_t ic, const AmrCells& aliens) const {
                 print_info(ic);
                 return -1;
             }
-            if (adj.alien[iface] >= 0) {
-                std::cout << "\tadjacent.alien >= 0 for local cell\n";
+            if (adj.ghost[iface] >= 0) {
+                std::cout << "\tadjacent.ghost >= 0 for local cell\n";
                 print_info(ic);
                 return -1;
             }
@@ -564,16 +636,16 @@ int AmrCells::check_connectivity(index_t ic, const AmrCells& aliens) const {
         }
         else {
             // Удаленная ячейка
-            if (adj.alien[iface] < 0 || adj.alien[iface] >= aliens.size()) {
-                std::cout << "\t" + f_name + ": adjacent.alien out of range for remote cell\n";
-                std::cout << "\t\taliens.size: " << aliens.size() << "\n";
+            if (adj.ghost[iface] < 0 || adj.ghost[iface] >= ghosts.n_cells()) {
+                std::cout << "\t" + f_name + ": adjacent.ghost out of range for remote cell\n";
+                std::cout << "\t\tghosts.size: " << ghosts.n_cells() << "\n";
                 print_info(ic);
                 return -1;
             }
         }
 
-        // Сосед может быть из aliens
-        auto [neibs, jc] = adj.get_neib(iface, *this, aliens);
+        // Сосед может быть из ghosts
+        auto [neibs, jc] = adj.get_neib(iface, *this, ghosts);
 
         Vector3d fc = faces.center[iface];
 
@@ -581,7 +653,7 @@ int AmrCells::check_connectivity(index_t ic, const AmrCells& aliens) const {
         // и ссылаться на текущую ячейку
         int counter = 0;
 
-        for (index_t jface: neibs.faces_range(jc)) {
+        for (index_t jface: neibs.faces.range(jc)) {
             if (neibs.faces.is_undefined(jface)) {
                 continue;
             }
@@ -618,7 +690,7 @@ int AmrCells::check_connectivity(index_t ic, const AmrCells& aliens) const {
                 return -1;
             }
             // Указывает на исходную ячейку
-            if (neibs.faces.adjacent.alien[jface] < 0 &&
+            if (neibs.faces.adjacent.ghost[jface] < 0 &&
                 neibs.faces.adjacent.index[jface] != ic) {
                 std::cout << "\tWrong connection (index != ic). " << f_name << " face\n";
                 std::cout << "\tCurrent cell:\n";

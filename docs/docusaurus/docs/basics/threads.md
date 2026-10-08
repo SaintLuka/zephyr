@@ -31,7 +31,7 @@ for (auto cell: mesh) {
 Аналогичный цикл в параллельном режиме:
 ```cpp
 mesh.for_each(
-  [](EuCell cell) {
+  [](Cell cell) {
     // Операции над ячейкой
   });
 ```
@@ -53,7 +53,7 @@ for (auto cell: mesh) {
 Параллельная версия того же алгоритма:
 ```cpp
 double min_volume = mesh.min(
-  [](EuCell cell) {
+  [](Cell cell) {
     return cell.volume();
   });
 ```
