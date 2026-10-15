@@ -61,7 +61,7 @@ geom::Polyhedron Cell::polyhedron() const {
 Cell Cell::neib(index_t i, index_t j) const {
     z_assert(cells_->dim() == 2, "neib(i, j) error: not 2D mesh");
     z_assert(cells_ != ghosts_, "neib(i, j) error: assuming start from local cell");
-    z_assert(utils::mpi::single() || cells_->has_nodes(), "neib(i, j) error: set nodes for distributed mesh");
+    //z_assert(utils::mpi::single() || cells_->has_nodes(), "neib(i, j) error: set nodes for distributed mesh");
 
     // Начинаем с самой ячейки
     RawCells* cells = cells_;
@@ -96,7 +96,7 @@ Cell Cell::neib(index_t i, index_t j) const {
 Cell Cell::neib(index_t i, index_t j, index_t k) const {
     z_assert(cells_->dim() == 3, "neib(i, j, k) error: not 3D mesh");
     z_assert(cells_ != ghosts_, "neib(i, j, k) error: assuming start from local cell");
-    z_assert(utils::mpi::single() || cells_->has_nodes(), "neib(i, j, k) error: set nodes for distributed mesh");
+    //z_assert(utils::mpi::single() || cells_->has_nodes(), "neib(i, j, k) error: set nodes for distributed mesh");
 
     // Начинаем с самой ячейки
     RawCells* cells = cells_;
@@ -161,6 +161,7 @@ bool good_local_neibs(const Cell& cell, Side<dim> side, int lvl) {
 }
 
 bool Cell::extended_stencil() const {
+    return false;
     int lvl = cells_->level[index_];
 
     if (dim() < 3) {

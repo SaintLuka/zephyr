@@ -139,10 +139,17 @@ inline std::tuple<mmf::QState, mmf::Flux> choose(
             return {Q_R,  F_R};
     }
 }
-
 // Классическая задача для CRP
 mmf::Flux CrpFlux::classic(const mmf::PState& zLA, const mmf::PState& zLB, const mmf::PState& zRB,
-                           const MixturePT& mixture, double delta, double dt) {
+                               const MixturePT& mixture, double delta, double dt) {
+
+    return classic_old(zLA, zLB, zRB, mixture, delta, dt);
+
+}
+
+// Классическая задача для CRP
+mmf::Flux CrpFlux::classic_old(const mmf::PState& zLA, const mmf::PState& zLB, const mmf::PState& zRB,
+                               const MixturePT& mixture, double delta, double dt) {
 
 #if 0 // MRV VERSION
 

@@ -38,11 +38,7 @@ Requests::Requests(int size) : size_(size) {
 }
 
 void Requests::wait() const {
-    for (int r = 0; r < size_; ++r) {
-        if (requests_[r] != MPI_REQUEST_NULL) {
-            MPI_Wait(&requests_[r], MPI_STATUS_IGNORE);
-        }
-    }
+    MPI_Waitall(size_, requests_.get(), MPI_STATUS_IGNORE);
 }
 
 void RequestsList::reserve(int size) {
@@ -189,6 +185,9 @@ Requests Router::isend(const utils::Buffer& src, MpiTag tag) const {
     Requests send_req(size_);
     for (int r = 0; r < size_; ++r) {
         if (send_count_[r] > 0) {
+            z_assert(send_offset_[r] <= src.size() && send_offset_[r] + send_count_[r] <= src.size(),
+                "Router::isend(Buffer): bad offsets");
+
             MPI_Isend(src.get_ptr(send_offset_[r]), send_count_[r],
                       src.dtype(), r, int(tag), utils::mpi::comm(), &send_req[r]);
         }
@@ -200,6 +199,9 @@ Requests Router::irecv(utils::Buffer& dst, MpiTag tag) const {
     Requests recv_req(size_);
     for (int r = 0; r < size_; ++r) {
         if (recv_count_[r] > 0) {
+            z_assert(recv_offset_[r] <= dst.size() && recv_offset_[r] + recv_count_[r] <= dst.size(),
+                "Router::irecv(Buffer): bad offsets");
+
             MPI_Irecv(dst.get_ptr(recv_offset_[r]), recv_count_[r],
                       dst.dtype(), r, int(tag), utils::mpi::comm(), &recv_req[r]);
         }

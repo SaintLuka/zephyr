@@ -142,32 +142,41 @@ void MmFluid::update(Mesh &mesh) {
 
 void MmFluid::integrate(Mesh &mesh, double dt, Direction dir) {
     if (m_acc == 1) {
+        mesh.sync(part.init);
+
         if (m_crp_mode == CrpMode::MUSCL) {
             // Для MUSCL нужен градиент объемных долей
             fractions_grad(mesh, part.init);
+            mesh.sync(part.grad_a);
         }
         else if (m_crp_mode == CrpMode::PLIC) {
             // Для PLIC нужна реконструкция
             interface_recovery(mesh);
+            mesh.sync(part.n, part.p);
         }
 
         // Расчет потоков
         fluxes(mesh, dt, dir);
     }
     else {
+        mesh.sync(part.init);
         compute_grad(mesh, part.init);
 
         if (m_crp_mode == CrpMode::MUSCL) {
             // Для MUSCL нужен градиент объемных долей
             fractions_grad(mesh, part.init);
+            mesh.sync(part.grad_a);
         }
         else if (m_crp_mode == CrpMode::PLIC) {
             // Для PLIC нужна реконструкция
             interface_recovery(mesh);
+            mesh.sync(part.n, part.p);
         }
 
+        mesh.sync(part.d_dx, part.d_dy, part.d_dz);
         fluxes_stage1(mesh, dt, dir);
 
+        mesh.sync(part.half);
         fluxes_stage2(mesh, dt, dir);
     }
 
@@ -949,6 +958,7 @@ Distributor MmFluid::distributor() const {
 }
 
 void MmFluid::set_flags(Mesh &mesh) {
+    mesh.sync(part.init);
     compute_grad(mesh, part.init);
 
     mesh.for_each([this](Cell &cell) -> void {

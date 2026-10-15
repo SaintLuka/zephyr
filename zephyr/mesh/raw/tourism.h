@@ -383,20 +383,32 @@ void Tourism::swap_node_data(Storable<T> var1, Storable<T> var2) {
 
 template <typename T>
 void Tourism::prepare(const RawCells& cells, Storable<T> var) {
+    z_assert(cells.data.contain(var), "Tourism::prepare: bad buffer #1");
+    z_assert(border_cells_.data.contain(var), "Tourism::prepare: bad buffer #2");
+
     const utils::Buffer& src = cells.data[var];
           utils::Buffer& dst = border_cells_.data[var];
 
     for (size_t ic = 0; ic < border_cells_indices_.size(); ++ic) {
+        z_assert(ic < dst.size(), "Tourism::prepare: bad buffer #3");
+        z_assert(border_cells_indices_[ic] < src.size(), "Tourism::prepare: bad buffer #4");
+
         src.copy_data(border_cells_indices_[ic], dst, ic);
     }
 }
 
 template <typename T>
 void Tourism::prepare(const RawNodes& nodes, Storable<T> var) {
+    z_assert(nodes.data.contain(var), "Tourism::prepare: bad buffer #1");
+    z_assert(border_nodes_.data.contain(var), "Tourism::prepare: bad buffer #2");
+
     const utils::Buffer& src = nodes.data[var];
     utils::Buffer& dst = border_nodes_.data[var];
 
     for (size_t ic = 0; ic < border_nodes_indices_.size(); ++ic) {
+        z_assert(ic < dst.size(), "Tourism::prepare: bad buffer #3");
+        z_assert(border_nodes_indices_[ic] < src.size(), "Tourism::prepare: bad buffer #4");
+
         src.copy_data(border_nodes_indices_[ic], dst, ic);
     }
 }
@@ -408,6 +420,9 @@ void Tourism::sync(const RawCells& cells, Args&&... vars) {
     
     // Отправить и дождаться одну переменную
     auto sync_one = [&](auto&& var) {
+        z_assert(border_cells_.data.contain(var), "Tourism::sync: bad buffer #1");
+        z_assert(ghost_cells_. data.contain(var), "Tourism::sync: bad buffer #2");
+
         prepare(cells, var);
         const utils::Buffer& src = border_cells_.data[var];
         auto send_req = cell_router_.isend(src, static_cast<MpiTag>(var.tag()));
@@ -429,6 +444,9 @@ void Tourism::sync(const RawNodes& nodes, Args&&... vars) {
 
     // Отправить и дождаться одну переменную
     auto sync_one = [&](auto&& var) {
+        z_assert(border_nodes_.data.contain(var), "Tourism::sync: bad buffer #1");
+        z_assert( ghost_nodes_.data.contain(var), "Tourism::sync: bad buffer #2");
+
         prepare(nodes, var);
         const utils::Buffer& src = border_nodes_.data[var];
         auto send_req = node_router_.isend(src, static_cast<MpiTag>(var.tag()));

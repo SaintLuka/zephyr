@@ -24,4 +24,4 @@ install(FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/router.h
     ${CMAKE_CURRENT_SOURCE_DIR}/tourism.h
     DESTINATION
-    include/${PROJECT_NAME}/mesh/euler)
+    include/${PROJECT_NAME}/mesh/raw)

@@ -18,6 +18,18 @@ namespace indexing = geom::indexing;
 
 namespace {
 
+// Диапазон [1:]
+template <typename T>
+std::span<T> shifted_span(std::vector<T>& arr) {
+    return {arr.data() + 1, arr.size() - 1};
+}
+
+// Диапазон [1:]
+template <typename T>
+std::span<const T> shifted_span(const std::vector<T>& arr) {
+    return {arr.data() + 1, arr.size() - 1};
+}
+
 // Вместо смещений записать разности, последнее значение -1.
 void pack_offsets(std::span<index_t> offsets) {
     z_assert(!offsets.empty(), "pack_offsets: empty offsets array");
@@ -135,7 +147,9 @@ void Tourism::extend_border_cells() {
     index_t n_border_faces = face_router_.send_buffer_size();
     index_t n_border_verts = vert_router_.send_buffer_size();
 
-    if (n_border_cells > border_cells_.n_cells()) {
+    if (n_border_cells > border_cells_.n_cells() ||
+        n_border_faces > border_cells_.n_faces() ||
+        n_border_verts > border_cells_.n_verts()) {
         border_cells_.resize(n_border_cells, n_border_faces, n_border_verts);
     }
 }
@@ -170,7 +184,9 @@ void Tourism::extend_ghost_cells() {
     int n_ghost_faces = face_router_.recv_buffer_size();
     int n_ghost_verts = vert_router_.recv_buffer_size();
 
-    if (n_ghost_cells > ghost_cells_.n_cells()) {
+    if (n_ghost_cells > ghost_cells_.n_cells() ||
+        n_ghost_faces > ghost_cells_.n_faces() ||
+        n_ghost_verts > ghost_cells_.n_verts()) {
         ghost_cells_.resize(n_ghost_cells, n_ghost_faces, n_ghost_verts);
     }
 }
@@ -218,6 +234,9 @@ void Tourism::fill_nodes_send_count(const RawNodes& nodes) {
 
             int neib_rank = nodes.incident.rank[inc];
             if (neib_rank != rank && last_append[neib_rank] != in) {
+                z_assert(0 <= neib_rank && neib_rank <= mpi::size(),
+                    "Tourism::fill_nodes_send_count: Bad neib rank");
+
                 last_append[neib_rank] = in;
                 node_send_count[neib_rank] += 1;
                 inct_send_count[neib_rank] += nodes.incident.max_count(in);
@@ -257,6 +276,9 @@ void Tourism::fill_border_nodes_indices(const RawNodes& nodes) {
 
             int neib_rank = nodes.incident.rank[inc];
             if (neib_rank != rank) {
+                z_assert(0 <= neib_rank && neib_rank <= mpi::size(),
+                    "Tourism::fill_border_nodes_indices: Bad neib rank");
+
                 if (last_append[neib_rank] != in) {
                     last_append[neib_rank] = in;
                     border_nodes_indices_[node_index[neib_rank]++] = in;
@@ -295,6 +317,9 @@ void Tourism::fill_cells_send_count(const RawCells& cells) {
 
             int neib_rank = cells.faces.adjacent.rank[iface];
             if (neib_rank != rank && last_append[neib_rank] != ic) {
+                z_assert(0 <= neib_rank && neib_rank <= mpi::size(),
+                    "Tourism::fill_cells_send_count: Bad neib rank");
+
                 last_append[neib_rank] = ic;
                 cell_send_count[neib_rank] += 1;
                 face_send_count[neib_rank] += cells.faces.max_count(ic);
@@ -338,6 +363,9 @@ void Tourism::fill_border_cells_indices(const RawCells& cells) {
 
             int neib_rank = cells.faces.adjacent.rank[iface];
             if (neib_rank != rank) {
+                z_assert(0 <= neib_rank && neib_rank <= mpi::size(),
+                    "Tourism::fill_border_cells_indices: Bad neib rank");
+
                 if (last_append[neib_rank] != ic) {
                     last_append[neib_rank] = ic;
                     border_cells_indices_[cell_index[neib_rank]++] = ic;
@@ -382,6 +410,9 @@ void Tourism::fill_cells_send_count(const RawCells& cells, const RawNodes& nodes
 
             int neib_rank = cells.faces.adjacent.rank[iface];
             if (neib_rank != rank && last_append[neib_rank] != ic) {
+                z_assert(0 <= neib_rank && neib_rank <= mpi::size(),
+                    "Tourism::fill_cells_send_count: Bad neib rank");
+
                 last_append[neib_rank] = ic;
                 cell_send_count[neib_rank] += 1;
                 face_send_count[neib_rank] += cells.faces.max_count(ic);
@@ -1091,7 +1122,8 @@ void Tourism::sync_nodes_geometry() {
 
     // При получении используем сдвиг на единицу, чтобы записать нулевой первый элемент
     if (!amr) {
-        nodes_recv += node_router_.irecv(ghost_nodes_.incident.offsets.data() + 1, MpiTag::INCT_BEG);
+        std::span incident_offsets_rbuf = shifted_span(ghost_nodes_.incident.offsets);
+        nodes_recv += node_router_.irecv(incident_offsets_rbuf, MpiTag::INCT_BEG);
     }
 
     // Получить данные граней
@@ -1204,8 +1236,10 @@ void Tourism::sync_cells_geometry() {
 
     if (!amr) {
         // При получении используем сдвиг на единицу, чтобы записать нулевой первый элемент
-        cells_recv += cell_router_.irecv(ghost_cells_.faces.offsets.data() + 1, MpiTag::FACE_BEG);
-        cells_recv += cell_router_.irecv(ghost_cells_.verts.offsets.data() + 1, MpiTag::VERT_BEG);
+        std::span faces_offsets_rbuf = shifted_span(ghost_cells_.faces.offsets);
+        std::span verts_offsets_rbuf = shifted_span(ghost_cells_.verts.offsets);
+        cells_recv += cell_router_.irecv(faces_offsets_rbuf, MpiTag::FACE_BEG);
+        cells_recv += cell_router_.irecv(verts_offsets_rbuf, MpiTag::VERT_BEG);
     }
 
     // Получить данные граней

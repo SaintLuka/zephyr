@@ -97,7 +97,7 @@ public:
     int tag() const { return 123000 + index; }
 
     /// @brief Число компонент
-    constexpr int size() const { return size_; }
+    //constexpr int size() const { return size_; }
 
 private:
     /// @brief Только Storage может создавать
@@ -208,6 +208,13 @@ public:
 
     /// @brief Содержит и поддерживает тип?
     template<typename T>
+    bool contain(Storable<T> var) const {
+        if ((var.index < 0) || (var.index >= m_data.size())) return false;
+        return m_data[var.index].template support<T>();
+    }
+
+    /// @brief Содержит и поддерживает тип?
+    template<typename T>
     bool contain(const std::string &name) const {
         for (int idx = 0; idx < m_data.size(); ++idx) {
             if (m_names[idx] == name) {
@@ -308,6 +315,7 @@ public:
     /// @brief Поменять два массива данных местами
     template <typename T>
     void swap(Storable<T> var1, Storable<T> var2) {
+        z_assert(contain<T>(var1) && contain<T>(var2), "Storage::swap: doesn't contain variables");
         std::swap(m_data[var1.index], m_data[var2.index]);
     }
 

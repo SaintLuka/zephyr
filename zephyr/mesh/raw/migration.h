@@ -8,6 +8,18 @@ namespace zephyr::mesh {
 
 #ifdef ZEPHYR_MPI
 
+// Диапазон [1:]
+template <typename T>
+std::span<T> shifted_span(std::vector<T>& arr) {
+    return {arr.data() + 1, arr.size() - 1};
+}
+
+// Диапазон [1:]
+template <typename T>
+std::span<const T> shifted_span(const std::vector<T>& arr) {
+    return {arr.data() + 1, arr.size() - 1};
+}
+
 class Migration {
 public:
     /// @brief Инициализирует буфер с теми же опциями
@@ -360,9 +372,12 @@ void Migration::migrate(Tourism& tourism, RawCells& cells, RawNodes& nodes, Vars
     };
 
     // При получении используем сдвиг на единицу, чтобы записать нулевой первый элемент
+    std::span faces_offsets_rbuf = shifted_span(cells.faces.offsets);
+    std::span verts_offsets_rbuf = shifted_span(cells.verts.offsets);
+
     RequestsList faces_recv; faces_recv.reserve(16);
-    faces_recv += cell_router_.irecv(cells.faces.offsets.data() + 1, MpiTag::FACE_BEG);
-    faces_recv += cell_router_.irecv(cells.verts.offsets.data() + 1, MpiTag::VERT_BEG);
+    faces_recv += cell_router_.irecv(faces_offsets_rbuf, MpiTag::FACE_BEG);
+    faces_recv += cell_router_.irecv(verts_offsets_rbuf, MpiTag::VERT_BEG);
 
     // Получить данные граней
     faces_recv += face_router_.irecv(cells.faces.adjacent.rank, MpiTag::ADJ_RANK);
@@ -397,7 +412,8 @@ void Migration::migrate(Tourism& tourism, RawCells& cells, RawNodes& nodes, Vars
         nodes_recv += node_router_.irecv(nodes.coord, MpiTag::NODE_COORD);
 
         // При получении используем сдвиг на единицу, чтобы записать нулевой первый элемент
-        nodes_recv += node_router_.irecv(nodes.incident.offsets.data() + 1, MpiTag::INCT_BEG);
+        std::span incident_offsets_rbuf = shifted_span(nodes.incident.offsets);
+        nodes_recv += node_router_.irecv(incident_offsets_rbuf, MpiTag::INCT_BEG);
 
         // Получить данные инцидентных ячеек
         incident_recv.reserve(4);

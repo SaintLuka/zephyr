@@ -177,10 +177,10 @@ public:
 
     /// @brief Асинхронная отправка
     template<typename T>
-    Requests isend(const T* src, MpiTag tag, MPI_Datatype dtype);
+    Requests isend(std::span<const T> src, MpiTag tag, MPI_Datatype dtype);
 
     template<typename T>
-    Requests isend(const T* src, MpiTag tag);
+    Requests isend(std::span<const T> src, MpiTag tag);
 
     template<typename T>
     Requests isend(const std::vector<T>& src, MpiTag tag);
@@ -193,10 +193,10 @@ public:
 
     /// @brief Асинхронное получение
     template<typename T>
-    Requests irecv(T* dst, MpiTag tag, MPI_Datatype dtype);
+    Requests irecv(std::span<T> dst, MpiTag tag, MPI_Datatype dtype);
 
     template<typename T>
-    Requests irecv(T* dst, MpiTag tag);
+    Requests irecv(std::span<T> dst, MpiTag tag);
 
     template<typename T>
     Requests irecv(std::vector<T>& dst, MpiTag tag);
@@ -228,11 +228,14 @@ protected:
 
 
 template<typename T>
-Requests Router::isend(const T* src, MpiTag tag, MPI_Datatype dtype) {
+Requests Router::isend(std::span<const T> src, MpiTag tag, MPI_Datatype dtype) {
     Requests send_req(size_);
     for (int r = 0; r < size_; ++r) {
         if (send_count_[r] > 0) {
-            MPI_Isend(src + send_offset_[r], send_count_[r],
+            z_assert(send_offset_[r] <= src.size() && send_offset_[r] + send_count_[r] <= src.size(),
+                "Router::isend(span<T>): bad offsets");
+
+            MPI_Isend(src.data() + send_offset_[r], send_count_[r],
                       dtype, r, int(tag), utils::mpi::comm(), &send_req[r]);
         }
     }
@@ -240,26 +243,29 @@ Requests Router::isend(const T* src, MpiTag tag, MPI_Datatype dtype) {
 }
 
 template<typename T>
-Requests Router::isend(const T* src, MpiTag tag) {
+Requests Router::isend(std::span<const T> src, MpiTag tag) {
     return isend(src, tag, utils::mpi::type<T>());
 }
 
 template<typename T>
 Requests Router::isend(const std::vector<T>& src, MpiTag tag) {
-    return isend(src, tag, utils::mpi::type<T>());
+    return isend(std::span(src), tag, utils::mpi::type<T>());
 }
 
 template<typename T>
 Requests Router::isend(const std::vector<T>& src, MpiTag tag, MPI_Datatype dtype) {
-    return isend(src.data(), tag, dtype);
+    return isend(std::span(src), tag, dtype);
 }
 
 template<typename T>
-Requests Router::irecv(T* dst, MpiTag tag, MPI_Datatype dtype) {
+Requests Router::irecv(std::span<T> dst, MpiTag tag, MPI_Datatype dtype) {
     Requests recv_req(size_);
     for (int r = 0; r < size_; ++r) {
         if (recv_count_[r] > 0) {
-            MPI_Irecv(dst + recv_offset_[r], recv_count_[r],
+            z_assert(recv_offset_[r] <= dst.size() && recv_offset_[r] + recv_count_[r] <= dst.size(),
+                "Router::irecv(Buffer): bad offsets");
+
+            MPI_Irecv(dst.data() + recv_offset_[r], recv_count_[r],
                       dtype, r, int(tag), utils::mpi::comm(), &recv_req[r]);
         }
     }
@@ -267,18 +273,18 @@ Requests Router::irecv(T* dst, MpiTag tag, MPI_Datatype dtype) {
 }
 
 template<typename T>
-Requests Router::irecv(T* dst, MpiTag tag) {
+Requests Router::irecv(std::span<T> dst, MpiTag tag) {
     return irecv(dst, tag, utils::mpi::type<T>());
 }
 
 template<typename T>
 Requests Router::irecv(std::vector<T>& dst, MpiTag tag) {
-    return irecv(dst, tag, utils::mpi::type<T>());
+    return irecv(std::span(dst), tag, utils::mpi::type<T>());
 }
 
 template<typename T>
 Requests Router::irecv(std::vector<T>& dst, MpiTag tag, MPI_Datatype dtype) {
-    return irecv(dst.data(), tag, dtype);
+    return irecv(std::span(dst), tag, dtype);
 }
 
 #endif // ZEPHYR_MPI

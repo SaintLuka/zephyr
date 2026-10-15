@@ -13,13 +13,16 @@
 #include <zephyr/math/solver/mm_fluid.h>
 
 #include <zephyr/io/pvd_file.h>
+#include <zephyr/utils/mpi.h>
 #include <zephyr/utils/threads.h>
+#include <zephyr/utils/stopwatch.h>
 
 using namespace zephyr::phys;
 using namespace zephyr::math;
 using namespace zephyr::math::mmf;
 
 using zephyr::io::PvdFile;
+using zephyr::utils::mpi;
 using zephyr::utils::threads;
 
 // Indicator function of the second material
@@ -76,8 +79,10 @@ void init_cells(Mesh &mesh, const MixturePT& mixture, Storable<PState> z) {
     });
 }
 
-int main() {
-    threads::on();
+int main(int argc, char** argv) {
+    mpi::handler handler(argc, argv);
+    threads::init(argc, argv);
+    threads::info();
 
     // Two identical/different materials
     Eos::Ptr eos1 = IdealGas::create("Air");
@@ -145,6 +150,7 @@ int main() {
         solver.set_flags(mesh);
         mesh.make_shuba(2);
         mesh.refine();
+        mesh.prebalancing(5);
     }
     init_cells(mesh, mixture, data.init);
 
@@ -155,15 +161,14 @@ int main() {
 
     while (curr_time < max_time) {
         if (curr_time >= next_write) {
-            std::cout << "\tStep: " << std::setw(6) << n_step << ";"
+            mpi::cout << "\tStep: " << std::setw(6) << n_step << ";"
                       << "\tTime: " << std::setw(6) << std::setprecision(3) << curr_time << "\n";
 
-            pvd.save(mesh, curr_time - 1.0);
             solver.interface_recovery(mesh);
             pvd.save(mesh, curr_time);
 
-            auto body = solver.domain(mesh, 1);
-            pvd_body.save(body, curr_time);
+            //auto body = solver.domain(mesh, 1);
+            //pvd_body.save(body, curr_time);
 
             next_write += max_time / 100;
         }
@@ -176,6 +181,11 @@ int main() {
         solver.set_flags(mesh);
         mesh.make_shuba(2);
         mesh.refine();
+
+        if (n_step % 10 == 0) {
+            mesh.balancing();
+            mesh.redistribute(z);
+        }
 
         curr_time += solver.dt();
         n_step += 1;
