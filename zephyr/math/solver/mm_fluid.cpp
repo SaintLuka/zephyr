@@ -959,7 +959,7 @@ Distributor MmFluid::distributor() const {
 
 void MmFluid::set_flags(Mesh &mesh) {
     mesh.sync(part.init);
-    compute_grad(mesh, part.init);
+    //compute_grad(mesh, part.init);
 
     mesh.for_each([this](Cell &cell) -> void {
         if (!cell[part.init].beta().is_pure()) {
@@ -969,8 +969,8 @@ void MmFluid::set_flags(Mesh &mesh) {
 
         int idx = cell[part.init].beta().index();
 
-        double rho = cell[part.init].rho();
-        double p   = cell[part.init].P();
+        //double rho = cell[part.init].rho();
+        //double p   = cell[part.init].P();
 
         Fractions mass_frac = cell[part.init].beta();
         bool need_split = false;
@@ -983,6 +983,7 @@ void MmFluid::set_flags(Mesh &mesh) {
                 break;
             }
 
+            /*
             // проверяем большой перепад давлений
             if (std::abs(face.neib(part.init).pressure - p) > 0.3 * abs(p)) {
                 need_split = true;
@@ -1002,6 +1003,7 @@ void MmFluid::set_flags(Mesh &mesh) {
                     break;
                 }
             }
+             */
         }
 
         cell.set_flag(need_split ? 1 : -1);

@@ -21,9 +21,6 @@ public:
     /// @param dt Шаг интегрирования по времени
     static mmf::Flux classic(const mmf::PState &zLA, const mmf::PState &zLB, const mmf::PState &zRB,
                              const phys::MixturePT &mixture, double delta, double dt);
-    
-    static mmf::Flux classic_old(const mmf::PState &zLA, const mmf::PState &zLB, const mmf::PState &zRB,
-                                 const phys::MixturePT &mixture, double delta, double dt);
 
     /// @brief Инвертированная составная задача Римана. Левая ячейка содержит
     /// единственный вектор состояния zLA, правая ячейка состояния zRA и zRB.
